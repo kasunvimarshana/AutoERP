@@ -36,7 +36,22 @@
             "Modules\\Auth\\Database\\Factories\\": "Modules/Auth/database/factories/",
             "Modules\\Customer\\": "Modules/Customer/app/",
             "Modules\\Customer\\Database\\Factories\\": "Modules/Customer/database/factories/",
-            "Modules\\Customer\\Database\\Seeders\\": "Modules/Customer/database/seeders/"
+            "Modules\\Customer\\Database\\Seeders\\": "Modules/Customer/database/seeders/",
+            "Modules\\Organization\\": "Modules/Organization/app/",
+            "Modules\\Organization\\Database\\Factories\\": "Modules/Organization/database/factories/",
+            "Modules\\Organization\\Database\\Seeders\\": "Modules/Organization/database/seeders/",
+            "Modules\\Appointment\\": "Modules/Appointment/app/",
+            "Modules\\Appointment\\Database\\Factories\\": "Modules/Appointment/database/factories/",
+            "Modules\\Appointment\\Database\\Seeders\\": "Modules/Appointment/database/seeders/",
+            "Modules\\JobCard\\": "Modules/JobCard/app/",
+            "Modules\\JobCard\\Database\\Factories\\": "Modules/JobCard/database/factories/",
+            "Modules\\JobCard\\Database\\Seeders\\": "Modules/JobCard/database/seeders/",
+            "Modules\\Inventory\\": "Modules/Inventory/app/",
+            "Modules\\Inventory\\Database\\Factories\\": "Modules/Inventory/database/factories/",
+            "Modules\\Inventory\\Database\\Seeders\\": "Modules/Inventory/database/seeders/",
+            "Modules\\Invoice\\": "Modules/Invoice/app/",
+            "Modules\\Invoice\\Database\\Factories\\": "Modules/Invoice/database/factories/",
+            "Modules\\Invoice\\Database\\Seeders\\": "Modules/Invoice/database/seeders/"
         }
     },
     "autoload-dev": {
@@ -44,7 +59,12 @@
             "Tests\\": "tests/",
             "Modules\\User\\Tests\\": "Modules/User/tests/",
             "Modules\\Auth\\Tests\\": "Modules/Auth/tests/",
-            "Modules\\Customer\\Tests\\": "Modules/Customer/tests/"
+            "Modules\\Customer\\Tests\\": "Modules/Customer/tests/",
+            "Modules\\Organization\\Tests\\": "Modules/Organization/tests/",
+            "Modules\\Appointment\\Tests\\": "Modules/Appointment/tests/",
+            "Modules\\JobCard\\Tests\\": "Modules/JobCard/tests/",
+            "Modules\\Inventory\\Tests\\": "Modules/Inventory/tests/",
+            "Modules\\Invoice\\Tests\\": "Modules/Invoice/tests/"
         }
     },
     "scripts": {

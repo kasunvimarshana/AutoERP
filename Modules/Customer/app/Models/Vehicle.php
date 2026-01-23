@@ -206,10 +206,19 @@ class Vehicle extends Model
      */
     public static function generateVehicleNumber(): string
     {
-        $prefix = 'VEH';
-        $timestamp = now()->format('Ymd');
-        $random = str_pad((string) rand(0, 9999), 4, '0', STR_PAD_LEFT);
+        do {
+            $prefix = 'VEH';
+            $timestamp = now()->format('Ymd');
+            // Use random_int for better randomness and add microseconds for more entropy
+            $random = str_pad((string) random_int(0, 99999), 5, '0', STR_PAD_LEFT);
+            $microtime = str_pad((string) (int) (microtime(true) * 10000 % 10000), 4, '0', STR_PAD_LEFT);
 
-        return "{$prefix}-{$timestamp}-{$random}";
+            $vehicleNumber = "{$prefix}-{$timestamp}-{$random}{$microtime}";
+
+            // Check if the number already exists
+            $exists = static::where('vehicle_number', $vehicleNumber)->exists();
+        } while ($exists);
+
+        return $vehicleNumber;
     }
 }

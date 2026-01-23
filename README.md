@@ -497,15 +497,21 @@ public function test_can_create_user(): void
 
 #### Architecture & Development
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - Detailed architecture documentation
-- **[USER_MODEL_GUIDELINES.md](USER_MODEL_GUIDELINES.md)** - ✨ NEW: User model usage guidelines
+- **[CROSS_MODULE_ORCHESTRATION.md](CROSS_MODULE_ORCHESTRATION.md)** - ✨ NEW: Cross-module orchestration & event-driven patterns
+- **[USER_MODEL_GUIDELINES.md](USER_MODEL_GUIDELINES.md)** - User model usage guidelines
 - **[SECURITY.md](SECURITY.md)** - Security implementation guide
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contributing guidelines
-- **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)** - ✨ NEW: Complete API documentation with Swagger/OpenAPI
+- **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)** - Complete API documentation with Swagger/OpenAPI
 
 #### Module Documentation
 - **[AUTH_IMPLEMENTATION_SUMMARY.md](AUTH_IMPLEMENTATION_SUMMARY.md)** - Auth module implementation summary
+- **[CVMS_IMPLEMENTATION_COMPLETE.md](CVMS_IMPLEMENTATION_COMPLETE.md)** - Customer & Vehicle Management System
+- **[INVENTORY_MODULE_SUMMARY.md](INVENTORY_MODULE_SUMMARY.md)** - Inventory & Procurement module
+- **[JOBCARD_MODULE_SUMMARY.md](JOBCARD_MODULE_SUMMARY.md)** - Job Card & Workflow module
 - **[Modules/Auth/README.md](Modules/Auth/README.md)** - Authentication module documentation
-- **[Modules/User/README.md](Modules/User/README.md)** - User module documentation (if exists)
+- **[Modules/Customer/README.md](Modules/Customer/README.md)** - Customer module documentation
+- **[Modules/Organization/README.md](Modules/Organization/README.md)** - Organization & Branch module
+- **[Modules/Appointment/README.md](Modules/Appointment/README.md)** - Appointments & Bay Scheduling
 
 #### Deployment & Operations
 - **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment guide
@@ -517,6 +523,7 @@ public function test_can_create_user(): void
 ### Quick Links
 
 - [API Documentation (Swagger UI)](/api/documentation) - Interactive API docs
+- [Cross-Module Orchestration Guide](CROSS_MODULE_ORCHESTRATION.md) - Service orchestration & event-driven patterns
 - [Security Best Practices](SECURITY.md#best-practices)
 - [Deployment Checklist](DEPLOYMENT.md#deployment-checklist)
 - [Authentication API](Modules/Auth/README.md)
