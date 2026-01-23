@@ -7,10 +7,10 @@ namespace Modules\User\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Modules\User\app\Requests\StoreUserRequest;
-use Modules\User\app\Requests\UpdateUserRequest;
-use Modules\User\app\Resources\UserResource;
-use Modules\User\app\Services\UserService;
+use Modules\User\Requests\StoreUserRequest;
+use Modules\User\Requests\UpdateUserRequest;
+use Modules\User\Resources\UserResource;
+use Modules\User\Services\UserService;
 
 /**
  * User Controller

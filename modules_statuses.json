@@ -1,1 +1,4 @@
-{"User": false}
+{
+    "User": true,
+    "Auth": true
+}

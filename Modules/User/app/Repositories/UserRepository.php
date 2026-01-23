@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Modules\User\app\Repositories;
+namespace Modules\User\Repositories;
 
 use App\Core\Repositories\BaseRepository;
 use Illuminate\Database\Eloquent\Model;
-use Modules\User\app\Models\User;
+use Modules\User\Models\User;
 
 /**
  * User Repository

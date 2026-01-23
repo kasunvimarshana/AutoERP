@@ -24,7 +24,7 @@ trait AuditTrait
     public static function bootAuditTrait(): void
     {
         static::creating(function (Model $model) {
-            if (Auth::check()) {
+            if (Auth::check() && $model->getConnection()->getSchemaBuilder()->hasColumn($model->getTable(), 'created_by')) {
                 $model->created_by = Auth::id();
             }
 
@@ -36,7 +36,7 @@ trait AuditTrait
         });
 
         static::updating(function (Model $model) {
-            if (Auth::check()) {
+            if (Auth::check() && $model->getConnection()->getSchemaBuilder()->hasColumn($model->getTable(), 'updated_by')) {
                 $model->updated_by = Auth::id();
             }
 

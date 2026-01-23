@@ -127,6 +127,21 @@ ModularSaaS-LaravelVue/
 │   └── Providers/
 │       └── TenancyServiceProvider.php # Tenancy configuration
 ├── Modules/                           # Modular application components
+│   ├── Auth/                          # ✨ NEW: Authentication & Authorization module
+│   │   ├── app/
+│   │   │   ├── Http/Controllers/      # Auth endpoints (login, register, etc.)
+│   │   │   ├── Services/              # Auth business logic & audit logging
+│   │   │   ├── Repositories/          # Auth data access
+│   │   │   ├── Requests/              # Auth validation
+│   │   │   ├── Resources/             # Auth API responses
+│   │   │   ├── Middleware/            # Rate limiting
+│   │   │   ├── Policies/              # Tenant-aware authorization
+│   │   │   └── Providers/             # Service & policy registration
+│   │   ├── database/seeders/          # Roles & permissions
+│   │   ├── lang/                      # i18n translations
+│   │   ├── routes/                    # Auth API routes
+│   │   ├── tests/                     # Feature tests
+│   │   └── README.md                  # Auth module documentation
 │   └── User/                          # Example: User module
 │       ├── app/
 │       │   ├── Http/
@@ -462,17 +477,19 @@ public function test_can_create_user(): void
 
 - **[README.md](README.md)** - Complete project overview and quick start
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - Detailed architecture documentation
-- **[SECURITY.md](SECURITY.md)** - Security implementation guide (NEW)
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment guide (NEW)
+- **[SECURITY.md](SECURITY.md)** - Security implementation guide
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment guide
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contributing guidelines
 - **[INSTALLATION.md](INSTALLATION.md)** - Installation instructions
 - **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** - Project summary
+- **[AUTH_IMPLEMENTATION_SUMMARY.md](AUTH_IMPLEMENTATION_SUMMARY.md)** - ✨ NEW: Auth module implementation summary
+- **[Modules/Auth/README.md](Modules/Auth/README.md)** - ✨ NEW: Authentication API documentation
 
 ### Quick Links
 
 - [Security Best Practices](SECURITY.md#best-practices)
 - [Deployment Checklist](DEPLOYMENT.md#deployment-checklist)
-- [API Documentation](#api-documentation)
+- [Authentication API](Modules/Auth/README.md)
 - [Testing Guide](#testing)
 
 ## 📚 API Documentation
@@ -489,6 +506,20 @@ Authorization: Bearer {token}
 ```
 
 ### Example Endpoints
+
+**Authentication** (✨ NEW)
+- `POST /auth/register` - Register new user
+- `POST /auth/login` - Login and get token
+- `POST /auth/logout` - Logout current device
+- `POST /auth/logout-all` - Logout all devices
+- `GET /auth/me` - Get current user profile
+- `POST /auth/refresh` - Refresh authentication token
+- `POST /auth/forgot-password` - Request password reset
+- `POST /auth/reset-password` - Reset password with token
+- `GET /auth/verify-email/{id}/{hash}` - Verify email address
+- `POST /auth/resend-verification` - Resend verification email
+
+See [Auth Module Documentation](Modules/Auth/README.md) for complete API details.
 
 **Users**
 - `GET /users` - List all users

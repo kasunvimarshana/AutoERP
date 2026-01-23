@@ -6,7 +6,7 @@ namespace Modules\User\Tests\Feature;
 
 use Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Modules\User\app\Models\User;
+use App\Models\User;
 
 /**
  * User API Test

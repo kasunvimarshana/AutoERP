@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Modules\User\app\Services;
+namespace Modules\User\Services;
 
 use App\Core\Services\BaseService;
-use Modules\User\app\Repositories\UserRepository;
+use Modules\User\Repositories\UserRepository;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 

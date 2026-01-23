@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\User\app\Models;
+namespace Modules\User\Models;
 
 use App\Core\Traits\AuditTrait;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
