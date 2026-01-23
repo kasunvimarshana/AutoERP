@@ -13,11 +13,17 @@ return Application::configure(basePath: dirname(__DIR__))
         then: function () {
             // Load module routes
             $moduleRoutes = [
+                'auth-management',
+                'tenant-management',
+                'user-management',
+                'role-management',
                 'customer-management',
                 'appointment-management',
                 'job-card-management',
                 'inventory-management',
                 'invoicing-management',
+                'crm-management',
+                'fleet-management',
             ];
             
             foreach ($moduleRoutes as $module) {
