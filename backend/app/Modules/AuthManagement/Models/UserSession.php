@@ -61,9 +61,13 @@ class UserSession extends Model
     /**
      * Update last activity timestamp
      */
-    public function touch(): void
+    public function touch($attribute = null): bool
     {
-        $this->update(['last_activity' => now()]);
+        if ($attribute === null) {
+            $this->update(['last_activity' => now()]);
+            return parent::touch();
+        }
+        return parent::touch($attribute);
     }
 
     /**

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules/CRMManagement\Http\Controllers;
+namespace App\Modules\CRMManagement\Http\Controllers;
 
 use App\Core\Base\BaseController;
 use App\Modules\CRMManagement\Services\CustomerSegmentService;
