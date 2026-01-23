@@ -21,7 +21,8 @@ class JobCardOrchestrationController extends Controller
 {
     public function __construct(
         private readonly JobCardOrchestrator $orchestrator
-    ) {}
+    ) {
+    }
 
     /**
      * Complete a job card with full orchestration
@@ -42,32 +43,24 @@ class JobCardOrchestrationController extends Controller
      *     summary="Complete a job card with full orchestration",
      *     description="Completes job card, generates invoice, updates inventory, and triggers notifications",
      *     security={{"sanctum":{}}},
-     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
      *         description="Job card ID",
-     *
      *         @OA\Schema(type="integer")
      *     ),
-     *
      *     @OA\RequestBody(
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="skip_invoice", type="boolean", description="Skip invoice generation"),
      *             @OA\Property(property="skip_inventory", type="boolean", description="Skip inventory updates"),
      *             @OA\Property(property="invoice_data", type="object", description="Additional invoice data")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=200,
      *         description="Job card completed successfully",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string"),
      *             @OA\Property(property="data", type="object",
@@ -78,7 +71,6 @@ class JobCardOrchestrationController extends Controller
      *             )
      *         )
      *     ),
-     *
      *     @OA\Response(response=400, description="Validation error or business logic failure"),
      *     @OA\Response(response=404, description="Job card not found"),
      *     @OA\Response(response=500, description="Server error")
@@ -130,24 +122,18 @@ class JobCardOrchestrationController extends Controller
      *     tags={"JobCards"},
      *     summary="Start a job card",
      *     security={{"sanctum":{}}},
-     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
-     *
      *         @OA\Schema(type="integer")
      *     ),
-     *
      *     @OA\RequestBody(
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="technician_id", type="integer", description="Assigned technician"),
      *             @OA\Property(property="bay_id", type="integer", description="Assigned bay")
      *         )
      *     ),
-     *
      *     @OA\Response(response=200, description="Job card started successfully")
      * )
      */
@@ -187,21 +173,16 @@ class JobCardOrchestrationController extends Controller
      *     tags={"JobCards"},
      *     summary="Get orchestration status",
      *     security={{"sanctum":{}}},
-     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
-     *
      *         @OA\Schema(type="integer")
      *     ),
-     *
      *     @OA\Response(
      *         response=200,
      *         description="Orchestration status",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="job_card_status", type="string"),
      *             @OA\Property(property="has_invoice", type="boolean"),
      *             @OA\Property(property="inventory_updated", type="boolean"),

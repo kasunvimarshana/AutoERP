@@ -40,7 +40,8 @@ class AppointmentOrchestrator extends BaseOrchestrator
         private readonly VehicleService $vehicleService,
         private readonly BayService $bayService,
         private readonly BranchService $branchService
-    ) {}
+    ) {
+    }
 
     /**
      * Book appointment with full validation and orchestration
@@ -249,6 +250,8 @@ class AppointmentOrchestrator extends BaseOrchestrator
     /**
      * Confirm appointment with SMS/Email notification
      *
+     * @param  int  $appointmentId
+     * @return Appointment
      *
      * @throws ServiceException
      */

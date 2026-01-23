@@ -21,7 +21,8 @@ class AppointmentOrchestrationController extends Controller
 {
     public function __construct(
         private readonly AppointmentOrchestrator $orchestrator
-    ) {}
+    ) {
+    }
 
     /**
      * Book appointment with full validation and orchestration
@@ -41,13 +42,10 @@ class AppointmentOrchestrationController extends Controller
      *     tags={"Appointments"},
      *     summary="Book an appointment with full orchestration",
      *     description="Creates appointment, handles customer/vehicle registration, and validates availability",
-     *
      *     @OA\RequestBody(
      *         required=true,
-     *
      *         @OA\JsonContent(
      *             required={"scheduled_date", "scheduled_time", "branch_id"},
-     *
      *             @OA\Property(property="customer_id", type="integer", description="Existing customer ID"),
      *             @OA\Property(property="customer_email", type="string", format="email", description="Customer email (for new/lookup)"),
      *             @OA\Property(property="customer_phone", type="string", description="Customer phone (for new/lookup)"),
@@ -66,13 +64,10 @@ class AppointmentOrchestrationController extends Controller
      *             @OA\Property(property="estimated_duration", type="integer", description="Minutes", example=60)
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=201,
      *         description="Appointment booked successfully",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="data", type="object",
      *                 @OA\Property(property="appointment", ref="#/components/schemas/Appointment"),
@@ -83,7 +78,6 @@ class AppointmentOrchestrationController extends Controller
      *             )
      *         )
      *     ),
-     *
      *     @OA\Response(response=400, description="Validation error or availability conflict"),
      *     @OA\Response(response=500, description="Server error")
      * )
@@ -152,15 +146,12 @@ class AppointmentOrchestrationController extends Controller
      *     tags={"Appointments"},
      *     summary="Confirm an appointment",
      *     security={{"sanctum":{}}},
-     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
-     *
      *         @OA\Schema(type="integer")
      *     ),
-     *
      *     @OA\Response(response=200, description="Appointment confirmed")
      * )
      */

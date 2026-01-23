@@ -51,12 +51,15 @@ class BranchService extends BaseService
 
         // Check if we\'re already in a transaction (e.g., from orchestrator or test)
 
+
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
+
+
         try {
-            if ($shouldManageTransaction) {
-                DB::beginTransaction();
-            }
+                if ($shouldManageTransaction) {
+                    DB::beginTransaction();
+                }
 
             $branch = $this->repository->create($data);
 
@@ -92,12 +95,15 @@ class BranchService extends BaseService
 
         // Check if we\'re already in a transaction (e.g., from orchestrator or test)
 
+
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
+
+
         try {
-            if ($shouldManageTransaction) {
-                DB::beginTransaction();
-            }
+                if ($shouldManageTransaction) {
+                    DB::beginTransaction();
+                }
 
             $branch = $this->repository->update($id, $data);
 
@@ -197,10 +203,11 @@ class BranchService extends BaseService
 
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
+
         try {
-            if ($shouldManageTransaction) {
-                DB::beginTransaction();
-            }
+                if ($shouldManageTransaction) {
+                    DB::beginTransaction();
+                }
 
             $branch = $this->repository->update($id, ['status' => 'active']);
 
@@ -228,10 +235,11 @@ class BranchService extends BaseService
 
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
+
         try {
-            if ($shouldManageTransaction) {
-                DB::beginTransaction();
-            }
+                if ($shouldManageTransaction) {
+                    DB::beginTransaction();
+                }
 
             $branch = $this->repository->update($id, ['status' => 'inactive']);
 
@@ -259,10 +267,11 @@ class BranchService extends BaseService
 
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
+
         try {
-            if ($shouldManageTransaction) {
-                DB::beginTransaction();
-            }
+                if ($shouldManageTransaction) {
+                    DB::beginTransaction();
+                }
 
             $branch = $this->repository->update($id, ['status' => 'maintenance']);
 

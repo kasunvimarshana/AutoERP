@@ -39,7 +39,8 @@ class JobCardOrchestrator extends BaseOrchestrator
         private readonly InvoiceService $invoiceService,
         private readonly InventoryService $inventoryService,
         private readonly VehicleServiceRecordService $serviceRecordService
-    ) {}
+    ) {
+    }
 
     /**
      * Complete a job card with full orchestration
@@ -159,11 +160,8 @@ class JobCardOrchestrator extends BaseOrchestrator
                 'service_record_id' => $serviceRecord?->id,
             ]);
 
-            // Refresh jobCard from repository only if it's a real model, otherwise return as-is
-            $refreshedJobCard = $jobCard->exists ? $jobCard->fresh() : $jobCard;
-
             return [
-                'jobCard' => $refreshedJobCard,
+                'jobCard' => $jobCard->fresh(),
                 'invoice' => $invoice,
                 'inventoryTransactions' => $inventoryTransactions,
                 'serviceRecord' => $serviceRecord,
@@ -195,7 +193,9 @@ class JobCardOrchestrator extends BaseOrchestrator
     /**
      * Start a job card with bay assignment and technician notification
      *
+     * @param  int  $jobCardId
      * @param  array<string, mixed>  $data  Contains technician_id, bay_id, etc.
+     * @return JobCard
      *
      * @throws ServiceException
      */

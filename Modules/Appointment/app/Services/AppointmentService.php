@@ -167,10 +167,11 @@ class AppointmentService extends BaseService
 
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
+
         try {
-            if ($shouldManageTransaction) {
-                DB::beginTransaction();
-            }
+                if ($shouldManageTransaction) {
+                    DB::beginTransaction();
+                }
 
             $appointment = $this->update($id, [
                 'status' => 'in_progress',
@@ -204,10 +205,11 @@ class AppointmentService extends BaseService
 
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
+
         try {
-            if ($shouldManageTransaction) {
-                DB::beginTransaction();
-            }
+                if ($shouldManageTransaction) {
+                    DB::beginTransaction();
+                }
 
             $appointment = $this->update($id, [
                 'status' => 'completed',
@@ -241,10 +243,11 @@ class AppointmentService extends BaseService
 
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
+
         try {
-            if ($shouldManageTransaction) {
-                DB::beginTransaction();
-            }
+                if ($shouldManageTransaction) {
+                    DB::beginTransaction();
+                }
 
             $appointment = $this->update($id, [
                 'status' => 'cancelled',
@@ -281,10 +284,11 @@ class AppointmentService extends BaseService
 
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
+
         try {
-            if ($shouldManageTransaction) {
-                DB::beginTransaction();
-            }
+                if ($shouldManageTransaction) {
+                    DB::beginTransaction();
+                }
 
             $appointment = $this->repository->findOrFail($id);
 
@@ -330,10 +334,11 @@ class AppointmentService extends BaseService
 
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
+
         try {
-            if ($shouldManageTransaction) {
-                DB::beginTransaction();
-            }
+                if ($shouldManageTransaction) {
+                    DB::beginTransaction();
+                }
 
             $appointment = $this->repository->findOrFail($id);
 

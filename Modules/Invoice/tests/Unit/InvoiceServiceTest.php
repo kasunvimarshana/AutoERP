@@ -9,6 +9,7 @@ use Modules\Customer\Models\Customer;
 use Modules\Customer\Models\Vehicle;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Models\InvoiceItem;
+use Modules\Invoice\Repositories\InvoiceRepository;
 use Modules\Invoice\Services\InvoiceService;
 use Modules\Organization\Models\Branch;
 use Tests\TestCase;

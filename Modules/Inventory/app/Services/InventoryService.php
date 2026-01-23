@@ -21,7 +21,8 @@ class InventoryService
     public function __construct(
         private readonly InventoryItemService $inventoryItemService,
         private readonly InventoryTransactionRepository $transactionRepository
-    ) {}
+    ) {
+    }
 
     /**
      * Adjust inventory with full transaction tracking
@@ -31,6 +32,7 @@ class InventoryService
      * @param  string  $transactionType  Type of transaction (e.g., 'job_card_usage', 'purchase', 'return')
      * @param  int|null  $referenceId  ID of the related record (e.g., job card ID)
      * @param  string  $reason  Reason for adjustment
+     * @return InventoryTransaction
      *
      * @throws ServiceException
      */
@@ -119,6 +121,8 @@ class InventoryService
      * Bulk adjust inventory for multiple items
      *
      * @param  array<int, array{item_id: int, quantity: float, reason: string}>  $adjustments
+     * @param  string  $transactionType
+     * @param  int|null  $referenceId
      * @return array<int, InventoryTransaction>
      *
      * @throws ServiceException

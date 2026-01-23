@@ -898,6 +898,7 @@ class VehicleServiceRecordController extends Controller
      *             @OA\Property(
      *                 property="data",
      *                 type="object",
+     *
      *                 @OA\Property(property="total_services", type="integer", example=10),
      *                 @OA\Property(property="total_cost", type="number", format="float", example=1250.00),
      *                 @OA\Property(property="average_cost", type="number", format="float", example=125.00),
@@ -952,6 +953,7 @@ class VehicleServiceRecordController extends Controller
      *             @OA\Property(
      *                 property="data",
      *                 type="object",
+     *
      *                 @OA\Property(property="total_vehicles", type="integer", example=3),
      *                 @OA\Property(property="total_services", type="integer", example=25),
      *                 @OA\Property(property="total_spent", type="number", format="float", example=3125.00),
@@ -1007,6 +1009,7 @@ class VehicleServiceRecordController extends Controller
      *             @OA\Property(
      *                 property="data",
      *                 type="object",
+     *
      *                 @OA\Property(property="vehicle_id", type="integer", example=1),
      *                 @OA\Property(property="total_services", type="integer", example=15),
      *                 @OA\Property(property="branches_serviced", type="array", @OA\Items(type="string"), example={"BRANCH-01", "BRANCH-02"}),

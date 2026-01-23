@@ -30,7 +30,8 @@ class UpdateInventoryFromJobCard implements ShouldQueue
      */
     public function __construct(
         private readonly InventoryService $inventoryService
-    ) {}
+    ) {
+    }
 
     /**
      * Handle the event

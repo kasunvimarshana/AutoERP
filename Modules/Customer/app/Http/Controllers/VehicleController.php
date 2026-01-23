@@ -726,6 +726,7 @@ class VehicleController extends Controller
      *             @OA\Property(
      *                 property="data",
      *                 type="object",
+     *
      *                 @OA\Property(property="total_services", type="integer", example=5),
      *                 @OA\Property(property="total_spent", type="number", format="float", example=625.00),
      *                 @OA\Property(property="last_service_date", type="string", format="date-time", example="2024-01-10T10:00:00Z"),

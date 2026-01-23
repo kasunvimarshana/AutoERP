@@ -122,7 +122,7 @@ class AppointmentRepository extends BaseRepository
         if ($scheduledDateTime instanceof \DateTimeInterface) {
             $scheduledDateTime = $scheduledDateTime->format('Y-m-d H:i:s');
         }
-
+        
         $endTime = date('Y-m-d H:i:s', strtotime($scheduledDateTime) + ($duration * 60));
 
         // Get all appointments for this vehicle in the relevant time window

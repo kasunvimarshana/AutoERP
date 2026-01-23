@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Core\Services\Examples;
 
+use App\Core\Exceptions\ServiceException;
 use App\Core\Services\BaseOrchestrator;
 
 /**

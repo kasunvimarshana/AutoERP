@@ -182,10 +182,11 @@ class CustomerService extends BaseService
 
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
+
         try {
-            if ($shouldManageTransaction) {
-                DB::beginTransaction();
-            }
+                if ($shouldManageTransaction) {
+                    DB::beginTransaction();
+                }
 
             $target = $this->repository->findOrFail($targetId);
             $source = $this->repository->findOrFail($sourceId);

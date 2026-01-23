@@ -38,31 +38,24 @@ class UserController extends Controller
      *     operationId="getUsers",
      *     tags={"Users"},
      *     security={{"sanctum": {}}},
-     *
      *     @OA\Parameter(
      *         name="paginate",
      *         in="query",
      *         description="Enable pagination",
      *         required=false,
-     *
      *         @OA\Schema(type="boolean", default=true, example=true)
      *     ),
-     *
      *     @OA\Parameter(
      *         name="per_page",
      *         in="query",
      *         description="Number of items per page",
      *         required=false,
-     *
      *         @OA\Schema(type="integer", default=15, example=15, minimum=1, maximum=100)
      *     ),
-     *
      *     @OA\Response(
      *         response=200,
      *         description="Users retrieved successfully",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Users retrieved successfully"),
      *             @OA\Property(
@@ -71,10 +64,8 @@ class UserController extends Controller
      *                 @OA\Property(
      *                     property="data",
      *                     type="array",
-     *
      *                     @OA\Items(ref="#/components/schemas/User")
      *                 ),
-     *
      *                 @OA\Property(property="current_page", type="integer", example=1),
      *                 @OA\Property(property="per_page", type="integer", example=15),
      *                 @OA\Property(property="total", type="integer", example=67),
@@ -82,23 +73,17 @@ class UserController extends Controller
      *             )
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=401,
      *         description="Unauthenticated",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="message", type="string", example="Unauthenticated.")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=403,
      *         description="Forbidden - Insufficient permissions",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="You do not have permission to view users")
      *         )
@@ -130,58 +115,44 @@ class UserController extends Controller
      *     operationId="createUser",
      *     tags={"Users"},
      *     security={{"sanctum": {}}},
-     *
      *     @OA\RequestBody(
      *         required=true,
      *         description="User data",
-     *
      *         @OA\JsonContent(
      *             required={"name", "email", "password", "password_confirmation"},
-     *
      *             @OA\Property(property="name", type="string", example="Jane Doe", description="User's full name"),
      *             @OA\Property(property="email", type="string", format="email", example="jane@example.com", description="User's email address (must be unique)"),
      *             @OA\Property(property="password", type="string", format="password", example="SecurePassword123!", description="User's password"),
      *             @OA\Property(property="password_confirmation", type="string", format="password", example="SecurePassword123!", description="Password confirmation")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=201,
      *         description="User created successfully",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="User created successfully"),
      *             @OA\Property(property="data", ref="#/components/schemas/User")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=401,
      *         description="Unauthenticated",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="message", type="string", example="Unauthenticated.")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=403,
      *         description="Forbidden - Insufficient permissions",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="You do not have permission to create users")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=422,
      *         description="Validation error",
-     *
      *         @OA\JsonContent(ref="#/components/schemas/ValidationError")
      *     )
      * )
@@ -206,55 +177,41 @@ class UserController extends Controller
      *     operationId="getUserById",
      *     tags={"Users"},
      *     security={{"sanctum": {}}},
-     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
      *         description="User ID",
-     *
      *         @OA\Schema(type="integer", example=1)
      *     ),
-     *
      *     @OA\Response(
      *         response=200,
      *         description="User retrieved successfully",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="User retrieved successfully"),
      *             @OA\Property(property="data", ref="#/components/schemas/User")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=401,
      *         description="Unauthenticated",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="message", type="string", example="Unauthenticated.")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=403,
      *         description="Forbidden - Insufficient permissions",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="You do not have permission to view this user")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=404,
      *         description="User not found",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="User not found")
      *         )
@@ -281,77 +238,58 @@ class UserController extends Controller
      *     operationId="updateUser",
      *     tags={"Users"},
      *     security={{"sanctum": {}}},
-     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
      *         description="User ID",
-     *
      *         @OA\Schema(type="integer", example=1)
      *     ),
-     *
      *     @OA\RequestBody(
      *         required=true,
      *         description="User data to update (all fields optional)",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="name", type="string", example="Jane Smith", description="User's full name"),
      *             @OA\Property(property="email", type="string", format="email", example="jane.smith@example.com", description="User's email address"),
      *             @OA\Property(property="password", type="string", format="password", example="NewPassword123!", description="New password"),
      *             @OA\Property(property="password_confirmation", type="string", format="password", example="NewPassword123!", description="Password confirmation")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=200,
      *         description="User updated successfully",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="User updated successfully"),
      *             @OA\Property(property="data", ref="#/components/schemas/User")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=401,
      *         description="Unauthenticated",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="message", type="string", example="Unauthenticated.")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=403,
      *         description="Forbidden - Insufficient permissions",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="You do not have permission to update this user")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=404,
      *         description="User not found",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="User not found")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=422,
      *         description="Validation error",
-     *
      *         @OA\JsonContent(ref="#/components/schemas/ValidationError")
      *     )
      * )
@@ -376,55 +314,41 @@ class UserController extends Controller
      *     operationId="deleteUser",
      *     tags={"Users"},
      *     security={{"sanctum": {}}},
-     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
      *         description="User ID",
-     *
      *         @OA\Schema(type="integer", example=1)
      *     ),
-     *
      *     @OA\Response(
      *         response=200,
      *         description="User deleted successfully",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="User deleted successfully"),
      *             @OA\Property(property="data", type="object", nullable=true)
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=401,
      *         description="Unauthenticated",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="message", type="string", example="Unauthenticated.")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=403,
      *         description="Forbidden - Insufficient permissions",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="You do not have permission to delete users")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=404,
      *         description="User not found",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="User not found")
      *         )
@@ -451,75 +375,56 @@ class UserController extends Controller
      *     operationId="assignRole",
      *     tags={"Users"},
      *     security={{"sanctum": {}}},
-     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
      *         description="User ID",
-     *
      *         @OA\Schema(type="integer", example=1)
      *     ),
-     *
      *     @OA\RequestBody(
      *         required=true,
      *         description="Role to assign",
-     *
      *         @OA\JsonContent(
      *             required={"role"},
-     *
      *             @OA\Property(property="role", type="string", example="admin", description="Role name to assign (must exist in roles table)")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=200,
      *         description="Role assigned successfully",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Role assigned successfully"),
      *             @OA\Property(property="data", ref="#/components/schemas/User")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=401,
      *         description="Unauthenticated",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="message", type="string", example="Unauthenticated.")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=403,
      *         description="Forbidden - Insufficient permissions",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="You do not have permission to assign roles")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=404,
      *         description="User or role not found",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="User or role not found")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=422,
      *         description="Validation error",
-     *
      *         @OA\JsonContent(ref="#/components/schemas/ValidationError")
      *     )
      * )
@@ -548,75 +453,56 @@ class UserController extends Controller
      *     operationId="revokeRole",
      *     tags={"Users"},
      *     security={{"sanctum": {}}},
-     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
      *         description="User ID",
-     *
      *         @OA\Schema(type="integer", example=1)
      *     ),
-     *
      *     @OA\RequestBody(
      *         required=true,
      *         description="Role to revoke",
-     *
      *         @OA\JsonContent(
      *             required={"role"},
-     *
      *             @OA\Property(property="role", type="string", example="admin", description="Role name to revoke")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=200,
      *         description="Role revoked successfully",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Role revoked successfully"),
      *             @OA\Property(property="data", ref="#/components/schemas/User")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=401,
      *         description="Unauthenticated",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="message", type="string", example="Unauthenticated.")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=403,
      *         description="Forbidden - Insufficient permissions",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="You do not have permission to revoke roles")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=404,
      *         description="User or role not found",
-     *
      *         @OA\JsonContent(
-     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="User or role not found")
      *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=422,
      *         description="Validation error",
-     *
      *         @OA\JsonContent(ref="#/components/schemas/ValidationError")
      *     )
      * )

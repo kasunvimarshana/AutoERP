@@ -71,12 +71,15 @@ class VehicleServiceRecordService extends BaseService
 
         // Check if we\'re already in a transaction (e.g., from orchestrator or test)
 
+
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
+
+
         try {
-            if ($shouldManageTransaction) {
-                DB::beginTransaction();
-            }
+                if ($shouldManageTransaction) {
+                    DB::beginTransaction();
+                }
 
             $serviceRecord = parent::create($data);
 
@@ -234,10 +237,11 @@ class VehicleServiceRecordService extends BaseService
 
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
+
         try {
-            if ($shouldManageTransaction) {
-                DB::beginTransaction();
-            }
+                if ($shouldManageTransaction) {
+                    DB::beginTransaction();
+                }
 
             $serviceRecord = $this->repository->findOrFail($id);
 
@@ -371,78 +375,44 @@ class VehicleServiceRecordService extends BaseService
     }
 
     /**
-     * Create service record from job card
+     * Create a service record from a job card
+     *
+     * This method is called by the JobCardOrchestrator when a job card is completed
+     * to create a corresponding vehicle service record.
      *
      * @param  \Modules\JobCard\Models\JobCard  $jobCard
+     * @return VehicleServiceRecord
      *
      * @throws ServiceException
      */
-    public function createFromJobCard($jobCard): VehicleServiceRecord
+    public function createFromJobCard($jobCard): mixed
     {
-        // Check if we're already in a transaction (e.g., from orchestrator or test)
-        $shouldManageTransaction = DB::transactionLevel() === 0;
+        // Extract data from job card to create service record
+        $data = [
+            'vehicle_id' => $jobCard->vehicle_id,
+            'customer_id' => $jobCard->customer_id,
+            'branch_id' => $jobCard->branch_id ?? null,
+            'service_date' => $jobCard->completed_at ?? now(),
+            'service_type' => $jobCard->service_type ?? 'general_service',
+            'mileage_at_service' => $jobCard->mileage_reading ?? 0,
+            'labor_cost' => $jobCard->labor_cost ?? 0,
+            'parts_cost' => $jobCard->parts_cost ?? 0,
+            'total_cost' => $jobCard->grand_total ?? 0,
+            'description' => $jobCard->description ?? 'Service from Job Card #'.$jobCard->job_number,
+            'technician_id' => $jobCard->technician_id ?? null,
+            'status' => 'completed',
+            'notes' => "Created from Job Card #{$jobCard->job_number}",
+            'job_card_id' => $jobCard->id,
+        ];
 
-        try {
-            if ($shouldManageTransaction) {
-                DB::beginTransaction();
-            }
-
-            // Validate job card is completed
-            if ($jobCard->status !== 'completed') {
-                throw new ServiceException('Job card must be completed before creating service record');
-            }
-
-            // Get vehicle to extract current mileage
-            $vehicle = $this->vehicleRepository->find($jobCard->vehicle_id);
-            if (! $vehicle) {
-                throw new ServiceException('Vehicle not found');
-            }
-
-            // Prepare service record data from job card
-            $serviceRecordData = [
-                'vehicle_id' => $jobCard->vehicle_id,
-                'customer_id' => $jobCard->customer_id,
-                'service_number' => $this->generateUniqueServiceNumber(),
-                'branch_id' => $jobCard->branch_id,
-                'service_date' => $jobCard->completed_at ?? now(),
-                'mileage_at_service' => $vehicle->current_mileage,
-                'service_type' => 'job_card', // Could be enhanced based on job card type
-                'service_description' => $jobCard->notes ?? 'Service from job card '.$jobCard->job_number,
-                'parts_used' => null, // Could be enhanced to list parts from job card
-                'labor_cost' => $jobCard->labor_total,
-                'parts_cost' => $jobCard->parts_total,
-                'total_cost' => $jobCard->grand_total,
-                'technician_name' => $jobCard->technician?->name ?? null,
-                'technician_id' => $jobCard->technician_id,
-                'notes' => 'Created from Job Card: '.$jobCard->job_number,
-                'status' => 'completed',
-            ];
-
-            // Create the service record
-            $serviceRecord = parent::create($serviceRecordData);
-
-            // Update vehicle mileage if needed
-            if ($vehicle->current_mileage < $serviceRecordData['mileage_at_service']) {
-                $this->vehicleRepository->update($vehicle->id, [
-                    'current_mileage' => $serviceRecordData['mileage_at_service'],
-                ]);
-            }
-
-            // Update customer last service date
-            $this->customerRepository->update($jobCard->customer_id, [
-                'last_service_date' => $serviceRecordData['service_date'],
-            ]);
-
-            if ($shouldManageTransaction) {
-                DB::commit();
-            }
-
-            return $serviceRecord;
-        } catch (\Exception $e) {
-            if ($shouldManageTransaction) {
-                DB::rollBack();
-            }
-            throw $e;
+        // Set next service information if available
+        if (isset($jobCard->next_service_mileage)) {
+            $data['next_service_mileage'] = $jobCard->next_service_mileage;
         }
+        if (isset($jobCard->next_service_date)) {
+            $data['next_service_date'] = $jobCard->next_service_date;
+        }
+
+        return $this->create($data);
     }
 }

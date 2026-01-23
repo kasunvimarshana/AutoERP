@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Modules\JobCard\Events;
 
 use App\Core\Events\BaseDomainEvent;
-use Modules\Invoice\Models\Invoice;
 use Modules\JobCard\Models\JobCard;
+use Modules\Invoice\Models\Invoice;
 
 /**
  * Job Card Completed Event
@@ -14,7 +14,7 @@ use Modules\JobCard\Models\JobCard;
  * Dispatched when a job card is marked as completed.
  * Triggers:
  * - Invoice generation
- * - Inventory updates
+ * - Inventory updates  
  * - Customer notifications
  * - Service history updates
  * - Analytics/reporting
