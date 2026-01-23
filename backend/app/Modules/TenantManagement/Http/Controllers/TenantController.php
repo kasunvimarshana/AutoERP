@@ -3,6 +3,7 @@
 namespace App\Modules\TenantManagement\Http\Controllers;
 
 use App\Core\Base\BaseController;
+use OpenApi\Attributes as OA;
 use App\Modules\TenantManagement\Services\TenantService;
 use App\Modules\TenantManagement\Http\Requests\StoreTenantRequest;
 use App\Modules\TenantManagement\Http\Requests\UpdateTenantRequest;

@@ -3,6 +3,7 @@
 namespace App\Modules\CRMManagement\Http\Controllers;
 
 use App\Core\Base\BaseController;
+use OpenApi\Attributes as OA;
 use App\Modules\CRMManagement\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;

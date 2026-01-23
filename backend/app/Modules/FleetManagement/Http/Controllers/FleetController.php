@@ -3,6 +3,7 @@
 namespace App\Modules\FleetManagement\Http\Controllers;
 
 use App\Core\Base\BaseController;
+use OpenApi\Attributes as OA;
 use App\Modules\FleetManagement\Services\FleetService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;

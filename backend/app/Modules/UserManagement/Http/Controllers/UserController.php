@@ -3,6 +3,7 @@
 namespace App\Modules\UserManagement\Http\Controllers;
 
 use App\Core\Base\BaseController;
+use OpenApi\Attributes as OA;
 use App\Modules\UserManagement\Services\UserService;
 use App\Modules\UserManagement\Http\Requests\StoreUserRequest;
 use App\Modules\UserManagement\Http\Requests\UpdateUserRequest;

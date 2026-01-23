@@ -15,7 +15,7 @@ class UserService extends BaseService
         parent::__construct($repository);
     }
 
-    public function create(array $data)
+    public function create(array $data): \Illuminate\Database\Eloquent\Model
     {
         // Hash password if provided
         if (!empty($data['password'])) {
@@ -25,7 +25,7 @@ class UserService extends BaseService
         return parent::create($data);
     }
 
-    public function update(int $id, array $data)
+    public function update(int $id, array $data): \Illuminate\Database\Eloquent\Model
     {
         // Hash password if provided
         if (!empty($data['password'])) {

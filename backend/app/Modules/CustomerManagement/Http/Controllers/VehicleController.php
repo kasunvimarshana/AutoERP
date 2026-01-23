@@ -7,6 +7,7 @@ use App\Modules\CustomerManagement\Http\Requests\StoreVehicleRequest;
 use App\Modules\CustomerManagement\Services\VehicleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use OpenApi\Attributes as OA;
 
 class VehicleController extends BaseController
 {
@@ -17,9 +18,24 @@ class VehicleController extends BaseController
         $this->vehicleService = $vehicleService;
     }
 
-    /**
-     * Display a listing of vehicles
-     */
+    #[OA\Get(
+        path: "/api/v1/vehicles",
+        summary: "List all vehicles",
+        description: "Retrieve a paginated list of vehicles with optional filtering by customer, service due date, etc.",
+        security: [["sanctum" => []]],
+        tags: ["Vehicle Management"],
+        parameters: [
+            new OA\Parameter(name: "search", in: "query", description: "Search by VIN, make, model, or license plate", schema: new OA\Schema(type: "string")),
+            new OA\Parameter(name: "status", in: "query", description: "Filter by status", schema: new OA\Schema(type: "string")),
+            new OA\Parameter(name: "customer_id", in: "query", description: "Filter by customer ID", schema: new OA\Schema(type: "integer")),
+            new OA\Parameter(name: "service_due", in: "query", description: "Filter vehicles with service due", schema: new OA\Schema(type: "boolean")),
+            new OA\Parameter(name: "per_page", in: "query", description: "Results per page", schema: new OA\Schema(type: "integer", default: 15))
+        ],
+        responses: [
+            new OA\Response(response: 200, description: "Vehicles retrieved successfully", content: new OA\JsonContent(ref: "#/components/schemas/SuccessResponse")),
+            new OA\Response(response: 401, description: "Unauthenticated", ref: "#/components/schemas/ErrorResponse")
+        ]
+    )]
     public function index(Request $request): JsonResponse
     {
         try {
@@ -40,9 +56,33 @@ class VehicleController extends BaseController
         }
     }
 
-    /**
-     * Store a newly created vehicle
-     */
+    #[OA\Post(
+        path: "/api/v1/vehicles",
+        summary: "Register a new vehicle",
+        description: "Create a new vehicle record and assign it to a customer",
+        security: [["sanctum" => []]],
+        tags: ["Vehicle Management"],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ["customer_id", "make", "model", "year", "vin"],
+                properties: [
+                    new OA\Property(property: "customer_id", type: "integer", example: 1),
+                    new OA\Property(property: "make", type: "string", example: "Toyota"),
+                    new OA\Property(property: "model", type: "string", example: "Camry"),
+                    new OA\Property(property: "year", type: "integer", example: 2022),
+                    new OA\Property(property: "vin", type: "string", example: "1HGBH41JXMN109186"),
+                    new OA\Property(property: "license_plate", type: "string", example: "ABC-1234"),
+                    new OA\Property(property: "color", type: "string", example: "Blue"),
+                    new OA\Property(property: "current_mileage", type: "integer", example: 15000)
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 201, description: "Vehicle created successfully", content: new OA\JsonContent(ref: "#/components/schemas/SuccessResponse")),
+            new OA\Response(response: 422, description: "Validation error", ref: "#/components/schemas/ValidationErrorResponse")
+        ]
+    )]
     public function store(StoreVehicleRequest $request): JsonResponse
     {
         try {
@@ -58,9 +98,20 @@ class VehicleController extends BaseController
         }
     }
 
-    /**
-     * Display the specified vehicle
-     */
+    #[OA\Get(
+        path: "/api/v1/vehicles/{id}",
+        summary: "Get vehicle details",
+        description: "Retrieve detailed vehicle information including current owner and ownership history",
+        security: [["sanctum" => []]],
+        tags: ["Vehicle Management"],
+        parameters: [
+            new OA\Parameter(name: "id", in: "path", required: true, description: "Vehicle ID", schema: new OA\Schema(type: "integer"))
+        ],
+        responses: [
+            new OA\Response(response: 200, description: "Vehicle retrieved successfully", content: new OA\JsonContent(ref: "#/components/schemas/SuccessResponse")),
+            new OA\Response(response: 404, description: "Vehicle not found", ref: "#/components/schemas/ErrorResponse")
+        ]
+    )]
     public function show(int $id): JsonResponse
     {
         try {
@@ -73,9 +124,29 @@ class VehicleController extends BaseController
         }
     }
 
-    /**
-     * Update the specified vehicle
-     */
+    #[OA\Put(
+        path: "/api/v1/vehicles/{id}",
+        summary: "Update vehicle",
+        description: "Update vehicle information",
+        security: [["sanctum" => []]],
+        tags: ["Vehicle Management"],
+        parameters: [
+            new OA\Parameter(name: "id", in: "path", required: true, description: "Vehicle ID", schema: new OA\Schema(type: "integer"))
+        ],
+        requestBody: new OA\RequestBody(
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: "color", type: "string", example: "Red"),
+                    new OA\Property(property: "license_plate", type: "string", example: "XYZ-5678"),
+                    new OA\Property(property: "current_mileage", type: "integer", example: 25000)
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: "Vehicle updated successfully", content: new OA\JsonContent(ref: "#/components/schemas/SuccessResponse")),
+            new OA\Response(response: 404, description: "Vehicle not found", ref: "#/components/schemas/ErrorResponse")
+        ]
+    )]
     public function update(Request $request, int $id): JsonResponse
     {
         try {
@@ -87,9 +158,32 @@ class VehicleController extends BaseController
         }
     }
 
-    /**
-     * Transfer vehicle ownership
-     */
+    #[OA\Post(
+        path: "/api/v1/vehicles/{id}/transfer-ownership",
+        summary: "Transfer vehicle ownership",
+        description: "Transfer vehicle to a new customer with complete ownership history tracking",
+        security: [["sanctum" => []]],
+        tags: ["Vehicle Management"],
+        parameters: [
+            new OA\Parameter(name: "id", in: "path", required: true, description: "Vehicle ID", schema: new OA\Schema(type: "integer"))
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ["new_customer_id"],
+                properties: [
+                    new OA\Property(property: "new_customer_id", type: "integer", example: 2, description: "ID of the new owner"),
+                    new OA\Property(property: "reason", type: "string", enum: ["sale", "gift", "trade", "inheritance", "other"], example: "sale"),
+                    new OA\Property(property: "notes", type: "string", example: "Vehicle sold to new owner")
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: "Ownership transferred successfully", content: new OA\JsonContent(ref: "#/components/schemas/SuccessResponse")),
+            new OA\Response(response: 404, description: "Vehicle not found", ref: "#/components/schemas/ErrorResponse"),
+            new OA\Response(response: 422, description: "Validation error", ref: "#/components/schemas/ValidationErrorResponse")
+        ]
+    )]
     public function transferOwnership(Request $request, int $id): JsonResponse
     {
         try {
@@ -111,9 +205,30 @@ class VehicleController extends BaseController
         }
     }
 
-    /**
-     * Update vehicle mileage
-     */
+    #[OA\Post(
+        path: "/api/v1/vehicles/{id}/update-mileage",
+        summary: "Update vehicle mileage",
+        description: "Record new mileage reading for a vehicle",
+        security: [["sanctum" => []]],
+        tags: ["Vehicle Management"],
+        parameters: [
+            new OA\Parameter(name: "id", in: "path", required: true, description: "Vehicle ID", schema: new OA\Schema(type: "integer"))
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ["mileage"],
+                properties: [
+                    new OA\Property(property: "mileage", type: "integer", example: 30000, description: "New mileage reading")
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: "Mileage updated successfully", content: new OA\JsonContent(ref: "#/components/schemas/SuccessResponse")),
+            new OA\Response(response: 404, description: "Vehicle not found", ref: "#/components/schemas/ErrorResponse"),
+            new OA\Response(response: 422, description: "Validation error", ref: "#/components/schemas/ValidationErrorResponse")
+        ]
+    )]
     public function updateMileage(Request $request, int $id): JsonResponse
     {
         try {
