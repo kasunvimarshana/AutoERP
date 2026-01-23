@@ -500,6 +500,7 @@ public function test_can_create_user(): void
 - **[USER_MODEL_GUIDELINES.md](USER_MODEL_GUIDELINES.md)** - ✨ NEW: User model usage guidelines
 - **[SECURITY.md](SECURITY.md)** - Security implementation guide
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contributing guidelines
+- **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)** - ✨ NEW: Complete API documentation with Swagger/OpenAPI
 
 #### Module Documentation
 - **[AUTH_IMPLEMENTATION_SUMMARY.md](AUTH_IMPLEMENTATION_SUMMARY.md)** - Auth module implementation summary
@@ -515,6 +516,7 @@ public function test_can_create_user(): void
 
 ### Quick Links
 
+- [API Documentation (Swagger UI)](/api/documentation) - Interactive API docs
 - [Security Best Practices](SECURITY.md#best-practices)
 - [Deployment Checklist](DEPLOYMENT.md#deployment-checklist)
 - [Authentication API](Modules/Auth/README.md)
