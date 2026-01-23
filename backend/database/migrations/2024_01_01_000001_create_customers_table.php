@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('customers', function (Blueprint $table) {
             $table->id();
             $table->uuid('uuid')->unique();
-            $table->foreignId('tenant_id')->nullable()->constrained()->cascadeOnDelete();
+            $table->unsignedBigInteger('tenant_id')->nullable();
             $table->string('customer_code')->unique();
             $table->enum('customer_type', ['individual', 'business'])->default('individual');
             

@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('vehicles', function (Blueprint $table) {
             $table->id();
             $table->uuid('uuid')->unique();
-            $table->foreignId('tenant_id')->nullable()->constrained()->cascadeOnDelete();
+            $table->unsignedBigInteger('tenant_id')->nullable();
             $table->foreignId('current_customer_id')->constrained('customers')->cascadeOnDelete();
             
             // Vehicle Identification
