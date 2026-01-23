@@ -673,6 +673,839 @@
                     }
                 }
             }
+        },
+        "/api/v1/customers": {
+            "get": {
+                "tags": [
+                    "Customer Management"
+                ],
+                "summary": "List all customers",
+                "description": "Retrieve a paginated list of customers with optional search and filtering. Results are automatically filtered by tenant.",
+                "operationId": "927216dac5e6a141aeb875ea758cbe95",
+                "parameters": [
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Search by name, email, or phone",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filter by status",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "active",
+                                "inactive"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "customer_type",
+                        "in": "query",
+                        "description": "Filter by customer type",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "individual",
+                                "business"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Results per page",
+                        "schema": {
+                            "type": "integer",
+                            "default": 15
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Customers retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Success"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "customer_type": {
+                                                                "type": "string",
+                                                                "example": "individual"
+                                                            },
+                                                            "first_name": {
+                                                                "type": "string",
+                                                                "example": "John"
+                                                            },
+                                                            "last_name": {
+                                                                "type": "string",
+                                                                "example": "Doe"
+                                                            },
+                                                            "email": {
+                                                                "type": "string",
+                                                                "example": "john@example.com"
+                                                            },
+                                                            "phone": {
+                                                                "type": "string",
+                                                                "example": "+1234567890"
+                                                            },
+                                                            "status": {
+                                                                "type": "string",
+                                                                "example": "active"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "per_page": {
+                                                    "type": "integer",
+                                                    "example": 15
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "example": 100
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/schemas/ErrorResponse"
+                    },
+                    "500": {
+                        "$ref": "#/components/schemas/ErrorResponse"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Customer Management"
+                ],
+                "summary": "Create a new customer",
+                "description": "Creates a new customer record (individual or business type)",
+                "operationId": "c8f1983edece688a83cff66836fa89b8",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "customer_type",
+                                    "first_name",
+                                    "email",
+                                    "phone"
+                                ],
+                                "properties": {
+                                    "customer_type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "individual",
+                                            "business"
+                                        ],
+                                        "example": "individual"
+                                    },
+                                    "first_name": {
+                                        "type": "string",
+                                        "example": "John"
+                                    },
+                                    "last_name": {
+                                        "type": "string",
+                                        "example": "Doe"
+                                    },
+                                    "company_name": {
+                                        "description": "Required for business customers",
+                                        "type": "string",
+                                        "example": "ABC Corp"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "john@example.com"
+                                    },
+                                    "phone": {
+                                        "type": "string",
+                                        "example": "+1234567890"
+                                    },
+                                    "address_line1": {
+                                        "type": "string",
+                                        "example": "123 Main St"
+                                    },
+                                    "address_line2": {
+                                        "type": "string",
+                                        "example": "Apt 4B"
+                                    },
+                                    "city": {
+                                        "type": "string",
+                                        "example": "New York"
+                                    },
+                                    "state": {
+                                        "type": "string",
+                                        "example": "NY"
+                                    },
+                                    "postal_code": {
+                                        "type": "string",
+                                        "example": "10001"
+                                    },
+                                    "country": {
+                                        "type": "string",
+                                        "example": "US"
+                                    },
+                                    "notes": {
+                                        "type": "string",
+                                        "example": "VIP customer"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Customer created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/schemas/ErrorResponse"
+                    },
+                    "422": {
+                        "$ref": "#/components/schemas/ValidationErrorResponse"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/customers/{id}": {
+            "get": {
+                "tags": [
+                    "Customer Management"
+                ],
+                "summary": "Get customer details",
+                "description": "Retrieve detailed information about a specific customer including their vehicles",
+                "operationId": "a69fd013533b28064fd7ea6be481597c",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Customer ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Customer retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/schemas/ErrorResponse"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Customer Management"
+                ],
+                "summary": "Update customer",
+                "description": "Update customer information",
+                "operationId": "0afbed14e9ba77231bdd7d92c6bbbed1",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Customer ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "first_name": {
+                                        "type": "string",
+                                        "example": "John"
+                                    },
+                                    "last_name": {
+                                        "type": "string",
+                                        "example": "Doe"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "john@example.com"
+                                    },
+                                    "phone": {
+                                        "type": "string",
+                                        "example": "+1234567890"
+                                    },
+                                    "status": {
+                                        "type": "string",
+                                        "enum": [
+                                            "active",
+                                            "inactive"
+                                        ],
+                                        "example": "active"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Customer updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/schemas/ErrorResponse"
+                    },
+                    "422": {
+                        "$ref": "#/components/schemas/ValidationErrorResponse"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Customer Management"
+                ],
+                "summary": "Delete customer",
+                "description": "Delete a customer from the system",
+                "operationId": "537959d5d5c7368973c08a7259d745f6",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Customer ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Customer deleted successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/schemas/ErrorResponse"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/customers/upcoming-services": {
+            "get": {
+                "tags": [
+                    "Customer Management"
+                ],
+                "summary": "Get customers with upcoming services",
+                "description": "Retrieve list of customers who have services scheduled in the near future",
+                "operationId": "a868fa62c3e90f6e9b0ed00345494694",
+                "responses": {
+                    "200": {
+                        "description": "Customers retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/schemas/ErrorResponse"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/vehicles": {
+            "get": {
+                "tags": [
+                    "Vehicle Management"
+                ],
+                "summary": "List all vehicles",
+                "description": "Retrieve a paginated list of vehicles with optional filtering by customer, service due date, etc.",
+                "operationId": "f8c14211ce59c33168e34f0e4e2108b2",
+                "parameters": [
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Search by VIN, make, model, or license plate",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filter by status",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "customer_id",
+                        "in": "query",
+                        "description": "Filter by customer ID",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "service_due",
+                        "in": "query",
+                        "description": "Filter vehicles with service due",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Results per page",
+                        "schema": {
+                            "type": "integer",
+                            "default": 15
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Vehicles retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/schemas/ErrorResponse"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Vehicle Management"
+                ],
+                "summary": "Register a new vehicle",
+                "description": "Create a new vehicle record and assign it to a customer",
+                "operationId": "ef58be040919a6f0283a36819f8c67f3",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "customer_id",
+                                    "make",
+                                    "model",
+                                    "year",
+                                    "vin"
+                                ],
+                                "properties": {
+                                    "customer_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "make": {
+                                        "type": "string",
+                                        "example": "Toyota"
+                                    },
+                                    "model": {
+                                        "type": "string",
+                                        "example": "Camry"
+                                    },
+                                    "year": {
+                                        "type": "integer",
+                                        "example": 2022
+                                    },
+                                    "vin": {
+                                        "type": "string",
+                                        "example": "1HGBH41JXMN109186"
+                                    },
+                                    "license_plate": {
+                                        "type": "string",
+                                        "example": "ABC-1234"
+                                    },
+                                    "color": {
+                                        "type": "string",
+                                        "example": "Blue"
+                                    },
+                                    "current_mileage": {
+                                        "type": "integer",
+                                        "example": 15000
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Vehicle created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/schemas/ValidationErrorResponse"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/vehicles/{id}": {
+            "get": {
+                "tags": [
+                    "Vehicle Management"
+                ],
+                "summary": "Get vehicle details",
+                "description": "Retrieve detailed vehicle information including current owner and ownership history",
+                "operationId": "241f82649ea1dfea2e3f9c0cd28e20fc",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Vehicle ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Vehicle retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/schemas/ErrorResponse"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Vehicle Management"
+                ],
+                "summary": "Update vehicle",
+                "description": "Update vehicle information",
+                "operationId": "67d21eb541f09b8521689a545269a309",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Vehicle ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "color": {
+                                        "type": "string",
+                                        "example": "Red"
+                                    },
+                                    "license_plate": {
+                                        "type": "string",
+                                        "example": "XYZ-5678"
+                                    },
+                                    "current_mileage": {
+                                        "type": "integer",
+                                        "example": 25000
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Vehicle updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/schemas/ErrorResponse"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/vehicles/{id}/transfer-ownership": {
+            "post": {
+                "tags": [
+                    "Vehicle Management"
+                ],
+                "summary": "Transfer vehicle ownership",
+                "description": "Transfer vehicle to a new customer with complete ownership history tracking",
+                "operationId": "fa0269965db26376fd2ae99e8b878936",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Vehicle ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "new_customer_id"
+                                ],
+                                "properties": {
+                                    "new_customer_id": {
+                                        "description": "ID of the new owner",
+                                        "type": "integer",
+                                        "example": 2
+                                    },
+                                    "reason": {
+                                        "type": "string",
+                                        "enum": [
+                                            "sale",
+                                            "gift",
+                                            "trade",
+                                            "inheritance",
+                                            "other"
+                                        ],
+                                        "example": "sale"
+                                    },
+                                    "notes": {
+                                        "type": "string",
+                                        "example": "Vehicle sold to new owner"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Ownership transferred successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/schemas/ErrorResponse"
+                    },
+                    "422": {
+                        "$ref": "#/components/schemas/ValidationErrorResponse"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/vehicles/{id}/update-mileage": {
+            "post": {
+                "tags": [
+                    "Vehicle Management"
+                ],
+                "summary": "Update vehicle mileage",
+                "description": "Record new mileage reading for a vehicle",
+                "operationId": "a450886dad5b551fd15df9d0dacc63d5",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Vehicle ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "mileage"
+                                ],
+                                "properties": {
+                                    "mileage": {
+                                        "description": "New mileage reading",
+                                        "type": "integer",
+                                        "example": 30000
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Mileage updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/schemas/ErrorResponse"
+                    },
+                    "422": {
+                        "$ref": "#/components/schemas/ValidationErrorResponse"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
         }
     },
     "components": {
@@ -784,6 +1617,14 @@
         {
             "name": "Authentication",
             "description": "Authentication and authorization endpoints including register, login, logout, password management, and token refresh"
+        },
+        {
+            "name": "Customer Management",
+            "description": "Customer profiles (individual and business), multi-vehicle ownership, service scheduling, and customer analytics"
+        },
+        {
+            "name": "Vehicle Management",
+            "description": "Vehicle CRUD, ownership transfer with history, mileage tracking, and service intervals"
         }
     ]
 }
