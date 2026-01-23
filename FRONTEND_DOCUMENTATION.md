@@ -9,12 +9,17 @@ This document provides comprehensive documentation for the Vue.js 3 frontend imp
 - **Vue.js 3.5+** - Progressive JavaScript framework with Composition API
 - **Vue Router 4.5+** - Official routing library for Vue.js
 - **Pinia 2.2+** - Official state management library for Vue.js
-- **Vue I18n 10+** - Internationalization plugin
+- **Vue I18n 11+** - Internationalization plugin
 - **Vite 6+** - Next-generation frontend build tool
-- **Tailwind CSS 3.4+** - Utility-first CSS framework
+- **Tailwind CSS 3.4+** - Utility-first CSS framework (used for public pages)
+- **AdminLTE 4.0** - Professional admin dashboard template (used for authenticated pages)
+- **Bootstrap 5.3+** - CSS framework (required by AdminLTE)
+- **Font Awesome 6.7+** - Icon library
 - **Axios 1.7+** - Promise-based HTTP client
 - **Headless UI** - Unstyled, accessible UI components
 - **Heroicons** - Beautiful hand-crafted SVG icons
+
+> **Note**: For detailed AdminLTE integration documentation, see [ADMINLTE_INTEGRATION.md](ADMINLTE_INTEGRATION.md)
 
 ## Project Structure
 
@@ -22,9 +27,11 @@ This document provides comprehensive documentation for the Vue.js 3 frontend imp
 resources/js/
 ├── components/           # Reusable UI components
 │   ├── Alert.vue        # Alert/notification component
-│   ├── AuthLayout.vue   # Layout for auth pages
+│   ├── AuthLayout.vue   # Layout for auth pages (Tailwind)
 │   ├── FormButton.vue   # Reusable button component
 │   └── FormInput.vue    # Reusable input component
+├── layouts/             # Layout components
+│   └── AdminLayout.vue  # AdminLTE layout for authenticated pages
 ├── i18n/                # Internationalization
 │   ├── locales/         # Translation files
 │   │   ├── en.js       # English translations
@@ -32,14 +39,14 @@ resources/js/
 │   │   └── fr.js       # French translations
 │   └── index.js        # i18n configuration
 ├── pages/               # Page components
-│   ├── auth/           # Authentication pages
+│   ├── auth/           # Authentication pages (Tailwind)
 │   │   ├── Login.vue
 │   │   ├── Register.vue
 │   │   ├── ForgotPassword.vue
 │   │   └── ResetPassword.vue
-│   ├── Dashboard.vue   # Main dashboard
-│   ├── Profile.vue     # User profile
-│   ├── Home.vue        # Landing page
+│   ├── Dashboard.vue   # Main dashboard (AdminLTE)
+│   ├── Profile.vue     # User profile (AdminLTE)
+│   ├── Home.vue        # Landing page (Tailwind)
 │   └── NotFound.vue    # 404 page
 ├── router/             # Vue Router configuration
 │   └── index.js       # Routes and navigation guards

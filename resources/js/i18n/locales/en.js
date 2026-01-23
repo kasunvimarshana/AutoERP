@@ -47,6 +47,7 @@ export default {
     no: 'No',
     confirm: 'Confirm',
     home: 'Home',
+    settings: 'Settings',
   },
   validation: {
     required: 'This field is required',

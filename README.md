@@ -69,8 +69,9 @@ This application strictly follows a **Modular Architecture** with the **Controll
 ### Frontend (Optional)
 - **Framework**: Vue.js 3.x
 - **Build Tool**: Vite
-- **Styling**: Tailwind CSS
-- **UI Components**: AdminLTE (optional)
+- **Styling**: Tailwind CSS (public pages) + AdminLTE 4.0 (admin pages)
+- **UI Components**: AdminLTE, Bootstrap 5
+- **Icons**: Font Awesome
 - **State Management**: Pinia
 - **Routing**: Vue Router
 - **i18n**: Vue I18n
@@ -483,6 +484,8 @@ public function test_can_create_user(): void
 - **[INSTALLATION.md](INSTALLATION.md)** - Installation instructions
 - **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** - Project summary
 - **[AUTH_IMPLEMENTATION_SUMMARY.md](AUTH_IMPLEMENTATION_SUMMARY.md)** - ✨ NEW: Auth module implementation summary
+- **[FRONTEND_DOCUMENTATION.md](FRONTEND_DOCUMENTATION.md)** - Vue.js frontend documentation
+- **[ADMINLTE_INTEGRATION.md](ADMINLTE_INTEGRATION.md)** - ✨ NEW: AdminLTE integration guide
 - **[Modules/Auth/README.md](Modules/Auth/README.md)** - ✨ NEW: Authentication API documentation
 
 ### Quick Links

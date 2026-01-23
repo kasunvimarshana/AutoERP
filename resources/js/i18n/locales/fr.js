@@ -47,6 +47,7 @@ export default {
     no: 'Non',
     confirm: 'Confirmer',
     home: 'Accueil',
+    settings: 'Paramètres',
   },
   validation: {
     required: 'Ce champ est requis',

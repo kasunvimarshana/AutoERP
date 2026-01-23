@@ -47,6 +47,7 @@ export default {
     no: 'No',
     confirm: 'Confirmar',
     home: 'Inicio',
+    settings: 'Configuración',
   },
   validation: {
     required: 'Este campo es obligatorio',

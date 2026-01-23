@@ -1,114 +1,121 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <nav class="bg-white shadow-sm">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between h-16">
-          <div class="flex">
-            <div class="flex-shrink-0 flex items-center">
-              <h1 class="text-xl font-bold text-indigo-600">ModularSaaS</h1>
-            </div>
-            <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
-              <RouterLink
-                to="/dashboard"
-                class="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-              >
-                {{ $t('dashboard.title') }}
-              </RouterLink>
-              <RouterLink
-                to="/profile"
-                class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-              >
-                {{ $t('profile.title') }}
-              </RouterLink>
-            </div>
+  <AdminLayout :page-title="$t('dashboard.title')">
+    <!-- Welcome Message -->
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">{{ $t('dashboard.welcome') }}, {{ authStore.userName }}!</h3>
           </div>
-          <div class="hidden sm:ml-6 sm:flex sm:items-center">
-            <div class="ml-3 relative">
-              <div class="flex items-center space-x-4">
-                <span class="text-sm text-gray-700">{{ authStore.userName }}</span>
-                <button
-                  @click="handleLogout"
-                  class="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  {{ $t('auth.logout') }}
-                </button>
+          <div class="card-body">
+            <p class="mb-0">Welcome to your dashboard. Here's an overview of your account.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="row">
+      <!-- Email Box -->
+      <div class="col-lg-4 col-6">
+        <div class="small-box bg-info">
+          <div class="inner">
+            <h3 style="font-size: 1.2rem; overflow-wrap: break-word;">{{ authStore.userEmail }}</h3>
+            <p>Email Address</p>
+          </div>
+          <div class="icon">
+            <i class="fas fa-envelope"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Roles Box -->
+      <div class="col-lg-4 col-6">
+        <div class="small-box bg-success">
+          <div class="inner">
+            <h3>{{ authStore.userRoles.length }}</h3>
+            <p>
+              <span v-for="role in authStore.userRoles" :key="role" class="badge badge-light mr-1">
+                {{ role }}
+              </span>
+            </p>
+            <p v-if="authStore.userRoles.length === 0">No roles assigned</p>
+          </div>
+          <div class="icon">
+            <i class="fas fa-user-tag"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Permissions Box -->
+      <div class="col-lg-4 col-6">
+        <div class="small-box bg-warning">
+          <div class="inner">
+            <h3>{{ authStore.userPermissions.length }}</h3>
+            <p>Permissions</p>
+          </div>
+          <div class="icon">
+            <i class="fas fa-shield-alt"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- User Details Card -->
+    <div class="row">
+      <div class="col-12">
+        <div class="card card-primary">
+          <div class="card-header">
+            <h3 class="card-title"><i class="fas fa-user mr-2"></i>Account Information</h3>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6">
+                <dl class="row">
+                  <dt class="col-sm-4">Name:</dt>
+                  <dd class="col-sm-8">{{ authStore.userName }}</dd>
+                  
+                  <dt class="col-sm-4">Email:</dt>
+                  <dd class="col-sm-8">{{ authStore.userEmail }}</dd>
+                  
+                  <dt class="col-sm-4">Roles:</dt>
+                  <dd class="col-sm-8">
+                    <span v-for="role in authStore.userRoles" :key="role" class="badge badge-success mr-1">
+                      {{ role }}
+                    </span>
+                    <span v-if="authStore.userRoles.length === 0" class="text-muted">No roles assigned</span>
+                  </dd>
+                </dl>
+              </div>
+              <div class="col-md-6">
+                <dl class="row">
+                  <dt class="col-sm-4">Permissions:</dt>
+                  <dd class="col-sm-8">{{ authStore.userPermissions.length }} permissions</dd>
+                  
+                  <dt class="col-sm-4">Status:</dt>
+                  <dd class="col-sm-8"><span class="badge badge-success">Active</span></dd>
+                </dl>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </nav>
-
-    <div class="py-10">
-      <header>
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 class="text-3xl font-bold leading-tight text-gray-900">
-            {{ $t('dashboard.title') }}
-          </h1>
-        </div>
-      </header>
-      <main>
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-          <div class="px-4 py-8 sm:px-0">
-            <div class="bg-white shadow overflow-hidden sm:rounded-lg">
-              <div class="px-4 py-5 sm:p-6">
-                <h3 class="text-lg leading-6 font-medium text-gray-900">
-                  {{ $t('dashboard.welcome') }}, {{ authStore.userName }}!
-                </h3>
-                <div class="mt-5">
-                  <dl class="grid grid-cols-1 gap-5 sm:grid-cols-3">
-                    <div class="px-4 py-5 bg-gray-50 shadow rounded-lg overflow-hidden sm:p-6">
-                      <dt class="text-sm font-medium text-gray-500 truncate">
-                        Email
-                      </dt>
-                      <dd class="mt-1 text-3xl font-semibold text-gray-900">
-                        {{ authStore.userEmail }}
-                      </dd>
-                    </div>
-                    <div class="px-4 py-5 bg-gray-50 shadow rounded-lg overflow-hidden sm:p-6">
-                      <dt class="text-sm font-medium text-gray-500 truncate">
-                        Roles
-                      </dt>
-                      <dd class="mt-1 text-lg font-semibold text-gray-900">
-                        <span
-                          v-for="role in authStore.userRoles"
-                          :key="role"
-                          class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 mr-1"
-                        >
-                          {{ role }}
-                        </span>
-                      </dd>
-                    </div>
-                    <div class="px-4 py-5 bg-gray-50 shadow rounded-lg overflow-hidden sm:p-6">
-                      <dt class="text-sm font-medium text-gray-500 truncate">
-                        Permissions
-                      </dt>
-                      <dd class="mt-1 text-sm font-semibold text-gray-900">
-                        {{ authStore.userPermissions.length }} permissions
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
     </div>
-  </div>
+  </AdminLayout>
 </template>
 
 <script setup>
-import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useI18n } from 'vue-i18n';
+import AdminLayout from '@/layouts/AdminLayout.vue';
 
-const router = useRouter();
 const authStore = useAuthStore();
 const { t } = useI18n();
-
-const handleLogout = async () => {
-  await authStore.logout();
-  router.push('/login');
-};
 </script>
+
+<style scoped>
+/* Ensure email text doesn't overflow */
+.small-box .inner h3 {
+  word-break: break-all;
+}
+</style>
