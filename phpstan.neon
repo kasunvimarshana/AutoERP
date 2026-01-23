@@ -1,0 +1,17 @@
+includes:
+    - ./vendor/larastan/larastan/extension.neon
+
+parameters:
+    paths:
+        - app
+        - modules
+    
+    level: 5
+    
+    ignoreErrors:
+        - '#should return .* but returns Illuminate\\Database\\Eloquent\\Model#'
+        - '#Access to an undefined property Illuminate\\Database\\Eloquent\\Model::\$#'
+        - '#Call to an undefined method App\\Contracts\\RepositoryInterface::#'
+    
+    excludePaths:
+        - ./*/*/FileToBeExcluded.php

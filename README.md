@@ -1,210 +1,123 @@
-# AutoERP - Vehicle Service Center SaaS Platform
+# Modular SaaS Vehicle Service Application
 
-[![Laravel](https://img.shields.io/badge/Laravel-11.x-FF2D20?logo=laravel)](https://laravel.com)
-[![Vue.js](https://img.shields.io/badge/Vue.js-3.x-4FC08D?logo=vue.js)](https://vuejs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript)](https://www.typescriptlang.org)
-[![PHP](https://img.shields.io/badge/PHP-8.3+-777BB4?logo=php)](https://www.php.net)
-
-**Production-ready, enterprise-level modular SaaS application for vehicle service centers and auto repair garages.**
-
-Built with **Laravel 11** backend and **Vue.js 3** frontend, implementing **Clean Architecture** principles with a strict **Controller → Service → Repository** pattern. Features comprehensive multi-tenancy support, event-driven architecture, full internationalization, and enterprise-grade security.
-
-## 🎯 Key Features
-
-- ✅ **Clean Architecture** - Controller → Service → Repository pattern
-- ✅ **Multi-Tenancy** - Complete tenant isolation and data segregation
-- ✅ **Event-Driven** - Asynchronous processing and decoupled modules
-- ✅ **Transaction Management** - Atomic operations with automatic rollback
-- ✅ **Audit Trails** - Complete activity logging and history tracking
-- ✅ **REST API** - Versioned, well-documented API endpoints
-- ✅ **TypeScript Frontend** - Type-safe Vue.js 3 with Pinia state management
-- ✅ **SOLID Principles** - Maintainable, testable, and scalable code
-
-## 📋 Implemented Modules
-
-### Customer & Vehicle Management ✅
-- Customer profiles (individual and business)
-- Multi-vehicle ownership tracking
-- Ownership transfer with complete history
-- Service scheduling and reminders
-- Mileage tracking and service intervals
-- Customer lifetime value analytics
-
-### Coming Soon
-- 📅 Appointments & Bay Scheduling
-- 📝 Job Cards & Workflows
-- 📦 Inventory & Procurement
-- 💰 Invoicing & Payments
-- 📞 CRM & Customer Engagement
-- 🚗 Fleet & Telematics
-- 📊 Reporting & Analytics
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- PHP 8.3+
-- Composer 2.x
-- Node.js 20.x+
-- MySQL 8.0+ or PostgreSQL 14+
-
-### Backend Setup
-
-```bash
-cd backend
-composer install
-cp .env.example .env
-php artisan key:generate
-php artisan migrate
-php artisan serve
-```
-
-### Frontend Setup
-
-```bash
-cd frontend
-npm install
-echo "VITE_API_URL=http://localhost:8000/api/v1" > .env
-npm run dev
-```
-
-Visit `http://localhost:5173` to see the frontend.
-
-## 📚 Documentation
-
-Comprehensive documentation is available in [DOCUMENTATION.md](./DOCUMENTATION.md), including:
-
-- Architecture overview and design patterns
-- Complete API documentation
-- Database schema
-- Transaction management
-- Event system
-- Deployment guide
-- Security best practices
+A production-ready, enterprise-grade modular SaaS application for vehicle service centers and auto repair garages built with Laravel and Vue.js.
 
 ## 🏗️ Architecture
 
+This application implements **Clean Architecture** with strict adherence to:
+- **Controller → Service → Repository** pattern
+- **SOLID** principles
+- **DRY** (Don't Repeat Yourself)
+- **KISS** (Keep It Simple, Stupid)
+
+## ✨ Key Features
+
+### Core Modules
+
+1. **Customer & Vehicle Management**
+   - Customer profiles and relationships
+   - Vehicle registration and ownership tracking
+   - Service history across all branches
+   - Meter readings and maintenance tracking
+
+2. **Appointments & Bay Scheduling**
+3. **Job Cards & Workflows**
+4. **Inventory & Procurement**
+5. **Invoicing & Payments**
+6. **CRM & Customer Engagement**
+7. **Fleet & Telematics**
+8. **Reporting & Analytics**
+
+### Technical Features
+
+- **Multi-Tenancy**: Complete tenant isolation
+- **Multi-Branch**: Operations across multiple service centers
+- **RBAC/ABAC**: Role and attribute-based access control
+- **Transaction Management**: Explicit boundaries, rollback mechanisms
+- **Event-Driven**: Asynchronous workflows via events
+- **REST API**: Clean, versioned API endpoints
+- **i18n**: Full internationalization support
+
+## 📁 Project Structure
+
 ```
-┌─────────────────────────────────────────────────┐
-│              Vue.js 3 Frontend                  │
-│  TypeScript + Pinia + Vue Router + Axios        │
-└─────────────────┬───────────────────────────────┘
-                  │ REST API (JSON)
-┌─────────────────▼───────────────────────────────┐
-│              Controllers Layer                   │
-│   (HTTP handling, validation, responses)         │
-└─────────────────┬───────────────────────────────┘
-                  │
-┌─────────────────▼───────────────────────────────┐
-│              Services Layer                      │
-│   (Business logic, orchestration, events)        │
-└─────────────────┬───────────────────────────────┘
-                  │
-┌─────────────────▼───────────────────────────────┐
-│             Repositories Layer                   │
-│         (Data access, queries)                   │
-└─────────────────┬───────────────────────────────┘
-                  │
-┌─────────────────▼───────────────────────────────┐
-│         Models & Database                        │
-│    (Eloquent ORM, Relationships)                 │
-└──────────────────────────────────────────────────┘
-```
-
-## 🛠️ Technology Stack
-
-**Backend:**
-- Laravel 11.x (PHP 8.3+)
-- Laravel Sanctum (Authentication)
-- Spatie Packages (Multi-tenancy, Permissions, Activity Log)
-- MySQL/PostgreSQL
-
-**Frontend:**
-- Vue.js 3 (Composition API)
-- TypeScript
-- Pinia (State Management)
-- Vue Router
-- Axios
-- Tailwind CSS
-
-## 🔐 Security Features
-
-- Token-based API authentication (Laravel Sanctum)
-- Role-Based Access Control (RBAC)
-- Tenant isolation at database level
-- Complete audit trails
-- Input validation and sanitization
-- CSRF protection
-- SQL injection prevention
-- XSS protection
-
-## 📊 API Example
-
-### Create Customer
-
-```http
-POST /api/v1/customers
-Content-Type: application/json
-
-{
-  "customer_type": "individual",
-  "first_name": "John",
-  "last_name": "Doe",
-  "email": "john.doe@example.com",
-  "phone": "+1234567890",
-  "address_line1": "123 Main St",
-  "city": "New York",
-  "country": "US"
-}
+ModularSaaS-LaravelVue/
+├── app/
+│   ├── Contracts/          # Interfaces for patterns
+│   ├── Repositories/       # Base repository implementation
+│   └── Services/           # Base service implementation
+├── modules/                # Modular architecture
+│   ├── Customer/           # Complete example module
+│   ├── Vehicle/            # Cross-module interaction example
+│   └── [Other Modules]/
+├── docs/                   # Comprehensive documentation
+└── tests/                  # Unit and integration tests
 ```
 
-### Transfer Vehicle Ownership
+## 🚀 Getting Started
 
-```http
-POST /api/v1/vehicles/{id}/transfer-ownership
-Content-Type: application/json
+### Prerequisites
 
-{
-  "new_customer_id": 2,
-  "reason": "sale",
-  "notes": "Vehicle sold to new owner"
-}
+- PHP 8.2+
+- Composer
+- Node.js 18+
+- MySQL/PostgreSQL or SQLite
+
+### Installation
+
+```bash
+# Clone repository
+git clone https://github.com/kasunvimarshana/ModularSaaS-LaravelVue.git
+cd ModularSaaS-LaravelVue
+
+# Install dependencies
+composer install
+npm install
+
+# Setup environment
+cp .env.example .env
+php artisan key:generate
+
+# Run migrations
+php artisan migrate
+
+# Build assets
+npm run build
 ```
+
+## 📚 Documentation
+
+- [Architecture Overview](ARCHITECTURE.md)
+- [Module Development Guide](docs/MODULE_DEVELOPMENT.md)
+- [Database Schema](docs/DATABASE.md)
+- [API Documentation](docs/API.md)
 
 ## 🧪 Testing
 
 ```bash
-# Backend tests
-cd backend
 php artisan test
-
-# Frontend tests
-cd frontend
-npm run test:unit
 ```
 
-## 📦 Deployment
+## 🔒 Security
 
-See [DOCUMENTATION.md](./DOCUMENTATION.md#deployment) for detailed deployment instructions including:
+- Tenant isolation at query level
+- RBAC/ABAC for access control
+- Encryption at rest and in transit
+- Immutable audit trails
 
-- Production checklist
-- Environment configuration
-- Queue workers setup
-- Scheduled tasks
-- Performance optimization
+## 🛠️ Technology Stack
 
-## 🤝 Contributing
+- **Backend**: Laravel 11 (PHP 8.2+)
+- **Frontend**: Vue.js 3
+- **UI**: Tailwind CSS, AdminLTE
+- **Database**: MySQL/PostgreSQL/SQLite
+- **Authentication**: Laravel Sanctum
 
-This is a demonstration project showcasing enterprise-level Laravel and Vue.js architecture. Contributions are welcome!
+## 📝 Example Modules
+
+- **Customer Module**: Complete CRUD with search and statistics
+- **Vehicle Module**: Cross-module interactions, ownership transfer
 
 ## 📄 License
 
-Proprietary. All rights reserved.
-
-## 📧 Contact
-
-For more information or support, please open an issue in this repository.
-
----
-
-**Built with modern best practices for the automotive service industry** 🚗💨
+MIT License

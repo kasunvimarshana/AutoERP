@@ -1,471 +1,143 @@
-# AutoERP Architecture Guide
+# Modular SaaS Vehicle Service Application
 
-## System Architecture Overview
+## Architecture Overview
 
-AutoERP follows a **clean architecture** approach with clear separation of concerns across multiple layers. This document provides detailed insights into the architectural decisions and patterns used.
+This application implements a complete modular SaaS solution for vehicle service centers following Clean Architecture principles with strict adherence to SOLID, DRY, and KISS.
 
-## Layered Architecture
+### Core Architectural Patterns
 
-### 1. Presentation Layer (Controllers)
+#### 1. Controller → Service → Repository Pattern
+- **Controllers**: Handle HTTP requests, validation, and response formatting
+- **Services**: Contain business logic, orchestrate cross-module interactions, manage transactions
+- **Repositories**: Abstract data access layer, provide clean interface to data persistence
 
-**Responsibility**: HTTP request/response handling, input validation, and API responses
+#### 2. Multi-Tenancy Support
+- Tenant isolation at database and application level
+- Tenant-scoped queries and operations
+- Centralized tenant context management
 
-**Location**: `app/Modules/*/Http/Controllers`
+#### 3. Transaction Management
+- All cross-module interactions use explicit transaction boundaries
+- Consistent exception propagation
+- Global rollback mechanisms for data integrity
 
-**Key Principles**:
-- Controllers are thin and delegate business logic to services
-- Use Form Request classes for validation
-- Return standardized JSON responses using BaseController methods
-- Handle authentication and authorization
+#### 4. Event-Driven Architecture
+- Asynchronous workflows using events
+- Decoupled module communication
+- Event listeners for notifications, logging, and CRM automation
 
-**Example**:
-```php
-class CustomerController extends BaseController
-{
-    public function store(StoreCustomerRequest $request): JsonResponse
-    {
-        try {
-            $customer = $this->customerService->create($request->validated());
-            return $this->created($customer, 'Customer created successfully');
-        } catch (\Exception $e) {
-            return $this->error($e->getMessage(), 500);
-        }
-    }
-}
+### Module Structure
+
+Each module follows this structure:
+```
+modules/{ModuleName}/
+├── Controllers/          # HTTP request handlers
+├── Services/            # Business logic layer
+├── Repositories/        # Data access layer
+├── Models/              # Eloquent models
+├── Migrations/          # Database migrations
+├── Requests/            # Form request validation
+├── Policies/            # Authorization policies
+├── Events/              # Domain events
+├── Listeners/           # Event listeners
+├── Resources/           # API resources (transformers)
+└── Tests/               # Module-specific tests
 ```
 
-### 2. Business Logic Layer (Services)
+### Core Modules
 
-**Responsibility**: Business rules, orchestration, transaction management, and event dispatching
+1. **Auth Module**: Authentication, authorization, RBAC/ABAC
+2. **Customer Module**: Customer management, relationships
+3. **Vehicle Module**: Vehicle data, ownership, service history
+4. **Branch Module**: Multi-branch operations, configurations
+5. **Appointment Module**: Scheduling, bay management
+6. **JobCard Module**: Work orders, workflows, inspections
+7. **Inventory Module**: Stock management, procurement
+8. **Invoice Module**: Billing, payments, commissions
+9. **CRM Module**: Customer engagement, notifications
+10. **Fleet Module**: Fleet management, telematics integration
+11. **Reporting Module**: Analytics, KPIs, dashboards
 
-**Location**: `app/Modules/*/Services`
+### Security Standards
 
-**Key Principles**:
-- Encapsulate complex business logic
-- Orchestrate multiple repository calls
-- Manage database transactions
-- Dispatch domain events
-- Implement cross-cutting concerns
+- Tenant isolation enforced at query level
+- RBAC for role-based permissions
+- ABAC for attribute-based access control
+- Data encryption at rest and in transit
+- Immutable audit trails
+- Structured logging for all operations
 
-**Transaction Pattern**:
-```php
-public function create(array $data): Model
-{
-    try {
-        DB::beginTransaction();
-        
-        $record = $this->repository->create($data);
-        $this->afterCreate($record, $data);
-        
-        DB::commit();
-        
-        event(new EntityCreated($record));
-        
-        return $record;
-    } catch (\Exception $e) {
-        DB::rollBack();
-        Log::error('Creation failed', ['error' => $e->getMessage()]);
-        throw $e;
-    }
-}
+### API Design
+
+- RESTful API design
+- API versioning (v1, v2, etc.)
+- Consistent response format
+- Rate limiting
+- OpenAPI/Swagger documentation
+
+### Testing Strategy
+
+- Unit tests for repositories and services
+- Integration tests for controllers
+- Feature tests for end-to-end workflows
+- Continuous integration pipeline
+
+### Technology Stack
+
+- **Backend**: Laravel 11 (PHP 8.2+)
+- **Frontend**: Vue.js 3 with Composition API
+- **UI Framework**: Tailwind CSS, AdminLTE
+- **State Management**: Pinia
+- **Database**: MySQL/PostgreSQL with multi-tenancy
+- **Queue**: Redis/Database queues
+- **Cache**: Redis
+- **Testing**: PHPUnit, Pest
+
+## Getting Started
+
+### Installation
+
+```bash
+# Install PHP dependencies
+composer install
+
+# Set up environment
+cp .env.example .env
+php artisan key:generate
+
+# Run migrations
+php artisan migrate
+
+# Install frontend dependencies
+npm install
+
+# Build frontend assets
+npm run build
 ```
 
-### 3. Data Access Layer (Repositories)
+### Development
 
-**Responsibility**: Database queries, data retrieval, and persistence
+```bash
+# Run development server
+php artisan serve
 
-**Location**: `app/Modules/*/Repositories`
+# Run frontend dev server
+npm run dev
 
-**Key Principles**:
-- Abstract database operations
-- Provide clean API for data access
-- Handle query optimization
-- Return Eloquent collections or models
+# Run tests
+php artisan test
 
-**Example**:
-```php
-class CustomerRepository extends BaseRepository
-{
-    public function search(array $criteria)
-    {
-        $query = $this->model->query();
-        
-        if (!empty($criteria['search'])) {
-            $query->where('email', 'like', "%{$criteria['search']}%");
-        }
-        
-        return $query->paginate($criteria['per_page'] ?? 15);
-    }
-}
+# Run static analysis
+./vendor/bin/phpstan analyse
 ```
 
-### 4. Domain Layer (Models)
+## Documentation
 
-**Responsibility**: Data representation, relationships, and domain logic
+- [API Documentation](docs/api.md)
+- [Module Development Guide](docs/modules.md)
+- [Database Schema](docs/database.md)
+- [Deployment Guide](docs/deployment.md)
 
-**Location**: `app/Modules/*/Models`
+## License
 
-**Key Principles**:
-- Define relationships
-- Implement scopes
-- Add accessor/mutator methods
-- Configure model behavior
-
-## Module Structure
-
-Each module follows a consistent structure:
-
-```
-Modules/
-└── CustomerManagement/
-    ├── Models/              # Eloquent models
-    ├── Repositories/        # Data access layer
-    ├── Services/            # Business logic
-    ├── Http/
-    │   ├── Controllers/     # HTTP controllers
-    │   └── Requests/        # Form validation
-    ├── Events/              # Domain events
-    ├── Listeners/           # Event handlers
-    ├── Policies/            # Authorization rules
-    └── Database/
-        └── Migrations/      # Database migrations
-```
-
-## Cross-Module Communication
-
-### Event-Driven Communication
-
-Modules communicate through events to maintain loose coupling:
-
-```php
-// In CustomerService
-event(new CustomerCreated($customer));
-
-// In NotificationListener
-public function handle(CustomerCreated $event)
-{
-    Mail::to($event->customer->email)->send(new WelcomeEmail($event->customer));
-}
-```
-
-### Service-to-Service Communication
-
-When synchronous communication is needed:
-
-```php
-class OrderService extends BaseService
-{
-    protected CustomerService $customerService;
-    protected VehicleService $vehicleService;
-    
-    public function __construct(
-        OrderRepository $repository,
-        CustomerService $customerService,
-        VehicleService $vehicleService
-    ) {
-        parent::__construct($repository);
-        $this->customerService = $customerService;
-        $this->vehicleService = $vehicleService;
-    }
-    
-    public function createOrder(array $data): Order
-    {
-        DB::beginTransaction();
-        try {
-            $customer = $this->customerService->findById($data['customer_id']);
-            $vehicle = $this->vehicleService->findById($data['vehicle_id']);
-            
-            $order = $this->repository->create($data);
-            
-            // Update customer lifetime value
-            $this->customerService->updateLifetimeValue(
-                $customer->id, 
-                $order->total
-            );
-            
-            DB::commit();
-            return $order;
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-    }
-}
-```
-
-## Database Design Patterns
-
-### 1. UUID Support
-
-All entities have both `id` (auto-increment) and `uuid` (universally unique):
-
-```php
-Schema::create('customers', function (Blueprint $table) {
-    $table->id();                    // Primary key for performance
-    $table->uuid('uuid')->unique();  // Public identifier
-    // ...
-});
-```
-
-### 2. Soft Deletes
-
-Critical entities use soft deletes for data retention:
-
-```php
-use SoftDeletes;
-
-protected $fillable = [...];
-protected $dates = ['deleted_at'];
-```
-
-### 3. Multi-Tenancy
-
-Tenant isolation at the database level:
-
-```php
-Schema::create('vehicles', function (Blueprint $table) {
-    $table->foreignId('tenant_id')->nullable()->constrained()->cascadeOnDelete();
-    // ...
-});
-
-// In model
-public function scopeForTenant($query, int $tenantId)
-{
-    return $query->where('tenant_id', $tenantId);
-}
-```
-
-### 4. Audit Trails
-
-Using Spatie Activity Log:
-
-```php
-use LogsActivity;
-
-public function getActivitylogOptions(): LogOptions
-{
-    return LogOptions::defaults()
-        ->logOnly(['*'])
-        ->logOnlyDirty()
-        ->dontSubmitEmptyLogs();
-}
-```
-
-## Security Patterns
-
-### 1. Authorization
-
-Policy-based authorization:
-
-```php
-// In Policy
-public function update(User $user, Customer $customer): bool
-{
-    return $user->tenant_id === $customer->tenant_id;
-}
-
-// In Controller
-$this->authorize('update', $customer);
-```
-
-### 2. Input Validation
-
-Form Request validation:
-
-```php
-class StoreCustomerRequest extends FormRequest
-{
-    public function rules(): array
-    {
-        return [
-            'email' => 'required|email|unique:customers,email',
-            'phone' => 'required|string|max:20',
-        ];
-    }
-}
-```
-
-### 3. Mass Assignment Protection
-
-Strict fillable/guarded definitions:
-
-```php
-protected $fillable = ['first_name', 'last_name', 'email'];
-protected $guarded = ['id', 'tenant_id'];
-```
-
-## API Design Patterns
-
-### 1. RESTful Resources
-
-```
-GET    /api/v1/customers          # List customers
-POST   /api/v1/customers          # Create customer
-GET    /api/v1/customers/{id}     # Get customer
-PUT    /api/v1/customers/{id}     # Update customer
-DELETE /api/v1/customers/{id}     # Delete customer
-```
-
-### 2. Custom Actions
-
-```
-POST /api/v1/vehicles/{id}/transfer-ownership
-POST /api/v1/vehicles/{id}/update-mileage
-```
-
-### 3. Standardized Responses
-
-```json
-{
-  "success": true,
-  "message": "Customer created successfully",
-  "data": {
-    "id": 1,
-    "uuid": "...",
-    "first_name": "John",
-    "last_name": "Doe"
-  }
-}
-```
-
-## Performance Optimization
-
-### 1. Eager Loading
-
-```php
-$customers = Customer::with('vehicles')->get();
-```
-
-### 2. Query Optimization
-
-```php
-// Add indexes in migrations
-$table->index('email');
-$table->index(['tenant_id', 'status']);
-```
-
-### 3. Caching Strategy
-
-```php
-Cache::remember('customers.active', 3600, function () {
-    return Customer::where('status', 'active')->get();
-});
-```
-
-## Testing Strategy
-
-### 1. Unit Tests
-
-Test individual components in isolation:
-
-```php
-public function test_can_create_customer()
-{
-    $repository = new CustomerRepository(new Customer);
-    $customer = $repository->create([
-        'first_name' => 'John',
-        'last_name' => 'Doe',
-        'email' => 'john@example.com',
-    ]);
-    
-    $this->assertInstanceOf(Customer::class, $customer);
-}
-```
-
-### 2. Feature Tests
-
-Test complete workflows:
-
-```php
-public function test_can_transfer_vehicle_ownership()
-{
-    $response = $this->postJson('/api/v1/vehicles/1/transfer-ownership', [
-        'new_customer_id' => 2,
-        'reason' => 'sale',
-    ]);
-    
-    $response->assertStatus(200);
-    $this->assertDatabaseHas('vehicles', [
-        'id' => 1,
-        'current_customer_id' => 2,
-    ]);
-}
-```
-
-## Deployment Architecture
-
-### Development Environment
-
-```
-Developer Machine
-├── Laravel (php artisan serve)
-├── Vue.js Dev Server (npm run dev)
-└── SQLite Database
-```
-
-### Production Environment
-
-```
-Load Balancer
-├── Web Servers (Nginx)
-│   ├── PHP-FPM (Laravel)
-│   └── Static Assets (Vue.js build)
-├── Application Servers
-│   ├── Queue Workers
-│   └── Scheduled Tasks
-├── Database Cluster (MySQL/PostgreSQL)
-├── Cache Layer (Redis)
-└── File Storage (S3)
-```
-
-## Scalability Considerations
-
-### Horizontal Scaling
-
-- Stateless application design
-- Session storage in Redis
-- File uploads to cloud storage
-- Queue-based background processing
-
-### Vertical Scaling
-
-- Database query optimization
-- Proper indexing
-- Connection pooling
-- OpCache configuration
-
-## Monitoring and Logging
-
-### Structured Logging
-
-```php
-Log::info('Customer created', [
-    'customer_id' => $customer->id,
-    'tenant_id' => $customer->tenant_id,
-    'user_id' => auth()->id(),
-]);
-```
-
-### Error Tracking
-
-- Exception logging
-- Failed job tracking
-- Performance monitoring
-- Uptime monitoring
-
-## Best Practices Checklist
-
-- ✅ Follow SOLID principles
-- ✅ Use dependency injection
-- ✅ Write meaningful tests
-- ✅ Document complex logic
-- ✅ Use type hints and return types
-- ✅ Handle exceptions properly
-- ✅ Validate all inputs
-- ✅ Use database transactions
-- ✅ Implement proper logging
-- ✅ Follow PSR standards
-
-## Conclusion
-
-This architecture provides a solid foundation for building scalable, maintainable, and secure SaaS applications. The modular approach allows for easy extension and modification while maintaining code quality and consistency.
+MIT License
