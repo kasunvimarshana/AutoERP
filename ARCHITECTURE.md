@@ -1,490 +1,471 @@
-# Architecture Documentation
+# AutoERP Architecture Guide
 
-## Overview
+## System Architecture Overview
 
-This ModularSaaS application follows a **Clean Architecture** approach with strict separation of concerns through the **Controller → Service → Repository** pattern. This document explains the architectural decisions and patterns used throughout the application.
+AutoERP follows a **clean architecture** approach with clear separation of concerns across multiple layers. This document provides detailed insights into the architectural decisions and patterns used.
 
-## Architectural Principles
+## Layered Architecture
 
-### 1. SOLID Principles
+### 1. Presentation Layer (Controllers)
 
-- **Single Responsibility**: Each class has one reason to change
-- **Open/Closed**: Open for extension, closed for modification
-- **Liskov Substitution**: Derived classes are substitutable for their base classes
-- **Interface Segregation**: Clients should not depend on interfaces they don't use
-- **Dependency Inversion**: Depend on abstractions, not concretions
+**Responsibility**: HTTP request/response handling, input validation, and API responses
 
-### 2. DRY (Don't Repeat Yourself)
+**Location**: `app/Modules/*/Http/Controllers`
 
-- Shared functionality extracted into base classes and traits
-- Reusable components across modules
-- Configuration centralization
+**Key Principles**:
+- Controllers are thin and delegate business logic to services
+- Use Form Request classes for validation
+- Return standardized JSON responses using BaseController methods
+- Handle authentication and authorization
 
-### 3. KISS (Keep It Simple, Stupid)
-
-- Simple, understandable code structure
-- Avoid over-engineering
-- Clear naming conventions
-
-## Layer Architecture
-
-```
-┌──────────────────────────────────────────┐
-│           HTTP Layer (Routes)             │
-│  - API Routes                             │
-│  - Web Routes                             │
-│  - Tenant Routes                          │
-└──────────────────┬───────────────────────┘
-                   │
-┌──────────────────▼───────────────────────┐
-│        Presentation Layer                 │
-│  - Controllers                            │
-│  - Form Requests (Validation)             │
-│  - Resources (Response Transformation)    │
-└──────────────────┬───────────────────────┘
-                   │
-┌──────────────────▼───────────────────────┐
-│         Business Logic Layer              │
-│  - Services                               │
-│  - DTOs (Data Transfer Objects)           │
-│  - Business Rules                         │
-│  - Transactions                           │
-└──────────────────┬───────────────────────┘
-                   │
-┌──────────────────▼───────────────────────┐
-│         Data Access Layer                 │
-│  - Repositories                           │
-│  - Query Logic                            │
-│  - Data Filtering                         │
-└──────────────────┬───────────────────────┘
-                   │
-┌──────────────────▼───────────────────────┐
-│            Domain Layer                   │
-│  - Models (Eloquent)                      │
-│  - Database Schema                        │
-│  - Relationships                          │
-└───────────────────────────────────────────┘
-```
-
-## Pattern Implementations
-
-### Repository Pattern
-
-**Purpose**: Abstract data access logic from business logic
-
-**Structure**:
+**Example**:
 ```php
-// Interface defines contract
-interface RepositoryInterface {
-    public function all(): Collection;
-    public function find(int $id): ?Model;
-    public function create(array $data): Model;
-    // ... other methods
-}
-
-// Base implementation for common operations
-abstract class BaseRepository implements RepositoryInterface {
-    protected Model $model;
-    // ... implementations
-}
-
-// Concrete implementation for specific entity
-class UserRepository extends BaseRepository {
-    protected function makeModel(): Model {
-        return new User();
+class CustomerController extends BaseController
+{
+    public function store(StoreCustomerRequest $request): JsonResponse
+    {
+        try {
+            $customer = $this->customerService->create($request->validated());
+            return $this->created($customer, 'Customer created successfully');
+        } catch (\Exception $e) {
+            return $this->error($e->getMessage(), 500);
+        }
     }
-    // ... additional methods specific to User
 }
 ```
 
-**Benefits**:
-- Testable (easy to mock)
-- Flexible (easy to swap implementations)
-- Maintainable (single place for data access)
+### 2. Business Logic Layer (Services)
 
-### Service Pattern
+**Responsibility**: Business rules, orchestration, transaction management, and event dispatching
 
-**Purpose**: Contain business logic and orchestrate repositories
+**Location**: `app/Modules/*/Services`
 
-**Structure**:
+**Key Principles**:
+- Encapsulate complex business logic
+- Orchestrate multiple repository calls
+- Manage database transactions
+- Dispatch domain events
+- Implement cross-cutting concerns
+
+**Transaction Pattern**:
 ```php
-// Interface defines contract
-interface ServiceInterface {
-    public function getAll(array $filters = []): mixed;
-    public function getById(int $id): mixed;
-    // ... other methods
-}
-
-// Base implementation
-abstract class BaseService implements ServiceInterface {
-    protected RepositoryInterface $repository;
-    // ... implementations with transactions, logging
-}
-
-// Concrete implementation
-class UserService extends BaseService {
-    public function __construct(UserRepository $repository) {
-        parent::__construct($repository);
+public function create(array $data): Model
+{
+    try {
+        DB::beginTransaction();
+        
+        $record = $this->repository->create($data);
+        $this->afterCreate($record, $data);
+        
+        DB::commit();
+        
+        event(new EntityCreated($record));
+        
+        return $record;
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Creation failed', ['error' => $e->getMessage()]);
+        throw $e;
     }
-    // ... additional business logic
 }
 ```
 
-**Benefits**:
-- Single place for business rules
-- Transaction management
-- Easy to test business logic
-- Reusable across controllers
+### 3. Data Access Layer (Repositories)
 
-### Controller Pattern
+**Responsibility**: Database queries, data retrieval, and persistence
 
-**Purpose**: Handle HTTP requests and responses
+**Location**: `app/Modules/*/Repositories`
 
-**Structure**:
+**Key Principles**:
+- Abstract database operations
+- Provide clean API for data access
+- Handle query optimization
+- Return Eloquent collections or models
+
+**Example**:
 ```php
-class UserController extends Controller {
+class CustomerRepository extends BaseRepository
+{
+    public function search(array $criteria)
+    {
+        $query = $this->model->query();
+        
+        if (!empty($criteria['search'])) {
+            $query->where('email', 'like', "%{$criteria['search']}%");
+        }
+        
+        return $query->paginate($criteria['per_page'] ?? 15);
+    }
+}
+```
+
+### 4. Domain Layer (Models)
+
+**Responsibility**: Data representation, relationships, and domain logic
+
+**Location**: `app/Modules/*/Models`
+
+**Key Principles**:
+- Define relationships
+- Implement scopes
+- Add accessor/mutator methods
+- Configure model behavior
+
+## Module Structure
+
+Each module follows a consistent structure:
+
+```
+Modules/
+└── CustomerManagement/
+    ├── Models/              # Eloquent models
+    ├── Repositories/        # Data access layer
+    ├── Services/            # Business logic
+    ├── Http/
+    │   ├── Controllers/     # HTTP controllers
+    │   └── Requests/        # Form validation
+    ├── Events/              # Domain events
+    ├── Listeners/           # Event handlers
+    ├── Policies/            # Authorization rules
+    └── Database/
+        └── Migrations/      # Database migrations
+```
+
+## Cross-Module Communication
+
+### Event-Driven Communication
+
+Modules communicate through events to maintain loose coupling:
+
+```php
+// In CustomerService
+event(new CustomerCreated($customer));
+
+// In NotificationListener
+public function handle(CustomerCreated $event)
+{
+    Mail::to($event->customer->email)->send(new WelcomeEmail($event->customer));
+}
+```
+
+### Service-to-Service Communication
+
+When synchronous communication is needed:
+
+```php
+class OrderService extends BaseService
+{
+    protected CustomerService $customerService;
+    protected VehicleService $vehicleService;
+    
     public function __construct(
-        private readonly UserService $userService
-    ) {}
-
-    public function index(Request $request): JsonResponse {
-        $users = $this->userService->getAll($filters);
-        return $this->successResponse(
-            UserResource::collection($users)
-        );
+        OrderRepository $repository,
+        CustomerService $customerService,
+        VehicleService $vehicleService
+    ) {
+        parent::__construct($repository);
+        $this->customerService = $customerService;
+        $this->vehicleService = $vehicleService;
+    }
+    
+    public function createOrder(array $data): Order
+    {
+        DB::beginTransaction();
+        try {
+            $customer = $this->customerService->findById($data['customer_id']);
+            $vehicle = $this->vehicleService->findById($data['vehicle_id']);
+            
+            $order = $this->repository->create($data);
+            
+            // Update customer lifetime value
+            $this->customerService->updateLifetimeValue(
+                $customer->id, 
+                $order->total
+            );
+            
+            DB::commit();
+            return $order;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
     }
 }
 ```
 
-**Responsibilities**:
-- Route request to service
-- Validate input (via FormRequests)
-- Transform output (via Resources)
-- Return HTTP responses
+## Database Design Patterns
 
-### Request Validation Pattern
+### 1. UUID Support
 
-**Purpose**: Validate and authorize incoming requests
+All entities have both `id` (auto-increment) and `uuid` (universally unique):
 
 ```php
-class StoreUserRequest extends FormRequest {
-    public function authorize(): bool {
-        return true;
-    }
+Schema::create('customers', function (Blueprint $table) {
+    $table->id();                    // Primary key for performance
+    $table->uuid('uuid')->unique();  // Public identifier
+    // ...
+});
+```
 
-    public function rules(): array {
+### 2. Soft Deletes
+
+Critical entities use soft deletes for data retention:
+
+```php
+use SoftDeletes;
+
+protected $fillable = [...];
+protected $dates = ['deleted_at'];
+```
+
+### 3. Multi-Tenancy
+
+Tenant isolation at the database level:
+
+```php
+Schema::create('vehicles', function (Blueprint $table) {
+    $table->foreignId('tenant_id')->nullable()->constrained()->cascadeOnDelete();
+    // ...
+});
+
+// In model
+public function scopeForTenant($query, int $tenantId)
+{
+    return $query->where('tenant_id', $tenantId);
+}
+```
+
+### 4. Audit Trails
+
+Using Spatie Activity Log:
+
+```php
+use LogsActivity;
+
+public function getActivitylogOptions(): LogOptions
+{
+    return LogOptions::defaults()
+        ->logOnly(['*'])
+        ->logOnlyDirty()
+        ->dontSubmitEmptyLogs();
+}
+```
+
+## Security Patterns
+
+### 1. Authorization
+
+Policy-based authorization:
+
+```php
+// In Policy
+public function update(User $user, Customer $customer): bool
+{
+    return $user->tenant_id === $customer->tenant_id;
+}
+
+// In Controller
+$this->authorize('update', $customer);
+```
+
+### 2. Input Validation
+
+Form Request validation:
+
+```php
+class StoreCustomerRequest extends FormRequest
+{
+    public function rules(): array
+    {
         return [
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'unique:users'],
+            'email' => 'required|email|unique:customers,email',
+            'phone' => 'required|string|max:20',
         ];
     }
 }
 ```
 
-**Benefits**:
-- Separated validation logic
-- Reusable validation rules
-- Type-safe validated data
+### 3. Mass Assignment Protection
 
-### Resource Pattern
-
-**Purpose**: Transform models for API responses
+Strict fillable/guarded definitions:
 
 ```php
-class UserResource extends JsonResource {
-    public function toArray(Request $request): array {
-        return [
-            'id' => $this->id,
-            'name' => $this->name,
-            'email' => $this->email,
-            'roles' => $this->whenLoaded('roles'),
-        ];
-    }
-}
+protected $fillable = ['first_name', 'last_name', 'email'];
+protected $guarded = ['id', 'tenant_id'];
 ```
 
-**Benefits**:
-- Consistent API responses
-- Hide sensitive data
-- Control output structure
+## API Design Patterns
 
-## Modular Architecture
-
-### Module Structure
-
-Each module is self-contained with:
+### 1. RESTful Resources
 
 ```
-ModuleName/
-├── app/
-│   ├── Http/
-│   │   └── Controllers/        # HTTP handlers
-│   ├── Models/                  # Domain models
-│   ├── Repositories/            # Data access
-│   ├── Services/                # Business logic
-│   ├── Requests/                # Validation
-│   └── Resources/               # Response transformation
-├── database/
-│   ├── migrations/              # Database schema
-│   ├── seeders/                 # Test data
-│   └── factories/               # Model factories
-├── lang/                        # Translations
-├── resources/                   # Views, assets
-├── routes/                      # Module routes
-└── tests/                       # Module tests
+GET    /api/v1/customers          # List customers
+POST   /api/v1/customers          # Create customer
+GET    /api/v1/customers/{id}     # Get customer
+PUT    /api/v1/customers/{id}     # Update customer
+DELETE /api/v1/customers/{id}     # Delete customer
 ```
 
-### Module Communication
-
-**Principle**: Modules should be loosely coupled
-
-**Approaches**:
-1. **Events**: Modules communicate via events
-2. **Service Contracts**: Define interfaces for inter-module communication
-3. **API Calls**: Modules expose API endpoints
-
-**Example**:
-```php
-// User module fires event
-event(new UserCreated($user));
-
-// Order module listens
-class CreateCustomerAccount {
-    public function handle(UserCreated $event) {
-        // Create customer account
-    }
-}
-```
-
-## Multi-Tenancy Architecture
-
-### Tenant Isolation
-
-**Database Strategy**: Separate databases per tenant
+### 2. Custom Actions
 
 ```
-┌─────────────────────────────────────┐
-│         Central Database             │
-│  - Tenants table                     │
-│  - Domains table                     │
-│  - Central users (if any)            │
-└─────────────────────────────────────┘
-
-┌─────────────────┐  ┌─────────────────┐
-│  Tenant 1 DB    │  │  Tenant 2 DB    │
-│  - Users        │  │  - Users        │
-│  - Orders       │  │  - Orders       │
-│  - Products     │  │  - Products     │
-└─────────────────┘  └─────────────────┘
+POST /api/v1/vehicles/{id}/transfer-ownership
+POST /api/v1/vehicles/{id}/update-mileage
 ```
 
-**Tenant Identification**: Domain-based
-```
-tenant1.app.com → Tenant 1
-tenant2.app.com → Tenant 2
-```
+### 3. Standardized Responses
 
-### Tenant-Aware Models
-
-```php
-class Product extends Model {
-    use TenantAware;  // Automatically scopes to current tenant
-}
-```
-
-## Security Architecture
-
-### Authentication
-
-**Token-Based**: Laravel Sanctum
-```
-Client → API with Bearer Token → Sanctum verifies → Controller
-```
-
-### Authorization
-
-**RBAC (Role-Based Access Control)**:
-```
-User → has → Roles → have → Permissions
-```
-
-**Example**:
-```php
-// Check permission
-if ($user->can('user.create')) {
-    // Allow action
-}
-
-// Check role
-if ($user->hasRole('admin')) {
-    // Allow action
-}
-```
-
-### Data Security
-
-1. **Input Validation**: All inputs validated via FormRequests
-2. **Output Sanitization**: Resources control output
-3. **SQL Injection Prevention**: Eloquent ORM + prepared statements
-4. **XSS Prevention**: Blade templates auto-escape
-5. **CSRF Protection**: Token validation on state-changing requests
-
-## Logging & Audit Trail
-
-### Structured Logging
-
-```php
-Log::info('User created', [
-    'user_id' => $user->id,
-    'ip' => request()->ip(),
-    'user_agent' => request()->userAgent(),
-]);
-```
-
-### Audit Trail
-
-**Automatic**: Via `AuditTrait` on models
-
-```php
-class User extends Model {
-    use AuditTrait;  // Logs create, update, delete
-}
-```
-
-**Logged Information**:
-- Who (user_id)
-- What (action)
-- When (timestamp)
-- Where (IP address)
-- Original values (before update)
-- New values (after update)
-
-## Testing Strategy
-
-### Test Pyramid
-
-```
-        ┌───────┐
-        │  E2E  │  (Few)
-        └───────┘
-       ┌─────────┐
-       │Integration│  (Some)
-       └─────────┘
-      ┌───────────┐
-      │   Unit     │  (Many)
-      └───────────┘
-```
-
-### Test Types
-
-1. **Unit Tests**: Test individual methods
-2. **Feature Tests**: Test API endpoints
-3. **Integration Tests**: Test module interactions
-
-### Test Structure
-
-```php
-public function test_user_can_be_created(): void {
-    // Arrange
-    $data = ['name' => 'Test', 'email' => 'test@test.com'];
-    
-    // Act
-    $response = $this->postJson('/api/v1/users', $data);
-    
-    // Assert
-    $response->assertStatus(201);
-    $this->assertDatabaseHas('users', ['email' => 'test@test.com']);
+```json
+{
+  "success": true,
+  "message": "Customer created successfully",
+  "data": {
+    "id": 1,
+    "uuid": "...",
+    "first_name": "John",
+    "last_name": "Doe"
+  }
 }
 ```
 
 ## Performance Optimization
 
-### Caching Strategy
+### 1. Eager Loading
 
-1. **Config Cache**: `php artisan config:cache`
-2. **Route Cache**: `php artisan route:cache`
-3. **View Cache**: `php artisan view:cache`
-4. **Query Result Cache**: Redis/Memcached
-5. **Tenant-Scoped Cache**: Separate cache per tenant
+```php
+$customers = Customer::with('vehicles')->get();
+```
 
-### Database Optimization
+### 2. Query Optimization
 
-1. **Indexes**: On frequently queried columns
-2. **Eager Loading**: Prevent N+1 queries
-3. **Query Optimization**: Use query builder efficiently
-4. **Pagination**: Limit result sets
+```php
+// Add indexes in migrations
+$table->index('email');
+$table->index(['tenant_id', 'status']);
+```
 
-### Code Optimization
+### 3. Caching Strategy
 
-1. **Lazy Loading**: Load resources when needed
-2. **Queueing**: Background jobs for heavy operations
-3. **Asset Bundling**: Vite for frontend assets
-4. **CDN**: Static assets served via CDN
+```php
+Cache::remember('customers.active', 3600, function () {
+    return Customer::where('status', 'active')->get();
+});
+```
+
+## Testing Strategy
+
+### 1. Unit Tests
+
+Test individual components in isolation:
+
+```php
+public function test_can_create_customer()
+{
+    $repository = new CustomerRepository(new Customer);
+    $customer = $repository->create([
+        'first_name' => 'John',
+        'last_name' => 'Doe',
+        'email' => 'john@example.com',
+    ]);
+    
+    $this->assertInstanceOf(Customer::class, $customer);
+}
+```
+
+### 2. Feature Tests
+
+Test complete workflows:
+
+```php
+public function test_can_transfer_vehicle_ownership()
+{
+    $response = $this->postJson('/api/v1/vehicles/1/transfer-ownership', [
+        'new_customer_id' => 2,
+        'reason' => 'sale',
+    ]);
+    
+    $response->assertStatus(200);
+    $this->assertDatabaseHas('vehicles', [
+        'id' => 1,
+        'current_customer_id' => 2,
+    ]);
+}
+```
+
+## Deployment Architecture
+
+### Development Environment
+
+```
+Developer Machine
+├── Laravel (php artisan serve)
+├── Vue.js Dev Server (npm run dev)
+└── SQLite Database
+```
+
+### Production Environment
+
+```
+Load Balancer
+├── Web Servers (Nginx)
+│   ├── PHP-FPM (Laravel)
+│   └── Static Assets (Vue.js build)
+├── Application Servers
+│   ├── Queue Workers
+│   └── Scheduled Tasks
+├── Database Cluster (MySQL/PostgreSQL)
+├── Cache Layer (Redis)
+└── File Storage (S3)
+```
 
 ## Scalability Considerations
 
 ### Horizontal Scaling
 
-- **Stateless Application**: Sessions in database/Redis
-- **Load Balancer**: Distribute traffic
-- **Database Replication**: Read replicas
-- **Queue Workers**: Multiple workers
+- Stateless application design
+- Session storage in Redis
+- File uploads to cloud storage
+- Queue-based background processing
 
 ### Vertical Scaling
 
-- **PHP OPcache**: Bytecode caching
-- **Database Optimization**: Query optimization
-- **Server Resources**: CPU, RAM upgrades
+- Database query optimization
+- Proper indexing
+- Connection pooling
+- OpCache configuration
 
-## Deployment Architecture
+## Monitoring and Logging
 
-```
-┌──────────────┐
-│ Load Balancer│
-└──────┬───────┘
-       │
-   ┌───┴───┬───────┬───────┐
-   │       │       │       │
-┌──▼───┐ ┌─▼───┐ ┌─▼───┐ ┌─▼───┐
-│ App  │ │ App │ │ App │ │ App │
-│Server│ │Server│ │Server│ │Server│
-└──┬───┘ └──┬──┘ └──┬──┘ └──┬──┘
-   │        │       │       │
-   └────────┴───────┴───────┘
-            │
-    ┌───────▼────────┐
-    │   Database     │
-    │   (Primary)    │
-    └───────┬────────┘
-            │
-    ┌───────▼────────┐
-    │   Database     │
-    │  (Read Replica)│
-    └────────────────┘
+### Structured Logging
+
+```php
+Log::info('Customer created', [
+    'customer_id' => $customer->id,
+    'tenant_id' => $customer->tenant_id,
+    'user_id' => auth()->id(),
+]);
 ```
 
-## Monitoring & Logging
+### Error Tracking
 
-### Application Monitoring
+- Exception logging
+- Failed job tracking
+- Performance monitoring
+- Uptime monitoring
 
-- **Logs**: Structured logging to files/services
-- **Metrics**: Performance metrics
-- **Alerts**: Error notifications
-- **APM**: Application Performance Monitoring (optional)
+## Best Practices Checklist
 
-### Infrastructure Monitoring
-
-- **Server Health**: CPU, Memory, Disk
-- **Database**: Query performance, connections
-- **Queue**: Job processing, failures
-- **Cache**: Hit/miss ratio
+- ✅ Follow SOLID principles
+- ✅ Use dependency injection
+- ✅ Write meaningful tests
+- ✅ Document complex logic
+- ✅ Use type hints and return types
+- ✅ Handle exceptions properly
+- ✅ Validate all inputs
+- ✅ Use database transactions
+- ✅ Implement proper logging
+- ✅ Follow PSR standards
 
 ## Conclusion
 
-This architecture provides:
-- **Maintainability**: Clear structure, easy to understand
-- **Scalability**: Horizontal and vertical scaling options
-- **Testability**: Each layer independently testable
-- **Security**: Multiple layers of protection
-- **Performance**: Optimized at every layer
-- **Flexibility**: Easy to extend and modify
+This architecture provides a solid foundation for building scalable, maintainable, and secure SaaS applications. The modular approach allows for easy extension and modification while maintaining code quality and consistency.
