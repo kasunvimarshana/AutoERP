@@ -138,6 +138,66 @@ use OpenApi\Attributes as OA;
         )
     ]
 )]
+#[OA\Schema(
+    schema: "Customer",
+    properties: [
+        new OA\Property(property: "id", type: "integer", example: 1),
+        new OA\Property(property: "customer_type", type: "string", enum: ["individual", "business"], example: "individual"),
+        new OA\Property(property: "first_name", type: "string", example: "John"),
+        new OA\Property(property: "last_name", type: "string", example: "Doe"),
+        new OA\Property(property: "company_name", type: "string", example: "ABC Corp", nullable: true),
+        new OA\Property(property: "email", type: "string", format: "email", example: "john@example.com"),
+        new OA\Property(property: "phone", type: "string", example: "+1234567890"),
+        new OA\Property(property: "status", type: "string", enum: ["active", "inactive"], example: "active"),
+        new OA\Property(property: "created_at", type: "string", format: "date-time"),
+        new OA\Property(property: "updated_at", type: "string", format: "date-time")
+    ]
+)]
+#[OA\Schema(
+    schema: "Vehicle",
+    properties: [
+        new OA\Property(property: "id", type: "integer", example: 1),
+        new OA\Property(property: "customer_id", type: "integer", example: 1),
+        new OA\Property(property: "make", type: "string", example: "Toyota"),
+        new OA\Property(property: "model", type: "string", example: "Camry"),
+        new OA\Property(property: "year", type: "integer", example: 2022),
+        new OA\Property(property: "vin", type: "string", example: "1HGBH41JXMN109186"),
+        new OA\Property(property: "license_plate", type: "string", example: "ABC-1234"),
+        new OA\Property(property: "color", type: "string", example: "Blue"),
+        new OA\Property(property: "current_mileage", type: "integer", example: 15000),
+        new OA\Property(property: "status", type: "string", example: "active"),
+        new OA\Property(property: "created_at", type: "string", format: "date-time")
+    ]
+)]
+#[OA\Schema(
+    schema: "JobCard",
+    properties: [
+        new OA\Property(property: "id", type: "integer", example: 1),
+        new OA\Property(property: "job_card_number", type: "string", example: "JC-2024-001"),
+        new OA\Property(property: "vehicle_id", type: "integer", example: 1),
+        new OA\Property(property: "customer_id", type: "integer", example: 1),
+        new OA\Property(property: "status", type: "string", enum: ["draft", "open", "in_progress", "completed", "closed"], example: "open"),
+        new OA\Property(property: "priority", type: "string", enum: ["low", "medium", "high", "urgent"], example: "medium"),
+        new OA\Property(property: "estimated_cost", type: "number", format: "decimal", example: 500.00),
+        new OA\Property(property: "actual_cost", type: "number", format: "decimal", example: 550.00, nullable: true),
+        new OA\Property(property: "created_at", type: "string", format: "date-time")
+    ]
+)]
+#[OA\Schema(
+    schema: "Invoice",
+    properties: [
+        new OA\Property(property: "id", type: "integer", example: 1),
+        new OA\Property(property: "invoice_number", type: "string", example: "INV-2024-001"),
+        new OA\Property(property: "customer_id", type: "integer", example: 1),
+        new OA\Property(property: "job_card_id", type: "integer", example: 1, nullable: true),
+        new OA\Property(property: "status", type: "string", enum: ["draft", "sent", "paid", "overdue", "cancelled"], example: "sent"),
+        new OA\Property(property: "subtotal", type: "number", format: "decimal", example: 500.00),
+        new OA\Property(property: "tax", type: "number", format: "decimal", example: 50.00),
+        new OA\Property(property: "total", type: "number", format: "decimal", example: 550.00),
+        new OA\Property(property: "due_date", type: "string", format: "date"),
+        new OA\Property(property: "created_at", type: "string", format: "date-time")
+    ]
+)]
 class SwaggerController extends Controller
 {
     /**

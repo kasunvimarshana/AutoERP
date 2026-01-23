@@ -3,6 +3,7 @@
 namespace App\Modules\AppointmentManagement\Http\Controllers;
 
 use App\Core\Base\BaseController;
+use OpenApi\Attributes as OA;
 use App\Modules\AppointmentManagement\Services\ServiceBayService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

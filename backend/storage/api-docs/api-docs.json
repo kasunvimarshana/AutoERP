@@ -1600,6 +1600,223 @@
                     }
                 },
                 "type": "object"
+            },
+            "Customer": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "customer_type": {
+                        "type": "string",
+                        "enum": [
+                            "individual",
+                            "business"
+                        ],
+                        "example": "individual"
+                    },
+                    "first_name": {
+                        "type": "string",
+                        "example": "John"
+                    },
+                    "last_name": {
+                        "type": "string",
+                        "example": "Doe"
+                    },
+                    "company_name": {
+                        "type": "string",
+                        "example": "ABC Corp",
+                        "nullable": true
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "john@example.com"
+                    },
+                    "phone": {
+                        "type": "string",
+                        "example": "+1234567890"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "active",
+                            "inactive"
+                        ],
+                        "example": "active"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "Vehicle": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "customer_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "make": {
+                        "type": "string",
+                        "example": "Toyota"
+                    },
+                    "model": {
+                        "type": "string",
+                        "example": "Camry"
+                    },
+                    "year": {
+                        "type": "integer",
+                        "example": 2022
+                    },
+                    "vin": {
+                        "type": "string",
+                        "example": "1HGBH41JXMN109186"
+                    },
+                    "license_plate": {
+                        "type": "string",
+                        "example": "ABC-1234"
+                    },
+                    "color": {
+                        "type": "string",
+                        "example": "Blue"
+                    },
+                    "current_mileage": {
+                        "type": "integer",
+                        "example": 15000
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "active"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "JobCard": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "job_card_number": {
+                        "type": "string",
+                        "example": "JC-2024-001"
+                    },
+                    "vehicle_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "customer_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "draft",
+                            "open",
+                            "in_progress",
+                            "completed",
+                            "closed"
+                        ],
+                        "example": "open"
+                    },
+                    "priority": {
+                        "type": "string",
+                        "enum": [
+                            "low",
+                            "medium",
+                            "high",
+                            "urgent"
+                        ],
+                        "example": "medium"
+                    },
+                    "estimated_cost": {
+                        "type": "number",
+                        "format": "decimal",
+                        "example": 500
+                    },
+                    "actual_cost": {
+                        "type": "number",
+                        "format": "decimal",
+                        "example": 550,
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "Invoice": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "invoice_number": {
+                        "type": "string",
+                        "example": "INV-2024-001"
+                    },
+                    "customer_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "job_card_id": {
+                        "type": "integer",
+                        "example": 1,
+                        "nullable": true
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "draft",
+                            "sent",
+                            "paid",
+                            "overdue",
+                            "cancelled"
+                        ],
+                        "example": "sent"
+                    },
+                    "subtotal": {
+                        "type": "number",
+                        "format": "decimal",
+                        "example": 500
+                    },
+                    "tax": {
+                        "type": "number",
+                        "format": "decimal",
+                        "example": 50
+                    },
+                    "total": {
+                        "type": "number",
+                        "format": "decimal",
+                        "example": 550
+                    },
+                    "due_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
             }
         },
         "securitySchemes": {

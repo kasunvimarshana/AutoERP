@@ -3,6 +3,7 @@
 namespace App\Modules\JobCardManagement\Http\Controllers;
 
 use App\Core\Base\BaseController;
+use OpenApi\Attributes as OA;
 use App\Modules\JobCardManagement\Services\JobCardService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
