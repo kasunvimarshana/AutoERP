@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules/AuthManagement\Repositories;
+namespace App\Modules\AuthManagement\Repositories;
 
 use App\Core\Base\BaseRepository;
 use App\Modules\AuthManagement\Models\UserSession;

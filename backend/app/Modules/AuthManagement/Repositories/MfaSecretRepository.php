@@ -3,7 +3,7 @@
 namespace App\Modules\AuthManagement\Repositories;
 
 use App\Core\Base\BaseRepository;
-use App\Modules\AuthManagement\Models/MfaSecret;
+use App\Modules\AuthManagement\Models\MfaSecret;
 
 class MfaSecretRepository extends BaseRepository
 {
