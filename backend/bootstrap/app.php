@@ -22,6 +22,8 @@ return Application::configure(basePath: dirname(__DIR__))
                 'job-card-management',
                 'inventory-management',
                 'invoicing-management',
+                'crm-management',
+                'fleet-management',
             ];
             
             foreach ($moduleRoutes as $module) {
