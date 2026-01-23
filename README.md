@@ -8,22 +8,45 @@
 
 **Production-ready, enterprise-level modular SaaS application for vehicle service centers and auto repair garages.**
 
-Built with **Laravel 11** backend and **Vue.js 3** frontend, implementing **Clean Architecture** principles with a strict **Controller → Service → Repository** pattern. Features comprehensive multi-tenancy support, event-driven architecture, full internationalization, and enterprise-grade security.
+Built with **Laravel 11** backend and **Vue.js 3** frontend, implementing **Clean Architecture** principles with a strict **Controller → Service → Repository** pattern. Features comprehensive multi-tenancy support, event-driven architecture, full RBAC, and enterprise-grade security.
 
 ## 🎯 Key Features
 
 - ✅ **Clean Architecture** - Controller → Service → Repository pattern
-- ✅ **Multi-Tenancy** - Complete tenant isolation and data segregation
+- ✅ **Multi-Tenancy** - Complete tenant isolation and subscription management
+- ✅ **Authentication** - Full auth system with Laravel Sanctum
+- ✅ **RBAC/ABAC** - Role-Based Access Control with 73 granular permissions
 - ✅ **Event-Driven** - Asynchronous processing and decoupled modules
 - ✅ **Transaction Management** - Atomic operations with automatic rollback
-- ✅ **Audit Trails** - Complete activity logging and history tracking
-- ✅ **REST API** - 62+ versioned, well-documented API endpoints
+- ✅ **Audit Trails** - Complete activity logging using Spatie Activity Log
+- ✅ **REST API** - 85+ versioned, well-documented API endpoints
 - ✅ **TypeScript Frontend** - Type-safe Vue.js 3 with Pinia state management
 - ✅ **SOLID Principles** - Maintainable, testable, and scalable code
-- ✅ **12,000+ Lines** - Production-quality backend implementation
+- ✅ **Production Ready** - Database seeders, migrations, comprehensive documentation
 
 ## 📋 Implemented Modules
 
+### ✅ Authentication & Authorization
+- Complete authentication system (register, login, logout)
+- Password reset and change functionality
+- Token-based authentication with Laravel Sanctum
+- Role-Based Access Control (RBAC)
+- 4 predefined roles: super_admin, admin, manager, user
+- 73 granular permissions across all modules
+
+### ✅ Tenant & Subscription Management
+- Multi-tenant architecture with data isolation
+- Subscription management (trial, active, expired, cancelled)
+- Tenant activation and suspension
+- Configurable user and branch limits
+- Subscription renewal and plan management
+
+### ✅ User Management
+- Full user CRUD operations
+- User activation and deactivation
+- Role and permission assignment
+- Tenant-scoped user management
+- User activity tracking
 ### ✅ Customer & Vehicle Management
 - Customer profiles (individual and business)
 - Multi-vehicle ownership tracking
@@ -86,14 +109,16 @@ Built with **Laravel 11** backend and **Vue.js 3** frontend, implementing **Clea
 ## 📊 Technical Metrics
 
 **Backend:**
-- 33 Database Tables
-- 26 Eloquent Models
-- 25 Repositories
-- 23 Services
-- 9 Controllers
-- 22 Domain Events
-- 62+ API Endpoints
-- 12,000+ Lines of Code
+- 35 Database Tables
+- 27 Eloquent Models
+- 26 Repositories
+- 24 Services
+- 15 Controllers
+- 25 Domain Events
+- 85+ API Endpoints
+- 73 Permissions
+- 4 Roles
+- 15,000+ Lines of Code
 
 **Frontend:**
 - 15+ TypeScript Interfaces
@@ -106,46 +131,55 @@ Built with **Laravel 11** backend and **Vue.js 3** frontend, implementing **Clea
 - 51 Assertions
 - 100% Success Rate
 
+## 🎯 Demo Credentials
+
+**Super Admin**: admin@autoerp.com / password123  
+**Admin**: admin@demo.com / password123  
+**Manager**: manager@demo.com / password123
+
 ### Prerequisites
 
 - PHP 8.3+
 - Composer 2.x
 - Node.js 20.x+
-- MySQL 8.0+ or PostgreSQL 14+
+- MySQL 8.0+ or PostgreSQL 14+ (SQLite for development)
 
-### Backend Setup
+### Quick Start
 
 ```bash
+# Clone the repository
+git clone https://github.com/kasunvimarshana/AutoERP.git
+cd AutoERP
+
+# Backend setup
 cd backend
 composer install
 cp .env.example .env
 php artisan key:generate
-php artisan migrate
+touch database/database.sqlite
+php artisan migrate --seed
 php artisan serve
-```
 
-### Frontend Setup
-
-```bash
+# In a new terminal - Frontend setup
 cd frontend
 npm install
 echo "VITE_API_URL=http://localhost:8000/api/v1" > .env
 npm run dev
 ```
 
-Visit `http://localhost:5173` to see the frontend.
+Visit:
+- Frontend: `http://localhost:5173`
+- Backend API: `http://localhost:8000/api/v1`
+- API Documentation: See [API_REFERENCE.md](./API_REFERENCE.md)
 
 ## 📚 Documentation
 
-Comprehensive documentation is available in [DOCUMENTATION.md](./DOCUMENTATION.md), including:
+Comprehensive documentation is available:
 
-- Architecture overview and design patterns
-- Complete API documentation
-- Database schema
-- Transaction management
-- Event system
-- Deployment guide
-- Security best practices
+- [API Reference](./API_REFERENCE.md) - Complete API documentation with examples
+- [Architecture Guide](./ARCHITECTURE.md) - Design patterns and principles
+- [Technical Documentation](./DOCUMENTATION.md) - Detailed technical specs
+- [Implementation Summary](./IMPLEMENTATION_SUMMARY.md) - What's been built
 
 ## 🏗️ Architecture
 
