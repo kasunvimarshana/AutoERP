@@ -64,7 +64,7 @@ class InvoiceController extends BaseController
     {
         try {
             $invoice = $this->invoiceService->findByIdOrFail($id);
-            $invoice->load(['customer', 'jobCard', 'lineItems', 'payments']);
+            $invoice->load(['customer', 'jobCard', 'items', 'payments']);
 
             return $this->success($invoice);
         } catch (\Exception $e) {

@@ -138,7 +138,7 @@ class PurchaseOrderService extends BaseService
     {
         $purchaseOrder = $this->repository->findOrFail($purchaseOrderId);
         return $purchaseOrder->items->sum(function ($item) {
-            return $item->quantity * $item->unit_price;
+            return $item->quantity_ordered * $item->unit_price;
         });
     }
 

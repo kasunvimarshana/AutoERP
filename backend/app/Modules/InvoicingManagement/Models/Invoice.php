@@ -107,7 +107,7 @@ class Invoice extends Model
      */
     public function vehicle(): BelongsTo
     {
-        return $this->belongsTo(\App\Modules\VehicleManagement\Models\Vehicle::class);
+        return $this->belongsTo(\App\Modules\CustomerManagement\Models\Vehicle::class);
     }
 
     /**

@@ -50,7 +50,8 @@ class ReportService extends BaseService
                 'filters' => $filters,
                 'status' => 'failed',
                 'error_message' => $e->getMessage(),
-                'generated_at' => now()
+                'generated_at' => now(),
+                'generated_by' => auth()->id() ?? null
             ]);
             
             throw $e;

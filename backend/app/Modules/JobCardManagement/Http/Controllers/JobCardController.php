@@ -66,7 +66,7 @@ class JobCardController extends BaseController
     {
         try {
             $jobCard = $this->jobCardService->findByIdOrFail($id);
-            $jobCard->load(['customer', 'vehicle', 'appointment', 'services', 'parts']);
+            $jobCard->load(['customer', 'vehicle', 'appointment', 'tasks', 'digitalInspections']);
 
             return $this->success($jobCard);
         } catch (\Exception $e) {
