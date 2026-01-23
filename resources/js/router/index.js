@@ -56,6 +56,45 @@ const routes = [
     component: () => import('@/pages/users/UserList.vue'),
     meta: { requiresAuth: true },
   },
+  // Customer Routes
+  {
+    path: '/customers',
+    name: 'customers',
+    component: () => import('@/pages/customers/CustomerList.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/customers/:id',
+    name: 'customer-detail',
+    component: () => import('@/pages/customers/CustomerDetail.vue'),
+    meta: { requiresAuth: true },
+  },
+  // Vehicle Routes
+  {
+    path: '/vehicles',
+    name: 'vehicles',
+    component: () => import('@/pages/vehicles/VehicleList.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/vehicles/:id',
+    name: 'vehicle-detail',
+    component: () => import('@/pages/vehicles/VehicleDetail.vue'),
+    meta: { requiresAuth: true },
+  },
+  // Service Record Routes
+  {
+    path: '/service-records',
+    name: 'service-records',
+    component: () => import('@/pages/service-records/ServiceRecordList.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/service-records/:id',
+    name: 'service-record-detail',
+    component: () => import('@/pages/service-records/ServiceRecordDetail.vue'),
+    meta: { requiresAuth: true },
+  },
   {
     path: '/:pathMatch(.*)*',
     name: 'not-found',

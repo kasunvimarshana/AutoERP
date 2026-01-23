@@ -47,6 +47,7 @@ return [
                     base_path('app/Http/Controllers'),
                     base_path('Modules/Auth/app/Http/Controllers'),
                     base_path('Modules/User/app/Http/Controllers'),
+                    base_path('Modules/Customer/app/Http/Controllers'),
                 ],
             ],
         ],

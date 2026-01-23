@@ -99,9 +99,29 @@
                 <p>{{ $t('profile.title') }}</p>
               </RouterLink>
             </li>
+            <li class="nav-header" role="heading" aria-level="3">{{ $t('common.management') || 'MANAGEMENT' }}</li>
+            <li class="nav-item" v-if="canViewCustomers">
+              <RouterLink to="/customers" class="nav-link" :class="{ active: $route.path.startsWith('/customers') }">
+                <i class="nav-icon fas fa-users"></i>
+                <p>{{ $t('customers.title') }}</p>
+              </RouterLink>
+            </li>
+            <li class="nav-item" v-if="canViewVehicles">
+              <RouterLink to="/vehicles" class="nav-link" :class="{ active: $route.path.startsWith('/vehicles') }">
+                <i class="nav-icon fas fa-car"></i>
+                <p>{{ $t('vehicles.title') }}</p>
+              </RouterLink>
+            </li>
+            <li class="nav-item" v-if="canViewServiceRecords">
+              <RouterLink to="/service-records" class="nav-link" :class="{ active: $route.path.startsWith('/service-records') }">
+                <i class="nav-icon fas fa-wrench"></i>
+                <p>{{ $t('serviceRecords.title') }}</p>
+              </RouterLink>
+            </li>
+            <li class="nav-header" role="heading" aria-level="3">{{ $t('common.administration') || 'ADMINISTRATION' }}</li>
             <li class="nav-item" v-if="canViewUsers">
               <RouterLink to="/users" class="nav-link" :class="{ active: $route.path.startsWith('/users') }">
-                <i class="nav-icon fas fa-users"></i>
+                <i class="nav-icon fas fa-user-shield"></i>
                 <p>{{ $t('users.title') }}</p>
               </RouterLink>
             </li>
@@ -181,6 +201,18 @@ const currentLocale = computed(() => locale.value);
 // Permission checks
 const canViewUsers = computed(() => {
   return authStore.hasPermission('user.view') || authStore.hasRole('super-admin') || authStore.hasRole('admin');
+});
+
+const canViewCustomers = computed(() => {
+  return authStore.hasPermission('customer.view') || authStore.hasRole('super-admin') || authStore.hasRole('admin');
+});
+
+const canViewVehicles = computed(() => {
+  return authStore.hasPermission('vehicle.view') || authStore.hasRole('super-admin') || authStore.hasRole('admin');
+});
+
+const canViewServiceRecords = computed(() => {
+  return authStore.hasPermission('service-record.view') || authStore.hasRole('super-admin') || authStore.hasRole('admin');
 });
 
 const toggleSidebar = () => {

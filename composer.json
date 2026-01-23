@@ -31,12 +31,20 @@
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/",
             "Modules\\User\\": "Modules/User/app/",
-            "Modules\\Auth\\": "Modules/Auth/app/"
+            "Modules\\User\\Database\\Factories\\": "Modules/User/database/factories/",
+            "Modules\\Auth\\": "Modules/Auth/app/",
+            "Modules\\Auth\\Database\\Factories\\": "Modules/Auth/database/factories/",
+            "Modules\\Customer\\": "Modules/Customer/app/",
+            "Modules\\Customer\\Database\\Factories\\": "Modules/Customer/database/factories/",
+            "Modules\\Customer\\Database\\Seeders\\": "Modules/Customer/database/seeders/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Tests\\": "tests/"
+            "Tests\\": "tests/",
+            "Modules\\User\\Tests\\": "Modules/User/tests/",
+            "Modules\\Auth\\Tests\\": "Modules/Auth/tests/",
+            "Modules\\Customer\\Tests\\": "Modules/Customer/tests/"
         }
     },
     "scripts": {
