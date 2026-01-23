@@ -85,7 +85,7 @@ class ApiClient {
     )
   }
 
-  private handleError(error: AxiosError<ApiResponse>): ApiError {
+  private handleError(error: AxiosError<any>): ApiError {
     const apiError: ApiError = {
       message: 'An unexpected error occurred',
       status: error.response?.status,
@@ -93,7 +93,7 @@ class ApiClient {
 
     if (error.response) {
       // Server responded with error
-      const data = error.response.data
+      const data = error.response.data as ApiResponse | undefined
       apiError.message = data?.message || error.message
       apiError.errors = data?.errors
       apiError.status = error.response.status

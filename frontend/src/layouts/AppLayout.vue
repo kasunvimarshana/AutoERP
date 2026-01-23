@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useUiStore } from '@/stores/ui'
@@ -9,8 +9,10 @@ import AppFooter from '@/components/layout/AppFooter.vue'
 import NotificationContainer from '@/components/ui/NotificationContainer.vue'
 
 const router = useRouter()
-const { isAuthenticated, user } = useAuth()
+const authStore = useAuth()
 const uiStore = useUiStore()
+
+const isAuthenticated = computed(() => authStore.isAuthenticated)
 
 onMounted(() => {
   // Check authentication on mount
