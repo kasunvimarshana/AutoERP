@@ -8,7 +8,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Service Exception
- * 
+ *
  * Thrown when service layer operations fail
  */
 class ServiceException extends BaseException
@@ -20,10 +20,6 @@ class ServiceException extends BaseException
 
     /**
      * Create exception for business rule violation
-     *
-     * @param string $rule
-     * @param string $reason
-     * @return static
      */
     public static function businessRuleViolation(string $rule, string $reason = ''): static
     {
@@ -34,28 +30,26 @@ class ServiceException extends BaseException
         $exception = new static($message);
         $exception->statusCode = Response::HTTP_UNPROCESSABLE_ENTITY;
         $exception->errorData = ['rule' => $rule, 'reason' => $reason];
+
         return $exception;
     }
 
     /**
      * Create exception for validation failure
      *
-     * @param array<string, mixed> $errors
-     * @return static
+     * @param  array<string, mixed>  $errors
      */
     public static function validationFailed(array $errors): static
     {
         $exception = new static('Validation failed');
         $exception->statusCode = Response::HTTP_UNPROCESSABLE_ENTITY;
         $exception->errorData = $errors;
+
         return $exception;
     }
 
     /**
      * Create exception for unauthorized access
-     *
-     * @param string $action
-     * @return static
      */
     public static function unauthorized(string $action = ''): static
     {
@@ -65,14 +59,12 @@ class ServiceException extends BaseException
         }
         $exception = new static($message);
         $exception->statusCode = Response::HTTP_UNAUTHORIZED;
+
         return $exception;
     }
 
     /**
      * Create exception for forbidden access
-     *
-     * @param string $resource
-     * @return static
      */
     public static function forbidden(string $resource = ''): static
     {
@@ -82,6 +74,7 @@ class ServiceException extends BaseException
         }
         $exception = new static($message);
         $exception->statusCode = Response::HTTP_FORBIDDEN;
+
         return $exception;
     }
 }

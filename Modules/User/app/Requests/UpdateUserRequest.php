@@ -9,7 +9,7 @@ use Illuminate\Validation\Rules\Password;
 
 /**
  * Update User Request
- * 
+ *
  * Validates data for updating an existing user
  */
 class UpdateUserRequest extends FormRequest

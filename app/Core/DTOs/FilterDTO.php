@@ -6,7 +6,7 @@ namespace App\Core\DTOs;
 
 /**
  * Filter Data Transfer Object
- * 
+ *
  * Encapsulates filtering parameters for queries
  */
 final class FilterDTO extends BaseDTO
@@ -14,16 +14,15 @@ final class FilterDTO extends BaseDTO
     /**
      * FilterDTO constructor
      *
-     * @param array<string, mixed> $filters Key-value pairs for filtering
-     * @param array<string> $relations Relations to eager load
-     * @param array<string> $columns Columns to select
+     * @param  array<string, mixed>  $filters  Key-value pairs for filtering
+     * @param  array<string>  $relations  Relations to eager load
+     * @param  array<string>  $columns  Columns to select
      */
     public function __construct(
         public readonly array $filters = [],
         public readonly array $relations = [],
         public readonly array $columns = ['*']
-    ) {
-    }
+    ) {}
 
     /**
      * {@inheritDoc}
@@ -51,9 +50,6 @@ final class FilterDTO extends BaseDTO
 
     /**
      * Check if a filter exists
-     *
-     * @param string $key
-     * @return bool
      */
     public function hasFilter(string $key): bool
     {
@@ -62,10 +58,6 @@ final class FilterDTO extends BaseDTO
 
     /**
      * Get a filter value
-     *
-     * @param string $key
-     * @param mixed $default
-     * @return mixed
      */
     public function getFilter(string $key, mixed $default = null): mixed
     {

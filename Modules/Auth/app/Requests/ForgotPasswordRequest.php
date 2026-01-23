@@ -8,15 +8,13 @@ use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * Forgot Password Request
- * 
+ *
  * Validates password reset request
  */
 class ForgotPasswordRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request
-     *
-     * @return bool
      */
     public function authorize(): bool
     {

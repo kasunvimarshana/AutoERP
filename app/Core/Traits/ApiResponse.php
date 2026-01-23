@@ -9,18 +9,13 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * API Response Trait
- * 
+ *
  * Provides consistent JSON response formatting across all API controllers
  */
 trait ApiResponse
 {
     /**
      * Success response
-     *
-     * @param mixed $data
-     * @param string $message
-     * @param int $statusCode
-     * @return JsonResponse
      */
     protected function successResponse(
         mixed $data = null,
@@ -36,11 +31,6 @@ trait ApiResponse
 
     /**
      * Error response
-     *
-     * @param string $message
-     * @param int $statusCode
-     * @param mixed $errors
-     * @return JsonResponse
      */
     protected function errorResponse(
         string $message = 'Error',
@@ -56,10 +46,6 @@ trait ApiResponse
 
     /**
      * Created response
-     *
-     * @param mixed $data
-     * @param string $message
-     * @return JsonResponse
      */
     protected function createdResponse(
         mixed $data = null,
@@ -70,8 +56,6 @@ trait ApiResponse
 
     /**
      * No content response
-     *
-     * @return JsonResponse
      */
     protected function noContentResponse(): JsonResponse
     {
@@ -80,10 +64,6 @@ trait ApiResponse
 
     /**
      * Validation error response
-     *
-     * @param mixed $errors
-     * @param string $message
-     * @return JsonResponse
      */
     protected function validationErrorResponse(
         mixed $errors,
@@ -98,9 +78,6 @@ trait ApiResponse
 
     /**
      * Not found response
-     *
-     * @param string $message
-     * @return JsonResponse
      */
     protected function notFoundResponse(
         string $message = 'Resource not found'
@@ -110,9 +87,6 @@ trait ApiResponse
 
     /**
      * Unauthorized response
-     *
-     * @param string $message
-     * @return JsonResponse
      */
     protected function unauthorizedResponse(
         string $message = 'Unauthorized'
@@ -122,9 +96,6 @@ trait ApiResponse
 
     /**
      * Forbidden response
-     *
-     * @param string $message
-     * @return JsonResponse
      */
     protected function forbiddenResponse(
         string $message = 'Forbidden'

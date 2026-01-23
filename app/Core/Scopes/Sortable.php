@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Sortable Trait
- * 
+ *
  * Adds sorting capabilities with mandatory column whitelist to Eloquent models
  * Use this trait when you need to explicitly define which columns can be sorted
  * For simpler sorting without whitelist, use the scopeSort method from Filterable trait
@@ -25,15 +25,10 @@ trait Sortable
 
     /**
      * Scope a query to apply sorting
-     *
-     * @param Builder $query
-     * @param string|null $column
-     * @param string $direction
-     * @return Builder
      */
     public function scopeSortBy(Builder $query, ?string $column, string $direction = 'asc'): Builder
     {
-        if (!$column || !in_array($column, $this->getSortableColumns(), true)) {
+        if (! $column || ! in_array($column, $this->getSortableColumns(), true)) {
             return $query;
         }
 
@@ -45,9 +40,7 @@ trait Sortable
     /**
      * Scope for multiple sort columns
      *
-     * @param Builder $query
-     * @param array<array{column: string, direction: string}> $sorts
-     * @return Builder
+     * @param  array<array{column: string, direction: string}>  $sorts
      */
     public function scopeMultiSort(Builder $query, array $sorts): Builder
     {

@@ -13,7 +13,8 @@ Route::prefix('api/v1/auth')->group(function () {
     Route::post('login', [AuthController::class, 'login'])->name('auth.login');
     Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->name('auth.forgot-password');
     Route::post('reset-password', [AuthController::class, 'resetPassword'])->name('auth.reset-password');
-    Route::get('verify-email/{id}/{hash}', [AuthController::class, 'verifyEmail'])->name('auth.verify-email');
+    Route::get('verify-email/{id}/{hash}', [AuthController::class, 'verifyEmail'])
+        ->name('verification.verify'); // Laravel expects this route name for MustVerifyEmail
 });
 
 // Protected routes (authentication required)

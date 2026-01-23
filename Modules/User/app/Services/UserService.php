@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace Modules\User\Services;
 
 use App\Core\Services\BaseService;
-use Modules\User\Repositories\UserRepository;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Modules\User\Repositories\UserRepository;
 
 /**
  * User Service
- * 
+ *
  * Contains business logic for User operations
  * Extends BaseService for common service layer functionality
  */
@@ -19,8 +19,6 @@ class UserService extends BaseService
 {
     /**
      * UserService constructor
-     *
-     * @param UserRepository $repository
      */
     public function __construct(UserRepository $repository)
     {
@@ -30,8 +28,8 @@ class UserService extends BaseService
     /**
      * Create a new user
      *
-     * @param array<string, mixed> $data
-     * @return mixed
+     * @param  array<string, mixed>  $data
+     *
      * @throws ValidationException
      */
     public function create(array $data): mixed
@@ -50,9 +48,8 @@ class UserService extends BaseService
     /**
      * Update user
      *
-     * @param int $id
-     * @param array<string, mixed> $data
-     * @return mixed
+     * @param  array<string, mixed>  $data
+     *
      * @throws ValidationException
      */
     public function update(int $id, array $data): mixed
@@ -72,10 +69,6 @@ class UserService extends BaseService
 
     /**
      * Assign role to user
-     *
-     * @param int $userId
-     * @param string $role
-     * @return mixed
      */
     public function assignRole(int $userId, string $role): mixed
     {
@@ -87,10 +80,6 @@ class UserService extends BaseService
 
     /**
      * Revoke role from user
-     *
-     * @param int $userId
-     * @param string $role
-     * @return mixed
      */
     public function revokeRole(int $userId, string $role): mixed
     {

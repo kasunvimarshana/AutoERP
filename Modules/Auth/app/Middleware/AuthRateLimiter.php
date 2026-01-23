@@ -11,29 +11,20 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Auth Rate Limiter Middleware
- * 
+ *
  * Rate limits authentication attempts to prevent brute force attacks
  */
 class AuthRateLimiter
 {
     /**
      * AuthRateLimiter constructor
-     *
-     * @param RateLimiter $limiter
      */
     public function __construct(
         protected RateLimiter $limiter
-    ) {
-    }
+    ) {}
 
     /**
      * Handle an incoming request
-     *
-     * @param Request $request
-     * @param Closure $next
-     * @param int $maxAttempts
-     * @param int $decayMinutes
-     * @return Response
      */
     public function handle(Request $request, Closure $next, int $maxAttempts = 5, int $decayMinutes = 1): Response
     {
@@ -62,16 +53,13 @@ class AuthRateLimiter
 
     /**
      * Resolve request signature
-     *
-     * @param Request $request
-     * @return string
      */
     protected function resolveRequestSignature(Request $request): string
     {
         return sha1(
-            $request->method() .
-            '|' . $request->ip() .
-            '|' . ($request->input('email') ?? 'no-email')
+            $request->method().
+            '|'.$request->ip().
+            '|'.($request->input('email') ?? 'no-email')
         );
     }
 }

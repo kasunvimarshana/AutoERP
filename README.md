@@ -232,20 +232,33 @@ ModularSaaS-LaravelVue/
    php artisan migrate
    ```
 
-7. **Seed initial data (optional)**
+7. **Seed roles and permissions**
+   ```bash
+   php artisan auth:seed-roles
+   ```
+
+8. **Seed initial data (optional)**
    ```bash
    php artisan db:seed
    ```
 
-8. **Install Sanctum**
+9. **Install Sanctum**
    ```bash
    php artisan install:api
    ```
 
-9. **Build frontend assets**
-   ```bash
-   npm run build
-   ```
+10. **Build frontend assets**
+    ```bash
+    npm run build
+    ```
+
+### Quick Start Guides
+
+For detailed setup instructions, see:
+- **[AUTH_SETUP_GUIDE.md](AUTH_SETUP_GUIDE.md)** - Complete authentication module setup
+- **[USER_MODEL_GUIDELINES.md](USER_MODEL_GUIDELINES.md)** - User model usage guidelines
+- **[QUICKSTART.md](QUICKSTART.md)** - Quick start guide
+- **[INSTALLATION.md](INSTALLATION.md)** - Detailed installation steps
 
 ## 🎯 Usage
 
@@ -476,15 +489,27 @@ public function test_can_create_user(): void
 
 ### Available Guides
 
+#### Setup & Installation
 - **[README.md](README.md)** - Complete project overview and quick start
+- **[INSTALLATION.md](INSTALLATION.md)** - Detailed installation instructions
+- **[QUICKSTART.md](QUICKSTART.md)** - Quick start guide
+- **[AUTH_SETUP_GUIDE.md](AUTH_SETUP_GUIDE.md)** - ✨ NEW: Complete authentication setup and troubleshooting
+
+#### Architecture & Development
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - Detailed architecture documentation
+- **[USER_MODEL_GUIDELINES.md](USER_MODEL_GUIDELINES.md)** - ✨ NEW: User model usage guidelines
 - **[SECURITY.md](SECURITY.md)** - Security implementation guide
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment guide
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contributing guidelines
-- **[INSTALLATION.md](INSTALLATION.md)** - Installation instructions
-- **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** - Project summary
-- **[AUTH_IMPLEMENTATION_SUMMARY.md](AUTH_IMPLEMENTATION_SUMMARY.md)** - ✨ NEW: Auth module implementation summary
+
+#### Module Documentation
+- **[AUTH_IMPLEMENTATION_SUMMARY.md](AUTH_IMPLEMENTATION_SUMMARY.md)** - Auth module implementation summary
+- **[Modules/Auth/README.md](Modules/Auth/README.md)** - Authentication module documentation
+- **[Modules/User/README.md](Modules/User/README.md)** - User module documentation (if exists)
+
+#### Deployment & Operations
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment guide
 - **[FRONTEND_DOCUMENTATION.md](FRONTEND_DOCUMENTATION.md)** - Vue.js frontend documentation
+- **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** - Project summary
 - **[ADMINLTE_INTEGRATION.md](ADMINLTE_INTEGRATION.md)** - ✨ NEW: AdminLTE integration guide
 - **[Modules/Auth/README.md](Modules/Auth/README.md)** - ✨ NEW: Authentication API documentation
 

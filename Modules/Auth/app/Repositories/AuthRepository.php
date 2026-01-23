@@ -10,26 +10,21 @@ use Illuminate\Support\Str;
 
 /**
  * Authentication Repository
- * 
+ *
  * Handles data access for authentication operations
  */
 class AuthRepository extends BaseRepository
 {
     /**
      * Make model instance
-     *
-     * @return \Illuminate\Database\Eloquent\Model
      */
     protected function makeModel(): \Illuminate\Database\Eloquent\Model
     {
-        return new User();
+        return new User;
     }
 
     /**
      * Find user by email
-     *
-     * @param string $email
-     * @return User|null
      */
     public function findByEmail(string $email): ?User
     {
@@ -38,9 +33,6 @@ class AuthRepository extends BaseRepository
 
     /**
      * Find user by reset token
-     *
-     * @param string $token
-     * @return User|null
      */
     public function findByResetToken(string $token): ?User
     {
@@ -49,10 +41,6 @@ class AuthRepository extends BaseRepository
 
     /**
      * Update user password
-     *
-     * @param int $id
-     * @param string $password
-     * @return bool
      */
     public function updatePassword(int $id, string $password): bool
     {
@@ -65,9 +53,6 @@ class AuthRepository extends BaseRepository
 
     /**
      * Mark email as verified
-     *
-     * @param int $id
-     * @return bool
      */
     public function markEmailAsVerified(int $id): bool
     {

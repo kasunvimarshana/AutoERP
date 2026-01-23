@@ -6,7 +6,7 @@ namespace App\Core\Enums;
 
 /**
  * Permission Type Enum
- * 
+ *
  * Defines types of permissions in the system
  */
 enum PermissionType: string
@@ -31,8 +31,6 @@ enum PermissionType: string
 
     /**
      * Get enum label
-     *
-     * @return string
      */
     public function label(): string
     {
@@ -49,9 +47,6 @@ enum PermissionType: string
 
     /**
      * Get permission name for a resource
-     *
-     * @param string $resource
-     * @return string
      */
     public function forResource(string $resource): string
     {

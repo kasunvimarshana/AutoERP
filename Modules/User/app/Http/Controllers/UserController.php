@@ -14,7 +14,7 @@ use Modules\User\Services\UserService;
 
 /**
  * User Controller
- * 
+ *
  * Handles HTTP requests for User operations
  * Follows Controller → Service → Repository pattern
  */
@@ -22,19 +22,13 @@ class UserController extends Controller
 {
     /**
      * UserController constructor
-     *
-     * @param UserService $userService
      */
     public function __construct(
         private readonly UserService $userService
-    ) {
-    }
+    ) {}
 
     /**
      * Display a listing of users
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function index(Request $request): JsonResponse
     {
@@ -53,9 +47,6 @@ class UserController extends Controller
 
     /**
      * Store a newly created user
-     *
-     * @param StoreUserRequest $request
-     * @return JsonResponse
      */
     public function store(StoreUserRequest $request): JsonResponse
     {
@@ -69,9 +60,6 @@ class UserController extends Controller
 
     /**
      * Display the specified user
-     *
-     * @param int $id
-     * @return JsonResponse
      */
     public function show(int $id): JsonResponse
     {
@@ -85,10 +73,6 @@ class UserController extends Controller
 
     /**
      * Update the specified user
-     *
-     * @param UpdateUserRequest $request
-     * @param int $id
-     * @return JsonResponse
      */
     public function update(UpdateUserRequest $request, int $id): JsonResponse
     {
@@ -102,9 +86,6 @@ class UserController extends Controller
 
     /**
      * Remove the specified user
-     *
-     * @param int $id
-     * @return JsonResponse
      */
     public function destroy(int $id): JsonResponse
     {
@@ -118,10 +99,6 @@ class UserController extends Controller
 
     /**
      * Assign role to user
-     *
-     * @param Request $request
-     * @param int $id
-     * @return JsonResponse
      */
     public function assignRole(Request $request, int $id): JsonResponse
     {
@@ -139,10 +116,6 @@ class UserController extends Controller
 
     /**
      * Revoke role from user
-     *
-     * @param Request $request
-     * @param int $id
-     * @return JsonResponse
      */
     public function revokeRole(Request $request, int $id): JsonResponse
     {

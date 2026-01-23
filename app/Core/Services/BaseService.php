@@ -4,28 +4,23 @@ declare(strict_types=1);
 
 namespace App\Core\Services;
 
-use App\Core\Contracts\ServiceInterface;
 use App\Core\Contracts\RepositoryInterface;
+use App\Core\Contracts\ServiceInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
  * Base Service Abstract Class
- * 
+ *
  * Provides common service layer implementations
  * All module services should extend this class
  */
 abstract class BaseService implements ServiceInterface
 {
-    /**
-     * @var RepositoryInterface
-     */
     protected RepositoryInterface $repository;
 
     /**
      * BaseService constructor
-     *
-     * @param RepositoryInterface $repository
      */
     public function __construct(RepositoryInterface $repository)
     {
@@ -39,6 +34,7 @@ abstract class BaseService implements ServiceInterface
     {
         if (isset($filters['paginate']) && $filters['paginate']) {
             $perPage = $filters['per_page'] ?? 15;
+
             return $this->repository->paginate($perPage);
         }
 

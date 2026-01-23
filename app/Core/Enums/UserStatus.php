@@ -6,7 +6,7 @@ namespace App\Core\Enums;
 
 /**
  * User Status Enum
- * 
+ *
  * Defines possible user account statuses
  */
 enum UserStatus: string
@@ -29,8 +29,6 @@ enum UserStatus: string
 
     /**
      * Get enum label
-     *
-     * @return string
      */
     public function label(): string
     {
@@ -45,8 +43,6 @@ enum UserStatus: string
 
     /**
      * Check if status is active
-     *
-     * @return bool
      */
     public function isActive(): bool
     {
@@ -55,8 +51,6 @@ enum UserStatus: string
 
     /**
      * Check if status allows login
-     *
-     * @return bool
      */
     public function canLogin(): bool
     {

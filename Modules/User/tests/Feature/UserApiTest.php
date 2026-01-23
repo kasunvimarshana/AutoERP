@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\User\Tests\Feature;
 
-use Tests\TestCase;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 /**
  * User API Test
- * 
+ *
  * Tests the User API endpoints following the repository pattern
  */
 class UserApiTest extends TestCase

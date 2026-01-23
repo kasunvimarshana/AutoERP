@@ -5,21 +5,18 @@ declare(strict_types=1);
 namespace App\Core\Repositories;
 
 use App\Core\Contracts\RepositoryInterface;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 
 /**
  * Base Repository Abstract Class
- * 
+ *
  * Provides common repository implementations
  * All module repositories should extend this class
  */
 abstract class BaseRepository implements RepositoryInterface
 {
-    /**
-     * @var Model
-     */
     protected Model $model;
 
     /**
@@ -32,8 +29,6 @@ abstract class BaseRepository implements RepositoryInterface
 
     /**
      * Make model instance
-     *
-     * @return Model
      */
     abstract protected function makeModel(): Model;
 

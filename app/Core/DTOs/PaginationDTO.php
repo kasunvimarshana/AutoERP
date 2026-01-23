@@ -6,7 +6,7 @@ namespace App\Core\DTOs;
 
 /**
  * Pagination Data Transfer Object
- * 
+ *
  * Encapsulates pagination parameters
  */
 final class PaginationDTO extends BaseDTO
@@ -14,18 +14,17 @@ final class PaginationDTO extends BaseDTO
     /**
      * PaginationDTO constructor
      *
-     * @param int $page Current page number
-     * @param int $perPage Items per page
-     * @param string|null $sortBy Column to sort by
-     * @param string $sortOrder Sort direction (asc/desc)
+     * @param  int  $page  Current page number
+     * @param  int  $perPage  Items per page
+     * @param  string|null  $sortBy  Column to sort by
+     * @param  string  $sortOrder  Sort direction (asc/desc)
      */
     public function __construct(
         public readonly int $page = 1,
         public readonly int $perPage = 15,
         public readonly ?string $sortBy = null,
         public readonly string $sortOrder = 'asc'
-    ) {
-    }
+    ) {}
 
     /**
      * {@inheritDoc}
@@ -55,8 +54,6 @@ final class PaginationDTO extends BaseDTO
 
     /**
      * Get offset for database query
-     *
-     * @return int
      */
     public function getOffset(): int
     {

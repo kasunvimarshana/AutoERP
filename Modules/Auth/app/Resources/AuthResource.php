@@ -9,7 +9,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * Authentication Resource
- * 
+ *
  * Transform authentication response data
  */
 class AuthResource extends JsonResource
@@ -17,7 +17,6 @@ class AuthResource extends JsonResource
     /**
      * Transform the resource into an array
      *
-     * @param Request $request
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array

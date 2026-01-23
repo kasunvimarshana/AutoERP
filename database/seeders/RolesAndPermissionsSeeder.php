@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 /**
  * Roles and Permissions Seeder
- * 
+ *
  * Seeds initial roles and permissions for RBAC system
  */
 class RolesAndPermissionsSeeder extends Seeder
@@ -30,14 +30,14 @@ class RolesAndPermissionsSeeder extends Seeder
             'user.create',
             'user.edit',
             'user.delete',
-            
+
             // Role permissions
             'role.view',
             'role.create',
             'role.edit',
             'role.delete',
             'role.assign',
-            
+
             // Permission permissions
             'permission.view',
             'permission.create',

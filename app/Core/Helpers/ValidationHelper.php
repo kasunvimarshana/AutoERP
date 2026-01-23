@@ -9,7 +9,7 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Validation Helper
- * 
+ *
  * Provides validation utilities
  */
 final class ValidationHelper
@@ -17,29 +17,29 @@ final class ValidationHelper
     /**
      * Validate data against rules
      *
-     * @param array<string, mixed> $data
-     * @param array<string, mixed> $rules
-     * @param array<string, string> $messages
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $rules
+     * @param  array<string, string>  $messages
      * @return array<string, mixed>
+     *
      * @throws ValidationException
      */
     public static function validate(array $data, array $rules, array $messages = []): array
     {
         $validator = Validator::make($data, $rules, $messages);
-        
+
         if ($validator->fails()) {
             throw new ValidationException($validator);
         }
-        
+
         return $validator->validated();
     }
 
     /**
      * Check if data passes validation
      *
-     * @param array<string, mixed> $data
-     * @param array<string, mixed> $rules
-     * @return bool
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $rules
      */
     public static function passes(array $data, array $rules): bool
     {
@@ -49,26 +49,23 @@ final class ValidationHelper
     /**
      * Get validation errors
      *
-     * @param array<string, mixed> $data
-     * @param array<string, mixed> $rules
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $rules
      * @return array<string, array<string>>
      */
     public static function errors(array $data, array $rules): array
     {
         $validator = Validator::make($data, $rules);
-        
+
         if ($validator->fails()) {
             return $validator->errors()->toArray();
         }
-        
+
         return [];
     }
 
     /**
      * Validate email address
-     *
-     * @param string $email
-     * @return bool
      */
     public static function isValidEmail(string $email): bool
     {
@@ -77,9 +74,6 @@ final class ValidationHelper
 
     /**
      * Validate URL
-     *
-     * @param string $url
-     * @return bool
      */
     public static function isValidUrl(string $url): bool
     {
@@ -88,21 +82,16 @@ final class ValidationHelper
 
     /**
      * Validate UUID
-     *
-     * @param string $uuid
-     * @return bool
      */
     public static function isValidUuid(string $uuid): bool
     {
         $pattern = '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i';
+
         return preg_match($pattern, $uuid) === 1;
     }
 
     /**
      * Sanitize string
-     *
-     * @param string $value
-     * @return string
      */
     public static function sanitize(string $value): string
     {
@@ -111,10 +100,6 @@ final class ValidationHelper
 
     /**
      * Validate strong password
-     *
-     * @param string $password
-     * @param int $minLength
-     * @return bool
      */
     public static function isStrongPassword(string $password, int $minLength = 8): bool
     {

@@ -9,7 +9,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Base Application Exception
- * 
+ *
  * Base class for all custom exceptions in the application
  */
 abstract class BaseException extends Exception
@@ -26,8 +26,6 @@ abstract class BaseException extends Exception
 
     /**
      * Get HTTP status code
-     *
-     * @return int
      */
     public function getStatusCode(): int
     {
@@ -47,12 +45,12 @@ abstract class BaseException extends Exception
     /**
      * Set error data
      *
-     * @param array<string, mixed> $data
-     * @return self
+     * @param  array<string, mixed>  $data
      */
     public function setErrorData(array $data): self
     {
         $this->errorData = $data;
+
         return $this;
     }
 

@@ -9,7 +9,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * User Resource
- * 
+ *
  * Transforms User model for API responses
  */
 class UserResource extends JsonResource

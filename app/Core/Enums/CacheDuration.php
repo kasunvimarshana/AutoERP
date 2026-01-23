@@ -6,7 +6,7 @@ namespace App\Core\Enums;
 
 /**
  * Cache Duration Enum
- * 
+ *
  * Defines standard cache durations in seconds
  */
 enum CacheDuration: int
@@ -24,8 +24,6 @@ enum CacheDuration: int
 
     /**
      * Get duration label
-     *
-     * @return string
      */
     public function label(): string
     {
@@ -45,8 +43,6 @@ enum CacheDuration: int
 
     /**
      * Get duration in minutes
-     *
-     * @return int
      */
     public function toMinutes(): int
     {

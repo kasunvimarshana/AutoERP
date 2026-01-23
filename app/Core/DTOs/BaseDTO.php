@@ -8,7 +8,7 @@ use JsonSerializable;
 
 /**
  * Base Data Transfer Object
- * 
+ *
  * Abstract base class for all DTOs in the application
  * Provides immutable data structures for transferring data between layers
  */
@@ -24,8 +24,7 @@ abstract class BaseDTO implements JsonSerializable
     /**
      * Create DTO from array
      *
-     * @param array<string, mixed> $data
-     * @return static
+     * @param  array<string, mixed>  $data
      */
     abstract public static function fromArray(array $data): static;
 
@@ -41,8 +40,6 @@ abstract class BaseDTO implements JsonSerializable
 
     /**
      * Convert DTO to JSON string
-     *
-     * @return string
      */
     public function toJson(): string
     {

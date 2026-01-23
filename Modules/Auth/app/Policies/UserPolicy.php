@@ -9,7 +9,7 @@ use Illuminate\Auth\Access\HandlesAuthorization;
 
 /**
  * User Authorization Policy
- * 
+ *
  * Tenant-aware authorization for user management operations
  * Implements both RBAC and ABAC patterns
  */
@@ -19,9 +19,6 @@ class UserPolicy
 
     /**
      * Determine if user can view any users
-     *
-     * @param User $user
-     * @return bool
      */
     public function viewAny(User $user): bool
     {
@@ -36,10 +33,6 @@ class UserPolicy
 
     /**
      * Determine if user can view specific user
-     *
-     * @param User $user
-     * @param User $targetUser
-     * @return bool
      */
     public function view(User $user, User $targetUser): bool
     {
@@ -59,9 +52,6 @@ class UserPolicy
 
     /**
      * Determine if user can create users
-     *
-     * @param User $user
-     * @return bool
      */
     public function create(User $user): bool
     {
@@ -71,10 +61,6 @@ class UserPolicy
 
     /**
      * Determine if user can update specific user
-     *
-     * @param User $user
-     * @param User $targetUser
-     * @return bool
      */
     public function update(User $user, User $targetUser): bool
     {
@@ -93,10 +79,6 @@ class UserPolicy
 
     /**
      * Determine if user can delete specific user
-     *
-     * @param User $user
-     * @param User $targetUser
-     * @return bool
      */
     public function delete(User $user, User $targetUser): bool
     {
@@ -115,10 +97,6 @@ class UserPolicy
 
     /**
      * Determine if user can assign roles
-     *
-     * @param User $user
-     * @param User $targetUser
-     * @return bool
      */
     public function assignRole(User $user, User $targetUser): bool
     {
@@ -137,10 +115,6 @@ class UserPolicy
 
     /**
      * Determine if user can revoke roles
-     *
-     * @param User $user
-     * @param User $targetUser
-     * @return bool
      */
     public function revokeRole(User $user, User $targetUser): bool
     {
@@ -159,20 +133,16 @@ class UserPolicy
 
     /**
      * Check if users belong to the same tenant
-     *
-     * @param User $user
-     * @param User $targetUser
-     * @return bool
      */
     protected function isSameTenant(User $user, User $targetUser): bool
     {
         // If tenancy helper is not available, allow (single-tenant mode)
-        if (!function_exists('tenancy')) {
+        if (! function_exists('tenancy')) {
             return true;
         }
 
         // If tenancy is not initialized, allow (non-tenant context)
-        if (!tenancy()->initialized) {
+        if (! tenancy()->initialized) {
             return true;
         }
 
@@ -187,10 +157,6 @@ class UserPolicy
 
     /**
      * Perform before authorization checks
-     *
-     * @param User $user
-     * @param string $ability
-     * @return bool|null
      */
     public function before(User $user, string $ability): ?bool
     {

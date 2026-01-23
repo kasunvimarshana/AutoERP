@@ -8,7 +8,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Repository Exception
- * 
+ *
  * Thrown when repository operations fail
  */
 class RepositoryException extends BaseException
@@ -20,10 +20,6 @@ class RepositoryException extends BaseException
 
     /**
      * Create exception for entity not found
-     *
-     * @param string $entity
-     * @param int|string $id
-     * @return static
      */
     public static function notFound(string $entity, int|string $id): static
     {
@@ -33,15 +29,12 @@ class RepositoryException extends BaseException
             'entity' => $entity,
             'id' => $id,
         ];
+
         return $exception;
     }
 
     /**
      * Create exception for create failure
-     *
-     * @param string $entity
-     * @param string $reason
-     * @return static
      */
     public static function createFailed(string $entity, string $reason = ''): static
     {
@@ -51,16 +44,12 @@ class RepositoryException extends BaseException
         }
         $exception = new static($message);
         $exception->errorData = ['entity' => $entity];
+
         return $exception;
     }
 
     /**
      * Create exception for update failure
-     *
-     * @param string $entity
-     * @param int|string $id
-     * @param string $reason
-     * @return static
      */
     public static function updateFailed(string $entity, int|string $id, string $reason = ''): static
     {
@@ -70,16 +59,12 @@ class RepositoryException extends BaseException
         }
         $exception = new static($message);
         $exception->errorData = ['entity' => $entity, 'id' => $id];
+
         return $exception;
     }
 
     /**
      * Create exception for delete failure
-     *
-     * @param string $entity
-     * @param int|string $id
-     * @param string $reason
-     * @return static
      */
     public static function deleteFailed(string $entity, int|string $id, string $reason = ''): static
     {
@@ -89,6 +74,7 @@ class RepositoryException extends BaseException
         }
         $exception = new static($message);
         $exception->errorData = ['entity' => $entity, 'id' => $id];
+
         return $exception;
     }
 }

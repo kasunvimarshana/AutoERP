@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Filterable Trait
- * 
+ *
  * Adds dynamic filtering capabilities to Eloquent models
  */
 trait Filterable
@@ -16,14 +16,12 @@ trait Filterable
     /**
      * Scope a query to apply filters
      *
-     * @param Builder $query
-     * @param array<string, mixed> $filters
-     * @return Builder
+     * @param  array<string, mixed>  $filters
      */
     public function scopeFilter(Builder $query, array $filters): Builder
     {
         foreach ($filters as $key => $value) {
-            if (method_exists($this, $method = 'filter' . ucfirst($key))) {
+            if (method_exists($this, $method = 'filter'.ucfirst($key))) {
                 $this->$method($query, $value);
             } elseif ($value !== null && $value !== '') {
                 $query->where($key, $value);
@@ -36,14 +34,11 @@ trait Filterable
     /**
      * Scope a query to search across specified columns
      *
-     * @param Builder $query
-     * @param string|null $search
-     * @param array<string> $columns
-     * @return Builder
+     * @param  array<string>  $columns
      */
     public function scopeSearch(Builder $query, ?string $search, array $columns): Builder
     {
-        if (!$search) {
+        if (! $search) {
             return $query;
         }
 
@@ -56,17 +51,12 @@ trait Filterable
 
     /**
      * Scope a query to apply simple sorting
-     * 
-     * Note: For models that need whitelisted columns, use the Sortable trait instead
      *
-     * @param Builder $query
-     * @param string|null $column
-     * @param string $direction
-     * @return Builder
+     * Note: For models that need whitelisted columns, use the Sortable trait instead
      */
     public function scopeSort(Builder $query, ?string $column, string $direction = 'asc'): Builder
     {
-        if (!$column) {
+        if (! $column) {
             return $query;
         }
 
@@ -75,11 +65,11 @@ trait Filterable
 
         // Only allow sorting if column exists in table or is a valid expression
         // This prevents SQL injection through column names
-        $allowedColumns = method_exists($this, 'getSortableColumns') 
-            ? $this->getSortableColumns() 
+        $allowedColumns = method_exists($this, 'getSortableColumns')
+            ? $this->getSortableColumns()
             : [];
-            
-        if (!empty($allowedColumns) && !in_array($column, $allowedColumns, true)) {
+
+        if (! empty($allowedColumns) && ! in_array($column, $allowedColumns, true)) {
             return $query;
         }
 
@@ -88,12 +78,6 @@ trait Filterable
 
     /**
      * Scope a query to filter by date range
-     *
-     * @param Builder $query
-     * @param string $column
-     * @param string|null $from
-     * @param string|null $to
-     * @return Builder
      */
     public function scopeDateRange(Builder $query, string $column, ?string $from, ?string $to): Builder
     {

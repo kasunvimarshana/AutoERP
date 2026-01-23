@@ -14,11 +14,10 @@ use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Modules\Auth\Repositories\AuthRepository;
-use Modules\Auth\Services\AuthAuditLogger;
 
 /**
  * Authentication Service
- * 
+ *
  * Handles all authentication business logic including user registration,
  * login, logout, password reset, and email verification
  */
@@ -26,8 +25,6 @@ class AuthService extends BaseService
 {
     /**
      * AuthService constructor
-     *
-     * @param AuthRepository $repository
      */
     public function __construct(
         AuthRepository $repository
@@ -37,15 +34,12 @@ class AuthService extends BaseService
 
     /**
      * Register a new user
-     *
-     * @param array $data
-     * @return array
      */
     public function register(array $data): array
     {
         // Hash password
         $data['password'] = Hash::make($data['password']);
-        
+
         // Set default status
         $data['email_verified_at'] = null;
 
@@ -77,8 +71,6 @@ class AuthService extends BaseService
     /**
      * Login user
      *
-     * @param array $credentials
-     * @return array
      * @throws ValidationException
      */
     public function login(array $credentials): array
@@ -87,7 +79,7 @@ class AuthService extends BaseService
         $user = $this->repository->findByEmail($credentials['email']);
 
         // Check if user exists and password is correct
-        if (!$user || !Hash::check($credentials['password'], $user->password)) {
+        if (! $user || ! Hash::check($credentials['password'], $user->password)) {
             AuthAuditLogger::logFailedLogin($credentials['email'], 'invalid_credentials');
             throw ValidationException::withMessages([
                 'email' => [__('auth::messages.invalid_credentials')],
@@ -95,7 +87,7 @@ class AuthService extends BaseService
         }
 
         // Check if user is active (if is_active attribute exists)
-        if (isset($user->is_active) && !$user->is_active) {
+        if (isset($user->is_active) && ! $user->is_active) {
             AuthAuditLogger::logFailedLogin($credentials['email'], 'account_inactive');
             throw ValidationException::withMessages([
                 'email' => [__('auth::messages.account_inactive')],
@@ -121,9 +113,6 @@ class AuthService extends BaseService
 
     /**
      * Logout user (revoke current token)
-     *
-     * @param User $user
-     * @return void
      */
     public function logout(User $user): void
     {
@@ -136,9 +125,6 @@ class AuthService extends BaseService
 
     /**
      * Logout from all devices (revoke all tokens)
-     *
-     * @param User $user
-     * @return void
      */
     public function logoutAll(User $user): void
     {
@@ -151,9 +137,6 @@ class AuthService extends BaseService
 
     /**
      * Refresh user token
-     *
-     * @param User $user
-     * @return array
      */
     public function refreshToken(User $user): array
     {
@@ -175,8 +158,6 @@ class AuthService extends BaseService
     /**
      * Send password reset link
      *
-     * @param array $data
-     * @return void
      * @throws ValidationException
      */
     public function sendPasswordResetLink(array $data): void
@@ -196,8 +177,6 @@ class AuthService extends BaseService
     /**
      * Reset password
      *
-     * @param array $data
-     * @return void
      * @throws ValidationException
      */
     public function resetPassword(array $data): void
@@ -234,21 +213,17 @@ class AuthService extends BaseService
 
     /**
      * Verify email
-     *
-     * @param string $id
-     * @param string $hash
-     * @return bool
      */
     public function verifyEmail(string $id, string $hash): bool
     {
         $user = $this->repository->find((int) $id);
 
-        if (!$user) {
+        if (! $user) {
             return false;
         }
 
         // Check if hash matches
-        if (!hash_equals($hash, sha1($user->getEmailForVerification()))) {
+        if (! hash_equals($hash, sha1($user->getEmailForVerification()))) {
             return false;
         }
 
@@ -270,9 +245,6 @@ class AuthService extends BaseService
 
     /**
      * Resend email verification
-     *
-     * @param User $user
-     * @return void
      */
     public function resendEmailVerification(User $user): void
     {

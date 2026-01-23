@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Audit Trail Trait
- * 
+ *
  * Automatically logs model events for auditing purposes
  * Tracks who created, updated, or deleted records
  */
@@ -18,8 +18,6 @@ trait AuditTrait
 {
     /**
      * Boot the audit trait for a model
-     *
-     * @return void
      */
     public static function bootAuditTrait(): void
     {

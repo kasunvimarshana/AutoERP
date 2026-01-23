@@ -6,7 +6,7 @@ namespace App\Core\Policies;
 
 /**
  * Resource Policy Example
- * 
+ *
  * Example policy demonstrating ABAC (Attribute-Based Access Control)
  * Combines roles, permissions, ownership, and tenant isolation
  */
@@ -14,9 +14,6 @@ class ResourcePolicy extends BasePolicy
 {
     /**
      * Determine if user can view any resources
-     *
-     * @param mixed $user
-     * @return bool
      */
     public function viewAny(mixed $user): bool
     {
@@ -31,10 +28,6 @@ class ResourcePolicy extends BasePolicy
 
     /**
      * Determine if user can view the resource
-     *
-     * @param mixed $user
-     * @param mixed $model
-     * @return bool
      */
     public function view(mixed $user, mixed $model): bool
     {
@@ -44,7 +37,7 @@ class ResourcePolicy extends BasePolicy
         }
 
         // Must be in same tenant
-        if (!$this->isSameTenant($user, $model)) {
+        if (! $this->isSameTenant($user, $model)) {
             return false;
         }
 
@@ -59,9 +52,6 @@ class ResourcePolicy extends BasePolicy
 
     /**
      * Determine if user can create resources
-     *
-     * @param mixed $user
-     * @return bool
      */
     public function create(mixed $user): bool
     {
@@ -76,10 +66,6 @@ class ResourcePolicy extends BasePolicy
 
     /**
      * Determine if user can update the resource
-     *
-     * @param mixed $user
-     * @param mixed $model
-     * @return bool
      */
     public function update(mixed $user, mixed $model): bool
     {
@@ -89,7 +75,7 @@ class ResourcePolicy extends BasePolicy
         }
 
         // Must be in same tenant
-        if (!$this->isSameTenant($user, $model)) {
+        if (! $this->isSameTenant($user, $model)) {
             return false;
         }
 
@@ -104,10 +90,6 @@ class ResourcePolicy extends BasePolicy
 
     /**
      * Determine if user can delete the resource
-     *
-     * @param mixed $user
-     * @param mixed $model
-     * @return bool
      */
     public function delete(mixed $user, mixed $model): bool
     {
@@ -117,7 +99,7 @@ class ResourcePolicy extends BasePolicy
         }
 
         // Must be in same tenant
-        if (!$this->isSameTenant($user, $model)) {
+        if (! $this->isSameTenant($user, $model)) {
             return false;
         }
 
@@ -132,10 +114,6 @@ class ResourcePolicy extends BasePolicy
 
     /**
      * Determine if user can restore the resource
-     *
-     * @param mixed $user
-     * @param mixed $model
-     * @return bool
      */
     public function restore(mixed $user, mixed $model): bool
     {
@@ -145,10 +123,6 @@ class ResourcePolicy extends BasePolicy
 
     /**
      * Determine if user can permanently delete the resource
-     *
-     * @param mixed $user
-     * @param mixed $model
-     * @return bool
      */
     public function forceDelete(mixed $user, mixed $model): bool
     {

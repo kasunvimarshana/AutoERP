@@ -9,7 +9,7 @@ use Illuminate\Validation\Rules\Password;
 
 /**
  * Store User Request
- * 
+ *
  * Validates data for creating a new user
  */
 class StoreUserRequest extends FormRequest

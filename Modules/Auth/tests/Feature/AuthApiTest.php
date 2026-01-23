@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Tests\Feature;
 
-use Tests\TestCase;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
+use Tests\TestCase;
 
 /**
  * Authentication API Test
- * 
+ *
  * Tests authentication endpoints including login, register, logout
  */
 class AuthApiTest extends TestCase
@@ -133,7 +133,7 @@ class AuthApiTest extends TestCase
         $user = User::factory()->create();
         $token = $user->createToken('test-token')->plainTextToken;
 
-        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
             ->postJson('/api/v1/auth/logout');
 
         $response->assertStatus(200)
@@ -189,7 +189,7 @@ class AuthApiTest extends TestCase
         $user = User::factory()->create();
         $oldToken = $user->createToken('test-token')->plainTextToken;
 
-        $response = $this->withHeader('Authorization', 'Bearer ' . $oldToken)
+        $response = $this->withHeader('Authorization', 'Bearer '.$oldToken)
             ->postJson('/api/v1/auth/refresh');
 
         $response->assertStatus(200)
@@ -208,13 +208,13 @@ class AuthApiTest extends TestCase
     public function test_user_can_logout_from_all_devices(): void
     {
         $user = User::factory()->create();
-        
+
         // Create multiple tokens
         $user->createToken('token-1');
         $user->createToken('token-2');
         $token3 = $user->createToken('token-3')->plainTextToken;
 
-        $response = $this->withHeader('Authorization', 'Bearer ' . $token3)
+        $response = $this->withHeader('Authorization', 'Bearer '.$token3)
             ->postJson('/api/v1/auth/logout-all');
 
         $response->assertStatus(200);

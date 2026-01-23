@@ -9,17 +9,13 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Authentication Audit Logger
- * 
+ *
  * Handles structured, immutable logging of authentication events
  */
 class AuthAuditLogger
 {
     /**
      * Log successful login
-     *
-     * @param User $user
-     * @param array $context
-     * @return void
      */
     public static function logSuccessfulLogin(User $user, array $context = []): void
     {
@@ -31,11 +27,6 @@ class AuthAuditLogger
 
     /**
      * Log failed login attempt
-     *
-     * @param string $email
-     * @param string $reason
-     * @param array $context
-     * @return void
      */
     public static function logFailedLogin(string $email, string $reason, array $context = []): void
     {
@@ -49,10 +40,6 @@ class AuthAuditLogger
 
     /**
      * Log successful registration
-     *
-     * @param User $user
-     * @param array $context
-     * @return void
      */
     public static function logSuccessfulRegistration(User $user, array $context = []): void
     {
@@ -64,11 +51,6 @@ class AuthAuditLogger
 
     /**
      * Log logout
-     *
-     * @param User $user
-     * @param bool $allDevices
-     * @param array $context
-     * @return void
      */
     public static function logLogout(User $user, bool $allDevices = false, array $context = []): void
     {
@@ -80,10 +62,6 @@ class AuthAuditLogger
 
     /**
      * Log password reset request
-     *
-     * @param string $email
-     * @param array $context
-     * @return void
      */
     public static function logPasswordResetRequest(string $email, array $context = []): void
     {
@@ -95,10 +73,6 @@ class AuthAuditLogger
 
     /**
      * Log password reset completion
-     *
-     * @param User $user
-     * @param array $context
-     * @return void
      */
     public static function logPasswordReset(User $user, array $context = []): void
     {
@@ -110,10 +84,6 @@ class AuthAuditLogger
 
     /**
      * Log email verification
-     *
-     * @param User $user
-     * @param array $context
-     * @return void
      */
     public static function logEmailVerification(User $user, array $context = []): void
     {
@@ -125,10 +95,6 @@ class AuthAuditLogger
 
     /**
      * Log token refresh
-     *
-     * @param User $user
-     * @param array $context
-     * @return void
      */
     public static function logTokenRefresh(User $user, array $context = []): void
     {
@@ -139,11 +105,6 @@ class AuthAuditLogger
 
     /**
      * Log authentication attempt with rate limiting
-     *
-     * @param string $email
-     * @param string $ip
-     * @param array $context
-     * @return void
      */
     public static function logRateLimitExceeded(string $email, string $ip, array $context = []): void
     {
@@ -156,11 +117,6 @@ class AuthAuditLogger
 
     /**
      * Log with user context
-     *
-     * @param string $message
-     * @param User $user
-     * @param array $context
-     * @return void
      */
     private static function log(string $message, User $user, array $context = []): void
     {
@@ -177,10 +133,6 @@ class AuthAuditLogger
 
     /**
      * Log without user context
-     *
-     * @param string $message
-     * @param array $context
-     * @return void
      */
     private static function logWithoutUser(string $message, array $context = []): void
     {
@@ -192,8 +144,6 @@ class AuthAuditLogger
 
     /**
      * Get base context for all logs
-     *
-     * @return array
      */
     private static function getBaseContext(): array
     {

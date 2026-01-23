@@ -6,27 +6,23 @@ namespace App\Core\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Audit Log Middleware
- * 
+ *
  * Logs all requests for audit trail
  */
 class AuditLog
 {
     /**
      * Handle an incoming request
-     *
-     * @param Request $request
-     * @param Closure $next
-     * @return Response
      */
     public function handle(Request $request, Closure $next): Response
     {
         $startTime = microtime(true);
-        
+
         // Log request
         Log::info('API Request', [
             'method' => $request->method(),
@@ -43,7 +39,7 @@ class AuditLog
         $duration = microtime(true) - $startTime;
         Log::info('API Response', [
             'status' => $response->getStatusCode(),
-            'duration' => round($duration * 1000, 2) . 'ms',
+            'duration' => round($duration * 1000, 2).'ms',
             'user_id' => $request->user()?->id,
         ]);
 

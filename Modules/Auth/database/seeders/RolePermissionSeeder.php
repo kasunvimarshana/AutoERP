@@ -11,15 +11,13 @@ use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Role and Permission Seeder
- * 
+ *
  * Seeds default roles and permissions for the application
  */
 class RolePermissionSeeder extends Seeder
 {
     /**
      * Run the database seeds
-     *
-     * @return void
      */
     public function run(): void
     {
@@ -34,7 +32,7 @@ class RolePermissionSeeder extends Seeder
             'user.update',
             'user.delete',
             'user.list',
-            
+
             // Role permissions
             'role.create',
             'role.read',
@@ -43,7 +41,7 @@ class RolePermissionSeeder extends Seeder
             'role.list',
             'role.assign',
             'role.revoke',
-            
+
             // Permission permissions
             'permission.create',
             'permission.read',
@@ -52,7 +50,7 @@ class RolePermissionSeeder extends Seeder
             'permission.list',
             'permission.assign',
             'permission.revoke',
-            
+
             // Tenant permissions
             'tenant.create',
             'tenant.read',
@@ -60,7 +58,7 @@ class RolePermissionSeeder extends Seeder
             'tenant.delete',
             'tenant.list',
             'tenant.switch',
-            
+
             // Audit permissions
             'audit.read',
             'audit.list',

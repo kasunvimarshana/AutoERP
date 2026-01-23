@@ -7,16 +7,16 @@ namespace Modules\Auth\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\Auth\Requests\ForgotPasswordRequest;
 use Modules\Auth\Requests\LoginRequest;
 use Modules\Auth\Requests\RegisterRequest;
-use Modules\Auth\Requests\ForgotPasswordRequest;
 use Modules\Auth\Requests\ResetPasswordRequest;
-use Modules\Auth\Services\AuthService;
 use Modules\Auth\Resources\AuthResource;
+use Modules\Auth\Services\AuthService;
 
 /**
  * Authentication Controller
- * 
+ *
  * Handles all authentication operations including login, register, logout,
  * password reset, and token management
  */
@@ -24,19 +24,13 @@ class AuthController extends Controller
 {
     /**
      * AuthController constructor
-     *
-     * @param AuthService $authService
      */
     public function __construct(
         private readonly AuthService $authService
-    ) {
-    }
+    ) {}
 
     /**
      * Register a new user
-     *
-     * @param RegisterRequest $request
-     * @return JsonResponse
      */
     public function register(RegisterRequest $request): JsonResponse
     {
@@ -50,9 +44,6 @@ class AuthController extends Controller
 
     /**
      * Login user and issue token
-     *
-     * @param LoginRequest $request
-     * @return JsonResponse
      */
     public function login(LoginRequest $request): JsonResponse
     {
@@ -66,9 +57,6 @@ class AuthController extends Controller
 
     /**
      * Logout current user
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function logout(Request $request): JsonResponse
     {
@@ -82,9 +70,6 @@ class AuthController extends Controller
 
     /**
      * Logout from all devices
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function logoutAll(Request $request): JsonResponse
     {
@@ -98,9 +83,6 @@ class AuthController extends Controller
 
     /**
      * Get current authenticated user
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function me(Request $request): JsonResponse
     {
@@ -115,9 +97,6 @@ class AuthController extends Controller
 
     /**
      * Refresh authentication token
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function refresh(Request $request): JsonResponse
     {
@@ -131,9 +110,6 @@ class AuthController extends Controller
 
     /**
      * Request password reset
-     *
-     * @param ForgotPasswordRequest $request
-     * @return JsonResponse
      */
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
@@ -147,9 +123,6 @@ class AuthController extends Controller
 
     /**
      * Reset password
-     *
-     * @param ResetPasswordRequest $request
-     * @return JsonResponse
      */
     public function resetPassword(ResetPasswordRequest $request): JsonResponse
     {
@@ -163,17 +136,12 @@ class AuthController extends Controller
 
     /**
      * Verify email
-     *
-     * @param Request $request
-     * @param string $id
-     * @param string $hash
-     * @return JsonResponse
      */
     public function verifyEmail(Request $request, string $id, string $hash): JsonResponse
     {
         $result = $this->authService->verifyEmail($id, $hash);
 
-        if (!$result) {
+        if (! $result) {
             return $this->errorResponse(
                 __('auth::messages.email_verification_failed'),
                 422
@@ -188,9 +156,6 @@ class AuthController extends Controller
 
     /**
      * Resend email verification
-     *
-     * @param Request $request
-     * @return JsonResponse
      */
     public function resendEmailVerification(Request $request): JsonResponse
     {
