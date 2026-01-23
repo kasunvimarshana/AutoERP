@@ -163,8 +163,14 @@ class AppointmentService extends BaseService
      */
     public function start(int $id): mixed
     {
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
-            DB::beginTransaction();
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $appointment = $this->update($id, [
                 'status' => 'in_progress',
@@ -176,11 +182,15 @@ class AppointmentService extends BaseService
                 $this->bayScheduleRepository->update($schedule->id, ['status' => 'active']);
             });
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $appointment;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw $e;
         }
     }
@@ -190,8 +200,14 @@ class AppointmentService extends BaseService
      */
     public function complete(int $id): mixed
     {
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
-            DB::beginTransaction();
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $appointment = $this->update($id, [
                 'status' => 'completed',
@@ -203,11 +219,15 @@ class AppointmentService extends BaseService
                 $this->bayScheduleRepository->update($schedule->id, ['status' => 'completed']);
             });
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $appointment;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw $e;
         }
     }
@@ -217,8 +237,14 @@ class AppointmentService extends BaseService
      */
     public function cancel(int $id, ?string $reason = null): mixed
     {
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
-            DB::beginTransaction();
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $appointment = $this->update($id, [
                 'status' => 'cancelled',
@@ -231,11 +257,15 @@ class AppointmentService extends BaseService
                 $this->bayScheduleRepository->update($schedule->id, ['status' => 'cancelled']);
             });
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $appointment;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw $e;
         }
     }
@@ -247,8 +277,14 @@ class AppointmentService extends BaseService
      */
     public function reschedule(int $id, array $data): mixed
     {
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
-            DB::beginTransaction();
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $appointment = $this->repository->findOrFail($id);
 
@@ -270,11 +306,15 @@ class AppointmentService extends BaseService
             // Delete old bay schedules
             $this->bayScheduleRepository->deleteForAppointment($id);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $appointment;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw $e;
         }
     }
@@ -286,8 +326,14 @@ class AppointmentService extends BaseService
      */
     public function assignBay(int $id, int $bayId, array $scheduleData = []): mixed
     {
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
-            DB::beginTransaction();
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $appointment = $this->repository->findOrFail($id);
 
@@ -309,11 +355,15 @@ class AppointmentService extends BaseService
                 'notes' => $scheduleData['notes'] ?? null,
             ]);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $this->repository->findWithRelations($id);
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw $e;
         }
     }

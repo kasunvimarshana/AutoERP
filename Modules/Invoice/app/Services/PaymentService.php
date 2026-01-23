@@ -39,8 +39,14 @@ class PaymentService extends BaseService
      */
     public function recordPayment(array $data): Payment
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             $invoice = $this->invoiceRepository->find($data['invoice_id']);
 
             if (! $invoice) {
@@ -82,11 +88,15 @@ class PaymentService extends BaseService
             // Update invoice status based on payment
             $this->invoiceService->updateStatusAfterPayment($invoice->id);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $payment;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw new ServiceException('Failed to record payment: '.$e->getMessage());
         }
     }
@@ -98,8 +108,14 @@ class PaymentService extends BaseService
      */
     public function voidPayment(int $id, ?string $notes = null): Payment
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             $payment = $this->repository->find($id);
 
             if (! $payment) {
@@ -127,11 +143,15 @@ class PaymentService extends BaseService
             // Update invoice status
             $this->invoiceService->updateStatusAfterPayment($invoice->id);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $payment;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw new ServiceException('Failed to void payment: '.$e->getMessage());
         }
     }

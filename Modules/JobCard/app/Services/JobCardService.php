@@ -40,8 +40,14 @@ class JobCardService extends BaseService
      */
     public function create(array $data): mixed
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             if (! isset($data['job_number'])) {
                 $data['job_number'] = $this->generateUniqueJobNumber();
             }
@@ -56,11 +62,15 @@ class JobCardService extends BaseService
 
             $jobCard = parent::create($data);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $jobCard;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw $e;
         }
     }
@@ -72,15 +82,25 @@ class JobCardService extends BaseService
      */
     public function update(int $id, array $data): mixed
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             $jobCard = parent::update($id, $data);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $jobCard;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw $e;
         }
     }
@@ -98,8 +118,14 @@ class JobCardService extends BaseService
      */
     public function start(int $id): mixed
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             $jobCard = $this->repository->findOrFail($id);
 
             if ($jobCard->status !== 'pending') {
@@ -115,11 +141,15 @@ class JobCardService extends BaseService
 
             $jobCard = $this->update($id, $data);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $jobCard;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw $e;
         }
     }
@@ -129,8 +159,14 @@ class JobCardService extends BaseService
      */
     public function pause(int $id): mixed
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             $jobCard = $this->repository->findOrFail($id);
 
             if ($jobCard->status !== 'in_progress') {
@@ -142,11 +178,15 @@ class JobCardService extends BaseService
             $data = ['status' => 'on_hold'];
             $jobCard = $this->update($id, $data);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $jobCard;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw $e;
         }
     }
@@ -156,8 +196,14 @@ class JobCardService extends BaseService
      */
     public function resume(int $id): mixed
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             $jobCard = $this->repository->findOrFail($id);
 
             if ($jobCard->status !== 'on_hold') {
@@ -169,11 +215,15 @@ class JobCardService extends BaseService
             $data = ['status' => 'in_progress'];
             $jobCard = $this->update($id, $data);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $jobCard;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw $e;
         }
     }
@@ -183,8 +233,14 @@ class JobCardService extends BaseService
      */
     public function complete(int $id): mixed
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             $jobCard = $this->repository->findOrFail($id);
 
             if (! in_array($jobCard->status, ['in_progress', 'quality_check'])) {
@@ -202,11 +258,15 @@ class JobCardService extends BaseService
 
             $jobCard = $this->update($id, $data);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $jobCard;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw $e;
         }
     }
@@ -216,8 +276,14 @@ class JobCardService extends BaseService
      */
     public function updateStatus(int $id, string $status): mixed
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             $validStatuses = ['pending', 'in_progress', 'on_hold', 'waiting_parts', 'quality_check', 'completed', 'cancelled'];
 
             if (! in_array($status, $validStatuses)) {
@@ -239,11 +305,15 @@ class JobCardService extends BaseService
 
             $jobCard = $this->update($id, $data);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $jobCard;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw $e;
         }
     }
@@ -261,8 +331,14 @@ class JobCardService extends BaseService
      */
     public function calculateTotals(int $id): mixed
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             $partsTotal = $this->partRepository->getTotalForJobCard($id);
 
             $tasks = $this->taskRepository->getForJobCard($id);
@@ -282,11 +358,15 @@ class JobCardService extends BaseService
 
             $jobCard = $this->update($id, $data);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $jobCard;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw $e;
         }
     }

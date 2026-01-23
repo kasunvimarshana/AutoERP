@@ -30,15 +30,25 @@ class InspectionItemService extends BaseService
      */
     public function create(array $data): mixed
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             $inspectionItem = parent::create($data);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $inspectionItem;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw $e;
         }
     }
@@ -50,16 +60,26 @@ class InspectionItemService extends BaseService
      */
     public function addToJobCard(int $jobCardId, array $itemData): mixed
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             $itemData['job_card_id'] = $jobCardId;
             $inspectionItem = $this->create($itemData);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $inspectionItem;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw $e;
         }
     }

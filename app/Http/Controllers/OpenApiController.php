@@ -35,6 +35,7 @@ use OpenApi\Attributes as OA;
  *     type="object",
  *     title="User",
  *     description="User model",
+ *
  *     @OA\Property(property="id", type="integer", example=1, description="User ID"),
  *     @OA\Property(property="name", type="string", example="John Doe", description="User's full name"),
  *     @OA\Property(property="email", type="string", format="email", example="john@example.com", description="User's email address"),
@@ -50,6 +51,7 @@ use OpenApi\Attributes as OA;
  *     type="object",
  *     title="Role",
  *     description="User role for RBAC",
+ *
  *     @OA\Property(property="id", type="integer", example=1),
  *     @OA\Property(property="name", type="string", example="admin", description="Role name"),
  *     @OA\Property(property="guard_name", type="string", example="web", description="Guard name"),
@@ -62,6 +64,7 @@ use OpenApi\Attributes as OA;
  *     type="object",
  *     title="Permission",
  *     description="User permission for fine-grained access control",
+ *
  *     @OA\Property(property="id", type="integer", example=1),
  *     @OA\Property(property="name", type="string", example="user.create", description="Permission name"),
  *     @OA\Property(property="guard_name", type="string", example="web"),
@@ -74,6 +77,7 @@ use OpenApi\Attributes as OA;
  *     type="object",
  *     title="Error Response",
  *     description="Standard error response structure",
+ *
  *     @OA\Property(property="success", type="boolean", example=false, description="Indicates the request failed"),
  *     @OA\Property(property="message", type="string", example="Error message", description="Human-readable error message"),
  *     @OA\Property(property="data", type="object", nullable=true, description="Additional error details (optional)")
@@ -84,6 +88,7 @@ use OpenApi\Attributes as OA;
  *     type="object",
  *     title="Validation Error Response",
  *     description="Validation error response with field-specific errors",
+ *
  *     @OA\Property(property="success", type="boolean", example=false),
  *     @OA\Property(property="message", type="string", example="The given data was invalid."),
  *     @OA\Property(
@@ -99,6 +104,7 @@ use OpenApi\Attributes as OA;
  *     type="object",
  *     title="Customer",
  *     description="Customer model",
+ *
  *     @OA\Property(property="id", type="integer", example=1, description="Customer ID"),
  *     @OA\Property(property="customer_number", type="string", example="CUST-001", description="Unique customer number"),
  *     @OA\Property(property="first_name", type="string", example="John", description="Customer's first name"),
@@ -130,6 +136,7 @@ use OpenApi\Attributes as OA;
  *     type="object",
  *     title="Vehicle",
  *     description="Vehicle model",
+ *
  *     @OA\Property(property="id", type="integer", example=1, description="Vehicle ID"),
  *     @OA\Property(property="customer_id", type="integer", example=1, description="Owner customer ID"),
  *     @OA\Property(property="vehicle_number", type="string", example="VEH-001", description="Unique vehicle number"),
@@ -165,6 +172,7 @@ use OpenApi\Attributes as OA;
  *     type="object",
  *     title="Vehicle Service Record",
  *     description="Vehicle service record model with cross-branch tracking",
+ *
  *     @OA\Property(property="id", type="integer", example=1, description="Service record ID"),
  *     @OA\Property(property="vehicle_id", type="integer", example=1, description="Vehicle ID"),
  *     @OA\Property(property="customer_id", type="integer", example=1, description="Customer ID"),
@@ -195,6 +203,7 @@ use OpenApi\Attributes as OA;
  *     type="object",
  *     title="Pagination Metadata",
  *     description="Pagination metadata for list responses",
+ *
  *     @OA\Property(property="current_page", type="integer", example=1, description="Current page number"),
  *     @OA\Property(property="from", type="integer", nullable=true, example=1, description="First item number on current page"),
  *     @OA\Property(property="last_page", type="integer", example=5, description="Last page number"),

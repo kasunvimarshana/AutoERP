@@ -45,8 +45,14 @@ class PurchaseOrderService extends BaseService
      */
     public function create(array $data): mixed
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             // Generate PO number if not provided
             if (! isset($data['po_number'])) {
                 $data['po_number'] = $this->generateUniquePONumber();
@@ -83,11 +89,15 @@ class PurchaseOrderService extends BaseService
                 ]);
             }
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $this->repository->findWithItems($po->id);
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             Log::error('PO creation failed', ['error' => $e->getMessage()]);
             throw new ServiceException('Failed to create purchase order: '.$e->getMessage());
         }
@@ -102,8 +112,14 @@ class PurchaseOrderService extends BaseService
      */
     public function update(int $id, array $data): mixed
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             /** @var PurchaseOrder */
             $po = $this->repository->findOrFail($id);
 
@@ -136,11 +152,15 @@ class PurchaseOrderService extends BaseService
 
             $result = parent::update($id, $data);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $this->repository->findWithItems($id);
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             Log::error('PO update failed', ['error' => $e->getMessage()]);
             throw new ServiceException('Failed to update purchase order: '.$e->getMessage());
         }
@@ -153,8 +173,14 @@ class PurchaseOrderService extends BaseService
      */
     public function approve(int $id): PurchaseOrder
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             /** @var PurchaseOrder */
             $po = $this->repository->findOrFail($id);
 
@@ -168,11 +194,15 @@ class PurchaseOrderService extends BaseService
                 'approved_at' => now(),
             ]);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $this->repository->findOrFail($id);
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             Log::error('PO approval failed', ['error' => $e->getMessage()]);
             throw new ServiceException('Failed to approve purchase order: '.$e->getMessage());
         }
@@ -187,8 +217,14 @@ class PurchaseOrderService extends BaseService
      */
     public function receiveItems(int $id, array $data): PurchaseOrder
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             /** @var PurchaseOrder */
             $po = $this->repository->findWithItems($id);
 
@@ -239,11 +275,15 @@ class PurchaseOrderService extends BaseService
                 $po->update(['status' => POStatus::RECEIVED->value]);
             }
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $this->repository->findWithItems($id);
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             Log::error('PO receiving failed', ['error' => $e->getMessage()]);
             throw new ServiceException('Failed to receive items: '.$e->getMessage());
         }

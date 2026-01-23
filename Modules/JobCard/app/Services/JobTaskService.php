@@ -30,8 +30,14 @@ class JobTaskService extends BaseService
      */
     public function create(array $data): mixed
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             if (! isset($data['status'])) {
                 $data['status'] = 'pending';
             }
@@ -54,8 +60,14 @@ class JobTaskService extends BaseService
      */
     public function addToJobCard(int $jobCardId, array $taskData): mixed
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             $taskData['job_card_id'] = $jobCardId;
             $task = $this->create($taskData);
 
@@ -81,8 +93,14 @@ class JobTaskService extends BaseService
      */
     public function complete(int $id, ?float $actualTime = null): mixed
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             $data = ['status' => 'completed'];
 
             if ($actualTime !== null) {

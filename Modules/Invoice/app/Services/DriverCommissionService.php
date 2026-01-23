@@ -38,8 +38,14 @@ class DriverCommissionService extends BaseService
      */
     public function calculateCommission(array $data): DriverCommission
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             $invoice = $this->invoiceRepository->find($data['invoice_id']);
 
             if (! $invoice) {
@@ -59,11 +65,15 @@ class DriverCommissionService extends BaseService
 
             $commission = parent::create($data);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $commission;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw new ServiceException('Failed to calculate commission: '.$e->getMessage());
         }
     }
@@ -75,8 +85,14 @@ class DriverCommissionService extends BaseService
      */
     public function markAsPaid(int $id, int $approvedBy): DriverCommission
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             $commission = $this->repository->find($id);
 
             if (! $commission) {
@@ -92,11 +108,15 @@ class DriverCommissionService extends BaseService
             $commission->approved_by = $approvedBy;
             $commission->save();
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $commission;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw new ServiceException('Failed to mark commission as paid: '.$e->getMessage());
         }
     }

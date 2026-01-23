@@ -83,8 +83,14 @@ class InventoryItemService extends BaseService
      */
     public function adjustStock(int $itemId, array $data): InventoryItem
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             /** @var InventoryItem */
             $item = $this->repository->findOrFail($itemId);
 
@@ -109,11 +115,15 @@ class InventoryItemService extends BaseService
                 'created_by' => Auth::id(),
             ]);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $this->repository->findOrFail($itemId);
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             Log::error('Stock adjustment failed', ['error' => $e->getMessage(), 'item_id' => $itemId]);
             throw new ServiceException('Failed to adjust stock: '.$e->getMessage());
         }
@@ -128,8 +138,14 @@ class InventoryItemService extends BaseService
      */
     public function transferStock(array $data): array
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             $fromItemId = $data['from_item_id'];
             $toBranchId = $data['to_branch_id'];
             $quantity = $data['quantity'];
@@ -198,14 +214,18 @@ class InventoryItemService extends BaseService
                 'branch_id' => $toBranchId,
             ]);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return [
                 'from_item' => $this->repository->findOrFail($fromItemId),
                 'to_item' => $this->repository->findOrFail($toItem->id),
             ];
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             Log::error('Stock transfer failed', ['error' => $e->getMessage()]);
             throw new ServiceException('Failed to transfer stock: '.$e->getMessage());
         }

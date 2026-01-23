@@ -56,16 +56,26 @@ class OrganizationService extends BaseService
             $data['organization_number'] = $this->generateUniqueOrganizationNumber();
         }
 
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
-            DB::beginTransaction();
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $organization = $this->repository->create($data);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $organization;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw new ServiceException('Failed to create organization: '.$e->getMessage());
         }
     }
@@ -94,16 +104,26 @@ class OrganizationService extends BaseService
             ]);
         }
 
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
-            DB::beginTransaction();
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $organization = $this->repository->update($id, $data);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $organization;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw new ServiceException('Failed to update organization: '.$e->getMessage());
         }
     }
@@ -161,16 +181,26 @@ class OrganizationService extends BaseService
      */
     public function activate(int $id): mixed
     {
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
-            DB::beginTransaction();
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $organization = $this->repository->update($id, ['status' => 'active']);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $organization;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw new ServiceException('Failed to activate organization: '.$e->getMessage());
         }
     }
@@ -182,16 +212,26 @@ class OrganizationService extends BaseService
      */
     public function deactivate(int $id): mixed
     {
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
-            DB::beginTransaction();
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $organization = $this->repository->update($id, ['status' => 'inactive']);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $organization;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw new ServiceException('Failed to deactivate organization: '.$e->getMessage());
         }
     }
@@ -203,16 +243,26 @@ class OrganizationService extends BaseService
      */
     public function suspend(int $id): mixed
     {
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
-            DB::beginTransaction();
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $organization = $this->repository->update($id, ['status' => 'suspended']);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $organization;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw new ServiceException('Failed to suspend organization: '.$e->getMessage());
         }
     }

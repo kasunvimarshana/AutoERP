@@ -49,16 +49,26 @@ class BranchService extends BaseService
             $data['branch_code'] = $this->generateUniqueBranchCode($data['organization_id'] ?? null);
         }
 
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
-            DB::beginTransaction();
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $branch = $this->repository->create($data);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $branch;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw new ServiceException('Failed to create branch: '.$e->getMessage());
         }
     }
@@ -80,16 +90,26 @@ class BranchService extends BaseService
             ]);
         }
 
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
-            DB::beginTransaction();
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $branch = $this->repository->update($id, $data);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $branch;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw new ServiceException('Failed to update branch: '.$e->getMessage());
         }
     }
@@ -173,16 +193,26 @@ class BranchService extends BaseService
      */
     public function activate(int $id): mixed
     {
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
-            DB::beginTransaction();
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $branch = $this->repository->update($id, ['status' => 'active']);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $branch;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw new ServiceException('Failed to activate branch: '.$e->getMessage());
         }
     }
@@ -194,16 +224,26 @@ class BranchService extends BaseService
      */
     public function deactivate(int $id): mixed
     {
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
-            DB::beginTransaction();
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $branch = $this->repository->update($id, ['status' => 'inactive']);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $branch;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw new ServiceException('Failed to deactivate branch: '.$e->getMessage());
         }
     }
@@ -215,16 +255,26 @@ class BranchService extends BaseService
      */
     public function setMaintenance(int $id): mixed
     {
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
-            DB::beginTransaction();
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $branch = $this->repository->update($id, ['status' => 'maintenance']);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $branch;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw new ServiceException('Failed to set branch to maintenance: '.$e->getMessage());
         }
     }

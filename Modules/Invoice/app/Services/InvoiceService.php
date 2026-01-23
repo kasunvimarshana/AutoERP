@@ -39,8 +39,14 @@ class InvoiceService extends BaseService
      */
     public function create(array $data): mixed
     {
-        DB::beginTransaction();
+        // Check if we're already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             if (! isset($data['invoice_number'])) {
                 $data['invoice_number'] = $this->generateUniqueInvoiceNumber();
             }
@@ -72,11 +78,15 @@ class InvoiceService extends BaseService
                 $invoice = parent::create($data);
             }
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $invoice;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw new ServiceException('Failed to create invoice: '.$e->getMessage());
         }
     }
@@ -88,15 +98,25 @@ class InvoiceService extends BaseService
      */
     public function update(int $id, array $data): mixed
     {
-        DB::beginTransaction();
+        // Check if we're already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             $invoice = parent::update($id, $data);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $invoice;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw new ServiceException('Failed to update invoice: '.$e->getMessage());
         }
     }
@@ -108,8 +128,14 @@ class InvoiceService extends BaseService
      */
     public function generateFromJobCard(int $jobCardId, array $additionalData = []): Invoice
     {
-        DB::beginTransaction();
+        // Check if we're already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             $jobCard = $this->jobCardRepository->findWithRelations($jobCardId);
 
             if (! $jobCard) {
@@ -163,11 +189,15 @@ class InvoiceService extends BaseService
                 $invoice = $this->recalculateTotals($invoice->id);
             }
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $invoice;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw new ServiceException('Failed to generate invoice from job card: '.$e->getMessage());
         }
     }

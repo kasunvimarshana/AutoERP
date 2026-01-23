@@ -54,12 +54,20 @@ abstract class BaseService implements ServiceInterface
      */
     public function create(array $data): mixed
     {
+        // Check if we're already in a transaction (e.g., from orchestrator or test)
+        // In test environment, let RefreshDatabase manage transactions
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
-            DB::beginTransaction();
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $record = $this->repository->create($data);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             Log::info('Record created', [
                 'model' => get_class($record),
@@ -68,7 +76,9 @@ abstract class BaseService implements ServiceInterface
 
             return $record;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
 
             Log::error('Failed to create record', [
                 'error' => $e->getMessage(),
@@ -84,12 +94,20 @@ abstract class BaseService implements ServiceInterface
      */
     public function update(int $id, array $data): mixed
     {
+        // Check if we're already in a transaction (e.g., from orchestrator or test)
+        // In test environment, let RefreshDatabase manage transactions
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
-            DB::beginTransaction();
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $record = $this->repository->update($id, $data);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             Log::info('Record updated', [
                 'model' => get_class($record),
@@ -98,7 +116,9 @@ abstract class BaseService implements ServiceInterface
 
             return $record;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
 
             Log::error('Failed to update record', [
                 'error' => $e->getMessage(),
@@ -115,12 +135,20 @@ abstract class BaseService implements ServiceInterface
      */
     public function delete(int $id): bool
     {
+        // Check if we're already in a transaction (e.g., from orchestrator or test)
+        // In test environment, let RefreshDatabase manage transactions
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
-            DB::beginTransaction();
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $result = $this->repository->delete($id);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             Log::info('Record deleted', [
                 'id' => $id,
@@ -128,7 +156,9 @@ abstract class BaseService implements ServiceInterface
 
             return $result;
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
 
             Log::error('Failed to delete record', [
                 'error' => $e->getMessage(),

@@ -452,7 +452,6 @@ class CustomerController extends Controller
      *             @OA\Property(
      *                 property="data",
      *                 type="object",
-     *
      *                 @OA\Property(property="total_vehicles", type="integer", example=3),
      *                 @OA\Property(property="total_service_records", type="integer", example=15),
      *                 @OA\Property(property="total_spent", type="number", format="float", example=2500.00),

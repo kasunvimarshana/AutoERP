@@ -178,8 +178,14 @@ class CustomerService extends BaseService
      */
     public function mergeDuplicates(int $targetId, int $sourceId): mixed
     {
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
-            DB::beginTransaction();
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $target = $this->repository->findOrFail($targetId);
             $source = $this->repository->findOrFail($sourceId);
@@ -200,11 +206,15 @@ class CustomerService extends BaseService
             // Soft delete the source customer
             $this->repository->delete($sourceId);
 
-            DB::commit();
+            if ($shouldManageTransaction) {
+                DB::commit();
+            }
 
             return $target->fresh();
         } catch (\Exception $e) {
-            DB::rollBack();
+            if ($shouldManageTransaction) {
+                DB::rollBack();
+            }
             throw $e;
         }
     }

@@ -30,8 +30,14 @@ class JobPartService extends BaseService
      */
     public function create(array $data): mixed
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             if (! isset($data['status'])) {
                 $data['status'] = 'pending';
             }
@@ -58,8 +64,14 @@ class JobPartService extends BaseService
      */
     public function addToJobCard(int $jobCardId, array $partData): mixed
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             $partData['job_card_id'] = $jobCardId;
             $part = $this->create($partData);
 
@@ -79,8 +91,14 @@ class JobPartService extends BaseService
      */
     public function update(int $id, array $data): mixed
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             $part = $this->repository->findOrFail($id);
 
             if (isset($data['quantity']) || isset($data['unit_price'])) {
@@ -105,8 +123,14 @@ class JobPartService extends BaseService
      */
     public function delete(int $id): bool
     {
-        DB::beginTransaction();
+        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        $shouldManageTransaction = DB::transactionLevel() === 0;
+
         try {
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
+
             $deleted = parent::delete($id);
 
             DB::commit();
