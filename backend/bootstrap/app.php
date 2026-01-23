@@ -12,8 +12,19 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
         then: function () {
             // Load module routes
-            if (file_exists(__DIR__.'/../routes/modules/customer-management.php')) {
-                require __DIR__.'/../routes/modules/customer-management.php';
+            $moduleRoutes = [
+                'customer-management',
+                'appointment-management',
+                'job-card-management',
+                'inventory-management',
+                'invoicing-management',
+            ];
+            
+            foreach ($moduleRoutes as $module) {
+                $routePath = __DIR__.'/../routes/modules/'.$module.'.php';
+                if (file_exists($routePath)) {
+                    require $routePath;
+                }
             }
         }
     )
