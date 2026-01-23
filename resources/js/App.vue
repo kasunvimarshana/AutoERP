@@ -1,6 +1,7 @@
 <template>
   <div id="app">
     <RouterView />
+    <Toast />
   </div>
 </template>
 
@@ -9,6 +10,7 @@ import { RouterView, useRouter, useRoute } from 'vue-router';
 import { onMounted, onUnmounted, watch } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import { AUTH_EVENTS } from '@/config/constants';
+import Toast from '@/components/Toast.vue';
 
 const router = useRouter();
 const route = useRoute();

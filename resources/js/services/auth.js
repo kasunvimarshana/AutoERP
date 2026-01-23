@@ -82,6 +82,20 @@ const authService = {
   },
 
   /**
+   * Verify email address
+   * @param {string|number} id - User ID
+   * @param {string} hash - Verification hash
+   * @param {Object} queryParams - Query parameters (expires, signature)
+   * @returns {Promise}
+   */
+  async verifyEmail(id, hash, queryParams) {
+    const response = await api.get(`/auth/verify-email/${id}/${hash}`, {
+      params: queryParams,
+    });
+    return response.data;
+  },
+
+  /**
    * Resend email verification
    * @returns {Promise}
    */

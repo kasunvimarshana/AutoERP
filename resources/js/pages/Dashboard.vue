@@ -1,5 +1,24 @@
 <template>
   <AdminLayout :page-title="$t('dashboard.title')">
+    <!-- Email Verification Notice -->
+    <div v-if="showVerificationNotice" class="row">
+      <div class="col-12">
+        <div class="alert alert-warning alert-dismissible">
+          <button type="button" class="close" data-dismiss="alert" aria-hidden="true" @click="dismissNotice">×</button>
+          <h5><i class="icon fas fa-exclamation-triangle"></i> {{ $t('dashboard.emailNotVerified') }}</h5>
+          <p>{{ $t('dashboard.pleaseVerifyEmail') }}</p>
+          <button 
+            class="btn btn-sm btn-warning" 
+            @click="handleResendVerification"
+            :disabled="resending"
+          >
+            <i class="fas fa-envelope mr-1"></i>
+            {{ resending ? $t('common.loading') : $t('auth.resendVerification') }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Welcome Message -->
     <div class="row">
       <div class="col-12">
@@ -105,12 +124,43 @@
 </template>
 
 <script setup>
+import { ref, computed } from 'vue';
 import { useAuthStore } from '@/stores/auth';
+import { useToastStore } from '@/stores/toast';
 import { useI18n } from 'vue-i18n';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 
 const authStore = useAuthStore();
+const toastStore = useToastStore();
 const { t } = useI18n();
+
+const resending = ref(false);
+const noticeDismissed = ref(false);
+
+// Check if email is verified (assume email_verified_at field exists on user)
+const showVerificationNotice = computed(() => {
+  return !noticeDismissed.value && 
+         authStore.user && 
+         !authStore.user.email_verified_at;
+});
+
+const dismissNotice = () => {
+  noticeDismissed.value = true;
+};
+
+const handleResendVerification = async () => {
+  if (resending.value) return;
+  
+  resending.value = true;
+  try {
+    await authStore.resendVerification();
+    toastStore.success(t('auth.verificationEmailSent'));
+  } catch (error) {
+    toastStore.error(error.response?.data?.message || t('auth.resendFailed'));
+  } finally {
+    resending.value = false;
+  }
+};
 </script>
 
 <style scoped>

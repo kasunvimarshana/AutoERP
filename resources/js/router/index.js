@@ -33,6 +33,12 @@ const routes = [
     meta: { requiresAuth: false, guestOnly: true },
   },
   {
+    path: '/verify-email/:id/:hash',
+    name: 'verify-email',
+    component: () => import('@/pages/auth/VerifyEmail.vue'),
+    meta: { requiresAuth: false },
+  },
+  {
     path: '/dashboard',
     name: 'dashboard',
     component: () => import('@/pages/Dashboard.vue'),
@@ -42,6 +48,12 @@ const routes = [
     path: '/profile',
     name: 'profile',
     component: () => import('@/pages/Profile.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/users',
+    name: 'users',
+    component: () => import('@/pages/users/UserList.vue'),
     meta: { requiresAuth: true },
   },
   {

@@ -209,6 +209,48 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * Verify email address
+   */
+  async function verifyEmail(id, hash, queryParams) {
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const response = await authService.verifyEmail(id, hash, queryParams);
+      
+      // Refresh user data after verification
+      if (response.success) {
+        await checkAuth();
+      }
+      
+      return response;
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Email verification failed';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  /**
+   * Resend email verification
+   */
+  async function resendVerification() {
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const response = await authService.resendVerification();
+      return response;
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to resend verification email';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  /**
    * Check if user has a specific permission
    */
   function hasPermission(permission) {
@@ -256,6 +298,8 @@ export const useAuthStore = defineStore('auth', () => {
     refresh,
     forgotPassword,
     resetPassword,
+    verifyEmail,
+    resendVerification,
     hasPermission,
     hasRole,
     clearAuth,

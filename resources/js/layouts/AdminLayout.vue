@@ -99,6 +99,12 @@
                 <p>{{ $t('profile.title') }}</p>
               </RouterLink>
             </li>
+            <li class="nav-item" v-if="canViewUsers">
+              <RouterLink to="/users" class="nav-link" :class="{ active: $route.path.startsWith('/users') }">
+                <i class="nav-icon fas fa-users"></i>
+                <p>{{ $t('users.title') }}</p>
+              </RouterLink>
+            </li>
             <li class="nav-header" role="heading" aria-level="3">{{ $t('common.settings') || 'SETTINGS' }}</li>
             <li class="nav-item">
               <a href="#" class="nav-link" @click.prevent="handleLogout">
@@ -171,6 +177,11 @@ const showUserDropdown = ref(false);
 const sidebarCollapsed = ref(false);
 
 const currentLocale = computed(() => locale.value);
+
+// Permission checks
+const canViewUsers = computed(() => {
+  return authStore.hasPermission('user.view') || authStore.hasRole('super-admin') || authStore.hasRole('admin');
+});
 
 const toggleSidebar = () => {
   sidebarCollapsed.value = !sidebarCollapsed.value;
