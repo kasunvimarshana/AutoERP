@@ -170,12 +170,16 @@ npm run dev
 Visit:
 - Frontend: `http://localhost:5173`
 - Backend API: `http://localhost:8000/api/v1`
+- **Swagger API Docs:** `http://localhost:8000/api/documentation` 🔥
 - API Documentation: See [API_REFERENCE.md](./API_REFERENCE.md)
 
 ## 📚 Documentation
 
 Comprehensive documentation is available:
 
+- **[Swagger/OpenAPI Docs](http://localhost:8000/api/documentation)** - Interactive API documentation 🔥
+- [Swagger Documentation Guide](./SWAGGER_DOCUMENTATION.md) - How to use Swagger UI
+- [Swagger Implementation Summary](./SWAGGER_IMPLEMENTATION_SUMMARY.md) - What's been implemented
 - [API Reference](./API_REFERENCE.md) - Complete API documentation with examples
 - [Architecture Guide](./ARCHITECTURE.md) - Design patterns and principles
 - [Technical Documentation](./DOCUMENTATION.md) - Detailed technical specs
