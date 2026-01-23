@@ -15,6 +15,8 @@ return Application::configure(basePath: dirname(__DIR__))
             $moduleRoutes = [
                 'auth-management',
                 'tenant-management',
+                'user-management',
+                'role-management',
                 'customer-management',
                 'appointment-management',
                 'job-card-management',
