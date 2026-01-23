@@ -15,6 +15,14 @@ class Customer extends Model
 {
     use HasFactory, SoftDeletes, LogsActivity;
 
+    /**
+     * Create a new factory instance for the model.
+     */
+    protected static function newFactory()
+    {
+        return \Database\Factories\CustomerFactory::new();
+    }
+
     protected $fillable = [
         'tenant_id',
         'customer_code',
