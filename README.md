@@ -21,6 +21,12 @@ This application strictly follows a **Modular Architecture** with the **Controll
 - ✅ **API Resources**: Consistent data transformation
 - ✅ **Request Validation**: Type-safe validation with custom request classes
 - ✅ **Trait-Based**: Reusable functionality through traits
+- ✅ **DTOs**: Type-safe data transfer objects (PHP 8.3+)
+- ✅ **Enums**: Type-safe constants and values
+- ✅ **Custom Exceptions**: Structured error handling hierarchy
+- ✅ **Helper Utilities**: Encryption, caching, and validation helpers
+- ✅ **Query Scopes**: Reusable query filters and sorting
+- ✅ **Policy-Based Auth**: ABAC with granular permissions
 
 ### Multi-Tenancy
 - ✅ **Database Isolation**: Each tenant has isolated data using `stancl/tenancy`
@@ -87,8 +93,34 @@ ModularSaaS-LaravelVue/
 │   │   │   ├── AuditTrait.php         # Audit logging
 │   │   │   └── TenantAware.php        # Multi-tenancy support
 │   │   ├── DTOs/                      # Data Transfer Objects
+│   │   │   ├── BaseDTO.php            # Abstract DTO base class
+│   │   │   ├── PaginationDTO.php      # Pagination parameters
+│   │   │   └── FilterDTO.php          # Query filtering
 │   │   ├── Enums/                     # Enumerations
-│   │   └── Exceptions/                # Custom exceptions
+│   │   │   ├── UserStatus.php         # User status enum
+│   │   │   ├── PermissionType.php     # Permission types
+│   │   │   └── CacheDuration.php      # Cache TTL constants
+│   │   ├── Exceptions/                # Custom exceptions
+│   │   │   ├── BaseException.php      # Abstract exception base
+│   │   │   ├── RepositoryException.php
+│   │   │   ├── ServiceException.php
+│   │   │   └── TenantException.php
+│   │   ├── Helpers/                   # Helper utilities
+│   │   │   ├── EncryptionHelper.php   # Encryption utilities
+│   │   │   ├── CacheHelper.php        # Tenant-aware caching
+│   │   │   └── ValidationHelper.php   # Validation utilities
+│   │   ├── Middleware/                # Security middleware
+│   │   │   ├── CheckPermission.php    # RBAC permission check
+│   │   │   ├── CheckRole.php          # RBAC role check
+│   │   │   ├── EnsureTenantContext.php # Tenant validation
+│   │   │   └── AuditLog.php           # Request/response logging
+│   │   ├── Policies/                  # Authorization policies
+│   │   │   ├── BasePolicy.php         # Abstract policy base
+│   │   │   └── ResourcePolicy.php     # ABAC example
+│   │   └── Scopes/                    # Query scopes
+│   │       ├── ActiveScope.php        # Filter active records
+│   │       ├── Filterable.php         # Dynamic filtering
+│   │       └── Sortable.php           # Safe sorting
 │   ├── Http/
 │   │   └── Controllers/
 │   │       └── Controller.php         # Base API controller
@@ -423,6 +455,25 @@ public function test_can_create_user(): void
 - [ ] Cache config: `php artisan config:cache`
 - [ ] Cache routes: `php artisan route:cache`
 - [ ] Cache views: `php artisan view:cache`
+
+## 📚 Documentation
+
+### Available Guides
+
+- **[README.md](README.md)** - Complete project overview and quick start
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Detailed architecture documentation
+- **[SECURITY.md](SECURITY.md)** - Security implementation guide (NEW)
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment guide (NEW)
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contributing guidelines
+- **[INSTALLATION.md](INSTALLATION.md)** - Installation instructions
+- **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** - Project summary
+
+### Quick Links
+
+- [Security Best Practices](SECURITY.md#best-practices)
+- [Deployment Checklist](DEPLOYMENT.md#deployment-checklist)
+- [API Documentation](#api-documentation)
+- [Testing Guide](#testing)
 
 ## 📚 API Documentation
 
