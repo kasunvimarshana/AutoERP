@@ -11,16 +11,9 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-    ->withMiddleware(function (Middleware $middleware) {
-        $middleware->api(prepend: [
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-        ]);
-
-        $middleware->alias([
-            'tenant.aware' => \App\Http\Middleware\TenantAwareMiddleware::class,
-            'verified' => \App\Http\Middleware\EnsureEmailIsVerified::class,
-        ]);
+    ->withMiddleware(function (Middleware $middleware): void {
+        //
     })
-    ->withExceptions(function (Exceptions $exceptions) {
+    ->withExceptions(function (Exceptions $exceptions): void {
         //
     })->create();

@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: autoerp-app
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+    networks:
+      - autoerp-network
+
+  webserver:
+    image: nginx:alpine
+    container_name: autoerp-webserver
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./:/var/www/html
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+    networks:
+      - autoerp-network
+    depends_on:
+      - app
+
+  db:
+    image: mysql:8.0
+    container_name: autoerp-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-autoerp}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-secret}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-secret}
+      MYSQL_USER: ${DB_USERNAME:-autoerp}
+    volumes:
+      - dbdata:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    networks:
+      - autoerp-network
+
+  redis:
+    image: redis:alpine
+    container_name: autoerp-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    networks:
+      - autoerp-network
+
+networks:
+  autoerp-network:
+    driver: bridge
+
+volumes:
+  dbdata:
+    driver: local

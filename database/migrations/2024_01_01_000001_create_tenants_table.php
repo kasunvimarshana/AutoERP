@@ -6,24 +6,32 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
         Schema::create('tenants', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('slug')->unique();
+            $table->string('subdomain')->unique();
             $table->string('domain')->nullable()->unique();
             $table->string('database')->nullable();
-            $table->json('settings')->nullable();
             $table->boolean('is_active')->default(true);
-            $table->timestamp('subscription_ends_at')->nullable();
+            $table->json('settings')->nullable();
+            $table->timestamp('trial_ends_at')->nullable();
+            $table->timestamp('subscribed_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['slug', 'is_active']);
+            $table->index('subdomain');
+            $table->index('is_active');
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
         Schema::dropIfExists('tenants');

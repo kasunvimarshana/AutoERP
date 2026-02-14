@@ -1,443 +1,341 @@
 # AutoERP - Architecture Documentation
 
-## System Architecture
+## Overview
+Production-ready, modular, ERP-grade SaaS platform built with Laravel (backend) and Vue.js (frontend).
 
-### Overview
-AutoERP is designed using Clean Architecture principles with a modular, layered approach that ensures:
-- Separation of concerns
-- Loose coupling
-- High testability
-- Long-term maintainability
-- Scalability
+## Architecture Principles
 
-### Architecture Layers
+### Clean Architecture
+- **Separation of Concerns**: Each layer has distinct responsibilities
+- **Dependency Inversion**: High-level modules independent of low-level implementations
+- **Testability**: Easy to test each layer independently
 
-```
-┌─────────────────────────────────────────────────┐
-│         Presentation Layer (Controllers)        │
-│  - API Controllers                              │
-│  - Request Validation                           │
-│  - Response Formatting                          │
-└────────────────┬────────────────────────────────┘
-                 │
-┌────────────────▼────────────────────────────────┐
-│         Application Layer (Services)            │
-│  - Business Logic                               │
-│  - Transaction Management                       │
-│  - Event Dispatching                            │
-│  - Cross-module Orchestration                   │
-└────────────────┬────────────────────────────────┘
-                 │
-┌────────────────▼────────────────────────────────┐
-│         Domain Layer (Repositories)             │
-│  - Data Access                                  │
-│  - Eloquent Queries                             │
-│  - Data Persistence                             │
-└────────────────┬────────────────────────────────┘
-                 │
-┌────────────────▼────────────────────────────────┐
-│         Infrastructure Layer (Database)         │
-│  - PostgreSQL/MySQL                             │
-│  - Migrations                                   │
-│  - Schema Management                            │
-└─────────────────────────────────────────────────┘
-```
+### Modular Architecture
+- **Feature-based modules**: Each business domain is a self-contained module
+- **Loose coupling**: Modules communicate only through defined contracts
+- **High cohesion**: Related functionality grouped together
 
-## Design Patterns
+### Design Patterns
+- **Controller → Service → Repository**: Strict layered architecture
+- **SOLID Principles**: Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion
+- **DRY (Don't Repeat Yourself)**: Code reuse through inheritance and composition
+- **KISS (Keep It Simple, Stupid)**: Simple, maintainable solutions
 
-### Controller→Service→Repository Pattern
-
-This is the core architectural pattern used throughout the application.
-
-#### Controllers (Thin Layer)
-**Purpose**: Handle HTTP communication
-**Responsibilities**:
-- Receive HTTP requests
-- Validate input data
-- Call appropriate service methods
-- Format and return responses
-- Handle HTTP-specific concerns
-
-**Example**:
-```php
-class ProductController extends Controller
-{
-    protected $productService;
-
-    public function __construct(ProductService $productService)
-    {
-        $this->productService = $productService;
-    }
-
-    public function store(Request $request)
-    {
-        // Validate
-        $validated = $request->validate([...]);
-        
-        // Delegate to service
-        $product = $this->productService->createProduct($validated);
-        
-        // Return response
-        return response()->json(['data' => $product], 201);
-    }
-}
-```
-
-#### Services (Business Logic Layer)
-**Purpose**: Implement business logic and orchestration
-**Responsibilities**:
-- Contain all business rules
-- Orchestrate multiple repositories
-- Handle transactions
-- Emit domain events
-- Ensure data consistency
-- Cross-cutting concerns
-
-**Example**:
-```php
-class ProductService
-{
-    protected $productRepository;
-
-    public function createProduct(array $data)
-    {
-        return DB::transaction(function () use ($data) {
-            // Business logic
-            $data['tenant_id'] = auth()->user()->tenant_id;
-            
-            // Repository call
-            $product = $this->productRepository->create($data);
-            
-            // Event emission
-            event(new ProductCreated($product));
-            
-            // Logging
-            Log::info('Product created', ['id' => $product->id]);
-            
-            return $product;
-        });
-    }
-}
-```
-
-#### Repositories (Data Access Layer)
-**Purpose**: Abstract database operations
-**Responsibilities**:
-- Execute database queries
-- Handle Eloquent operations
-- Provide clean data access interface
-- No business logic
-- Return models or collections
-
-**Example**:
-```php
-class ProductRepository
-{
-    public function create(array $data)
-    {
-        return Product::create($data);
-    }
-
-    public function find($id)
-    {
-        return Product::with(['variants', 'inventory'])->findOrFail($id);
-    }
-}
-```
-
-## Multi-Tenancy Architecture
-
-### Tenant Isolation Strategy
-
-The system uses **single-database multi-tenancy** with tenant_id column isolation:
+## Backend Structure
 
 ```
-┌─────────────────────────────────────────────┐
-│              Tenant A Request               │
-└────────────────┬────────────────────────────┘
-                 │
-┌────────────────▼────────────────────────────┐
-│         TenantAwareMiddleware               │
-│  - Validates tenant access                  │
-│  - Sets tenant context                      │
-└────────────────┬────────────────────────────┘
-                 │
-┌────────────────▼────────────────────────────┐
-│           Global Scope Filter               │
-│  WHERE tenant_id = auth()->user()->tenant_id│
-└────────────────┬────────────────────────────┘
-                 │
-┌────────────────▼────────────────────────────┐
-│         Tenant A Data Only                  │
-└─────────────────────────────────────────────┘
+app/
+├── Core/
+│   ├── Interfaces/         # Repository and service interfaces
+│   ├── Repositories/       # Base repository implementations
+│   ├── Services/           # Base service implementations
+│   ├── Traits/             # Reusable traits (TenantScoped, etc.)
+│   ├── Middleware/         # Custom middleware
+│   └── Exceptions/         # Custom exceptions
+│
+├── Modules/                # Business domain modules
+│   ├── Tenancy/           # Multi-tenancy management
+│   ├── Auth/              # Authentication & authorization
+│   ├── User/              # User management
+│   ├── Customer/          # Customer management
+│   ├── Vehicle/           # Vehicle management
+│   ├── Branch/            # Branch management
+│   ├── Vendor/            # Vendor management
+│   ├── CRM/               # Customer relationship management
+│   ├── Inventory/         # Inventory management
+│   ├── POS/               # Point of sale
+│   ├── Billing/           # Invoicing & payments
+│   ├── Fleet/             # Fleet management
+│   └── Analytics/         # Reports & analytics
+│
+└── Support/               # Helper services and utilities
+    ├── Helpers/
+    └── Services/
 ```
 
-### Implementation Details
-
-1. **Global Scopes on Models**
-```php
-protected static function booted(): void
-{
-    static::addGlobalScope('tenant', function ($builder) {
-        if (auth()->check() && auth()->user()->tenant_id) {
-            $builder->where('tenant_id', auth()->user()->tenant_id);
-        }
-    });
-}
+### Module Structure
+Each module follows the same structure:
+```
+ModuleName/
+├── Controllers/           # HTTP request handlers (thin)
+├── Services/              # Business logic (orchestration)
+├── Repositories/          # Data access layer
+├── Models/                # Eloquent models
+├── DTOs/                  # Data Transfer Objects
+├── Policies/              # Authorization policies
+├── Events/                # Domain events
+├── Listeners/             # Event handlers
+└── Requests/              # Form request validation
 ```
 
-2. **Middleware Protection**
-```php
-Route::middleware(['auth:sanctum', 'tenant.aware'])->group(...)
-```
-
-3. **Automatic tenant_id Assignment**
-```php
-if (auth()->check()) {
-    $data['tenant_id'] = auth()->user()->tenant_id;
-}
-```
-
-## Transaction Management
-
-All business operations that modify data use database transactions:
-
-```php
-public function complexOperation(array $data)
-{
-    return DB::transaction(function () use ($data) {
-        // Multiple operations
-        $customer = $this->customerRepository->create($data);
-        $invoice = $this->invoiceRepository->create([...]);
-        $inventory = $this->inventoryRepository->update([...]);
-        
-        // All succeed or all rollback
-        return $customer;
-    });
-}
-```
-
-### Transaction Guarantees
-- **Atomicity**: All or nothing execution
-- **Consistency**: Data integrity maintained
-- **Isolation**: Concurrent operations don't interfere
-- **Durability**: Committed changes are permanent
-
-## Event-Driven Architecture
-
-### Event Flow
+## Frontend Structure
 
 ```
-┌─────────────┐      ┌──────────────┐      ┌───────────────┐
-│   Service   │─────▶│    Event     │─────▶│   Listeners   │
-│  (Emit)     │      │  Dispatcher  │      │  (Handle)     │
-└─────────────┘      └──────────────┘      └───────────────┘
-                                                    │
-                                     ┌──────────────┴──────────────┐
-                                     ▼                             ▼
-                              ┌──────────┐                  ┌─────────────┐
-                              │  Logging │                  │ Notification│
-                              └──────────┘                  └─────────────┘
+resources/
+├── js/
+│   ├── modules/           # Feature-based Vue modules
+│   │   ├── auth/
+│   │   ├── dashboard/
+│   │   ├── crm/
+│   │   ├── inventory/
+│   │   └── ...
+│   │
+│   ├── components/        # Shared components
+│   ├── layouts/           # Layout components
+│   ├── router/            # Vue Router configuration
+│   ├── stores/            # Pinia state management
+│   ├── services/          # API services
+│   ├── composables/       # Vue composables
+│   └── locales/           # i18n translations
+│
+└── css/
+    └── app.css            # Tailwind CSS
 ```
 
-### Use Cases for Events
-- Audit trail logging
-- Sending notifications
-- Updating derived data
-- Triggering workflows
-- Third-party integrations
-- Analytics tracking
+## Key Features
 
-## Security Architecture
+### Multi-Tenancy
+- **Tenant Isolation**: Strict data separation using tenant_id
+- **Global Scopes**: Automatic query scoping with TenantScoped trait
+- **Tenant Context**: Auth-based tenant identification
 
-### Authentication Flow
+### Multi-Vendor & Multi-Branch
+- **Hierarchical Structure**: Tenant → Vendor → Branch
+- **Scoped Operations**: All operations respect vendor/branch context
+- **Centralized History**: Cross-branch data visibility
 
-```
-┌──────────┐      ┌──────────┐      ┌──────────┐      ┌──────────┐
-│  Client  │─────▶│   API    │─────▶│  Sanctum │─────▶│   User   │
-│          │      │ Endpoint │      │  Auth    │      │  Session │
-└──────────┘      └──────────┘      └──────────┘      └──────────┘
-     │                                                        │
-     └────────────── Bearer Token ◀─────────────────────────┘
-```
+### Authentication & Authorization
+- **Laravel Sanctum**: Token-based API authentication
+- **RBAC**: Role-Based Access Control using Spatie Laravel Permission
+- **ABAC**: Attribute-Based Access Control for fine-grained permissions
+- **Policies**: Laravel policies for authorization
 
-### Authorization Layers
-1. **Route Middleware**: `auth:sanctum`
-2. **Tenant Middleware**: `tenant.aware`
-3. **Policy Classes**: Fine-grained permissions
-4. **Global Scopes**: Data isolation
+### Service Orchestration
+- **Transactional Boundaries**: All service methods wrapped in DB transactions
+- **Exception Handling**: Consistent error handling and rollback
+- **Event-Driven**: Domain events for async workflows
+- **Idempotency**: Safe retry mechanisms
 
-### Security Measures
-- Password hashing (bcrypt)
-- CSRF protection
-- Rate limiting
-- SQL injection prevention (Eloquent)
-- XSS protection (Vue escaping)
-- Secure session handling
-- Token-based API auth
+### API Design
+- **Versioned APIs**: /api/v1/ prefix for version management
+- **RESTful**: Standard HTTP methods and status codes
+- **Swagger/OpenAPI**: Auto-generated API documentation
+- **Pagination**: Built-in pagination support
 
-## Database Design
+### Security
+- **HTTPS**: Enforced in production
+- **Encryption**: Data at rest encryption
+- **Validation**: Strict input validation
+- **Rate Limiting**: API throttling
+- **Audit Trails**: Immutable activity logs
+- **CSRF Protection**: Cross-site request forgery prevention
 
-### Schema Principles
-- **Normalized structure**: Reduce redundancy
-- **Proper indexes**: Optimize queries
-- **Foreign keys**: Maintain referential integrity
-- **Soft deletes**: Preserve data history
-- **Timestamps**: Track changes
-- **JSON columns**: Flexible attributes (PostgreSQL JSONB)
+### Internationalization (i18n)
+- **Backend**: Laravel localization for messages and validation
+- **Frontend**: Vue i18n for UI translations
+- **Shared Keys**: Consistent translation keys across stack
 
-### Key Relationships
-
-```
-Tenant ──┬──▶ Users
-         ├──▶ Vendors
-         ├──▶ Branches
-         ├──▶ Customers
-         └──▶ Products
-
-Vendor ──▶ Branches
-
-Product ──┬──▶ InventoryItems
-          └──▶ Variants (self-reference)
-
-InventoryItem ──▶ InventoryMovements
-
-Invoice ──┬──▶ InvoiceItems
-          └──▶ Customer
-```
-
-## API Design
-
-### RESTful Principles
-- **Resource-based URLs**: `/api/v1/products`
-- **HTTP verbs**: GET, POST, PUT, DELETE
-- **Status codes**: 200, 201, 400, 401, 404, 500
-- **Versioning**: `/api/v1/`
-- **Consistent responses**: `{ data: {...}, message: "..." }`
-
-### Response Format
-```json
-{
-  "data": {
-    "id": 1,
-    "name": "Product Name"
-  },
-  "message": "Success",
-  "meta": {
-    "page": 1,
-    "per_page": 15
-  }
-}
-```
-
-## Frontend Architecture
-
-### Vue.js Structure
-
-```
-resources/js/
-├── components/       # Reusable UI components
-├── views/           # Page components
-├── stores/          # Pinia state management
-├── router/          # Vue Router configuration
-├── services/        # API communication
-└── main.js          # Application entry point
-```
-
-### State Management (Pinia)
-- **Stores**: Centralized state
-- **Getters**: Computed state
-- **Actions**: Async operations
-- **Reactivity**: Vue 3 Composition API
-
-### Component Communication
-- **Props down**: Parent to child
-- **Events up**: Child to parent
-- **Store**: Global state
-- **Provide/Inject**: Deep hierarchies
-
-## Scalability Considerations
-
-### Horizontal Scaling
-- Stateless API design
-- Session storage in database/Redis
-- Load balancer ready
-- CDN for static assets
-
-### Vertical Scaling
-- Database optimization
-- Query optimization
-- Caching strategy (Redis)
-- Queue workers for background jobs
-
-### Future Enhancements
-- Database-per-tenant option
-- Read replicas
-- Microservices extraction
-- Event sourcing
-- CQRS pattern
+### Caching & Performance
+- **Redis**: Distributed caching
+- **Query Optimization**: Eager loading, indexes
+- **Queue Jobs**: Background processing for heavy operations
 
 ## Development Workflow
 
-### Code Organization
-1. Start with migration (database schema)
-2. Create model with relationships
-3. Create repository for data access
-4. Create service for business logic
-5. Create controller for HTTP handling
-6. Add routes
-7. Write tests
-8. Document API
+### Prerequisites
+- PHP 8.1+
+- Node.js 18+
+- Composer
+- MySQL/PostgreSQL
+- Redis (optional, for caching)
 
-### Testing Strategy
-- **Unit tests**: Services and repositories
-- **Integration tests**: API endpoints
-- **Feature tests**: User workflows
-- **E2E tests**: Full application flows
+### Installation
+```bash
+# Install PHP dependencies
+composer install
 
-## Best Practices
+# Install Node dependencies
+npm install
 
-### Do's ✅
-- Keep controllers thin
-- Put business logic in services
-- Use transactions for multi-step operations
-- Emit events for side effects
-- Write descriptive method names
-- Use type hints
-- Follow PSR-12 standards
-- Write tests
+# Copy environment file
+cp .env.example .env
 
-### Don'ts ❌
-- Don't put business logic in controllers
-- Don't put business logic in models
-- Don't bypass the service layer
-- Don't ignore transactions
-- Don't hardcode tenant_id
-- Don't skip validation
-- Don't ignore errors
+# Generate application key
+php artisan key:generate
 
-## Monitoring and Logging
+# Run migrations
+php artisan migrate
 
-### Log Levels
-- **DEBUG**: Detailed information
-- **INFO**: Important events
-- **WARNING**: Exceptional occurrences
-- **ERROR**: Runtime errors
-- **CRITICAL**: Critical conditions
+# Seed database
+php artisan db:seed
 
-### What to Log
-- User actions (audit trail)
-- Business operations
-- Security events
-- Performance metrics
-- Error stack traces
+# Build frontend assets
+npm run build
 
-## Conclusion
+# Start development server
+php artisan serve
+npm run dev
+```
 
-This architecture provides:
-- **Maintainability**: Clear separation of concerns
-- **Scalability**: Can grow with business needs
-- **Testability**: Each layer can be tested independently
-- **Security**: Multiple layers of protection
-- **Performance**: Optimized data access
-- **Flexibility**: Easy to modify and extend
+### Development Commands
+```bash
+# Run tests
+php artisan test
+
+# Code formatting
+./vendor/bin/pint
+
+# Generate API documentation
+php artisan l5-swagger:generate
+
+# Clear caches
+php artisan optimize:clear
+```
+
+## Module Implementation Guide
+
+### Creating a New Module
+
+1. **Create Module Structure**
+```bash
+mkdir -p app/Modules/NewModule/{Controllers,Services,Repositories,Models,DTOs,Policies,Events,Listeners,Requests}
+```
+
+2. **Create Model**
+```php
+<?php
+namespace App\Modules\NewModule\Models;
+
+use App\Core\Traits\TenantScoped;
+use Illuminate\Database\Eloquent\Model;
+
+class NewModel extends Model
+{
+    use TenantScoped;
+    
+    protected $fillable = ['field1', 'field2'];
+}
+```
+
+3. **Create Repository**
+```php
+<?php
+namespace App\Modules\NewModule\Repositories;
+
+use App\Core\Repositories\BaseRepository;
+use App\Modules\NewModule\Models\NewModel;
+
+class NewRepository extends BaseRepository
+{
+    protected function model(): string
+    {
+        return NewModel::class;
+    }
+}
+```
+
+4. **Create Service**
+```php
+<?php
+namespace App\Modules\NewModule\Services;
+
+use App\Core\Services\BaseService;
+use App\Modules\NewModule\Repositories\NewRepository;
+
+class NewService extends BaseService
+{
+    public function __construct(NewRepository $repository)
+    {
+        $this->repository = $repository;
+    }
+    
+    // Add custom business logic methods
+}
+```
+
+5. **Create Controller**
+```php
+<?php
+namespace App\Modules\NewModule\Controllers;
+
+use App\Http\Controllers\Controller;
+use App\Modules\NewModule\Services\NewService;
+use Illuminate\Http\Request;
+
+class NewController extends Controller
+{
+    protected $service;
+    
+    public function __construct(NewService $service)
+    {
+        $this->service = $service;
+    }
+    
+    public function index()
+    {
+        return response()->json($this->service->getPaginated());
+    }
+}
+```
+
+6. **Add Routes**
+```php
+Route::prefix('new-module')->group(function () {
+    Route::get('/', [NewController::class, 'index']);
+    Route::post('/', [NewController::class, 'store']);
+    // ... more routes
+});
+```
+
+## Testing Strategy
+
+### Unit Tests
+- Test individual methods in isolation
+- Mock dependencies
+- Fast execution
+
+### Integration Tests
+- Test module interactions
+- Use test database
+- Test API endpoints
+
+### Feature Tests
+- End-to-end scenarios
+- Test complete workflows
+- Include frontend interactions
+
+## Deployment
+
+### Production Checklist
+- [ ] Environment variables configured
+- [ ] Database migrations run
+- [ ] Assets compiled (`npm run build`)
+- [ ] Caches optimized (`php artisan optimize`)
+- [ ] Queue workers configured
+- [ ] SSL certificates installed
+- [ ] Backups configured
+- [ ] Monitoring setup
+
+### Docker Deployment
+```bash
+# Build image
+docker build -t autoerp .
+
+# Run containers
+docker-compose up -d
+```
+
+## Contributing Guidelines
+
+1. Follow PSR-12 coding standards
+2. Write meaningful commit messages
+3. Add tests for new features
+4. Update documentation
+5. Create feature branches
+6. Submit pull requests for review
+
+## License
+Proprietary - All rights reserved
+
+## Support
+For support, contact: support@autoerp.com

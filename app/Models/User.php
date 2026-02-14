@@ -2,7 +2,10 @@
 
 namespace App\Models;
 
+// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Core\Traits\TenantScoped;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -10,49 +13,49 @@ use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable, HasRoles;
+    /** @use HasFactory<\Database\Factories\UserFactory> */
+    use HasApiTokens, HasFactory, HasRoles, Notifiable, TenantScoped;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
     protected $fillable = [
-        'tenant_id',
         'name',
         'email',
         'password',
-        'phone',
-        'is_active',
-        'email_verified_at',
+        'tenant_id',
     ];
 
+    /**
+     * The attributes that should be hidden for serialization.
+     *
+     * @var list<string>
+     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
-            'is_active' => 'boolean',
         ];
     }
 
     /**
-     * Boot the model.
+     * Get the tenant that owns the user
      */
-    protected static function booted(): void
+    public function tenant(): BelongsTo
     {
-        static::addGlobalScope('tenant', function ($builder) {
-            if (auth()->check() && auth()->user()->tenant_id) {
-                $builder->where('tenant_id', auth()->user()->tenant_id);
-            }
-        });
-    }
-
-    /**
-     * Relationship: User belongs to a Tenant
-     */
-    public function tenant()
-    {
-        return $this->belongsTo(Tenant::class);
+        return $this->belongsTo(\App\Modules\Tenancy\Models\Tenant::class);
     }
 }

@@ -1,77 +1,146 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
+import { createRouter, createWebHistory } from 'vue-router';
+import { useAuthStore } from '../stores/auth';
+import MainLayout from '../layouts/MainLayout.vue';
+import AuthLayout from '../layouts/AuthLayout.vue';
+
+// Lazy load views
+const Dashboard = () => import('../modules/dashboard/views/Dashboard.vue');
+const Login = () => import('../modules/auth/views/Login.vue');
+const Register = () => import('../modules/auth/views/Register.vue');
+const CustomerList = () => import('../modules/customers/views/CustomerList.vue');
+const CustomerForm = () => import('../modules/customers/views/CustomerForm.vue');
+const ProductList = () => import('../modules/products/views/ProductList.vue');
+const ProductForm = () => import('../modules/products/views/ProductForm.vue');
+const StockList = () => import('../modules/inventory/views/StockList.vue');
+const StockAdjustment = () => import('../modules/inventory/views/StockAdjustment.vue');
 
 const routes = [
-  {
-    path: '/',
-    redirect: '/dashboard'
-  },
-  {
-    path: '/login',
-    name: 'Login',
-    component: () => import('../views/auth/Login.vue'),
-    meta: { requiresAuth: false }
-  },
-  {
-    path: '/register',
-    name: 'Register',
-    component: () => import('../views/auth/Register.vue'),
-    meta: { requiresAuth: false }
-  },
-  {
-    path: '/dashboard',
-    name: 'Dashboard',
-    component: () => import('../views/Dashboard.vue'),
-    meta: { requiresAuth: true }
-  },
-  {
-    path: '/products',
-    name: 'Products',
-    component: () => import('../views/products/ProductList.vue'),
-    meta: { requiresAuth: true }
-  },
-  {
-    path: '/inventory',
-    name: 'Inventory',
-    component: () => import('../views/inventory/InventoryList.vue'),
-    meta: { requiresAuth: true }
-  },
-  {
-    path: '/customers',
-    name: 'Customers',
-    component: () => import('../views/customers/CustomerList.vue'),
-    meta: { requiresAuth: true }
-  },
-  {
-    path: '/invoices',
-    name: 'Invoices',
-    component: () => import('../views/invoices/InvoiceList.vue'),
-    meta: { requiresAuth: true }
-  },
-  {
-    path: '/analytics',
-    name: 'Analytics',
-    component: () => import('../views/Analytics.vue'),
-    meta: { requiresAuth: true }
-  }
-]
+    {
+        path: '/',
+        redirect: '/dashboard',
+    },
+    {
+        path: '/',
+        component: AuthLayout,
+        meta: { guest: true },
+        children: [
+            {
+                path: '/login',
+                name: 'login',
+                component: Login,
+            },
+            {
+                path: '/register',
+                name: 'register',
+                component: Register,
+            },
+        ],
+    },
+    {
+        path: '/',
+        component: MainLayout,
+        meta: { requiresAuth: true },
+        children: [
+            {
+                path: '/dashboard',
+                name: 'dashboard',
+                component: Dashboard,
+            },
+            {
+                path: '/customers',
+                name: 'customers',
+                component: CustomerList,
+            },
+            {
+                path: '/customers/create',
+                name: 'customers.create',
+                component: CustomerForm,
+            },
+            {
+                path: '/customers/:id/edit',
+                name: 'customers.edit',
+                component: CustomerForm,
+            },
+            {
+                path: '/products',
+                name: 'products',
+                component: ProductList,
+            },
+            {
+                path: '/products/create',
+                name: 'products.create',
+                component: ProductForm,
+            },
+            {
+                path: '/products/:id/edit',
+                name: 'products.edit',
+                component: ProductForm,
+            },
+            {
+                path: '/inventory',
+                name: 'inventory',
+                component: StockList,
+            },
+            {
+                path: '/inventory/adjustment',
+                name: 'inventory.adjustment',
+                component: StockAdjustment,
+            },
+            {
+                path: '/pos',
+                name: 'pos',
+                component: () => import('../modules/pos/views/POS.vue'),
+            },
+            {
+                path: '/billing',
+                name: 'billing',
+                component: () => import('../modules/billing/views/BillingList.vue'),
+            },
+            {
+                path: '/branches',
+                name: 'branches',
+                component: () => import('../modules/branches/views/BranchList.vue'),
+            },
+            {
+                path: '/fleet',
+                name: 'fleet',
+                component: () => import('../modules/fleet/views/FleetList.vue'),
+            },
+            {
+                path: '/crm',
+                name: 'crm',
+                component: () => import('../modules/crm/views/CRMDashboard.vue'),
+            },
+            {
+                path: '/analytics',
+                name: 'analytics',
+                component: () => import('../modules/analytics/views/Analytics.vue'),
+            },
+        ],
+    },
+];
 
 const router = createRouter({
-  history: createWebHistory(),
-  routes
-})
+    history: createWebHistory(),
+    routes,
+});
 
-router.beforeEach((to, from, next) => {
-  const authStore = useAuthStore()
-  const requiresAuth = to.meta.requiresAuth !== false
+// Navigation guards
+router.beforeEach(async (to, from, next) => {
+    const authStore = useAuthStore();
+    
+    // Check authentication on first load
+    if (!authStore.user && authStore.token) {
+        await authStore.checkAuth();
+    }
+    
+    if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+        next({ name: 'login' });
+    } else if (to.meta.guest && authStore.isAuthenticated) {
+        next({ name: 'dashboard' });
+    } else {
+        next();
+    }
+});
 
-  if (requiresAuth && !authStore.isAuthenticated) {
-    next('/login')
-  } else if (!requiresAuth && authStore.isAuthenticated && (to.path === '/login' || to.path === '/register')) {
-    next('/dashboard')
-  } else {
-    next()
-  }
-})
-
-export default router
+export default router;
