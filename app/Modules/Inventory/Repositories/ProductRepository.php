@@ -4,21 +4,30 @@ namespace App\Modules\Inventory\Repositories;
 
 use App\Core\Repositories\BaseRepository;
 use App\Modules\Inventory\Models\Product;
+use Illuminate\Database\Eloquent\Collection;
 
 /**
  * Product Repository
- *
- * Handles data access for product operations.
+ * 
+ * Handles data access operations for products
  */
 class ProductRepository extends BaseRepository
 {
-    public function __construct(Product $model)
+    /**
+     * Specify the model class name
+     *
+     * @return string
+     */
+    protected function model(): string
     {
-        parent::__construct($model);
+        return Product::class;
     }
 
     /**
-     * Find product by SKU.
+     * Find product by SKU
+     *
+     * @param string $sku
+     * @return Product|null
      */
     public function findBySku(string $sku): ?Product
     {
@@ -26,51 +35,49 @@ class ProductRepository extends BaseRepository
     }
 
     /**
-     * Get products by category.
+     * Get products with low stock levels
      *
-     * @return \Illuminate\Database\Eloquent\Collection
+     * @return Collection
      */
-    public function getByCategory(int $categoryId)
-    {
-        return $this->model->where('category_id', $categoryId)->active()->get();
-    }
-
-    /**
-     * Get products by brand.
-     *
-     * @return \Illuminate\Database\Eloquent\Collection
-     */
-    public function getByBrand(int $brandId)
-    {
-        return $this->model->where('brand_id', $brandId)->active()->get();
-    }
-
-    /**
-     * Get products with low stock.
-     *
-     * @return \Illuminate\Database\Eloquent\Collection
-     */
-    public function getLowStockProducts()
+    public function lowStockProducts(): Collection
     {
         return $this->model
-            ->where('track_inventory', true)
-            ->whereColumn('min_stock_level', '>', 'reorder_point')
-            ->active()
+            ->whereColumn('current_stock', '<=', 'min_stock_level')
             ->get();
     }
 
     /**
-     * Search products.
+     * Get active products
      *
-     * @return \Illuminate\Database\Eloquent\Collection
+     * @return Collection
      */
-    public function search(string $query)
+    public function getActiveProducts(): Collection
     {
         return $this->model
-            ->where('sku', 'like', "%{$query}%")
-            ->orWhere('name', 'like', "%{$query}%")
-            ->orWhere('barcode', 'like', "%{$query}%")
-            ->active()
+            ->where('is_active', true)
+            ->orderBy('name')
             ->get();
+    }
+
+    /**
+     * Search products by name or SKU
+     *
+     * @param string $search
+     * @return Collection
+     */
+    public function searchProducts(string $search): Collection
+    {
+        return $this->model
+            ->where(function ($query) use ($search) {
+                $query->where('name', 'like', "%{$search}%")
+                    ->orWhere('sku', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%");
+            })
+            ->get();
+    }
+
+    protected function getFilterableColumns(): array
+    {
+        return ['category_id', 'status', 'type', 'is_active'];
     }
 }

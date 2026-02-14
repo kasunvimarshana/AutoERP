@@ -2,27 +2,39 @@
 
 namespace App\Modules\Inventory\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * Stock Location Model
- *
- * Detailed bin/shelf locations within warehouses.
+ * StockLocation Model
+ * 
+ * Represents a storage location within a warehouse
  */
 class StockLocation extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'warehouse_id',
-        'location_code',
+        'name',
+        'code',
         'aisle',
         'rack',
         'shelf',
         'bin',
     ];
 
+    protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
+
+    protected $hidden = [];
+
     /**
-     * Get the warehouse.
+     * Get the warehouse that owns this location
      */
     public function warehouse(): BelongsTo
     {
@@ -30,17 +42,10 @@ class StockLocation extends Model
     }
 
     /**
-     * Get full location identifier.
+     * Get stock ledger entries for this location
      */
-    public function getFullLocationAttribute(): string
+    public function stockLedger(): HasMany
     {
-        $parts = array_filter([
-            $this->aisle ? "A:{$this->aisle}" : null,
-            $this->rack ? "R:{$this->rack}" : null,
-            $this->shelf ? "S:{$this->shelf}" : null,
-            $this->bin ? "B:{$this->bin}" : null,
-        ]);
-
-        return implode('-', $parts) ?: $this->location_code;
+        return $this->hasMany(StockLedger::class, 'location_id');
     }
 }

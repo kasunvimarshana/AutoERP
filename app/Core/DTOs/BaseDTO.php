@@ -2,62 +2,45 @@
 
 namespace App\Core\DTOs;
 
-use Illuminate\Contracts\Support\Arrayable;
-use JsonSerializable;
+use Illuminate\Support\Arr;
 
-/**
- * Base Data Transfer Object
- *
- * Provides type-safe data transfer between layers.
- * Ensures data integrity and validation.
- */
-abstract class BaseDTO implements Arrayable, JsonSerializable
+abstract class BaseDTO
 {
-    /**
-     * Create DTO from array.
-     */
-    public static function fromArray(array $data): static
+    public function __construct(array $data = [])
     {
-        return new static(...$data);
+        $this->map($data);
     }
 
-    /**
-     * Create DTO from request.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     */
-    public static function fromRequest($request): static
+    protected function map(array $data): void
     {
-        return static::fromArray($request->validated());
+        foreach ($data as $key => $value) {
+            if (property_exists($this, $key)) {
+                $this->{$key} = $value;
+            }
+        }
     }
 
-    /**
-     * Convert DTO to array.
-     */
     public function toArray(): array
     {
-        $reflection = new \ReflectionClass($this);
-        $properties = $reflection->getProperties(\ReflectionProperty::IS_PUBLIC);
-
-        $data = [];
-        foreach ($properties as $property) {
-            $name = $property->getName();
-            $data[$name] = $this->{$name};
+        $array = [];
+        foreach (get_object_vars($this) as $key => $value) {
+            $array[$key] = $value;
         }
-
-        return $data;
+        return $array;
     }
 
-    /**
-     * Specify data which should be serialized to JSON.
-     */
-    public function jsonSerialize(): array
+    public static function fromArray(array $data): static
     {
-        return $this->toArray();
+        return new static($data);
     }
 
-    /**
-     * Validate the DTO data.
-     */
-    abstract public function validate(): bool;
+    public function only(array $keys): array
+    {
+        return Arr::only($this->toArray(), $keys);
+    }
+
+    public function except(array $keys): array
+    {
+        return Arr::except($this->toArray(), $keys);
+    }
 }

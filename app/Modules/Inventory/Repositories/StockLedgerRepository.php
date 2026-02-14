@@ -4,133 +4,74 @@ namespace App\Modules\Inventory\Repositories;
 
 use App\Core\Repositories\BaseRepository;
 use App\Modules\Inventory\Models\StockLedger;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Collection;
 
 /**
  * Stock Ledger Repository
- *
- * Handles append-only stock ledger operations.
- * Supports FIFO/FEFO, batch/lot/serial tracking.
+ * 
+ * Handles data access operations for stock ledger entries
  */
 class StockLedgerRepository extends BaseRepository
 {
-    public function __construct(StockLedger $model)
-    {
-        parent::__construct($model);
-    }
-
     /**
-     * Get current stock for a product at a branch.
-     */
-    public function getCurrentStock(int $productId, int $branchId, ?int $warehouseId = null): float
-    {
-        $query = DB::table('stock_summary')
-            ->where('product_id', $productId)
-            ->where('branch_id', $branchId);
-
-        if ($warehouseId) {
-            $query->where('warehouse_id', $warehouseId);
-        }
-
-        return $query->sum('current_quantity') ?? 0;
-    }
-
-    /**
-     * Get stock by batch/lot numbers (for FIFO).
+     * Specify the model class name
      *
-     * @return \Illuminate\Support\Collection
+     * @return string
      */
-    public function getStockByBatch(int $productId, int $branchId, ?int $warehouseId = null)
+    protected function model(): string
     {
-        $query = DB::table('stock_summary')
+        return StockLedger::class;
+    }
+
+    /**
+     * Get total stock for a product in a warehouse
+     *
+     * @param int $productId
+     * @param int $warehouseId
+     * @return float
+     */
+    public function getProductStock(int $productId, int $warehouseId): float
+    {
+        return $this->model
             ->where('product_id', $productId)
-            ->where('branch_id', $branchId)
-            ->where('current_quantity', '>', 0);
+            ->where('warehouse_id', $warehouseId)
+            ->sum('quantity');
+    }
 
-        if ($warehouseId) {
-            $query->where('warehouse_id', $warehouseId);
-        }
-
-        return $query
-            ->orderBy('batch_number')
-            ->orderBy('lot_number')
+    /**
+     * Get FIFO batches for stock allocation
+     *
+     * @param int $productId
+     * @param int $warehouseId
+     * @return Collection
+     */
+    public function getFifoBatches(int $productId, int $warehouseId): Collection
+    {
+        return $this->model
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->where('quantity', '>', 0)
+            ->orderBy('created_at', 'asc')
             ->get();
     }
 
     /**
-     * Get stock by expiry date (for FEFO).
+     * Get stock movements for a product
      *
-     * @return \Illuminate\Support\Collection
+     * @param int $productId
+     * @param int|null $warehouseId
+     * @return Collection
      */
-    public function getStockByExpiry(int $productId, int $branchId, ?int $warehouseId = null)
+    public function getStockMovements(int $productId, ?int $warehouseId = null): Collection
     {
-        $query = DB::table('stock_summary')
+        $query = $this->model
             ->where('product_id', $productId)
-            ->where('branch_id', $branchId)
-            ->where('current_quantity', '>', 0)
-            ->whereNotNull('expiry_date');
+            ->orderBy('created_at', 'desc');
 
         if ($warehouseId) {
             $query->where('warehouse_id', $warehouseId);
-        }
-
-        return $query
-            ->orderBy('expiry_date')
-            ->get();
-    }
-
-    /**
-     * Get expired stock.
-     *
-     * @return \Illuminate\Support\Collection
-     */
-    public function getExpiredStock(?int $branchId = null)
-    {
-        $query = DB::table('stock_summary')
-            ->where('current_quantity', '>', 0)
-            ->where('expiry_date', '<', now());
-
-        if ($branchId) {
-            $query->where('branch_id', $branchId);
         }
 
         return $query->get();
-    }
-
-    /**
-     * Get near-expiry stock.
-     *
-     * @return \Illuminate\Support\Collection
-     */
-    public function getNearExpiryStock(int $days = 30, ?int $branchId = null)
-    {
-        $expiryDate = now()->addDays($days);
-
-        $query = DB::table('stock_summary')
-            ->where('current_quantity', '>', 0)
-            ->where('expiry_date', '<=', $expiryDate)
-            ->where('expiry_date', '>=', now());
-
-        if ($branchId) {
-            $query->where('branch_id', $branchId);
-        }
-
-        return $query->orderBy('expiry_date')->get();
-    }
-
-    /**
-     * Record stock movement (append-only).
-     */
-    public function recordMovement(array $data): StockLedger
-    {
-        // Calculate total cost
-        $data['total_cost'] = $data['quantity'] * $data['unit_cost'];
-
-        // Set created_by if not provided
-        if (! isset($data['created_by'])) {
-            $data['created_by'] = auth()->id();
-        }
-
-        return $this->create($data);
     }
 }

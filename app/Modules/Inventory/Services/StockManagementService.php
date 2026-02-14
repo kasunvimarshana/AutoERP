@@ -2,171 +2,109 @@
 
 namespace App\Modules\Inventory\Services;
 
-use App\Core\Exceptions\ServiceException;
 use App\Core\Services\BaseService;
-use App\Modules\Inventory\Models\StockLedger;
-use App\Modules\Inventory\Repositories\ProductRepository;
 use App\Modules\Inventory\Repositories\StockLedgerRepository;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Stock Management Service
- *
- * Handles stock movement operations with FIFO/FEFO logic.
- * All operations are append-only for immutable audit trails.
+ * 
+ * Handles business logic for stock management operations
  */
 class StockManagementService extends BaseService
 {
-    protected ProductRepository $productRepository;
-
-    public function __construct(
-        StockLedgerRepository $repository,
-        ProductRepository $productRepository
-    ) {
-        parent::__construct($repository);
-        $this->productRepository = $productRepository;
-    }
-
     /**
-     * Record incoming stock (purchase, transfer in, etc.)
-     */
-    public function recordIncomingStock(array $data): StockLedger
-    {
-        return $this->transaction(function () use ($data) {
-            // Validate product exists
-            $product = $this->productRepository->find($data['product_id']);
-            if (! $product) {
-                throw new ServiceException('Product not found');
-            }
-
-            // Validate quantity is positive
-            if ($data['quantity'] <= 0) {
-                throw new ServiceException('Quantity must be positive for incoming stock');
-            }
-
-            // Ensure transaction type is incoming
-            if (! in_array($data['transaction_type'], ['purchase', 'transfer_in', 'adjustment_in', 'return', 'production'])) {
-                throw new ServiceException('Invalid transaction type for incoming stock');
-            }
-
-            return $this->repository->recordMovement($data);
-        });
-    }
-
-    /**
-     * Record outgoing stock (sale, transfer out, etc.) with FIFO/FEFO.
+     * Constructor
      *
-     * @return array Array of StockLedger entries
+     * @param StockLedgerRepository $repository
      */
-    public function recordOutgoingStock(array $data): array
+    public function __construct(StockLedgerRepository $repository)
     {
-        return $this->transaction(function () use ($data) {
-            $product = $this->productRepository->find($data['product_id']);
-            if (! $product) {
-                throw new ServiceException('Product not found');
-            }
+        $this->repository = $repository;
+    }
 
-            // Validate quantity is positive
-            if ($data['quantity'] <= 0) {
-                throw new ServiceException('Quantity must be positive for outgoing stock');
-            }
+    /**
+     * Record incoming stock (purchase, return, etc.)
+     *
+     * @param array $data
+     * @return mixed
+     */
+    public function recordIncomingStock(array $data)
+    {
+        $data['quantity'] = abs($data['quantity']);
+        $data['created_by'] = $data['created_by'] ?? auth()->id();
+        return $this->create($data);
+    }
 
-            // Check available stock
-            $availableStock = $this->repository->getCurrentStock(
+    /**
+     * Record outgoing stock using FIFO method
+     *
+     * @param array $data
+     * @return bool
+     * @throws \Exception
+     */
+    public function recordOutgoingStock(array $data): bool
+    {
+        return DB::transaction(function () use ($data) {
+            $quantity = abs($data['quantity']);
+            $batches = $this->repository->getFifoBatches(
                 $data['product_id'],
-                $data['branch_id'],
-                $data['warehouse_id'] ?? null
+                $data['warehouse_id']
             );
 
-            if ($availableStock < $data['quantity']) {
-                throw new ServiceException(
-                    "Insufficient stock. Available: {$availableStock}, Required: {$data['quantity']}"
-                );
-            }
-
-            // Apply FIFO/FEFO logic
-            $entries = [];
-            $remainingQty = $data['quantity'];
-
-            // Use FEFO if product tracks expiry, otherwise use FIFO
-            if ($product->track_expiry) {
-                $batches = $this->repository->getStockByExpiry(
-                    $data['product_id'],
-                    $data['branch_id'],
-                    $data['warehouse_id'] ?? null
-                );
-            } else {
-                $batches = $this->repository->getStockByBatch(
-                    $data['product_id'],
-                    $data['branch_id'],
-                    $data['warehouse_id'] ?? null
-                );
-            }
-
+            $remainingQty = $quantity;
             foreach ($batches as $batch) {
                 if ($remainingQty <= 0) {
                     break;
                 }
 
-                $qtyToDeduct = min($remainingQty, $batch->current_quantity);
+                $deductQty = min($remainingQty, $batch->quantity);
 
-                $ledgerData = array_merge($data, [
-                    'quantity' => $qtyToDeduct,
+                $this->create([
+                    'product_id' => $data['product_id'],
+                    'warehouse_id' => $data['warehouse_id'],
+                    'quantity' => -$deductQty,
+                    'unit_cost' => $batch->unit_cost,
                     'batch_number' => $batch->batch_number,
-                    'lot_number' => $batch->lot_number,
-                    'expiry_date' => $batch->expiry_date,
-                    'unit_cost' => $batch->average_cost,
+                    'transaction_type' => $data['transaction_type'] ?? 'sale',
+                    'reference_type' => $data['reference_type'] ?? null,
+                    'reference_id' => $data['reference_id'] ?? null,
+                    'created_by' => $data['created_by'] ?? auth()->id(),
                 ]);
 
-                $entries[] = $this->repository->recordMovement($ledgerData);
-                $remainingQty -= $qtyToDeduct;
+                $remainingQty -= $deductQty;
             }
 
             if ($remainingQty > 0) {
-                throw new ServiceException('Unable to allocate stock from batches');
+                throw new \Exception("Insufficient stock. Requested: {$quantity}, Available: " . ($quantity - $remainingQty));
             }
 
-            return $entries;
+            return true;
         });
     }
 
     /**
-     * Get current stock level.
+     * Get current stock level
+     *
+     * @param int $productId
+     * @param int $warehouseId
+     * @return float
      */
-    public function getCurrentStockLevel(int $productId, int $branchId, ?int $warehouseId = null): float
+    public function getCurrentStock(int $productId, int $warehouseId): float
     {
-        return $this->repository->getCurrentStock($productId, $branchId, $warehouseId);
+        return $this->repository->getProductStock($productId, $warehouseId);
     }
 
     /**
-     * Get stock valuation.
+     * Get stock movements
+     *
+     * @param int $productId
+     * @param int|null $warehouseId
+     * @return Collection
      */
-    public function getStockValuation(int $productId, int $branchId, ?int $warehouseId = null): array
+    public function getStockMovements(int $productId, ?int $warehouseId = null): Collection
     {
-        $batches = $this->repository->getStockByBatch($productId, $branchId, $warehouseId);
-
-        $totalQty = 0;
-        $totalValue = 0;
-
-        foreach ($batches as $batch) {
-            $totalQty += $batch->current_quantity;
-            $totalValue += $batch->current_quantity * $batch->average_cost;
-        }
-
-        return [
-            'quantity' => $totalQty,
-            'total_value' => $totalValue,
-            'average_cost' => $totalQty > 0 ? $totalValue / $totalQty : 0,
-        ];
-    }
-
-    /**
-     * Get expiry alerts.
-     */
-    public function getExpiryAlerts(int $branchId, int $days = 30): array
-    {
-        return [
-            'expired' => $this->repository->getExpiredStock($branchId),
-            'near_expiry' => $this->repository->getNearExpiryStock($days, $branchId),
-        ];
+        return $this->repository->getStockMovements($productId, $warehouseId);
     }
 }

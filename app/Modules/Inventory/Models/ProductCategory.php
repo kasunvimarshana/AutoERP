@@ -2,57 +2,61 @@
 
 namespace App\Modules\Inventory\Models;
 
+use App\Core\Traits\TenantScoped;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * Product Category Model
- *
- * Hierarchical product categorization.
+ * ProductCategory Model
+ * 
+ * Represents a product category with hierarchical structure
  */
 class ProductCategory extends Model
 {
+    use HasFactory, TenantScoped;
+
     protected $fillable = [
-        'tenant_id',
         'parent_id',
         'name',
-        'code',
+        'slug',
         'description',
-        'is_active',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
+    protected $hidden = [];
+
+    protected static function newFactory()
+    {
+        return \Database\Factories\ProductCategoryFactory::new();
+    }
+
     /**
-     * Get the parent category.
+     * Get the parent category
      */
-    public function parent()
+    public function parent(): BelongsTo
     {
         return $this->belongsTo(ProductCategory::class, 'parent_id');
     }
 
     /**
-     * Get all child categories.
+     * Get child categories
      */
-    public function children()
+    public function children(): HasMany
     {
         return $this->hasMany(ProductCategory::class, 'parent_id');
     }
 
     /**
-     * Get all products in this category.
+     * Get products in this category
      */
-    public function products()
+    public function products(): HasMany
     {
         return $this->hasMany(Product::class, 'category_id');
-    }
-
-    /**
-     * Scope active categories.
-     */
-    public function scopeActive($query)
-    {
-        return $query->where('is_active', true);
     }
 }

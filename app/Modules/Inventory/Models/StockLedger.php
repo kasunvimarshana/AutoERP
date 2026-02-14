@@ -2,54 +2,59 @@
 
 namespace App\Modules\Inventory\Models;
 
+use App\Core\Traits\TenantScoped;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Stock Ledger Model (Append-Only)
- *
- * Immutable stock movement tracking.
- * Supports FIFO/FEFO, batch/lot/serial tracking, and expiry handling.
- * All stock movements are recorded as append-only entries for audit trail.
+ * StockLedger Model
+ * 
+ * Append-only stock ledger for immutable audit trail
+ * NO updated_at timestamp - records are never updated
  */
 class StockLedger extends Model
 {
-    // Disable updated_at as this is append-only
-    const UPDATED_AT = null;
+    use HasFactory, TenantScoped;
+
+    /**
+     * Disable updated_at timestamp - this is an append-only ledger
+     */
+    public const UPDATED_AT = null;
 
     protected $table = 'stock_ledger';
 
     protected $fillable = [
-        'tenant_id',
         'product_id',
-        'branch_id',
         'warehouse_id',
+        'location_id',
         'transaction_type',
-        'reference_type',
-        'reference_id',
         'quantity',
         'unit_cost',
-        'total_cost',
         'batch_number',
         'lot_number',
         'serial_number',
         'manufacture_date',
         'expiry_date',
-        'remarks',
+        'reference_type',
+        'reference_id',
+        'notes',
         'created_by',
     ];
 
     protected $casts = [
-        'quantity' => 'decimal:4',
+        'quantity' => 'decimal:2',
         'unit_cost' => 'decimal:2',
-        'total_cost' => 'decimal:2',
         'manufacture_date' => 'date',
         'expiry_date' => 'date',
         'created_at' => 'datetime',
     ];
 
+    protected $hidden = [];
+
     /**
-     * Get the product.
+     * Get the product for this ledger entry
      */
     public function product(): BelongsTo
     {
@@ -57,15 +62,7 @@ class StockLedger extends Model
     }
 
     /**
-     * Get the branch.
-     */
-    public function branch(): BelongsTo
-    {
-        return $this->belongsTo(\App\Modules\Tenant\Models\Branch::class);
-    }
-
-    /**
-     * Get the warehouse.
+     * Get the warehouse for this ledger entry
      */
     public function warehouse(): BelongsTo
     {
@@ -73,92 +70,18 @@ class StockLedger extends Model
     }
 
     /**
-     * Get the user who created this entry.
+     * Get the location for this ledger entry
      */
-    public function creator(): BelongsTo
+    public function location(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\User::class, 'created_by');
+        return $this->belongsTo(StockLocation::class, 'location_id');
     }
 
     /**
-     * Get the reference model (polymorphic).
+     * Get the user who created this ledger entry
      */
-    public function reference()
+    public function createdBy(): BelongsTo
     {
-        return $this->morphTo('reference', 'reference_type', 'reference_id');
-    }
-
-    /**
-     * Check if this is an incoming transaction.
-     */
-    public function isIncoming(): bool
-    {
-        return in_array($this->transaction_type, [
-            'purchase', 'transfer_in', 'adjustment_in', 'return', 'production',
-        ]);
-    }
-
-    /**
-     * Check if this is an outgoing transaction.
-     */
-    public function isOutgoing(): bool
-    {
-        return in_array($this->transaction_type, [
-            'sale', 'transfer_out', 'adjustment_out',
-        ]);
-    }
-
-    /**
-     * Check if item has expired.
-     */
-    public function hasExpired(): bool
-    {
-        return $this->expiry_date && $this->expiry_date->isPast();
-    }
-
-    /**
-     * Check if item is near expiry (within 30 days).
-     */
-    public function isNearExpiry(int $days = 30): bool
-    {
-        return $this->expiry_date &&
-               $this->expiry_date->isFuture() &&
-               $this->expiry_date->diffInDays(now()) <= $days;
-    }
-
-    /**
-     * Scope for specific product.
-     */
-    public function scopeForProduct($query, int $productId)
-    {
-        return $query->where('product_id', $productId);
-    }
-
-    /**
-     * Scope for specific branch.
-     */
-    public function scopeForBranch($query, int $branchId)
-    {
-        return $query->where('branch_id', $branchId);
-    }
-
-    /**
-     * Scope for incoming transactions.
-     */
-    public function scopeIncoming($query)
-    {
-        return $query->whereIn('transaction_type', [
-            'purchase', 'transfer_in', 'adjustment_in', 'return', 'production',
-        ]);
-    }
-
-    /**
-     * Scope for outgoing transactions.
-     */
-    public function scopeOutgoing($query)
-    {
-        return $query->whereIn('transaction_type', [
-            'sale', 'transfer_out', 'adjustment_out',
-        ]);
+        return $this->belongsTo(User::class, 'created_by');
     }
 }

@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: autoerp-app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    networks:
+      - autoerp-network
+    depends_on:
+      - db
+      - redis
+
+  nginx:
+    image: nginx:alpine
+    container_name: autoerp-nginx
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./:/var/www
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+    networks:
+      - autoerp-network
+    depends_on:
+      - app
+
+  db:
+    image: postgres:15-alpine
+    container_name: autoerp-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-autoerp}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    networks:
+      - autoerp-network
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    container_name: autoerp-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - autoerp-network
+    volumes:
+      - redisdata:/data
+
+  queue:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: autoerp-queue
+    restart: unless-stopped
+    command: php artisan queue:work --tries=3
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+    networks:
+      - autoerp-network
+    depends_on:
+      - db
+      - redis
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: autoerp-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - autoerp-network
+
+networks:
+  autoerp-network:
+    driver: bridge
+
+volumes:
+  dbdata:
+    driver: local
+  redisdata:
+    driver: local

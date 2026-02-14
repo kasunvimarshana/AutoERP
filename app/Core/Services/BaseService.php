@@ -2,148 +2,96 @@
 
 namespace App\Core\Services;
 
-use App\Core\Exceptions\ServiceException;
-use App\Core\Interfaces\RepositoryInterface;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\Model;
+use App\Core\Repositories\BaseRepository;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
-/**
- * Base Service Class
- *
- * Implements business logic layer with transaction management.
- * Orchestrates operations between controllers and repositories.
- * Enforces service-layer-only orchestration for cross-module interactions.
- */
 abstract class BaseService
 {
-    protected RepositoryInterface $repository;
+    protected BaseRepository $repository;
 
-    /**
-     * BaseService constructor.
-     */
-    public function __construct(RepositoryInterface $repository)
+    public function __construct(BaseRepository $repository)
     {
         $this->repository = $repository;
     }
 
-    /**
-     * Get all records with optional pagination.
-     *
-     * @return Collection|LengthAwarePaginator
-     */
-    public function getAll(?int $perPage = null)
+    public function create(array $data)
     {
-        try {
-            if ($perPage) {
-                return $this->repository->paginate($perPage);
+        return DB::transaction(function () use ($data) {
+            try {
+                $record = $this->repository->create($data);
+                $this->afterCreate($record, $data);
+                return $record;
+            } catch (\Exception $e) {
+                Log::error('Service create failed', [
+                    'service' => get_class($this),
+                    'error' => $e->getMessage()
+                ]);
+                throw $e;
             }
-
-            return $this->repository->all();
-        } catch (\Exception $e) {
-            Log::error('Error fetching records: '.$e->getMessage());
-            throw new ServiceException('Failed to fetch records', 0, $e);
-        }
+        });
     }
 
-    /**
-     * Find a record by ID.
-     */
-    public function findById(int $id): ?Model
+    public function update($id, array $data)
     {
-        try {
-            return $this->repository->find($id);
-        } catch (\Exception $e) {
-            Log::error("Error finding record {$id}: ".$e->getMessage());
-            throw new ServiceException("Failed to find record {$id}", 0, $e);
-        }
+        return DB::transaction(function () use ($id, $data) {
+            try {
+                $record = $this->repository->update($id, $data);
+                $this->afterUpdate($record, $data);
+                return $record;
+            } catch (\Exception $e) {
+                Log::error('Service update failed', [
+                    'service' => get_class($this),
+                    'id' => $id,
+                    'error' => $e->getMessage()
+                ]);
+                throw $e;
+            }
+        });
     }
 
-    /**
-     * Create a new record with transaction support.
-     */
-    public function create(array $data): Model
+    public function delete($id): bool
     {
-        DB::beginTransaction();
-
-        try {
-            $model = $this->repository->create($data);
-            DB::commit();
-
-            Log::info('Record created successfully', ['id' => $model->id]);
-
-            return $model;
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Error creating record: '.$e->getMessage());
-            throw new ServiceException('Failed to create record', 0, $e);
-        }
+        return DB::transaction(function () use ($id) {
+            try {
+                $result = $this->repository->delete($id);
+                $this->afterDelete($id);
+                return $result;
+            } catch (\Exception $e) {
+                Log::error('Service delete failed', [
+                    'service' => get_class($this),
+                    'id' => $id,
+                    'error' => $e->getMessage()
+                ]);
+                throw $e;
+            }
+        });
     }
 
-    /**
-     * Update a record with transaction support.
-     */
-    public function update(int $id, array $data): bool
+    public function find($id)
     {
-        DB::beginTransaction();
-
-        try {
-            $result = $this->repository->update($id, $data);
-            DB::commit();
-
-            Log::info("Record {$id} updated successfully");
-
-            return $result;
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error("Error updating record {$id}: ".$e->getMessage());
-            throw new ServiceException("Failed to update record {$id}", 0, $e);
-        }
+        return $this->repository->find($id);
     }
 
-    /**
-     * Delete a record with transaction support.
-     */
-    public function delete(int $id): bool
+    public function all()
     {
-        DB::beginTransaction();
-
-        try {
-            $result = $this->repository->delete($id);
-            DB::commit();
-
-            Log::info("Record {$id} deleted successfully");
-
-            return $result;
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error("Error deleting record {$id}: ".$e->getMessage());
-            throw new ServiceException("Failed to delete record {$id}", 0, $e);
-        }
+        return $this->repository->all();
     }
 
-    /**
-     * Execute a callback within a database transaction.
-     *
-     * @return mixed
-     *
-     * @throws ServiceException
-     */
-    protected function transaction(callable $callback)
+    public function paginate(int $perPage = 15, array $filters = [])
     {
-        DB::beginTransaction();
+        return $this->repository->paginate($perPage, $filters);
+    }
 
-        try {
-            $result = $callback();
-            DB::commit();
+    protected function afterCreate($record, array $data): void
+    {
+    }
 
-            return $result;
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Transaction failed: '.$e->getMessage());
-            throw new ServiceException('Transaction failed', 0, $e);
-        }
+    protected function afterUpdate($record, array $data): void
+    {
+    }
+
+    protected function afterDelete($id): void
+    {
     }
 }

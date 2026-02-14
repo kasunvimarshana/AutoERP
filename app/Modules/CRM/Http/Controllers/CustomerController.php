@@ -3,8 +3,6 @@
 namespace App\Modules\CRM\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\CRM\Http\Requests\CreateCustomerRequest;
-use App\Modules\CRM\Http\Requests\UpdateCustomerRequest;
 use App\Modules\CRM\Services\CustomerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,89 +15,123 @@ use Illuminate\Http\Request;
  */
 class CustomerController extends Controller
 {
-    protected CustomerService $customerService;
+    protected CustomerService $service;
 
-    public function __construct(CustomerService $customerService)
+    public function __construct(CustomerService $service)
     {
-        $this->customerService = $customerService;
+        $this->service = $service;
     }
 
     /**
      * @OA\Get(
      *     path="/api/v1/customers",
-     *     summary="Get all customers",
      *     tags={"Customers"},
-     *
+     *     summary="List all customers",
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Page number",
+     *         @OA\Schema(type="integer")
+     *     ),
      *     @OA\Parameter(
      *         name="per_page",
      *         in="query",
      *         description="Items per page",
-     *         required=false,
-     *
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="integer", maximum=100)
      *     ),
-     *
      *     @OA\Response(
      *         response=200,
-     *         description="Successful operation"
+     *         description="Successful operation",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
+     *         )
      *     )
      * )
      */
     public function index(Request $request): JsonResponse
     {
-        $perPage = $request->get('per_page', 15);
-        $customers = $this->customerService->getAll($perPage);
+        $perPage = min($request->get('per_page', 15), 100);
+        $customers = $this->service->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'data' => $customers,
+            'data' => $customers->items(),
+            'meta' => [
+                'current_page' => $customers->currentPage(),
+                'per_page' => $customers->perPage(),
+                'total' => $customers->total(),
+                'last_page' => $customers->lastPage(),
+            ]
         ]);
     }
 
     /**
      * @OA\Post(
      *     path="/api/v1/customers",
-     *     summary="Create a new customer",
      *     tags={"Customers"},
-     *
+     *     summary="Create a new customer",
+     *     security={{"sanctum":{}}},
      *     @OA\RequestBody(
      *         required=true,
-     *
-     *         @OA\JsonContent(ref="#/components/schemas/CreateCustomerRequest")
+     *         @OA\JsonContent(
+     *             required={"type", "email"},
+     *             @OA\Property(property="type", type="string", enum={"individual", "business"}),
+     *             @OA\Property(property="first_name", type="string"),
+     *             @OA\Property(property="last_name", type="string"),
+     *             @OA\Property(property="company_name", type="string"),
+     *             @OA\Property(property="email", type="string", format="email"),
+     *             @OA\Property(property="phone", type="string")
+     *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=201,
      *         description="Customer created successfully"
      *     )
      * )
      */
-    public function store(CreateCustomerRequest $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
-        $customer = $this->customerService->createCustomer($request->validated());
+        $tenantId = $request->user()->tenant_id;
+        
+        $validated = $request->validate([
+            'type' => 'required|in:individual,business',
+            'first_name' => 'required_if:type,individual|string|max:255',
+            'last_name' => 'required_if:type,individual|string|max:255',
+            'company_name' => 'required_if:type,business|string|max:255',
+            'email' => [
+                'required',
+                'email',
+                \Illuminate\Validation\Rule::unique('customers', 'email')->where('tenant_id', $tenantId)
+            ],
+            'phone' => 'required|string|max:20',
+            'tax_number' => 'nullable|string|max:50',
+            'credit_limit' => 'nullable|numeric|min:0',
+            'payment_terms' => 'nullable|integer|min:0',
+        ]);
+
+        $customer = $this->service->create($validated);
 
         return response()->json([
             'success' => true,
             'message' => 'Customer created successfully',
-            'data' => $customer,
+            'data' => $customer
         ], 201);
     }
 
     /**
      * @OA\Get(
      *     path="/api/v1/customers/{id}",
-     *     summary="Get customer by ID",
      *     tags={"Customers"},
-     *
+     *     summary="Get customer by ID",
+     *     security={{"sanctum":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
-     *         description="Customer ID",
      *         required=true,
-     *
      *         @OA\Schema(type="integer")
      *     ),
-     *
      *     @OA\Response(
      *         response=200,
      *         description="Successful operation"
@@ -112,73 +144,78 @@ class CustomerController extends Controller
      */
     public function show(int $id): JsonResponse
     {
-        $customer = $this->customerService->getCustomerProfile($id);
+        $customer = $this->service->find($id);
 
-        if (! $customer) {
+        if (!$customer) {
             return response()->json([
                 'success' => false,
-                'message' => 'Customer not found',
+                'message' => 'Customer not found'
             ], 404);
         }
 
         return response()->json([
             'success' => true,
-            'data' => $customer,
+            'data' => $customer->load(['contacts', 'addresses', 'tags'])
         ]);
     }
 
     /**
      * @OA\Put(
      *     path="/api/v1/customers/{id}",
-     *     summary="Update customer",
      *     tags={"Customers"},
-     *
+     *     summary="Update customer",
+     *     security={{"sanctum":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
-     *         description="Customer ID",
      *         required=true,
-     *
      *         @OA\Schema(type="integer")
      *     ),
-     *
      *     @OA\RequestBody(
-     *         required=true,
-     *
-     *         @OA\JsonContent(ref="#/components/schemas/UpdateCustomerRequest")
+     *         @OA\JsonContent(
+     *             @OA\Property(property="email", type="string", format="email"),
+     *             @OA\Property(property="phone", type="string")
+     *         )
      *     ),
-     *
      *     @OA\Response(
      *         response=200,
      *         description="Customer updated successfully"
      *     )
      * )
      */
-    public function update(UpdateCustomerRequest $request, int $id): JsonResponse
+    public function update(Request $request, int $id): JsonResponse
     {
-        $this->customerService->update($id, $request->validated());
+        $validated = $request->validate([
+            'first_name' => 'sometimes|string|max:255',
+            'last_name' => 'sometimes|string|max:255',
+            'company_name' => 'sometimes|string|max:255',
+            'email' => 'sometimes|email|unique:customers,email,' . $id,
+            'phone' => 'sometimes|string|max:20',
+            'credit_limit' => 'sometimes|numeric|min:0',
+            'status' => 'sometimes|in:active,inactive',
+        ]);
+
+        $customer = $this->service->update($id, $validated);
 
         return response()->json([
             'success' => true,
             'message' => 'Customer updated successfully',
+            'data' => $customer
         ]);
     }
 
     /**
      * @OA\Delete(
      *     path="/api/v1/customers/{id}",
-     *     summary="Delete customer",
      *     tags={"Customers"},
-     *
+     *     summary="Delete customer",
+     *     security={{"sanctum":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
-     *         description="Customer ID",
      *         required=true,
-     *
      *         @OA\Schema(type="integer")
      *     ),
-     *
      *     @OA\Response(
      *         response=200,
      *         description="Customer deleted successfully"
@@ -187,43 +224,41 @@ class CustomerController extends Controller
      */
     public function destroy(int $id): JsonResponse
     {
-        $this->customerService->delete($id);
+        $this->service->delete($id);
 
         return response()->json([
             'success' => true,
-            'message' => 'Customer deleted successfully',
+            'message' => 'Customer deleted successfully'
         ]);
     }
 
     /**
      * @OA\Get(
      *     path="/api/v1/customers/search",
-     *     summary="Search customers",
      *     tags={"Customers"},
-     *
+     *     summary="Search customers",
+     *     security={{"sanctum":{}}},
      *     @OA\Parameter(
      *         name="q",
      *         in="query",
-     *         description="Search query",
      *         required=true,
-     *
      *         @OA\Schema(type="string")
      *     ),
-     *
      *     @OA\Response(
      *         response=200,
-     *         description="Successful operation"
+     *         description="Search results"
      *     )
      * )
      */
     public function search(Request $request): JsonResponse
     {
-        $query = $request->get('q');
-        $customers = $this->customerService->searchCustomers($query);
+        $request->validate(['q' => 'required|string|min:2']);
+        
+        $results = $this->service->searchCustomers($request->get('q'));
 
         return response()->json([
             'success' => true,
-            'data' => $customers,
+            'data' => $results
         ]);
     }
 }

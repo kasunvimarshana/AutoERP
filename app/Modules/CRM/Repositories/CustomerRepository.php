@@ -4,29 +4,41 @@ namespace App\Modules\CRM\Repositories;
 
 use App\Core\Repositories\BaseRepository;
 use App\Modules\CRM\Models\Customer;
+use Illuminate\Database\Eloquent\Collection;
 
 /**
  * Customer Repository
- *
- * Handles data access for customer operations.
+ * 
+ * Handles data access operations for customers
  */
 class CustomerRepository extends BaseRepository
 {
-    public function __construct(Customer $model)
+    /**
+     * Specify the model class name
+     *
+     * @return string
+     */
+    protected function model(): string
     {
-        parent::__construct($model);
+        return Customer::class;
     }
 
     /**
-     * Find customer by customer code.
+     * Find customer by code
+     *
+     * @param string $code
+     * @return Customer|null
      */
     public function findByCode(string $code): ?Customer
     {
-        return $this->model->where('customer_code', $code)->first();
+        return $this->model->where('code', $code)->first();
     }
 
     /**
-     * Find customer by email.
+     * Find customer by email
+     *
+     * @param string $email
+     * @return Customer|null
      */
     public function findByEmail(string $email): ?Customer
     {
@@ -34,27 +46,21 @@ class CustomerRepository extends BaseRepository
     }
 
     /**
-     * Get customers with vehicles.
+     * Search customers by multiple fields
      *
-     * @return \Illuminate\Database\Eloquent\Collection
+     * @param string $search
+     * @return Collection
      */
-    public function getCustomersWithVehicles()
-    {
-        return $this->model->has('vehicles')->with('vehicles')->get();
-    }
-
-    /**
-     * Search customers by name or email.
-     *
-     * @return \Illuminate\Database\Eloquent\Collection
-     */
-    public function search(string $query)
+    public function searchCustomers(string $search): Collection
     {
         return $this->model
-            ->where('first_name', 'like', "%{$query}%")
-            ->orWhere('last_name', 'like', "%{$query}%")
-            ->orWhere('company_name', 'like', "%{$query}%")
-            ->orWhere('email', 'like', "%{$query}%")
+            ->where(function ($query) use ($search) {
+                $query->where('first_name', 'like', "%{$search}%")
+                    ->orWhere('last_name', 'like', "%{$search}%")
+                    ->orWhere('company_name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%");
+            })
             ->get();
     }
 }

@@ -1,83 +1,49 @@
 <?php
 
-use App\Modules\CRM\Http\Controllers\CustomerController;
-use App\Modules\CRM\Http\Controllers\CustomerEnhancedController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Auth\AuthController;
+use App\Modules\CRM\Http\Controllers\CustomerController;
+use App\Modules\Inventory\Http\Controllers\ProductController;
+use App\Modules\Inventory\Http\Controllers\ProductCategoryController;
+use App\Modules\Billing\Http\Controllers\InvoiceController;
 
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
-*/
+Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+    return $request->user();
+});
 
-/**
- * @OA\Info(
- *     title="AutoERP API",
- *     version="1.0.0",
- *     description="AutoERP REST API",
- *
- *     @OA\Contact(
- *         email="support@autoerp.com"
- *     )
- * )
- *
- * @OA\Server(
- *     url="http://localhost:8000",
- *     description="Local development server"
- * )
- *
- * @OA\SecurityScheme(
- *     securityScheme="bearerAuth",
- *     type="http",
- *     scheme="bearer",
- *     bearerFormat="JWT"
- * )
- */
-
-// Public routes
-Route::prefix('v1')->group(function () {
-    // Health check
-    Route::get('/health', function () {
-        return response()->json([
-            'status' => 'healthy',
-            'timestamp' => now()->toIso8601String(),
-        ]);
+// Auth Routes (v1)
+Route::prefix('v1/auth')->group(function () {
+    Route::post('login', [AuthController::class, 'login']);
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('logout', [AuthController::class, 'logout']);
+        Route::get('profile', [AuthController::class, 'profile']);
+        Route::get('user', [AuthController::class, 'user']);
     });
 });
 
-// Protected routes
-Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
-    // User profile
-    Route::get('/user', function (Request $request) {
-        return $request->user();
-    });
+Route::prefix('v1')->middleware(['auth:sanctum', 'tenant.aware'])->group(function () {
+    // CRM Routes
+    Route::get('customers/search', [CustomerController::class, 'search']);
+    Route::apiResource('customers', CustomerController::class);
 
-    // CRM Module - Original implementation
-    Route::prefix('customers')->group(function () {
-        Route::get('/search', [CustomerController::class, 'search']);
-        Route::apiResource('/', CustomerController::class)->parameters(['' => 'id']);
-    });
+    // Inventory Routes
+    Route::apiResource('product-categories', ProductCategoryController::class);
+    
+    Route::get('products/search', [ProductController::class, 'search']);
+    Route::get('products/{id}/inventory', [ProductController::class, 'inventory']);
+    Route::post('products/{id}/adjust-stock', [ProductController::class, 'adjustStock']);
+    Route::apiResource('products', ProductController::class);
 
-    // CRM Module - Enhanced CRUD Framework implementation
-    Route::apiResource('customers-enhanced', CustomerEnhancedController::class);
+    // Billing Routes
+    Route::get('invoices/search', [InvoiceController::class, 'search']);
+    Route::post('invoices/{id}/send', [InvoiceController::class, 'send']);
+    Route::post('invoices/{id}/record-payment', [InvoiceController::class, 'recordPayment']);
+    Route::get('invoices/{id}/pdf', [InvoiceController::class, 'downloadPdf']);
+    Route::apiResource('invoices', InvoiceController::class);
+});
 
-    // Inventory Module (to be implemented)
-    // Route::prefix('inventory')->group(function () {
-    //     Route::apiResource('products', ProductController::class);
-    //     Route::post('stock/in', [StockController::class, 'recordIncoming']);
-    //     Route::post('stock/out', [StockController::class, 'recordOutgoing']);
-    // });
-
-    // Tenant Management (to be implemented)
-    // Route::prefix('tenants')->group(function () {
-    //     Route::apiResource('/', TenantController::class);
-    //     Route::apiResource('organizations', OrganizationController::class);
-    //     Route::apiResource('branches', BranchController::class);
-    // });
+// Health check
+Route::get('/health', function () {
+    return response()->json(['status' => 'ok', 'timestamp' => now()]);
 });

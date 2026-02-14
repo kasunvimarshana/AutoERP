@@ -3,88 +3,96 @@
 namespace App\Modules\CRM\Services;
 
 use App\Core\Services\BaseService;
-use App\Modules\CRM\Models\Customer;
 use App\Modules\CRM\Repositories\CustomerRepository;
+use Illuminate\Database\Eloquent\Collection;
 
 /**
  * Customer Service
- *
- * Handles business logic for customer operations.
+ * 
+ * Handles business logic for customer operations
  */
 class CustomerService extends BaseService
 {
+    /**
+     * Constructor
+     *
+     * @param CustomerRepository $repository
+     */
     public function __construct(CustomerRepository $repository)
     {
-        parent::__construct($repository);
+        $this->repository = $repository;
     }
 
     /**
-     * Create a new customer.
+     * Create a new customer
+     *
+     * @param array $data
+     * @return mixed
      */
-    public function createCustomer(array $data): Customer
+    public function create(array $data)
     {
-        return $this->transaction(function () use ($data) {
-            // Generate customer code if not provided
-            if (! isset($data['customer_code'])) {
-                $data['customer_code'] = $this->generateCustomerCode();
-            }
+        if (empty($data['code'])) {
+            $data['code'] = $this->generateCustomerCode();
+        }
 
-            // Set defaults
-            $data['status'] = $data['status'] ?? 'active';
-            $data['payment_terms_days'] = $data['payment_terms_days'] ?? 30;
-            $data['credit_limit'] = $data['credit_limit'] ?? 0;
-
-            $customer = $this->repository->create($data);
-
-            // Create primary contact if provided
-            if (isset($data['contacts']) && is_array($data['contacts'])) {
-                foreach ($data['contacts'] as $index => $contactData) {
-                    $contactData['is_primary'] = $index === 0;
-                    $customer->contacts()->create($contactData);
-                }
-            }
-
-            return $customer->fresh(['contacts']);
-        });
+        return parent::create($data);
     }
 
     /**
-     * Generate unique customer code.
+     * Generate unique customer code
+     *
+     * @return string
      */
     protected function generateCustomerCode(): string
     {
-        $prefix = 'CUST';
-        $number = str_pad(
-            (Customer::max('id') ?? 0) + 1,
-            6,
-            '0',
-            STR_PAD_LEFT
-        );
-
-        return $prefix.$number;
-    }
-
-    /**
-     * Search customers.
-     *
-     * @return \Illuminate\Database\Eloquent\Collection
-     */
-    public function searchCustomers(string $query)
-    {
-        return $this->repository->search($query);
-    }
-
-    /**
-     * Get customer with complete profile.
-     */
-    public function getCustomerProfile(int $id): ?Customer
-    {
-        $customer = $this->repository->find($id);
-
-        if ($customer) {
-            $customer->load(['contacts', 'vehicles.serviceHistory']);
+        $prefix = 'CUST-';
+        $lastCustomer = $this->repository->model
+            ->where('code', 'like', $prefix . '%')
+            ->orderBy('id', 'desc')
+            ->lockForUpdate()
+            ->first();
+        
+        $number = 1;
+        if ($lastCustomer && str_starts_with($lastCustomer->code, $prefix)) {
+            $extracted = substr($lastCustomer->code, strlen($prefix));
+            if (is_numeric($extracted)) {
+                $number = (int)$extracted + 1;
+            }
         }
+        
+        return $prefix . str_pad($number, 6, '0', STR_PAD_LEFT);
+    }
 
-        return $customer;
+    /**
+     * Search customers
+     *
+     * @param string $search
+     * @return Collection
+     */
+    public function searchCustomers(string $search): Collection
+    {
+        return $this->repository->searchCustomers($search);
+    }
+
+    /**
+     * Find customer by code
+     *
+     * @param string $code
+     * @return mixed
+     */
+    public function findByCode(string $code)
+    {
+        return $this->repository->findByCode($code);
+    }
+
+    /**
+     * Find customer by email
+     *
+     * @param string $email
+     * @return mixed
+     */
+    public function findByEmail(string $email)
+    {
+        return $this->repository->findByEmail($email);
     }
 }

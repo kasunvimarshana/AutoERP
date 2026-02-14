@@ -2,61 +2,55 @@
 
 namespace App\Modules\CRM\Models;
 
+use App\Core\Traits\HasUuid;
+use App\Core\Traits\TenantScoped;
+use App\Modules\Fleet\Models\Vehicle;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
  * Customer Model
- *
- * Manages customer data with support for both individual and business customers.
- * Includes credit limits, payment terms, and multi-address support.
+ * 
+ * Represents a customer (individual or business)
  */
 class Customer extends Model
 {
-    use SoftDeletes;
+    use HasFactory, TenantScoped, HasUuid, SoftDeletes;
 
     protected $fillable = [
-        'tenant_id',
-        'customer_code',
+        'code',
         'type',
         'first_name',
         'last_name',
         'company_name',
         'email',
         'phone',
-        'mobile',
-        'tax_id',
-        'billing_address',
-        'shipping_address',
-        'city',
-        'state',
-        'country',
-        'postal_code',
-        'status',
+        'tax_number',
         'credit_limit',
-        'payment_terms_days',
-        'preferences',
-        'metadata',
+        'payment_terms',
+        'status',
     ];
 
     protected $casts = [
         'credit_limit' => 'decimal:2',
-        'preferences' => 'array',
-        'metadata' => 'array',
+        'payment_terms' => 'integer',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
     ];
 
-    /**
-     * Get the tenant that owns the customer.
-     */
-    public function tenant(): BelongsTo
+    protected $hidden = [];
+
+    protected static function newFactory()
     {
-        return $this->belongsTo(\App\Modules\Tenant\Models\Tenant::class);
+        return \Database\Factories\CustomerFactory::new();
     }
 
     /**
-     * Get all contacts for the customer.
+     * Get contacts for this customer
      */
     public function contacts(): HasMany
     {
@@ -64,46 +58,26 @@ class Customer extends Model
     }
 
     /**
-     * Get all vehicles owned by the customer.
+     * Get addresses for this customer
+     */
+    public function addresses(): HasMany
+    {
+        return $this->hasMany(CustomerAddress::class);
+    }
+
+    /**
+     * Get tags for this customer
+     */
+    public function tags(): BelongsToMany
+    {
+        return $this->belongsToMany(CustomerTag::class, 'customer_tag', 'customer_id', 'tag_id');
+    }
+
+    /**
+     * Get vehicles for this customer
      */
     public function vehicles(): HasMany
     {
         return $this->hasMany(Vehicle::class);
-    }
-
-    /**
-     * Get the primary contact.
-     */
-    public function primaryContact()
-    {
-        return $this->hasOne(CustomerContact::class)->where('is_primary', true);
-    }
-
-    /**
-     * Get full name for individual customers.
-     */
-    public function getFullNameAttribute(): string
-    {
-        if ($this->type === 'individual') {
-            return trim("{$this->first_name} {$this->last_name}");
-        }
-
-        return $this->company_name;
-    }
-
-    /**
-     * Scope active customers.
-     */
-    public function scopeActive($query)
-    {
-        return $query->where('status', 'active');
-    }
-
-    /**
-     * Scope by customer type.
-     */
-    public function scopeOfType($query, string $type)
-    {
-        return $query->where('type', $type);
     }
 }

@@ -2,87 +2,66 @@
 
 namespace App\Modules\Inventory\Models;
 
+use App\Core\Traits\HasUuid;
+use App\Core\Traits\TenantScoped;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * Product Model
- *
- * Manages products with SKU/variant support.
- * Includes inventory tracking, batch/lot/serial tracking, and multi-attribute support.
+ * 
+ * Represents a product in the inventory
  */
 class Product extends Model
 {
-    use SoftDeletes;
+    use HasFactory, TenantScoped, HasUuid, SoftDeletes;
 
     protected $fillable = [
-        'tenant_id',
         'sku',
         'name',
         'description',
-        'type',
-        'parent_id',
-        'barcode',
         'category_id',
         'brand_id',
-        'unit_of_measure',
+        'unit_price',
         'cost_price',
-        'selling_price',
+        'unit_of_measure',
+        'track_inventory',
+        'track_batch',
+        'track_serial',
+        'track_expiry',
         'min_stock_level',
         'max_stock_level',
         'reorder_point',
-        'is_active',
-        'track_inventory',
-        'track_serial',
-        'track_batch',
-        'track_expiry',
-        'attributes',
-        'images',
+        'status',
     ];
 
     protected $casts = [
+        'unit_price' => 'decimal:2',
         'cost_price' => 'decimal:2',
-        'selling_price' => 'decimal:2',
+        'track_inventory' => 'boolean',
+        'track_batch' => 'boolean',
+        'track_serial' => 'boolean',
+        'track_expiry' => 'boolean',
         'min_stock_level' => 'decimal:2',
         'max_stock_level' => 'decimal:2',
         'reorder_point' => 'decimal:2',
-        'is_active' => 'boolean',
-        'track_inventory' => 'boolean',
-        'track_serial' => 'boolean',
-        'track_batch' => 'boolean',
-        'track_expiry' => 'boolean',
-        'attributes' => 'array',
-        'images' => 'array',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
     ];
 
-    /**
-     * Get the tenant that owns the product.
-     */
-    public function tenant(): BelongsTo
+    protected $hidden = [];
+
+    protected static function newFactory()
     {
-        return $this->belongsTo(\App\Modules\Tenant\Models\Tenant::class);
+        return \Database\Factories\ProductFactory::new();
     }
 
     /**
-     * Get the parent product (for variants).
-     */
-    public function parent(): BelongsTo
-    {
-        return $this->belongsTo(Product::class, 'parent_id');
-    }
-
-    /**
-     * Get all variants of this product.
-     */
-    public function variants(): HasMany
-    {
-        return $this->hasMany(Product::class, 'parent_id');
-    }
-
-    /**
-     * Get the category.
+     * Get the category for this product
      */
     public function category(): BelongsTo
     {
@@ -90,7 +69,7 @@ class Product extends Model
     }
 
     /**
-     * Get the brand.
+     * Get the brand for this product
      */
     public function brand(): BelongsTo
     {
@@ -98,42 +77,10 @@ class Product extends Model
     }
 
     /**
-     * Get all stock ledger entries.
+     * Get stock ledger entries for this product
      */
     public function stockLedger(): HasMany
     {
         return $this->hasMany(StockLedger::class);
-    }
-
-    /**
-     * Check if product is a variant.
-     */
-    public function isVariant(): bool
-    {
-        return $this->type === 'variant' && $this->parent_id !== null;
-    }
-
-    /**
-     * Check if product has variants.
-     */
-    public function hasVariants(): bool
-    {
-        return $this->variants()->exists();
-    }
-
-    /**
-     * Scope active products.
-     */
-    public function scopeActive($query)
-    {
-        return $query->where('is_active', true);
-    }
-
-    /**
-     * Scope products by type.
-     */
-    public function scopeOfType($query, string $type)
-    {
-        return $query->where('type', $type);
     }
 }

@@ -2,41 +2,43 @@
 
 namespace App\Modules\Inventory\Models;
 
+use App\Core\Traits\TenantScoped;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Brand Model
- *
- * Product brand/manufacturer management.
+ * 
+ * Represents a product brand
  */
 class Brand extends Model
 {
+    use HasFactory, TenantScoped;
+
     protected $fillable = [
-        'tenant_id',
         'name',
-        'code',
-        'description',
+        'slug',
         'logo',
-        'is_active',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
-    /**
-     * Get all products of this brand.
-     */
-    public function products()
+    protected $hidden = [];
+
+    protected static function newFactory()
     {
-        return $this->hasMany(Product::class);
+        return \Database\Factories\BrandFactory::new();
     }
 
     /**
-     * Scope active brands.
+     * Get products for this brand
      */
-    public function scopeActive($query)
+    public function products(): HasMany
     {
-        return $query->where('is_active', true);
+        return $this->hasMany(Product::class);
     }
 }
