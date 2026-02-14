@@ -1,26 +1,26 @@
 {
-    "$schema": "https://www.schemastore.org/package.json",
-    "private": true,
-    "type": "module",
-    "scripts": {
-        "build": "vite build",
-        "dev": "vite"
-    },
-    "devDependencies": {
-        "@tailwindcss/vite": "^4.0.0",
-        "autoprefixer": "^10.4.23",
-        "axios": "^1.13.4",
-        "concurrently": "^9.0.1",
-        "laravel-vite-plugin": "^2.0.0",
-        "postcss": "^8.5.6",
-        "tailwindcss": "^3.4.19",
-        "vite": "^7.0.7"
-    },
-    "dependencies": {
-        "@vitejs/plugin-vue": "^6.0.3",
-        "pinia": "^3.0.4",
-        "vue": "^3.5.27",
-        "vue-i18n": "^10.0.8",
-        "vue-router": "^4.6.4"
-    }
+  "name": "autoerp",
+  "version": "1.0.0",
+  "description": "Act as a Full-Stack Engineer and Principal Systems Architect to review, reconcile, and implement all provided requirements without omission into a single, production-ready, ERP-grade modular SaaS platform using Laravel (backend) and Vue.js with Vite (frontend), optionally leveraging Tailwind CSS and AdminLTE, strictly enforcing Clean Architecture, Modular Architecture, Controller → Service → Repository, and SOLID, DRY, KISS principles to ensure scalability, performance, testability, and minimal technical debt; design a secure, tenant-aware foundation with strict multi-tenancy and isolation, multi-vendor, multi-branch, multi-language (i18n), multi-currency, multi-unit, and fine-grained RBAC/ABAC with tenant-aware authentication, policies, and global scopes; fully implement and integrate all core, ERP, and cross-cutting modules including IAM, tenants and subscriptions, organizations, users, roles and permissions, configuration and master data, CRM, customers and vehicles with centralized cross-branch histories, appointments and scheduling, job cards and workflows, inventory using an append-only stock ledger with SKU/variant modeling, batch/lot and expiry tracking (FIFO/FEFO), multiple price lists and pricing rules, procurement, POS, invoicing, payments and taxation, fleet and preventive maintenance, manufacturing and warehouse operations, reporting, analytics and KPI dashboards, notifications, integrations, logging, auditing, and system administration; enforce service-layer-only orchestration with explicit transactional boundaries guaranteeing atomicity, idempotency, consistent exception propagation, and rollback safety, complemented by event-driven workflows for asynchronous processes without compromising transactional consistency; expose clean, versioned REST APIs, support bulk operations via CSV and APIs, apply enterprise-grade SaaS security (HTTPS, encryption at rest, validation, rate limiting, structured logging, immutable audits), rely only on native framework features or stable LTS libraries, and deliver a fully scaffolded, LTS-ready solution with migrations, seeders, models, repositories, DTOs, services, controllers, middleware, policies, events, background jobs, Swagger/OpenAPI documentation, and a modular, scalable Vue frontend with routing, state management, localization, permission-aware UI composition, reusable components, and responsive, accessible layouts.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.3",
+    "autoprefixer": "^10.4.24",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.18",
+    "vite": "^7.3.1",
+    "vue": "^3.5.27"
+  },
+  "dependencies": {
+    "axios": "^1.13.4",
+    "pinia": "^3.0.4",
+    "vue-i18n": "^11.2.8",
+    "vue-router": "^5.0.1"
+  }
 }

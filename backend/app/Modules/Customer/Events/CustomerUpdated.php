@@ -1,0 +1,17 @@
+<?php
+
+namespace App\Modules\Customer\Events;
+
+use App\Modules\Customer\Models\Customer;
+use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Foundation\Events\Dispatchable;
+use Illuminate\Queue\SerializesModels;
+
+class CustomerUpdated
+{
+    use Dispatchable, InteractsWithSockets, SerializesModels;
+
+    public function __construct(
+        public Customer $customer
+    ) {}
+}

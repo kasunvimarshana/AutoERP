@@ -1,0 +1,132 @@
+{
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "create": "Crear",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "export": "Exportar",
+    "import": "Importar",
+    "yes": "Sí",
+    "no": "No",
+    "loading": "Cargando...",
+    "noData": "No hay datos disponibles",
+    "error": "Ocurrió un error",
+    "success": "Operación exitosa",
+    "confirm": "Confirmar",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "previous": "Anterior"
+  },
+  "auth": {
+    "login": "Iniciar Sesión",
+    "logout": "Cerrar Sesión",
+    "register": "Registrarse",
+    "email": "Correo Electrónico",
+    "password": "Contraseña",
+    "confirmPassword": "Confirmar Contraseña",
+    "forgotPassword": "¿Olvidaste tu Contraseña?",
+    "resetPassword": "Restablecer Contraseña",
+    "welcomeBack": "Bienvenido de Nuevo",
+    "loginSubtitle": "Inicia sesión en tu cuenta para continuar"
+  },
+  "dashboard": {
+    "title": "Panel",
+    "overview": "Resumen",
+    "statistics": "Estadísticas",
+    "recentActivity": "Actividad Reciente"
+  },
+  "tenant": {
+    "title": "Inquilinos",
+    "create": "Crear Inquilino",
+    "edit": "Editar Inquilino",
+    "name": "Nombre del Inquilino",
+    "domain": "Dominio",
+    "status": "Estado",
+    "plan": "Plan"
+  },
+  "user": {
+    "title": "Usuarios",
+    "create": "Crear Usuario",
+    "edit": "Editar Usuario",
+    "name": "Nombre",
+    "email": "Correo Electrónico",
+    "role": "Rol",
+    "status": "Estado"
+  },
+  "customer": {
+    "title": "Clientes",
+    "create": "Crear Cliente",
+    "edit": "Editar Cliente",
+    "name": "Nombre del Cliente",
+    "email": "Correo Electrónico",
+    "phone": "Teléfono",
+    "address": "Dirección"
+  },
+  "vehicle": {
+    "title": "Vehículos",
+    "create": "Crear Vehículo",
+    "edit": "Editar Vehículo",
+    "make": "Marca",
+    "model": "Modelo",
+    "year": "Año",
+    "vin": "VIN",
+    "licensePlate": "Placa"
+  },
+  "inventory": {
+    "title": "Inventario",
+    "create": "Agregar Artículo",
+    "edit": "Editar Artículo",
+    "item": "Artículo",
+    "quantity": "Cantidad",
+    "location": "Ubicación",
+    "status": "Estado"
+  },
+  "product": {
+    "title": "Productos",
+    "create": "Crear Producto",
+    "edit": "Editar Producto",
+    "name": "Nombre del Producto",
+    "sku": "SKU",
+    "price": "Precio",
+    "category": "Categoría"
+  },
+  "order": {
+    "title": "Pedidos",
+    "create": "Crear Pedido",
+    "edit": "Editar Pedido",
+    "orderNumber": "Número de Pedido",
+    "customer": "Cliente",
+    "status": "Estado",
+    "total": "Total"
+  },
+  "invoice": {
+    "title": "Facturas",
+    "create": "Crear Factura",
+    "edit": "Editar Factura",
+    "invoiceNumber": "Número de Factura",
+    "date": "Fecha",
+    "dueDate": "Fecha de Vencimiento",
+    "amount": "Monto",
+    "status": "Estado"
+  },
+  "payment": {
+    "title": "Pagos",
+    "create": "Registrar Pago",
+    "edit": "Editar Pago",
+    "amount": "Monto",
+    "date": "Fecha",
+    "method": "Método de Pago",
+    "status": "Estado"
+  },
+  "reports": {
+    "title": "Reportes",
+    "sales": "Reporte de Ventas",
+    "inventory": "Reporte de Inventario",
+    "financial": "Reporte Financiero",
+    "generate": "Generar Reporte",
+    "dateRange": "Rango de Fechas"
+  }
+}

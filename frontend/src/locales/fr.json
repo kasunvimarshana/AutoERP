@@ -1,0 +1,132 @@
+{
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "create": "Créer",
+    "search": "Rechercher",
+    "filter": "Filtrer",
+    "export": "Exporter",
+    "import": "Importer",
+    "yes": "Oui",
+    "no": "Non",
+    "loading": "Chargement...",
+    "noData": "Aucune donnée disponible",
+    "error": "Une erreur s'est produite",
+    "success": "Opération réussie",
+    "confirm": "Confirmer",
+    "back": "Retour",
+    "next": "Suivant",
+    "previous": "Précédent"
+  },
+  "auth": {
+    "login": "Connexion",
+    "logout": "Déconnexion",
+    "register": "S'inscrire",
+    "email": "Email",
+    "password": "Mot de passe",
+    "confirmPassword": "Confirmer le mot de passe",
+    "forgotPassword": "Mot de passe oublié?",
+    "resetPassword": "Réinitialiser le mot de passe",
+    "welcomeBack": "Bon retour",
+    "loginSubtitle": "Connectez-vous à votre compte pour continuer"
+  },
+  "dashboard": {
+    "title": "Tableau de bord",
+    "overview": "Vue d'ensemble",
+    "statistics": "Statistiques",
+    "recentActivity": "Activité récente"
+  },
+  "tenant": {
+    "title": "Locataires",
+    "create": "Créer un locataire",
+    "edit": "Modifier le locataire",
+    "name": "Nom du locataire",
+    "domain": "Domaine",
+    "status": "Statut",
+    "plan": "Plan"
+  },
+  "user": {
+    "title": "Utilisateurs",
+    "create": "Créer un utilisateur",
+    "edit": "Modifier l'utilisateur",
+    "name": "Nom",
+    "email": "Email",
+    "role": "Rôle",
+    "status": "Statut"
+  },
+  "customer": {
+    "title": "Clients",
+    "create": "Créer un client",
+    "edit": "Modifier le client",
+    "name": "Nom du client",
+    "email": "Email",
+    "phone": "Téléphone",
+    "address": "Adresse"
+  },
+  "vehicle": {
+    "title": "Véhicules",
+    "create": "Créer un véhicule",
+    "edit": "Modifier le véhicule",
+    "make": "Marque",
+    "model": "Modèle",
+    "year": "Année",
+    "vin": "NIV",
+    "licensePlate": "Plaque d'immatriculation"
+  },
+  "inventory": {
+    "title": "Inventaire",
+    "create": "Ajouter un article",
+    "edit": "Modifier l'article",
+    "item": "Article",
+    "quantity": "Quantité",
+    "location": "Emplacement",
+    "status": "Statut"
+  },
+  "product": {
+    "title": "Produits",
+    "create": "Créer un produit",
+    "edit": "Modifier le produit",
+    "name": "Nom du produit",
+    "sku": "SKU",
+    "price": "Prix",
+    "category": "Catégorie"
+  },
+  "order": {
+    "title": "Commandes",
+    "create": "Créer une commande",
+    "edit": "Modifier la commande",
+    "orderNumber": "Numéro de commande",
+    "customer": "Client",
+    "status": "Statut",
+    "total": "Total"
+  },
+  "invoice": {
+    "title": "Factures",
+    "create": "Créer une facture",
+    "edit": "Modifier la facture",
+    "invoiceNumber": "Numéro de facture",
+    "date": "Date",
+    "dueDate": "Date d'échéance",
+    "amount": "Montant",
+    "status": "Statut"
+  },
+  "payment": {
+    "title": "Paiements",
+    "create": "Enregistrer un paiement",
+    "edit": "Modifier le paiement",
+    "amount": "Montant",
+    "date": "Date",
+    "method": "Méthode de paiement",
+    "status": "Statut"
+  },
+  "reports": {
+    "title": "Rapports",
+    "sales": "Rapport des ventes",
+    "inventory": "Rapport d'inventaire",
+    "financial": "Rapport financier",
+    "generate": "Générer un rapport",
+    "dateRange": "Plage de dates"
+  }
+}

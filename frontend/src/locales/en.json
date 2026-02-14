@@ -1,0 +1,132 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "filter": "Filter",
+    "export": "Export",
+    "import": "Import",
+    "yes": "Yes",
+    "no": "No",
+    "loading": "Loading...",
+    "noData": "No data available",
+    "error": "An error occurred",
+    "success": "Operation successful",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous"
+  },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout",
+    "register": "Register",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "forgotPassword": "Forgot Password?",
+    "resetPassword": "Reset Password",
+    "welcomeBack": "Welcome Back",
+    "loginSubtitle": "Sign in to your account to continue"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "overview": "Overview",
+    "statistics": "Statistics",
+    "recentActivity": "Recent Activity"
+  },
+  "tenant": {
+    "title": "Tenants",
+    "create": "Create Tenant",
+    "edit": "Edit Tenant",
+    "name": "Tenant Name",
+    "domain": "Domain",
+    "status": "Status",
+    "plan": "Plan"
+  },
+  "user": {
+    "title": "Users",
+    "create": "Create User",
+    "edit": "Edit User",
+    "name": "Name",
+    "email": "Email",
+    "role": "Role",
+    "status": "Status"
+  },
+  "customer": {
+    "title": "Customers",
+    "create": "Create Customer",
+    "edit": "Edit Customer",
+    "name": "Customer Name",
+    "email": "Email",
+    "phone": "Phone",
+    "address": "Address"
+  },
+  "vehicle": {
+    "title": "Vehicles",
+    "create": "Create Vehicle",
+    "edit": "Edit Vehicle",
+    "make": "Make",
+    "model": "Model",
+    "year": "Year",
+    "vin": "VIN",
+    "licensePlate": "License Plate"
+  },
+  "inventory": {
+    "title": "Inventory",
+    "create": "Add Item",
+    "edit": "Edit Item",
+    "item": "Item",
+    "quantity": "Quantity",
+    "location": "Location",
+    "status": "Status"
+  },
+  "product": {
+    "title": "Products",
+    "create": "Create Product",
+    "edit": "Edit Product",
+    "name": "Product Name",
+    "sku": "SKU",
+    "price": "Price",
+    "category": "Category"
+  },
+  "order": {
+    "title": "Orders",
+    "create": "Create Order",
+    "edit": "Edit Order",
+    "orderNumber": "Order Number",
+    "customer": "Customer",
+    "status": "Status",
+    "total": "Total"
+  },
+  "invoice": {
+    "title": "Invoices",
+    "create": "Create Invoice",
+    "edit": "Edit Invoice",
+    "invoiceNumber": "Invoice Number",
+    "date": "Date",
+    "dueDate": "Due Date",
+    "amount": "Amount",
+    "status": "Status"
+  },
+  "payment": {
+    "title": "Payments",
+    "create": "Record Payment",
+    "edit": "Edit Payment",
+    "amount": "Amount",
+    "date": "Date",
+    "method": "Payment Method",
+    "status": "Status"
+  },
+  "reports": {
+    "title": "Reports",
+    "sales": "Sales Report",
+    "inventory": "Inventory Report",
+    "financial": "Financial Report",
+    "generate": "Generate Report",
+    "dateRange": "Date Range"
+  }
+}
