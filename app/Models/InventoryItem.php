@@ -2,65 +2,67 @@
 
 namespace App\Models;
 
-/**
- * InventoryItem Model
- * 
- * Tracks individual inventory items and stock levels.
- *
- * @property int $id
- * @property int $tenant_id
- * @property int $product_id
- * @property int $location_id
- * @property int $quantity
- * @property string|null $batch_number
- * @property \Illuminate\Support\Carbon|null $expiry_date
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
- * @property \Illuminate\Support\Carbon|null $deleted_at
- */
-class InventoryItem extends BaseModel
-{
-    /**
-     * The table associated with the model
-     */
-    protected $table = 'inventory_items';
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
-    /**
-     * The attributes that are mass assignable
-     */
+class InventoryItem extends Model
+{
+    use HasFactory;
+
     protected $fillable = [
         'tenant_id',
         'product_id',
-        'location_id',
-        'quantity',
+        'branch_id',
         'batch_number',
+        'quantity',
+        'reserved_quantity',
+        'available_quantity',
+        'reorder_level',
+        'reorder_quantity',
+        'location',
         'expiry_date',
     ];
 
-    /**
-     * The attributes that should be cast
-     */
     protected $casts = [
-        'quantity' => 'integer',
+        'quantity' => 'decimal:2',
+        'reserved_quantity' => 'decimal:2',
+        'available_quantity' => 'decimal:2',
+        'reorder_level' => 'decimal:2',
+        'reorder_quantity' => 'decimal:2',
         'expiry_date' => 'date',
-        'tenant_id' => 'integer',
-        'product_id' => 'integer',
-        'location_id' => 'integer',
     ];
 
-    /**
-     * Get the product that owns this inventory item
-     */
+    protected static function booted(): void
+    {
+        static::addGlobalScope('tenant', function ($builder) {
+            if (auth()->check() && auth()->user()->tenant_id) {
+                $builder->where('tenant_id', auth()->user()->tenant_id);
+            }
+        });
+        
+        // Auto-calculate available quantity
+        static::saving(function ($item) {
+            $item->available_quantity = $item->quantity - $item->reserved_quantity;
+        });
+    }
+
+    public function tenant()
+    {
+        return $this->belongsTo(Tenant::class);
+    }
+
     public function product()
     {
         return $this->belongsTo(Product::class);
     }
 
-    /**
-     * Scope to filter by low stock
-     */
-    public function scopeLowStock($query, int $threshold = 10)
+    public function branch()
     {
-        return $query->where('quantity', '<=', $threshold);
+        return $this->belongsTo(Branch::class);
+    }
+
+    public function movements()
+    {
+        return $this->hasMany(InventoryMovement::class);
     }
 }

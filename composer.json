@@ -1,31 +1,35 @@
 {
-    "name": "autoerp/autoerp",
+    "name": "autoerp/erp",
+    "description": "Production-ready ERP-grade SaaS platform",
     "type": "project",
-    "description": "Enterprise-grade modular ERP SaaS platform with multi-tenancy, clean architecture, and comprehensive business modules",
-    "keywords": ["laravel", "erp", "saas", "multi-tenant", "vue", "crm", "inventory", "pos"],
     "license": "MIT",
+    "authors": [
+        {
+            "name": "AutoERP Team",
+            "email": "team@autoerp.local"
+        }
+    ],
     "require": {
-        "php": "^8.3",
-        "laravel/framework": "^11.0",
-        "laravel/sanctum": "^4.0",
-        "laravel/tinker": "^2.9",
-        "spatie/laravel-permission": "^6.0",
-        "spatie/laravel-activitylog": "^4.8",
-        "darkaonline/l5-swagger": "^8.6",
-        "predis/predis": "^2.2"
+        "php": "^8.1",
+        "laravel/framework": "^10.0",
+        "laravel/sanctum": "^3.3",
+        "laravel/tinker": "^2.8",
+        "spatie/laravel-permission": "^5.11",
+        "darkaonline/l5-swagger": "^8.5"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
         "laravel/pint": "^1.13",
         "laravel/sail": "^1.26",
         "mockery/mockery": "^1.6",
-        "nunomaduro/collision": "^8.0",
-        "phpunit/phpunit": "^11.0",
-        "larastan/larastan": "^2.0"
+        "nunomaduro/collision": "^7.10",
+        "phpunit/phpunit": "^10.5",
+        "spatie/laravel-ignition": "^2.4"
     },
     "autoload": {
         "psr-4": {
             "App\\": "app/",
+            "Modules\\": "Modules/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
         }
@@ -47,21 +51,7 @@
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
         ],
         "post-create-project-cmd": [
-            "@php artisan key:generate --ansi",
-            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
-            "@php artisan migrate --graceful --ansi"
-        ],
-        "test": [
-            "@php artisan test"
-        ],
-        "test-coverage": [
-            "@php artisan test --coverage"
-        ],
-        "analyse": [
-            "vendor/bin/phpstan analyse"
-        ],
-        "format": [
-            "vendor/bin/pint"
+            "@php artisan key:generate --ansi"
         ]
     },
     "extra": {

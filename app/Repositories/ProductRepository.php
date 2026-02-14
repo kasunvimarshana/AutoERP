@@ -3,105 +3,38 @@
 namespace App\Repositories;
 
 use App\Models\Product;
-use Illuminate\Database\Eloquent\Collection;
 
-/**
- * Product Repository
- * 
- * Handles data access for Product model.
- * Demonstrates how to extend BaseRepository with custom methods.
- */
-class ProductRepository extends BaseRepository
+class ProductRepository
 {
-    /**
-     * Constructor
-     *
-     * @param Product $model
-     */
-    public function __construct(Product $model)
+    public function all()
     {
-        parent::__construct($model);
+        return Product::with(['parentProduct', 'variants', 'inventoryItems'])->get();
     }
 
-    /**
-     * Find product by SKU
-     *
-     * @param string $sku
-     * @return Product|null
-     */
-    public function findBySku(string $sku): ?Product
+    public function find($id)
     {
-        return $this->model->where('sku', $sku)->first();
+        return Product::with(['parentProduct', 'variants', 'inventoryItems'])->findOrFail($id);
     }
 
-    /**
-     * Find product by SKU or fail
-     *
-     * @param string $sku
-     * @return Product
-     * @throws \Illuminate\Database\Eloquent\ModelNotFoundException
-     */
-    public function findBySkuOrFail(string $sku): Product
+    public function findBySku($sku)
     {
-        return $this->model->where('sku', $sku)->firstOrFail();
+        return Product::where('sku', $sku)->firstOrFail();
     }
 
-    /**
-     * Get active products
-     *
-     * @param array $config
-     * @return Collection
-     */
-    public function getActive(array $config = []): Collection
+    public function create(array $data)
     {
-        $this->resetQuery();
-        $this->query->where('status', 'active');
-        $this->applyConfig($config);
-        
-        return $this->query->get();
+        return Product::create($data);
     }
 
-    /**
-     * Get products by category
-     *
-     * @param int $categoryId
-     * @param array $config
-     * @return Collection
-     */
-    public function getByCategory(int $categoryId, array $config = []): Collection
+    public function update($id, array $data)
     {
-        $this->resetQuery();
-        $this->query->where('category_id', $categoryId);
-        $this->applyConfig($config);
-        
-        return $this->query->get();
+        $product = $this->find($id);
+        $product->update($data);
+        return $product;
     }
 
-    /**
-     * Get low stock products
-     *
-     * @param int $threshold
-     * @return Collection
-     */
-    public function getLowStock(int $threshold = 10): Collection
+    public function delete($id)
     {
-        return $this->model
-            ->whereHas('inventoryItems', function ($query) use ($threshold) {
-                $query->where('quantity', '<=', $threshold);
-            })
-            ->with('inventoryItems')
-            ->get();
-    }
-
-    /**
-     * Check if SKU exists
-     *
-     * @param string $sku
-     * @param int|null $excludeId
-     * @return bool
-     */
-    public function skuExists(string $sku, ?int $excludeId = null): bool
-    {
-        return $this->exists('sku', $sku, $excludeId);
+        return Product::destroy($id);
     }
 }

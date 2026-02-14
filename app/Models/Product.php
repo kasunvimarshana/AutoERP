@@ -2,83 +2,67 @@
 
 namespace App\Models;
 
-/**
- * Product Model
- * 
- * Example model demonstrating the CRUD framework usage.
- * Products support multi-tenancy, variants, and inventory tracking.
- *
- * @property int $id
- * @property int $tenant_id
- * @property string $name
- * @property string $sku
- * @property string|null $description
- * @property float $price
- * @property string $status
- * @property int|null $category_id
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
- * @property \Illuminate\Support\Carbon|null $deleted_at
- */
-class Product extends BaseModel
-{
-    /**
-     * The table associated with the model
-     */
-    protected $table = 'products';
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
-    /**
-     * The attributes that are mass assignable
-     */
+class Product extends Model
+{
+    use HasFactory, SoftDeletes;
+
     protected $fillable = [
         'tenant_id',
-        'name',
         'sku',
+        'name',
         'description',
-        'price',
-        'status',
-        'category_id',
+        'category',
+        'brand',
+        'unit_of_measure',
+        'cost_price',
+        'selling_price',
+        'tax_rate',
+        'barcode',
+        'attributes',
+        'is_active',
+        'is_variant',
+        'parent_product_id',
     ];
 
-    /**
-     * The attributes that should be cast
-     */
     protected $casts = [
-        'price' => 'decimal:2',
-        'status' => 'string',
-        'tenant_id' => 'integer',
-        'category_id' => 'integer',
+        'attributes' => 'array',
+        'cost_price' => 'decimal:2',
+        'selling_price' => 'decimal:2',
+        'tax_rate' => 'decimal:2',
+        'is_active' => 'boolean',
+        'is_variant' => 'boolean',
     ];
 
-    /**
-     * Get the category that owns the product
-     */
-    public function category()
+    protected static function booted(): void
     {
-        return $this->belongsTo(Category::class);
+        static::addGlobalScope('tenant', function ($builder) {
+            if (auth()->check() && auth()->user()->tenant_id) {
+                $builder->where('tenant_id', auth()->user()->tenant_id);
+            }
+        });
     }
 
-    /**
-     * Get the inventory records for the product
-     */
+    public function tenant()
+    {
+        return $this->belongsTo(Tenant::class);
+    }
+
+    public function parentProduct()
+    {
+        return $this->belongsTo(Product::class, 'parent_product_id');
+    }
+
+    public function variants()
+    {
+        return $this->hasMany(Product::class, 'parent_product_id');
+    }
+
     public function inventoryItems()
     {
         return $this->hasMany(InventoryItem::class);
-    }
-
-    /**
-     * Scope to filter active products
-     */
-    public function scopeActive($query)
-    {
-        return $query->where('status', 'active');
-    }
-
-    /**
-     * Scope to filter by category
-     */
-    public function scopeOfCategory($query, int $categoryId)
-    {
-        return $query->where('category_id', $categoryId);
     }
 }

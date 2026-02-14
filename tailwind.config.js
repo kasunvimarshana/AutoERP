@@ -1,8 +1,8 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
-    './resources/**/*.blade.php',
-    './resources/js/**/*.{vue,js,ts,jsx,tsx}',
+    "./index.html",
+    "./resources/**/*.{vue,js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {
@@ -18,7 +18,6 @@ export default {
           700: '#1d4ed8',
           800: '#1e40af',
           900: '#1e3a8a',
-          950: '#172554',
         },
       },
     },
