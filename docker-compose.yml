@@ -1,93 +1,176 @@
 version: '3.8'
 
 services:
+  # Laravel Application
   app:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
-    container_name: autoerp-app
+    container_name: erp_app
     restart: unless-stopped
     working_dir: /var/www
     volumes:
-      - ./:/var/www
-      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+      - ./backend:/var/www
+      - ./backend/storage:/var/www/storage
     networks:
-      - autoerp-network
+      - erp_network
+    environment:
+      - DB_HOST=postgres
+      - DB_DATABASE=autoerp
+      - DB_USERNAME=erp_user
+      - DB_PASSWORD=erp_password
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     depends_on:
-      - db
+      - postgres
       - redis
 
+  # Nginx Web Server
   nginx:
     image: nginx:alpine
-    container_name: autoerp-nginx
+    container_name: erp_nginx
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "8000:80"
     volumes:
-      - ./:/var/www
+      - ./backend:/var/www
       - ./docker/nginx/conf.d:/etc/nginx/conf.d
     networks:
-      - autoerp-network
+      - erp_network
     depends_on:
       - app
 
-  db:
-    image: postgres:15-alpine
-    container_name: autoerp-db
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: erp_postgres
     restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${DB_DATABASE:-autoerp}
-      POSTGRES_USER: ${DB_USERNAME:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
-    volumes:
-      - dbdata:/var/lib/postgresql/data
-    networks:
-      - autoerp-network
     ports:
       - "5432:5432"
+    environment:
+      - POSTGRES_DB=autoerp
+      - POSTGRES_USER=erp_user
+      - POSTGRES_PASSWORD=erp_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - erp_network
 
+  # Redis Cache & Queue
   redis:
     image: redis:7-alpine
-    container_name: autoerp-redis
+    container_name: erp_redis
     restart: unless-stopped
     ports:
       - "6379:6379"
-    networks:
-      - autoerp-network
     volumes:
-      - redisdata:/data
+      - redis_data:/data
+    networks:
+      - erp_network
+    command: redis-server --appendonly yes
 
+  # Laravel Queue Worker
   queue:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
-    container_name: autoerp-queue
+    container_name: erp_queue
     restart: unless-stopped
-    command: php artisan queue:work --tries=3
     working_dir: /var/www
     volumes:
-      - ./:/var/www
+      - ./backend:/var/www
     networks:
-      - autoerp-network
+      - erp_network
+    environment:
+      - DB_HOST=postgres
+      - DB_DATABASE=autoerp
+      - DB_USERNAME=erp_user
+      - DB_PASSWORD=erp_password
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     depends_on:
-      - db
+      - app
       - redis
+    command: php artisan queue:work --sleep=3 --tries=3 --max-time=3600
 
+  # Laravel Scheduler
+  scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: erp_scheduler
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./backend:/var/www
+    networks:
+      - erp_network
+    environment:
+      - DB_HOST=postgres
+      - DB_DATABASE=autoerp
+      - DB_USERNAME=erp_user
+      - DB_PASSWORD=erp_password
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - app
+    command: sh -c "while true; do php artisan schedule:run --verbose --no-interaction & sleep 60; done"
+
+  # Vue.js Frontend (Development)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: erp_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - erp_network
+    environment:
+      - VITE_API_URL=http://localhost:8000/api
+      - VITE_API_VERSION=v1
+    depends_on:
+      - nginx
+
+  # Meilisearch (Optional)
+  meilisearch:
+    image: getmeili/meilisearch:v1.5
+    container_name: erp_meilisearch
+    restart: unless-stopped
+    ports:
+      - "7700:7700"
+    volumes:
+      - meilisearch_data:/meili_data
+    networks:
+      - erp_network
+    environment:
+      - MEILI_ENV=development
+      - MEILI_MASTER_KEY=masterKey
+
+  # MailHog (Email Testing)
   mailhog:
     image: mailhog/mailhog:latest
-    container_name: autoerp-mailhog
+    container_name: erp_mailhog
+    restart: unless-stopped
     ports:
-      - "1025:1025"
-      - "8025:8025"
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
     networks:
-      - autoerp-network
+      - erp_network
 
 networks:
-  autoerp-network:
+  erp_network:
     driver: bridge
 
 volumes:
-  dbdata:
+  postgres_data:
     driver: local
-  redisdata:
+  redis_data:
+    driver: local
+  meilisearch_data:
     driver: local
