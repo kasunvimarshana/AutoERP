@@ -1,28 +1,21 @@
 <?php
 
-namespace App\Http\Controllers\API;
+namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller as BaseController;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 
-/**
- * Base API Controller
- * 
- * All API controllers should extend this base controller.
- * Provides consistent response formatting and common methods.
- */
-abstract class APIController extends BaseController
+class ApiController extends Controller
 {
     /**
      * Success response
-     *
-     * @param mixed $data
-     * @param string $message
-     * @param int $statusCode
-     * @return JsonResponse
      */
-    protected function successResponse($data, string $message = 'Success', int $statusCode = 200): JsonResponse
-    {
+    protected function successResponse(
+        $data = null,
+        string $message = 'Success',
+        int $statusCode = Response::HTTP_OK
+    ): JsonResponse {
         return response()->json([
             'success' => true,
             'message' => $message,
@@ -32,90 +25,117 @@ abstract class APIController extends BaseController
 
     /**
      * Error response
-     *
-     * @param string $message
-     * @param int $statusCode
-     * @param array $errors
-     * @return JsonResponse
      */
-    protected function errorResponse(string $message = 'Error', int $statusCode = 400, array $errors = []): JsonResponse
-    {
-        $response = [
+    protected function errorResponse(
+        string $message = 'Error',
+        $errors = null,
+        int $statusCode = Response::HTTP_BAD_REQUEST
+    ): JsonResponse {
+        return response()->json([
             'success' => false,
             'message' => $message,
-        ];
-
-        if (!empty($errors)) {
-            $response['errors'] = $errors;
-        }
-
-        return response()->json($response, $statusCode);
+            'errors' => $errors,
+        ], $statusCode);
     }
 
     /**
-     * Not found response
-     *
-     * @param string $message
-     * @return JsonResponse
+     * Paginated response
      */
-    protected function notFoundResponse(string $message = 'Resource not found'): JsonResponse
-    {
-        return $this->errorResponse($message, 404);
+    protected function paginatedResponse(
+        $paginator,
+        string $message = 'Success'
+    ): JsonResponse {
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'data' => $paginator->items(),
+            'pagination' => [
+                'total' => $paginator->total(),
+                'per_page' => $paginator->perPage(),
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'from' => $paginator->firstItem(),
+                'to' => $paginator->lastItem(),
+            ],
+        ]);
     }
 
     /**
-     * Unauthorized response
-     *
-     * @param string $message
-     * @return JsonResponse
+     * Resource response
      */
-    protected function unauthorizedResponse(string $message = 'Unauthorized'): JsonResponse
-    {
-        return $this->errorResponse($message, 401);
-    }
-
-    /**
-     * Forbidden response
-     *
-     * @param string $message
-     * @return JsonResponse
-     */
-    protected function forbiddenResponse(string $message = 'Forbidden'): JsonResponse
-    {
-        return $this->errorResponse($message, 403);
-    }
-
-    /**
-     * Validation error response
-     *
-     * @param array $errors
-     * @param string $message
-     * @return JsonResponse
-     */
-    protected function validationErrorResponse(array $errors, string $message = 'Validation failed'): JsonResponse
-    {
-        return $this->errorResponse($message, 422, $errors);
+    protected function resourceResponse(
+        $resource,
+        string $message = 'Success',
+        int $statusCode = Response::HTTP_OK
+    ): JsonResponse {
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'data' => $resource,
+        ], $statusCode);
     }
 
     /**
      * Created response
-     *
-     * @param mixed $data
-     * @param string $message
-     * @return JsonResponse
      */
-    protected function createdResponse($data, string $message = 'Resource created successfully'): JsonResponse
-    {
-        return $this->successResponse($data, $message, 201);
+    protected function createdResponse(
+        $data = null,
+        string $message = 'Resource created successfully'
+    ): JsonResponse {
+        return $this->successResponse($data, $message, Response::HTTP_CREATED);
     }
 
     /**
      * No content response
-     *
-     * @return JsonResponse
      */
-    protected function noContentResponse(): JsonResponse
+    protected function noContentResponse(): Response
     {
-        return response()->json(null, 204);
+        return response()->noContent();
+    }
+
+    /**
+     * Unauthorized response
+     */
+    protected function unauthorizedResponse(
+        string $message = 'Unauthorized'
+    ): JsonResponse {
+        return $this->errorResponse($message, null, Response::HTTP_UNAUTHORIZED);
+    }
+
+    /**
+     * Forbidden response
+     */
+    protected function forbiddenResponse(
+        string $message = 'Forbidden'
+    ): JsonResponse {
+        return $this->errorResponse($message, null, Response::HTTP_FORBIDDEN);
+    }
+
+    /**
+     * Not found response
+     */
+    protected function notFoundResponse(
+        string $message = 'Resource not found'
+    ): JsonResponse {
+        return $this->errorResponse($message, null, Response::HTTP_NOT_FOUND);
+    }
+
+    /**
+     * Validation error response
+     */
+    protected function validationErrorResponse(
+        $errors,
+        string $message = 'Validation failed'
+    ): JsonResponse {
+        return $this->errorResponse($message, $errors, Response::HTTP_UNPROCESSABLE_ENTITY);
+    }
+
+    /**
+     * Internal server error response
+     */
+    protected function serverErrorResponse(
+        string $message = 'Internal server error'
+    ): JsonResponse {
+        return $this->errorResponse($message, null, Response::HTTP_INTERNAL_SERVER_ERROR);
     }
 }

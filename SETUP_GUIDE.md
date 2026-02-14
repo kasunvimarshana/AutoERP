@@ -1,170 +1,312 @@
-## IDE Setup
+# AutoERP: Setup and Installation Guide
 
-### VS Code Extensions
+## Prerequisites
+- PHP 8.2 or higher
+- Composer 2.x
+- MySQL 8.0+ or PostgreSQL 13+
+- Node.js 18+ and npm (for frontend)
+- Redis (recommended for caching and queues)
 
-Install the following extensions:
+## Backend Setup
 
-- PHP Intelephense
-- Laravel Extra Intellisense
-- Laravel Blade Snippets
-- Volar (Vue Language Features)
-- TypeScript Vue Plugin (Volar)
-- ESLint
-- Prettier - Code formatter
-- Tailwind CSS IntelliSense
-- GitLens
-- Docker
-
-### VS Code Settings
-
-```json
-{
-  "editor.formatOnSave": true,
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
-  "[php]": {
-    "editor.defaultFormatter": "bmewburn.vscode-intelephense-client"
-  },
-  "php.suggest.basic": false,
-  "intelephense.files.maxSize": 5000000,
-  "typescript.tsdk": "frontend/node_modules/typescript/lib"
-}
+### 1. Clone the Repository
+```bash
+git clone https://github.com/kasunvimarshana/AutoERP.git
+cd AutoERP
 ```
 
-### PHPStorm Configuration
-
-1. Enable Laravel plugin
-2. Configure PHP interpreter (PHP 8.3+)
-3. Configure Composer
-4. Configure Node.js and npm
-5. Enable Tailwind CSS support
-6. Configure Vue.js support
-
----
-
-## Troubleshooting
-
-### Common Issues
-
-#### 1. Composer Install Fails
-
+### 2. Install Backend Dependencies
 ```bash
-# Clear composer cache
-composer clear-cache
-
-# Update composer
-composer self-update
-
-# Try install again
-composer install --ignore-platform-reqs
+cd backend
+composer install
 ```
 
-#### 2. Migration Errors
-
+### 3. Configure Environment
 ```bash
-# Reset database
-php artisan migrate:fresh
+cp .env.example .env
+php artisan key:generate
+```
 
-# Rollback and re-migrate
-php artisan migrate:rollback
+Edit `.env` file with your database credentials:
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=autoerp
+DB_USERNAME=your_username
+DB_PASSWORD=your_password
+```
+
+### 4. Run Migrations
+```bash
 php artisan migrate
 ```
 
-#### 3. Permission Errors
-
+### 5. Seed Initial Data (Optional)
 ```bash
-# Fix storage permissions
+php artisan db:seed --class=PermissionSeeder
+php artisan db:seed --class=RoleSeeder
+php artisan db:seed --class=TenantSeeder
+```
+
+### 6. Start Development Server
+```bash
+php artisan serve
+```
+
+The backend API will be available at `http://localhost:8000`
+
+## Database Schema Overview
+
+### Core Tables
+1. **tenants**: Multi-tenant isolation with subscription management
+2. **organizations**: Organizations within tenants (vendors/customers)
+3. **branches**: Physical locations for organizations
+4. **users**: System users with tenant awareness
+5. **roles**: Role definitions for RBAC
+6. **permissions**: System-wide permissions
+7. **role_permission**: Role-permission pivot
+8. **user_role**: User-role pivot
+
+### Inventory Tables
+9. **products**: Product master data
+10. **product_variants**: SKU/variant management
+11. **batches**: Batch/lot/serial tracking
+12. **stock_ledger**: Append-only inventory transactions
+
+### Pricing Tables
+13. **price_lists**: Price list definitions
+14. **price_list_items**: Product-specific pricing
+
+## Architecture Overview
+
+### Clean Architecture Layers
+
+```
+┌─────────────────────────────────────────┐
+│          Controllers (HTTP)              │
+│  - Request validation                    │
+│  - Response formatting                   │
+│  - Thin, no business logic              │
+└──────────────┬──────────────────────────┘
+               │
+┌──────────────▼──────────────────────────┐
+│          Services (Business Logic)       │
+│  - Orchestration                         │
+│  - Transaction management                │
+│  - Business rules                        │
+│  - Cross-cutting concerns                │
+└──────────────┬──────────────────────────┘
+               │
+┌──────────────▼──────────────────────────┐
+│      Repositories (Data Access)          │
+│  - Database queries                      │
+│  - ORM abstraction                       │
+│  - No business logic                     │
+└──────────────┬──────────────────────────┘
+               │
+┌──────────────▼──────────────────────────┐
+│            Models (Entities)             │
+│  - Database mapping                      │
+│  - Relationships                         │
+│  - Accessors/Mutators                    │
+└─────────────────────────────────────────┘
+```
+
+### Module Structure
+
+Each module follows this structure:
+```
+app/Modules/{ModuleName}/
+├── Controllers/      # HTTP controllers
+├── Services/         # Business logic
+├── Repositories/     # Data access
+├── Models/           # Eloquent models
+├── DTOs/             # Data transfer objects
+├── Requests/         # Form requests
+├── Policies/         # Authorization policies
+├── Events/           # Domain events
+├── Listeners/        # Event listeners
+├── Jobs/             # Background jobs
+└── Rules/            # Custom validation rules
+```
+
+## Key Features Implemented
+
+### ✅ Multi-Tenancy
+- Tenant isolation with global scopes
+- Automatic tenant ID injection
+- Support for multi-organization, multi-branch operations
+- Subscription management
+
+### ✅ RBAC/ABAC
+- Role-based access control
+- Permission-based authorization
+- Flexible permission assignment
+- Tenant-aware roles
+
+### ✅ Inventory Management
+- Product and variant tracking
+- Append-only stock ledger (immutable)
+- Batch/lot/serial number tracking
+- FIFO/FEFO support (ready for implementation)
+- Multi-location inventory
+
+### ✅ Pricing Engine
+- Multiple price lists
+- Tiered pricing support
+- Time-based pricing validity
+- Customer-specific pricing (ready)
+
+## API Endpoints (Coming Soon)
+
+### Authentication
+- POST `/api/v1/auth/login`
+- POST `/api/v1/auth/register`
+- POST `/api/v1/auth/logout`
+- GET `/api/v1/auth/me`
+
+### Users
+- GET `/api/v1/users`
+- POST `/api/v1/users`
+- GET `/api/v1/users/{id}`
+- PUT `/api/v1/users/{id}`
+- DELETE `/api/v1/users/{id}`
+
+### Products
+- GET `/api/v1/products`
+- POST `/api/v1/products`
+- GET `/api/v1/products/{id}`
+- PUT `/api/v1/products/{id}`
+- DELETE `/api/v1/products/{id}`
+
+### Stock
+- GET `/api/v1/stock/ledger`
+- POST `/api/v1/stock/adjustment`
+- POST `/api/v1/stock/transfer`
+- GET `/api/v1/stock/balance`
+
+## Testing
+
+### Run All Tests
+```bash
+php artisan test
+```
+
+### Run Specific Test Suite
+```bash
+php artisan test --testsuite=Feature
+php artisan test --testsuite=Unit
+```
+
+### Run with Coverage
+```bash
+php artisan test --coverage
+```
+
+## Deployment
+
+### Production Checklist
+- [ ] Set `APP_ENV=production` in `.env`
+- [ ] Set `APP_DEBUG=false`
+- [ ] Configure proper database credentials
+- [ ] Set up Redis for caching and queues
+- [ ] Configure mail settings
+- [ ] Set up SSL/TLS certificates
+- [ ] Configure CORS settings
+- [ ] Set up proper logging
+- [ ] Configure backup strategy
+- [ ] Set up monitoring and alerts
+- [ ] Run `php artisan config:cache`
+- [ ] Run `php artisan route:cache`
+- [ ] Run `php artisan view:cache`
+
+### Queue Workers
+```bash
+php artisan queue:work --queue=high,default,low
+```
+
+### Scheduler
+Add to crontab:
+```
+* * * * * cd /path-to-your-project && php artisan schedule:run >> /dev/null 2>&1
+```
+
+## Frontend Setup (Coming Soon)
+
+### Install Frontend Dependencies
+```bash
+cd frontend
+npm install
+```
+
+### Run Development Server
+```bash
+npm run dev
+```
+
+### Build for Production
+```bash
+npm run build
+```
+
+## Development Guidelines
+
+### Code Style
+- Follow PSR-12 coding standards
+- Use type hints for all method parameters and return types
+- Write meaningful PHPDoc comments
+- Keep methods small and focused (Single Responsibility Principle)
+
+### Naming Conventions
+- Controllers: `{Resource}Controller` (e.g., `UserController`)
+- Services: `{Resource}Service` (e.g., `UserService`)
+- Repositories: `{Resource}Repository` (e.g., `UserRepository`)
+- Models: Singular form (e.g., `User`, `Product`)
+- Tables: Plural form (e.g., `users`, `products`)
+
+### Commit Messages
+Follow conventional commits:
+```
+feat: Add user authentication
+fix: Resolve stock calculation bug
+docs: Update API documentation
+refactor: Simplify product service
+test: Add unit tests for inventory
+```
+
+## Troubleshooting
+
+### Database Connection Issues
+```bash
+php artisan config:clear
+php artisan cache:clear
+```
+
+### Migration Issues
+```bash
+php artisan migrate:fresh --seed
+```
+
+### Permission Issues
+```bash
 chmod -R 775 storage bootstrap/cache
 chown -R www-data:www-data storage bootstrap/cache
 ```
 
-#### 4. Frontend Build Errors
+## Support & Documentation
 
-```bash
-# Clear node_modules and reinstall
-rm -rf node_modules package-lock.json
-npm install
+- **Documentation**: Coming soon
+- **API Docs**: Will be available at `/api/documentation`
+- **Issues**: [GitHub Issues](https://github.com/kasunvimarshana/AutoERP/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/kasunvimarshana/AutoERP/discussions)
 
-# Clear Vite cache
-rm -rf frontend/.vite
-```
+## License
 
-#### 5. Docker Issues
-
-```bash
-# Rebuild containers
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
-
-# View logs
-docker-compose logs -f app
-
-# Execute command in container
-docker-compose exec app bash
-```
-
-### Database Connection Issues
-
-1. Verify PostgreSQL is running
-2. Check database credentials in .env
-3. Ensure database exists
-4. Check firewall rules
-5. Verify pg_hba.conf settings
-
-### Redis Connection Issues
-
-1. Verify Redis is running: `redis-cli ping`
-2. Check Redis credentials in .env
-3. Verify Redis port is not blocked
-4. Clear Redis cache: `redis-cli FLUSHALL`
+This project is proprietary and confidential.
 
 ---
 
-## Development Workflow
-
-### 1. Create Feature Branch
-
-```bash
-git checkout -b feature/my-feature
-```
-
-### 2. Make Changes
-
-- Write code following coding standards
-- Write tests for new features
-- Update documentation
-
-### 3. Run Tests and Checks
-
-```bash
-# Backend
-php artisan test
-./vendor/bin/phpstan analyse
-./vendor/bin/pint
-
-# Frontend
-npm run test
-npm run lint
-npm run type-check
-```
-
-### 4. Commit Changes
-
-```bash
-git add .
-git commit -m "feat: add new feature"
-```
-
-Follow [Conventional Commits](https://www.conventionalcommits.org/):
-- `feat:` for new features
-- `fix:` for bug fixes
-- `docs:` for documentation
-- `refactor:` for code refactoring
-- `test:` for tests
-- `chore:` for maintenance
-
-### 5. Push and Create Pull Request
-
-```bash
-git push origin feature/my-feature
-```
+**Version**: 0.1.0-alpha  
+**Last Updated**: 2026-02-02  
+**Status**: Active Development
