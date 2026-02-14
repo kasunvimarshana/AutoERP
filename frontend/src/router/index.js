@@ -1,155 +1,164 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '@/modules/auth/store/authStore'
+import { useAuthStore } from '@stores/auth'
 
 const routes = [
   {
-    path: '/auth',
-    component: () => import('@/components/layouts/AuthLayout.vue'),
-    children: [
-      {
-        path: 'login',
-        name: 'Login',
-        component: () => import('@/modules/auth/views/LoginView.vue')
-      },
-      {
-        path: 'register',
-        name: 'Register',
-        component: () => import('@/modules/auth/views/RegisterView.vue')
-      },
-      {
-        path: 'forgot-password',
-        name: 'ForgotPassword',
-        component: () => import('@/modules/auth/views/ForgotPasswordView.vue')
-      }
-    ]
+    path: '/login',
+    name: 'login',
+    component: () => import('@modules/auth/views/LoginView.vue'),
+    meta: { guest: true }
+  },
+  {
+    path: '/register',
+    name: 'register',
+    component: () => import('@modules/auth/views/RegisterView.vue'),
+    meta: { guest: true }
   },
   {
     path: '/',
-    component: () => import('@/components/layouts/DashboardLayout.vue'),
+    component: () => import('@layouts/DashboardLayout.vue'),
     meta: { requiresAuth: true },
     children: [
       {
         path: '',
-        name: 'Dashboard',
-        component: () => import('@/modules/dashboard/views/DashboardView.vue')
+        name: 'dashboard',
+        component: () => import('@/views/DashboardView.vue')
       },
       {
-        path: 'tenants',
-        name: 'Tenants',
-        component: () => import('@/modules/tenant/views/TenantListView.vue')
+        path: 'crm/customers',
+        name: 'customers',
+        component: () => import('@modules/crm/views/CustomerListView.vue')
       },
       {
-        path: 'tenants/:id',
-        name: 'TenantDetail',
-        component: () => import('@/modules/tenant/views/TenantDetailView.vue')
+        path: 'crm/customers/create',
+        name: 'customers-create',
+        component: () => import('@modules/crm/views/CustomerFormView.vue')
       },
       {
-        path: 'users',
-        name: 'Users',
-        component: () => import('@/modules/user/views/UserListView.vue')
+        path: 'crm/customers/:id',
+        name: 'customers-view',
+        component: () => import('@modules/crm/views/CustomerDetailView.vue')
       },
       {
-        path: 'users/:id',
-        name: 'UserDetail',
-        component: () => import('@/modules/user/views/UserDetailView.vue')
+        path: 'crm/customers/:id/edit',
+        name: 'customers-edit',
+        component: () => import('@modules/crm/views/CustomerFormView.vue')
       },
       {
-        path: 'customers',
-        name: 'Customers',
-        component: () => import('@/modules/customer/views/CustomerListView.vue')
+        path: 'crm/contacts',
+        name: 'contacts',
+        component: () => import('@modules/crm/views/ContactListView.vue')
       },
       {
-        path: 'customers/:id',
-        name: 'CustomerDetail',
-        component: () => import('@/modules/customer/views/CustomerDetailView.vue')
+        path: 'crm/contacts/create',
+        name: 'contacts-create',
+        component: () => import('@modules/crm/views/ContactFormView.vue')
       },
       {
-        path: 'vehicles',
-        name: 'Vehicles',
-        component: () => import('@/modules/vehicle/views/VehicleListView.vue')
+        path: 'crm/contacts/:id/edit',
+        name: 'contacts-edit',
+        component: () => import('@modules/crm/views/ContactFormView.vue')
       },
       {
-        path: 'vehicles/:id',
-        name: 'VehicleDetail',
-        component: () => import('@/modules/vehicle/views/VehicleDetailView.vue')
+        path: 'crm/vehicles',
+        name: 'vehicles',
+        component: () => import('@modules/crm/views/VehicleListView.vue')
       },
       {
-        path: 'inventory',
-        name: 'Inventory',
-        component: () => import('@/modules/inventory/views/InventoryListView.vue')
+        path: 'crm/vehicles/create',
+        name: 'vehicles-create',
+        component: () => import('@modules/crm/views/VehicleFormView.vue')
       },
       {
-        path: 'inventory/:id',
-        name: 'InventoryDetail',
-        component: () => import('@/modules/inventory/views/InventoryDetailView.vue')
+        path: 'crm/vehicles/:id/edit',
+        name: 'vehicles-edit',
+        component: () => import('@modules/crm/views/VehicleFormView.vue')
       },
       {
-        path: 'products',
-        name: 'Products',
-        component: () => import('@/modules/product/views/ProductListView.vue')
+        path: 'inventory/products',
+        name: 'products',
+        component: () => import('@modules/inventory/views/ProductListView.vue')
       },
       {
-        path: 'products/:id',
-        name: 'ProductDetail',
-        component: () => import('@/modules/product/views/ProductDetailView.vue')
+        path: 'inventory/products/create',
+        name: 'products-create',
+        component: () => import('@modules/inventory/views/ProductFormView.vue')
       },
       {
-        path: 'orders',
-        name: 'Orders',
-        component: () => import('@/modules/order/views/OrderListView.vue')
+        path: 'inventory/products/:id',
+        name: 'products-view',
+        component: () => import('@modules/inventory/views/ProductDetailView.vue')
       },
       {
-        path: 'orders/:id',
-        name: 'OrderDetail',
-        component: () => import('@/modules/order/views/OrderDetailView.vue')
+        path: 'inventory/products/:id/edit',
+        name: 'products-edit',
+        component: () => import('@modules/inventory/views/ProductFormView.vue')
       },
       {
-        path: 'invoices',
-        name: 'Invoices',
-        component: () => import('@/modules/invoice/views/InvoiceListView.vue')
+        path: 'billing/invoices',
+        name: 'invoices',
+        component: () => import('@modules/billing/views/InvoiceListView.vue')
       },
       {
-        path: 'invoices/:id',
-        name: 'InvoiceDetail',
-        component: () => import('@/modules/invoice/views/InvoiceDetailView.vue')
+        path: 'billing/invoices/create',
+        name: 'invoices-create',
+        component: () => import('@modules/billing/views/InvoiceFormView.vue')
       },
       {
-        path: 'payments',
-        name: 'Payments',
-        component: () => import('@/modules/payment/views/PaymentListView.vue')
+        path: 'billing/invoices/:id',
+        name: 'invoices-view',
+        component: () => import('@modules/billing/views/InvoiceDetailView.vue')
       },
       {
-        path: 'payments/:id',
-        name: 'PaymentDetail',
-        component: () => import('@/modules/payment/views/PaymentDetailView.vue')
+        path: 'billing/invoices/:id/edit',
+        name: 'invoices-edit',
+        component: () => import('@modules/billing/views/InvoiceFormView.vue')
       },
       {
-        path: 'reports',
-        name: 'Reports',
-        component: () => import('@/modules/reports/views/ReportsView.vue')
+        path: 'appointments',
+        name: 'appointments',
+        component: () => import('@modules/appointments/views/AppointmentListView.vue')
+      },
+      {
+        path: 'appointments/create',
+        name: 'appointments-create',
+        component: () => import('@modules/appointments/views/AppointmentFormView.vue')
+      },
+      {
+        path: 'appointments/:id/edit',
+        name: 'appointments-edit',
+        component: () => import('@modules/appointments/views/AppointmentFormView.vue')
       }
     ]
   },
   {
+    path: '/forbidden',
+    name: 'forbidden',
+    component: () => import('@/views/ForbiddenView.vue')
+  },
+  {
     path: '/:pathMatch(.*)*',
-    name: 'NotFound',
-    component: () => import('@/components/layouts/MainLayout.vue')
+    name: 'not-found',
+    component: () => import('@/views/NotFoundView.vue')
   }
 ]
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHistory(),
   routes
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    next({ name: 'Login' })
-  } else if (to.path === '/auth/login' && authStore.isAuthenticated) {
-    next({ name: 'Dashboard' })
+    next({ name: 'login', query: { redirect: to.fullPath } })
+  } else if (to.meta.guest && authStore.isAuthenticated) {
+    next({ name: 'dashboard' })
   } else {
+    if (authStore.isAuthenticated && !authStore.user) {
+      await authStore.fetchUser()
+    }
     next()
   }
 })

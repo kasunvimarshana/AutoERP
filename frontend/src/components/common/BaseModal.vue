@@ -1,79 +1,48 @@
 <template>
-  <Teleport to="body">
-    <Transition name="modal">
-      <div v-if="modelValue" class="fixed inset-0 z-50 overflow-y-auto" @click.self="close">
-        <div class="flex min-h-screen items-center justify-center p-4">
-          <!-- Backdrop -->
-          <div class="fixed inset-0 bg-black/50 transition-opacity"></div>
-          
-          <!-- Modal -->
-          <div 
-            class="relative bg-white rounded-xl shadow-2xl max-w-md w-full mx-auto z-10"
-            @click.stop
-          >
-            <!-- Header -->
-            <div v-if="$slots.header || title" class="flex items-center justify-between p-6 border-b border-secondary-200">
-              <slot name="header">
-                <h3 class="text-xl font-semibold text-secondary-900">{{ title }}</h3>
-              </slot>
-              <button @click="close" class="text-secondary-400 hover:text-secondary-600">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            <!-- Body -->
-            <div class="p-6">
-              <slot />
-            </div>
-            
-            <!-- Footer -->
-            <div v-if="$slots.footer" class="flex justify-end space-x-3 p-6 border-t border-secondary-200">
-              <slot name="footer" />
+  <div v-if="show" class="fixed inset-0 z-50 overflow-y-auto" @click.self="close">
+    <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+      <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" @click="close"></div>
+      
+      <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+        <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+          <div class="sm:flex sm:items-start">
+            <div class="mt-3 text-center sm:mt-0 sm:text-left w-full">
+              <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                {{ title }}
+              </h3>
+              <div class="mt-2">
+                <slot></slot>
+              </div>
             </div>
           </div>
         </div>
+        <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-2">
+          <slot name="footer">
+            <BaseButton @click="close" variant="outline">
+              {{ cancelText }}
+            </BaseButton>
+          </slot>
+        </div>
       </div>
-    </Transition>
-  </Teleport>
+    </div>
+  </div>
 </template>
 
 <script setup>
-const props = defineProps({
-  modelValue: Boolean,
+import BaseButton from './BaseButton.vue'
+
+defineProps({
+  show: Boolean,
   title: String,
-  closeOnEscape: {
-    type: Boolean,
-    default: true
+  cancelText: {
+    type: String,
+    default: 'Cancel'
   }
 })
 
-const emit = defineEmits(['update:modelValue', 'close'])
+const emit = defineEmits(['close'])
 
 const close = () => {
-  emit('update:modelValue', false)
   emit('close')
 }
-
-// Handle escape key
-if (props.closeOnEscape) {
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && props.modelValue) {
-      close()
-    }
-  })
-}
 </script>
-
-<style scoped>
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-}
-</style>

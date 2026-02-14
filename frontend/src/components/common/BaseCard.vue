@@ -1,45 +1,31 @@
 <template>
-  <div :class="cardClasses">
-    <div v-if="$slots.header || title" class="border-b border-secondary-200 pb-4 mb-4">
-      <slot name="header">
-        <h3 class="text-lg font-semibold text-secondary-900">{{ title }}</h3>
-      </slot>
+  <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+    <div class="px-4 py-5 sm:px-6 flex justify-between items-center">
+      <div>
+        <h3 class="text-lg leading-6 font-medium text-gray-900">
+          <slot name="title">{{ title }}</slot>
+        </h3>
+        <p v-if="subtitle" class="mt-1 max-w-2xl text-sm text-gray-500">
+          {{ subtitle }}
+        </p>
+      </div>
+      <div v-if="$slots.actions">
+        <slot name="actions"></slot>
+      </div>
     </div>
-    
-    <div :class="bodyClasses">
-      <slot />
-    </div>
-    
-    <div v-if="$slots.footer" class="border-t border-secondary-200 pt-4 mt-4">
-      <slot name="footer" />
+    <div :class="{ 'px-4 py-5 sm:p-6': padding }">
+      <slot></slot>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
-
-const props = defineProps({
+defineProps({
   title: String,
+  subtitle: String,
   padding: {
-    type: String,
-    default: 'md',
-    validator: (value) => ['none', 'sm', 'md', 'lg'].includes(value)
+    type: Boolean,
+    default: true
   }
-})
-
-const cardClasses = computed(() => {
-  const paddingMap = {
-    none: 'p-0',
-    sm: 'p-4',
-    md: 'p-6',
-    lg: 'p-8'
-  }
-  
-  return ['card', paddingMap[props.padding]].join(' ')
-})
-
-const bodyClasses = computed(() => {
-  return props.padding === 'none' ? 'p-6' : ''
 })
 </script>
