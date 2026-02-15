@@ -4,12 +4,14 @@ namespace App\Modules\Inventory\Repositories;
 
 use App\Core\Repositories\BaseRepository;
 use App\Modules\Inventory\Models\StockLedger;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Collection;
 
-class StockLedgerRepository extends BaseRepository
+class StockLedgerRepository extends BaseRepository implements StockLedgerRepositoryInterface
 {
     /**
      * StockLedgerRepository constructor.
+     *
+     * @param StockLedger $model
      */
     public function __construct(StockLedger $model)
     {
@@ -17,276 +19,144 @@ class StockLedgerRepository extends BaseRepository
     }
 
     /**
-     * Create stock in transaction
+     * Record stock movement
+     *
+     * @param array $data
+     * @return StockLedger
      */
-    public function createStockIn(array $data): StockLedger
+    public function recordMovement(array $data): StockLedger
     {
-        $data['transaction_type'] = StockLedger::TYPE_IN;
-        $data['transaction_date'] = $data['transaction_date'] ?? now();
-        $data['user_id'] = $data['user_id'] ?? auth()->id();
-
         // Calculate running balance
-        $data['running_balance'] = $this->calculateRunningBalance(
+        $currentBalance = $this->getCurrentBalance(
             $data['product_id'],
-            $data['product_variant_id'] ?? null,
-            $data['branch_id'],
-            $data['quantity']
+            $data['branch_id'] ?? null,
+            $data['location_id'] ?? null,
+            $data['variant_id'] ?? null
         );
+
+        $quantity = $data['quantity'];
+        $newBalance = $currentBalance + $quantity;
+
+        $data['running_balance'] = $newBalance;
 
         return $this->create($data);
     }
 
     /**
-     * Create stock out transaction
+     * Get current balance for a product
+     *
+     * @param int $productId
+     * @param int|null $branchId
+     * @param int|null $locationId
+     * @param int|null $variantId
+     * @return float
      */
-    public function createStockOut(array $data): StockLedger
-    {
-        $data['transaction_type'] = StockLedger::TYPE_OUT;
-        $data['transaction_date'] = $data['transaction_date'] ?? now();
-        $data['user_id'] = $data['user_id'] ?? auth()->id();
-        
-        // Make quantity negative for OUT transactions
-        $data['quantity'] = -abs($data['quantity']);
-
-        // Calculate running balance
-        $data['running_balance'] = $this->calculateRunningBalance(
-            $data['product_id'],
-            $data['product_variant_id'] ?? null,
-            $data['branch_id'],
-            $data['quantity']
-        );
-
-        return $this->create($data);
-    }
-
-    /**
-     * Create stock transfer transaction
-     */
-    public function createTransfer(array $data): array
-    {
-        // Create OUT transaction from source branch
-        $outData = [
-            'tenant_id' => $data['tenant_id'],
-            'branch_id' => $data['from_branch_id'],
-            'product_id' => $data['product_id'],
-            'product_variant_id' => $data['product_variant_id'] ?? null,
-            'batch_id' => $data['batch_id'] ?? null,
-            'quantity' => $data['quantity'],
-            'unit_cost' => $data['unit_cost'] ?? 0,
-            'total_cost' => ($data['unit_cost'] ?? 0) * $data['quantity'],
-            'transaction_type' => StockLedger::TYPE_TRANSFER,
-            'transaction_date' => $data['transaction_date'] ?? now(),
-            'reference_type' => $data['reference_type'] ?? 'transfer',
-            'reference_id' => $data['reference_id'] ?? null,
-            'notes' => $data['notes'] ?? 'Transfer out',
-            'user_id' => $data['user_id'] ?? auth()->id(),
-        ];
-
-        // Create IN transaction to destination branch
-        $inData = [
-            'tenant_id' => $data['tenant_id'],
-            'branch_id' => $data['to_branch_id'],
-            'product_id' => $data['product_id'],
-            'product_variant_id' => $data['product_variant_id'] ?? null,
-            'batch_id' => $data['batch_id'] ?? null,
-            'quantity' => $data['quantity'],
-            'unit_cost' => $data['unit_cost'] ?? 0,
-            'total_cost' => ($data['unit_cost'] ?? 0) * $data['quantity'],
-            'transaction_type' => StockLedger::TYPE_TRANSFER,
-            'transaction_date' => $data['transaction_date'] ?? now(),
-            'reference_type' => $data['reference_type'] ?? 'transfer',
-            'reference_id' => $data['reference_id'] ?? null,
-            'notes' => $data['notes'] ?? 'Transfer in',
-            'user_id' => $data['user_id'] ?? auth()->id(),
-        ];
-
-        $outTransaction = $this->createStockOut($outData);
-        $inTransaction = $this->createStockIn($inData);
-
-        return [
-            'out' => $outTransaction,
-            'in' => $inTransaction,
-        ];
-    }
-
-    /**
-     * Create stock adjustment transaction
-     */
-    public function createAdjustment(array $data): StockLedger
-    {
-        $data['transaction_type'] = StockLedger::TYPE_ADJUSTMENT;
-        $data['transaction_date'] = $data['transaction_date'] ?? now();
-        $data['user_id'] = $data['user_id'] ?? auth()->id();
-
-        // Calculate running balance
-        $data['running_balance'] = $this->calculateRunningBalance(
-            $data['product_id'],
-            $data['product_variant_id'] ?? null,
-            $data['branch_id'],
-            $data['quantity']
-        );
-
-        return $this->create($data);
-    }
-
-    /**
-     * Calculate running balance for a product/variant at a branch
-     */
-    protected function calculateRunningBalance(
+    public function getCurrentBalance(
         int $productId,
-        ?int $variantId,
-        int $branchId,
-        float $quantity
+        ?int $branchId = null,
+        ?int $locationId = null,
+        ?int $variantId = null
     ): float {
+        return StockLedger::getCurrentBalance($productId, $branchId, $locationId, $variantId);
+    }
+
+    /**
+     * Get stock movements for a product
+     *
+     * @param int $productId
+     * @param \DateTime $startDate
+     * @param \DateTime $endDate
+     * @param int|null $branchId
+     * @return Collection
+     */
+    public function getMovements(
+        int $productId,
+        \DateTime $startDate,
+        \DateTime $endDate,
+        ?int $branchId = null
+    ): Collection {
+        return StockLedger::getMovements($productId, $startDate, $endDate, $branchId);
+    }
+
+    /**
+     * Get expiring items
+     *
+     * @param int $daysThreshold
+     * @param int|null $branchId
+     * @return Collection
+     */
+    public function getExpiringItems(int $daysThreshold = 30, ?int $branchId = null): Collection
+    {
+        return StockLedger::getExpiringItems($daysThreshold, $branchId);
+    }
+
+    /**
+     * Get stock by batch
+     *
+     * @param string $batchNumber
+     * @return Collection
+     */
+    public function getByBatch(string $batchNumber): Collection
+    {
+        return $this->model->where('batch_number', $batchNumber)->get();
+    }
+
+    /**
+     * Get stock by serial
+     *
+     * @param string $serialNumber
+     * @return Collection
+     */
+    public function getBySerial(string $serialNumber): Collection
+    {
+        return $this->model->where('serial_number', $serialNumber)->get();
+    }
+
+    /**
+     * Calculate average cost
+     *
+     * @param int $productId
+     * @param int|null $branchId
+     * @return float
+     */
+    public function calculateAverageCost(int $productId, ?int $branchId = null): float
+    {
+        return StockLedger::calculateAverageCost($productId, $branchId);
+    }
+
+    /**
+     * Get stock by location
+     *
+     * @param int $locationId
+     * @return Collection
+     */
+    public function getByLocation(int $locationId): Collection
+    {
+        return $this->model
+            ->where('location_id', $locationId)
+            ->where('running_balance', '>', 0)
+            ->get();
+    }
+
+    /**
+     * Get FIFO batches for a product
+     *
+     * @param int $productId
+     * @param int|null $branchId
+     * @return Collection
+     */
+    public function getFIFOBatches(int $productId, ?int $branchId = null): Collection
+    {
         $query = $this->model
             ->where('product_id', $productId)
-            ->where('branch_id', $branchId);
-
-        if ($variantId) {
-            $query->where('product_variant_id', $variantId);
-        } else {
-            $query->whereNull('product_variant_id');
-        }
-
-        $currentBalance = $query->sum('quantity');
-
-        return $currentBalance + $quantity;
-    }
-
-    /**
-     * Get stock balance for a product/variant at a branch
-     */
-    public function getStockBalance(
-        int $productId,
-        ?int $variantId = null,
-        ?int $branchId = null
-    ): float {
-        $query = $this->model->where('product_id', $productId);
-
-        if ($variantId) {
-            $query->where('product_variant_id', $variantId);
-        }
+            ->where('quantity', '>', 0)
+            ->where('running_balance', '>', 0)
+            ->orderBy('created_at', 'asc');
 
         if ($branchId) {
             $query->where('branch_id', $branchId);
         }
-
-        return (float) $query->sum('quantity');
-    }
-
-    /**
-     * Get stock balance by batch (for FIFO/FEFO)
-     */
-    public function getStockBalanceByBatch(
-        int $productId,
-        ?int $variantId = null,
-        ?int $branchId = null,
-        string $orderBy = 'expiry_date' // 'expiry_date' for FEFO, 'created_at' for FIFO
-    ) {
-        $query = DB::table('stock_ledger as sl')
-            ->join('batches as b', 'sl.batch_id', '=', 'b.id')
-            ->select([
-                'b.id as batch_id',
-                'b.batch_number',
-                'b.expiry_date',
-                'b.created_at',
-                DB::raw('SUM(sl.quantity) as balance')
-            ])
-            ->where('sl.product_id', $productId)
-            ->groupBy('b.id', 'b.batch_number', 'b.expiry_date', 'b.created_at')
-            ->having('balance', '>', 0);
-
-        if ($variantId) {
-            $query->where('sl.product_variant_id', $variantId);
-        }
-
-        if ($branchId) {
-            $query->where('sl.branch_id', $branchId);
-        }
-
-        // Order by expiry date (FEFO) or creation date (FIFO)
-        $query->orderBy("b.{$orderBy}");
 
         return $query->get();
-    }
-
-    /**
-     * Get available batches for picking (FIFO/FEFO)
-     */
-    public function getAvailableBatches(
-        int $productId,
-        ?int $variantId = null,
-        ?int $branchId = null,
-        float $requiredQuantity = 0,
-        string $strategy = 'FEFO' // 'FEFO' or 'FIFO'
-    ): array {
-        $orderBy = $strategy === 'FEFO' ? 'expiry_date' : 'created_at';
-        
-        $batches = $this->getStockBalanceByBatch(
-            $productId,
-            $variantId,
-            $branchId,
-            $orderBy
-        );
-
-        $result = [];
-        $remainingQty = $requiredQuantity;
-
-        foreach ($batches as $batch) {
-            if ($remainingQty <= 0 && $requiredQuantity > 0) {
-                break;
-            }
-
-            $availableQty = $batch->balance;
-            $pickQty = $requiredQuantity > 0 ? min($remainingQty, $availableQty) : $availableQty;
-
-            $result[] = [
-                'batch_id' => $batch->batch_id,
-                'batch_number' => $batch->batch_number,
-                'expiry_date' => $batch->expiry_date,
-                'available_quantity' => $availableQty,
-                'pick_quantity' => $pickQty,
-            ];
-
-            $remainingQty -= $pickQty;
-        }
-
-        return $result;
-    }
-
-    /**
-     * Get stock movement history
-     */
-    public function getMovementHistory(
-        int $productId,
-        ?int $variantId = null,
-        ?int $branchId = null,
-        ?string $startDate = null,
-        ?string $endDate = null,
-        int $perPage = 50
-    ) {
-        $query = $this->model
-            ->where('product_id', $productId)
-            ->with(['user', 'branch', 'batch']);
-
-        if ($variantId) {
-            $query->where('product_variant_id', $variantId);
-        }
-
-        if ($branchId) {
-            $query->where('branch_id', $branchId);
-        }
-
-        if ($startDate) {
-            $query->whereDate('transaction_date', '>=', $startDate);
-        }
-
-        if ($endDate) {
-            $query->whereDate('transaction_date', '<=', $endDate);
-        }
-
-        return $query->orderBy('transaction_date', 'desc')
-            ->orderBy('created_at', 'desc')
-            ->paginate($perPage);
     }
 }

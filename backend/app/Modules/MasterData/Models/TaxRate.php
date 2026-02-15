@@ -2,91 +2,124 @@
 
 namespace App\Modules\MasterData\Models;
 
-use App\Core\Traits\HasUuid;
-use App\Core\Traits\TenantAware;
-use App\Modules\Tenancy\Models\Tenant;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Core\Traits\HasUuid;
+use App\Core\Traits\TenantScoped;
+use App\Core\Traits\Auditable;
+use App\Models\User;
 
 class TaxRate extends Model
 {
-    use HasFactory, SoftDeletes, TenantAware, HasUuid;
+    use HasFactory, SoftDeletes, HasUuid, TenantScoped, Auditable;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
     protected $fillable = [
+        'uuid',
         'tenant_id',
         'name',
         'code',
         'type',
         'rate',
-        'is_inclusive',
         'is_compound',
-        'priority',
-        'effective_from',
-        'effective_to',
-        'description',
+        'valid_from',
+        'valid_to',
         'is_active',
-        'metadata',
+        'created_by',
+        'updated_by',
     ];
 
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
     protected $casts = [
         'rate' => 'decimal:4',
-        'is_inclusive' => 'boolean',
         'is_compound' => 'boolean',
-        'priority' => 'integer',
-        'effective_from' => 'date',
-        'effective_to' => 'date',
+        'valid_from' => 'date',
+        'valid_to' => 'date',
         'is_active' => 'boolean',
-        'metadata' => 'array',
     ];
 
     /**
-     * Get the tenant that owns the tax rate.
+     * Get the user who created the tax rate.
      */
-    public function tenant(): BelongsTo
+    public function creator()
     {
-        return $this->belongsTo(Tenant::class);
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     /**
-     * Scope to get only active tax rates.
+     * Get the user who last updated the tax rate.
      */
-    public function scopeActive($query)
+    public function updater()
     {
-        return $query->where('is_active', true);
+        return $this->belongsTo(User::class, 'updated_by');
     }
 
     /**
-     * Scope to get effective tax rates for a given date.
+     * Check if tax rate is active.
+     *
+     * @return bool
      */
-    public function scopeEffectiveOn($query, $date = null)
+    public function isActive(): bool
+    {
+        return $this->is_active;
+    }
+
+    /**
+     * Check if tax rate is compound.
+     *
+     * @return bool
+     */
+    public function isCompound(): bool
+    {
+        return $this->is_compound;
+    }
+
+    /**
+     * Check if tax rate is valid for given date.
+     *
+     * @param \DateTime|null $date
+     * @return bool
+     */
+    public function isValidOn($date = null): bool
     {
         $date = $date ?? now();
         
-        return $query->where(function ($q) use ($date) {
-            $q->whereNull('effective_from')
-              ->orWhere('effective_from', '<=', $date);
-        })->where(function ($q) use ($date) {
-            $q->whereNull('effective_to')
-              ->orWhere('effective_to', '>=', $date);
-        });
+        if ($this->valid_from && $date < $this->valid_from) {
+            return false;
+        }
+        
+        if ($this->valid_to && $date > $this->valid_to) {
+            return false;
+        }
+        
+        return true;
     }
 
     /**
-     * Calculate tax amount for a given base amount.
+     * Calculate tax amount for given base amount.
+     *
+     * @param float $baseAmount
+     * @return float
      */
     public function calculateTax(float $baseAmount): float
     {
-        if ($this->type === 'percentage') {
-            return $baseAmount * ($this->rate / 100);
-        }
-        
-        return $this->rate;
+        return round($baseAmount * ($this->rate / 100), 2);
     }
 
     /**
-     * Calculate amount including tax.
+     * Calculate total amount including tax.
+     *
+     * @param float $baseAmount
+     * @return float
      */
     public function calculateTotalWithTax(float $baseAmount): float
     {
@@ -95,13 +128,12 @@ class TaxRate extends Model
 
     /**
      * Calculate base amount from tax-inclusive amount.
+     *
+     * @param float $totalAmount
+     * @return float
      */
     public function calculateBaseFromTotal(float $totalAmount): float
     {
-        if ($this->type === 'percentage') {
-            return $totalAmount / (1 + ($this->rate / 100));
-        }
-        
-        return $totalAmount - $this->rate;
+        return round($totalAmount / (1 + ($this->rate / 100)), 2);
     }
 }

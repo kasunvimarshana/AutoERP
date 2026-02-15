@@ -2,46 +2,19 @@
 
 namespace App\Core\Traits;
 
-use Illuminate\Support\Str;
-
-/**
- * UUID Trait
- * 
- * Automatically generates UUIDs for models.
- */
 trait HasUuid
 {
     /**
-     * Boot the UUID trait
+     * Boot the UUID trait for a model.
      *
      * @return void
      */
-    protected static function bootHasUuid(): void
+    protected static function bootHasUuid()
     {
         static::creating(function ($model) {
-            if (empty($model->{$model->getKeyName()})) {
-                $model->{$model->getKeyName()} = (string) Str::uuid();
+            if (empty($model->uuid)) {
+                $model->uuid = (string) \Illuminate\Support\Str::uuid();
             }
         });
-    }
-
-    /**
-     * Get the key type
-     *
-     * @return string
-     */
-    public function getKeyType(): string
-    {
-        return 'string';
-    }
-
-    /**
-     * Get incrementing state
-     *
-     * @return bool
-     */
-    public function getIncrementing(): bool
-    {
-        return false;
     }
 }

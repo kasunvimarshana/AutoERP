@@ -2,120 +2,141 @@
 
 namespace App\Models;
 
-use App\Core\Traits\TenantAware;
+// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use App\Core\Traits\HasUuid;
+use App\Core\Traits\Auditable;
+use App\Modules\Tenant\Models\Tenant;
+use App\Modules\Tenant\Models\Organization;
+use App\Modules\Tenant\Models\Branch;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, HasApiTokens, TenantAware, SoftDeletes;
+    /** @use HasFactory<\Database\Factories\UserFactory> */
+    use HasFactory, Notifiable, HasApiTokens, SoftDeletes, HasUuid, Auditable, HasRoles;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
     protected $fillable = [
+        'uuid',
         'tenant_id',
         'organization_id',
         'branch_id',
         'name',
-        'username',
         'email',
-        'phone',
         'password',
-        'is_active',
-        'is_verified',
+        'phone',
+        'avatar',
+        'timezone',
+        'language_code',
+        'status',
         'last_login_at',
-        'settings',
-        'metadata',
+        'last_login_ip',
+        'created_by',
+        'updated_by',
     ];
 
+    /**
+     * The attributes that should be hidden for serialization.
+     *
+     * @var list<string>
+     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-            'is_active' => 'boolean',
-            'is_verified' => 'boolean',
             'last_login_at' => 'datetime',
-            'settings' => 'array',
-            'metadata' => 'array',
+            'password' => 'hashed',
+            'notification_preferences' => 'array',
         ];
     }
 
-    public function tenant(): BelongsTo
+    /**
+     * Get the tenant that owns the user.
+     */
+    public function tenant()
     {
-        return $this->belongsTo(\App\Modules\Tenancy\Models\Tenant::class);
+        return $this->belongsTo(Tenant::class);
     }
 
-    public function organization(): BelongsTo
+    /**
+     * Get push notification subscriptions for this user.
+     */
+    public function pushSubscriptions()
     {
-        return $this->belongsTo(\App\Modules\Organization\Models\Organization::class);
+        return $this->hasMany(PushSubscription::class);
     }
 
-    public function branch(): BelongsTo
+    /**
+     * Get the organization that the user belongs to.
+     */
+    public function organization()
     {
-        return $this->belongsTo(\App\Modules\Organization\Models\Branch::class);
+        return $this->belongsTo(Organization::class);
     }
 
-    public function roles(): BelongsToMany
+    /**
+     * Get the branch that the user belongs to.
+     */
+    public function branch()
     {
-        return $this->belongsToMany(\App\Modules\IAM\Models\Role::class, 'user_role');
+        return $this->belongsTo(Branch::class);
     }
 
-    public function hasRole(string $roleSlug): bool
+    /**
+     * Get the user who created this user.
+     */
+    public function creator()
     {
-        return $this->roles()->where('slug', $roleSlug)->exists();
+        return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function hasPermission(string $permissionSlug): bool
+    /**
+     * Get the user who last updated this user.
+     */
+    public function updater()
     {
-        return $this->roles()
-            ->whereHas('permissions', function ($query) use ($permissionSlug) {
-                $query->where('slug', $permissionSlug);
-            })
-            ->exists();
+        return $this->belongsTo(User::class, 'updated_by');
     }
 
-    public function assignRole($role): void
-    {
-        if (is_string($role)) {
-            $role = \App\Modules\IAM\Models\Role::where('slug', $role)->firstOrFail();
-        }
-
-        if (!$this->hasRole($role->slug)) {
-            $this->roles()->attach($role);
-        }
-    }
-
-    public function removeRole($role): void
-    {
-        if (is_string($role)) {
-            $role = \App\Modules\IAM\Models\Role::where('slug', $role)->firstOrFail();
-        }
-
-        $this->roles()->detach($role);
-    }
-
+    /**
+     * Check if user is active.
+     *
+     * @return bool
+     */
     public function isActive(): bool
     {
-        return $this->is_active;
+        return $this->status === 'active';
     }
 
-    public function isVerified(): bool
-    {
-        return $this->is_verified;
-    }
-
+    /**
+     * Update last login information.
+     *
+     * @return void
+     */
     public function updateLastLogin(): void
     {
-        $this->update(['last_login_at' => now()]);
+        $this->update([
+            'last_login_at' => now(),
+            'last_login_ip' => request()->ip(),
+        ]);
     }
 }
-

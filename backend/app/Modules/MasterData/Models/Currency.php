@@ -2,83 +2,107 @@
 
 namespace App\Modules\MasterData\Models;
 
-use App\Core\Traits\HasUuid;
-use App\Core\Traits\TenantAware;
-use App\Modules\Tenancy\Models\Tenant;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Core\Traits\HasUuid;
+use App\Core\Traits\TenantScoped;
+use App\Core\Traits\Auditable;
+use App\Models\User;
 
 class Currency extends Model
 {
-    use HasFactory, SoftDeletes, TenantAware, HasUuid;
+    use HasFactory, SoftDeletes, HasUuid, TenantScoped, Auditable;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
     protected $fillable = [
+        'uuid',
         'tenant_id',
-        'name',
         'code',
+        'name',
         'symbol',
         'decimal_places',
         'exchange_rate',
-        'is_base',
+        'is_base_currency',
         'is_active',
-        'metadata',
+        'created_by',
+        'updated_by',
     ];
 
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
     protected $casts = [
         'decimal_places' => 'integer',
-        'exchange_rate' => 'decimal:8',
-        'is_base' => 'boolean',
+        'exchange_rate' => 'decimal:6',
+        'is_base_currency' => 'boolean',
         'is_active' => 'boolean',
-        'metadata' => 'array',
     ];
 
     /**
-     * Get the tenant that owns the currency.
+     * Get the user who created the currency.
      */
-    public function tenant(): BelongsTo
+    public function creator()
     {
-        return $this->belongsTo(Tenant::class);
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     /**
-     * Scope to get only active currencies.
+     * Get the user who last updated the currency.
      */
-    public function scopeActive($query)
+    public function updater()
     {
-        return $query->where('is_active', true);
+        return $this->belongsTo(User::class, 'updated_by');
     }
 
     /**
-     * Scope to get base currency.
+     * Check if currency is active.
+     *
+     * @return bool
      */
-    public function scopeBase($query)
+    public function isActive(): bool
     {
-        return $query->where('is_base', true);
+        return $this->is_active;
     }
 
     /**
-     * Convert amount from this currency to base currency.
+     * Check if this is the base currency.
+     *
+     * @return bool
      */
-    public function toBaseCurrency(float $amount): float
+    public function isBaseCurrency(): bool
     {
-        return $amount * $this->exchange_rate;
+        return $this->is_base_currency;
     }
 
     /**
      * Convert amount from base currency to this currency.
+     *
+     * @param float $amount
+     * @return float
      */
-    public function fromBaseCurrency(float $amount): float
+    public function convertFromBase(float $amount): float
     {
-        return $this->exchange_rate > 0 ? $amount / $this->exchange_rate : 0;
+        return round($amount * $this->exchange_rate, $this->decimal_places);
     }
 
     /**
-     * Format amount with currency symbol.
+     * Convert amount from this currency to base currency.
+     *
+     * @param float $amount
+     * @return float
      */
-    public function format(float $amount): string
+    public function convertToBase(float $amount): float
     {
-        return $this->symbol . ' ' . number_format($amount, $this->decimal_places);
+        if ($this->exchange_rate == 0) {
+            return 0;
+        }
+        return round($amount / $this->exchange_rate, $this->decimal_places);
     }
 }

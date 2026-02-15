@@ -2,136 +2,120 @@
 
 namespace App\Core\Services;
 
-use App\Core\Contracts\ServiceInterface;
-use App\Core\Contracts\RepositoryInterface;
+use App\Core\Repositories\BaseRepositoryInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Core\Exceptions\ServiceException;
 
-/**
- * Base Service Class
- * 
- * Provides common business logic operations with transactional support.
- * All module-specific services should extend this class.
- */
-abstract class BaseService implements ServiceInterface
+abstract class BaseService implements BaseServiceInterface
 {
-    protected RepositoryInterface $repository;
+    /**
+     * @var BaseRepositoryInterface
+     */
+    protected $repository;
 
-    public function __construct(RepositoryInterface $repository)
+    /**
+     * BaseService constructor.
+     *
+     * @param BaseRepositoryInterface $repository
+     */
+    public function __construct(BaseRepositoryInterface $repository)
     {
         $this->repository = $repository;
     }
 
-    public function getRepository(): RepositoryInterface
-    {
-        return $this->repository;
-    }
-
     /**
-     * Execute a callback within a database transaction
+     * Get all records with optional filtering and pagination
      *
-     * @param callable $callback
+     * @param array $filters
+     * @param int|null $perPage
      * @return mixed
-     * @throws \Throwable
      */
-    protected function transaction(callable $callback)
+    public function getAll(array $filters = [], ?int $perPage = null)
     {
-        return DB::transaction($callback);
+        try {
+            if ($perPage) {
+                return $this->repository->paginate($perPage);
+            }
+            
+            return $this->repository->all();
+        } catch (\Exception $e) {
+            Log::error('Error in getAll: ' . $e->getMessage());
+            throw new ServiceException('Failed to retrieve records: ' . $e->getMessage());
+        }
     }
 
     /**
-     * Log an error
-     *
-     * @param string $message
-     * @param array $context
-     * @return void
-     */
-    protected function logError(string $message, array $context = []): void
-    {
-        Log::error($message, $context);
-    }
-
-    /**
-     * Log info
-     *
-     * @param string $message
-     * @param array $context
-     * @return void
-     */
-    protected function logInfo(string $message, array $context = []): void
-    {
-        Log::info($message, $context);
-    }
-
-    /**
-     * Get all records
-     *
-     * @return \Illuminate\Database\Eloquent\Collection
-     */
-    public function getAll()
-    {
-        return $this->repository->all();
-    }
-
-    /**
-     * Get paginated records
-     *
-     * @param int $perPage
-     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
-     */
-    public function getPaginated(int $perPage = 15)
-    {
-        return $this->repository->paginate($perPage);
-    }
-
-    /**
-     * Find a record by ID
+     * Get a single record by ID
      *
      * @param int $id
-     * @return \Illuminate\Database\Eloquent\Model|null
+     * @return mixed
      */
-    public function findById(int $id)
+    public function getById(int $id)
     {
-        return $this->repository->find($id);
-    }
-
-    /**
-     * Find a record by ID or fail
-     *
-     * @param int $id
-     * @return \Illuminate\Database\Eloquent\Model
-     * @throws \Illuminate\Database\Eloquent\ModelNotFoundException
-     */
-    public function findByIdOrFail(int $id)
-    {
-        return $this->repository->findOrFail($id);
+        try {
+            $record = $this->repository->findById($id);
+            
+            if (!$record) {
+                throw new ServiceException('Record not found');
+            }
+            
+            return $record;
+        } catch (\Exception $e) {
+            Log::error('Error in getById: ' . $e->getMessage());
+            throw new ServiceException('Failed to retrieve record: ' . $e->getMessage());
+        }
     }
 
     /**
      * Create a new record
      *
      * @param array $data
-     * @return \Illuminate\Database\Eloquent\Model
+     * @return mixed
      */
     public function create(array $data)
     {
-        return $this->transaction(function () use ($data) {
-            return $this->repository->create($data);
-        });
+        DB::beginTransaction();
+        
+        try {
+            $record = $this->repository->create($data);
+            
+            DB::commit();
+            
+            return $record;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error in create: ' . $e->getMessage());
+            throw new ServiceException('Failed to create record: ' . $e->getMessage());
+        }
     }
 
     /**
-     * Update an existing record
+     * Update a record
      *
      * @param int $id
      * @param array $data
-     * @return \Illuminate\Database\Eloquent\Model
+     * @return mixed
      */
     public function update(int $id, array $data)
     {
-        return $this->transaction(function () use ($id, $data) {
-            return $this->repository->update($id, $data);
-        });
+        DB::beginTransaction();
+        
+        try {
+            $success = $this->repository->update($id, $data);
+            
+            if (!$success) {
+                throw new ServiceException('Record not found or update failed');
+            }
+            
+            DB::commit();
+            
+            return $this->repository->findById($id);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error in update: ' . $e->getMessage());
+            throw new ServiceException('Failed to update record: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -142,8 +126,68 @@ abstract class BaseService implements ServiceInterface
      */
     public function delete(int $id): bool
     {
-        return $this->transaction(function () use ($id) {
-            return $this->repository->delete($id);
-        });
+        DB::beginTransaction();
+        
+        try {
+            $success = $this->repository->delete($id);
+            
+            if (!$success) {
+                throw new ServiceException('Record not found or delete failed');
+            }
+            
+            DB::commit();
+            
+            return true;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error in delete: ' . $e->getMessage());
+            throw new ServiceException('Failed to delete record: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Bulk create records
+     *
+     * @param array $data
+     * @return mixed
+     */
+    public function bulkCreate(array $data)
+    {
+        DB::beginTransaction();
+        
+        try {
+            $success = $this->repository->bulkCreate($data);
+            
+            DB::commit();
+            
+            return $success;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error in bulkCreate: ' . $e->getMessage());
+            throw new ServiceException('Failed to bulk create records: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Bulk update records
+     *
+     * @param array $data
+     * @return mixed
+     */
+    public function bulkUpdate(array $data)
+    {
+        DB::beginTransaction();
+        
+        try {
+            $success = $this->repository->bulkUpdate($data);
+            
+            DB::commit();
+            
+            return $success;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error in bulkUpdate: ' . $e->getMessage());
+            throw new ServiceException('Failed to bulk update records: ' . $e->getMessage());
+        }
     }
 }

@@ -2,130 +2,208 @@
 
 namespace App\Core\Repositories;
 
-use App\Core\Contracts\RepositoryInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 
-/**
- * Base Repository Implementation
- * 
- * Provides common data access methods following the Repository pattern.
- * All module-specific repositories should extend this class.
- */
-abstract class BaseRepository implements RepositoryInterface
+abstract class BaseRepository implements BaseRepositoryInterface
 {
-    protected Model $model;
-    protected Builder $query;
+    /**
+     * @var Model
+     */
+    protected $model;
 
-    public function __construct()
+    /**
+     * BaseRepository constructor.
+     *
+     * @param Model $model
+     */
+    public function __construct(Model $model)
     {
-        $this->model = $this->makeModel();
-        $this->query = $this->model->newQuery();
+        $this->model = $model;
     }
 
-    abstract protected function model(): string;
-
-    protected function makeModel(): Model
+    /**
+     * Get all records
+     *
+     * @param array $columns
+     * @param array $relations
+     * @return Collection
+     */
+    public function all(array $columns = ['*'], array $relations = []): Collection
     {
-        $model = app($this->model());
-
-        if (!$model instanceof Model) {
-            throw new \RuntimeException(
-                "Class {$this->model()} must be an instance of Illuminate\\Database\\Eloquent\\Model"
-            );
-        }
-
-        return $model;
+        return $this->model->with($relations)->get($columns);
     }
 
-    protected function resetQuery(): void
+    /**
+     * Get paginated records
+     *
+     * @param int $perPage
+     * @param array $columns
+     * @param array $relations
+     * @return LengthAwarePaginator
+     */
+    public function paginate(int $perPage = 15, array $columns = ['*'], array $relations = []): LengthAwarePaginator
     {
-        $this->query = $this->model->newQuery();
+        return $this->model->with($relations)->paginate($perPage, $columns);
     }
 
-    public function find(int $id, array $columns = ['*']): ?Model
+    /**
+     * Find a record by ID
+     *
+     * @param int $id
+     * @param array $columns
+     * @param array $relations
+     * @return Model|null
+     */
+    public function findById(int $id, array $columns = ['*'], array $relations = []): ?Model
     {
-        return $this->query->find($id, $columns);
+        return $this->model->with($relations)->find($id, $columns);
     }
 
-    public function findOrFail(int $id, array $columns = ['*']): Model
+    /**
+     * Find records by criteria
+     *
+     * @param array $criteria
+     * @param array $columns
+     * @param array $relations
+     * @return Collection
+     */
+    public function findBy(array $criteria, array $columns = ['*'], array $relations = []): Collection
     {
-        return $this->query->findOrFail($id, $columns);
+        return $this->buildQuery($criteria)->with($relations)->get($columns);
     }
 
-    public function findBy(string $column, $value, array $columns = ['*']): Collection
+    /**
+     * Find single record by criteria
+     *
+     * @param array $criteria
+     * @param array $columns
+     * @param array $relations
+     * @return Model|null
+     */
+    public function findOneBy(array $criteria, array $columns = ['*'], array $relations = []): ?Model
     {
-        return $this->query->where($column, $value)->get($columns);
+        return $this->buildQuery($criteria)->with($relations)->first($columns);
     }
 
-    public function all(array $columns = ['*']): Collection
-    {
-        return $this->query->get($columns);
-    }
-
-    public function paginate(int $perPage = 15, array $columns = ['*']): LengthAwarePaginator
-    {
-        return $this->query->paginate($perPage, $columns);
-    }
-
+    /**
+     * Create a new record
+     *
+     * @param array $data
+     * @return Model
+     */
     public function create(array $data): Model
     {
         return $this->model->create($data);
     }
 
-    public function update(int $id, array $data): Model
+    /**
+     * Update a record
+     *
+     * @param int $id
+     * @param array $data
+     * @return bool
+     */
+    public function update(int $id, array $data): bool
     {
-        $model = $this->findOrFail($id);
-        $model->update($data);
-        return $model->fresh();
+        $record = $this->findById($id);
+        
+        if (!$record) {
+            return false;
+        }
+        
+        return $record->update($data);
     }
 
+    /**
+     * Delete a record
+     *
+     * @param int $id
+     * @return bool
+     */
     public function delete(int $id): bool
     {
-        $model = $this->findOrFail($id);
-        return $model->delete();
-    }
-
-    public function count(array $criteria = []): int
-    {
-        if (!empty($criteria)) {
-            $this->whereCriteria($criteria);
+        $record = $this->findById($id);
+        
+        if (!$record) {
+            return false;
         }
         
-        $count = $this->query->count();
-        $this->resetQuery();
-        
-        return $count;
+        return $record->delete();
     }
 
-    public function exists(int $id): bool
+    /**
+     * Bulk create records
+     *
+     * @param array $data
+     * @return bool
+     */
+    public function bulkCreate(array $data): bool
     {
-        return $this->query->where($this->model->getKeyName(), $id)->exists();
+        return $this->model->insert($data);
     }
 
-    public function with(array $relations, array $columns = ['*']): Collection
+    /**
+     * Bulk update records
+     *
+     * @param array $data
+     * @return bool
+     */
+    public function bulkUpdate(array $data): bool
     {
-        return $this->query->with($relations)->get($columns);
-    }
-
-    public function whereCriteria(array $criteria): self
-    {
-        foreach ($criteria as $column => $value) {
-            if (is_array($value)) {
-                $this->query->whereIn($column, $value);
-            } else {
-                $this->query->where($column, $value);
+        // Implementation depends on specific use case
+        // This is a basic example
+        foreach ($data as $item) {
+            if (isset($item['id'])) {
+                $this->update($item['id'], $item);
             }
         }
-
-        return $this;
+        
+        return true;
     }
 
-    public function orderBy(string $column, string $direction = 'asc'): self
+    /**
+     * Count records by criteria
+     *
+     * @param array $criteria
+     * @return int
+     */
+    public function count(array $criteria = []): int
     {
-        $this->query->orderBy($column, $direction);
-        return $this;
+        return $this->buildQuery($criteria)->count();
+    }
+
+    /**
+     * Check if record exists
+     *
+     * @param array $criteria
+     * @return bool
+     */
+    public function exists(array $criteria): bool
+    {
+        return $this->buildQuery($criteria)->exists();
+    }
+
+    /**
+     * Build query from criteria
+     *
+     * @param array $criteria
+     * @return Builder
+     */
+    protected function buildQuery(array $criteria): Builder
+    {
+        $query = $this->model->query();
+        
+        foreach ($criteria as $key => $value) {
+            if (is_array($value)) {
+                $query->whereIn($key, $value);
+            } else {
+                $query->where($key, $value);
+            }
+        }
+        
+        return $query;
     }
 }

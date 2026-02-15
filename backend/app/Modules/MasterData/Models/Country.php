@@ -2,53 +2,67 @@
 
 namespace App\Modules\MasterData\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Core\Traits\HasUuid;
+use App\Core\Traits\Auditable;
+use App\Models\User;
 
 class Country extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes, HasUuid, Auditable;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
     protected $fillable = [
-        'name',
+        'uuid',
         'code',
-        'code_3',
-        'numeric_code',
+        'name',
+        'iso2',
+        'iso3',
         'phone_code',
         'currency_code',
-        'region',
-        'subregion',
         'is_active',
-        'metadata',
+        'created_by',
+        'updated_by',
     ];
 
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
     protected $casts = [
         'is_active' => 'boolean',
-        'metadata' => 'array',
     ];
 
     /**
-     * Get the states for the country.
+     * Get the user who created the country.
      */
-    public function states(): HasMany
+    public function creator()
     {
-        return $this->hasMany(State::class);
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     /**
-     * Scope to get only active countries.
+     * Get the user who last updated the country.
      */
-    public function scopeActive($query)
+    public function updater()
     {
-        return $query->where('is_active', true);
+        return $this->belongsTo(User::class, 'updated_by');
     }
 
     /**
-     * Scope to filter by region.
+     * Check if country is active.
+     *
+     * @return bool
      */
-    public function scopeByRegion($query, string $region)
+    public function isActive(): bool
     {
-        return $query->where('region', $region);
+        return $this->is_active;
     }
 }

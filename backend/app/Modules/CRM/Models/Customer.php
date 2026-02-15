@@ -1,80 +1,83 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\CRM\Models;
 
-use App\Core\Traits\HasUuid;
-use App\Core\Traits\TenantAware;
-use App\Modules\MasterData\Models\Currency;
-use App\Modules\Organization\Models\Organization;
-use App\Modules\Pricing\Models\PriceList;
-use App\Modules\Tenancy\Models\Tenant;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Core\Traits\HasUuid;
+use App\Core\Traits\TenantScoped;
+use App\Core\Traits\Auditable;
+use App\Models\User;
+use App\Modules\Tenant\Models\Organization;
+use App\Modules\Tenant\Models\Branch;
+use App\Modules\MasterData\Models\Currency;
 
 class Customer extends Model
 {
-    use HasFactory, SoftDeletes, TenantAware, HasUuid;
+    use HasFactory, SoftDeletes, HasUuid, TenantScoped, Auditable;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
     protected $fillable = [
+        'uuid',
         'tenant_id',
         'organization_id',
-        'customer_code',
+        'branch_id',
         'type',
-        'first_name',
-        'last_name',
-        'company_name',
+        'code',
+        'name',
         'email',
         'phone',
         'mobile',
-        'tax_id',
-        'registration_number',
-        'billing_address',
-        'billing_city',
-        'billing_state',
-        'billing_country',
-        'billing_postal_code',
-        'shipping_address',
-        'shipping_city',
-        'shipping_state',
-        'shipping_country',
-        'shipping_postal_code',
-        'currency_id',
-        'price_list_id',
+        'website',
+        'tax_number',
+        'company_name',
+        'industry',
+        'employee_count',
+        'established_date',
         'credit_limit',
         'payment_terms_days',
-        'discount_percentage',
-        'category',
-        'group',
-        'status',
-        'lead_source',
-        'sales_rep',
-        'first_contact_date',
-        'last_contact_date',
-        'notes',
+        'currency_id',
+        'payment_method',
         'is_active',
+        'is_verified',
+        'status',
+        'priority',
+        'customer_group',
+        'source',
+        'assigned_to',
+        'notes',
+        'tags',
+        'custom_fields',
         'metadata',
-    ];
-
-    protected $casts = [
-        'credit_limit' => 'decimal:2',
-        'payment_terms_days' => 'integer',
-        'discount_percentage' => 'decimal:2',
-        'first_contact_date' => 'date',
-        'last_contact_date' => 'date',
-        'is_active' => 'boolean',
-        'metadata' => 'array',
+        'created_by',
+        'updated_by',
     ];
 
     /**
-     * Get the tenant that owns the customer.
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
      */
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(Tenant::class);
-    }
+    protected $casts = [
+        'is_active' => 'boolean',
+        'is_verified' => 'boolean',
+        'credit_limit' => 'decimal:2',
+        'payment_terms_days' => 'integer',
+        'employee_count' => 'integer',
+        'established_date' => 'date',
+        'tags' => 'array',
+        'custom_fields' => 'array',
+        'metadata' => 'array',
+    ];
 
     /**
      * Get the organization that owns the customer.
@@ -85,7 +88,15 @@ class Customer extends Model
     }
 
     /**
-     * Get the customer's currency.
+     * Get the branch that owns the customer.
+     */
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
+    /**
+     * Get the currency for the customer.
      */
     public function currency(): BelongsTo
     {
@@ -93,11 +104,46 @@ class Customer extends Model
     }
 
     /**
-     * Get the customer's price list.
+     * Get the user assigned to this customer.
      */
-    public function priceList(): BelongsTo
+    public function assignedUser(): BelongsTo
     {
-        return $this->belongsTo(PriceList::class);
+        return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    /**
+     * Get the addresses for the customer.
+     */
+    public function addresses(): HasMany
+    {
+        return $this->hasMany(CustomerAddress::class);
+    }
+
+    /**
+     * Get the billing addresses for the customer.
+     */
+    public function billingAddresses(): HasMany
+    {
+        return $this->hasMany(CustomerAddress::class)
+            ->whereIn('type', ['billing', 'both']);
+    }
+
+    /**
+     * Get the shipping addresses for the customer.
+     */
+    public function shippingAddresses(): HasMany
+    {
+        return $this->hasMany(CustomerAddress::class)
+            ->whereIn('type', ['shipping', 'both']);
+    }
+
+    /**
+     * Get the primary address for the customer.
+     */
+    public function primaryAddress(): HasMany
+    {
+        return $this->hasMany(CustomerAddress::class)
+            ->where('is_primary', true);
     }
 
     /**
@@ -111,72 +157,83 @@ class Customer extends Model
     /**
      * Get the primary contact for the customer.
      */
-    public function primaryContact()
+    public function primaryContact(): HasMany
     {
-        return $this->hasOne(Contact::class)->where('is_primary', true);
+        return $this->hasMany(Contact::class)
+            ->where('is_primary', true);
     }
 
     /**
-     * Scope to get only active customers.
+     * Get the notes for the customer.
      */
-    public function scopeActive($query)
+    public function notes(): HasMany
     {
-        return $query->where('is_active', true);
+        return $this->hasMany(CustomerNote::class);
     }
 
     /**
-     * Scope to filter by type.
+     * Get the user who created the customer.
      */
-    public function scopeOfType($query, string $type)
+    public function creator(): BelongsTo
     {
-        return $query->where('type', $type);
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     /**
-     * Scope to filter by status.
+     * Get the user who last updated the customer.
      */
-    public function scopeWithStatus($query, string $status)
+    public function updater(): BelongsTo
     {
-        return $query->where('status', $status);
+        return $this->belongsTo(User::class, 'updated_by');
     }
 
     /**
-     * Get customer's full name.
+     * Check if customer is active.
      */
-    public function getFullNameAttribute(): string
+    public function isActive(): bool
     {
-        if ($this->type === 'company') {
-            return $this->company_name;
-        }
-        
-        return trim("{$this->first_name} {$this->last_name}");
+        return $this->is_active && $this->status === 'active';
     }
 
     /**
-     * Get customer's display name.
+     * Check if customer is verified.
      */
-    public function getDisplayNameAttribute(): string
+    public function isVerified(): bool
     {
-        $name = $this->full_name;
-        return $name ? "{$this->customer_code} - {$name}" : $this->customer_code;
+        return $this->is_verified;
+    }
+
+    /**
+     * Check if customer is business type.
+     */
+    public function isBusiness(): bool
+    {
+        return $this->type === 'business';
+    }
+
+    /**
+     * Check if customer is individual type.
+     */
+    public function isIndividual(): bool
+    {
+        return $this->type === 'individual';
+    }
+
+    /**
+     * Get the customer's available credit.
+     */
+    public function getAvailableCredit(): float
+    {
+        // This would be calculated by subtracting outstanding invoices
+        // For now, returning credit limit
+        return (float) $this->credit_limit;
     }
 
     /**
      * Check if customer has exceeded credit limit.
      */
-    public function hasCreditLimitExceeded(float $additionalAmount = 0): bool
+    public function hasCreditLimitExceeded(float $amount = 0): bool
     {
-        // This would typically check against actual outstanding invoices
-        // For now, just a placeholder
-        return false;
-    }
-
-    /**
-     * Get customer's available credit.
-     */
-    public function getAvailableCreditAttribute(): float
-    {
-        // This would calculate based on credit_limit minus outstanding invoices
-        return $this->credit_limit;
+        return ($this->getAvailableCredit() - $amount) < 0;
     }
 }

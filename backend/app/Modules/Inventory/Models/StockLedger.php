@@ -2,207 +2,276 @@
 
 namespace App\Modules\Inventory\Models;
 
-use App\Core\Traits\HasUuid;
-use App\Core\Traits\TenantAware;
-use App\Models\User;
-use App\Modules\Organization\Models\Branch;
-use App\Modules\Tenancy\Models\Tenant;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Core\Traits\HasUuid;
+use App\Core\Traits\TenantScoped;
+use App\Core\Traits\Auditable;
+use App\Modules\Product\Models\Product;
+use App\Modules\Product\Models\ProductVariant;
+use App\Modules\Tenant\Models\Branch;
+use App\Modules\Tenant\Models\Location;
+use App\Models\User;
 
 class StockLedger extends Model
 {
-    use HasFactory, TenantAware, HasUuid;
+    use HasFactory, HasUuid, TenantScoped, Auditable;
 
-    // Append-only: No updates or soft deletes allowed
-    // Once created, stock ledger entries are immutable
+    /**
+     * Indicates if the model should be timestamped.
+     * Stock ledger is append-only and immutable.
+     *
+     * @var bool
+     */
+    public $timestamps = true;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
     protected $fillable = [
+        'uuid',
         'tenant_id',
-        'branch_id',
         'product_id',
-        'product_variant_id',
-        'batch_id',
+        'variant_id',
+        'branch_id',
+        'location_id',
         'transaction_type',
-        'transaction_date',
         'reference_type',
         'reference_id',
+        'reference_number',
         'quantity',
+        'running_balance',
+        'batch_number',
+        'serial_number',
+        'lot_number',
+        'expiry_date',
         'unit_cost',
         'total_cost',
-        'running_balance',
+        'valuation_method',
         'notes',
-        'user_id',
         'metadata',
+        'created_by',
+        'created_at',
     ];
 
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
     protected $casts = [
-        'transaction_date' => 'datetime',
         'quantity' => 'decimal:4',
-        'unit_cost' => 'decimal:4',
-        'total_cost' => 'decimal:4',
         'running_balance' => 'decimal:4',
-        'metadata' => 'json',
+        'unit_cost' => 'decimal:2',
+        'total_cost' => 'decimal:2',
+        'expiry_date' => 'date',
+        'metadata' => 'array',
+        'created_at' => 'datetime',
     ];
 
-    // Transaction types
-    const TYPE_IN = 'in';           // Stock in (purchase, production, return)
-    const TYPE_OUT = 'out';         // Stock out (sale, consumption, damage)
-    const TYPE_TRANSFER = 'transfer'; // Transfer between branches
-    const TYPE_ADJUSTMENT = 'adjustment'; // Stock adjustment (reconciliation)
-
     /**
-     * Get the tenant that owns the ledger entry
+     * Disable updates for this model (append-only).
      */
-    public function tenant(): BelongsTo
+    public static function boot()
     {
-        return $this->belongsTo(Tenant::class);
+        parent::boot();
+        
+        // Prevent updates to stock ledger entries
+        static::updating(function ($model) {
+            return false;
+        });
     }
 
     /**
-     * Get the branch for this ledger entry
+     * Get the product associated with this stock ledger entry.
      */
-    public function branch(): BelongsTo
-    {
-        return $this->belongsTo(Branch::class);
-    }
-
-    /**
-     * Get the product for this ledger entry
-     */
-    public function product(): BelongsTo
+    public function product()
     {
         return $this->belongsTo(Product::class);
     }
 
     /**
-     * Get the product variant for this ledger entry
+     * Get the variant associated with this stock ledger entry.
      */
-    public function productVariant(): BelongsTo
+    public function variant()
     {
-        return $this->belongsTo(ProductVariant::class);
+        return $this->belongsTo(ProductVariant::class, 'variant_id');
     }
 
     /**
-     * Get the batch for this ledger entry
+     * Get the branch for this stock ledger entry.
      */
-    public function batch(): BelongsTo
+    public function branch()
     {
-        return $this->belongsTo(Batch::class);
+        return $this->belongsTo(Branch::class);
     }
 
     /**
-     * Get the user who created this ledger entry
+     * Get the location for this stock ledger entry.
      */
-    public function user(): BelongsTo
+    public function location()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Location::class);
     }
 
     /**
-     * Disable updates on stock ledger (append-only)
+     * Get the user who created this entry.
      */
-    public function update(array $attributes = [], array $options = [])
+    public function creator()
     {
-        throw new \Exception('Stock ledger entries cannot be updated. Create a new adjustment entry instead.');
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     /**
-     * Disable deletes on stock ledger (append-only)
+     * Check if transaction increases stock.
+     *
+     * @return bool
      */
-    public function delete()
+    public function isStockIncrease(): bool
     {
-        throw new \Exception('Stock ledger entries cannot be deleted. Create a new adjustment entry instead.');
+        return in_array($this->transaction_type, [
+            'purchase',
+            'return',
+            'adjustment_increase',
+            'production',
+            'transfer_in',
+        ]);
     }
 
     /**
-     * Disable force deletes on stock ledger (append-only)
+     * Check if transaction decreases stock.
+     *
+     * @return bool
      */
-    public function forceDelete()
+    public function isStockDecrease(): bool
     {
-        throw new \Exception('Stock ledger entries cannot be deleted. Create a new adjustment entry instead.');
+        return in_array($this->transaction_type, [
+            'sale',
+            'return_outbound',
+            'adjustment_decrease',
+            'consumption',
+            'transfer_out',
+        ]);
     }
 
     /**
-     * Get signed quantity (negative for OUT transactions)
+     * Get the absolute quantity (always positive).
+     *
+     * @return float
      */
-    public function getSignedQuantityAttribute(): float
+    public function getAbsoluteQuantity(): float
     {
-        return $this->transaction_type === self::TYPE_OUT ? 
-               -abs($this->quantity) : 
-               abs($this->quantity);
+        return abs($this->quantity);
     }
 
     /**
-     * Check if transaction is inbound
+     * Get current stock balance for a product at a location.
+     *
+     * @param int $productId
+     * @param int|null $branchId
+     * @param int|null $locationId
+     * @param int|null $variantId
+     * @return float
      */
-    public function isInbound(): bool
-    {
-        return $this->transaction_type === self::TYPE_IN;
+    public static function getCurrentBalance(
+        int $productId,
+        ?int $branchId = null,
+        ?int $locationId = null,
+        ?int $variantId = null
+    ): float {
+        $query = static::where('product_id', $productId);
+        
+        if ($branchId) {
+            $query->where('branch_id', $branchId);
+        }
+        
+        if ($locationId) {
+            $query->where('location_id', $locationId);
+        }
+        
+        if ($variantId) {
+            $query->where('variant_id', $variantId);
+        }
+        
+        return $query->latest('id')->value('running_balance') ?? 0;
     }
 
     /**
-     * Check if transaction is outbound
+     * Get stock movements within a date range.
+     *
+     * @param int $productId
+     * @param \DateTime $startDate
+     * @param \DateTime $endDate
+     * @param int|null $branchId
+     * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function isOutbound(): bool
-    {
-        return $this->transaction_type === self::TYPE_OUT;
+    public static function getMovements(
+        int $productId,
+        \DateTime $startDate,
+        \DateTime $endDate,
+        ?int $branchId = null
+    ) {
+        $query = static::where('product_id', $productId)
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->orderBy('created_at');
+        
+        if ($branchId) {
+            $query->where('branch_id', $branchId);
+        }
+        
+        return $query->get();
     }
 
     /**
-     * Scope to get entries for a specific branch
+     * Get items nearing expiry.
+     *
+     * @param int $daysThreshold
+     * @param int|null $branchId
+     * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function scopeForBranch($query, int $branchId)
+    public static function getExpiringItems(int $daysThreshold = 30, ?int $branchId = null)
     {
-        return $query->where('branch_id', $branchId);
+        $thresholdDate = now()->addDays($daysThreshold);
+        
+        $query = static::whereNotNull('expiry_date')
+            ->where('expiry_date', '<=', $thresholdDate)
+            ->where('expiry_date', '>=', now())
+            ->where('running_balance', '>', 0)
+            ->orderBy('expiry_date');
+        
+        if ($branchId) {
+            $query->where('branch_id', $branchId);
+        }
+        
+        return $query->get();
     }
 
     /**
-     * Scope to get entries for a specific product
+     * Calculate average cost for a product using FIFO method.
+     *
+     * @param int $productId
+     * @param int|null $branchId
+     * @return float
      */
-    public function scopeForProduct($query, int $productId)
+    public static function calculateAverageCost(int $productId, ?int $branchId = null): float
     {
-        return $query->where('product_id', $productId);
-    }
-
-    /**
-     * Scope to get entries for a specific variant
-     */
-    public function scopeForVariant($query, int $variantId)
-    {
-        return $query->where('product_variant_id', $variantId);
-    }
-
-    /**
-     * Scope to get entries for a specific batch
-     */
-    public function scopeForBatch($query, int $batchId)
-    {
-        return $query->where('batch_id', $batchId);
-    }
-
-    /**
-     * Scope to get inbound transactions
-     */
-    public function scopeInbound($query)
-    {
-        return $query->where('transaction_type', self::TYPE_IN);
-    }
-
-    /**
-     * Scope to get outbound transactions
-     */
-    public function scopeOutbound($query)
-    {
-        return $query->where('transaction_type', self::TYPE_OUT);
-    }
-
-    /**
-     * Scope to get transactions within date range
-     */
-    public function scopeDateRange($query, $startDate, $endDate)
-    {
-        return $query->whereBetween('transaction_date', [$startDate, $endDate]);
+        $query = static::where('product_id', $productId)
+            ->where('quantity', '>', 0)
+            ->whereNotNull('unit_cost');
+        
+        if ($branchId) {
+            $query->where('branch_id', $branchId);
+        }
+        
+        $totalCost = $query->sum('total_cost');
+        $totalQuantity = $query->sum('quantity');
+        
+        if ($totalQuantity == 0) {
+            return 0;
+        }
+        
+        return round($totalCost / $totalQuantity, 2);
     }
 }

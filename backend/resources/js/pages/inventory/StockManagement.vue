@@ -1,1 +1,0 @@
-<template><div><h1 class="text-2xl font-bold text-gray-900 mb-6">Page</h1><div class="bg-white shadow rounded-lg p-6"><p class="text-gray-500">Content will be implemented here.</p></div></div></template>

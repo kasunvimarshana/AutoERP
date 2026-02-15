@@ -1,52 +1,70 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\CRM\Models;
 
-use App\Core\Traits\HasUuid;
-use App\Core\Traits\TenantAware;
-use App\Modules\Tenancy\Models\Tenant;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Core\Traits\HasUuid;
+use App\Core\Traits\TenantScoped;
+use App\Core\Traits\Auditable;
+use App\Models\User;
 
 class Contact extends Model
 {
-    use HasFactory, SoftDeletes, TenantAware, HasUuid;
+    use HasFactory, SoftDeletes, HasUuid, TenantScoped, Auditable;
 
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
     protected $fillable = [
+        'uuid',
         'tenant_id',
         'customer_id',
         'first_name',
         'last_name',
-        'title',
-        'position',
-        'department',
         'email',
         'phone',
         'mobile',
-        'fax',
-        'date_of_birth',
-        'notes',
+        'designation',
+        'department',
         'is_primary',
+        'is_decision_maker',
+        'email_opt_in',
+        'sms_opt_in',
+        'phone_opt_in',
+        'preferred_contact_method',
+        'preferred_contact_time',
+        'linkedin_url',
+        'twitter_handle',
         'is_active',
-        'metadata',
-    ];
-
-    protected $casts = [
-        'date_of_birth' => 'date',
-        'is_primary' => 'boolean',
-        'is_active' => 'boolean',
-        'metadata' => 'array',
+        'notes',
+        'birthday',
+        'custom_fields',
+        'created_by',
+        'updated_by',
     ];
 
     /**
-     * Get the tenant that owns the contact.
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
      */
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(Tenant::class);
-    }
+    protected $casts = [
+        'is_primary' => 'boolean',
+        'is_decision_maker' => 'boolean',
+        'email_opt_in' => 'boolean',
+        'sms_opt_in' => 'boolean',
+        'phone_opt_in' => 'boolean',
+        'is_active' => 'boolean',
+        'birthday' => 'date',
+        'custom_fields' => 'array',
+    ];
 
     /**
      * Get the customer that owns the contact.
@@ -57,46 +75,74 @@ class Contact extends Model
     }
 
     /**
-     * Scope to get only active contacts.
+     * Get the user who created the contact.
      */
-    public function scopeActive($query)
+    public function creator(): BelongsTo
     {
-        return $query->where('is_active', true);
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     /**
-     * Scope to get primary contacts.
+     * Get the user who last updated the contact.
      */
-    public function scopePrimary($query)
+    public function updater(): BelongsTo
     {
-        return $query->where('is_primary', true);
+        return $this->belongsTo(User::class, 'updated_by');
     }
 
     /**
-     * Get contact's full name.
+     * Get the contact's full name.
      */
     public function getFullNameAttribute(): string
     {
-        $name = trim("{$this->first_name} {$this->last_name}");
-        
-        if ($this->title) {
-            return "{$this->title} {$name}";
-        }
-        
-        return $name;
+        return trim("{$this->first_name} {$this->last_name}");
     }
 
     /**
-     * Get contact's display name with position.
+     * Check if contact is active.
      */
-    public function getDisplayNameAttribute(): string
+    public function isActive(): bool
     {
-        $name = $this->full_name;
-        
-        if ($this->position) {
-            return "{$name} ({$this->position})";
-        }
-        
-        return $name;
+        return $this->is_active;
+    }
+
+    /**
+     * Check if this is the primary contact.
+     */
+    public function isPrimary(): bool
+    {
+        return $this->is_primary;
+    }
+
+    /**
+     * Check if contact is a decision maker.
+     */
+    public function isDecisionMaker(): bool
+    {
+        return $this->is_decision_maker;
+    }
+
+    /**
+     * Check if contact can be contacted via email.
+     */
+    public function canContactViaEmail(): bool
+    {
+        return $this->email_opt_in && !empty($this->email);
+    }
+
+    /**
+     * Check if contact can be contacted via SMS.
+     */
+    public function canContactViaSms(): bool
+    {
+        return $this->sms_opt_in && !empty($this->mobile);
+    }
+
+    /**
+     * Check if contact can be contacted via phone.
+     */
+    public function canContactViaPhone(): bool
+    {
+        return $this->phone_opt_in && (!empty($this->phone) || !empty($this->mobile));
     }
 }
