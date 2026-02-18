@@ -1,28 +1,18 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-/**
- * Tenant Model
- *
- * Represents a tenant in the multi-tenant system.
- */
 class Tenant extends Model
 {
-    use HasFactory, SoftDeletes;
-
-    /**
-     * Create a new factory instance for the model.
-     */
-    protected static function newFactory()
-    {
-        return \Database\Factories\TenantFactory::new();
-    }
+    use HasFactory, HasUuids, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -31,14 +21,12 @@ class Tenant extends Model
      */
     protected $fillable = [
         'name',
-        'slug',
-        'domain',
-        'email',
-        'phone',
-        'address',
-        'logo',
+        'subdomain',
+        'database_name',
+        'isolation_strategy',
+        'status',
         'settings',
-        'is_active',
+        'metadata',
         'trial_ends_at',
         'subscription_ends_at',
     ];
@@ -50,13 +38,13 @@ class Tenant extends Model
      */
     protected $casts = [
         'settings' => 'array',
-        'is_active' => 'boolean',
+        'metadata' => 'array',
         'trial_ends_at' => 'datetime',
         'subscription_ends_at' => 'datetime',
     ];
 
     /**
-     * Get the users for the tenant
+     * Get the users for the tenant.
      */
     public function users(): HasMany
     {
@@ -64,31 +52,31 @@ class Tenant extends Model
     }
 
     /**
-     * Check if tenant is active
+     * Check if tenant is active.
      */
     public function isActive(): bool
     {
-        return $this->is_active;
+        return $this->status === 'active';
     }
 
     /**
-     * Check if tenant subscription is active
+     * Check if tenant subscription is valid.
      */
-    public function hasActiveSubscription(): bool
+    public function hasValidSubscription(): bool
     {
-        if (! $this->subscription_ends_at) {
-            return false;
+        if ($this->subscription_ends_at === null) {
+            return true; // No expiration set
         }
 
         return $this->subscription_ends_at->isFuture();
     }
 
     /**
-     * Check if tenant is in trial period
+     * Check if tenant is in trial.
      */
     public function isInTrial(): bool
     {
-        if (! $this->trial_ends_at) {
+        if ($this->trial_ends_at === null) {
             return false;
         }
 

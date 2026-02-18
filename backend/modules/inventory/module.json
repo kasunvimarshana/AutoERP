@@ -1,0 +1,74 @@
+{
+  "name": "inventory",
+  "display_name": "Inventory Management",
+  "description": "Comprehensive inventory management with product, SKU, stock ledger, and warehouse management",
+  "version": "1.0.0",
+  "author": "ERP Team",
+  "dependencies": ["base", "iam"],
+  "requires": {
+    "php": ">=8.2",
+    "laravel": ">=10.0"
+  },
+  "providers": [
+    "Modules\\Inventory\\Providers\\InventoryServiceProvider"
+  ],
+  "aliases": {
+    "Inventory": "Modules\\Inventory\\Facades\\Inventory"
+  },
+  "autoload": {
+    "psr-4": {
+      "Modules\\Inventory\\": "src/"
+    }
+  },
+  "extra": {
+    "module-type": "base",
+    "priority": 20,
+    "routes": {
+      "api": "routes/api.php"
+    },
+    "migrations": "database/migrations",
+    "permissions": [
+      {
+        "name": "inventory.products.view",
+        "description": "View products",
+        "group": "Products"
+      },
+      {
+        "name": "inventory.products.create",
+        "description": "Create products",
+        "group": "Products"
+      },
+      {
+        "name": "inventory.products.edit",
+        "description": "Edit products",
+        "group": "Products"
+      },
+      {
+        "name": "inventory.products.delete",
+        "description": "Delete products",
+        "group": "Products"
+      },
+      {
+        "name": "inventory.stock.view",
+        "description": "View stock levels",
+        "group": "Stock"
+      },
+      {
+        "name": "inventory.stock.manage",
+        "description": "Manage stock movements",
+        "group": "Stock"
+      },
+      {
+        "name": "inventory.warehouses.view",
+        "description": "View warehouses",
+        "group": "Warehouses"
+      },
+      {
+        "name": "inventory.warehouses.manage",
+        "description": "Manage warehouses",
+        "group": "Warehouses"
+      }
+    ],
+    "enabled": true
+  }
+}

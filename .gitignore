@@ -1,57 +1,263 @@
-# Backend (Laravel)
-/backend/vendor/
-/backend/node_modules/
-/backend/.env
-/backend/.env.backup
-/backend/.env.production
-/backend/.phpunit.result.cache
-/backend/Homestead.json
-/backend/Homestead.yaml
-/backend/auth.json
-/backend/npm-debug.log
-/backend/yarn-error.log
-/backend/storage/*.key
-/backend/.idea
-/backend/.vscode
-/backend/.vagrant
-/backend/public/storage
-/backend/public/hot
-/backend/storage/logs/*.log
-/backend/storage/framework/cache/data/*
-/backend/storage/framework/sessions/*
-/backend/storage/framework/testing/*
-/backend/storage/framework/views/*
-/backend/bootstrap/cache/*
-
-# Frontend (Vue.js)
-/frontend/node_modules/
-/frontend/dist/
-/frontend/.env
-/frontend/.env.local
-/frontend/.env.*.local
-/frontend/npm-debug.log*
-/frontend/yarn-debug.log*
-/frontend/yarn-error.log*
-/frontend/pnpm-debug.log*
-
-# IDEs and Editors
-.idea/
-.vscode/
+# Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 *.swp
 *.swo
 *~
-.DS_Store
 
-# OS
-Thumbs.db
+# IDE and Editor Files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.project
+.settings/
+*.tmproj
+*.code-workspace
 
-# Temporary files
-/tmp/
+# Environment Files
+.env
+.env.local
+.env.*.local
+.env.backup
+.env.production
+
+# Backend (Laravel/PHP)
+/backend/vendor/
+/backend/node_modules/
+/backend/public/hot
+/backend/public/storage
+/backend/storage/*.key
+/backend/storage/app/*
+!/backend/storage/app/.gitkeep
+/backend/storage/framework/cache/*
+!/backend/storage/framework/cache/.gitkeep
+/backend/storage/framework/sessions/*
+!/backend/storage/framework/sessions/.gitkeep
+/backend/storage/framework/testing/*
+!/backend/storage/framework/testing/.gitkeep
+/backend/storage/framework/views/*
+!/backend/storage/framework/views/.gitkeep
+/backend/storage/logs/*
+!/backend/storage/logs/.gitkeep
+/backend/bootstrap/cache/*
+!/backend/bootstrap/cache/.gitkeep
+/backend/.phpunit.result.cache
+/backend/coverage/
+/backend/.php_cs.cache
+/backend/.php-cs-fixer.cache
+
+# Backend (Node.js/NestJS)
+/backend/node_modules/
+/backend/dist/
+/backend/build/
+/backend/.env
+/backend/.env.test
+/backend/.env.production
+
+# Frontend
+/frontend/node_modules/
+/frontend/dist/
+/frontend/build/
+/frontend/.nuxt/
+/frontend/.next/
+/frontend/out/
+/frontend/.cache/
+/frontend/.parcel-cache/
+/frontend/.vite/
+/frontend/.output/
+/frontend/.vercel
+
+# Test Coverage
+/coverage/
+/.nyc_output/
+/frontend/coverage/
+/backend/coverage/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Dependencies
+node_modules/
+vendor/
+jspm_packages/
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+
+# Compiled Files
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+*.pyc
+*.pyo
+
+# Package Files
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Temporary Files
+tmp/
+temp/
 *.tmp
 *.bak
 *.cache
 
-# Build artifacts
-*.log
-coverage/
-.nyc_output/
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Documentation Build
+/docs/_build/
+/docs/.doctrees/
+
+# Certificates and Keys
+*.pem
+*.key
+*.crt
+*.csr
+*.pfx
+*.p12
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
+
+# Kubernetes
+*.kubeconfig
+
+# CI/CD
+.github/workflows/secrets.yml
+
+# MacOS
+.AppleDouble
+.LSOverride
+
+# Windows
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Jetbrains IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Backup files
+*.backup
+*.old
+*.orig
+
+# Module-specific
+/modules/*/vendor/
+/modules/*/node_modules/
+/modules/*/dist/
+
+# Public uploads
+/backend/public/uploads/*
+!/backend/public/uploads/.gitkeep
+/frontend/public/uploads/*
+!/frontend/public/uploads/.gitkeep
+
+# Reports and exports
+/reports/
+/exports/
+
+# Session files
+sessions/
+
+# Cache directories
+.cache/
+.npm/
+.yarn/
+.pnp/
+.pnp.js
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# Yarn v2
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# Storybook
+.storybook-static/
+
+# Local configuration
+.local/
+
+# Generated files
+generated/
+
+# API Documentation
+/api-docs/generated/
+
+# Sentry
+.sentryclirc
