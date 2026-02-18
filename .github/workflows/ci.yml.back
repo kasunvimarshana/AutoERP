@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 name: CI/CD Pipeline
 
 on:
@@ -177,3 +178,100 @@ jobs:
         run: |
           [ -f "docker/Dockerfile.backend" ] && echo "✓ Backend Dockerfile exists"
           [ -f "docker/Dockerfile.frontend" ] && echo "✓ Frontend Dockerfile exists"
+=======
+---
+name: AutoERP Quality Assurance
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  erp-backend-validation:
+    name: ERP Backend Module Validation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure PHP Environment
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, pdo, pdo_pgsql, pgsql, redis, bcmath, intl
+
+      - name: Execute Custom Module Validator
+        working-directory: ./backend
+        run: php scripts/validate-erp-modules.php
+
+  erp-frontend-validation:
+    name: ERP Frontend Module Validation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure Node Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Execute Custom Frontend Validator
+        working-directory: ./frontend
+        run: node scripts/validate-frontend-modules.js
+
+      - name: Verify Tenant-Aware State Management
+        working-directory: ./frontend
+        run: |
+          echo "Checking tenant isolation in Pinia stores..."
+          tenant_refs=$(grep -r "tenant" src/stores/*.ts | wc -l)
+          if [ "$tenant_refs" -gt 0 ]; then
+            echo "✓ Found $tenant_refs tenant references in stores"
+          else
+            echo "✗ No tenant references found in stores"
+            exit 1
+          fi
+
+  erp-integration-check:
+    name: ERP Integration Validation
+    runs-on: ubuntu-latest
+    needs: [erp-backend-validation, erp-frontend-validation]
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Docker Infrastructure
+        run: |
+          echo "=== ERP Container Configuration Check ==="
+          for cfg in docker-compose.yml docker/api/Dockerfile \
+            docker/web/Dockerfile docker/nginx/nginx.conf; do
+            if [ -f "$cfg" ]; then
+              echo "✓ $cfg exists"
+            else
+              echo "✗ $cfg missing"
+              exit 1
+            fi
+          done
+
+      - name: Verify Multi-Tenant Configuration
+        working-directory: ./backend
+        run: |
+          echo "Checking multi-tenant configuration..."
+          if grep -q "stancl/tenancy" composer.json; then
+            echo "✓ Multi-tenant package configured"
+          else
+            echo "✗ Multi-tenant package missing"
+            exit 1
+          fi
+>>>>>>> kv-erp-001

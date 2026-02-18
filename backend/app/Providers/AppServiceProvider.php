@@ -14,6 +14,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+<<<<<<< HEAD
         // Register core services as singletons
         $this->app->singleton(ModuleLoader::class, function ($app) {
             $loader = new ModuleLoader();
@@ -36,6 +37,12 @@ class AppServiceProvider extends ServiceProvider
         $this->app->alias(ModuleLoader::class, 'module.loader');
         $this->app->alias(EventBus::class, 'event.bus');
         $this->app->alias(ConfigurationManager::class, 'config.manager');
+=======
+        // Register Module Registry as singleton
+        $this->app->singleton(\App\Services\ModuleRegistry::class, function ($app) {
+            return new \App\Services\ModuleRegistry;
+        });
+>>>>>>> kv-erp-001
     }
 
     /**

@@ -1,0 +1,26 @@
+{
+  "modules": [
+    {
+      "id": "inventory",
+      "name": "Inventory Management",
+      "icon": "warehouse",
+      "enabled": true,
+      "routes": [
+        {
+          "path": "/inventory/products",
+          "component": "ProductList",
+          "name": "inventory.products.list",
+          "meta": {
+            "title": "Products",
+            "permissions": ["inventory.products.view"]
+          }
+        }
+      ]
+    }
+  ],
+  "features": {
+    "multiCurrency": true,
+    "multiWarehouse": true,
+    "batchTracking": true
+  }
+}

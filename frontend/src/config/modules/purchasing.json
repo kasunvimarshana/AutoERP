@@ -1,0 +1,16 @@
+{
+  "id": "purchasing",
+  "name": "purchasing",
+  "label": "Purchasing",
+  "icon": "shopping-cart",
+  "description": "Manage suppliers, purchase orders, and procurement processes",
+  "enabled": true,
+  "order": 30,
+  "permissions": ["purchasing.access"],
+  "features": {
+    "suppliers": true,
+    "purchaseOrders": true,
+    "approvalWorkflow": true,
+    "goodsReceipts": true
+  }
+}

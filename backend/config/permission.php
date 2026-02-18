@@ -8,9 +8,12 @@ return [
          * When using the "HasPermissions" trait from this package, we need to know which
          * Eloquent model should be used to retrieve your permissions. Of course, it
          * is often just the "Permission" model but you may use whatever you like.
+<<<<<<< HEAD
          *
          * The model you want to use as a Permission model needs to implement the
          * `Spatie\Permission\Contracts\Permission` contract.
+=======
+>>>>>>> kv-erp-001
          */
 
         'permission' => Spatie\Permission\Models\Permission::class,
@@ -19,9 +22,12 @@ return [
          * When using the "HasRoles" trait from this package, we need to know which
          * Eloquent model should be used to retrieve your roles. Of course, it
          * is often just the "Role" model but you may use whatever you like.
+<<<<<<< HEAD
          *
          * The model you want to use as a Role model needs to implement the
          * `Spatie\Permission\Contracts\Role` contract.
+=======
+>>>>>>> kv-erp-001
          */
 
         'role' => Spatie\Permission\Models\Role::class,
@@ -48,7 +54,11 @@ return [
 
         /*
          * When using the "HasPermissions" trait from this package, we need to know which
+<<<<<<< HEAD
          * table should be used to retrieve your models permissions. We have chosen a
+=======
+         * table should be used to retrieve your model permissions. We have chosen a
+>>>>>>> kv-erp-001
          * basic default value but you may easily change it to any table you like.
          */
 
@@ -56,7 +66,11 @@ return [
 
         /*
          * When using the "HasRoles" trait from this package, we need to know which
+<<<<<<< HEAD
          * table should be used to retrieve your models roles. We have chosen a
+=======
+         * table should be used to retrieve your model roles. We have chosen a
+>>>>>>> kv-erp-001
          * basic default value but you may easily change it to any table you like.
          */
 
@@ -64,7 +78,11 @@ return [
 
         /*
          * When using the "HasRoles" trait from this package, we need to know which
+<<<<<<< HEAD
          * table should be used to retrieve your roles permissions. We have chosen a
+=======
+         * table should be used to retrieve your role permissions. We have chosen a
+>>>>>>> kv-erp-001
          * basic default value but you may easily change it to any table you like.
          */
 
@@ -81,6 +99,7 @@ return [
         /*
          * Change this if you want to name the related model primary key other than
          * `model_id`.
+<<<<<<< HEAD
          *
          * For example, this would be nice if your primary keys are all UUIDs. In
          * that case, name this `model_uuid`.
@@ -93,18 +112,32 @@ return [
          * foreign key is other than `team_id`.
          */
 
+=======
+         */
+        'model_morph_key' => 'model_id',
+
+        /*
+         * Change this if you want to use the teams feature and use a different name
+         * for the team foreign key than `team_id`.
+         */
+>>>>>>> kv-erp-001
         'team_foreign_key' => 'team_id',
     ],
 
     /*
      * When set to true, the method for checking permissions will be registered on the gate.
+<<<<<<< HEAD
      * Set this to false if you want to implement custom logic for checking permissions.
+=======
+     * Set this to false, if you want to implement custom logic for checking permissions.
+>>>>>>> kv-erp-001
      */
 
     'register_permission_check_method' => true,
 
     /*
      * When set to true, Laravel\Octane\Events\OperationTerminated event listener will be registered
+<<<<<<< HEAD
      * this will refresh permissions on every TickTerminated, TaskTerminated and RequestTerminated
      * NOTE: This should not be needed in most cases, but an Octane/Vapor combination benefited from it.
      */
@@ -159,15 +192,38 @@ return [
      * setting is false here for optimum safety.
      */
 
+=======
+     * to flush the cache for permissions and roles on every request in octane.
+     */
+
+    'register_octane_reset_listener' => false,
+
+    /*
+     * Teams Feature
+     */
+    'teams' => false,
+
+    /*
+     * Passport Client Credentials Grant
+     */
+    'use_passport_client_credentials' => false,
+
+    'display_permission_in_exception' => false,
+
+>>>>>>> kv-erp-001
     'display_role_in_exception' => false,
 
     /*
      * By default wildcard permission lookups are disabled.
+<<<<<<< HEAD
      * See documentation to understand supported syntax.
+=======
+>>>>>>> kv-erp-001
      */
 
     'enable_wildcard_permission' => false,
 
+<<<<<<< HEAD
     /*
      * The class to use for interpreting wildcard permissions.
      * If you need to modify delimiters, override the class and specify its name here.
@@ -176,6 +232,8 @@ return [
 
     /* Cache-specific settings */
 
+=======
+>>>>>>> kv-erp-001
     'cache' => [
 
         /*

@@ -15,7 +15,11 @@ class RouteServiceProvider extends ServiceProvider
      *
      * @var string
      */
+<<<<<<< HEAD
     public const HOME = '/dashboard';
+=======
+    public const HOME = '/home';
+>>>>>>> kv-erp-001
 
     /**
      * Define your route model bindings, pattern filters, and other route configuration.
@@ -25,12 +29,19 @@ class RouteServiceProvider extends ServiceProvider
         $this->configureRateLimiting();
 
         $this->routes(function () {
+<<<<<<< HEAD
             // API v1 routes with rate limiting
             Route::middleware('api')
                 ->prefix('api/v1')
                 ->group(base_path('routes/api.php'));
 
             // Web routes
+=======
+            Route::middleware('api')
+                ->prefix('api')
+                ->group(base_path('routes/api.php'));
+
+>>>>>>> kv-erp-001
             Route::middleware('web')
                 ->group(base_path('routes/web.php'));
         });
@@ -41,6 +52,7 @@ class RouteServiceProvider extends ServiceProvider
      */
     protected function configureRateLimiting(): void
     {
+<<<<<<< HEAD
         // Global API rate limit - 60 requests per minute
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
@@ -60,5 +72,10 @@ class RouteServiceProvider extends ServiceProvider
         RateLimiter::for('admin', function (Request $request) {
             return Limit::perMinute(30)->by($request->user()?->id ?: $request->ip());
         });
+=======
+        RateLimiter::for('api', function (Request $request) {
+            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        });
+>>>>>>> kv-erp-001
     }
 }

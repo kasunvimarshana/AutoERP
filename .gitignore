@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Operating System Files
+=======
+# OS Files
+>>>>>>> kv-erp-001
 .DS_Store
 .DS_Store?
 ._*
@@ -6,6 +10,7 @@
 .Trashes
 ehthumbs.db
 Thumbs.db
+<<<<<<< HEAD
 *.swp
 *.swo
 *~
@@ -80,10 +85,65 @@ Thumbs.db
 /backend/coverage/
 
 # Logs
+=======
+*~
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+*.sublime-project
+*.sublime-workspace
+.project
+.settings/
+
+# Dependencies
+node_modules/
+vendor/
+bower_components/
+
+# Backend (Laravel)
+backend/.env
+backend/.env.backup
+backend/.env.testing
+backend/.phpunit.result.cache
+backend/storage/*.key
+backend/storage/app/*
+!backend/storage/app/.gitignore
+backend/storage/framework/cache/*
+!backend/storage/framework/cache/.gitignore
+backend/storage/framework/sessions/*
+!backend/storage/framework/sessions/.gitignore
+backend/storage/framework/testing/*
+!backend/storage/framework/testing/.gitignore
+backend/storage/framework/views/*
+!backend/storage/framework/views/.gitignore
+backend/storage/logs/*
+!backend/storage/logs/.gitignore
+backend/bootstrap/cache/*
+!backend/bootstrap/cache/.gitignore
+
+# Frontend (Vue.js)
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+frontend/dist/
+frontend/dist-ssr/
+frontend/.cache/
+frontend/.temp/
+frontend/.vite/
+frontend/coverage/
+
+# Testing
+coverage/
+>>>>>>> kv-erp-001
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+<<<<<<< HEAD
 lerna-debug.log*
 .pnpm-debug.log*
 
@@ -261,3 +321,69 @@ generated/
 
 # Sentry
 .sentryclirc
+=======
+pnpm-debug.log*
+.phpunit.cache
+test-results/
+
+# Build artifacts
+build/
+dist/
+out/
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Compiled files
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Docker
+.docker-sync/
+
+# Terraform
+infrastructure/terraform/**/.terraform/
+infrastructure/terraform/**/*.tfstate
+infrastructure/terraform/**/*.tfstate.backup
+infrastructure/terraform/**/.terraform.lock.hcl
+
+# Secrets
+secrets/
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+
+# Documentation build
+docs/_build/
+site/
+
+# Package files
+*.tar.gz
+*.zip
+*.rar
+
+# CI/CD
+.github/workflows/.cache/
+>>>>>>> kv-erp-001

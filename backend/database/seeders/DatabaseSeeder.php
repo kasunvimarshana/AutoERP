@@ -13,11 +13,20 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+<<<<<<< HEAD
         $this->call([
             RolePermissionSeeder::class,
             TenantSeeder::class,
         ]);
 
         $this->command->info('Database seeding completed successfully!');
+=======
+        // \App\Models\User::factory(10)->create();
+
+        // \App\Models\User::factory()->create([
+        //     'name' => 'Test User',
+        //     'email' => 'test@example.com',
+        // ]);
+>>>>>>> kv-erp-001
     }
 }
