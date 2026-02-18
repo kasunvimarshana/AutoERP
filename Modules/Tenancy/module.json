@@ -1,0 +1,15 @@
+{
+    "name": "Tenancy",
+    "alias": "tenancy",
+    "description": "Multi-tenant support module providing tenant isolation and management",
+    "keywords": [
+        "tenancy",
+        "multi-tenant",
+        "isolation"
+    ],
+    "priority": 2,
+    "providers": [
+        "Modules\\Tenancy\\Providers\\TenancyServiceProvider"
+    ],
+    "files": []
+}

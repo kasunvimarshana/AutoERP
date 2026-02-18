@@ -1,0 +1,15 @@
+{
+    "name": "Core",
+    "alias": "core",
+    "description": "Core module providing base classes, interfaces, and shared functionality",
+    "keywords": [
+        "core",
+        "base",
+        "foundation"
+    ],
+    "priority": 1,
+    "providers": [
+        "Modules\\Core\\Providers\\CoreServiceProvider"
+    ],
+    "files": []
+}

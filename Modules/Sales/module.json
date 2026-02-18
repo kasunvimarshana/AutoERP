@@ -1,0 +1,16 @@
+{
+    "name": "Sales",
+    "alias": "sales",
+    "description": "Sales and CRM module for managing customers, leads, opportunities, and sales orders",
+    "keywords": [
+        "sales",
+        "crm",
+        "customer",
+        "lead"
+    ],
+    "priority": 10,
+    "providers": [
+        "Modules\\Sales\\Providers\\SalesServiceProvider"
+    ],
+    "files": []
+}

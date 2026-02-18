@@ -1,0 +1,19 @@
+{
+    "name": "IAM",
+    "alias": "iam",
+    "description": "Identity and Access Management module for managing users, roles, permissions, and authorization",
+    "keywords": [
+        "iam",
+        "identity",
+        "access",
+        "permissions",
+        "roles",
+        "authorization",
+        "rbac"
+    ],
+    "priority": 5,
+    "providers": [
+        "Modules\\IAM\\Providers\\IAMServiceProvider"
+    ],
+    "files": []
+}

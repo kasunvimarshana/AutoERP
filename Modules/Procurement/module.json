@@ -1,0 +1,17 @@
+{
+    "name": "Procurement",
+    "alias": "procurement",
+    "description": "Procurement module for managing suppliers, purchase requisitions, purchase orders, and goods receipts",
+    "keywords": [
+        "procurement",
+        "purchase",
+        "supplier",
+        "purchase order",
+        "goods receipt"
+    ],
+    "priority": 30,
+    "providers": [
+        "Modules\\Procurement\\Providers\\ProcurementServiceProvider"
+    ],
+    "files": []
+}

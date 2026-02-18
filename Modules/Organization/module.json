@@ -1,0 +1,23 @@
+{
+    "name": "Organization",
+    "alias": "organization",
+    "description": "Multi-level organizational structure management with hierarchical organizations and locations",
+    "keywords": [
+        "organization",
+        "hierarchy",
+        "branch",
+        "location",
+        "multi-organization"
+    ],
+    "priority": 2,
+    "version": "1.0.0",
+    "providers": [
+        "Modules\\Organization\\Providers\\OrganizationServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": [
+        "Core",
+        "Tenancy"
+    ]
+}

@@ -1,0 +1,10 @@
+{
+    "Core": true,
+    "Tenancy": true,
+    "Sales": true,
+    "IAM": true,
+    "Inventory": true,
+    "Accounting": true,
+    "HR": true,
+    "Procurement": true
+}

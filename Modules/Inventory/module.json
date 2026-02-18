@@ -1,0 +1,20 @@
+{
+    "name": "Inventory",
+    "alias": "inventory",
+    "description": "Inventory Management module for managing products, warehouses, stock levels, and stock movements",
+    "keywords": [
+        "inventory",
+        "warehouse",
+        "stock",
+        "product"
+    ],
+    "priority": 20,
+    "providers": [
+        "Modules\\Inventory\\Providers\\InventoryServiceProvider"
+    ],
+    "dependencies": [
+        "Core",
+        "Tenancy"
+    ],
+    "files": []
+}
