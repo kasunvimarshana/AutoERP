@@ -86,6 +86,29 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Supported Locales
+    |--------------------------------------------------------------------------
+    |
+    | List of supported application locales for multi-language support.
+    | Add more locales as needed for your application.
+    |
+    */
+
+    'supported_locales' => [
+        'en' => 'English',
+        'es' => 'Español',
+        'fr' => 'Français',
+        'de' => 'Deutsch',
+        'it' => 'Italiano',
+        'pt' => 'Português',
+        'zh' => '中文',
+        'ja' => '日本語',
+        'ko' => '한국어',
+        'ar' => 'العربية',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Encryption Key
     |--------------------------------------------------------------------------
     |

@@ -1,0 +1,30 @@
+{
+  "name": "base",
+  "display_name": "Base Module",
+  "description": "Base module providing core functionality for all other modules",
+  "version": "1.0.0",
+  "author": "ERP Team",
+  "dependencies": [],
+  "requires": {
+    "php": ">=8.2",
+    "laravel": ">=10.0"
+  },
+  "providers": [
+    "Modules\\Base\\Providers\\BaseServiceProvider"
+  ],
+  "aliases": {},
+  "autoload": {
+    "psr-4": {
+      "Modules\\Base\\": "src/"
+    }
+  },
+  "extra": {
+    "module-type": "core",
+    "priority": 1,
+    "routes": {
+      "api": "routes/api.php"
+    },
+    "migrations": "database/migrations",
+    "enabled": true
+  }
+}
