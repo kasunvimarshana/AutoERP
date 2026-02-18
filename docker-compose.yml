@@ -1,98 +1,139 @@
 version: '3.8'
 
 services:
+  # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
-    container_name: erp_postgres
+    container_name: autoerp-postgres
     environment:
-      POSTGRES_DB: erp_system
-      POSTGRES_USER: erp_admin
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-erp_secure_pass}
+      POSTGRES_DB: autoerp
+      POSTGRES_USER: autoerp_user
+      POSTGRES_PASSWORD: secret_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     networks:
-      - erp_network
+      - autoerp-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U erp_admin"]
+      test: ["CMD-SHELL", "pg_isready -U autoerp_user"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # Redis Cache
   redis:
     image: redis:7-alpine
-    container_name: erp_redis
+    container_name: autoerp-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
     ports:
       - "6379:6379"
     networks:
-      - erp_network
+      - autoerp-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  backend:
-    build:
-      context: ./backend
-      dockerfile: ../docker/Dockerfile.backend
-    container_name: erp_backend
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    environment:
-      DB_CONNECTION: pgsql
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_DATABASE: erp_system
-      DB_USERNAME: erp_admin
-      DB_PASSWORD: ${DB_PASSWORD:-erp_secure_pass}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      APP_ENV: local
-      APP_DEBUG: "true"
-    volumes:
-      - ./backend:/var/www/html
-      - backend_vendor:/var/www/html/vendor
-    ports:
-      - "8000:8000"
-    networks:
-      - erp_network
-    command: php artisan serve --host=0.0.0.0 --port=8000
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: ../docker/Dockerfile.frontend
-    container_name: erp_frontend
-    environment:
-      VITE_API_URL: http://localhost:8000/api
-    volumes:
-      - ./frontend:/app
-      - frontend_node_modules:/app/node_modules
-    ports:
-      - "3000:3000"
-    networks:
-      - erp_network
-    command: npm run dev -- --host
-
+  # MailHog (Development email testing)
   mailhog:
     image: mailhog/mailhog:latest
-    container_name: erp_mailhog
+    container_name: autoerp-mailhog
     ports:
-      - "1025:1025"
-      - "8025:8025"
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
     networks:
-      - erp_network
+      - autoerp-network
+
+  # Laravel API (Backend)
+  # Uncomment when backend is implemented
+  # api:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: ../docker/api/Dockerfile
+  #   container_name: autoerp-api
+  #   environment:
+  #     APP_ENV: local
+  #     APP_DEBUG: "true"
+  #     DB_HOST: postgres
+  #     DB_PORT: 5432
+  #     DB_DATABASE: autoerp
+  #     DB_USERNAME: autoerp_user
+  #     DB_PASSWORD: secret_password
+  #     REDIS_HOST: redis
+  #     REDIS_PORT: 6379
+  #     MAIL_HOST: mailhog
+  #     MAIL_PORT: 1025
+  #   volumes:
+  #     - ./backend:/var/www/html
+  #     - api_storage:/var/www/html/storage
+  #   ports:
+  #     - "8000:8000"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   networks:
+  #     - autoerp-network
+  #   command: php artisan serve --host=0.0.0.0 --port=8000
+
+  # Queue Worker
+  # Uncomment when backend is implemented
+  # worker:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: ../docker/worker/Dockerfile
+  #   container_name: autoerp-worker
+  #   environment:
+  #     APP_ENV: local
+  #     DB_HOST: postgres
+  #     DB_PORT: 5432
+  #     DB_DATABASE: autoerp
+  #     DB_USERNAME: autoerp_user
+  #     DB_PASSWORD: secret_password
+  #     REDIS_HOST: redis
+  #     REDIS_PORT: 6379
+  #   volumes:
+  #     - ./backend:/var/www/html
+  #   depends_on:
+  #     - api
+  #     - redis
+  #   networks:
+  #     - autoerp-network
+  #   command: php artisan queue:work --tries=3 --timeout=90
+
+  # Vue.js Frontend
+  # Uncomment when frontend is implemented
+  # web:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: ../docker/web/Dockerfile
+  #   container_name: autoerp-web
+  #   environment:
+  #     VITE_API_BASE_URL: http://localhost:8000/api
+  #   volumes:
+  #     - ./frontend:/app
+  #     - /app/node_modules
+  #   ports:
+  #     - "5173:5173"
+  #   depends_on:
+  #     - api
+  #   networks:
+  #     - autoerp-network
+  #   command: npm run dev -- --host
 
 volumes:
   postgres_data:
-  backend_vendor:
-  frontend_node_modules:
+    driver: local
+  redis_data:
+    driver: local
+  # api_storage:
+  #   driver: local
 
 networks:
-  erp_network:
+  autoerp-network:
     driver: bridge

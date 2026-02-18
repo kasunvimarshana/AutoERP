@@ -1,0 +1,150 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "AutoERP Enterprise API",
+    "description": "Multi-tenant ERP system with modular architecture supporting global operations",
+    "version": "1.0.0",
+    "contact": {
+      "name": "AutoERP Development Team",
+      "email": "kasun@example.com"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "{protocol}://{host}/api",
+      "description": "AutoERP API Server",
+      "variables": {
+        "protocol": {
+          "default": "https",
+          "enum": ["http", "https"]
+        },
+        "host": {
+          "default": "localhost:8000"
+        }
+      }
+    }
+  ],
+  "tags": [
+    {
+      "name": "IAM-Auth",
+      "description": "Identity and authentication operations"
+    },
+    {
+      "name": "IAM-Users",
+      "description": "User management and profiles"
+    },
+    {
+      "name": "IAM-Roles",
+      "description": "Role hierarchy and assignments"
+    },
+    {
+      "name": "IAM-Permissions",
+      "description": "Permission definitions and grants"
+    },
+    {
+      "name": "Core-Health",
+      "description": "System status and diagnostics"
+    },
+    {
+      "name": "Core-Tenants",
+      "description": "Multi-tenant organization control"
+    },
+    {
+      "name": "Core-Configuration",
+      "description": "Tenant settings and preferences"
+    },
+    {
+      "name": "Core-Audit",
+      "description": "Activity tracking and compliance logs"
+    },
+    {
+      "name": "Core-Metadata",
+      "description": "Dynamic UI configuration data"
+    },
+    {
+      "name": "Purchasing-Orders",
+      "description": "Purchase order management - Create and manage supplier purchase orders"
+    },
+    {
+      "name": "Purchasing-Suppliers",
+      "description": "Supplier/vendor management - Manage supplier relationships and information"
+    },
+    {
+      "name": "Purchasing-GoodsReceipts",
+      "description": "Goods receipt management - Record and manage incoming shipments from suppliers"
+    }
+  ],
+  "paths": {},
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Token",
+        "description": "Sanctum token obtained from login endpoint"
+      }
+    },
+    "schemas": {
+      "ApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Operation outcome indicator"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable response message"
+          },
+          "data": {
+            "type": "object",
+            "description": "Response payload"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "message": {
+            "type": "string",
+            "description": "Error description"
+          },
+          "errors": {
+            "type": "object",
+            "description": "Detailed validation errors"
+          }
+        }
+      },
+      "ValidationError": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "message": {
+            "type": "string",
+            "example": "Validation failed"
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -15,7 +15,7 @@ class RouteServiceProvider extends ServiceProvider
      *
      * @var string
      */
-    public const HOME = '/dashboard';
+    public const HOME = '/home';
 
     /**
      * Define your route model bindings, pattern filters, and other route configuration.
@@ -25,12 +25,10 @@ class RouteServiceProvider extends ServiceProvider
         $this->configureRateLimiting();
 
         $this->routes(function () {
-            // API v1 routes with rate limiting
             Route::middleware('api')
-                ->prefix('api/v1')
+                ->prefix('api')
                 ->group(base_path('routes/api.php'));
 
-            // Web routes
             Route::middleware('web')
                 ->group(base_path('routes/web.php'));
         });
@@ -41,24 +39,8 @@ class RouteServiceProvider extends ServiceProvider
      */
     protected function configureRateLimiting(): void
     {
-        // Global API rate limit - 60 requests per minute
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
-        });
-
-        // Strict rate limit for authentication endpoints - 5 attempts per minute
-        RateLimiter::for('auth', function (Request $request) {
-            return Limit::perMinute(5)->by($request->ip());
-        });
-
-        // Higher rate limit for authenticated users - 120 requests per minute
-        RateLimiter::for('authenticated', function (Request $request) {
-            return Limit::perMinute(120)->by($request->user()?->id ?: $request->ip());
-        });
-
-        // Rate limit for admin operations - 30 requests per minute
-        RateLimiter::for('admin', function (Request $request) {
-            return Limit::perMinute(30)->by($request->user()?->id ?: $request->ip());
         });
     }
 }

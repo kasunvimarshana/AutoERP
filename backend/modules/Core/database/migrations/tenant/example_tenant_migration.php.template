@@ -1,0 +1,34 @@
+<?php
+
+/**
+ * This is a template for tenant-specific migrations.
+ * 
+ * Each tenant will have their own database with these tables.
+ * Copy this file and modify it for your tenant-specific migrations.
+ * 
+ * Example:
+ * cp example_tenant_migration.php.template 2024_01_01_create_tenant_users_table.php
+ */
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        // Example tenant-specific table
+        // Schema::create('tenant_specific_table', function (Blueprint $table) {
+        //     $table->uuid('id')->primary();
+        //     $table->string('name');
+        //     $table->timestamps();
+        //     $table->softDeletes();
+        // });
+    }
+
+    public function down(): void
+    {
+        // Schema::dropIfExists('tenant_specific_table');
+    }
+};

@@ -3,124 +3,124 @@
 namespace Tests\Unit\ValueObjects;
 
 use App\ValueObjects\Money;
-use App\Services\Finance\CurrencyService;
 use InvalidArgumentException;
 use Tests\TestCase;
 
 class MoneyTest extends TestCase
 {
-    public function test_can_create_money_object()
+    public function test_can_create_money_with_amount_and_currency(): void
     {
-        $money = new Money(100.50, 'USD');
+        $money = Money::fromAmount(100.50, 'USD');
         
         $this->assertEquals(100.50, $money->getAmount());
         $this->assertEquals('USD', $money->getCurrency());
     }
 
-    public function test_cannot_create_money_with_negative_amount()
+    public function test_can_create_zero_money(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        new Money(-100, 'USD');
+        $money = Money::zero('EUR');
+        
+        $this->assertEquals(0.0, $money->getAmount());
+        $this->assertEquals('EUR', $money->getCurrency());
+        $this->assertTrue($money->isZero());
     }
 
-    public function test_can_add_money()
+    public function test_cannot_create_negative_money(): void
     {
-        $money1 = new Money(100, 'USD');
-        $money2 = new Money(50, 'USD');
+        $this->expectException(InvalidArgumentException::class);
+        Money::fromAmount(-10, 'USD');
+    }
+
+    public function test_can_add_money(): void
+    {
+        $money1 = Money::fromAmount(100, 'USD');
+        $money2 = Money::fromAmount(50, 'USD');
         
         $result = $money1->add($money2);
         
         $this->assertEquals(150, $result->getAmount());
-        $this->assertEquals('USD', $result->getCurrency());
     }
 
-    public function test_cannot_add_money_with_different_currencies()
+    public function test_cannot_add_different_currencies(): void
     {
-        $money1 = new Money(100, 'USD');
-        $money2 = new Money(50, 'EUR');
+        $money1 = Money::fromAmount(100, 'USD');
+        $money2 = Money::fromAmount(50, 'EUR');
         
         $this->expectException(InvalidArgumentException::class);
         $money1->add($money2);
     }
 
-    public function test_can_subtract_money()
+    public function test_can_subtract_money(): void
     {
-        $money1 = new Money(100, 'USD');
-        $money2 = new Money(30, 'USD');
+        $money1 = Money::fromAmount(100, 'USD');
+        $money2 = Money::fromAmount(30, 'USD');
         
         $result = $money1->subtract($money2);
         
         $this->assertEquals(70, $result->getAmount());
-        $this->assertEquals('USD', $result->getCurrency());
     }
 
-    public function test_cannot_subtract_to_negative()
+    public function test_cannot_subtract_more_than_amount(): void
     {
-        $money1 = new Money(50, 'USD');
-        $money2 = new Money(100, 'USD');
+        $money1 = Money::fromAmount(50, 'USD');
+        $money2 = Money::fromAmount(100, 'USD');
         
         $this->expectException(InvalidArgumentException::class);
         $money1->subtract($money2);
     }
 
-    public function test_can_multiply_money()
+    public function test_can_multiply_money(): void
     {
-        $money = new Money(100, 'USD');
+        $money = Money::fromAmount(10, 'USD');
         
-        $result = $money->multiply(2);
+        $result = $money->multiply(2.5);
         
-        $this->assertEquals(200, $result->getAmount());
-        $this->assertEquals('USD', $result->getCurrency());
+        $this->assertEquals(25, $result->getAmount());
     }
 
-    public function test_can_divide_money()
+    public function test_can_divide_money(): void
     {
-        $money = new Money(100, 'USD');
+        $money = Money::fromAmount(100, 'USD');
         
-        $result = $money->divide(2);
+        $result = $money->divide(4);
         
-        $this->assertEquals(50, $result->getAmount());
-        $this->assertEquals('USD', $result->getCurrency());
+        $this->assertEquals(25, $result->getAmount());
     }
 
-    public function test_can_compare_money()
+    public function test_can_compare_money(): void
     {
-        $money1 = new Money(100, 'USD');
-        $money2 = new Money(50, 'USD');
-        $money3 = new Money(100, 'USD');
+        $money1 = Money::fromAmount(100, 'USD');
+        $money2 = Money::fromAmount(50, 'USD');
+        $money3 = Money::fromAmount(100, 'USD');
         
-        $this->assertTrue($money1->greaterThan($money2));
-        $this->assertTrue($money2->lessThan($money1));
+        $this->assertTrue($money1->isGreaterThan($money2));
+        $this->assertTrue($money2->isLessThan($money1));
         $this->assertTrue($money1->equals($money3));
     }
 
-    public function test_can_check_if_zero()
+    public function test_can_format_money(): void
     {
-        $money = new Money(0, 'USD');
+        $money = Money::fromAmount(100.50, 'USD');
         
-        $this->assertTrue($money->isZero());
+        $this->assertEquals('USD 100.50', $money->format());
+        $this->assertEquals('USD 100.50', (string) $money);
     }
 
-    public function test_can_convert_to_array()
+    public function test_can_json_serialize(): void
     {
-        $money = new Money(100.50, 'USD');
+        $money = Money::fromAmount(100.50, 'USD');
         
-        $array = $money->toArray();
+        $json = $money->jsonSerialize();
         
-        $this->assertEquals([
-            'amount' => 100.50,
-            'currency' => 'USD',
-        ], $array);
+        $this->assertIsArray($json);
+        $this->assertEquals(100.50, $json['amount']);
+        $this->assertEquals('USD', $json['currency']);
+        $this->assertEquals('USD 100.50', $json['formatted']);
     }
 
-    public function test_can_create_from_array()
+    public function test_currency_must_be_three_letters(): void
     {
-        $money = Money::fromArray([
-            'amount' => 100.50,
-            'currency' => 'EUR',
-        ]);
-        
-        $this->assertEquals(100.50, $money->getAmount());
-        $this->assertEquals('EUR', $money->getCurrency());
+        $this->expectException(InvalidArgumentException::class);
+        Money::fromAmount(100, 'US');
     }
 }
