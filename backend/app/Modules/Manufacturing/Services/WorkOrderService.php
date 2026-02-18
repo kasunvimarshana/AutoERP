@@ -1,462 +1,278 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Modules\Manufacturing\Services;
 
-use App\Core\Services\BaseService;
-use App\Core\Exceptions\ServiceException;
-use App\Modules\Manufacturing\Repositories\WorkOrderRepositoryInterface;
-use App\Modules\Manufacturing\Repositories\BillOfMaterialRepositoryInterface;
+use App\Modules\Manufacturing\DTOs\CompleteWorkOrderDTO;
+use App\Modules\Manufacturing\Enums\WorkOrderStatus;
+use App\Modules\Manufacturing\Events\WorkOrderCompleted;
+use App\Modules\Manufacturing\Events\WorkOrderStarted;
 use App\Modules\Manufacturing\Models\WorkOrder;
-use App\Modules\Manufacturing\Models\WorkOrderItem;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use App\Modules\Manufacturing\Repositories\WorkOrderRepository;
+use App\Services\BaseService;
+use Illuminate\Support\Facades\Auth;
 
 /**
- * WorkOrderService
- * 
- * Handles business logic for Work Order management and production operations
+ * Work Order Service
+ *
+ * Handles business logic for work order scheduling and completion.
  */
 class WorkOrderService extends BaseService
 {
-    protected BillOfMaterialRepositoryInterface $bomRepository;
+    public function __construct(
+        protected WorkOrderRepository $workOrderRepository
+    ) {}
 
     /**
-     * WorkOrderService constructor.
-     *
-     * @param WorkOrderRepositoryInterface $repository
-     * @param BillOfMaterialRepositoryInterface $bomRepository
+     * Get all work orders with pagination
      */
-    public function __construct(
-        WorkOrderRepositoryInterface $repository,
-        BillOfMaterialRepositoryInterface $bomRepository
-    ) {
-        parent::__construct($repository);
-        $this->bomRepository = $bomRepository;
+    public function getAllWorkOrders(int $perPage = 15)
+    {
+        return $this->workOrderRepository->paginate($perPage);
     }
 
     /**
      * Create a new work order
-     *
-     * @param array $data
-     * @return WorkOrder
-     * @throws ServiceException
      */
-    public function create(array $data)
+    public function createWorkOrder(array $data): WorkOrder
     {
-        DB::beginTransaction();
-        
-        try {
-            // Check if work order number already exists
-            if (isset($data['work_order_number'])) {
-                $existing = $this->repository->findByNumber($data['work_order_number']);
-                if ($existing) {
-                    throw new ServiceException('Work order number already exists');
-                }
-            } else {
-                // Auto-generate work order number if not provided
-                $data['work_order_number'] = $this->generateWorkOrderNumber();
-            }
+        return $this->transaction(function () use ($data) {
+            $this->logInfo('Creating new work order', ['wo_number' => $data['work_order_number']]);
 
-            // If BOM is not specified, use default BOM for the product
-            if (!isset($data['bom_id']) && isset($data['product_id'])) {
-                $defaultBOM = $this->bomRepository->getDefaultBOM($data['product_id']);
-                if ($defaultBOM) {
-                    $data['bom_id'] = $defaultBOM->id;
-                }
-            }
-
-            // Extract items data (if provided)
-            $items = $data['items'] ?? null;
-            unset($data['items']);
-
-            // Set default status if not provided
-            $data['status'] = $data['status'] ?? 'draft';
-
-            // Create the work order
-            $workOrder = $this->repository->create($data);
-
-            // Create work order items from BOM or provided items
-            if ($items !== null) {
-                $this->createWorkOrderItems($workOrder, $items);
-            } elseif ($workOrder->bom_id) {
-                $this->createWorkOrderItemsFromBOM($workOrder);
-            }
-
-            // Calculate estimated cost
-            $this->updateEstimatedCost($workOrder);
-
-            DB::commit();
-            
-            return $this->repository->getWithItems($workOrder->id);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Failed to create work order: ' . $e->getMessage());
-            throw new ServiceException('Failed to create work order: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Update work order
-     *
-     * @param int $id
-     * @param array $data
-     * @return WorkOrder
-     * @throws ServiceException
-     */
-    public function update(int $id, array $data)
-    {
-        DB::beginTransaction();
-        
-        try {
-            $workOrder = $this->repository->findById($id);
-            
-            if (!$workOrder) {
-                throw new ServiceException('Work order not found');
-            }
-
-            // Validate status transitions
-            if (isset($data['status']) && !$this->canChangeStatus($workOrder, $data['status'])) {
-                throw new ServiceException("Cannot change status from {$workOrder->status} to {$data['status']}");
-            }
-
-            // Check work order number uniqueness if changed
-            if (isset($data['work_order_number']) && $data['work_order_number'] !== $workOrder->work_order_number) {
-                $existing = $this->repository->findByNumber($data['work_order_number']);
-                if ($existing && $existing->id !== $id) {
-                    throw new ServiceException('Work order number already exists');
-                }
-            }
-
-            // Extract items data
-            $items = $data['items'] ?? null;
-            unset($data['items']);
-
-            // Update the work order
-            $this->repository->update($id, $data);
-
-            // Update work order items if provided
-            if ($items !== null) {
-                $this->updateWorkOrderItems($workOrder, $items);
-            }
-
-            // Recalculate costs if needed
-            if ($items !== null || isset($data['planned_quantity'])) {
-                $this->updateEstimatedCost($workOrder);
-            }
-
-            DB::commit();
-            
-            return $this->repository->getWithItems($id);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Failed to update work order: ' . $e->getMessage());
-            throw new ServiceException('Failed to update work order: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Start production (move to in_progress status)
-     *
-     * @param int $id
-     * @return WorkOrder
-     * @throws ServiceException
-     */
-    public function startProduction(int $id)
-    {
-        DB::beginTransaction();
-        
-        try {
-            $workOrder = $this->repository->findById($id);
-            
-            if (!$workOrder) {
-                throw new ServiceException('Work order not found');
-            }
-
-            if (!$workOrder->canStart()) {
-                throw new ServiceException('Work order cannot be started from current status');
-            }
-
-            // Validate material availability (optional - can be implemented later)
-            // $this->validateMaterialAvailability($workOrder);
-
-            $this->repository->update($id, [
-                'status' => 'in_progress',
-                'actual_start_date' => now(),
+            // Create work order
+            $workOrder = $this->workOrderRepository->create([
+                'work_order_number' => $data['work_order_number'],
+                'production_order_id' => $data['production_order_id'],
+                'workstation' => $data['workstation'] ?? null,
+                'description' => $data['description'] ?? null,
+                'scheduled_start' => $data['scheduled_start'] ?? null,
+                'scheduled_end' => $data['scheduled_end'] ?? null,
+                'status' => $data['status'] ?? WorkOrderStatus::PENDING->value,
+                'notes' => $data['notes'] ?? null,
+                'assigned_to' => $data['assigned_to'] ?? null,
             ]);
 
-            DB::commit();
-            
-            return $this->repository->findById($id);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Failed to start production: ' . $e->getMessage());
-            throw new ServiceException('Failed to start production: ' . $e->getMessage());
-        }
+            // Load relationships
+            $workOrder->load(['productionOrder.product', 'assignedUser']);
+
+            $this->logInfo('Work order created successfully', ['id' => $workOrder->id]);
+
+            return $workOrder;
+        });
     }
 
     /**
-     * Complete production
-     *
-     * @param int $id
-     * @param array $data
-     * @return WorkOrder
-     * @throws ServiceException
+     * Update a work order
      */
-    public function completeProduction(int $id, array $data = [])
+    public function updateWorkOrder(int $id, array $data): WorkOrder
     {
-        DB::beginTransaction();
-        
-        try {
-            $workOrder = $this->repository->findById($id);
-            
-            if (!$workOrder) {
-                throw new ServiceException('Work order not found');
+        return $this->transaction(function () use ($id, $data) {
+            $this->logInfo('Updating work order', ['id' => $id]);
+
+            // Update work order
+            $this->workOrderRepository->update($id, [
+                'work_order_number' => $data['work_order_number'],
+                'production_order_id' => $data['production_order_id'],
+                'workstation' => $data['workstation'] ?? null,
+                'description' => $data['description'] ?? null,
+                'scheduled_start' => $data['scheduled_start'] ?? null,
+                'scheduled_end' => $data['scheduled_end'] ?? null,
+                'notes' => $data['notes'] ?? null,
+                'assigned_to' => $data['assigned_to'] ?? null,
+            ]);
+
+            $workOrder = $this->workOrderRepository->findOrFail($id);
+            $workOrder->load(['productionOrder.product', 'assignedUser']);
+
+            $this->logInfo('Work order updated successfully', ['id' => $id]);
+
+            return $workOrder;
+        });
+    }
+
+    /**
+     * Delete a work order
+     */
+    public function deleteWorkOrder(int $id): bool
+    {
+        $this->logInfo('Deleting work order', ['id' => $id]);
+
+        $result = $this->workOrderRepository->delete($id);
+
+        if ($result) {
+            $this->logInfo('Work order deleted successfully', ['id' => $id]);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get a work order by ID
+     */
+    public function getWorkOrderById(int $id): WorkOrder
+    {
+        return $this->workOrderRepository->findWithRelations($id);
+    }
+
+    /**
+     * Start a work order
+     */
+    public function start(int $id): WorkOrder
+    {
+        return $this->transaction(function () use ($id) {
+            $workOrder = $this->workOrderRepository->findOrFail($id);
+
+            // Check if can be started
+            if (! $workOrder->status->canStart()) {
+                throw new \InvalidArgumentException(
+                    "Work order with status '{$workOrder->status->label()}' cannot be started"
+                );
             }
 
-            if (!$workOrder->canComplete()) {
-                throw new ServiceException('Work order cannot be completed from current status');
+            $this->logInfo('Starting work order', ['id' => $id]);
+
+            // Update status
+            $this->workOrderRepository->update($id, [
+                'status' => WorkOrderStatus::IN_PROGRESS->value,
+                'actual_start' => now(),
+                'started_by' => Auth::id(),
+            ]);
+
+            $workOrder->refresh();
+            $workOrder->load(['productionOrder.product', 'assignedUser']);
+
+            // Dispatch event
+            event(new WorkOrderStarted($workOrder));
+
+            $this->logInfo('Work order started successfully', ['id' => $id]);
+
+            return $workOrder;
+        });
+    }
+
+    /**
+     * Complete a work order
+     */
+    public function complete(int $id, ?CompleteWorkOrderDTO $dto = null): WorkOrder
+    {
+        return $this->transaction(function () use ($id, $dto) {
+            $workOrder = $this->workOrderRepository->findOrFail($id);
+
+            // Check if can be completed
+            if (! $workOrder->status->canComplete()) {
+                throw new \InvalidArgumentException(
+                    "Work order with status '{$workOrder->status->label()}' cannot be completed"
+                );
             }
+
+            $this->logInfo('Completing work order', ['id' => $id]);
 
             $updateData = [
-                'status' => 'completed',
-                'actual_end_date' => now(),
+                'status' => WorkOrderStatus::COMPLETED->value,
+                'actual_end' => $dto?->actualEnd ?? now(),
+                'completed_by' => $dto?->completedBy ?? Auth::id(),
             ];
 
-            if (isset($data['produced_quantity'])) {
-                $updateData['produced_quantity'] = $data['produced_quantity'];
+            if ($dto?->notes) {
+                $updateData['notes'] = $dto->notes;
             }
 
-            if (isset($data['scrap_quantity'])) {
-                $updateData['scrap_quantity'] = $data['scrap_quantity'];
-            }
+            $this->workOrderRepository->update($id, $updateData);
 
-            if (isset($data['actual_cost'])) {
-                $updateData['actual_cost'] = $data['actual_cost'];
-            }
+            $workOrder->refresh();
+            $workOrder->load(['productionOrder.product', 'assignedUser']);
 
-            $this->repository->update($id, $updateData);
+            // Dispatch event
+            event(new WorkOrderCompleted($workOrder));
 
-            // Trigger inventory updates (to be implemented with Inventory Service integration)
-            // $this->updateInventory($workOrder);
+            $this->logInfo('Work order completed successfully', ['id' => $id]);
 
-            DB::commit();
-            
-            return $this->repository->findById($id);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Failed to complete production: ' . $e->getMessage());
-            throw new ServiceException('Failed to complete production: ' . $e->getMessage());
-        }
+            return $workOrder;
+        });
     }
 
     /**
-     * Cancel work order
-     *
-     * @param int $id
-     * @param string $reason
-     * @return WorkOrder
-     * @throws ServiceException
+     * Cancel a work order
      */
-    public function cancel(int $id, string $reason = '')
+    public function cancel(int $id): WorkOrder
     {
-        DB::beginTransaction();
-        
-        try {
-            $workOrder = $this->repository->findById($id);
-            
-            if (!$workOrder) {
-                throw new ServiceException('Work order not found');
+        return $this->transaction(function () use ($id) {
+            $workOrder = $this->workOrderRepository->findOrFail($id);
+
+            // Check if can be cancelled
+            if (! $workOrder->status->canCancel()) {
+                throw new \InvalidArgumentException(
+                    "Work order with status '{$workOrder->status->label()}' cannot be cancelled"
+                );
             }
 
-            if (!$workOrder->canCancel()) {
-                throw new ServiceException('Work order cannot be cancelled from current status');
-            }
+            $this->logInfo('Cancelling work order', ['id' => $id]);
 
-            $this->repository->update($id, [
-                'status' => 'cancelled',
-                'cancelled_by' => auth()->id(),
-                'cancelled_at' => now(),
-                'cancellation_reason' => $reason,
+            $this->workOrderRepository->update($id, [
+                'status' => WorkOrderStatus::CANCELLED->value,
             ]);
 
-            // Release allocated materials (to be implemented with Inventory Service integration)
-            // $this->releaseAllocatedMaterials($workOrder);
+            $workOrder->refresh();
+            $workOrder->load(['productionOrder.product', 'assignedUser']);
 
-            DB::commit();
-            
-            return $this->repository->findById($id);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Failed to cancel work order: ' . $e->getMessage());
-            throw new ServiceException('Failed to cancel work order: ' . $e->getMessage());
-        }
+            $this->logInfo('Work order cancelled successfully', ['id' => $id]);
+
+            return $workOrder;
+        });
     }
 
     /**
      * Get work orders by status
-     *
-     * @param string $status
-     * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function getByStatus(string $status)
+    public function getByStatus(WorkOrderStatus $status)
     {
-        return $this->repository->getByStatus($status);
+        return $this->workOrderRepository->getByStatus($status);
+    }
+
+    /**
+     * Get pending work orders
+     */
+    public function getPending()
+    {
+        return $this->workOrderRepository->getPending();
     }
 
     /**
      * Get in-progress work orders
-     *
-     * @return \Illuminate\Database\Eloquent\Collection
      */
     public function getInProgress()
     {
-        return $this->repository->getInProgress();
+        return $this->workOrderRepository->getInProgress();
     }
 
     /**
-     * Get overdue work orders
-     *
-     * @return \Illuminate\Database\Eloquent\Collection
+     * Get work orders for production order
      */
-    public function getOverdue()
+    public function getByProductionOrder(int $productionOrderId)
     {
-        return $this->repository->getOverdue();
+        return $this->workOrderRepository->getByProductionOrder($productionOrderId);
+    }
+
+    /**
+     * Get work orders assigned to user
+     */
+    public function getAssignedToUser(int $userId)
+    {
+        return $this->workOrderRepository->getAssignedToUser($userId);
     }
 
     /**
      * Search work orders
-     *
-     * @param array $filters
-     * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function search(array $filters = [])
+    public function searchWorkOrders(string $search)
     {
-        return $this->repository->search($filters);
+        return $this->workOrderRepository->search($search);
     }
 
     /**
-     * Generate unique work order number
-     *
-     * @return string
+     * Get overdue work orders
      */
-    protected function generateWorkOrderNumber(): string
+    public function getOverdue()
     {
-        $prefix = 'WO';
-        $date = now()->format('Ymd');
-        $random = strtoupper(substr(md5(uniqid()), 0, 6));
-        
-        return "{$prefix}-{$date}-{$random}";
-    }
-
-    /**
-     * Create work order items from BOM
-     *
-     * @param WorkOrder $workOrder
-     * @return void
-     */
-    protected function createWorkOrderItemsFromBOM(WorkOrder $workOrder): void
-    {
-        $bom = $this->bomRepository->getWithItems($workOrder->bom_id);
-        
-        if (!$bom) {
-            return;
-        }
-
-        $quantity = $workOrder->planned_quantity;
-
-        foreach ($bom->items as $index => $bomItem) {
-            $plannedQty = $bomItem->required_quantity * $quantity;
-            
-            WorkOrderItem::create([
-                'work_order_id' => $workOrder->id,
-                'product_id' => $bomItem->product_id,
-                'bom_item_id' => $bomItem->id,
-                'planned_quantity' => $plannedQty,
-                'unit_id' => $bomItem->unit_id,
-                'unit_cost' => $bomItem->unit_cost,
-                'total_cost' => $plannedQty * $bomItem->unit_cost,
-                'scrap_percentage' => $bomItem->scrap_percentage,
-                'sequence' => $bomItem->sequence,
-                'status' => 'pending',
-            ]);
-        }
-    }
-
-    /**
-     * Create work order items
-     *
-     * @param WorkOrder $workOrder
-     * @param array $items
-     * @return void
-     */
-    protected function createWorkOrderItems(WorkOrder $workOrder, array $items): void
-    {
-        foreach ($items as $index => $itemData) {
-            $itemData['work_order_id'] = $workOrder->id;
-            $itemData['sequence'] = $itemData['sequence'] ?? $index + 1;
-            $itemData['status'] = $itemData['status'] ?? 'pending';
-            $itemData['total_cost'] = ($itemData['planned_quantity'] ?? 0) * ($itemData['unit_cost'] ?? 0);
-            
-            WorkOrderItem::create($itemData);
-        }
-    }
-
-    /**
-     * Update work order items
-     *
-     * @param WorkOrder $workOrder
-     * @param array $items
-     * @return void
-     */
-    protected function updateWorkOrderItems(WorkOrder $workOrder, array $items): void
-    {
-        // Delete existing items
-        $workOrder->items()->delete();
-        
-        // Create new items
-        $this->createWorkOrderItems($workOrder, $items);
-    }
-
-    /**
-     * Update estimated cost of work order
-     *
-     * @param WorkOrder $workOrder
-     * @return void
-     */
-    protected function updateEstimatedCost(WorkOrder $workOrder): void
-    {
-        $workOrder->refresh();
-        $materialCost = $workOrder->items->sum('total_cost');
-        $estimatedCost = $materialCost + ($workOrder->labor_cost ?? 0) + ($workOrder->overhead_cost ?? 0);
-        
-        $workOrder->update([
-            'material_cost' => $materialCost,
-            'estimated_cost' => $estimatedCost,
-        ]);
-    }
-
-    /**
-     * Check if status change is allowed
-     *
-     * @param WorkOrder $workOrder
-     * @param string $newStatus
-     * @return bool
-     */
-    protected function canChangeStatus(WorkOrder $workOrder, string $newStatus): bool
-    {
-        $allowedTransitions = [
-            'draft' => ['planned', 'cancelled'],
-            'planned' => ['released', 'cancelled'],
-            'released' => ['in_progress', 'cancelled'],
-            'in_progress' => ['completed', 'cancelled'],
-            'completed' => [],
-            'cancelled' => [],
-        ];
-
-        $currentStatus = $workOrder->status;
-        
-        return in_array($newStatus, $allowedTransitions[$currentStatus] ?? []);
+        return $this->workOrderRepository->getOverdue();
     }
 }

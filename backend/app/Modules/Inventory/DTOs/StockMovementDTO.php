@@ -1,141 +1,84 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Modules\Inventory\DTOs;
 
-use App\Core\DTOs\BaseDTO;
+use App\Enums\StockMovementType;
 
 /**
  * Stock Movement Data Transfer Object
- * 
- * Type-safe data container for inventory movements
+ *
+ * Encapsulates data for stock movement operations.
  */
-class StockMovementDTO extends BaseDTO
+class StockMovementDTO
 {
     public function __construct(
-        public readonly int $product_id,
-        public readonly int $tenant_id,
-        public readonly ?int $organization_id = null,
-        public readonly ?int $branch_id = null,
-        public readonly ?int $location_id = null,
-        public readonly ?int $variant_id = null,
-        public readonly string $movement_type, // in, out, adjustment, transfer
+        public readonly int $productId,
+        public readonly StockMovementType $movementType,
         public readonly float $quantity,
-        public readonly ?int $unit_id = null,
-        public readonly ?float $unit_cost = null,
-        public readonly ?string $reference_type = null, // purchase_order, sales_order, etc.
-        public readonly ?int $reference_id = null,
-        public readonly ?string $batch_number = null,
-        public readonly ?string $serial_number = null,
-        public readonly ?string $lot_number = null,
-        public readonly ?\DateTimeInterface $expiry_date = null,
+        public readonly ?float $unitCost = null,
+        public readonly ?int $warehouseId = null,
+        public readonly ?int $locationId = null,
+        public readonly ?string $batchNumber = null,
+        public readonly ?string $lotNumber = null,
+        public readonly ?string $serialNumber = null,
+        public readonly ?string $manufacturingDate = null,
+        public readonly ?string $expiryDate = null,
+        public readonly ?string $referenceType = null,
+        public readonly ?int $referenceId = null,
         public readonly ?string $notes = null,
-        public readonly ?int $from_branch_id = null,
-        public readonly ?int $from_location_id = null,
-        public readonly ?int $to_branch_id = null,
-        public readonly ?int $to_location_id = null,
-        public readonly ?int $created_by = null,
         public readonly ?array $metadata = null,
-    ) {
-        $this->validate();
+        public readonly ?\DateTime $transactionDate = null,
+    ) {}
+
+    /**
+     * Create DTO from array
+     */
+    public static function fromArray(array $data): self
+    {
+        return new self(
+            productId: $data['product_id'],
+            movementType: StockMovementType::from($data['movement_type']),
+            quantity: $data['quantity'],
+            unitCost: $data['unit_cost'] ?? null,
+            warehouseId: $data['warehouse_id'] ?? null,
+            locationId: $data['location_id'] ?? null,
+            batchNumber: $data['batch_number'] ?? null,
+            lotNumber: $data['lot_number'] ?? null,
+            serialNumber: $data['serial_number'] ?? null,
+            manufacturingDate: $data['manufacturing_date'] ?? null,
+            expiryDate: $data['expiry_date'] ?? null,
+            referenceType: $data['reference_type'] ?? null,
+            referenceId: $data['reference_id'] ?? null,
+            notes: $data['notes'] ?? null,
+            metadata: $data['metadata'] ?? null,
+            transactionDate: isset($data['transaction_date'])
+                ? new \DateTime($data['transaction_date'])
+                : null,
+        );
     }
 
     /**
-     * Validate DTO data
-     *
-     * @throws \InvalidArgumentException
+     * Convert DTO to array
      */
-    public function validate(): void
+    public function toArray(): array
     {
-        if ($this->product_id <= 0) {
-            throw new \InvalidArgumentException('Valid product_id is required');
-        }
-
-        if ($this->tenant_id <= 0) {
-            throw new \InvalidArgumentException('Valid tenant_id is required');
-        }
-
-        if (!in_array($this->movement_type, ['in', 'out', 'adjustment', 'transfer'])) {
-            throw new \InvalidArgumentException('Invalid movement type');
-        }
-
-        if ($this->quantity == 0) {
-            throw new \InvalidArgumentException('Quantity cannot be zero');
-        }
-
-        if ($this->unit_cost !== null && $this->unit_cost < 0) {
-            throw new \InvalidArgumentException('Unit cost cannot be negative');
-        }
-
-        if ($this->movement_type === 'transfer') {
-            if ($this->from_branch_id === null || $this->to_branch_id === null) {
-                throw new \InvalidArgumentException('Transfer requires both from_branch_id and to_branch_id');
-            }
-
-            if ($this->from_branch_id === $this->to_branch_id && 
-                $this->from_location_id === $this->to_location_id) {
-                throw new \InvalidArgumentException('Transfer source and destination cannot be the same');
-            }
-        }
-    }
-
-    /**
-     * Get absolute quantity (for calculations)
-     *
-     * @return float
-     */
-    public function getAbsoluteQuantity(): float
-    {
-        return abs($this->quantity);
-    }
-
-    /**
-     * Get signed quantity (positive for in, negative for out)
-     *
-     * @return float
-     */
-    public function getSignedQuantity(): float
-    {
-        return match ($this->movement_type) {
-            'in' => abs($this->quantity),
-            'out' => -abs($this->quantity),
-            'adjustment' => $this->quantity,
-            'transfer' => $this->quantity,
-        };
-    }
-
-    /**
-     * Check if this is a stock increase
-     *
-     * @return bool
-     */
-    public function isStockIncrease(): bool
-    {
-        return $this->getSignedQuantity() > 0;
-    }
-
-    /**
-     * Check if this is a stock decrease
-     *
-     * @return bool
-     */
-    public function isStockDecrease(): bool
-    {
-        return $this->getSignedQuantity() < 0;
-    }
-
-    /**
-     * Get total value of this movement
-     *
-     * @return float|null
-     */
-    public function getTotalValue(): ?float
-    {
-        if ($this->unit_cost === null) {
-            return null;
-        }
-
-        return $this->getAbsoluteQuantity() * $this->unit_cost;
+        return [
+            'product_id' => $this->productId,
+            'movement_type' => $this->movementType->value,
+            'quantity' => $this->quantity,
+            'unit_cost' => $this->unitCost,
+            'warehouse_id' => $this->warehouseId,
+            'location_id' => $this->locationId,
+            'batch_number' => $this->batchNumber,
+            'lot_number' => $this->lotNumber,
+            'serial_number' => $this->serialNumber,
+            'manufacturing_date' => $this->manufacturingDate,
+            'expiry_date' => $this->expiryDate,
+            'reference_type' => $this->referenceType,
+            'reference_id' => $this->referenceId,
+            'notes' => $this->notes,
+            'metadata' => $this->metadata,
+            'transaction_date' => $this->transactionDate?->format('Y-m-d H:i:s'),
+        ];
     }
 }

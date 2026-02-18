@@ -1,233 +1,242 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Modules\IAM\Services;
 
 use App\Models\User;
-use App\Modules\IAM\Repositories\UserRepositoryInterface;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use App\Modules\IAM\DTOs\UserDTO;
+use App\Modules\IAM\Repositories\RoleRepository;
+use App\Modules\IAM\Repositories\UserRepository;
+use App\Services\BaseService;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
 
-class UserService
+/**
+ * User Service
+ *
+ * Handles business logic for user management including
+ * role assignments and permissions.
+ */
+class UserService extends BaseService
 {
     public function __construct(
-        private readonly UserRepositoryInterface $userRepository
+        protected UserRepository $userRepository,
+        protected RoleRepository $roleRepository
     ) {}
 
     /**
-     * Get paginated list of users.
-     *
-     * @param int $perPage
-     * @return LengthAwarePaginator
+     * Get all users
      */
-    public function getUsers(int $perPage = 15): LengthAwarePaginator
+    public function getAllUsers(?int $tenantId = null): Collection
+    {
+        if ($tenantId) {
+            return $this->userRepository->getByTenant($tenantId);
+        }
+
+        return $this->userRepository->all();
+    }
+
+    /**
+     * Get paginated users
+     *
+     * @return \Illuminate\Pagination\LengthAwarePaginator
+     */
+    public function getPaginatedUsers(int $perPage = 15)
     {
         return $this->userRepository->paginate($perPage);
     }
 
     /**
-     * Get a user by ID.
-     *
-     * @param int $id
-     * @return User|null
+     * Get user by ID
      */
-    public function getUser(int $id): ?User
+    public function getUserById(int $id): User
     {
-        return $this->userRepository->find($id);
+        return $this->userRepository->findOrFail($id);
     }
 
     /**
-     * Get a user by UUID.
-     *
-     * @param string $uuid
-     * @return User|null
+     * Get user by email
      */
-    public function getUserByUuid(string $uuid): ?User
+    public function getUserByEmail(string $email): ?User
     {
-        return $this->userRepository->findByUuid($uuid);
+        return $this->userRepository->findByEmail($email);
     }
 
     /**
-     * Create a new user with transaction safety.
+     * Create a new user
      *
-     * @param array $data
-     * @return User
-     * @throws \Exception
+     * @throws \Throwable
      */
-    public function createUser(array $data): User
+    public function createUser(UserDTO $dto): User
     {
-        try {
-            DB::beginTransaction();
+        return $this->transaction(function () use ($dto) {
+            // Check if user with email already exists
+            if ($this->userRepository->findByEmail($dto->email)) {
+                throw new \InvalidArgumentException('User with this email already exists');
+            }
+
+            $userData = $dto->toArray();
+
+            // Hash password if provided
+            if ($dto->password) {
+                $userData['password'] = Hash::make($dto->password);
+            }
+
+            $user = $this->userRepository->create($userData);
+
+            $this->logInfo('User created', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+            ]);
+
+            return $user;
+        });
+    }
+
+    /**
+     * Update user
+     *
+     * @throws \Throwable
+     */
+    public function updateUser(int $id, array $data): User
+    {
+        return $this->transaction(function () use ($id, $data) {
+            // Check if email is being updated and already exists
+            if (isset($data['email'])) {
+                $existingUser = $this->userRepository->findByEmail($data['email']);
+                if ($existingUser && $existingUser->id !== $id) {
+                    throw new \InvalidArgumentException('User with this email already exists');
+                }
+            }
 
             // Hash password if provided
             if (isset($data['password'])) {
                 $data['password'] = Hash::make($data['password']);
             }
 
-            // Set default status if not provided
-            $data['status'] = $data['status'] ?? 'active';
+            $this->userRepository->update($id, $data);
+            $user = $this->userRepository->findOrFail($id);
 
-            // Create user
-            $user = $this->userRepository->create($data);
+            $this->logInfo('User updated', [
+                'user_id' => $user->id,
+            ]);
 
-            // Assign roles if provided
-            if (isset($data['roles']) && is_array($data['roles'])) {
-                $this->userRepository->assignRoles($user, $data['roles']);
-            }
-
-            // Assign permissions if provided
-            if (isset($data['permissions']) && is_array($data['permissions'])) {
-                $this->userRepository->assignPermissions($user, $data['permissions']);
-            }
-
-            DB::commit();
-
-            return $user->fresh(['tenant', 'organization', 'branch', 'roles', 'permissions']);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
+            return $user;
+        });
     }
 
     /**
-     * Update a user with transaction safety.
+     * Delete user
      *
-     * @param int $id
-     * @param array $data
-     * @return User
-     * @throws \Exception
-     */
-    public function updateUser(int $id, array $data): User
-    {
-        try {
-            DB::beginTransaction();
-
-            $user = $this->userRepository->find($id);
-
-            if (!$user) {
-                throw new \Exception('User not found');
-            }
-
-            // Hash password if provided and changed
-            if (isset($data['password']) && !empty($data['password'])) {
-                $data['password'] = Hash::make($data['password']);
-            } else {
-                unset($data['password']);
-            }
-
-            // Update user
-            $user = $this->userRepository->update($user, $data);
-
-            // Sync roles if provided
-            if (isset($data['roles']) && is_array($data['roles'])) {
-                $this->userRepository->syncRoles($user, $data['roles']);
-            }
-
-            // Assign permissions if provided
-            if (isset($data['permissions']) && is_array($data['permissions'])) {
-                // Clear existing direct permissions first
-                $user->permissions()->detach();
-                $this->userRepository->assignPermissions($user, $data['permissions']);
-            }
-
-            DB::commit();
-
-            return $user->fresh(['tenant', 'organization', 'branch', 'roles', 'permissions']);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-    }
-
-    /**
-     * Delete a user (soft delete).
-     *
-     * @param int $id
-     * @return bool
-     * @throws \Exception
+     * @throws \Throwable
      */
     public function deleteUser(int $id): bool
     {
-        $user = $this->userRepository->find($id);
+        return $this->transaction(function () use ($id) {
+            $user = $this->userRepository->findOrFail($id);
 
-        if (!$user) {
-            throw new \Exception('User not found');
-        }
+            $result = $this->userRepository->delete($id);
 
-        // Prevent self-deletion
-        if ($user->id === auth()->id()) {
-            throw ValidationException::withMessages([
-                'user' => ['You cannot delete yourself']
+            $this->logInfo('User deleted', [
+                'user_id' => $id,
             ]);
-        }
 
-        return $this->userRepository->delete($user);
+            return $result;
+        });
     }
 
     /**
-     * Restore a soft-deleted user.
+     * Assign roles to user
      *
-     * @param int $id
-     * @return bool
+     * @throws \Throwable
      */
-    public function restoreUser(int $id): bool
+    public function assignRoles(int $userId, array $roleIds): User
     {
-        return $this->userRepository->restore($id);
+        return $this->transaction(function () use ($userId, $roleIds) {
+            $user = $this->userRepository->findOrFail($userId);
+
+            // Validate all roles exist and fetch them
+            $roles = [];
+            foreach ($roleIds as $roleId) {
+                $roles[] = $this->roleRepository->findOrFail($roleId);
+            }
+
+            // Assign each role
+            foreach ($roles as $role) {
+                $this->userRepository->assignRole($user, $role);
+            }
+
+            $this->logInfo('Roles assigned to user', [
+                'user_id' => $userId,
+                'role_ids' => $roleIds,
+            ]);
+
+            return $user->fresh(['roles']);
+        });
     }
 
     /**
-     * Search users.
+     * Sync user roles (replace all existing roles)
      *
-     * @param array $criteria
-     * @param int $perPage
-     * @return LengthAwarePaginator
+     * @throws \Throwable
      */
-    public function searchUsers(array $criteria, int $perPage = 15): LengthAwarePaginator
+    public function syncRoles(int $userId, array $roleIds): User
     {
-        return $this->userRepository->search($criteria, $perPage);
+        return $this->transaction(function () use ($userId, $roleIds) {
+            $user = $this->userRepository->findOrFail($userId);
+
+            // Validate all roles exist
+            foreach ($roleIds as $roleId) {
+                $this->roleRepository->findOrFail($roleId);
+            }
+
+            $this->userRepository->syncRoles($user, $roleIds);
+
+            $this->logInfo('User roles synchronized', [
+                'user_id' => $userId,
+                'role_ids' => $roleIds,
+            ]);
+
+            return $user->fresh(['roles']);
+        });
     }
 
     /**
-     * Get users by role.
-     *
-     * @param string $roleName
-     * @return Collection
+     * Get user roles
      */
-    public function getUsersByRole(string $roleName): Collection
+    public function getUserRoles(int $userId): Collection
     {
-        return $this->userRepository->getByRole($roleName);
+        $user = $this->userRepository->findOrFail($userId);
+
+        return $user->roles;
     }
 
     /**
-     * Get users by organization.
-     *
-     * @param int $organizationId
-     * @return Collection
+     * Get user permissions (via roles)
      */
-    public function getUsersByOrganization(int $organizationId): Collection
+    public function getUserPermissions(int $userId): Collection
     {
-        return $this->userRepository->getByOrganization($organizationId);
+        $user = $this->userRepository->findOrFail($userId);
+
+        // Get all unique permissions from all user roles
+        return $user->roles()
+            ->with('permissions')
+            ->get()
+            ->pluck('permissions')
+            ->flatten()
+            ->unique('id')
+            ->values();
     }
 
     /**
-     * Get users by branch.
-     *
-     * @param int $branchId
-     * @return Collection
+     * Search users
      */
-    public function getUsersByBranch(int $branchId): Collection
+    public function searchUsers(string $search): Collection
     {
-        return $this->userRepository->getByBranch($branchId);
+        return $this->userRepository->search($search);
     }
 
     /**
-     * Get active users.
-     *
-     * @return Collection
+     * Get active users
      */
     public function getActiveUsers(): Collection
     {
@@ -235,73 +244,10 @@ class UserService
     }
 
     /**
-     * Assign roles to user.
-     *
-     * @param int $userId
-     * @param array $roleNames
-     * @return User
-     * @throws \Exception
+     * Get users by role
      */
-    public function assignRolesToUser(int $userId, array $roleNames): User
+    public function getUsersByRole(int $roleId): Collection
     {
-        $user = $this->userRepository->find($userId);
-
-        if (!$user) {
-            throw new \Exception('User not found');
-        }
-
-        return $this->userRepository->assignRoles($user, $roleNames);
-    }
-
-    /**
-     * Update user profile.
-     *
-     * @param int $userId
-     * @param array $data
-     * @return User
-     * @throws \Exception
-     */
-    public function updateProfile(int $userId, array $data): User
-    {
-        $user = $this->userRepository->find($userId);
-
-        if (!$user) {
-            throw new \Exception('User not found');
-        }
-
-        // Only allow specific profile fields
-        $allowedFields = ['name', 'phone', 'avatar', 'timezone', 'language_code'];
-        $profileData = array_intersect_key($data, array_flip($allowedFields));
-
-        return $this->userRepository->update($user, $profileData);
-    }
-
-    /**
-     * Change user password.
-     *
-     * @param int $userId
-     * @param string $currentPassword
-     * @param string $newPassword
-     * @return User
-     * @throws \Exception
-     */
-    public function changePassword(int $userId, string $currentPassword, string $newPassword): User
-    {
-        $user = $this->userRepository->find($userId);
-
-        if (!$user) {
-            throw new \Exception('User not found');
-        }
-
-        // Verify current password
-        if (!Hash::check($currentPassword, $user->password)) {
-            throw ValidationException::withMessages([
-                'current_password' => ['The provided password does not match your current password.']
-            ]);
-        }
-
-        return $this->userRepository->update($user, [
-            'password' => Hash::make($newPassword)
-        ]);
+        return $this->userRepository->getUsersByRole($roleId);
     }
 }

@@ -1,460 +1,492 @@
-# AutoERP - Implementation Status & Next Steps
+# Implementation Guide - AutoERP
 
-**Date:** February 3, 2026  
-**Version:** 1.0.0-alpha  
-**Status:** Foundation Complete (70%)
+This guide explains the implementation details and architectural decisions of the AutoERP platform.
 
----
+## Architecture Overview
 
-## 🎉 What Has Been Accomplished
+The platform follows **Clean Architecture** principles with strict separation of concerns:
 
-### ✅ Core Infrastructure (100% Complete)
-1. **Backend Framework**
-   - Laravel 11 with PHP 8.3
-   - 112 Composer packages installed
-   - Clean Architecture implemented
-   - Modular domain boundaries established
-
-2. **Database Schema (50 Tables)**
-   - Multi-tenant tables (tenants, organizations, branches, locations)
-   - IAM tables (users, roles, permissions)
-   - Master data (currencies, countries, units, tax rates)
-   - Product management (products, categories, variants, price lists)
-   - Inventory (stock ledgers - append-only)
-   - CRM (customers, leads, contacts, addresses, notes)
-   - Procurement (vendors, purchase orders, receipts, returns)
-   - Sales (quotes, sales orders)
-   - Invoicing (invoices, invoice items, payments)
-   - POS (sessions, transactions, receipts)
-   - Payment (methods, payments, allocations)
-
-3. **Frontend Framework**
-   - Vue.js 3 with Vite
-   - 78 NPM packages installed
-   - Pinia for state management
-   - Vue Router for navigation
-   - Vue I18n for internationalization
-   - Axios for API calls
-
-### ✅ Business Logic Layer (100% Complete)
-**Services Implemented (12):**
-- TenantService
-- ProductService
-- InventoryService
-- CRMService
-- ProcurementService
-- SalesOrderService
-- QuoteService
-- InvoiceService
-- PaymentService
-- POSService
-- AnalyticsService
-- ReportingService
-
-### ✅ Data Access Layer (100% Complete)
-**Repositories Implemented (multiple per module):**
-- Tenant repositories
-- Product repositories
-- CRM repositories
-- POS repositories
-- Payment repositories
-- Procurement repositories
-- Sales repositories
-
-### ✅ API Layer (100% Complete)
-**Controllers Implemented (10+):**
-- AuthController (login, register, logout, password reset)
-- ProductController
-- InventoryController
-- CustomerController, LeadController, ContactController
-- VendorController, PurchaseOrderController, PurchaseReceiptController
-- QuoteController, SalesOrderController
-- InvoiceController
-- PaymentController
-- POSSessionController, POSTransactionController
-
-**50+ API Endpoints Including:**
-- Authentication & Authorization
-- Product Management (CRUD, search, pricing)
-- Inventory Management (stock in/out, transfer, adjustment, valuation)
-- CRM (customers, leads, contacts with statistics)
-- Procurement (vendors, POs, receipts, returns)
-- Sales (quotes, orders)
-- Invoicing (create, approve, payments)
-- POS (sessions, transactions)
-- Payment Processing
-
-### ✅ Event-Driven Architecture (90% Complete)
-**Domain Events (16+):**
-- Product: ProductCreated, ProductUpdated, ProductDeleted
-- Sales: OrderCreated, OrderApproved, OrderFulfilled
-- Procurement: PurchaseOrderApproved, GoodsReceived
-- Inventory: StockMovementRecorded, LowStockDetected, StockExpiring
-- CRM: CustomerCreated, LeadConverted
-- Invoice: InvoiceGenerated, InvoicePaymentReceived, InvoiceOverdue
-- Notification: SystemNotification
-
-**Event Listeners (10+):**
-- GenerateInvoiceFromOrder
-- UpdateInventoryOnSale
-- NotifyPurchaseOrderApproval
-- SendStockExpiryAlert
-- StoreNotificationInDatabase
-
-### ✅ Security & Multi-Tenancy (90% Complete)
-- Laravel Sanctum authentication (working)
-- Spatie Permission package (RBAC)
-- Roles: Super Admin, Admin, Manager, Staff
-- 30+ permissions defined
-- TenantContext middleware (tenant isolation)
-- EnsureTenantIsActive middleware (subscription validation)
-- Custom exceptions (Service, Validation, Tenant)
-- Global scopes for automatic tenant filtering
-- Audit trails (created_by, updated_by)
-- Soft deletes
-- UUID for external identifiers
-
-### ✅ Testing Infrastructure (Basic)
-- PHPUnit configured
-- 5 tests passing (10 assertions)
-- Event system tests
-- Feature tests structure in place
-
----
-
-## 🚧 What Needs To Be Done
-
-### Priority 1: Complete Missing Components (1-2 weeks)
-
-#### 1.1 FormRequest Validation Classes
-Create validation classes for all API endpoints:
-```bash
-php artisan make:request Product/StoreProductRequest
-php artisan make:request Product/UpdateProductRequest
-php artisan make:request Inventory/StockInRequest
-php artisan make:request Inventory/StockOutRequest
-php artisan make:request Inventory/StockTransferRequest
-# ... etc for all endpoints
+```
+┌─────────────────────────────────────────────┐
+│            Presentation Layer               │
+│  (Controllers, Views, API Routes)           │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│          Business Logic Layer               │
+│         (Services, DTOs, Events)            │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│           Data Access Layer                 │
+│       (Repositories, Models, DB)            │
+└─────────────────────────────────────────────┘
 ```
 
-#### 1.2 API Resources for Response Transformation
-Create resource classes for consistent API responses:
-```bash
-php artisan make:resource ProductResource
-php artisan make:resource ProductCollection
-php artisan make:resource InventoryResource
-php artisan make:resource CustomerResource
-# ... etc for all models
-```
+## Design Patterns
 
-#### 1.3 Event Registration
-Update `app/Providers/EventServiceProvider.php`:
+### 1. Repository Pattern
+
+**Purpose:** Abstract data access logic and provide a clean API for data operations.
+
+**Implementation:**
 ```php
+// Interface (Contract)
+interface RepositoryInterface {
+    public function all();
+    public function find($id);
+    public function create(array $data);
+    // ...
+}
+
+// Base Repository
+abstract class BaseRepository implements RepositoryInterface {
+    protected function model(): string;
+    // Common CRUD methods
+}
+
+// Specific Repository
+class ProductRepository extends BaseRepository {
+    protected function model(): string {
+        return Product::class;
+    }
+    
+    // Product-specific methods
+}
+```
+
+### 2. Service Layer Pattern
+
+**Purpose:** Contain business logic and orchestrate repository operations.
+
+**Implementation:**
+```php
+class ProductService extends BaseService {
+    public function __construct(
+        protected ProductRepository $repository
+    ) {}
+    
+    public function createProduct(array $data): Product {
+        // Validation
+        // Business logic
+        // Call repository
+        return $this->repository->create($data);
+    }
+}
+```
+
+### 3. DTO (Data Transfer Object) Pattern
+
+**Purpose:** Transfer data between layers without coupling to models.
+
+**Implementation:**
+```php
+class StockMovementDTO {
+    public function __construct(
+        public int $productId,
+        public StockMovementType $movementType,
+        public float $quantity,
+        public ?int $warehouseId = null,
+        // ...
+    ) {}
+}
+```
+
+### 4. Event-Driven Pattern
+
+**Purpose:** Decouple business logic and enable asynchronous processing.
+
+**Implementation:**
+```php
+// Event
+class StockMovementRecorded {
+    public function __construct(
+        public StockLedger $stockLedger
+    ) {}
+}
+
+// Listener
+class CheckReorderLevel implements ShouldQueue {
+    public function handle(StockMovementRecorded $event): void {
+        // Check and notify if below reorder level
+    }
+}
+
+// Registration
 protected $listen = [
-    ProductCreated::class => [SendProductCreatedNotification::class],
-    LowStockDetected::class => [SendLowStockAlert::class],
-    SystemNotification::class => [StoreNotificationInDatabase::class],
-    // ... register all events and listeners
+    StockMovementRecorded::class => [
+        CheckReorderLevel::class,
+    ],
 ];
 ```
 
-#### 1.4 Queue Configuration
-Configure queue workers in `.env`:
-```
-QUEUE_CONNECTION=database
-```
-Create queue worker jobs:
-```bash
-php artisan make:job ProcessProductImport
-php artisan make:job SendBulkNotifications
-php artisan make:job GenerateMonthlyReport
+## Multi-Tenancy Implementation
+
+### Tenant Scoping
+
+All tenant-specific models automatically filter by tenant:
+
+```php
+trait TenantScoped {
+    protected static function bootTenantScoped() {
+        static::addGlobalScope('tenant', function (Builder $builder) {
+            if (auth()->check()) {
+                $builder->where('tenant_id', auth()->user()->tenant_id);
+            }
+        });
+        
+        static::creating(function ($model) {
+            if (auth()->check()) {
+                $model->tenant_id = auth()->user()->tenant_id;
+            }
+        });
+    }
+}
 ```
 
-#### 1.5 Middleware Registration
-Update `bootstrap/app.php` to register middleware:
+### Usage
+
 ```php
-->withMiddleware(function (Middleware $middleware) {
-    $middleware->api(append: [
-        TenantContext::class,
-        EnsureTenantIsActive::class,
-    ]);
+class Product extends Model {
+    use TenantScoped;
+    // Automatically filters by tenant_id
+}
+
+// This query automatically includes WHERE tenant_id = ?
+$products = Product::all();
+```
+
+## Stock Ledger - Append-Only Pattern
+
+### Principle
+
+Never delete or modify stock ledger entries. Always create new entries for corrections.
+
+### Implementation
+
+```php
+class StockMovementService {
+    public function recordMovement(StockMovementDTO $dto): StockLedger {
+        return DB::transaction(function () use ($dto) {
+            $quantity = $this->calculateQuantity($dto->movementType, $dto->quantity);
+            $currentBalance = $this->getCurrentBalance($dto->productId);
+            $newBalance = $currentBalance + $quantity;
+            
+            return StockLedger::create([
+                'product_id' => $dto->productId,
+                'quantity' => $quantity,
+                'running_balance' => $newBalance,
+                // ...
+            ]);
+        });
+    }
+}
+```
+
+### Benefits
+
+- Complete audit trail
+- Historical accuracy
+- Never lose data
+- Easy to trace discrepancies
+
+## Pricing Engine
+
+### Features
+
+1. **Base Pricing:** Product buying and selling prices
+2. **Tiered Pricing:** Quantity-based discounts
+3. **Customer-Specific Pricing:** Custom prices per customer
+4. **Tax Calculation:** Percentage or fixed tax
+5. **Discount Management:** Product-level and transaction-level
+
+### Implementation
+
+```php
+class PricingService {
+    public function calculatePrice(
+        int $productId,
+        float $quantity,
+        ?int $customerId = null
+    ): array {
+        // 1. Get base price
+        $unitPrice = $product->selling_price;
+        $subtotal = $unitPrice * $quantity;
+        
+        // 2. Apply discounts
+        $discount = $this->calculateDiscounts($product, $quantity, $customerId);
+        $afterDiscount = $subtotal - $discount;
+        
+        // 3. Calculate tax
+        $tax = $this->calculateTax($product, $afterDiscount);
+        
+        // 4. Return breakdown
+        return [
+            'subtotal' => $subtotal,
+            'discount' => $discount,
+            'tax' => $tax,
+            'total' => $afterDiscount + $tax,
+        ];
+    }
+}
+```
+
+## Event-Driven Workflows
+
+### Stock Movement Event Flow
+
+```
+Stock Movement Recorded
+    ↓
+CheckReorderLevel Listener
+    ↓
+If below reorder level:
+    → Create Notification
+    → Dispatch LowStockAlert Event
+    → Auto-create Purchase Order (optional)
+```
+
+### Purchase Order Event Flow
+
+```
+Purchase Order Created
+    ↓
+PurchaseOrderCreated Event
+    ↓
+Log Activity
+    ↓
+Purchase Order Approved
+    ↓
+PurchaseOrderApproved Event
+    ↓
+NotifySupplier Listener
+    → Send Email to Supplier
+    → Update Inventory Expected
+```
+
+## Authentication & Authorization
+
+### Authentication Flow
+
+1. User sends credentials to `/api/v1/auth/login`
+2. Backend validates credentials
+3. Creates Sanctum token
+4. Returns token to client
+5. Client stores token (localStorage/cookies)
+6. Client includes token in subsequent requests
+
+### Authorization
+
+Uses **Role-Based Access Control (RBAC)**:
+
+```php
+// Check if user has role
+if ($user->hasRole('admin')) {
+    // Allow access
+}
+
+// Check if user has permission
+if ($user->hasPermission('products.create')) {
+    // Allow action
+}
+```
+
+## Database Schema Design
+
+### Key Principles
+
+1. **Normalized Design:** Minimize data redundancy
+2. **Foreign Keys:** Enforce referential integrity
+3. **Indexes:** Optimize query performance
+4. **Soft Deletes:** Never hard delete data
+5. **Timestamps:** Track creation and updates
+
+### Example: Products Table
+
+```sql
+CREATE TABLE products (
+    id BIGINT PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    sku VARCHAR(100) UNIQUE,
+    name VARCHAR(255) NOT NULL,
+    product_type VARCHAR(50),
+    buying_price DECIMAL(15,2),
+    selling_price DECIMAL(15,2),
+    current_stock DECIMAL(15,2),
+    reorder_level DECIMAL(15,2),
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
+    deleted_at TIMESTAMP,
+    
+    INDEX idx_tenant (tenant_id),
+    INDEX idx_sku (sku),
+    INDEX idx_type (product_type),
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+);
+```
+
+## Frontend Architecture
+
+### State Management with Pinia
+
+```javascript
+// Store definition
+export const useAuthStore = defineStore('auth', {
+  state: () => ({
+    user: null,
+    token: null,
+  }),
+  
+  actions: {
+    async login(email, password) {
+      const response = await authService.login(email, password)
+      this.user = response.data.user
+      this.token = response.data.token
+    }
+  }
 })
 ```
 
-### Priority 2: Frontend Development (2-3 weeks)
+### API Service Layer
 
-#### 2.1 Authentication Pages
-- Login page with validation
-- Registration page (if public signup allowed)
-- Password reset flow
-- Email verification
+```javascript
+// Centralized API calls
+export const productService = {
+  async getAll() {
+    return await apiClient.get('/inventory/products')
+  },
+  
+  async create(data) {
+    return await apiClient.post('/inventory/products', data)
+  }
+}
+```
 
-#### 2.2 Dashboard
-- Key metrics cards (sales, inventory, customers)
-- Charts (revenue trends, stock levels)
-- Recent activities
-- Quick actions
+## Testing Strategy
 
-#### 2.3 Product Management UI
-- Product list with filters and search
-- Product form (create/edit)
-- Product details view
-- Category management
-- Price list management
+### Unit Tests
 
-#### 2.4 Inventory Management UI
-- Stock movements history
-- Stock transfer form
-- Stock adjustment form
-- Low stock alerts
-- Expiring items alerts
+Test individual components in isolation:
 
-#### 2.5 Core Module UIs
-- Customer management
-- Lead management
-- Vendor management
-- Purchase orders
-- Sales orders
-- Invoicing
-- POS interface
+```php
+public function test_product_repository_creates_product() {
+    $repository = new ProductRepository();
+    $product = $repository->create([
+        'sku' => 'TEST-001',
+        'name' => 'Test Product',
+    ]);
+    
+    $this->assertNotNull($product->id);
+}
+```
 
-### Priority 3: Testing & Quality Assurance (2 weeks)
+### Feature Tests
 
-#### 3.1 Unit Tests
-Write tests for:
-- All service classes
-- All repository classes
-- Model methods
-- Helper functions
-- Utilities
-
-#### 3.2 Feature Tests
-Write tests for:
-- All API endpoints
-- Authentication flows
-- Authorization checks
-- CRUD operations
-- Business workflows
-
-#### 3.3 Integration Tests
 Test complete workflows:
-- Order to invoice to payment
-- Purchase order to receipt to stock
-- Lead to customer conversion
-- Stock movement tracking
 
-### Priority 4: Documentation (1 week)
-
-#### 4.1 OpenAPI/Swagger
-Generate API documentation:
-```bash
-composer require darkaonline/l5-swagger
-php artisan l5-swagger:generate
+```php
+public function test_user_can_create_product_via_api() {
+    $response = $this->actingAs($user)
+        ->postJson('/api/v1/inventory/products', [
+            'sku' => 'TEST-001',
+            'name' => 'Test Product',
+        ]);
+    
+    $response->assertStatus(201);
+}
 ```
 
-#### 4.2 User Documentation
-- Getting started guide
-- Module-specific guides
-- FAQ
-- Troubleshooting
+## Performance Optimization
 
-#### 4.3 Developer Documentation
-- Architecture overview
-- Code organization
-- Contribution guidelines
-- API reference
+### 1. Eager Loading
 
-### Priority 5: Production Readiness (1-2 weeks)
+Prevent N+1 queries:
 
-#### 5.1 Performance Optimization
-- Add caching (Redis)
-- Optimize database queries
-- Implement eager loading
-- Add pagination
+```php
+// Bad
+$products = Product::all();
+foreach ($products as $product) {
+    echo $product->category->name; // N+1 queries
+}
 
-#### 5.2 Security Hardening
-- Add rate limiting
-- Implement CORS properly
-- Add security headers
-- Audit logging
-- Penetration testing
-
-#### 5.3 Monitoring & Logging
-- Setup error tracking (Sentry)
-- Application performance monitoring
-- Structured logging
-- Health checks
-- Metrics collection
-
-#### 5.4 Deployment
-- Docker configuration
-- CI/CD pipeline (GitHub Actions)
-- Environment configurations
-- Database backup strategy
-- Deployment documentation
-
----
-
-## 📊 Feature Completeness Matrix
-
-| Module | Backend | API | Tests | Frontend | Docs | Status |
-|--------|---------|-----|-------|----------|------|--------|
-| Authentication | 100% | 100% | 20% | 0% | 50% | ✅ |
-| Multi-Tenancy | 100% | 100% | 20% | 0% | 50% | ✅ |
-| Product Management | 100% | 100% | 20% | 0% | 30% | ✅ |
-| Inventory | 100% | 100% | 20% | 0% | 30% | ✅ |
-| CRM | 100% | 100% | 20% | 0% | 30% | ✅ |
-| Procurement | 100% | 100% | 20% | 0% | 30% | ✅ |
-| Sales | 100% | 100% | 20% | 0% | 30% | ✅ |
-| Invoicing | 100% | 100% | 20% | 0% | 30% | ✅ |
-| Payments | 100% | 100% | 20% | 0% | 30% | ✅ |
-| POS | 100% | 100% | 20% | 0% | 30% | ✅ |
-| Manufacturing | 50% | 0% | 0% | 0% | 0% | 🚧 |
-| Warehouse | 50% | 0% | 0% | 0% | 0% | 🚧 |
-| Reporting | 70% | 0% | 0% | 0% | 0% | 🚧 |
-| Analytics | 70% | 0% | 0% | 0% | 0% | 🚧 |
-
-**Legend:**
-- ✅ Ready for use (80%+ complete)
-- 🚧 In progress (50-79% complete)
-- ⚠️ Basic implementation (20-49% complete)
-- ❌ Not started (0-19% complete)
-
----
-
-## 🚀 Quick Start for Development
-
-### Backend
-```bash
-cd backend
-composer install
-cp .env.example .env
-php artisan key:generate
-php artisan migrate --seed
-php artisan serve
+// Good
+$products = Product::with('category')->get();
+foreach ($products as $product) {
+    echo $product->category->name; // 2 queries total
+}
 ```
 
-### Frontend
-```bash
-cd frontend
-npm install
-npm run dev
+### 2. Caching
+
+Cache frequently accessed data:
+
+```php
+$categories = Cache::remember('categories', 3600, function () {
+    return Category::all();
+});
 ```
 
-### Run Tests
-```bash
-cd backend
-php artisan test
+### 3. Database Indexing
+
+Index frequently queried columns:
+
+```php
+$table->index('tenant_id');
+$table->index(['tenant_id', 'is_active']);
 ```
 
-### Default Users
-After seeding, you can login with:
-- **Super Admin:** superadmin@demo.autoerp.local / password
-- **Admin:** admin@demo.autoerp.local / password
-- **Manager:** manager@demo.autoerp.local / password
-- **Staff:** user@demo.autoerp.local / password
+## Security Best Practices
 
----
+1. **Input Validation:** Validate all user input
+2. **SQL Injection Prevention:** Use Eloquent/Query Builder
+3. **XSS Prevention:** Escape output
+4. **CSRF Protection:** Enable CSRF tokens
+5. **Rate Limiting:** Limit API requests
+6. **Authentication:** Use Sanctum tokens
+7. **Authorization:** Check permissions
+8. **Encryption:** Encrypt sensitive data
 
-## 📈 Timeline Estimate
+## Deployment Checklist
 
-Based on current progress and remaining work:
+- [ ] Set `APP_ENV=production`
+- [ ] Set `APP_DEBUG=false`
+- [ ] Configure database credentials
+- [ ] Run migrations
+- [ ] Seed initial data
+- [ ] Configure queue workers
+- [ ] Set up HTTPS
+- [ ] Configure CORS
+- [ ] Set up backups
+- [ ] Configure logging
+- [ ] Set up monitoring
 
-| Phase | Duration | Status |
-|-------|----------|--------|
-| Foundation (Phase 1-2) | 4 weeks | ✅ 100% DONE |
-| Missing Components | 1-2 weeks | 🚧 In Progress |
-| Frontend MVP | 2-3 weeks | ⏳ Not Started |
-| Testing | 2 weeks | ⏳ Not Started |
-| Documentation | 1 week | ⏳ Not Started |
-| Production Readiness | 1-2 weeks | ⏳ Not Started |
-| **Total to Production** | **11-14 weeks** | **~70% Complete** |
+## Troubleshooting
 
----
+### Common Issues
 
-## 💡 Recommendations
+**Issue:** 401 Unauthorized
+**Solution:** Check token in Authorization header
 
-### Immediate Actions (This Week)
-1. ✅ **DONE:** Fix migration syntax errors
-2. ✅ **DONE:** Setup database and seeders
-3. ✅ **DONE:** Verify API endpoints
-4. ✅ **DONE:** Create middleware and exceptions
-5. ⚠️ **TODO:** Create FormRequest validation classes
-6. ⚠️ **TODO:** Create API Resource classes
-7. ⚠️ **TODO:** Register events in EventServiceProvider
-8. ⚠️ **TODO:** Configure queue workers
+**Issue:** 422 Validation Error
+**Solution:** Review validation rules and request data
 
-### Short Term (Next 2 Weeks)
-1. Complete all FormRequest validations
-2. Complete all API Resources
-3. Build authentication pages (frontend)
-4. Build dashboard (frontend)
-5. Write comprehensive tests (target 60%+ coverage)
-6. Setup queue workers for async jobs
+**Issue:** 500 Server Error
+**Solution:** Check logs in `storage/logs/laravel.log`
 
-### Medium Term (Next Month)
-1. Complete all frontend modules
-2. Achieve 80%+ test coverage
-3. Generate API documentation
-4. Setup CI/CD pipeline
-5. Performance optimization
-6. Security audit
+**Issue:** CORS errors
+**Solution:** Configure CORS in `config/cors.php`
 
-### Long Term (Next Quarter)
-1. Advanced reporting features
-2. Analytics dashboards
-3. Manufacturing module completion
-4. Warehouse module completion
-5. Mobile app (optional)
-6. Third-party integrations
+## Contributing
 
----
+1. Follow the established patterns
+2. Write tests for new features
+3. Update documentation
+4. Use meaningful commit messages
+5. Create pull requests for review
 
-## 🎯 Success Criteria
+## Additional Resources
 
-The platform will be considered production-ready when:
-
-- [ ] All 8 core modules have complete frontend UIs
-- [ ] Test coverage is above 80%
-- [ ] API documentation is complete and published
-- [ ] All security best practices are implemented
-- [ ] Performance benchmarks are met (< 200ms API response time)
-- [ ] CI/CD pipeline is operational
-- [ ] Monitoring and logging are in place
-- [ ] User and developer documentation are complete
-- [ ] At least 3 complete end-to-end workflows are tested
-- [ ] Load testing shows system can handle 100+ concurrent users
-
----
-
-## 📞 Support & Resources
-
-### Documentation
-- Architecture: `ARCHITECTURE.md`
-- Implementation Progress: `IMPLEMENTATION_PROGRESS.md`
-- Quick Start: `QUICK_START.md`
-
-### Testing
-```bash
-# Run all tests
-php artisan test
-
-# Run specific test
-php artisan test --filter TestName
-
-# Run with coverage
-php artisan test --coverage
-```
-
-### Code Quality
-```bash
-# PHP Linting
-./vendor/bin/pint
-
-# Static Analysis (when added)
-./vendor/bin/phpstan analyse
-```
-
----
-
-**This is a solid, production-ready foundation for an enterprise ERP system. The architecture is clean, scalable, and follows industry best practices. Focus on completing the frontend and testing to reach production status.**
+- [Laravel Documentation](https://laravel.com/docs)
+- [Vue.js Guide](https://vuejs.org/guide/)
+- [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
+- [Repository Pattern](https://martinfowler.com/eaaCatalog/repository.html)

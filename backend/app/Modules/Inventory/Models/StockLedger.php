@@ -2,28 +2,32 @@
 
 namespace App\Modules\Inventory\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use App\Core\Traits\HasUuid;
-use App\Core\Traits\TenantScoped;
-use App\Core\Traits\Auditable;
-use App\Modules\Product\Models\Product;
-use App\Modules\Product\Models\ProductVariant;
-use App\Modules\Tenant\Models\Branch;
-use App\Modules\Tenant\Models\Location;
+use App\Enums\StockMovementType;
+use App\Models\Tenant;
 use App\Models\User;
+use App\Traits\TenantScoped;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
+/**
+ * Stock Ledger Model
+ *
+ * Append-only stock ledger for complete inventory audit trail.
+ * NEVER delete or modify existing entries - always create new entries.
+ */
 class StockLedger extends Model
 {
-    use HasFactory, HasUuid, TenantScoped, Auditable;
+    use HasFactory, TenantScoped;
 
     /**
-     * Indicates if the model should be timestamped.
-     * Stock ledger is append-only and immutable.
-     *
-     * @var bool
+     * Create a new factory instance for the model.
      */
-    public $timestamps = true;
+    protected static function newFactory()
+    {
+        return \Database\Factories\Inventory\StockLedgerFactory::new();
+    }
 
     /**
      * The attributes that are mass assignable.
@@ -31,29 +35,26 @@ class StockLedger extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'uuid',
         'tenant_id',
         'product_id',
-        'variant_id',
-        'branch_id',
-        'location_id',
-        'transaction_type',
-        'reference_type',
-        'reference_id',
-        'reference_number',
+        'movement_type',
         'quantity',
-        'running_balance',
-        'batch_number',
-        'serial_number',
-        'lot_number',
-        'expiry_date',
         'unit_cost',
         'total_cost',
-        'valuation_method',
+        'warehouse_id',
+        'location_id',
+        'batch_number',
+        'lot_number',
+        'serial_number',
+        'manufacturing_date',
+        'expiry_date',
+        'reference_type',
+        'reference_id',
+        'created_by',
         'notes',
         'metadata',
-        'created_by',
-        'created_at',
+        'running_balance',
+        'transaction_date',
     ];
 
     /**
@@ -62,216 +63,127 @@ class StockLedger extends Model
      * @var array<string, string>
      */
     protected $casts = [
+        'movement_type' => StockMovementType::class,
         'quantity' => 'decimal:4',
-        'running_balance' => 'decimal:4',
         'unit_cost' => 'decimal:2',
         'total_cost' => 'decimal:2',
+        'running_balance' => 'decimal:4',
+        'manufacturing_date' => 'date',
         'expiry_date' => 'date',
+        'transaction_date' => 'datetime',
         'metadata' => 'array',
-        'created_at' => 'datetime',
     ];
 
     /**
-     * Disable updates for this model (append-only).
+     * Boot the model
      */
-    public static function boot()
+    protected static function boot()
     {
         parent::boot();
-        
-        // Prevent updates to stock ledger entries
-        static::updating(function ($model) {
-            return false;
+
+        // Prevent deletion - append-only ledger
+        static::deleting(function ($ledger) {
+            throw new \RuntimeException('Stock ledger entries cannot be deleted. Create a reversal entry instead.');
+        });
+
+        // Calculate running balance on create
+        static::creating(function ($ledger) {
+            if (auth()->check()) {
+                $ledger->created_by = auth()->id();
+            }
+
+            // Set transaction date if not provided
+            if (! $ledger->transaction_date) {
+                $ledger->transaction_date = now();
+            }
+
+            // Calculate running balance
+            $previousBalance = static::where('product_id', $ledger->product_id)
+                ->where('warehouse_id', $ledger->warehouse_id)
+                ->latest('id')
+                ->value('running_balance') ?? 0;
+
+            $ledger->running_balance = $previousBalance + $ledger->quantity;
         });
     }
 
     /**
-     * Get the product associated with this stock ledger entry.
+     * Get the tenant that owns the stock ledger
      */
-    public function product()
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
+    }
+
+    /**
+     * Get the product associated with the stock ledger
+     */
+    public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
     }
 
     /**
-     * Get the variant associated with this stock ledger entry.
+     * Get the user who created the entry
      */
-    public function variant()
-    {
-        return $this->belongsTo(ProductVariant::class, 'variant_id');
-    }
-
-    /**
-     * Get the branch for this stock ledger entry.
-     */
-    public function branch()
-    {
-        return $this->belongsTo(Branch::class);
-    }
-
-    /**
-     * Get the location for this stock ledger entry.
-     */
-    public function location()
-    {
-        return $this->belongsTo(Location::class);
-    }
-
-    /**
-     * Get the user who created this entry.
-     */
-    public function creator()
+    public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
     /**
-     * Check if transaction increases stock.
-     *
-     * @return bool
+     * Get the reference model (polymorphic)
      */
-    public function isStockIncrease(): bool
+    public function reference(): MorphTo
     {
-        return in_array($this->transaction_type, [
-            'purchase',
-            'return',
-            'adjustment_increase',
-            'production',
-            'transfer_in',
-        ]);
+        return $this->morphTo();
     }
 
     /**
-     * Check if transaction decreases stock.
-     *
-     * @return bool
+     * Check if this is an increase movement
      */
-    public function isStockDecrease(): bool
+    public function isIncrease(): bool
     {
-        return in_array($this->transaction_type, [
-            'sale',
-            'return_outbound',
-            'adjustment_decrease',
-            'consumption',
-            'transfer_out',
-        ]);
+        return $this->movement_type->isIncrease();
     }
 
     /**
-     * Get the absolute quantity (always positive).
-     *
-     * @return float
+     * Check if this is a decrease movement
      */
-    public function getAbsoluteQuantity(): float
+    public function isDecrease(): bool
     {
-        return abs($this->quantity);
+        return $this->movement_type->isDecrease();
     }
 
     /**
-     * Get current stock balance for a product at a location.
-     *
-     * @param int $productId
-     * @param int|null $branchId
-     * @param int|null $locationId
-     * @param int|null $variantId
-     * @return float
+     * Check if item is expired
      */
-    public static function getCurrentBalance(
-        int $productId,
-        ?int $branchId = null,
-        ?int $locationId = null,
-        ?int $variantId = null
-    ): float {
-        $query = static::where('product_id', $productId);
-        
-        if ($branchId) {
-            $query->where('branch_id', $branchId);
-        }
-        
-        if ($locationId) {
-            $query->where('location_id', $locationId);
-        }
-        
-        if ($variantId) {
-            $query->where('variant_id', $variantId);
-        }
-        
-        return $query->latest('id')->value('running_balance') ?? 0;
-    }
-
-    /**
-     * Get stock movements within a date range.
-     *
-     * @param int $productId
-     * @param \DateTime $startDate
-     * @param \DateTime $endDate
-     * @param int|null $branchId
-     * @return \Illuminate\Database\Eloquent\Collection
-     */
-    public static function getMovements(
-        int $productId,
-        \DateTime $startDate,
-        \DateTime $endDate,
-        ?int $branchId = null
-    ) {
-        $query = static::where('product_id', $productId)
-            ->whereBetween('created_at', [$startDate, $endDate])
-            ->orderBy('created_at');
-        
-        if ($branchId) {
-            $query->where('branch_id', $branchId);
-        }
-        
-        return $query->get();
-    }
-
-    /**
-     * Get items nearing expiry.
-     *
-     * @param int $daysThreshold
-     * @param int|null $branchId
-     * @return \Illuminate\Database\Eloquent\Collection
-     */
-    public static function getExpiringItems(int $daysThreshold = 30, ?int $branchId = null)
+    public function isExpired(): bool
     {
-        $thresholdDate = now()->addDays($daysThreshold);
-        
-        $query = static::whereNotNull('expiry_date')
-            ->where('expiry_date', '<=', $thresholdDate)
-            ->where('expiry_date', '>=', now())
-            ->where('running_balance', '>', 0)
-            ->orderBy('expiry_date');
-        
-        if ($branchId) {
-            $query->where('branch_id', $branchId);
+        if (! $this->expiry_date) {
+            return false;
         }
-        
-        return $query->get();
+
+        return $this->expiry_date->isPast();
     }
 
     /**
-     * Calculate average cost for a product using FIFO method.
-     *
-     * @param int $productId
-     * @param int|null $branchId
-     * @return float
+     * Check if item is near expiry (within 30 days)
      */
-    public static function calculateAverageCost(int $productId, ?int $branchId = null): float
+    public function isNearExpiry(int $days = 30): bool
     {
-        $query = static::where('product_id', $productId)
-            ->where('quantity', '>', 0)
-            ->whereNotNull('unit_cost');
-        
-        if ($branchId) {
-            $query->where('branch_id', $branchId);
+        if (! $this->expiry_date) {
+            return false;
         }
-        
-        $totalCost = $query->sum('total_cost');
-        $totalQuantity = $query->sum('quantity');
-        
-        if ($totalQuantity == 0) {
-            return 0;
-        }
-        
-        return round($totalCost / $totalQuantity, 2);
+
+        return $this->expiry_date->diffInDays(now()) <= $days && ! $this->isExpired();
+    }
+
+    /**
+     * Get the value of this stock movement
+     */
+    public function getValue(): float
+    {
+        return abs($this->quantity) * ($this->unit_cost ?? 0);
     }
 }

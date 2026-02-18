@@ -1,40 +1,34 @@
 <?php
 
+use App\Http\Controllers\Api\FeatureFlagController;
+use App\Http\Controllers\Api\MenuController;
+use App\Http\Controllers\Api\MetadataController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\NotificationController;
+use App\Modules\CRM\Http\Controllers\CustomerController;
+use App\Modules\Finance\Http\Controllers\AccountController;
+use App\Modules\Finance\Http\Controllers\FinancialReportController;
+use App\Modules\Finance\Http\Controllers\FiscalYearController;
+use App\Modules\Finance\Http\Controllers\JournalEntryController;
+use App\Modules\IAM\Http\Controllers\PermissionController;
+use App\Modules\IAM\Http\Controllers\RoleController;
+use App\Modules\IAM\Http\Controllers\UserController;
+use App\Modules\Inventory\Http\Controllers\ProductController;
+use App\Modules\Inventory\Http\Controllers\StockMovementController;
+use App\Modules\Manufacturing\Http\Controllers\BillOfMaterialController;
+use App\Modules\Manufacturing\Http\Controllers\ProductionOrderController;
+use App\Modules\Manufacturing\Http\Controllers\WorkOrderController;
+use App\Modules\POS\Http\Controllers\InvoiceController;
+use App\Modules\POS\Http\Controllers\PaymentController;
+use App\Modules\POS\Http\Controllers\QuotationController;
+use App\Modules\POS\Http\Controllers\SalesOrderController;
+use App\Modules\Procurement\Http\Controllers\PurchaseOrderController;
+use App\Modules\Procurement\Http\Controllers\SupplierController;
+use App\Modules\Reporting\Http\Controllers\AnalyticsController;
+use App\Modules\Reporting\Http\Controllers\DashboardController;
+use App\Modules\Reporting\Http\Controllers\ReportController;
+use App\Modules\Reporting\Http\Controllers\ScheduledReportController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\Auth\AuthController;
-use App\Http\Controllers\Api\Product\ProductController;
-use App\Http\Controllers\Api\Inventory\InventoryController;
-use App\Http\Controllers\Api\CRM\CustomerController;
-use App\Http\Controllers\Api\CRM\ContactController;
-use App\Http\Controllers\Api\CRM\LeadController;
-use App\Http\Controllers\Api\Procurement\VendorController;
-use App\Http\Controllers\Api\Procurement\PurchaseOrderController;
-use App\Http\Controllers\Api\Procurement\PurchaseReceiptController;
-use App\Http\Controllers\Api\Procurement\PurchaseReturnController;
-use App\Http\Controllers\Api\Sales\QuoteController;
-use App\Http\Controllers\Api\Sales\SalesOrderController;
-use App\Http\Controllers\Api\Invoice\InvoiceController;
-use App\Http\Controllers\Api\Payment\PaymentController;
-use App\Http\Controllers\Api\POS\POSSessionController;
-use App\Http\Controllers\Api\POS\POSTransactionController;
-use App\Http\Controllers\Api\IAM\UserController;
-use App\Http\Controllers\Api\IAM\RoleController;
-use App\Http\Controllers\Api\IAM\PermissionController;
-use App\Http\Controllers\Api\MasterData\CurrencyController;
-use App\Http\Controllers\Api\MasterData\TaxRateController;
-use App\Http\Controllers\Api\MasterData\UnitOfMeasureController;
-use App\Http\Controllers\Api\MasterData\CountryController;
-use App\Http\Controllers\Api\Manufacturing\BillOfMaterialController;
-use App\Http\Controllers\Api\Manufacturing\WorkOrderController;
-use App\Http\Controllers\Api\Warehouse\WarehouseTransferController;
-use App\Http\Controllers\Api\Warehouse\WarehousePickingController;
-use App\Http\Controllers\Api\Warehouse\WarehousePutawayController;
-use App\Http\Controllers\Api\Taxation\TaxGroupController;
-use App\Http\Controllers\Api\Taxation\TaxExemptionController;
-use App\Http\Controllers\Api\Taxation\TaxJurisdictionController;
-use App\Http\Controllers\Api\Taxation\TaxCalculationController;
-use App\Http\Controllers\Api\V1\NotificationController;
-use App\Http\Controllers\Api\V1\PushSubscriptionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -42,453 +36,331 @@ use App\Http\Controllers\Api\V1\PushSubscriptionController;
 |--------------------------------------------------------------------------
 |
 | Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
+| routes are loaded by the RouteServiceProvider within a group which
+| is assigned the "api" middleware group.
 |
 */
 
-// Public routes (no authentication required)
+// API v1 Routes
 Route::prefix('v1')->group(function () {
-    // Health check
+
+    // Public routes
     Route::get('/health', function () {
         return response()->json([
-            'status' => 'ok',
-            'timestamp' => now()->toIso8601String(),
+            'success' => true,
+            'message' => 'AutoERP API is running',
             'version' => '1.0.0',
+            'timestamp' => now()->toIso8601String(),
         ]);
     });
-    
+
     // Authentication routes (public)
     Route::prefix('auth')->group(function () {
-        Route::post('/register', [AuthController::class, 'register']);
-        Route::post('/login', [AuthController::class, 'login']);
-        Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
-        Route::post('/reset-password', [AuthController::class, 'resetPassword']);
-    });
-});
-
-// Protected routes (authentication required)
-Route::prefix('v1')->middleware(['auth:sanctum', 'tenant.context'])->group(function () {
-    
-    // Authentication routes (protected)
-    Route::prefix('auth')->group(function () {
-        Route::post('/logout', [AuthController::class, 'logout']);
-        Route::post('/logout-all', [AuthController::class, 'logoutAll']);
-        Route::get('/me', [AuthController::class, 'me']);
-        Route::post('/refresh', [AuthController::class, 'refresh']);
-    });
-    
-    // IAM Routes
-    Route::prefix('users')->group(function () {
-        Route::get('/', [UserController::class, 'index']);
-        Route::post('/', [UserController::class, 'store']);
-        Route::get('/search', [UserController::class, 'search']);
-        Route::get('/{id}', [UserController::class, 'show']);
-        Route::put('/{id}', [UserController::class, 'update']);
-        Route::delete('/{id}', [UserController::class, 'destroy']);
-        Route::post('/{id}/restore', [UserController::class, 'restore']);
-        Route::post('/{id}/roles', [UserController::class, 'assignRoles']);
+        Route::post('register', [AuthController::class, 'register']);
+        Route::post('login', [AuthController::class, 'login']);
     });
 
-    Route::prefix('roles')->group(function () {
-        Route::get('/', [RoleController::class, 'index']);
-        Route::post('/', [RoleController::class, 'store']);
-        Route::get('/{id}', [RoleController::class, 'show']);
-        Route::put('/{id}', [RoleController::class, 'update']);
-        Route::delete('/{id}', [RoleController::class, 'destroy']);
-        Route::post('/{id}/permissions', [RoleController::class, 'assignPermissions']);
-    });
+    // Protected routes (require authentication)
+    Route::middleware('auth:sanctum')->group(function () {
 
-    Route::prefix('permissions')->group(function () {
-        Route::get('/', [PermissionController::class, 'index']);
-        Route::post('/', [PermissionController::class, 'store']);
-        Route::get('/by-module', [PermissionController::class, 'byModule']);
-        Route::get('/{id}', [PermissionController::class, 'show']);
-        Route::put('/{id}', [PermissionController::class, 'update']);
-        Route::delete('/{id}', [PermissionController::class, 'destroy']);
-    });
-    
-    // Master Data Routes
-    Route::prefix('master-data')->group(function () {
-        // Currencies
-        Route::prefix('currencies')->group(function () {
-            Route::get('/', [CurrencyController::class, 'index']);
-            Route::post('/', [CurrencyController::class, 'store']);
-            Route::get('/active', [CurrencyController::class, 'active']);
-            Route::get('/base', [CurrencyController::class, 'base']);
-            Route::get('/{code}', [CurrencyController::class, 'show']);
-            Route::put('/{code}', [CurrencyController::class, 'update']);
-            Route::delete('/{code}', [CurrencyController::class, 'destroy']);
+        // Authentication routes (protected)
+        Route::prefix('auth')->group(function () {
+            Route::post('logout', [AuthController::class, 'logout']);
+            Route::post('refresh', [AuthController::class, 'refresh']);
+            Route::get('user', [AuthController::class, 'user']);
+            Route::get('me', [AuthController::class, 'me']);
+            Route::put('profile', [AuthController::class, 'profile']);
+            Route::put('change-password', [AuthController::class, 'changePassword']);
         });
 
-        // Tax Rates
-        Route::prefix('tax-rates')->group(function () {
-            Route::get('/', [TaxRateController::class, 'index']);
-            Route::post('/', [TaxRateController::class, 'store']);
-            Route::get('/active', [TaxRateController::class, 'active']);
-            Route::get('/valid-on', [TaxRateController::class, 'validOn']);
-            Route::get('/{id}', [TaxRateController::class, 'show']);
-            Route::put('/{id}', [TaxRateController::class, 'update']);
-            Route::delete('/{id}', [TaxRateController::class, 'destroy']);
+        // Metadata API Routes
+        Route::prefix('metadata')->group(function () {
+            // Get metadata catalog and entity info
+            Route::get('catalog', [MetadataController::class, 'catalog']);
+            Route::get('entity/{name}', [MetadataController::class, 'entity']);
+            Route::get('module/{module}', [MetadataController::class, 'module']);
+            Route::get('entity/{entityName}/fields', [MetadataController::class, 'fieldConfig']);
+            Route::get('entity/{entityName}/validation', [MetadataController::class, 'validationRules']);
+            Route::post('cache/clear', [MetadataController::class, 'clearCache']);
+
+            // Admin routes for managing metadata
+            Route::post('entities', [MetadataController::class, 'createEntity']);
+            Route::put('entities/{id}', [MetadataController::class, 'updateEntity']);
         });
 
-        // Units of Measure
-        Route::prefix('units')->group(function () {
-            Route::get('/', [UnitOfMeasureController::class, 'index']);
-            Route::post('/', [UnitOfMeasureController::class, 'store']);
-            Route::get('/by-type/{type}', [UnitOfMeasureController::class, 'byType']);
-            Route::get('/base-units', [UnitOfMeasureController::class, 'baseUnits']);
-            Route::get('/{id}', [UnitOfMeasureController::class, 'show']);
-            Route::put('/{id}', [UnitOfMeasureController::class, 'update']);
-            Route::delete('/{id}', [UnitOfMeasureController::class, 'destroy']);
+        // Menu API Routes
+        Route::prefix('menu')->group(function () {
+            Route::get('/', [MenuController::class, 'index']); // User menu
+            Route::get('all', [MenuController::class, 'all']); // Admin view
+            Route::post('/', [MenuController::class, 'store']);
+            Route::put('{id}', [MenuController::class, 'update']);
+            Route::delete('{id}', [MenuController::class, 'destroy']);
+            Route::post('reorder', [MenuController::class, 'reorder']);
         });
 
-        // Countries
-        Route::prefix('countries')->group(function () {
-            Route::get('/', [CountryController::class, 'index']);
-            Route::get('/{code}', [CountryController::class, 'show']);
-        });
-    });
-    
-    // Product Management Routes
-    Route::prefix('products')->group(function () {
-        Route::get('/', [ProductController::class, 'index']);
-        Route::post('/', [ProductController::class, 'store']);
-        Route::get('/search', [ProductController::class, 'search']);
-        Route::get('/low-stock', [ProductController::class, 'lowStock']);
-        Route::get('/out-of-stock', [ProductController::class, 'outOfStock']);
-        Route::get('/{id}', [ProductController::class, 'show']);
-        Route::put('/{id}', [ProductController::class, 'update']);
-        Route::delete('/{id}', [ProductController::class, 'destroy']);
-        Route::post('/{id}/calculate-price', [ProductController::class, 'calculatePrice']);
-    });
-
-    // Inventory Management Routes
-    Route::prefix('inventory')->group(function () {
-        // Stock movements
-        Route::post('/stock-in', [InventoryController::class, 'stockIn']);
-        Route::post('/stock-out', [InventoryController::class, 'stockOut']);
-        Route::post('/adjustment', [InventoryController::class, 'stockAdjustment']);
-        Route::post('/transfer', [InventoryController::class, 'stockTransfer']);
-        
-        // Stock queries
-        Route::get('/balance', [InventoryController::class, 'getCurrentBalance']);
-        Route::get('/movements', [InventoryController::class, 'getMovements']);
-        Route::get('/expiring-items', [InventoryController::class, 'getExpiringItems']);
-        Route::get('/valuation', [InventoryController::class, 'calculateValuation']);
-    });
-
-    // CRM Routes
-    Route::prefix('crm')->group(function () {
-        // Customer routes
-        Route::prefix('customers')->group(function () {
-            Route::get('/', [CustomerController::class, 'index']);
-            Route::post('/', [CustomerController::class, 'store']);
-            Route::get('/search', [CustomerController::class, 'search']);
-            Route::get('/statistics', [CustomerController::class, 'statistics']);
-            Route::get('/{id}', [CustomerController::class, 'show']);
-            Route::put('/{id}', [CustomerController::class, 'update']);
-            Route::delete('/{id}', [CustomerController::class, 'destroy']);
+        // Feature Flags API Routes
+        Route::prefix('features')->group(function () {
+            Route::get('/', [FeatureFlagController::class, 'index']); // Enabled features
+            Route::get('check/{name}', [FeatureFlagController::class, 'check']);
+            Route::post('check-multiple', [FeatureFlagController::class, 'checkMultiple']);
+            Route::get('module/{module}', [FeatureFlagController::class, 'byModule']);
+            Route::post('{name}/enable', [FeatureFlagController::class, 'enable']);
+            Route::post('{name}/disable', [FeatureFlagController::class, 'disable']);
+            Route::post('/', [FeatureFlagController::class, 'store']);
+            Route::put('{id}', [FeatureFlagController::class, 'update']);
         });
 
-        // Contact routes
-        Route::prefix('contacts')->group(function () {
-            Route::get('/', [ContactController::class, 'index']);
-            Route::post('/', [ContactController::class, 'store']);
-            Route::get('/search', [ContactController::class, 'search']);
-            Route::get('/{id}', [ContactController::class, 'show']);
-            Route::put('/{id}', [ContactController::class, 'update']);
-            Route::delete('/{id}', [ContactController::class, 'destroy']);
+        // Products (root level)
+        Route::get('products/search', [ProductController::class, 'search']);
+        Route::get('products/below-reorder-level', [ProductController::class, 'belowReorderLevel']);
+        Route::get('products/{id}/stock-history', [ProductController::class, 'stockHistory']);
+        Route::apiResource('products', ProductController::class);
+
+        // Inventory Module Routes
+        Route::prefix('inventory')->group(function () {
+
+            // Products (also available here for backward compatibility)
+            Route::get('products/search', [ProductController::class, 'search']);
+            Route::get('products/below-reorder-level', [ProductController::class, 'belowReorderLevel']);
+            Route::get('products/{id}/stock-history', [ProductController::class, 'stockHistory']);
+            Route::apiResource('products', ProductController::class);
+
+            // Stock Movements
+            Route::prefix('stock-movements')->group(function () {
+                Route::get('types', [StockMovementController::class, 'types']);
+                Route::get('history', [StockMovementController::class, 'history']);
+                Route::post('adjustment', [StockMovementController::class, 'adjustment']);
+                Route::post('transfer', [StockMovementController::class, 'transfer']);
+            });
+
         });
 
-        // Lead routes
-        Route::prefix('leads')->group(function () {
-            Route::get('/', [LeadController::class, 'index']);
-            Route::post('/', [LeadController::class, 'store']);
-            Route::get('/search', [LeadController::class, 'search']);
-            Route::get('/statistics', [LeadController::class, 'statistics']);
-            Route::get('/{id}', [LeadController::class, 'show']);
-            Route::put('/{id}', [LeadController::class, 'update']);
-            Route::delete('/{id}', [LeadController::class, 'destroy']);
-            Route::post('/{id}/convert', [LeadController::class, 'convert']);
-        });
-    });
-
-    // Procurement Routes
-    Route::prefix('procurement')->group(function () {
-        // Vendor routes
-        Route::prefix('vendors')->group(function () {
-            Route::get('/', [VendorController::class, 'index']);
-            Route::post('/', [VendorController::class, 'store']);
-            Route::get('/search', [VendorController::class, 'search']);
-            Route::get('/statistics', [VendorController::class, 'statistics']);
-            Route::get('/{id}', [VendorController::class, 'show']);
-            Route::put('/{id}', [VendorController::class, 'update']);
-            Route::delete('/{id}', [VendorController::class, 'destroy']);
+        // CRM Module Routes
+        Route::prefix('crm')->group(function () {
+            Route::get('customers/search', [CustomerController::class, 'search']);
+            Route::apiResource('customers', CustomerController::class);
         });
 
-        // Purchase Order routes
-        Route::prefix('purchase-orders')->group(function () {
-            Route::get('/', [PurchaseOrderController::class, 'index']);
-            Route::post('/', [PurchaseOrderController::class, 'store']);
-            Route::get('/{id}', [PurchaseOrderController::class, 'show']);
-            Route::put('/{id}', [PurchaseOrderController::class, 'update']);
-            Route::delete('/{id}', [PurchaseOrderController::class, 'destroy']);
-            Route::post('/{id}/approve', [PurchaseOrderController::class, 'approve']);
-            Route::post('/{id}/reject', [PurchaseOrderController::class, 'reject']);
-            Route::post('/{id}/cancel', [PurchaseOrderController::class, 'cancel']);
+        // Procurement Module Routes
+        Route::prefix('procurement')->group(function () {
+
+            // Suppliers
+            Route::get('suppliers/search', [SupplierController::class, 'search']);
+            Route::get('suppliers/active', [SupplierController::class, 'active']);
+            Route::apiResource('suppliers', SupplierController::class);
+
+            // Purchase Orders
+            Route::get('purchase-orders/search', [PurchaseOrderController::class, 'search']);
+            Route::get('purchase-orders/pending', [PurchaseOrderController::class, 'pending']);
+            Route::post('purchase-orders/{id}/approve', [PurchaseOrderController::class, 'approve']);
+            Route::post('purchase-orders/{id}/receive', [PurchaseOrderController::class, 'receive']);
+            Route::post('purchase-orders/{id}/cancel', [PurchaseOrderController::class, 'cancel']);
+            Route::apiResource('purchase-orders', PurchaseOrderController::class);
+
         });
 
-        // Purchase Receipt routes (GRN)
-        Route::prefix('purchase-receipts')->group(function () {
-            Route::get('/', [PurchaseReceiptController::class, 'index']);
-            Route::post('/', [PurchaseReceiptController::class, 'store']);
-            Route::get('/{id}', [PurchaseReceiptController::class, 'show']);
-            Route::delete('/{id}', [PurchaseReceiptController::class, 'destroy']);
-            Route::post('/{id}/accept', [PurchaseReceiptController::class, 'accept']);
+        // IAM Module Routes
+        Route::prefix('iam')->group(function () {
+
+            // Users
+            Route::get('users/search', [UserController::class, 'search']);
+            Route::get('users/active', [UserController::class, 'active']);
+            Route::post('users/{id}/assign-roles', [UserController::class, 'assignRoles']);
+            Route::post('users/{id}/sync-roles', [UserController::class, 'syncRoles']);
+            Route::get('users/{id}/roles', [UserController::class, 'getRoles']);
+            Route::get('users/{id}/permissions', [UserController::class, 'getPermissions']);
+            Route::apiResource('users', UserController::class);
+
+            // Roles
+            Route::get('roles/system', [RoleController::class, 'systemRoles']);
+            Route::get('roles/custom', [RoleController::class, 'customRoles']);
+            Route::post('roles/{id}/assign-permissions', [RoleController::class, 'assignPermissions']);
+            Route::post('roles/{id}/sync-permissions', [RoleController::class, 'syncPermissions']);
+            Route::get('roles/{id}/permissions', [RoleController::class, 'getPermissions']);
+            Route::get('roles/{id}/users', [RoleController::class, 'getUsers']);
+            Route::apiResource('roles', RoleController::class);
+
+            // Permissions (read-only)
+            Route::get('permissions/grouped', [PermissionController::class, 'grouped']);
+            Route::get('permissions/{id}/roles', [PermissionController::class, 'getRoles']);
+            Route::get('permissions/{id}', [PermissionController::class, 'show']);
+            Route::get('permissions', [PermissionController::class, 'index']);
+
         });
 
-        // Purchase Return routes
-        Route::prefix('purchase-returns')->group(function () {
-            Route::get('/', [PurchaseReturnController::class, 'index']);
-            Route::post('/', [PurchaseReturnController::class, 'store']);
-            Route::get('/{id}', [PurchaseReturnController::class, 'show']);
-            Route::delete('/{id}', [PurchaseReturnController::class, 'destroy']);
-            Route::post('/{id}/approve', [PurchaseReturnController::class, 'approve']);
-        });
-    });
+        // POS (Point of Sale) Module Routes
+        Route::prefix('pos')->group(function () {
 
-    // Sales Routes
-    Route::prefix('sales')->group(function () {
-        // Quote routes
-        Route::prefix('quotes')->group(function () {
-            Route::get('/', [QuoteController::class, 'index']);
-            Route::post('/', [QuoteController::class, 'store']);
-            Route::get('/{id}', [QuoteController::class, 'show']);
-            Route::put('/{id}', [QuoteController::class, 'update']);
-            Route::delete('/{id}', [QuoteController::class, 'destroy']);
-            Route::post('/{id}/convert', [QuoteController::class, 'convertToOrder']);
-        });
+            // Quotations
+            Route::get('quotations/expired', [QuotationController::class, 'expired']);
+            Route::get('quotations/customer/{customerId}', [QuotationController::class, 'byCustomer']);
+            Route::post('quotations/{id}/convert-to-sales-order', [QuotationController::class, 'convertToSalesOrder']);
+            Route::apiResource('quotations', QuotationController::class);
 
-        // Sales Order routes
-        Route::prefix('orders')->group(function () {
-            Route::get('/', [SalesOrderController::class, 'index']);
-            Route::post('/', [SalesOrderController::class, 'store']);
-            Route::get('/{id}', [SalesOrderController::class, 'show']);
-            Route::put('/{id}', [SalesOrderController::class, 'update']);
-            Route::delete('/{id}', [SalesOrderController::class, 'destroy']);
-            Route::post('/{id}/approve', [SalesOrderController::class, 'approve']);
-            Route::post('/{id}/reserve-inventory', [SalesOrderController::class, 'reserveInventory']);
-            Route::post('/from-quote/{quoteId}', [SalesOrderController::class, 'createFromQuote']);
-        });
-    });
+            // Sales Orders
+            Route::get('sales-orders/search', [SalesOrderController::class, 'search']);
+            Route::get('sales-orders/status/{status}', [SalesOrderController::class, 'byStatus']);
+            Route::get('sales-orders/customer/{customerId}', [SalesOrderController::class, 'byCustomer']);
+            Route::post('sales-orders/{id}/confirm', [SalesOrderController::class, 'confirm']);
+            Route::post('sales-orders/{id}/cancel', [SalesOrderController::class, 'cancel']);
+            Route::apiResource('sales-orders', SalesOrderController::class);
 
-    // Invoice Routes
-    Route::prefix('invoices')->group(function () {
-        Route::get('/', [InvoiceController::class, 'index']);
-        Route::post('/', [InvoiceController::class, 'store']);
-        Route::get('/{id}', [InvoiceController::class, 'show']);
-        Route::put('/{id}', [InvoiceController::class, 'update']);
-        Route::delete('/{id}', [InvoiceController::class, 'destroy']);
-        Route::post('/{id}/approve', [InvoiceController::class, 'approve']);
-        Route::post('/{id}/payments', [InvoiceController::class, 'recordPayment']);
-        Route::post('/from-sales-order/{salesOrderId}', [InvoiceController::class, 'createFromSalesOrder']);
-    });
-    
-    // Payment Management Routes
-    Route::prefix('payments')->group(function () {
-        Route::get('/', [PaymentController::class, 'index']);
-        Route::post('/', [PaymentController::class, 'store']);
-        Route::get('/search', [PaymentController::class, 'search']);
-        Route::get('/statistics', [PaymentController::class, 'statistics']);
-        Route::get('/{id}', [PaymentController::class, 'show']);
-        Route::put('/{id}', [PaymentController::class, 'update']);
-        Route::delete('/{id}', [PaymentController::class, 'destroy']);
-        Route::post('/{id}/reconcile', [PaymentController::class, 'reconcile']);
-        Route::post('/{id}/unreconcile', [PaymentController::class, 'unreconcile']);
-        Route::post('/{id}/complete', [PaymentController::class, 'complete']);
-        Route::post('/{id}/cancel', [PaymentController::class, 'cancel']);
-    });
-    
-    // POS Management Routes
-    Route::prefix('pos')->group(function () {
-        // POS Sessions
-        Route::prefix('sessions')->group(function () {
-            Route::get('/', [POSSessionController::class, 'index']);
-            Route::post('/', [POSSessionController::class, 'store']);
-            Route::get('/current', [POSSessionController::class, 'current']);
-            Route::get('/{id}', [POSSessionController::class, 'show']);
-            Route::post('/{id}/close', [POSSessionController::class, 'close']);
-        });
-        
-        // POS Transactions
-        Route::prefix('transactions')->group(function () {
-            Route::get('/', [POSTransactionController::class, 'index']);
-            Route::post('/', [POSTransactionController::class, 'store']);
-            Route::get('/{id}', [POSTransactionController::class, 'show']);
-            Route::post('/{id}/complete', [POSTransactionController::class, 'complete']);
-            Route::post('/{id}/receipt', [POSTransactionController::class, 'generateReceipt']);
-        });
-    });
-    
-    // Pricing Management Routes
-    Route::prefix('pricing')->group(function () {
-        // Pricing Calculations
-        Route::post('/calculate', [\App\Http\Controllers\Api\Pricing\PricingCalculationController::class, 'calculate']);
-        Route::post('/calculate-bulk', [\App\Http\Controllers\Api\Pricing\PricingCalculationController::class, 'calculateBulk']);
-        Route::get('/applicable-rules', [\App\Http\Controllers\Api\Pricing\PricingCalculationController::class, 'getApplicableRules']);
-        Route::get('/applicable-tiers', [\App\Http\Controllers\Api\Pricing\PricingCalculationController::class, 'getApplicableTiers']);
-        
-        // Pricing Rules
-        Route::prefix('rules')->group(function () {
-            Route::get('/', [\App\Http\Controllers\Api\Pricing\PricingRuleController::class, 'index']);
-            Route::post('/', [\App\Http\Controllers\Api\Pricing\PricingRuleController::class, 'store']);
-            Route::get('/{id}', [\App\Http\Controllers\Api\Pricing\PricingRuleController::class, 'show']);
-            Route::put('/{id}', [\App\Http\Controllers\Api\Pricing\PricingRuleController::class, 'update']);
-            Route::delete('/{id}', [\App\Http\Controllers\Api\Pricing\PricingRuleController::class, 'destroy']);
-            Route::post('/{id}/activate', [\App\Http\Controllers\Api\Pricing\PricingRuleController::class, 'activate']);
-            Route::post('/{id}/deactivate', [\App\Http\Controllers\Api\Pricing\PricingRuleController::class, 'deactivate']);
-        });
-    });
-    
-    // Manufacturing Routes
-    Route::prefix('manufacturing')->group(function () {
-        // Bill of Materials (BOM)
-        Route::prefix('boms')->group(function () {
-            Route::get('/', [BillOfMaterialController::class, 'index']);
-            Route::post('/', [BillOfMaterialController::class, 'store']);
-            Route::get('/{id}', [BillOfMaterialController::class, 'show']);
-            Route::put('/{id}', [BillOfMaterialController::class, 'update']);
-            Route::delete('/{id}', [BillOfMaterialController::class, 'destroy']);
-            Route::post('/{id}/activate', [BillOfMaterialController::class, 'activate']);
-            Route::post('/{id}/deactivate', [BillOfMaterialController::class, 'deactivate']);
-            Route::get('/{id}/calculate-materials', [BillOfMaterialController::class, 'calculateMaterials']);
-            Route::get('/product/{productId}', [BillOfMaterialController::class, 'getByProduct']);
-        });
-        
-        // Work Orders
-        Route::prefix('work-orders')->group(function () {
-            Route::get('/', [WorkOrderController::class, 'index']);
-            Route::post('/', [WorkOrderController::class, 'store']);
-            Route::get('/in-progress', [WorkOrderController::class, 'inProgress']);
-            Route::get('/overdue', [WorkOrderController::class, 'overdue']);
-            Route::get('/{id}', [WorkOrderController::class, 'show']);
-            Route::put('/{id}', [WorkOrderController::class, 'update']);
-            Route::delete('/{id}', [WorkOrderController::class, 'destroy']);
-            Route::post('/{id}/start-production', [WorkOrderController::class, 'startProduction']);
-            Route::post('/{id}/complete-production', [WorkOrderController::class, 'completeProduction']);
-            Route::post('/{id}/cancel', [WorkOrderController::class, 'cancel']);
-        });
-    });
+            // Invoices
+            Route::get('invoices/overdue', [InvoiceController::class, 'overdue']);
+            Route::get('invoices/status/{status}', [InvoiceController::class, 'byStatus']);
+            Route::get('invoices/customer/{customerId}', [InvoiceController::class, 'byCustomer']);
+            Route::post('invoices/from-sales-order/{salesOrderId}', [InvoiceController::class, 'createFromSalesOrder']);
+            Route::apiResource('invoices', InvoiceController::class);
 
-    // Warehouse Management Routes
-    Route::prefix('warehouse')->group(function () {
-        // Warehouse Transfer routes
-        Route::prefix('transfers')->group(function () {
-            Route::get('/', [WarehouseTransferController::class, 'index']);
-            Route::post('/', [WarehouseTransferController::class, 'store']);
-            Route::get('/pending', [WarehouseTransferController::class, 'pending']);
-            Route::get('/in-transit', [WarehouseTransferController::class, 'inTransit']);
-            Route::get('/{id}', [WarehouseTransferController::class, 'show']);
-            Route::put('/{id}', [WarehouseTransferController::class, 'update']);
-            Route::delete('/{id}', [WarehouseTransferController::class, 'destroy']);
-            Route::post('/{id}/approve', [WarehouseTransferController::class, 'approve']);
-            Route::post('/{id}/ship', [WarehouseTransferController::class, 'ship']);
-            Route::post('/{id}/receive', [WarehouseTransferController::class, 'receive']);
-            Route::post('/{id}/cancel', [WarehouseTransferController::class, 'cancel']);
+            // Payments
+            Route::get('payments/invoice/{invoiceId}', [PaymentController::class, 'byInvoice']);
+            Route::get('payments/customer/{customerId}', [PaymentController::class, 'byCustomer']);
+            Route::post('payments/{id}/void', [PaymentController::class, 'void']);
+            Route::apiResource('payments', PaymentController::class)->except(['update']);
+
         });
 
-        // Warehouse Picking routes
-        Route::prefix('pickings')->group(function () {
-            Route::get('/', [WarehousePickingController::class, 'index']);
-            Route::post('/', [WarehousePickingController::class, 'store']);
-            Route::get('/pending', [WarehousePickingController::class, 'pending']);
-            Route::get('/efficiency', [WarehousePickingController::class, 'efficiency']);
-            Route::get('/{id}', [WarehousePickingController::class, 'show']);
-            Route::delete('/{id}', [WarehousePickingController::class, 'destroy']);
-            Route::post('/{id}/assign', [WarehousePickingController::class, 'assign']);
-            Route::post('/{id}/start', [WarehousePickingController::class, 'start']);
-            Route::post('/{id}/pick', [WarehousePickingController::class, 'pick']);
-            Route::post('/{id}/complete', [WarehousePickingController::class, 'complete']);
-            Route::post('/{id}/cancel', [WarehousePickingController::class, 'cancel']);
+        // Manufacturing Module Routes
+        Route::prefix('manufacturing')->group(function () {
+
+            // Bill of Materials
+            Route::get('boms/search', [BillOfMaterialController::class, 'search']);
+            Route::get('boms/product/{productId}', [BillOfMaterialController::class, 'byProduct']);
+            Route::get('boms/product/{productId}/latest-active', [BillOfMaterialController::class, 'latestActive']);
+            Route::post('boms/{id}/create-version', [BillOfMaterialController::class, 'createVersion']);
+            Route::apiResource('boms', BillOfMaterialController::class);
+
+            // Production Orders
+            Route::get('production-orders/search', [ProductionOrderController::class, 'search']);
+            Route::get('production-orders/status', [ProductionOrderController::class, 'byStatus']);
+            Route::get('production-orders/in-progress', [ProductionOrderController::class, 'inProgress']);
+            Route::get('production-orders/overdue', [ProductionOrderController::class, 'overdue']);
+            Route::post('production-orders/{id}/release', [ProductionOrderController::class, 'release']);
+            Route::post('production-orders/{id}/start', [ProductionOrderController::class, 'start']);
+            Route::post('production-orders/{id}/consume-materials', [ProductionOrderController::class, 'consumeMaterials']);
+            Route::post('production-orders/{id}/complete', [ProductionOrderController::class, 'complete']);
+            Route::post('production-orders/{id}/cancel', [ProductionOrderController::class, 'cancel']);
+            Route::apiResource('production-orders', ProductionOrderController::class);
+
+            // Work Orders
+            Route::get('work-orders/search', [WorkOrderController::class, 'search']);
+            Route::get('work-orders/status', [WorkOrderController::class, 'byStatus']);
+            Route::get('work-orders/pending', [WorkOrderController::class, 'pending']);
+            Route::get('work-orders/in-progress', [WorkOrderController::class, 'inProgress']);
+            Route::get('work-orders/overdue', [WorkOrderController::class, 'overdue']);
+            Route::get('work-orders/my-work-orders', [WorkOrderController::class, 'myWorkOrders']);
+            Route::get('work-orders/production-order/{productionOrderId}', [WorkOrderController::class, 'byProductionOrder']);
+            Route::post('work-orders/{id}/start', [WorkOrderController::class, 'start']);
+            Route::post('work-orders/{id}/complete', [WorkOrderController::class, 'complete']);
+            Route::post('work-orders/{id}/cancel', [WorkOrderController::class, 'cancel']);
+            Route::apiResource('work-orders', WorkOrderController::class);
+
         });
 
-        // Warehouse Putaway routes
-        Route::prefix('putaways')->group(function () {
-            Route::get('/', [WarehousePutawayController::class, 'index']);
-            Route::post('/', [WarehousePutawayController::class, 'store']);
-            Route::get('/pending', [WarehousePutawayController::class, 'pending']);
-            Route::get('/{id}', [WarehousePutawayController::class, 'show']);
-            Route::delete('/{id}', [WarehousePutawayController::class, 'destroy']);
-            Route::post('/{id}/assign', [WarehousePutawayController::class, 'assign']);
-            Route::post('/{id}/start', [WarehousePutawayController::class, 'start']);
-            Route::post('/{id}/putaway', [WarehousePutawayController::class, 'putaway']);
-            Route::post('/{id}/complete', [WarehousePutawayController::class, 'complete']);
-            Route::post('/{id}/cancel', [WarehousePutawayController::class, 'cancel']);
-        });
-    });
+        // Finance Module Routes
+        Route::prefix('finance')->group(function () {
 
-    // Taxation Routes
-    Route::prefix('taxation')->group(function () {
-        // Tax Groups
-        Route::prefix('tax-groups')->group(function () {
-            Route::get('/', [TaxGroupController::class, 'index']);
-            Route::post('/', [TaxGroupController::class, 'store']);
-            Route::get('/active', [TaxGroupController::class, 'active']);
-            Route::get('/{id}', [TaxGroupController::class, 'show']);
-            Route::put('/{id}', [TaxGroupController::class, 'update']);
-            Route::delete('/{id}', [TaxGroupController::class, 'destroy']);
-            Route::post('/{id}/attach-tax-rate', [TaxGroupController::class, 'attachTaxRate']);
-            Route::delete('/{id}/detach-tax-rate/{taxRateId}', [TaxGroupController::class, 'detachTaxRate']);
-        });
+            // Accounts (Chart of Accounts)
+            Route::get('accounts/by-type', [AccountController::class, 'byType']);
+            Route::get('accounts/root', [AccountController::class, 'rootAccounts']);
+            Route::get('accounts/active', [AccountController::class, 'activeAccounts']);
+            Route::get('accounts/search', [AccountController::class, 'search']);
+            Route::get('accounts/{id}/balance', [AccountController::class, 'balance']);
+            Route::apiResource('accounts', AccountController::class);
 
-        // Tax Exemptions
-        Route::prefix('tax-exemptions')->group(function () {
-            Route::get('/', [TaxExemptionController::class, 'index']);
-            Route::post('/', [TaxExemptionController::class, 'store']);
-            Route::get('/active', [TaxExemptionController::class, 'active']);
-            Route::get('/by-entity', [TaxExemptionController::class, 'byEntity']);
-            Route::get('/{id}', [TaxExemptionController::class, 'show']);
-            Route::put('/{id}', [TaxExemptionController::class, 'update']);
-            Route::delete('/{id}', [TaxExemptionController::class, 'destroy']);
+            // Journal Entries
+            Route::get('journal-entries/by-status', [JournalEntryController::class, 'byStatus']);
+            Route::get('journal-entries/draft', [JournalEntryController::class, 'draft']);
+            Route::get('journal-entries/posted', [JournalEntryController::class, 'posted']);
+            Route::get('journal-entries/search', [JournalEntryController::class, 'search']);
+            Route::get('journal-entries/generate-entry-number', [JournalEntryController::class, 'generateEntryNumber']);
+            Route::post('journal-entries/{id}/post', [JournalEntryController::class, 'post']);
+            Route::post('journal-entries/{id}/void', [JournalEntryController::class, 'void']);
+            Route::apiResource('journal-entries', JournalEntryController::class);
+
+            // Financial Reports
+            Route::post('reports/trial-balance', [FinancialReportController::class, 'trialBalance']);
+            Route::post('reports/profit-and-loss', [FinancialReportController::class, 'profitAndLoss']);
+            Route::post('reports/balance-sheet', [FinancialReportController::class, 'balanceSheet']);
+            Route::post('reports/account-ledger/{accountId}', [FinancialReportController::class, 'accountLedger']);
+            Route::post('reports/general-ledger', [FinancialReportController::class, 'generalLedger']);
+
+            // Fiscal Years
+            Route::get('fiscal-years/open', [FiscalYearController::class, 'open']);
+            Route::get('fiscal-years/closed', [FiscalYearController::class, 'closed']);
+            Route::get('fiscal-years/current', [FiscalYearController::class, 'current']);
+            Route::post('fiscal-years/{id}/close', [FiscalYearController::class, 'close']);
+            Route::apiResource('fiscal-years', FiscalYearController::class);
+
         });
 
-        // Tax Jurisdictions
-        Route::prefix('tax-jurisdictions')->group(function () {
-            Route::get('/', [TaxJurisdictionController::class, 'index']);
-            Route::post('/', [TaxJurisdictionController::class, 'store']);
-            Route::get('/active', [TaxJurisdictionController::class, 'active']);
-            Route::get('/find-by-location', [TaxJurisdictionController::class, 'findByLocation']);
-            Route::get('/{id}', [TaxJurisdictionController::class, 'show']);
-            Route::put('/{id}', [TaxJurisdictionController::class, 'update']);
-            Route::delete('/{id}', [TaxJurisdictionController::class, 'destroy']);
+        // Notifications Module Routes
+        Route::prefix('notifications')->group(function () {
+
+            // Push Notifications
+            Route::post('push/subscribe', [NotificationController::class, 'subscribePush']);
+            Route::post('push/unsubscribe', [NotificationController::class, 'unsubscribePush']);
+            Route::get('push/subscriptions', [NotificationController::class, 'getPushSubscriptions']);
+            Route::post('push/test', [NotificationController::class, 'sendTestNotification']);
+
+            // Notification Preferences
+            Route::get('preferences', [NotificationController::class, 'getPreferences']);
+            Route::put('preferences', [NotificationController::class, 'updatePreferences']);
+
+            // Notification History
+            Route::get('history', [NotificationController::class, 'getHistory']);
+            Route::post('{id}/mark-as-read', [NotificationController::class, 'markAsRead']);
+            Route::post('mark-all-as-read', [NotificationController::class, 'markAllAsRead']);
+            Route::delete('{id}', [NotificationController::class, 'deleteNotification']);
+
         });
 
-        // Tax Calculations
-        Route::prefix('calculations')->group(function () {
-            Route::post('/calculate', [TaxCalculationController::class, 'calculate']);
-            Route::post('/calculate-and-save', [TaxCalculationController::class, 'calculateAndSave']);
-            Route::get('/history', [TaxCalculationController::class, 'history']);
-            Route::get('/summary', [TaxCalculationController::class, 'summary']);
-            Route::get('/breakdown', [TaxCalculationController::class, 'breakdown']);
+        // Reporting & Analytics Module Routes
+        Route::prefix('reports')->group(function () {
+
+            // Reports - specialized routes first
+            Route::get('by-module', [ReportController::class, 'getByModule']);
+
+            // Dashboards (before generic report resource routes)
+            Route::prefix('dashboards')->group(function () {
+                Route::get('default', [DashboardController::class, 'getDefault']);
+                Route::post('{id}/set-default', [DashboardController::class, 'setAsDefault']);
+                Route::post('widgets', [DashboardController::class, 'addWidget']);
+                Route::put('widgets/{widgetId}', [DashboardController::class, 'updateWidget']);
+                Route::delete('widgets/{widgetId}', [DashboardController::class, 'removeWidget']);
+                Route::post('{id}/reorder-widgets', [DashboardController::class, 'reorderWidgets']);
+                Route::apiResource('/', DashboardController::class)->parameters(['' => 'id']);
+            });
+
+            // Analytics & KPIs
+            Route::prefix('analytics')->group(function () {
+                Route::get('kpis', [AnalyticsController::class, 'getKPIs']);
+                Route::get('revenue', [AnalyticsController::class, 'getTotalRevenue']);
+                Route::get('expenses', [AnalyticsController::class, 'getTotalExpenses']);
+                Route::get('gross-profit-margin', [AnalyticsController::class, 'getGrossProfitMargin']);
+                Route::get('net-profit-margin', [AnalyticsController::class, 'getNetProfitMargin']);
+                Route::get('inventory-turnover-ratio', [AnalyticsController::class, 'getInventoryTurnoverRatio']);
+                Route::get('days-sales-outstanding', [AnalyticsController::class, 'getDaysSalesOutstanding']);
+                Route::get('order-fulfillment-rate', [AnalyticsController::class, 'getOrderFulfillmentRate']);
+                Route::get('production-efficiency', [AnalyticsController::class, 'getProductionEfficiency']);
+                Route::get('customer-acquisition-cost', [AnalyticsController::class, 'getCustomerAcquisitionCost']);
+                Route::get('average-order-value', [AnalyticsController::class, 'getAverageOrderValue']);
+            });
+
+            // Scheduled Reports
+            Route::prefix('scheduled')->group(function () {
+                Route::get('due', [ScheduledReportController::class, 'getDueReports']);
+                Route::post('process', [ScheduledReportController::class, 'processDueReports']);
+                Route::get('report/{reportId}', [ScheduledReportController::class, 'getForReport']);
+                Route::apiResource('/', ScheduledReportController::class)->parameters(['' => 'id']);
+            });
+
+            // Reports - generic resource routes last
+            Route::post('{id}/execute', [ReportController::class, 'execute']);
+            Route::post('{id}/export', [ReportController::class, 'export']);
+            Route::apiResource('/', ReportController::class)->parameters(['' => 'id']);
+
         });
-    });
 
-    // Notification Routes
-    Route::prefix('notifications')->group(function () {
-        Route::get('/', [NotificationController::class, 'index']);
-        Route::get('/unread-count', [NotificationController::class, 'unreadCount']);
-        Route::post('/{notificationId}/mark-as-read', [NotificationController::class, 'markAsRead']);
-        Route::post('/mark-all-as-read', [NotificationController::class, 'markAllAsRead']);
-        Route::get('/preferences', [NotificationController::class, 'getPreferences']);
-        Route::put('/preferences', [NotificationController::class, 'updatePreferences']);
-    });
-
-    // Push Notification Routes
-    Route::prefix('push')->group(function () {
-        Route::get('/public-key', [PushSubscriptionController::class, 'getPublicKey']);
-        Route::post('/subscribe', [PushSubscriptionController::class, 'subscribe']);
-        Route::post('/unsubscribe', [PushSubscriptionController::class, 'unsubscribe']);
-        Route::post('/test', [PushSubscriptionController::class, 'test']);
     });
 });

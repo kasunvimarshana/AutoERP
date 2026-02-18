@@ -13,27 +13,18 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->uuid('uuid')->unique();
-            $table->foreignId('tenant_id')->nullable()->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('organization_id')->nullable()->constrained('organizations')->nullOnDelete();
-            $table->foreignId('branch_id')->nullable()->constrained('branches')->nullOnDelete();
+            $table->foreignId('tenant_id')->nullable()->constrained()->onDelete('cascade');
             $table->string('name');
             $table->string('email');
-            $table->unique(['email', 'tenant_id']);
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->string('phone')->nullable();
-            $table->string('avatar')->nullable();
-            $table->string('timezone')->nullable();
-            $table->string('language_code', 5)->default('en');
-            $table->enum('status', ['active', 'inactive', 'suspended'])->default('active');
-            $table->timestamp('last_login_at')->nullable();
-            $table->string('last_login_ip')->nullable();
+            $table->boolean('is_active')->default(true);
             $table->rememberToken();
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
             $table->softDeletes();
+
+            // Unique constraint on email per tenant
+            $table->unique(['tenant_id', 'email']);
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {

@@ -2,161 +2,142 @@
 
 namespace App\Modules\Inventory\Repositories;
 
-use App\Core\Repositories\BaseRepository;
 use App\Modules\Inventory\Models\StockLedger;
-use Illuminate\Database\Eloquent\Collection;
+use App\Repositories\BaseRepository;
+use Illuminate\Support\Facades\DB;
 
-class StockLedgerRepository extends BaseRepository implements StockLedgerRepositoryInterface
+/**
+ * Stock Ledger Repository
+ *
+ * Handles data access for stock ledger entries.
+ */
+class StockLedgerRepository extends BaseRepository
 {
     /**
-     * StockLedgerRepository constructor.
-     *
-     * @param StockLedger $model
+     * Specify Model class name
      */
-    public function __construct(StockLedger $model)
+    protected function model(): string
     {
-        parent::__construct($model);
+        return StockLedger::class;
     }
 
     /**
-     * Record stock movement
+     * Get stock ledger entries for a product
      *
-     * @param array $data
-     * @return StockLedger
+     * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function recordMovement(array $data): StockLedger
+    public function getProductLedger(int $productId, ?int $warehouseId = null)
     {
-        // Calculate running balance
-        $currentBalance = $this->getCurrentBalance(
-            $data['product_id'],
-            $data['branch_id'] ?? null,
-            $data['location_id'] ?? null,
-            $data['variant_id'] ?? null
-        );
+        $query = $this->model
+            ->where('product_id', $productId)
+            ->with(['creator', 'reference']);
 
-        $quantity = $data['quantity'];
-        $newBalance = $currentBalance + $quantity;
+        if ($warehouseId) {
+            $query->where('warehouse_id', $warehouseId);
+        }
 
-        $data['running_balance'] = $newBalance;
-
-        return $this->create($data);
+        return $query->orderBy('transaction_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->get();
     }
 
     /**
-     * Get current balance for a product
-     *
-     * @param int $productId
-     * @param int|null $branchId
-     * @param int|null $locationId
-     * @param int|null $variantId
-     * @return float
+     * Calculate current stock balance for a product
      */
-    public function getCurrentBalance(
-        int $productId,
-        ?int $branchId = null,
-        ?int $locationId = null,
-        ?int $variantId = null
-    ): float {
-        return StockLedger::getCurrentBalance($productId, $branchId, $locationId, $variantId);
-    }
-
-    /**
-     * Get stock movements for a product
-     *
-     * @param int $productId
-     * @param \DateTime $startDate
-     * @param \DateTime $endDate
-     * @param int|null $branchId
-     * @return Collection
-     */
-    public function getMovements(
-        int $productId,
-        \DateTime $startDate,
-        \DateTime $endDate,
-        ?int $branchId = null
-    ): Collection {
-        return StockLedger::getMovements($productId, $startDate, $endDate, $branchId);
-    }
-
-    /**
-     * Get expiring items
-     *
-     * @param int $daysThreshold
-     * @param int|null $branchId
-     * @return Collection
-     */
-    public function getExpiringItems(int $daysThreshold = 30, ?int $branchId = null): Collection
+    public function calculateStockBalance(int $productId, ?int $warehouseId = null): float
     {
-        return StockLedger::getExpiringItems($daysThreshold, $branchId);
+        $query = $this->model->where('product_id', $productId);
+
+        if ($warehouseId) {
+            $query->where('warehouse_id', $warehouseId);
+        }
+
+        return $query->sum('quantity');
     }
 
     /**
      * Get stock by batch
      *
-     * @param string $batchNumber
-     * @return Collection
+     * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function getByBatch(string $batchNumber): Collection
+    public function getStockByBatch(int $productId, string $batchNumber, ?int $warehouseId = null)
     {
-        return $this->model->where('batch_number', $batchNumber)->get();
+        $query = $this->model
+            ->where('product_id', $productId)
+            ->where('batch_number', $batchNumber);
+
+        if ($warehouseId) {
+            $query->where('warehouse_id', $warehouseId);
+        }
+
+        return $query->get();
     }
 
     /**
-     * Get stock by serial
+     * Get expiring stock
      *
-     * @param string $serialNumber
-     * @return Collection
+     * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function getBySerial(string $serialNumber): Collection
+    public function getExpiringStock(int $productId, int $days = 30)
     {
-        return $this->model->where('serial_number', $serialNumber)->get();
-    }
+        $expiryDate = now()->addDays($days);
 
-    /**
-     * Calculate average cost
-     *
-     * @param int $productId
-     * @param int|null $branchId
-     * @return float
-     */
-    public function calculateAverageCost(int $productId, ?int $branchId = null): float
-    {
-        return StockLedger::calculateAverageCost($productId, $branchId);
-    }
-
-    /**
-     * Get stock by location
-     *
-     * @param int $locationId
-     * @return Collection
-     */
-    public function getByLocation(int $locationId): Collection
-    {
         return $this->model
-            ->where('location_id', $locationId)
-            ->where('running_balance', '>', 0)
+            ->where('product_id', $productId)
+            ->whereNotNull('expiry_date')
+            ->where('expiry_date', '<=', $expiryDate)
+            ->where('expiry_date', '>', now())
+            ->orderBy('expiry_date')
             ->get();
     }
 
     /**
-     * Get FIFO batches for a product
+     * Get expired stock
      *
-     * @param int $productId
-     * @param int|null $branchId
-     * @return Collection
+     * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function getFIFOBatches(int $productId, ?int $branchId = null): Collection
+    public function getExpiredStock(int $productId)
+    {
+        return $this->model
+            ->where('product_id', $productId)
+            ->whereNotNull('expiry_date')
+            ->where('expiry_date', '<', now())
+            ->orderBy('expiry_date')
+            ->get();
+    }
+
+    /**
+     * Get stock movement summary
+     */
+    public function getMovementSummary(int $productId, string $startDate, string $endDate): array
+    {
+        return $this->model
+            ->where('product_id', $productId)
+            ->whereBetween('transaction_date', [$startDate, $endDate])
+            ->select(
+                'movement_type',
+                DB::raw('SUM(quantity) as total_quantity'),
+                DB::raw('SUM(total_cost) as total_cost'),
+                DB::raw('COUNT(*) as transaction_count')
+            )
+            ->groupBy('movement_type')
+            ->get()
+            ->toArray();
+    }
+
+    /**
+     * Get stock valuation
+     */
+    public function getStockValuation(int $productId, ?int $warehouseId = null): float
     {
         $query = $this->model
             ->where('product_id', $productId)
-            ->where('quantity', '>', 0)
-            ->where('running_balance', '>', 0)
-            ->orderBy('created_at', 'asc');
+            ->whereNotNull('unit_cost');
 
-        if ($branchId) {
-            $query->where('branch_id', $branchId);
+        if ($warehouseId) {
+            $query->where('warehouse_id', $warehouseId);
         }
 
-        return $query->get();
+        return $query->sum(DB::raw('quantity * unit_cost'));
     }
 }

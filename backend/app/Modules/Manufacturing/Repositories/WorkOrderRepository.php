@@ -1,198 +1,157 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Modules\Manufacturing\Repositories;
 
-use App\Core\Repositories\BaseRepository;
+use App\Modules\Manufacturing\Enums\WorkOrderStatus;
 use App\Modules\Manufacturing\Models\WorkOrder;
-use Illuminate\Database\Eloquent\Collection;
+use App\Repositories\BaseRepository;
 
-class WorkOrderRepository extends BaseRepository implements WorkOrderRepositoryInterface
+/**
+ * Work Order Repository
+ *
+ * Handles data access for work orders.
+ */
+class WorkOrderRepository extends BaseRepository
 {
     /**
-     * WorkOrderRepository constructor.
-     *
-     * @param WorkOrder $model
+     * Specify Model class name
      */
-    public function __construct(WorkOrder $model)
+    protected function model(): string
     {
-        parent::__construct($model);
+        return WorkOrder::class;
     }
 
     /**
      * Find work order by number
-     *
-     * @param string $workOrderNumber
-     * @return WorkOrder|null
      */
-    public function findByNumber(string $workOrderNumber): ?WorkOrder
+    public function findByNumber(string $number): ?WorkOrder
     {
-        return $this->model->where('work_order_number', $workOrderNumber)->first();
+        return $this->model->where('work_order_number', $number)->first();
     }
 
     /**
      * Get work orders by status
-     *
-     * @param string $status
-     * @return Collection
      */
-    public function getByStatus(string $status): Collection
+    public function getByStatus(WorkOrderStatus $status)
     {
-        return $this->model->status($status)
-            ->orderBy('priority', 'desc')
-            ->orderBy('planned_start_date', 'asc')
+        return $this->model
+            ->byStatus($status)
+            ->with(['productionOrder.product', 'assignedUser'])
+            ->orderBy('scheduled_start', 'asc')
             ->get();
     }
 
     /**
-     * Get work orders by product
-     *
-     * @param int $productId
-     * @return Collection
+     * Get pending work orders
      */
-    public function getByProduct(int $productId): Collection
+    public function getPending()
     {
-        return $this->model->where('product_id', $productId)
-            ->orderBy('planned_start_date', 'desc')
+        return $this->model
+            ->pending()
+            ->with(['productionOrder.product', 'assignedUser'])
+            ->orderBy('scheduled_start', 'asc')
             ->get();
-    }
-
-    /**
-     * Get work orders by date range
-     *
-     * @param string $startDate
-     * @param string $endDate
-     * @return Collection
-     */
-    public function getByDateRange(string $startDate, string $endDate): Collection
-    {
-        return $this->model->dateRange($startDate, $endDate)->get();
     }
 
     /**
      * Get in-progress work orders
-     *
-     * @return Collection
      */
-    public function getInProgress(): Collection
+    public function getInProgress()
     {
-        return $this->model->inProgress()
-            ->orderBy('priority', 'desc')
-            ->orderBy('planned_end_date', 'asc')
+        return $this->model
+            ->inProgress()
+            ->with(['productionOrder.product', 'assignedUser'])
+            ->orderBy('actual_start', 'asc')
+            ->get();
+    }
+
+    /**
+     * Get work orders for production order
+     */
+    public function getByProductionOrder(int $productionOrderId)
+    {
+        return $this->model
+            ->where('production_order_id', $productionOrderId)
+            ->with(['assignedUser', 'starter', 'completer'])
+            ->orderBy('scheduled_start', 'asc')
+            ->get();
+    }
+
+    /**
+     * Get work orders assigned to user
+     */
+    public function getAssignedToUser(int $userId)
+    {
+        return $this->model
+            ->where('assigned_to', $userId)
+            ->whereIn('status', [
+                WorkOrderStatus::PENDING->value,
+                WorkOrderStatus::IN_PROGRESS->value,
+            ])
+            ->with(['productionOrder.product'])
+            ->orderBy('scheduled_start', 'asc')
+            ->get();
+    }
+
+    /**
+     * Find with relationships loaded
+     */
+    public function findWithRelations(int $id): WorkOrder
+    {
+        return $this->model
+            ->with([
+                'productionOrder.product',
+                'productionOrder.billOfMaterial',
+                'assignedUser',
+                'starter',
+                'completer',
+            ])
+            ->findOrFail($id);
+    }
+
+    /**
+     * Search work orders
+     */
+    public function search(string $search)
+    {
+        return $this->model
+            ->where(function ($query) use ($search) {
+                $query->where('work_order_number', 'like', "%{$search}%")
+                    ->orWhere('workstation', 'like', "%{$search}%")
+                    ->orWhere('notes', 'like', "%{$search}%")
+                    ->orWhereHas('productionOrder', function ($q) use ($search) {
+                        $q->where('production_order_number', 'like', "%{$search}%");
+                    });
+            })
+            ->with(['productionOrder.product', 'assignedUser'])
+            ->get();
+    }
+
+    /**
+     * Get scheduled work orders for date range
+     */
+    public function getScheduledBetween(string $startDate, string $endDate)
+    {
+        return $this->model
+            ->whereBetween('scheduled_start', [$startDate, $endDate])
+            ->with(['productionOrder.product', 'assignedUser'])
+            ->orderBy('scheduled_start', 'asc')
             ->get();
     }
 
     /**
      * Get overdue work orders
-     *
-     * @return Collection
      */
-    public function getOverdue(): Collection
+    public function getOverdue()
     {
         return $this->model
-            ->whereIn('status', ['planned', 'released', 'in_progress'])
-            ->where('planned_end_date', '<', now())
-            ->orderBy('planned_end_date', 'asc')
-            ->get();
-    }
-
-    /**
-     * Get work orders by branch
-     *
-     * @param int $branchId
-     * @return Collection
-     */
-    public function getByBranch(int $branchId): Collection
-    {
-        return $this->model->where('branch_id', $branchId)
-            ->orderBy('planned_start_date', 'desc')
-            ->get();
-    }
-
-    /**
-     * Search work orders
-     *
-     * @param array $filters
-     * @return Collection
-     */
-    public function search(array $filters = []): Collection
-    {
-        $query = $this->model->query();
-
-        if (isset($filters['search'])) {
-            $query->where(function ($q) use ($filters) {
-                $q->where('work_order_number', 'like', "%{$filters['search']}%")
-                  ->orWhere('reference_number', 'like', "%{$filters['search']}%");
-            });
-        }
-
-        if (isset($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        if (isset($filters['priority'])) {
-            $query->where('priority', $filters['priority']);
-        }
-
-        if (isset($filters['product_id'])) {
-            $query->where('product_id', $filters['product_id']);
-        }
-
-        if (isset($filters['branch_id'])) {
-            $query->where('branch_id', $filters['branch_id']);
-        }
-
-        if (isset($filters['assigned_to'])) {
-            $query->where('assigned_to', $filters['assigned_to']);
-        }
-
-        if (isset($filters['start_date']) && isset($filters['end_date'])) {
-            $query->whereBetween('planned_start_date', [
-                $filters['start_date'],
-                $filters['end_date']
-            ]);
-        }
-
-        return $query->with([
-            'product',
-            'bom',
-            'branch',
-            'assignedTo',
-            'items.product'
-        ])->get();
-    }
-
-    /**
-     * Get work order with items
-     *
-     * @param int $id
-     * @return WorkOrder|null
-     */
-    public function getWithItems(int $id): ?WorkOrder
-    {
-        return $this->model->with([
-            'product',
-            'bom.items.product',
-            'branch',
-            'location',
-            'unit',
-            'assignedTo',
-            'items.product',
-            'items.unit',
-        ])->find($id);
-    }
-
-    /**
-     * Get work orders by priority
-     *
-     * @param string $priority
-     * @return Collection
-     */
-    public function getByPriority(string $priority): Collection
-    {
-        return $this->model->priority($priority)
-            ->orderBy('planned_start_date', 'asc')
+            ->where('scheduled_end', '<', now())
+            ->whereIn('status', [
+                WorkOrderStatus::PENDING->value,
+                WorkOrderStatus::IN_PROGRESS->value,
+            ])
+            ->with(['productionOrder.product', 'assignedUser'])
+            ->orderBy('scheduled_end', 'asc')
             ->get();
     }
 }

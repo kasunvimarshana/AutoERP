@@ -1,145 +1,106 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Modules\Procurement\Repositories;
 
-use App\Core\Repositories\BaseRepository;
+use App\Modules\Procurement\Enums\PurchaseOrderStatus;
 use App\Modules\Procurement\Models\PurchaseOrder;
-use Illuminate\Database\Eloquent\Collection;
+use App\Repositories\BaseRepository;
 
-class PurchaseOrderRepository extends BaseRepository implements PurchaseOrderRepositoryInterface
+/**
+ * Purchase Order Repository
+ *
+ * Handles data access for purchase orders.
+ */
+class PurchaseOrderRepository extends BaseRepository
 {
     /**
-     * PurchaseOrderRepository constructor.
+     * Specify Model class name
      */
-    public function __construct(PurchaseOrder $model)
+    protected function model(): string
     {
-        parent::__construct($model);
+        return PurchaseOrder::class;
     }
 
     /**
-     * Find purchase order by code
+     * Find purchase order by PO number
      */
-    public function findByCode(string $code): mixed
+    public function findByPoNumber(string $poNumber): ?PurchaseOrder
     {
-        return $this->model->where('code', $code)->first();
+        return $this->model->where('po_number', $poNumber)->first();
     }
 
     /**
      * Get purchase orders by status
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function getByStatus(string $status): Collection
+    public function getByStatus(PurchaseOrderStatus $status)
     {
-        return $this->model->where('status', $status)->get();
-    }
-
-    /**
-     * Get purchase orders by approval status
-     */
-    public function getByApprovalStatus(string $approvalStatus): Collection
-    {
-        return $this->model->where('approval_status', $approvalStatus)->get();
-    }
-
-    /**
-     * Get purchase orders by payment status
-     */
-    public function getByPaymentStatus(string $paymentStatus): Collection
-    {
-        return $this->model->where('payment_status', $paymentStatus)->get();
-    }
-
-    /**
-     * Get purchase orders by vendor
-     */
-    public function getByVendor(int $vendorId): Collection
-    {
-        return $this->model->where('vendor_id', $vendorId)->get();
+        return $this->model->byStatus($status)->with(['supplier', 'items.product'])->get();
     }
 
     /**
      * Get pending purchase orders
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function getPendingOrders(): Collection
+    public function getPending()
     {
-        return $this->model
-            ->where('status', 'pending')
-            ->where('approval_status', 'approved')
-            ->get();
+        return $this->model->pending()->with(['supplier', 'items.product'])->get();
     }
 
     /**
-     * Get overdue purchase orders
+     * Get purchase orders by supplier
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function getOverdueOrders(): Collection
+    public function getBySupplier(int $supplierId)
     {
-        return $this->model
-            ->where('status', 'pending')
-            ->where('expected_delivery_date', '<', now())
+        return $this->model->where('supplier_id', $supplierId)
+            ->with(['items.product'])
+            ->orderBy('po_date', 'desc')
             ->get();
     }
 
     /**
      * Search purchase orders
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function search(string $query, array $filters = []): Collection
+    public function search(string $search)
     {
-        $queryBuilder = $this->model->query();
+        return $this->model
+            ->where(function ($query) use ($search) {
+                $query->where('po_number', 'like', "%{$search}%")
+                    ->orWhere('notes', 'like', "%{$search}%")
+                    ->orWhereHas('supplier', function ($q) use ($search) {
+                        $q->where('name', 'like', "%{$search}%")
+                            ->orWhere('company_name', 'like', "%{$search}%");
+                    });
+            })
+            ->with(['supplier', 'items.product'])
+            ->get();
+    }
 
-        // Search by code, reference number, vendor
-        if (!empty($query)) {
-            $queryBuilder->where(function ($q) use ($query) {
-                $q->where('code', 'like', "%{$query}%")
-                  ->orWhere('reference_number', 'like', "%{$query}%")
-                  ->orWhereHas('vendor', function ($vendorQuery) use ($query) {
-                      $vendorQuery->where('name', 'like', "%{$query}%")
-                                  ->orWhere('code', 'like', "%{$query}%");
-                  });
-            });
-        }
+    /**
+     * Find with items loaded
+     */
+    public function findWithItems(int $id): PurchaseOrder
+    {
+        return $this->model->with(['supplier', 'items.product'])->findOrFail($id);
+    }
 
-        // Apply filters
-        if (isset($filters['status'])) {
-            $queryBuilder->where('status', $filters['status']);
-        }
-
-        if (isset($filters['approval_status'])) {
-            $queryBuilder->where('approval_status', $filters['approval_status']);
-        }
-
-        if (isset($filters['payment_status'])) {
-            $queryBuilder->where('payment_status', $filters['payment_status']);
-        }
-
-        if (isset($filters['vendor_id'])) {
-            $queryBuilder->where('vendor_id', $filters['vendor_id']);
-        }
-
-        if (isset($filters['organization_id'])) {
-            $queryBuilder->where('organization_id', $filters['organization_id']);
-        }
-
-        if (isset($filters['branch_id'])) {
-            $queryBuilder->where('branch_id', $filters['branch_id']);
-        }
-
-        if (isset($filters['order_date_from'])) {
-            $queryBuilder->where('order_date', '>=', $filters['order_date_from']);
-        }
-
-        if (isset($filters['order_date_to'])) {
-            $queryBuilder->where('order_date', '<=', $filters['order_date_to']);
-        }
-
-        if (isset($filters['expected_delivery_from'])) {
-            $queryBuilder->where('expected_delivery_date', '>=', $filters['expected_delivery_from']);
-        }
-
-        if (isset($filters['expected_delivery_to'])) {
-            $queryBuilder->where('expected_delivery_date', '<=', $filters['expected_delivery_to']);
-        }
-
-        return $queryBuilder->get();
+    /**
+     * Get purchase orders needing approval
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getNeedingApproval()
+    {
+        return $this->model
+            ->where('status', PurchaseOrderStatus::PENDING)
+            ->with(['supplier', 'items.product'])
+            ->orderBy('po_date', 'asc')
+            ->get();
     }
 }

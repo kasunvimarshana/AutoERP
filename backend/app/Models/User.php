@@ -3,22 +3,19 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Modules\IAM\Models\Role;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use App\Core\Traits\HasUuid;
-use App\Core\Traits\Auditable;
-use App\Modules\Tenant\Models\Tenant;
-use App\Modules\Tenant\Models\Organization;
-use App\Modules\Tenant\Models\Branch;
-use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasApiTokens, SoftDeletes, HasUuid, Auditable, HasRoles;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -26,22 +23,11 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
-        'uuid',
         'tenant_id',
-        'organization_id',
-        'branch_id',
         'name',
         'email',
         'password',
-        'phone',
-        'avatar',
-        'timezone',
-        'language_code',
-        'status',
-        'last_login_at',
-        'last_login_ip',
-        'created_by',
-        'updated_by',
+        'is_active',
     ];
 
     /**
@@ -63,80 +49,61 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'last_login_at' => 'datetime',
             'password' => 'hashed',
-            'notification_preferences' => 'array',
+            'is_active' => 'boolean',
         ];
     }
 
     /**
-     * Get the tenant that owns the user.
+     * Get the tenant that owns the user
      */
-    public function tenant()
+    public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
     }
 
     /**
-     * Get push notification subscriptions for this user.
+     * The roles that belong to the user
      */
-    public function pushSubscriptions()
+    public function roles(): BelongsToMany
     {
-        return $this->hasMany(PushSubscription::class);
+        return $this->belongsToMany(Role::class, 'role_user')
+            ->withTimestamps();
     }
 
     /**
-     * Get the organization that the user belongs to.
+     * Check if user has a specific role
      */
-    public function organization()
+    public function hasRole(string $roleSlug): bool
     {
-        return $this->belongsTo(Organization::class);
+        return $this->roles()->where('slug', $roleSlug)->exists();
     }
 
     /**
-     * Get the branch that the user belongs to.
+     * Check if user has a specific permission
      */
-    public function branch()
+    public function hasPermission(string $permissionSlug): bool
     {
-        return $this->belongsTo(Branch::class);
+        return $this->roles()
+            ->whereHas('permissions', function ($query) use ($permissionSlug) {
+                $query->where('slug', $permissionSlug);
+            })
+            ->exists();
     }
 
     /**
-     * Get the user who created this user.
+     * Assign a role to the user
      */
-    public function creator()
+    public function assignRole(Role $role): void
     {
-        return $this->belongsTo(User::class, 'created_by');
+        $this->roles()->syncWithoutDetaching([$role->id]);
     }
 
     /**
-     * Get the user who last updated this user.
+     * Remove a role from the user
      */
-    public function updater()
+    public function removeRole(Role $role): void
     {
-        return $this->belongsTo(User::class, 'updated_by');
-    }
-
-    /**
-     * Check if user is active.
-     *
-     * @return bool
-     */
-    public function isActive(): bool
-    {
-        return $this->status === 'active';
-    }
-
-    /**
-     * Update last login information.
-     *
-     * @return void
-     */
-    public function updateLastLogin(): void
-    {
-        $this->update([
-            'last_login_at' => now(),
-            'last_login_ip' => request()->ip(),
-        ]);
+        $this->roles()->detach($role->id);
     }
 }

@@ -1,356 +1,205 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Modules\Manufacturing\Services;
 
-use App\Core\Services\BaseService;
-use App\Core\Exceptions\ServiceException;
-use App\Modules\Manufacturing\Repositories\BillOfMaterialRepositoryInterface;
+use App\Modules\Manufacturing\DTOs\CreateBillOfMaterialDTO;
 use App\Modules\Manufacturing\Models\BillOfMaterial;
-use App\Modules\Manufacturing\Models\BOMItem;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use App\Modules\Manufacturing\Repositories\BillOfMaterialRepository;
+use App\Services\BaseService;
 
 /**
- * BillOfMaterialService
- * 
- * Handles business logic for Bill of Materials management
+ * Bill of Material Service
+ *
+ * Handles business logic for BOM management including CRUD and version control.
  */
 class BillOfMaterialService extends BaseService
 {
+    public function __construct(
+        protected BillOfMaterialRepository $bomRepository
+    ) {}
+
     /**
-     * BillOfMaterialService constructor.
-     *
-     * @param BillOfMaterialRepositoryInterface $repository
+     * Get all BOMs with pagination
      */
-    public function __construct(BillOfMaterialRepositoryInterface $repository)
+    public function getAllBOMs(int $perPage = 15)
     {
-        parent::__construct($repository);
+        return $this->bomRepository->paginate($perPage);
     }
 
     /**
-     * Create a new BOM with items
-     *
-     * @param array $data
-     * @return BillOfMaterial
-     * @throws ServiceException
+     * Create a new bill of material
      */
-    public function create(array $data)
+    public function createBOM(CreateBillOfMaterialDTO $dto): BillOfMaterial
     {
-        DB::beginTransaction();
-        
-        try {
-            // Check if BOM number already exists
-            if (isset($data['bom_number'])) {
-                $existing = $this->repository->findByNumber($data['bom_number']);
-                if ($existing) {
-                    throw new ServiceException('BOM number already exists');
-                }
-            } else {
-                // Auto-generate BOM number if not provided
-                $data['bom_number'] = $this->generateBOMNumber();
-            }
+        return $this->transaction(function () use ($dto) {
+            $this->logInfo('Creating new BOM', ['bom_number' => $dto->bomNumber]);
 
-            // If this is set as default, unset other defaults for this product
-            if (isset($data['is_default']) && $data['is_default']) {
-                $this->unsetDefaultBOMs($data['product_id']);
-            }
+            // Create BOM
+            $bom = $this->bomRepository->create([
+                'product_id' => $dto->productId,
+                'bom_number' => $dto->bomNumber,
+                'version' => $dto->version,
+                'is_active' => $dto->isActive,
+                'effective_date' => $dto->effectiveDate,
+                'notes' => $dto->notes,
+            ]);
 
-            // Extract items data
-            $items = $data['items'] ?? [];
-            unset($data['items']);
-
-            // Create the BOM
-            $bom = $this->repository->create($data);
-
-            // Create BOM items if provided
-            if (!empty($items)) {
-                $this->createBOMItems($bom, $items);
-            }
-
-            // Update estimated cost
-            $this->updateEstimatedCost($bom);
-
-            DB::commit();
-            
-            return $this->repository->getWithItems($bom->id);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Failed to create BOM: ' . $e->getMessage());
-            throw new ServiceException('Failed to create BOM: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Update BOM with items
-     *
-     * @param int $id
-     * @param array $data
-     * @return BillOfMaterial
-     * @throws ServiceException
-     */
-    public function update(int $id, array $data)
-    {
-        DB::beginTransaction();
-        
-        try {
-            $bom = $this->repository->findById($id);
-            
-            if (!$bom) {
-                throw new ServiceException('BOM not found');
-            }
-
-            // Check BOM number uniqueness if changed
-            if (isset($data['bom_number']) && $data['bom_number'] !== $bom->bom_number) {
-                $existing = $this->repository->findByNumber($data['bom_number']);
-                if ($existing && $existing->id !== $id) {
-                    throw new ServiceException('BOM number already exists');
+            // Create BOM items
+            if ($dto->items) {
+                foreach ($dto->items as $item) {
+                    $bom->items()->create([
+                        'component_product_id' => $item['component_product_id'],
+                        'quantity' => $item['quantity'],
+                        'uom_id' => $item['uom_id'] ?? null,
+                        'scrap_factor' => $item['scrap_factor'] ?? 0,
+                        'notes' => $item['notes'] ?? null,
+                    ]);
                 }
             }
 
-            // If this is set as default, unset other defaults for this product
-            if (isset($data['is_default']) && $data['is_default']) {
-                $this->unsetDefaultBOMs($bom->product_id, $id);
+            // Load relationships
+            $bom->load(['product', 'items.componentProduct', 'items.uom']);
+
+            $this->logInfo('BOM created successfully', ['id' => $bom->id]);
+
+            return $bom;
+        });
+    }
+
+    /**
+     * Update a bill of material
+     */
+    public function updateBOM(int $id, CreateBillOfMaterialDTO $dto): BillOfMaterial
+    {
+        return $this->transaction(function () use ($id, $dto) {
+            $bom = $this->bomRepository->findOrFail($id);
+
+            $this->logInfo('Updating BOM', ['id' => $id]);
+
+            // Update BOM
+            $this->bomRepository->update($id, [
+                'product_id' => $dto->productId,
+                'bom_number' => $dto->bomNumber,
+                'version' => $dto->version,
+                'is_active' => $dto->isActive,
+                'effective_date' => $dto->effectiveDate,
+                'notes' => $dto->notes,
+            ]);
+
+            // Update items if provided
+            if ($dto->items) {
+                // Delete existing items
+                $bom->items()->delete();
+
+                // Create new items
+                foreach ($dto->items as $item) {
+                    $bom->items()->create([
+                        'component_product_id' => $item['component_product_id'],
+                        'quantity' => $item['quantity'],
+                        'uom_id' => $item['uom_id'] ?? null,
+                        'scrap_factor' => $item['scrap_factor'] ?? 0,
+                        'notes' => $item['notes'] ?? null,
+                    ]);
+                }
             }
 
-            // Extract items data
-            $items = $data['items'] ?? null;
-            unset($data['items']);
+            $bom->refresh();
+            $bom->load(['product', 'items.componentProduct', 'items.uom']);
 
-            // Update the BOM
-            $this->repository->update($id, $data);
+            $this->logInfo('BOM updated successfully', ['id' => $id]);
 
-            // Update BOM items if provided
-            if ($items !== null) {
-                $this->updateBOMItems($bom, $items);
-            }
+            return $bom;
+        });
+    }
 
-            // Recalculate estimated cost
-            $this->updateEstimatedCost($bom);
+    /**
+     * Delete a bill of material
+     */
+    public function deleteBOM(int $id): bool
+    {
+        $this->logInfo('Deleting BOM', ['id' => $id]);
 
-            DB::commit();
-            
-            return $this->repository->getWithItems($id);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Failed to update BOM: ' . $e->getMessage());
-            throw new ServiceException('Failed to update BOM: ' . $e->getMessage());
+        $result = $this->bomRepository->delete($id);
+
+        if ($result) {
+            $this->logInfo('BOM deleted successfully', ['id' => $id]);
         }
+
+        return $result;
     }
 
     /**
-     * Activate BOM
-     *
-     * @param int $id
-     * @return BillOfMaterial
-     * @throws ServiceException
+     * Get a BOM by ID
      */
-    public function activate(int $id)
+    public function getBOMById(int $id): BillOfMaterial
     {
-        DB::beginTransaction();
-        
-        try {
-            $bom = $this->repository->findById($id);
-            
-            if (!$bom) {
-                throw new ServiceException('BOM not found');
+        return $this->bomRepository->findWithItems($id);
+    }
+
+    /**
+     * Get latest active BOM for a product
+     */
+    public function getLatestActiveBOMForProduct(int $productId): ?BillOfMaterial
+    {
+        return $this->bomRepository->getLatestActiveForProduct($productId);
+    }
+
+    /**
+     * Get all BOMs for a product
+     */
+    public function getBOMsForProduct(int $productId)
+    {
+        return $this->bomRepository->getAllForProduct($productId);
+    }
+
+    /**
+     * Create a new version of an existing BOM
+     */
+    public function createNewVersion(int $bomId): BillOfMaterial
+    {
+        return $this->transaction(function () use ($bomId) {
+            $originalBom = $this->bomRepository->findWithItems($bomId);
+
+            $this->logInfo('Creating new BOM version', ['original_id' => $bomId]);
+
+            // Deactivate old version
+            $this->bomRepository->update($bomId, ['is_active' => false]);
+
+            // Create new version
+            $newVersion = $originalBom->version + 1;
+            $newBom = $this->bomRepository->create([
+                'product_id' => $originalBom->product_id,
+                'bom_number' => $originalBom->bom_number,
+                'version' => $newVersion,
+                'is_active' => true,
+                'effective_date' => now()->toDateString(),
+                'notes' => "Version {$newVersion} - Copied from version {$originalBom->version}",
+            ]);
+
+            // Copy items
+            foreach ($originalBom->items as $item) {
+                $newBom->items()->create([
+                    'component_product_id' => $item->component_product_id,
+                    'quantity' => $item->quantity,
+                    'uom_id' => $item->uom_id,
+                    'scrap_factor' => $item->scrap_factor,
+                    'notes' => $item->notes,
+                ]);
             }
 
-            if ($bom->status === 'active') {
-                throw new ServiceException('BOM is already active');
-            }
+            $newBom->load(['product', 'items.componentProduct', 'items.uom']);
 
-            // Validate BOM has items
-            if ($bom->items->isEmpty()) {
-                throw new ServiceException('Cannot activate BOM without items');
-            }
+            $this->logInfo('New BOM version created', ['id' => $newBom->id, 'version' => $newVersion]);
 
-            $this->repository->update($id, ['status' => 'active']);
-
-            DB::commit();
-            
-            return $this->repository->findById($id);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Failed to activate BOM: ' . $e->getMessage());
-            throw new ServiceException('Failed to activate BOM: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Deactivate BOM
-     *
-     * @param int $id
-     * @return BillOfMaterial
-     * @throws ServiceException
-     */
-    public function deactivate(int $id)
-    {
-        return $this->update($id, ['status' => 'inactive']);
-    }
-
-    /**
-     * Get BOM by product
-     *
-     * @param int $productId
-     * @return \Illuminate\Database\Eloquent\Collection
-     */
-    public function getByProduct(int $productId)
-    {
-        return $this->repository->getByProduct($productId);
-    }
-
-    /**
-     * Get default BOM for a product
-     *
-     * @param int $productId
-     * @return BillOfMaterial|null
-     */
-    public function getDefaultBOM(int $productId)
-    {
-        return $this->repository->getDefaultBOM($productId);
+            return $newBom;
+        });
     }
 
     /**
      * Search BOMs
-     *
-     * @param array $filters
-     * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function search(array $filters = [])
+    public function searchBOMs(string $search)
     {
-        return $this->repository->search($filters);
-    }
-
-    /**
-     * Calculate material requirements
-     *
-     * @param int $bomId
-     * @param float $quantity
-     * @return array
-     * @throws ServiceException
-     */
-    public function calculateMaterialRequirements(int $bomId, float $quantity = 1): array
-    {
-        $bom = $this->repository->getWithItems($bomId);
-        
-        if (!$bom) {
-            throw new ServiceException('BOM not found');
-        }
-
-        $requirements = [];
-        
-        foreach ($bom->items as $item) {
-            $requiredQty = $item->required_quantity * $quantity;
-            
-            $requirements[] = [
-                'product_id' => $item->product_id,
-                'product_name' => $item->product->name,
-                'product_sku' => $item->product->sku,
-                'required_quantity' => $requiredQty,
-                'unit_id' => $item->unit_id,
-                'unit_cost' => $item->unit_cost,
-                'total_cost' => $requiredQty * $item->unit_cost,
-                'scrap_percentage' => $item->scrap_percentage,
-            ];
-        }
-
-        return [
-            'bom_id' => $bomId,
-            'bom_number' => $bom->bom_number,
-            'product_id' => $bom->product_id,
-            'product_name' => $bom->product->name,
-            'quantity' => $quantity,
-            'materials' => $requirements,
-            'total_cost' => array_sum(array_column($requirements, 'total_cost')),
-        ];
-    }
-
-    /**
-     * Generate unique BOM number
-     *
-     * @return string
-     */
-    protected function generateBOMNumber(): string
-    {
-        $prefix = 'BOM';
-        $date = now()->format('Ymd');
-        $random = strtoupper(substr(md5(uniqid()), 0, 6));
-        
-        return "{$prefix}-{$date}-{$random}";
-    }
-
-    /**
-     * Unset default BOMs for a product
-     *
-     * @param int $productId
-     * @param int|null $exceptId
-     * @return void
-     */
-    protected function unsetDefaultBOMs(int $productId, ?int $exceptId = null): void
-    {
-        $query = BillOfMaterial::where('product_id', $productId)
-            ->where('is_default', true);
-            
-        if ($exceptId) {
-            $query->where('id', '!=', $exceptId);
-        }
-        
-        $query->update(['is_default' => false]);
-    }
-
-    /**
-     * Create BOM items
-     *
-     * @param BillOfMaterial $bom
-     * @param array $items
-     * @return void
-     */
-    protected function createBOMItems(BillOfMaterial $bom, array $items): void
-    {
-        foreach ($items as $index => $itemData) {
-            $itemData['bom_id'] = $bom->id;
-            $itemData['sequence'] = $itemData['sequence'] ?? $index + 1;
-            $itemData['total_cost'] = ($itemData['quantity'] ?? 0) * ($itemData['unit_cost'] ?? 0);
-            
-            // Apply scrap percentage to total cost
-            if (isset($itemData['scrap_percentage']) && $itemData['scrap_percentage'] > 0) {
-                $scrapMultiplier = 1 + ($itemData['scrap_percentage'] / 100);
-                $itemData['total_cost'] *= $scrapMultiplier;
-            }
-            
-            BOMItem::create($itemData);
-        }
-    }
-
-    /**
-     * Update BOM items
-     *
-     * @param BillOfMaterial $bom
-     * @param array $items
-     * @return void
-     */
-    protected function updateBOMItems(BillOfMaterial $bom, array $items): void
-    {
-        // Delete existing items
-        $bom->items()->delete();
-        
-        // Create new items
-        $this->createBOMItems($bom, $items);
-    }
-
-    /**
-     * Update estimated cost of BOM
-     *
-     * @param BillOfMaterial $bom
-     * @return void
-     */
-    protected function updateEstimatedCost(BillOfMaterial $bom): void
-    {
-        $bom->refresh();
-        $totalCost = $bom->calculateTotalCost();
-        
-        $bom->update(['estimated_cost' => $totalCost]);
+        return $this->bomRepository->search($search);
     }
 }

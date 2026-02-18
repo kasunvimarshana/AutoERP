@@ -1,194 +1,97 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Modules\IAM\Repositories;
 
 use App\Models\User;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use App\Modules\IAM\Models\Role;
+use App\Repositories\BaseRepository;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
 
-class UserRepository implements UserRepositoryInterface
+/**
+ * User Repository
+ *
+ * Handles data access for users.
+ */
+class UserRepository extends BaseRepository
 {
     /**
-     * Get all users for the current tenant with pagination.
+     * Specify Model class name
      */
-    public function paginate(int $perPage = 15): LengthAwarePaginator
+    protected function model(): string
     {
-        return User::with(['tenant', 'organization', 'branch', 'roles'])
-            ->orderBy('created_at', 'desc')
-            ->paginate($perPage);
+        return User::class;
     }
 
     /**
-     * Find a user by ID.
-     */
-    public function find(int $id): ?User
-    {
-        return User::with(['tenant', 'organization', 'branch', 'roles', 'permissions'])
-            ->find($id);
-    }
-
-    /**
-     * Find a user by UUID.
-     */
-    public function findByUuid(string $uuid): ?User
-    {
-        return User::with(['tenant', 'organization', 'branch', 'roles', 'permissions'])
-            ->where('uuid', $uuid)
-            ->first();
-    }
-
-    /**
-     * Find a user by email.
+     * Find user by email
      */
     public function findByEmail(string $email): ?User
     {
-        return User::where('email', $email)->first();
+        return $this->model->where('email', $email)->first();
     }
 
     /**
-     * Create a new user.
-     */
-    public function create(array $data): User
-    {
-        // Set tenant context if not provided
-        if (!isset($data['tenant_id'])) {
-            $data['tenant_id'] = config('app.current_tenant_id') ?? auth()->user()?->tenant_id;
-        }
-
-        // Set creator
-        $data['created_by'] = auth()->id();
-
-        return User::create($data);
-    }
-
-    /**
-     * Update a user.
-     */
-    public function update(User $user, array $data): User
-    {
-        $data['updated_by'] = auth()->id();
-        $user->update($data);
-        return $user->fresh(['tenant', 'organization', 'branch', 'roles', 'permissions']);
-    }
-
-    /**
-     * Delete a user (soft delete).
-     */
-    public function delete(User $user): bool
-    {
-        return $user->delete();
-    }
-
-    /**
-     * Restore a soft-deleted user.
-     */
-    public function restore(int $id): bool
-    {
-        $user = User::withTrashed()->find($id);
-        return $user ? $user->restore() : false;
-    }
-
-    /**
-     * Search users by criteria.
-     */
-    public function search(array $criteria, int $perPage = 15): LengthAwarePaginator
-    {
-        $query = User::with(['tenant', 'organization', 'branch', 'roles']);
-
-        if (isset($criteria['name'])) {
-            $query->where('name', 'like', '%' . $criteria['name'] . '%');
-        }
-
-        if (isset($criteria['email'])) {
-            $query->where('email', 'like', '%' . $criteria['email'] . '%');
-        }
-
-        if (isset($criteria['status'])) {
-            $query->where('status', $criteria['status']);
-        }
-
-        if (isset($criteria['organization_id'])) {
-            $query->where('organization_id', $criteria['organization_id']);
-        }
-
-        if (isset($criteria['branch_id'])) {
-            $query->where('branch_id', $criteria['branch_id']);
-        }
-
-        if (isset($criteria['role'])) {
-            $query->role($criteria['role']);
-        }
-
-        return $query->orderBy('created_at', 'desc')->paginate($perPage);
-    }
-
-    /**
-     * Get users by role.
-     */
-    public function getByRole(string $roleName): Collection
-    {
-        return User::role($roleName)
-            ->with(['tenant', 'organization', 'branch'])
-            ->get();
-    }
-
-    /**
-     * Get users by organization.
-     */
-    public function getByOrganization(int $organizationId): Collection
-    {
-        return User::where('organization_id', $organizationId)
-            ->with(['tenant', 'branch', 'roles'])
-            ->get();
-    }
-
-    /**
-     * Get users by branch.
-     */
-    public function getByBranch(int $branchId): Collection
-    {
-        return User::where('branch_id', $branchId)
-            ->with(['tenant', 'organization', 'roles'])
-            ->get();
-    }
-
-    /**
-     * Get active users.
+     * Get active users
      */
     public function getActiveUsers(): Collection
     {
-        return User::where('status', 'active')
-            ->with(['tenant', 'organization', 'branch', 'roles'])
+        return $this->model->where('is_active', true)->get();
+    }
+
+    /**
+     * Get users by tenant
+     */
+    public function getByTenant(int $tenantId): Collection
+    {
+        return $this->model->where('tenant_id', $tenantId)->get();
+    }
+
+    /**
+     * Get users by role
+     */
+    public function getUsersByRole(int $roleId): Collection
+    {
+        return $this->model
+            ->whereHas('roles', function ($query) use ($roleId) {
+                $query->where('roles.id', $roleId);
+            })
             ->get();
     }
 
     /**
-     * Assign roles to user.
+     * Assign role to user
      */
-    public function assignRoles(User $user, array $roleNames): User
+    public function assignRole(User $user, Role $role): void
     {
-        $user->assignRole($roleNames);
-        return $user->fresh(['roles']);
+        $user->roles()->syncWithoutDetaching([$role->id]);
     }
 
     /**
-     * Sync roles for user.
+     * Remove role from user
      */
-    public function syncRoles(User $user, array $roleNames): User
+    public function removeRole(User $user, Role $role): void
     {
-        $user->syncRoles($roleNames);
-        return $user->fresh(['roles']);
+        $user->roles()->detach($role->id);
     }
 
     /**
-     * Assign permissions to user.
+     * Sync user roles
      */
-    public function assignPermissions(User $user, array $permissionNames): User
+    public function syncRoles(User $user, array $roleIds): void
     {
-        $user->givePermissionTo($permissionNames);
-        return $user->fresh(['permissions']);
+        $user->roles()->sync($roleIds);
+    }
+
+    /**
+     * Search users
+     */
+    public function search(string $search): Collection
+    {
+        return $this->model
+            ->where(function ($query) use ($search) {
+                $query->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            })
+            ->get();
     }
 }

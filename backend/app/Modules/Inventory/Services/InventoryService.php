@@ -2,360 +2,208 @@
 
 namespace App\Modules\Inventory\Services;
 
-use App\Core\Services\BaseService;
-use App\Modules\Inventory\Repositories\StockLedgerRepositoryInterface;
-use App\Modules\Product\Repositories\ProductRepositoryInterface;
-use App\Core\Exceptions\ServiceException;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
+use App\Enums\StockMovementType;
+use App\Modules\Inventory\DTOs\StockMovementDTO;
+use App\Modules\Inventory\Models\Product;
+use App\Modules\Inventory\Models\StockLedger;
+use App\Modules\Inventory\Repositories\ProductRepository;
+use App\Modules\Inventory\Repositories\StockLedgerRepository;
+use App\Services\BaseService;
 
+/**
+ * Inventory Service
+ *
+ * Handles business logic for inventory management including
+ * stock movements, valuation, and reporting.
+ */
 class InventoryService extends BaseService
 {
-    /**
-     * @var ProductRepositoryInterface
-     */
-    protected $productRepository;
-
-    /**
-     * InventoryService constructor.
-     *
-     * @param StockLedgerRepositoryInterface $repository
-     * @param ProductRepositoryInterface $productRepository
-     */
     public function __construct(
-        StockLedgerRepositoryInterface $repository,
-        ProductRepositoryInterface $productRepository
-    ) {
-        parent::__construct($repository);
-        $this->productRepository = $productRepository;
-    }
+        protected ProductRepository $productRepository,
+        protected StockLedgerRepository $stockLedgerRepository
+    ) {}
 
     /**
-     * Record stock IN transaction
+     * Record a stock movement
      *
-     * @param array $data
-     * @return mixed
+     * @throws \Throwable
      */
-    public function stockIn(array $data)
+    public function recordStockMovement(StockMovementDTO $dto): StockLedger
     {
-        return $this->recordStockMovement(array_merge($data, [
-            'quantity' => abs($data['quantity']),
-        ]));
-    }
-
-    /**
-     * Record stock OUT transaction
-     *
-     * @param array $data
-     * @return mixed
-     */
-    public function stockOut(array $data)
-    {
-        // Verify sufficient stock before allowing stock out
-        $currentBalance = $this->repository->getCurrentBalance(
-            $data['product_id'],
-            $data['branch_id'] ?? null,
-            $data['location_id'] ?? null,
-            $data['variant_id'] ?? null
-        );
-
-        $requestedQuantity = abs($data['quantity']);
-
-        if ($currentBalance < $requestedQuantity) {
-            throw new ServiceException(
-                "Insufficient stock. Current balance: {$currentBalance}, Requested: {$requestedQuantity}"
-            );
-        }
-
-        return $this->recordStockMovement(array_merge($data, [
-            'quantity' => -1 * abs($data['quantity']),
-        ]));
-    }
-
-    /**
-     * Record stock adjustment
-     *
-     * @param array $data
-     * @return mixed
-     */
-    public function stockAdjustment(array $data)
-    {
-        $currentBalance = $this->repository->getCurrentBalance(
-            $data['product_id'],
-            $data['branch_id'] ?? null,
-            $data['location_id'] ?? null,
-            $data['variant_id'] ?? null
-        );
-
-        $targetBalance = $data['target_balance'];
-        $adjustmentQuantity = $targetBalance - $currentBalance;
-
-        $transactionType = $adjustmentQuantity > 0 ? 'adjustment_increase' : 'adjustment_decrease';
-
-        return $this->recordStockMovement(array_merge($data, [
-            'quantity' => $adjustmentQuantity,
-            'transaction_type' => $transactionType,
-        ]));
-    }
-
-    /**
-     * Record stock transfer between locations
-     *
-     * @param array $data
-     * @return array
-     */
-    public function stockTransfer(array $data)
-    {
-        DB::beginTransaction();
-
-        try {
-            // Validate transfer data
-            if (!isset($data['from_location_id']) || !isset($data['to_location_id'])) {
-                throw new ServiceException('Both from_location_id and to_location_id are required');
-            }
-
-            if ($data['from_location_id'] === $data['to_location_id']) {
-                throw new ServiceException('Cannot transfer to the same location');
-            }
-
-            // Record stock out from source location
-            $stockOut = $this->stockOut([
-                'product_id' => $data['product_id'],
-                'variant_id' => $data['variant_id'] ?? null,
-                'branch_id' => $data['from_branch_id'] ?? null,
-                'location_id' => $data['from_location_id'],
-                'transaction_type' => 'transfer_out',
-                'quantity' => $data['quantity'],
-                'reference_type' => $data['reference_type'] ?? 'transfer',
-                'reference_id' => $data['reference_id'] ?? null,
-                'reference_number' => $data['reference_number'] ?? null,
-                'unit_cost' => $data['unit_cost'] ?? null,
-                'notes' => $data['notes'] ?? 'Stock transfer out',
-            ]);
-
-            // Record stock in to destination location
-            $stockIn = $this->stockIn([
-                'product_id' => $data['product_id'],
-                'variant_id' => $data['variant_id'] ?? null,
-                'branch_id' => $data['to_branch_id'] ?? $data['from_branch_id'] ?? null,
-                'location_id' => $data['to_location_id'],
-                'transaction_type' => 'transfer_in',
-                'quantity' => $data['quantity'],
-                'reference_type' => $data['reference_type'] ?? 'transfer',
-                'reference_id' => $data['reference_id'] ?? null,
-                'reference_number' => $data['reference_number'] ?? null,
-                'unit_cost' => $data['unit_cost'] ?? null,
-                'notes' => $data['notes'] ?? 'Stock transfer in',
-            ]);
-
-            DB::commit();
-
-            return [
-                'success' => true,
-                'stock_out' => $stockOut,
-                'stock_in' => $stockIn,
-            ];
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw new ServiceException('Failed to transfer stock: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Get current stock balance
-     *
-     * @param int $productId
-     * @param int|null $branchId
-     * @param int|null $locationId
-     * @param int|null $variantId
-     * @return float
-     */
-    public function getCurrentBalance(
-        int $productId,
-        ?int $branchId = null,
-        ?int $locationId = null,
-        ?int $variantId = null
-    ): float {
-        return $this->repository->getCurrentBalance($productId, $branchId, $locationId, $variantId);
-    }
-
-    /**
-     * Get stock movements
-     *
-     * @param int $productId
-     * @param \DateTime $startDate
-     * @param \DateTime $endDate
-     * @param int|null $branchId
-     * @return \Illuminate\Database\Eloquent\Collection
-     */
-    public function getStockMovements(
-        int $productId,
-        \DateTime $startDate,
-        \DateTime $endDate,
-        ?int $branchId = null
-    ) {
-        return $this->repository->getMovements($productId, $startDate, $endDate, $branchId);
-    }
-
-    /**
-     * Get expiring items
-     *
-     * @param int $daysThreshold
-     * @param int|null $branchId
-     * @return \Illuminate\Database\Eloquent\Collection
-     */
-    public function getExpiringItems(int $daysThreshold = 30, ?int $branchId = null)
-    {
-        return $this->repository->getExpiringItems($daysThreshold, $branchId);
-    }
-
-    /**
-     * Calculate stock valuation using selected method
-     *
-     * @param int $productId
-     * @param string $method (fifo, lifo, average)
-     * @param int|null $branchId
-     * @return array
-     */
-    public function calculateStockValuation(
-        int $productId,
-        string $method = 'fifo',
-        ?int $branchId = null
-    ): array {
-        $currentBalance = $this->getCurrentBalance($productId, $branchId);
-
-        if ($currentBalance <= 0) {
-            return [
-                'quantity' => 0,
-                'total_value' => 0,
-                'average_cost' => 0,
-                'method' => $method,
-            ];
-        }
-
-        switch ($method) {
-            case 'fifo':
-                return $this->calculateFIFOValuation($productId, $currentBalance, $branchId);
-            case 'lifo':
-                return $this->calculateLIFOValuation($productId, $currentBalance, $branchId);
-            case 'average':
-            default:
-                $averageCost = $this->repository->calculateAverageCost($productId, $branchId);
-                return [
-                    'quantity' => $currentBalance,
-                    'total_value' => $currentBalance * $averageCost,
-                    'average_cost' => $averageCost,
-                    'method' => 'average',
-                ];
-        }
-    }
-
-    /**
-     * Calculate FIFO valuation
-     *
-     * @param int $productId
-     * @param float $quantity
-     * @param int|null $branchId
-     * @return array
-     */
-    protected function calculateFIFOValuation(int $productId, float $quantity, ?int $branchId = null): array
-    {
-        $batches = $this->repository->getFIFOBatches($productId, $branchId);
-        $remainingQuantity = $quantity;
-        $totalValue = 0;
-        $totalQuantity = 0;
-
-        foreach ($batches as $batch) {
-            if ($remainingQuantity <= 0) {
-                break;
-            }
-
-            $batchQuantity = min($batch->running_balance, $remainingQuantity);
-            $totalValue += $batchQuantity * $batch->unit_cost;
-            $totalQuantity += $batchQuantity;
-            $remainingQuantity -= $batchQuantity;
-        }
-
-        $averageCost = $totalQuantity > 0 ? $totalValue / $totalQuantity : 0;
-
-        return [
-            'quantity' => $totalQuantity,
-            'total_value' => $totalValue,
-            'average_cost' => $averageCost,
-            'method' => 'fifo',
-        ];
-    }
-
-    /**
-     * Calculate LIFO valuation
-     *
-     * @param int $productId
-     * @param float $quantity
-     * @param int|null $branchId
-     * @return array
-     */
-    protected function calculateLIFOValuation(int $productId, float $quantity, ?int $branchId = null): array
-    {
-        $batches = $this->repository->getFIFOBatches($productId, $branchId)->reverse();
-        $remainingQuantity = $quantity;
-        $totalValue = 0;
-        $totalQuantity = 0;
-
-        foreach ($batches as $batch) {
-            if ($remainingQuantity <= 0) {
-                break;
-            }
-
-            $batchQuantity = min($batch->running_balance, $remainingQuantity);
-            $totalValue += $batchQuantity * $batch->unit_cost;
-            $totalQuantity += $batchQuantity;
-            $remainingQuantity -= $batchQuantity;
-        }
-
-        $averageCost = $totalQuantity > 0 ? $totalValue / $totalQuantity : 0;
-
-        return [
-            'quantity' => $totalQuantity,
-            'total_value' => $totalValue,
-            'average_cost' => $averageCost,
-            'method' => 'lifo',
-        ];
-    }
-
-    /**
-     * Record stock movement (internal method)
-     *
-     * @param array $data
-     * @return mixed
-     */
-    protected function recordStockMovement(array $data)
-    {
-        DB::beginTransaction();
-
-        try {
+        return $this->transaction(function () use ($dto) {
             // Validate product exists
-            $product = $this->productRepository->findById($data['product_id']);
-            if (!$product) {
-                throw new ServiceException('Product not found');
+            $product = $this->productRepository->findOrFail($dto->productId);
+
+            // Validate stock tracking
+            if (! $product->requiresStockTracking()) {
+                throw new \InvalidArgumentException('Product does not require stock tracking');
             }
 
-            // Set created_by
-            $data['created_by'] = Auth::id();
+            // Calculate quantity with proper sign
+            $quantity = $dto->quantity * $dto->movementType->getSign();
 
-            // Calculate total cost if unit cost is provided
-            if (isset($data['unit_cost'])) {
-                $data['total_cost'] = abs($data['quantity']) * $data['unit_cost'];
-            }
+            // Create stock ledger entry
+            $ledgerData = [
+                'tenant_id' => $product->tenant_id,
+                'product_id' => $dto->productId,
+                'movement_type' => $dto->movementType->value,
+                'quantity' => $quantity,
+                'unit_cost' => $dto->unitCost,
+                'total_cost' => abs($quantity) * ($dto->unitCost ?? 0),
+                'warehouse_id' => $dto->warehouseId,
+                'location_id' => $dto->locationId,
+                'batch_number' => $dto->batchNumber,
+                'lot_number' => $dto->lotNumber,
+                'serial_number' => $dto->serialNumber,
+                'manufacturing_date' => $dto->manufacturingDate,
+                'expiry_date' => $dto->expiryDate,
+                'reference_type' => $dto->referenceType,
+                'reference_id' => $dto->referenceId,
+                'notes' => $dto->notes,
+                'metadata' => $dto->metadata,
+                'transaction_date' => $dto->transactionDate ?? now(),
+            ];
 
-            // Record the movement
-            $ledgerEntry = $this->repository->recordMovement($data);
+            $stockLedger = $this->stockLedgerRepository->create($ledgerData);
 
-            DB::commit();
+            $this->logInfo('Stock movement recorded', [
+                'product_id' => $dto->productId,
+                'movement_type' => $dto->movementType->value,
+                'quantity' => $quantity,
+            ]);
 
-            return $ledgerEntry;
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw new ServiceException('Failed to record stock movement: ' . $e->getMessage());
-        }
+            return $stockLedger;
+        });
+    }
+
+    /**
+     * Get current stock balance for a product
+     */
+    public function getCurrentStock(int $productId, ?int $warehouseId = null): float
+    {
+        return $this->stockLedgerRepository->calculateStockBalance($productId, $warehouseId);
+    }
+
+    /**
+     * Adjust stock
+     *
+     * @throws \Throwable
+     */
+    public function adjustStock(
+        int $productId,
+        float $quantity,
+        ?int $warehouseId = null,
+        ?string $notes = null
+    ): StockLedger {
+        $movementType = $quantity >= 0
+            ? StockMovementType::ADJUSTMENT_IN
+            : StockMovementType::ADJUSTMENT_OUT;
+
+        $dto = new StockMovementDTO(
+            productId: $productId,
+            movementType: $movementType,
+            quantity: abs($quantity),
+            warehouseId: $warehouseId,
+            notes: $notes
+        );
+
+        return $this->recordStockMovement($dto);
+    }
+
+    /**
+     * Transfer stock between warehouses
+     *
+     * @throws \Throwable
+     */
+    public function transferStock(
+        int $productId,
+        int $fromWarehouseId,
+        int $toWarehouseId,
+        float $quantity,
+        ?string $notes = null
+    ): array {
+        return $this->transaction(function () use (
+            $productId,
+            $fromWarehouseId,
+            $toWarehouseId,
+            $quantity,
+            $notes
+        ) {
+            // Record outward movement from source warehouse
+            $outDto = new StockMovementDTO(
+                productId: $productId,
+                movementType: StockMovementType::TRANSFER_OUT,
+                quantity: $quantity,
+                warehouseId: $fromWarehouseId,
+                notes: $notes
+            );
+            $outMovement = $this->recordStockMovement($outDto);
+
+            // Record inward movement to destination warehouse
+            $inDto = new StockMovementDTO(
+                productId: $productId,
+                movementType: StockMovementType::TRANSFER_IN,
+                quantity: $quantity,
+                warehouseId: $toWarehouseId,
+                notes: $notes
+            );
+            $inMovement = $this->recordStockMovement($inDto);
+
+            return [
+                'out_movement' => $outMovement,
+                'in_movement' => $inMovement,
+            ];
+        });
+    }
+
+    /**
+     * Get stock valuation for a product
+     */
+    public function getStockValuation(int $productId, ?int $warehouseId = null): float
+    {
+        return $this->stockLedgerRepository->getStockValuation($productId, $warehouseId);
+    }
+
+    /**
+     * Get products below reorder level
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getProductsBelowReorderLevel()
+    {
+        return $this->productRepository->getBelowReorderLevel();
+    }
+
+    /**
+     * Get expiring stock for a product
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getExpiringStock(int $productId, int $days = 30)
+    {
+        return $this->stockLedgerRepository->getExpiringStock($productId, $days);
+    }
+
+    /**
+     * Get stock movement history
+     *
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public function getStockHistory(int $productId, ?int $warehouseId = null)
+    {
+        return $this->stockLedgerRepository->getProductLedger($productId, $warehouseId);
+    }
+
+    /**
+     * Verify stock availability
+     */
+    public function verifyStockAvailability(
+        int $productId,
+        float $requiredQuantity,
+        ?int $warehouseId = null
+    ): bool {
+        $currentStock = $this->getCurrentStock($productId, $warehouseId);
+
+        return $currentStock >= $requiredQuantity;
     }
 }

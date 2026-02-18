@@ -2,111 +2,137 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
 
+/**
+ * Base API Controller
+ *
+ * Provides standardized JSON response methods for consistent API responses.
+ */
 abstract class BaseController extends Controller
 {
+    use AuthorizesRequests, ValidatesRequests;
+
     /**
-     * Success response
-     *
-     * @param mixed $data
-     * @param string $message
-     * @param int $code
-     * @return JsonResponse
+     * Return a success response
      */
-    protected function successResponse($data = null, string $message = 'Success', int $code = 200): JsonResponse
-    {
+    protected function successResponse(
+        mixed $data = null,
+        string $message = 'Operation successful',
+        int $statusCode = 200
+    ): JsonResponse {
         return response()->json([
             'success' => true,
             'message' => $message,
             'data' => $data,
-        ], $code);
+        ], $statusCode);
     }
 
     /**
-     * Error response
-     *
-     * @param string $message
-     * @param array $errors
-     * @param int $code
-     * @return JsonResponse
+     * Return an error response
      */
-    protected function errorResponse(string $message = 'Error', array $errors = [], int $code = 400): JsonResponse
-    {
-        return response()->json([
+    protected function errorResponse(
+        string $message = 'Operation failed',
+        mixed $errors = null,
+        int $statusCode = 400
+    ): JsonResponse {
+        $response = [
             'success' => false,
             'message' => $message,
-            'errors' => $errors,
-        ], $code);
+        ];
+
+        if ($errors !== null) {
+            $response['errors'] = $errors;
+        }
+
+        return response()->json($response, $statusCode);
     }
 
     /**
-     * Paginated response
-     *
-     * @param mixed $data
-     * @param string $message
-     * @return JsonResponse
+     * Return a created response
      */
-    protected function paginatedResponse($data, string $message = 'Success'): JsonResponse
-    {
-        return response()->json([
-            'success' => true,
-            'message' => $message,
-            'data' => $data->items(),
-            'pagination' => [
-                'total' => $data->total(),
-                'per_page' => $data->perPage(),
-                'current_page' => $data->currentPage(),
-                'last_page' => $data->lastPage(),
-                'from' => $data->firstItem(),
-                'to' => $data->lastItem(),
-            ],
-        ]);
+    protected function createdResponse(
+        mixed $data = null,
+        string $message = 'Resource created successfully'
+    ): JsonResponse {
+        return $this->successResponse($data, $message, 201);
     }
 
     /**
-     * Not found response
-     *
-     * @param string $message
-     * @return JsonResponse
+     * Return a no content response
      */
-    protected function notFoundResponse(string $message = 'Resource not found'): JsonResponse
+    protected function noContentResponse(): JsonResponse
     {
-        return $this->errorResponse($message, [], 404);
+        return response()->json(null, 204);
     }
 
     /**
-     * Unauthorized response
-     *
-     * @param string $message
-     * @return JsonResponse
+     * Return a not found response
      */
-    protected function unauthorizedResponse(string $message = 'Unauthorized'): JsonResponse
-    {
-        return $this->errorResponse($message, [], 401);
+    protected function notFoundResponse(
+        string $message = 'Resource not found'
+    ): JsonResponse {
+        return $this->errorResponse($message, null, 404);
     }
 
     /**
-     * Forbidden response
-     *
-     * @param string $message
-     * @return JsonResponse
+     * Return an unauthorized response
      */
-    protected function forbiddenResponse(string $message = 'Forbidden'): JsonResponse
-    {
-        return $this->errorResponse($message, [], 403);
+    protected function unauthorizedResponse(
+        string $message = 'Unauthorized'
+    ): JsonResponse {
+        return $this->errorResponse($message, null, 401);
     }
 
     /**
-     * Validation error response
-     *
-     * @param array $errors
-     * @param string $message
-     * @return JsonResponse
+     * Return a forbidden response
      */
-    protected function validationErrorResponse(array $errors, string $message = 'Validation failed'): JsonResponse
-    {
+    protected function forbiddenResponse(
+        string $message = 'Forbidden'
+    ): JsonResponse {
+        return $this->errorResponse($message, null, 403);
+    }
+
+    /**
+     * Return a validation error response
+     */
+    protected function validationErrorResponse(
+        array $errors,
+        string $message = 'Validation failed'
+    ): JsonResponse {
         return $this->errorResponse($message, $errors, 422);
+    }
+
+    /**
+     * Alias for successResponse for backwards compatibility
+     *
+     * @deprecated Use successResponse instead
+     */
+    protected function success($data = null, string $message = 'Operation successful', int $statusCode = 200): JsonResponse
+    {
+        return $this->successResponse($data, $message, $statusCode);
+    }
+
+    /**
+     * Alias for errorResponse for backwards compatibility
+     *
+     * @deprecated Use errorResponse instead
+     */
+    protected function error(string $message = 'Operation failed', mixed $errors = null, int $statusCode = 400): JsonResponse
+    {
+        return $this->errorResponse($message, $errors, $statusCode);
+    }
+
+    /**
+     * Alias for validationErrorResponse for backwards compatibility
+     *
+     * @deprecated Use validationErrorResponse instead
+     */
+    protected function validationError(array $errors, string $message = 'Validation failed'): JsonResponse
+    {
+        return $this->validationErrorResponse($errors, $message);
     }
 }
