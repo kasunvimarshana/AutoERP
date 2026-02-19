@@ -1,153 +1,307 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import apiClient from '../services/apiClient';
+import authService from '@/services/auth';
+import { STORAGE_KEYS } from '@/config/constants';
 
-/**
- * Auth Store
- * 
- * Manages authentication state:
- * - User data
- * - JWT tokens
- * - Tenant/Organization context
- * - Permissions (RBAC/ABAC)
- */
 export const useAuthStore = defineStore('auth', () => {
-    // State
-    const user = ref(null);
-    const token = ref(localStorage.getItem('jwt_token'));
-    const refreshToken = ref(localStorage.getItem('refresh_token'));
-    const tenantId = ref(localStorage.getItem('tenant_id'));
-    const organizationId = ref(localStorage.getItem('organization_id'));
-    const permissions = ref([]);
-    const roles = ref([]);
+  // State
+  const user = ref(null);
+  const token = ref(null);
+  const loading = ref(false);
+  const error = ref(null);
 
-    // Getters
-    const isAuthenticated = computed(() => !!token.value);
-    const currentUser = computed(() => user.value);
-    const currentTenant = computed(() => tenantId.value);
-    const currentOrganization = computed(() => organizationId.value);
+  // Getters
+  const isAuthenticated = computed(() => !!token.value && !!user.value);
+  const userName = computed(() => user.value?.name || '');
+  const userEmail = computed(() => user.value?.email || '');
+  const userRoles = computed(() => user.value?.roles || []);
+  const userPermissions = computed(() => user.value?.permissions || []);
 
-    // Check if user has permission
-    const hasPermission = computed(() => (permission) => {
-        return permissions.value.includes(permission);
-    });
+  // Private helper functions
+  
+  /**
+   * Store auth data in state and localStorage
+   * @private
+   */
+  function storeAuthData(authToken, userData) {
+    token.value = authToken;
+    user.value = userData;
+    
+    localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, authToken);
+    localStorage.setItem(STORAGE_KEYS.AUTH_USER, JSON.stringify(userData));
+  }
+  
+  // Actions
+  
+  /**
+   * Initialize auth state from localStorage
+   */
+  function initAuth() {
+    const storedToken = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    const storedUser = localStorage.getItem(STORAGE_KEYS.AUTH_USER);
+    
+    if (storedToken && storedUser) {
+      token.value = storedToken;
+      try {
+        user.value = JSON.parse(storedUser);
+      } catch (e) {
+        console.error('Failed to parse stored user:', e);
+        clearAuth();
+      }
+    }
+  }
 
-    // Check if user has role
-    const hasRole = computed(() => (role) => {
-        return roles.value.includes(role);
-    });
-
-    // Check if user has any of the permissions
-    const hasAnyPermission = computed(() => (permissionList) => {
-        return permissionList.some(p => permissions.value.includes(p));
-    });
-
-    // Check if user has all permissions
-    const hasAllPermissions = computed(() => (permissionList) => {
-        return permissionList.every(p => permissions.value.includes(p));
-    });
-
-    // Actions
-    async function login(credentials) {
-        try {
-            const response = await apiClient.post('/auth/login', credentials);
-            const { user: userData, token: jwtToken, refresh_token, tenant, organization, permissions: userPermissions, roles: userRoles } = response.data.data;
-
-            // Store tokens
-            token.value = jwtToken;
-            refreshToken.value = refresh_token;
-            localStorage.setItem('jwt_token', jwtToken);
-            localStorage.setItem('refresh_token', refresh_token);
-
-            // Store user data
-            user.value = userData;
-            
-            // Store context
-            tenantId.value = tenant.id;
-            organizationId.value = organization?.id;
-            localStorage.setItem('tenant_id', tenant.id);
-            if (organization?.id) {
-                localStorage.setItem('organization_id', organization.id);
-            }
-
-            // Store permissions and roles
-            permissions.value = userPermissions || [];
-            roles.value = userRoles || [];
-
-            return true;
-        } catch (error) {
-            console.error('Login failed:', error);
-            throw error;
-        }
+  /**
+   * Check authentication status
+   */
+  async function checkAuth() {
+    if (!token.value) {
+      initAuth();
     }
 
-    async function logout() {
-        try {
-            await apiClient.post('/auth/logout');
-        } catch (error) {
-            console.error('Logout failed:', error);
-        } finally {
-            // Clear state
-            user.value = null;
-            token.value = null;
-            refreshToken.value = null;
-            tenantId.value = null;
-            organizationId.value = null;
-            permissions.value = [];
-            roles.value = [];
-
-            // Clear localStorage
-            localStorage.clear();
+    if (token.value) {
+      try {
+        const response = await authService.me();
+        if (response.success && response.data) {
+          user.value = response.data;
+          localStorage.setItem(STORAGE_KEYS.AUTH_USER, JSON.stringify(response.data));
         }
+      } catch (err) {
+        console.error('Auth check failed:', err);
+        clearAuth();
+      }
     }
+  }
 
-    async function fetchUser() {
-        try {
-            const response = await apiClient.get('/auth/me');
-            const { user: userData, permissions: userPermissions, roles: userRoles } = response.data.data;
-            
-            user.value = userData;
-            permissions.value = userPermissions || [];
-            roles.value = userRoles || [];
+  /**
+   * Register a new user
+   */
+  async function register(credentials) {
+    loading.value = true;
+    error.value = null;
 
-            return user.value;
-        } catch (error) {
-            console.error('Failed to fetch user:', error);
-            throw error;
-        }
-    }
-
-    async function switchOrganization(newOrganizationId) {
-        organizationId.value = newOrganizationId;
-        localStorage.setItem('organization_id', newOrganizationId);
+    try {
+      const response = await authService.register(credentials);
+      
+      if (response.success && response.data) {
+        storeAuthData(response.data.token, response.data.user);
         
-        // Fetch updated permissions for new organization
-        await fetchUser();
+        return response;
+      }
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Registration failed';
+      throw err;
+    } finally {
+      loading.value = false;
     }
+  }
 
-    return {
-        // State
-        user,
-        token,
-        tenantId,
-        organizationId,
-        permissions,
-        roles,
+  /**
+   * Login user
+   */
+  async function login(credentials) {
+    loading.value = true;
+    error.value = null;
 
-        // Getters
-        isAuthenticated,
-        currentUser,
-        currentTenant,
-        currentOrganization,
-        hasPermission,
-        hasRole,
-        hasAnyPermission,
-        hasAllPermissions,
+    try {
+      const response = await authService.login(credentials);
+      
+      if (response.success && response.data) {
+        storeAuthData(response.data.token, response.data.user);
+        
+        return response;
+      }
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Login failed';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
 
-        // Actions
-        login,
-        logout,
-        fetchUser,
-        switchOrganization,
-    };
+  /**
+   * Logout from current device
+   */
+  async function logout() {
+    loading.value = true;
+    error.value = null;
+
+    try {
+      await authService.logout();
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      clearAuth();
+      loading.value = false;
+    }
+  }
+
+  /**
+   * Logout from all devices
+   */
+  async function logoutAll() {
+    loading.value = true;
+    error.value = null;
+
+    try {
+      await authService.logoutAll();
+    } catch (err) {
+      console.error('Logout all error:', err);
+    } finally {
+      clearAuth();
+      loading.value = false;
+    }
+  }
+
+  /**
+   * Refresh authentication token
+   */
+  async function refresh() {
+    try {
+      const response = await authService.refresh();
+      
+      if (response.success && response.data) {
+        storeAuthData(response.data.token, response.data.user);
+        
+        return response;
+      }
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Token refresh failed';
+      clearAuth();
+      throw err;
+    }
+  }
+
+  /**
+   * Request password reset
+   */
+  async function forgotPassword(email) {
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const response = await authService.forgotPassword(email);
+      return response;
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Password reset request failed';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  /**
+   * Reset password with token
+   */
+  async function resetPassword(data) {
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const response = await authService.resetPassword(data);
+      return response;
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Password reset failed';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  /**
+   * Verify email address
+   */
+  async function verifyEmail(id, hash, queryParams) {
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const response = await authService.verifyEmail(id, hash, queryParams);
+      
+      // Refresh user data after verification
+      if (response.success) {
+        await checkAuth();
+      }
+      
+      return response;
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Email verification failed';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  /**
+   * Resend email verification
+   */
+  async function resendVerification() {
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const response = await authService.resendVerification();
+      return response;
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to resend verification email';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  /**
+   * Check if user has a specific permission
+   */
+  function hasPermission(permission) {
+    return userPermissions.value.includes(permission);
+  }
+
+  /**
+   * Check if user has a specific role
+   */
+  function hasRole(role) {
+    return userRoles.value.includes(role);
+  }
+
+  /**
+   * Clear authentication state
+   */
+  function clearAuth() {
+    token.value = null;
+    user.value = null;
+    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+    localStorage.removeItem(STORAGE_KEYS.AUTH_USER);
+  }
+
+  // Initialize on store creation
+  initAuth();
+
+  return {
+    // State
+    user,
+    token,
+    loading,
+    error,
+    // Getters
+    isAuthenticated,
+    userName,
+    userEmail,
+    userRoles,
+    userPermissions,
+    // Actions
+    checkAuth,
+    register,
+    login,
+    logout,
+    logoutAll,
+    refresh,
+    forgotPassword,
+    resetPassword,
+    verifyEmail,
+    resendVerification,
+    hasPermission,
+    hasRole,
+    clearAuth,
+  };
 });

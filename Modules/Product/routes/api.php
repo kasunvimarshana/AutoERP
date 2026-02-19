@@ -1,30 +1,22 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Support\Facades\Route;
 use Modules\Product\Http\Controllers\ProductCategoryController;
 use Modules\Product\Http\Controllers\ProductController;
-use Modules\Product\Http\Controllers\UnitController;
 
 /*
-|--------------------------------------------------------------------------
-| Product API Routes
-|--------------------------------------------------------------------------
-*/
+ *--------------------------------------------------------------------------
+ * API Routes
+ *--------------------------------------------------------------------------
+ */
 
-Route::prefix('api/v1')->middleware(['api', 'auth:jwt'])->group(function () {
-
+Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     // Products
-    Route::apiResource('products', ProductController::class);
-    Route::get('products/{product}/bundles', [ProductController::class, 'getBundleItems']);
-    Route::post('products/{product}/bundles', [ProductController::class, 'addBundleItem']);
-    Route::delete('products/{product}/bundles/{bundleItem}', [ProductController::class, 'removeBundleItem']);
-    Route::get('products/{product}/composites', [ProductController::class, 'getCompositeParts']);
-    Route::post('products/{product}/composites', [ProductController::class, 'addCompositePart']);
-    Route::delete('products/{product}/composites/{compositePart}', [ProductController::class, 'removeCompositePart']);
+    Route::apiResource('products', ProductController::class)->names('product');
 
     // Product Categories
-    Route::apiResource('product-categories', ProductCategoryController::class);
-
-    // Units
-    Route::apiResource('units', UnitController::class);
+    Route::get('product-categories/tree', [ProductCategoryController::class, 'tree'])->name('product-categories.tree');
+    Route::apiResource('product-categories', ProductCategoryController::class)->names('product-categories');
 });

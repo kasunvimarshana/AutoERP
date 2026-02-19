@@ -1,262 +1,298 @@
 <?php
 
+use Nwidart\Modules\Activators\FileActivator;
+use Nwidart\Modules\Providers\ConsoleServiceProvider;
+
 return [
+
     /*
     |--------------------------------------------------------------------------
-    | Module Registry Configuration
+    | Module Namespace
     |--------------------------------------------------------------------------
     |
-    | This file contains the central configuration for the module registry
-    | system. All modules must be registered here to be loaded by the
-    | application. Modules can be enabled/disabled at runtime via this
-    | configuration.
+    | Default module namespace.
     |
     */
-
-    'enabled' => env('MODULES_ENABLED', true),
-
-    'auto_discover' => env('MODULES_AUTO_DISCOVER', true),
-
-    'modules_path' => base_path('modules'),
-
     'namespace' => 'Modules',
 
     /*
     |--------------------------------------------------------------------------
-    | Registered Modules
+    | Module Stubs
     |--------------------------------------------------------------------------
     |
-    | List of all available modules in the system. Each module can be
-    | enabled or disabled individually. The order matters for dependency
-    | resolution - modules are loaded in the order specified here.
+    | Default module stubs.
     |
     */
+    'stubs' => [
+        'enabled' => false,
+        'path' => base_path('vendor/nwidart/laravel-modules/src/Commands/stubs'),
+        'files' => [
+            'routes/web' => 'routes/web.php',
+            'routes/api' => 'routes/api.php',
+            'views/index' => 'resources/views/index.blade.php',
+            'views/master' => 'resources/views/components/layouts/master.blade.php',
+            'scaffold/config' => 'config/config.php',
+            'composer' => 'composer.json',
+            'assets/js/app' => 'resources/assets/js/app.js',
+            'assets/sass/app' => 'resources/assets/sass/app.scss',
+            'vite' => 'vite.config.js',
+            'package' => 'package.json',
+        ],
+        'replacements' => [
+            /**
+             * Define custom replacements for each section.
+             * You can specify a closure for dynamic values.
+             *
+             * Example:
+             *
+             * 'composer' => [
+             *      'CUSTOM_KEY' => fn (\Nwidart\Modules\Generators\ModuleGenerator $generator) => $generator->getModule()->getLowerName() . '-module',
+             *      'CUSTOM_KEY2' => fn () => 'custom text',
+             *      'LOWER_NAME',
+             *      'STUDLY_NAME',
+             *      // ...
+             * ],
+             *
+             * Note: Keys should be in UPPERCASE.
+             */
+            'routes/web' => ['LOWER_NAME', 'STUDLY_NAME', 'PLURAL_LOWER_NAME', 'KEBAB_NAME', 'MODULE_NAMESPACE', 'CONTROLLER_NAMESPACE'],
+            'routes/api' => ['LOWER_NAME', 'STUDLY_NAME', 'PLURAL_LOWER_NAME', 'KEBAB_NAME', 'MODULE_NAMESPACE', 'CONTROLLER_NAMESPACE'],
+            'vite' => ['LOWER_NAME', 'STUDLY_NAME', 'KEBAB_NAME'],
+            'json' => ['LOWER_NAME', 'STUDLY_NAME', 'KEBAB_NAME', 'MODULE_NAMESPACE', 'PROVIDER_NAMESPACE'],
+            'views/index' => ['LOWER_NAME'],
+            'views/master' => ['LOWER_NAME', 'STUDLY_NAME', 'KEBAB_NAME'],
+            'scaffold/config' => ['STUDLY_NAME'],
+            'composer' => [
+                'LOWER_NAME',
+                'STUDLY_NAME',
+                'VENDOR',
+                'AUTHOR_NAME',
+                'AUTHOR_EMAIL',
+                'MODULE_NAMESPACE',
+                'PROVIDER_NAMESPACE',
+                'APP_FOLDER_NAME',
+            ],
+        ],
+        'gitkeep' => true,
+    ],
+    'paths' => [
+        /*
+        |--------------------------------------------------------------------------
+        | Modules path
+        |--------------------------------------------------------------------------
+        |
+        | This path is used to save the generated module.
+        | This path will also be added automatically to the list of scanned folders.
+        |
+        */
+        'modules' => base_path('Modules'),
 
-    'registered' => [
-        'Core' => [
-            'enabled' => env('MODULE_CORE_ENABLED', true),
-            'priority' => 1, // Highest priority - loaded first
-            'dependencies' => [],
-            'provides' => [
-                'ModuleInterface',
-                'MathHelper',
-                'TransactionHelper',
-            ],
-        ],
-        'Tenant' => [
-            'enabled' => env('MODULE_TENANT_ENABLED', true),
-            'priority' => 2,
-            'dependencies' => ['Core'],
-            'provides' => [
-                'TenantContext',
-                'TenantScoped',
-            ],
-        ],
-        'Auth' => [
-            'enabled' => env('MODULE_AUTH_ENABLED', true),
-            'priority' => 3,
-            'dependencies' => ['Core', 'Tenant'],
-            'provides' => [
-                'JwtTokenService',
-                'TokenServiceInterface',
-            ],
-        ],
-        'Audit' => [
-            'enabled' => env('MODULE_AUDIT_ENABLED', true),
-            'priority' => 4,
-            'dependencies' => ['Core', 'Tenant', 'Auth'],
-            'provides' => [
-                'AuditService',
-                'Auditable',
-            ],
-        ],
-        'Product' => [
-            'enabled' => env('MODULE_PRODUCT_ENABLED', true),
-            'priority' => 5,
-            'dependencies' => ['Core', 'Tenant', 'Audit'],
-            'provides' => [
-                'ProductService',
-            ],
-        ],
-        'Pricing' => [
-            'enabled' => env('MODULE_PRICING_ENABLED', true),
-            'priority' => 6,
-            'dependencies' => ['Core', 'Tenant', 'Product'],
-            'provides' => [
-                'PricingService',
-                'PricingEngineInterface',
-            ],
-        ],
-        'CRM' => [
-            'enabled' => env('MODULE_CRM_ENABLED', true),
-            'priority' => 7,
-            'dependencies' => ['Core', 'Tenant', 'Auth', 'Audit'],
-            'provides' => [
-                'CustomerRepository',
-                'LeadRepository',
-                'OpportunityRepository',
-                'LeadConversionService',
-                'OpportunityService',
-            ],
-        ],
-        'Sales' => [
-            'enabled' => env('MODULE_SALES_ENABLED', true),
-            'priority' => 8,
-            'dependencies' => ['Core', 'Tenant', 'Auth', 'Audit', 'Product', 'Pricing', 'CRM'],
-            'provides' => [
-                'QuotationRepository',
-                'OrderRepository',
-                'InvoiceRepository',
-                'QuotationService',
-                'OrderService',
-                'InvoiceService',
-            ],
-        ],
-        'Purchase' => [
-            'enabled' => env('MODULE_PURCHASE_ENABLED', true),
-            'priority' => 9,
-            'dependencies' => ['Core', 'Tenant', 'Auth', 'Audit', 'Product', 'Pricing'],
-            'provides' => [
-                'VendorRepository',
-                'PurchaseOrderRepository',
-                'GoodsReceiptRepository',
-                'BillRepository',
-                'VendorService',
-                'PurchaseOrderService',
-                'GoodsReceiptService',
-                'BillService',
-            ],
-        ],
-        'Inventory' => [
-            'enabled' => env('MODULE_INVENTORY_ENABLED', true),
-            'priority' => 10,
-            'dependencies' => ['Core', 'Tenant', 'Auth', 'Audit', 'Product', 'Sales', 'Purchase'],
-            'provides' => [
-                'WarehouseRepository',
-                'StockItemRepository',
-                'StockMovementRepository',
-                'StockCountRepository',
-                'WarehouseService',
-                'StockMovementService',
-                'InventoryValuationService',
-                'StockCountService',
-                'ReorderService',
-                'SerialNumberService',
-            ],
-        ],
-        'Accounting' => [
-            'enabled' => env('MODULE_ACCOUNTING_ENABLED', true),
-            'priority' => 11,
-            'dependencies' => ['Core', 'Tenant', 'Auth', 'Audit', 'Sales', 'Purchase', 'Inventory'],
-            'provides' => [
-                'AccountRepository',
-                'JournalEntryRepository',
-                'FiscalPeriodRepository',
-                'AccountingService',
-                'ChartOfAccountsService',
-                'GeneralLedgerService',
-                'TrialBalanceService',
-                'FinancialStatementService',
-            ],
-        ],
-        'Notification' => [
-            'enabled' => env('MODULE_NOTIFICATION_ENABLED', true),
-            'priority' => 12,
-            'dependencies' => ['Core', 'Tenant', 'Auth', 'Audit'],
-            'provides' => [
-                'NotificationRepository',
-                'TemplateRepository',
-                'ChannelRepository',
-                'NotificationLogRepository',
-                'NotificationService',
-                'TemplateService',
-                'ChannelService',
-                'NotificationDeliveryService',
-            ],
-        ],
-        'Billing' => [
-            'enabled' => env('MODULE_BILLING_ENABLED', true),
-            'priority' => 12,
-            'dependencies' => ['Core', 'Tenant', 'Auth', 'Audit'],
-            'provides' => [
-                'PlanRepository',
-                'SubscriptionRepository',
-                'SubscriptionPaymentRepository',
-                'SubscriptionService',
-                'PaymentService',
-                'BillingCalculationService',
-                'UsageTrackingService',
-            ],
-        ],
-        'Reporting' => [
-            'enabled' => env('MODULE_REPORTING_ENABLED', true),
-            'priority' => 13,
-            'dependencies' => ['Core', 'Tenant', 'Auth', 'Audit'],
-            'provides' => [
-                'ReportRepository',
-                'DashboardRepository',
-                'WidgetRepository',
-                'ReportBuilder',
-                'ExportService',
-                'AnalyticsService',
-            ],
-        ],
-        'Document' => [
-            'enabled' => env('MODULE_DOCUMENT_ENABLED', true),
-            'priority' => 13,
-            'dependencies' => ['Core', 'Tenant', 'Auth', 'Audit'],
-            'provides' => [
-                'DocumentRepository',
-                'FolderRepository',
-                'VersionRepository',
-                'DocumentStorageService',
-                'VersionControlService',
-                'SharingService',
-            ],
-        ],
-        'Workflow' => [
-            'enabled' => env('MODULE_WORKFLOW_ENABLED', true),
-            'priority' => 14,
-            'dependencies' => ['Core', 'Tenant', 'Auth', 'Audit'],
-            'provides' => [
-                'WorkflowRepository',
-                'WorkflowInstanceRepository',
-                'ApprovalRepository',
-                'WorkflowEngine',
-                'WorkflowExecutor',
-                'ApprovalService',
-            ],
+        /*
+        |--------------------------------------------------------------------------
+        | Modules assets path
+        |--------------------------------------------------------------------------
+        |
+        | Here you may update the modules' assets path.
+        |
+        */
+        'assets' => public_path('modules'),
+
+        /*
+        |--------------------------------------------------------------------------
+        | The migrations' path
+        |--------------------------------------------------------------------------
+        |
+        | Where you run the 'module:publish-migration' command, where do you publish the
+        | the migration files?
+        |
+        */
+        'migration' => base_path('database/migrations'),
+
+        /*
+        |--------------------------------------------------------------------------
+        | The app path
+        |--------------------------------------------------------------------------
+        |
+        | app folder name
+        | for example can change it to 'src' or 'App'
+        */
+        'app_folder' => 'app/',
+
+        /*
+        |--------------------------------------------------------------------------
+        | Generator path
+        |--------------------------------------------------------------------------
+        | Customise the paths where the folders will be generated.
+        | Setting the generate key to false will not generate that folder
+        */
+        'generator' => [
+            // app/
+            'actions' => ['path' => 'app/Actions', 'generate' => false],
+            'casts' => ['path' => 'app/Casts', 'generate' => false],
+            'channels' => ['path' => 'app/Broadcasting', 'generate' => false],
+            'class' => ['path' => 'app/Classes', 'generate' => false],
+            'command' => ['path' => 'app/Console', 'generate' => false],
+            'component-class' => ['path' => 'app/View/Components', 'generate' => false],
+            'emails' => ['path' => 'app/Emails', 'generate' => false],
+            'event' => ['path' => 'app/Events', 'generate' => false],
+            'enums' => ['path' => 'app/Enums', 'generate' => false],
+            'exceptions' => ['path' => 'app/Exceptions', 'generate' => false],
+            'jobs' => ['path' => 'app/Jobs', 'generate' => false],
+            'helpers' => ['path' => 'app/Helpers', 'generate' => false],
+            'interfaces' => ['path' => 'app/Interfaces', 'generate' => false],
+            'listener' => ['path' => 'app/Listeners', 'generate' => false],
+            'model' => ['path' => 'app/Models', 'generate' => false],
+            'notifications' => ['path' => 'app/Notifications', 'generate' => false],
+            'observer' => ['path' => 'app/Observers', 'generate' => false],
+            'policies' => ['path' => 'app/Policies', 'generate' => false],
+            'provider' => ['path' => 'app/Providers', 'generate' => true],
+            'repository' => ['path' => 'app/Repositories', 'generate' => false],
+            'resource' => ['path' => 'app/Transformers', 'generate' => false],
+            'route-provider' => ['path' => 'app/Providers', 'generate' => true],
+            'rules' => ['path' => 'app/Rules', 'generate' => false],
+            'services' => ['path' => 'app/Services', 'generate' => false],
+            'scopes' => ['path' => 'app/Models/Scopes', 'generate' => false],
+            'traits' => ['path' => 'app/Traits', 'generate' => false],
+
+            // app/Http/
+            'controller' => ['path' => 'app/Http/Controllers', 'generate' => true],
+            'filter' => ['path' => 'app/Http/Middleware', 'generate' => false],
+            'request' => ['path' => 'app/Http/Requests', 'generate' => false],
+
+            // config/
+            'config' => ['path' => 'config', 'generate' => true],
+
+            // database/
+            'factory' => ['path' => 'database/factories', 'generate' => true],
+            'migration' => ['path' => 'database/migrations', 'generate' => true],
+            'seeder' => ['path' => 'database/seeders', 'generate' => true],
+
+            // lang/
+            'lang' => ['path' => 'lang', 'generate' => false],
+
+            // resource/
+            'assets' => ['path' => 'resources/assets', 'generate' => true],
+            'component-view' => ['path' => 'resources/views/components', 'generate' => false],
+            'views' => ['path' => 'resources/views', 'generate' => true],
+
+            // routes/
+            'routes' => ['path' => 'routes', 'generate' => true],
+
+            // tests/
+            'test-feature' => ['path' => 'tests/Feature', 'generate' => true],
+            'test-unit' => ['path' => 'tests/Unit', 'generate' => true],
         ],
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | Module Caching
+    | Auto Discover of Modules
     |--------------------------------------------------------------------------
     |
-    | Module information can be cached to improve performance. When enabled,
-    | module configuration and providers are cached and only reloaded when
-    | the cache is cleared.
+    | Here you configure auto discover of module
+    | This is useful for simplify module providers.
     |
     */
+    'auto-discover' => [
+        /*
+        |--------------------------------------------------------------------------
+        | Migrations
+        |--------------------------------------------------------------------------
+        |
+        | This option for register migration automatically.
+        |
+        */
+        'migrations' => true,
 
-    'cache' => [
-        'enabled' => env('MODULE_CACHE_ENABLED', ! env('APP_DEBUG', false)),
-        'key' => 'modules.cache',
-        'ttl' => env('MODULE_CACHE_TTL', 3600), // 1 hour
+        /*
+        |--------------------------------------------------------------------------
+        | Translations
+        |--------------------------------------------------------------------------
+        |
+        | This option for register lang file automatically.
+        |
+        */
+        'translations' => false,
+
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | Module Events
+    | Package commands
     |--------------------------------------------------------------------------
     |
-    | Enable or disable event firing for module lifecycle events
-    | (loading, loaded, enabling, enabled, disabling, disabled).
+    | Here you can define which commands will be visible and used in your
+    | application. You can add your own commands to merge section.
     |
     */
+    'commands' => ConsoleServiceProvider::defaultCommands()
+        ->merge([
+            // New commands go here
+        ])->toArray(),
 
-    'events' => [
-        'enabled' => env('MODULE_EVENTS_ENABLED', true),
+    /*
+    |--------------------------------------------------------------------------
+    | Scan Path
+    |--------------------------------------------------------------------------
+    |
+    | Here you define which folder will be scanned. By default will scan vendor
+    | directory. This is useful if you host the package in packagist website.
+    |
+    */
+    'scan' => [
+        'enabled' => false,
+        'paths' => [
+            base_path('vendor/*/*'),
+        ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Composer File Template
+    |--------------------------------------------------------------------------
+    |
+    | Here is the config for the composer.json file, generated by this package
+    |
+    */
+    'composer' => [
+        'vendor' => env('MODULE_VENDOR', 'nwidart'),
+        'author' => [
+            'name' => env('MODULE_AUTHOR_NAME', 'Nicolas Widart'),
+            'email' => env('MODULE_AUTHOR_EMAIL', 'n.widart@gmail.com'),
+        ],
+        'composer-output' => false,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Choose what laravel-modules will register as custom namespaces.
+    | Setting one to false will require you to register that part
+    | in your own Service Provider class.
+    |--------------------------------------------------------------------------
+    */
+    'register' => [
+        'translations' => true,
+        /**
+         * load files on boot or register method
+         */
+        'files' => 'register',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Activators
+    |--------------------------------------------------------------------------
+    |
+    | You can define new types of activators here, file, database, etc. The only
+    | required parameter is 'class'.
+    | The file activator will store the activation status in storage/installed_modules
+    */
+    'activators' => [
+        'file' => [
+            'class' => FileActivator::class,
+            'statuses-file' => base_path('modules_statuses.json'),
+        ],
+    ],
+
+    'activator' => 'file',
 ];

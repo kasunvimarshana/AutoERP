@@ -1,28 +1,24 @@
 <?php
 
-declare(strict_types=1);
-
 use Illuminate\Support\Facades\Route;
+use Modules\Pricing\Http\Controllers\DiscountRuleController;
+use Modules\Pricing\Http\Controllers\PriceListController;
 use Modules\Pricing\Http\Controllers\PricingController;
+use Modules\Pricing\Http\Controllers\TaxRateController;
 
-Route::middleware(['api', 'auth:api', 'throttle:api'])->prefix('api')->group(function () {
-    Route::post('pricing/calculate', [PricingController::class, 'calculate'])
-        ->name('pricing.calculate');
+Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
+    // Pricing calculation endpoints
+    Route::post('pricing/calculate', [PricingController::class, 'calculate'])->name('pricing.calculate');
+    Route::post('pricing/calculate-cart', [PricingController::class, 'calculateCart'])->name('pricing.calculate-cart');
+    Route::get('pricing/strategies', [PricingController::class, 'strategies'])->name('pricing.strategies');
 
-    Route::prefix('products/{product}')->group(function () {
-        Route::get('prices', [PricingController::class, 'index'])
-            ->name('products.prices.index');
+    // Price lists
+    Route::apiResource('price-lists', PriceListController::class)->names('price-lists');
 
-        Route::post('prices', [PricingController::class, 'store'])
-            ->name('products.prices.store');
+    // Discount rules
+    Route::apiResource('discount-rules', DiscountRuleController::class)->names('discount-rules');
 
-        Route::get('prices/{price}', [PricingController::class, 'show'])
-            ->name('products.prices.show');
-
-        Route::put('prices/{price}', [PricingController::class, 'update'])
-            ->name('products.prices.update');
-
-        Route::delete('prices/{price}', [PricingController::class, 'destroy'])
-            ->name('products.prices.destroy');
-    });
+    // Tax rates
+    Route::post('tax-rates/calculate', [TaxRateController::class, 'calculate'])->name('tax-rates.calculate');
+    Route::apiResource('tax-rates', TaxRateController::class)->names('tax-rates');
 });

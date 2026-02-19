@@ -1,492 +1,359 @@
-# Product Module REST API Documentation
+# Product Module
 
 ## Overview
 
-This document describes the complete REST API layer for the Product module, including products, product categories, and units.
+The Product Module is a comprehensive product management system built following the Clean Architecture pattern (Controller → Service → Repository). It supports multiple product types, inventory tracking, hierarchical categories, and flexible unit of measure configurations.
 
-## Base URL
-
-All endpoints are prefixed with: `/api/v1`
-
-## Authentication
-
-All endpoints require JWT authentication via the `Authorization: Bearer {token}` header and tenant context.
-
-## Endpoints
-
-### Products
-
-#### List Products
-```http
-GET /api/v1/products
-```
-
-**Query Parameters:**
-- `type` (string, optional): Filter by product type (good, service, bundle, composite)
-- `category_id` (uuid, optional): Filter by category
-- `is_active` (boolean, optional): Filter by active status
-- `search` (string, optional): Search in name, code, or description
-- `per_page` (integer, optional): Results per page (default: 15)
-
-**Response:**
-```json
-{
-  "data": [
-    {
-      "id": "uuid",
-      "name": "Product Name",
-      "code": "PRD12345",
-      "type": "good",
-      "type_label": "Physical Good",
-      "description": "Product description",
-      "category_id": "uuid",
-      "category": {...},
-      "buying_unit_id": "uuid",
-      "buying_unit": {...},
-      "selling_unit_id": "uuid",
-      "selling_unit": {...},
-      "metadata": {},
-      "is_active": true,
-      "has_inventory": true,
-      "created_at": "2024-01-01T00:00:00.000000Z",
-      "updated_at": "2024-01-01T00:00:00.000000Z"
-    }
-  ],
-  "meta": {
-    "current_page": 1,
-    "last_page": 5,
-    "per_page": 15,
-    "total": 67
-  }
-}
-```
-
-#### Create Product
-```http
-POST /api/v1/products
-```
-
-**Request Body:**
-```json
-{
-  "name": "Product Name",
-  "code": "PRD12345",
-  "type": "good",
-  "category_id": "uuid",
-  "buying_unit_id": "uuid",
-  "selling_unit_id": "uuid",
-  "description": "Product description",
-  "metadata": {},
-  "is_active": true
-}
-```
-
-**Notes:**
-- `code` is auto-generated if not provided
-- Valid types: `good`, `service`, `bundle`, `composite`
-- `is_active` defaults to `true`
-
-#### Get Product
-```http
-GET /api/v1/products/{id}
-```
-
-#### Update Product
-```http
-PUT /api/v1/products/{id}
-PATCH /api/v1/products/{id}
-```
-
-#### Delete Product
-```http
-DELETE /api/v1/products/{id}
-```
-
-### Product Bundles
-
-#### List Bundle Items
-```http
-GET /api/v1/products/{product_id}/bundles
-```
-
-**Response:**
-```json
-{
-  "data": [
-    {
-      "id": "uuid",
-      "bundle_id": "uuid",
-      "product_id": "uuid",
-      "product": {...},
-      "quantity": "10.0000000000",
-      "created_at": "2024-01-01T00:00:00.000000Z"
-    }
-  ]
-}
-```
-
-#### Add Bundle Item
-```http
-POST /api/v1/products/{product_id}/bundles
-```
-
-**Request Body:**
-```json
-{
-  "product_id": "uuid",
-  "quantity": 10.5
-}
-```
-
-**Notes:**
-- Product must be of type `bundle`
-- Validates against circular references
-- Product cannot contain itself
-
-#### Remove Bundle Item
-```http
-DELETE /api/v1/products/{product_id}/bundles/{item_id}
-```
-
-### Product Composites
-
-#### List Composite Parts
-```http
-GET /api/v1/products/{product_id}/composites
-```
-
-**Response:**
-```json
-{
-  "data": [
-    {
-      "id": "uuid",
-      "composite_id": "uuid",
-      "component_id": "uuid",
-      "component": {...},
-      "quantity": "5.0000000000",
-      "sort_order": 0,
-      "created_at": "2024-01-01T00:00:00.000000Z"
-    }
-  ]
-}
-```
-
-#### Add Composite Part
-```http
-POST /api/v1/products/{product_id}/composites
-```
-
-**Request Body:**
-```json
-{
-  "component_id": "uuid",
-  "quantity": 5.0,
-  "sort_order": 0
-}
-```
-
-**Notes:**
-- Product must be of type `composite`
-- Validates against circular references
-- `sort_order` is auto-generated if not provided
-
-#### Remove Composite Part
-```http
-DELETE /api/v1/products/{product_id}/composites/{item_id}
-```
-
-### Product Categories
-
-#### List Categories
-```http
-GET /api/v1/product-categories
-```
-
-**Query Parameters:**
-- `parent_id` (uuid|null, optional): Filter by parent category (use "null" for root categories)
-- `is_active` (boolean, optional): Filter by active status
-- `search` (string, optional): Search in name, code, or description
-- `per_page` (integer, optional): Results per page (default: 15)
-
-#### Create Category
-```http
-POST /api/v1/product-categories
-```
-
-**Request Body:**
-```json
-{
-  "name": "Category Name",
-  "code": "CAT12345",
-  "parent_id": "uuid",
-  "description": "Category description",
-  "metadata": {},
-  "is_active": true
-}
-```
-
-**Notes:**
-- `code` is auto-generated if not provided
-- `parent_id` can be null for root categories
-
-#### Get Category
-```http
-GET /api/v1/product-categories/{id}
-```
-
-#### Update Category
-```http
-PUT /api/v1/product-categories/{id}
-PATCH /api/v1/product-categories/{id}
-```
-
-**Notes:**
-- Validates against circular parent references
-- A category cannot be its own parent
-
-#### Delete Category
-```http
-DELETE /api/v1/product-categories/{id}
-```
-
-**Notes:**
-- Cannot delete category with child categories
-- Cannot delete category with products
-
-#### Get Child Categories
-```http
-GET /api/v1/product-categories/{id}/children
-```
-
-#### Get Products in Category
-```http
-GET /api/v1/product-categories/{id}/products
-```
-
-**Query Parameters:**
-- `is_active` (boolean, optional): Filter by active status
-- `per_page` (integer, optional): Results per page (default: 15)
-
-### Units
-
-#### List Units
-```http
-GET /api/v1/units
-```
-
-**Query Parameters:**
-- `type` (string, optional): Filter by unit type
-- `search` (string, optional): Search in name or symbol
-- `per_page` (integer, optional): Results per page (default: 15)
-
-#### Create Unit
-```http
-POST /api/v1/units
-```
-
-**Request Body:**
-```json
-{
-  "name": "Kilogram",
-  "symbol": "kg",
-  "type": "weight",
-  "metadata": {}
-}
-```
-
-#### Get Unit
-```http
-GET /api/v1/units/{id}
-```
-
-#### Update Unit
-```http
-PUT /api/v1/units/{id}
-PATCH /api/v1/units/{id}
-```
-
-#### Delete Unit
-```http
-DELETE /api/v1/units/{id}
-```
-
-**Notes:**
-- Cannot delete unit used by products
-- Deletes all conversions associated with the unit
-
-### Unit Conversions
-
-#### List Unit Conversions
-```http
-GET /api/v1/units/{unit_id}/conversions
-```
-
-**Response:**
-```json
-{
-  "data": [
-    {
-      "id": "uuid",
-      "from_unit_id": "uuid",
-      "from_unit": {...},
-      "to_unit_id": "uuid",
-      "to_unit": {...},
-      "conversion_factor": "1000.0000000000",
-      "created_at": "2024-01-01T00:00:00.000000Z"
-    }
-  ]
-}
-```
-
-#### Add Unit Conversion
-```http
-POST /api/v1/units/{unit_id}/conversions
-```
-
-**Request Body:**
-```json
-{
-  "to_unit_id": "uuid",
-  "conversion_factor": 1000.0
-}
-```
-
-**Notes:**
-- Can only convert between units of the same type
-- Conversion factor must be greater than zero
-- Each unit pair can only have one conversion
-
-#### Convert Quantity
-```http
-POST /api/v1/units/convert
-```
-
-**Request Body:**
-```json
-{
-  "from_unit_id": "uuid",
-  "to_unit_id": "uuid",
-  "quantity": 100.5
-}
-```
-
-**Response:**
-```json
-{
-  "from_unit_id": "uuid",
-  "to_unit_id": "uuid",
-  "from_quantity": "100.5",
-  "to_quantity": "100500.0000000000",
-  "conversion_factor": "1000.0000000000"
-}
-```
-
-**Notes:**
-- Supports reverse conversions automatically
-- Uses BCMath for precision calculations
-- Returns 404 if no conversion path exists
-
-## Error Responses
-
-### Validation Error (422)
-```json
-{
-  "message": "The given data was invalid.",
-  "errors": {
-    "field_name": [
-      "Error message"
-    ]
-  }
-}
-```
-
-### Not Found (404)
-```json
-{
-  "message": "Resource not found."
-}
-```
-
-### Unauthorized (401)
-```json
-{
-  "message": "Unauthenticated."
-}
-```
-
-### Forbidden (403)
-```json
-{
-  "message": "This action is unauthorized."
-}
-```
-
-### Bad Request (400)
-```json
-{
-  "message": "Error message describing the issue."
-}
-```
-
-## Business Rules
+## Features
 
 ### Product Types
+- **Goods**: Physical products with inventory tracking
+- **Services**: Non-physical services without inventory
+- **Digital**: Digital products (downloads, software licenses)
+- **Bundle**: Product bundles/kits
+- **Composite**: Composite products made from other products
 
-1. **Good**: Physical product with inventory
-2. **Service**: Non-physical offering without inventory
-3. **Bundle**: Collection of products sold together
-4. **Composite**: Product made from component parts
+### Key Capabilities
+- ✅ Multi-tenancy support (branch/organization isolation)
+- ✅ Hierarchical product categories
+- ✅ Product variants (size, color, etc.)
+- ✅ Flexible unit of measure system with conversions
+- ✅ Configurable buy/sell units
+- ✅ Inventory tracking with reorder levels
+- ✅ Product attributes/specifications (JSON)
+- ✅ Multiple product images
+- ✅ Pricing with min/max constraints
+- ✅ Tax and discount configuration
+- ✅ Low stock alerts
+- ✅ Profit margin calculations
+- ✅ Barcode support
 
-### Validation Rules
+## Architecture
 
-1. **Product Codes**: Must be unique per tenant, auto-generated if not provided
-2. **Category Codes**: Must be unique per tenant, auto-generated if not provided
-3. **Unit Symbols**: Must be unique per tenant
-4. **Bundles**: Cannot contain circular references or itself
-5. **Composites**: Cannot contain circular references or itself
-6. **Categories**: Cannot create circular parent-child relationships
-7. **Unit Conversions**: Can only convert between units of the same type
+### Models
 
-### Tenant Isolation
+#### Product
+Main product model with comprehensive fields for all product types.
 
-All operations are tenant-scoped:
-- Products can only reference categories, units within the same tenant
-- Bundle/composite items must belong to the same tenant
-- Category parent must be in the same tenant
-- Unit conversions only work within the same tenant
+**Key Fields:**
+- `sku`: Stock Keeping Unit (unique per branch)
+- `name`: Product name
+- `type`: goods|services|digital|bundle|composite
+- `status`: active|inactive|discontinued|out_of_stock
+- `cost_price`, `selling_price`: Pricing
+- `track_inventory`: Enable/disable inventory tracking
+- `current_stock`, `reorder_level`: Stock management
+- `attributes`: JSON field for custom specifications
+- `images`: JSON array of image paths
 
-## Permissions Required
+#### ProductCategory
+Hierarchical categories with parent-child relationships.
 
-- `products.view`: View products
-- `products.create`: Create products
-- `products.update`: Update products and manage bundles/composites
-- `products.delete`: Delete products
-- `product-categories.view`: View categories
-- `product-categories.create`: Create categories
-- `product-categories.update`: Update categories
-- `product-categories.delete`: Delete categories
-- `units.view`: View units
-- `units.create`: Create units
-- `units.update`: Update units and manage conversions
-- `units.delete`: Delete units
+**Key Features:**
+- Self-referential parent-child structure
+- Full path generation (e.g., "Electronics > Computers > Laptops")
+- Active/inactive status
+- Sort ordering
 
-## Configuration
+#### ProductVariant
+Product variations (e.g., different sizes, colors).
 
-Product codes can be configured in `config/product.php`:
+**Key Features:**
+- Variant-specific SKU and barcode
+- Override pricing (inherits from parent if not set)
+- Separate stock tracking per variant
+- Variant attributes (JSON)
+- Default variant marking
 
-```php
-'code' => [
-    'auto_generate' => env('PRODUCT_CODE_AUTO_GENERATE', true),
-    'prefix' => env('PRODUCT_CODE_PREFIX', 'PRD'),
-    'length' => env('PRODUCT_CODE_LENGTH', 8),
-],
+#### UnitOfMeasure
+Units for product measurements (kg, liter, piece, etc.).
+
+**Key Features:**
+- Unit types (weight, volume, length, quantity)
+- Base unit marking
+- Active/inactive status
+
+#### UoMConversion
+Conversion factors between units.
+
+**Example:**
+- 1 kg = 1000 g (conversion_factor: 1000)
+- 1 liter = 1000 ml (conversion_factor: 1000)
+
+### Repositories
+
+#### ProductRepository
+Data access for products with methods for:
+- Finding by SKU, barcode
+- Searching products
+- Low stock / out of stock queries
+- Stock updates (increment/decrement)
+- Filtering by type, category, manufacturer, brand
+
+#### ProductCategoryRepository
+Category data access with tree operations:
+- Category tree retrieval
+- Root categories
+- Child category queries
+
+#### UnitOfMeasureRepository
+UoM data access with filtering by type and base units.
+
+### Services
+
+#### ProductService
+Business logic for product operations:
+- Auto-generate unique SKU if not provided
+- Validate SKU and barcode uniqueness
+- Stock management (add/remove stock)
+- Inventory statistics
+- Profitability calculations
+- Status changes
+
+#### ProductCategoryService
+Category business logic:
+- Validate category code uniqueness
+- Prevent circular parent references
+- Category tree operations
+
+### Controllers
+
+#### ProductController
+RESTful API endpoints with full Swagger documentation:
+- `GET /api/v1/products` - List products
+- `POST /api/v1/products` - Create product
+- `GET /api/v1/products/{id}` - Get product
+- `PUT /api/v1/products/{id}` - Update product
+- `DELETE /api/v1/products/{id}` - Delete product
+
+#### ProductCategoryController
+Category API endpoints:
+- `GET /api/v1/product-categories` - List categories
+- `GET /api/v1/product-categories/tree` - Get category tree
+- `POST /api/v1/product-categories` - Create category
+- `GET /api/v1/product-categories/{id}` - Get category
+- `PUT /api/v1/product-categories/{id}` - Update category
+- `DELETE /api/v1/product-categories/{id}` - Delete category
+
+## Database Schema
+
+### Tables Created
+1. `product_categories` - Hierarchical product categories
+2. `unit_of_measures` - Units of measurement
+3. `uom_conversions` - Unit conversion factors
+4. `products` - Main products table
+5. `product_variants` - Product variations
+
+### Key Indexes
+- SKU, barcode, name, category_id
+- Type, status, manufacturer, brand
+- Stock levels, featured flag
+- Created_at for sorting
+
+### Foreign Keys
+- `category_id` → `product_categories.id` (nullOnDelete)
+- `buy_unit_id`, `sell_unit_id` → `unit_of_measures.id` (nullOnDelete)
+- `branch_id` → `branches.id` (cascadeOnDelete)
+- Variant `product_id` → `products.id` (cascadeOnDelete)
+
+### Constraints
+- Unique: `(branch_id, sku)` per branch
+- Unique: `(branch_id, code)` for categories
+
+## API Examples
+
+### Create Product
+```json
+POST /api/v1/products
+{
+  "name": "Laptop Computer",
+  "description": "High-performance laptop",
+  "type": "goods",
+  "status": "active",
+  "cost_price": 800.00,
+  "selling_price": 1200.00,
+  "track_inventory": true,
+  "current_stock": 50,
+  "reorder_level": 10,
+  "manufacturer": "Dell",
+  "brand": "XPS",
+  "attributes": {
+    "processor": "Intel i7",
+    "ram": "16GB",
+    "storage": "512GB SSD"
+  }
+}
 ```
 
-## Implementation Notes
+### Update Product Stock
+```php
+$productService->addStock($productId, 100); // Add 100 units
+$productService->removeStock($productId, 50); // Remove 50 units
+$productService->updateStock($productId, 200); // Set to 200 units
+```
 
-- All numeric calculations use BCMath for precision
-- All database operations use transactions
-- All responses include ISO 8601 timestamps
-- Soft deletes are enabled for products and categories
-- Audit logging is automatic for products (via Auditable trait)
+### Create Category
+```json
+POST /api/v1/product-categories
+{
+  "name": "Electronics",
+  "code": "ELEC",
+  "description": "Electronic products",
+  "is_active": true
+}
+```
+
+### Create Subcategory
+```json
+POST /api/v1/product-categories
+{
+  "parent_id": 1,
+  "name": "Computers",
+  "code": "COMP",
+  "description": "Computing devices"
+}
+```
+
+## Enums
+
+### ProductType
+```php
+ProductType::GOODS
+ProductType::SERVICES
+ProductType::DIGITAL
+ProductType::BUNDLE
+ProductType::COMPOSITE
+```
+
+### ProductStatus
+```php
+ProductStatus::ACTIVE
+ProductStatus::INACTIVE
+ProductStatus::DISCONTINUED
+ProductStatus::OUT_OF_STOCK
+```
+
+## Usage Examples
+
+### Check Stock Status
+```php
+$product = Product::find(1);
+
+if ($product->needsReorder()) {
+    // Trigger reorder process
+    $quantity = $product->reorder_quantity;
+}
+
+if ($product->isOutOfStock()) {
+    // Handle out of stock
+}
+
+$stockStatus = $product->stock_status; // 'in_stock', 'low_stock', 'out_of_stock', 'not_tracked'
+```
+
+### Calculate Profitability
+```php
+$profitability = $productService->calculateProfitability($productId);
+// Returns: ['cost_price', 'selling_price', 'profit', 'profit_margin']
+
+$product = Product::find(1);
+$profit = $product->profit; // Amount
+$margin = $product->profit_margin; // Percentage
+```
+
+### Category Tree
+```php
+$tree = $categoryService->getCategoryTree();
+// Returns hierarchical category structure
+
+$category = ProductCategory::find(1);
+$fullPath = $category->full_path; // "Electronics > Computers > Laptops"
+```
+
+## Testing
+
+Run feature tests:
+```bash
+php artisan test --filter=ProductApiTest
+```
+
+### Test Coverage
+- ✅ List products
+- ✅ Create product
+- ✅ Show product
+- ✅ Update product
+- ✅ Delete product
+- ✅ Validation errors
+- ✅ Unique constraints (SKU, barcode)
+
+## Integration Points
+
+### Inventory Module
+Products integrate with Inventory for stock movements and adjustments.
+
+### Pricing Module
+Products can have multiple price lists and dynamic pricing rules.
+
+### Sales/Invoice Modules
+Products are line items in sales transactions and invoices.
+
+## Multi-Tenancy
+
+All models support branch/organization isolation:
+- Branch-specific products and categories
+- Unique constraints per branch (SKU, category codes)
+- Cross-branch queries when needed
+
+## Validation Rules
+
+### Product
+- `name`: required, max:255
+- `sku`: unique per branch, max:100
+- `barcode`: unique, max:100
+- `type`: enum(goods, services, digital, bundle, composite)
+- `status`: enum(active, inactive, discontinued, out_of_stock)
+- `cost_price`, `selling_price`: numeric, min:0, max:9999999999.99
+- `current_stock`: integer, min:0
+
+### Product Category
+- `name`: required, max:255
+- `code`: required, unique per branch, max:100
+- `parent_id`: exists in product_categories (prevents circular refs)
+
+## Performance Considerations
+
+### Indexes
+All frequently queried fields are indexed:
+- SKU, barcode, name
+- Type, status, category
+- Stock levels, featured flag
+- Created_at for date sorting
+
+### Eager Loading
+Use with relationships to avoid N+1:
+```php
+Product::with(['category', 'buyUnit', 'sellUnit', 'variants'])->get();
+```
+
+### Caching
+Consider caching:
+- Category trees
+- Featured products
+- Low stock alerts
+
+## Future Enhancements
+
+- [ ] Product bundles/composites implementation
+- [ ] Product reviews and ratings
+- [ ] Product comparison features
+- [ ] Bulk import/export
+- [ ] Product templates
+- [ ] Advanced search/filtering
+- [ ] Product tags/labels
+- [ ] Related products
+- [ ] Product history/audit trail
+- [ ] Barcode generation
+
+## License
+
+Part of AutoERP - Modular SaaS Application

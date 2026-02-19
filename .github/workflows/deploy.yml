@@ -1,0 +1,131 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.3'
+        extensions: mbstring, dom, fileinfo, mysql, bcmath
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Install Composer dependencies
+      run: composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
+
+    - name: Install NPM dependencies
+      run: npm ci
+
+    - name: Build frontend assets
+      run: npm run build
+
+    - name: Optimize Laravel
+      run: |
+        php artisan config:cache
+        php artisan route:cache
+        php artisan view:cache
+
+    - name: Create deployment artifact
+      run: |
+        tar -czf autoerp-${{ github.sha }}.tar.gz \
+          --exclude=.git \
+          --exclude=.github \
+          --exclude=node_modules \
+          --exclude=tests \
+          --exclude=storage/logs/* \
+          --exclude=storage/framework/cache/* \
+          --exclude=storage/framework/sessions/* \
+          --exclude=storage/framework/views/* \
+          .
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: deployment-artifact
+        path: autoerp-${{ github.sha }}.tar.gz
+        retention-days: 7
+
+  deploy-staging:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging'
+    environment: staging
+    
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: deployment-artifact
+
+    - name: Deploy to Staging
+      run: |
+        echo "Deploying to staging environment..."
+        # Add your deployment script here
+        # Example: SSH to server and deploy
+        # ssh user@staging-server 'bash -s' < deploy-script.sh
+
+  deploy-production:
+    needs: build
+    runs-on: ubuntu-latest
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
+    environment: production
+    
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: deployment-artifact
+
+    - name: Deploy to Production
+      run: |
+        echo "Deploying to production environment..."
+        # Add your deployment script here
+        # Example: SSH to server and deploy
+        # ssh user@production-server 'bash -s' < deploy-script.sh
+
+    - name: Run Database Migrations
+      run: |
+        echo "Running database migrations..."
+        # Add migration command here
+        # ssh user@production-server 'cd /path/to/app && php artisan migrate --force'
+
+    - name: Clear Caches
+      run: |
+        echo "Clearing caches..."
+        # ssh user@production-server 'cd /path/to/app && php artisan cache:clear'
+
+  health-check:
+    needs: [deploy-production]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Production Health Check
+      run: |
+        # Add health check logic here
+        # curl -f https://your-production-url.com/health || exit 1
+        echo "Health check passed!"

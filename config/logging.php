@@ -54,7 +54,7 @@ return [
 
         'stack' => [
             'driver' => 'stack',
-            'channels' => explode(',', (string) env('LOG_STACK', 'single')),
+            'channels' => explode(',', env('LOG_STACK', 'single')),
             'ignore_exceptions' => false,
         ],
 
@@ -98,10 +98,10 @@ return [
             'driver' => 'monolog',
             'level' => env('LOG_LEVEL', 'debug'),
             'handler' => StreamHandler::class,
-            'handler_with' => [
+            'formatter' => env('LOG_STDERR_FORMATTER'),
+            'with' => [
                 'stream' => 'php://stderr',
             ],
-            'formatter' => env('LOG_STDERR_FORMATTER'),
             'processors' => [PsrLogMessageProcessor::class],
         ],
 
@@ -125,6 +125,14 @@ return [
 
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
+        ],
+
+        'auth' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/auth.log'),
+            'level' => env('LOG_LEVEL', 'info'),
+            'days' => 90, // Keep auth logs for 90 days
+            'replace_placeholders' => true,
         ],
 
     ],

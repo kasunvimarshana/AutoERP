@@ -1,244 +1,663 @@
-# Instructions
+# GitHub Copilot Instructions for ModularSaaS-LaravelVue
 
-## Role and Responsibilities
+This document provides GitHub Copilot coding agent with project-specific guidelines, patterns, and conventions for this repository.
 
-## Core Principles
+## Project Overview
 
-### Architecture Standards
-- **Clean Architecture**: Enforce strict separation of concerns with clear boundaries between layers
-- **Domain-Driven Design (DDD)**: Organize code around business domains with explicit domain boundaries
-- **SOLID Principles**: Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion
-- **DRY (Don't Repeat Yourself)**: Eliminate code duplication and redundancy
-- **KISS (Keep It Simple, Stupid)**: Prefer simple, maintainable solutions over complex ones
-- **API-First Development**: Design all functionality with API-first approach
+ModularSaaS is a production-ready, enterprise-grade modular SaaS application built with Laravel 11 and Vue.js 3. It follows a strict **Modular Architecture** with the **Controller → Service → Repository** pattern, implementing multi-tenancy, RBAC, and enterprise security standards.
 
-### Modular Architecture
-Strictly follow modular architecture principles:
-- Design all modules as **fully isolated, loosely coupled, plugin-style components**
-- Modules must be independently **installable, removable, extendable, or replaceable**
-- **No circular dependencies** between modules
-- **No shared state** across modules
-- **No direct cross-module imports**
-- Communication **only via explicit contracts, events, or APIs**
-- All behavior and configuration must be **metadata-driven**
-- Core provides abstractions only; modules implement concrete functionality
-- Detect and implement all missing or incomplete modules
-- Eliminate duplication, coupling, and architectural violations
+## Core Architecture Pattern
 
-### Technology Stack
-- **Backend**: Native Laravel (version 12.x) capabilities only; avoid additional PHP/backend packages unless explicitly approved as core dependencies
-- **Frontend Runtime**: Native Vue capabilities only for shipped/browser runtime code
-- **Frontend Tooling Exceptions**: Frontend build-time tooling (for example Tailwind CSS, bundlers, linters) and API documentation tooling (for example Swagger/OpenAPI generators) are allowed when used strictly as development/build-time tools, not as required runtime dependencies
-- **Manual Implementation**: Prefer manual implementation for backend/business logic instead of relying on third-party libraries; use external tools only where they clearly improve developer productivity without becoming hard runtime dependencies
-- **Dependencies**: Only use unavoidable, stable, LTS, officially supported dependencies when absolutely essential; any third-party backend or runtime package must be explicitly justified, documented, and approved
-- **Prohibited**: Experimental, deprecated, abandoned, placeholder, partial, or unsupported implementations and dependencies; reference links to third-party tools in this document are **informational, optional examples only**, not mandatory or endorsed dependencies
+### Controller → Service → Repository Flow
 
-## System Architecture
+**ALWAYS follow this strict flow**:
 
-### Multi-Tenancy and Organization Structure
-- **Strict tenant isolation**: Ensure complete data and process separation between tenants
-- **Hierarchical multi-level organizational structures**: Support nested organizations with inheritance
-- **Distributed architecture**: Design for scalability across multiple nodes and services
+```
+HTTP Request → Controller → Service → Repository → Model → Database
+```
 
-### Authentication and Authorization
-- **Stateless Application**: No server-side sessions; fully stateless at the application layer
-- **JWT Authentication**: Token-based authentication per user × device × organization
-- **Secure Token Lifecycle**: Proper token generation, validation, refresh, and revocation
-- **Multi-Guard Support**: Support multiple authentication guards
-- **Multi-User/Multi-Device Concurrency**: Handle concurrent access safely
-- **RBAC (Role-Based Access Control)**: Implement via native Laravel policies and middleware
-- **ABAC (Attribute-Based Access Control)**: Support attribute-based permissions via native Laravel policies
+**Controller** (HTTP/Presentation Layer):
+- Handle HTTP requests and responses ONLY
+- Validate input using FormRequest classes
+- Delegate business logic to Services
+- Transform output using API Resources
+- Never access repositories directly
+- Never contain business logic
 
-### Data Integrity and Concurrency
-- **Database Transactions**: Use atomic transactions for all data modifications
-- **Foreign Key Constraints**: Enforce referential integrity at database level
-- **Optimistic Locking**: Implement versioning for concurrent updates
-- **Pessimistic Locking**: Use database locks when necessary for critical sections
-- **Retry-Safe APIs**: Design endpoints to be safely retryable; use idempotency keys for non-idempotent operations (e.g., POST create), and keep PUT/PATCH/DELETE semantics consistent
-- **Audit Logging**: Comprehensive, structured audit trails for all critical operations
-- **Deterministic Calculations**: All financial and quantity calculations must be precision-safe and auditable
+**Service** (Business Logic Layer):
+- Contain ALL business logic and orchestration
+- Manage database transactions
+- Call repositories for data operations
+- Trigger events and notifications
+- Handle complex business rules
+- Never access models directly
 
-### Event-Driven Architecture
-- **Native Events**: Use Laravel's native event system
-- **Queues**: Leverage Laravel's queue system for asynchronous processing
-- **Processes**: Use Laravel's process management
-- **Pipelines**: Implement workflow pipelines using Laravel's pipeline helper
-- **Event/Contract-Only Integration**: Modules integrate only through events and contracts
+**Repository** (Data Access Layer):
+- Handle database queries ONLY
+- No business logic
+- Return models or collections
+- Implement query scopes and filters
+- Abstract database operations
 
-### Dynamic and Metadata-Driven System
-- **Runtime Configurable**: All behaviors, rules, pricing, and modules customizable without code changes
-- **Metadata-Driven**: UI, workflows, permissions, rules, and configurations driven by metadata
-- **Dynamic UI Rendering**: Generate UI components dynamically based on metadata
-- **Centralized Configuration**: Define configuration in Laravel config files (accessed via `config()`), source environment-specific values from `.env`, and reserve enums for true domain constants (avoid spreading hardcoded literals)
-- **Service Orchestration**: Scalable service orchestration for complex workflows
+### Example Implementation
 
-## Business Domain Implementation
+```php
+// Controller - Minimal, delegates to service
+public function store(StoreUserRequest $request): JsonResponse
+{
+    $user = $this->userService->create($request->validated());
+    return $this->createdResponse(new UserResource($user));
+}
 
-### Product and Service Models
-- **Dynamic Products**: Support for goods, services, bundles, and composite offerings
-- **Multi-Unit Support**: Configurable buying and selling units
-- **Location-Based Pricing**: Different prices per location
-- **Flexible Product Types**: Product/Service/Combo models
+// Service - Business logic with transaction
+public function create(array $data): Model
+{
+    DB::beginTransaction();
+    try {
+        $user = $this->repository->create($data);
+        event(new UserCreated($user));
+        DB::commit();
+        return $user;
+    } catch (Exception $e) {
+        DB::rollBack();
+        throw new ServiceException($e->getMessage());
+    }
+}
 
-### Pricing and Calculation Engines
-- **Extensible Pricing Engines**: Support multiple pricing strategies (flat, percentage, tiered, rule-based)
-- **Calculation Rules**: Implement flat, percentage, and tiered pricing logic
-- **Rule-Driven Computations**: Dynamic, pluggable pricing rules
-- **Precision-Safe**: Use BCMath for all financial and quantity calculations (deterministic and auditable)
+// Repository - Data access only
+public function create(array $data): Model
+{
+    return $this->model->create($data);
+}
+```
 
-## Development Standards
+## Module Structure
 
-### Code Quality
-- **Clean Code**: Write clean, readable, and self-documenting code
-- **Meaningful Naming**: Use consistent and descriptive names for all entities
-- **Production-Ready**: All code must be production-ready, never use placeholders or partial implementations
-- **Documentation**: Maintain clear module-level documentation
-- **No Partial Implementations**: Complete all features fully with no placeholders
-- **Long-Term Sustainability**: Align all code with enterprise standards and long-term sustainability
+### Creating New Modules
 
-### Security Requirements
-- **Enterprise-Grade Security**: Implement security best practices throughout
-- **Secure Data Handling**: Protect sensitive data at rest and in transit
-- **Input Validation**: Validate all inputs thoroughly
-- **Output Encoding**: Properly encode all outputs
-- **No Secrets in Code**: Never commit secrets or sensitive data
+Use Laravel Modules package: `php artisan module:make ModuleName`
 
-### Scalability and Performance
-- **Scalable Design**: Architecture must support horizontal and vertical scaling
-- **Performance Optimization**: Optimize for performance without premature optimization
-- **Fault Tolerance**: Design for resilience and graceful degradation
-- **Caching Strategy**: Implement appropriate caching where beneficial
-- **Concurrency-Safe Processing**: Ensure all operations are safe for concurrent execution
+**Required Structure**:
+```
+ModuleName/
+├── app/
+│   ├── Http/
+│   │   ├── Controllers/    # HTTP handlers
+│   │   ├── Requests/       # Form validation
+│   │   └── Resources/      # API transformations
+│   ├── Models/             # Eloquent models
+│   ├── Repositories/       # Data access
+│   └── Services/          # Business logic
+├── database/
+│   ├── migrations/        # Schema definitions
+│   ├── seeders/          # Test data
+│   └── factories/        # Model factories
+├── lang/
+│   ├── en/              # English translations
+│   ├── es/              # Spanish translations
+│   └── fr/              # French translations
+├── routes/
+│   ├── api.php          # API routes
+│   └── web.php          # Web routes
+└── tests/
+    ├── Feature/         # Integration tests
+    └── Unit/           # Unit tests
+```
 
-## Configuration Standards
+## Coding Standards
 
-### Environment Configuration
-- **Config Files First**: Define application configuration in Laravel `config/` files and access it via `config()`
-- **Environment Variables**: Use `.env` only for environment-specific, deploy-time values that feed into config files; avoid reading environment variables directly throughout the app
-- **Domain Enums**: Use enums for true domain-level constants (business concepts), not for every configuration value
-- **No Hardcoded Sensitive/Env Values**: Do not hardcode environment-specific or sensitive configuration values (such as secrets, credentials, or hostnames) in code; prefer configuration files backed by `.env`
+### PHP Standards
 
-### Module Detection and Implementation
-- **Identify Missing Modules**: Detect all missing or incomplete modules
-- **Implement According to Domain**: Follow documented domain boundaries
-- **Fix Circular Dependencies**: Eliminate all circular dependencies
-- **Remove Duplication**: Identify and remove code duplication
+**MUST follow**:
+- PSR-12 coding standard
+- Strict types: `declare(strict_types=1);` at the top of every PHP file
+- Type hints on ALL parameters, return types, and properties (PHP 8.2+ required, 8.3+ recommended)
+- PHPDoc blocks on ALL classes and methods
+- SOLID principles
+
+**Code Formatting**:
+- Use Laravel Pint: `./vendor/bin/pint`
+- Run Pint before committing
+
+### Naming Conventions
+
+**Classes** (PascalCase):
+- Controllers: `UserController`, `PostController`
+- Services: `UserService`, `AuthenticationService`
+- Repositories: `UserRepository`, `PostRepository`
+- Models: Singular form - `User`, `Post`, `Comment`
+- Requests: `StoreUserRequest`, `UpdateUserRequest`
+- Resources: `UserResource`, `PostResource`
+
+**Methods** (camelCase):
+- Actions: `createUser()`, `deletePost()`, `sendEmail()`
+- Retrievals: `getUsers()`, `getUserById()`, `findByEmail()`
+- Boolean checks: `isActive()`, `hasPermission()`, `canAccess()`
+
+**Variables** (camelCase):
+- Descriptive: `$userEmail`, `$postTitle` (not `$ue`, `$pt`)
+- Booleans: `$isActive`, `$hasPermission`, `$canEdit`
+- Collections: Plural - `$users`, `$posts`
+
+**Constants** (UPPER_SNAKE_CASE):
+- `MAX_LOGIN_ATTEMPTS`, `DEFAULT_CACHE_TTL`
+
+### Dependency Injection
+
+**ALWAYS use constructor injection** with readonly properties (PHP 8.1+):
+
+```php
+public function __construct(
+    private readonly UserService $userService,
+    private readonly RoleService $roleService,
+    private readonly CacheHelper $cache
+) {}
+```
+
+## Multi-Tenancy
+
+### Tenant Awareness
+
+- Use `stancl/tenancy` package for multi-tenancy
+- All models in modules MUST be tenant-aware
+- Use `TenantAware` trait for automatic tenant scoping
+- Tenant context is managed via domains/subdomains
+- Each tenant has isolated database, cache, and file storage
+
+**Example**:
+```php
+use App\Core\Traits\TenantAware;
+
+class Post extends Model
+{
+    use TenantAware;
+    
+    // Model automatically scoped to current tenant
+}
+```
+
+### Tenant Isolation
+
+- Database: Separate tables/schemas per tenant
+- Cache: Tenant-specific keys using `CacheHelper`
+- Storage: Tenant-specific directories
+- Queue Jobs: Pass tenant context
+
+## Security & Authorization
+
+### Authentication
+
+- Use Laravel Sanctum for API authentication
+- Token-based auth for API endpoints
+- All API routes MUST require authentication unless explicitly public
+
+### Authorization
+
+- Use Spatie Laravel Permission for RBAC
+- Define policies for all resources
+- Use middleware: `CheckPermission`, `CheckRole`
+- Implement ABAC where granular control needed
+
+**Example**:
+```php
+// In routes
+Route::middleware(['auth:sanctum', 'permission:user.create'])
+    ->post('/users', [UserController::class, 'store']);
+
+// In Policy
+public function update(User $user, Post $post): bool
+{
+    return $user->hasPermissionTo('post.update') 
+        && $post->user_id === $user->id;
+}
+```
+
+### Input Validation
+
+- ALWAYS use FormRequest classes for validation
+- Never trust user input
+- Validate in request, not controller
+- Use custom validation rules when needed
+
+### Audit Trail
+
+- Use `AuditTrait` for automatic logging
+- Log all create, update, delete operations
+- Include user context in logs
+- Store immutable audit records
+
+## Testing Requirements
+
+### Test Coverage Requirements
+
+**MANDATORY**:
+- All service methods MUST have unit tests
+- All API endpoints MUST have feature tests
+- Critical business logic MUST have 100% coverage
+- Test both success and failure scenarios
+
+### Writing Tests
+
+**Feature Tests** (API endpoints):
+```php
+public function test_user_can_be_created(): void
+{
+    $data = [
+        'name' => 'Test User',
+        'email' => 'test@example.com',
+        'password' => 'password',
+    ];
+
+    $response = $this->actingAs($this->user)
+        ->postJson('/api/v1/users', $data);
+
+    $response->assertStatus(201)
+        ->assertJsonStructure([
+            'success',
+            'message',
+            'data' => ['id', 'name', 'email'],
+        ]);
+
+    $this->assertDatabaseHas('users', ['email' => 'test@example.com']);
+}
+```
+
+**Unit Tests** (Service logic):
+```php
+public function test_service_creates_user_with_hashed_password(): void
+{
+    $data = [
+        'name' => 'Test User',
+        'email' => 'test@example.com',
+        'password' => 'password',
+    ];
+
+    $user = $this->userService->create($data);
+
+    $this->assertNotEquals('password', $user->password);
+    $this->assertTrue(Hash::check('password', $user->password));
+}
+```
+
+### Running Tests
+
+```bash
+# All tests
+php artisan test
+
+# Specific suite
+php artisan test --testsuite=Feature
+
+# With coverage
+php artisan test --coverage
+
+# Parallel
+php artisan test --parallel
+```
+
+## Localization (i18n)
+
+### Multi-Language Support
+
+- Support: English (en), Spanish (es), French (fr)
+- Each module has its own translations in `lang/` directory
+- Use translation keys, not hardcoded strings
+
+**Usage**:
+```php
+// In code
+__('user::messages.user_created')
+
+// In views
+{{ __('user::validation.email_required') }}
+
+// In Vue components
+$t('user.messages.user_created')
+```
+
+### Translation Files
+
+```php
+// Modules/User/lang/en/messages.php
+return [
+    'user_created' => 'User created successfully',
+    'user_updated' => 'User updated successfully',
+];
+```
+
+## Error Handling
+
+### Exception Hierarchy
+
+Use custom exceptions from `App\Core\Exceptions`:
+- `ServiceException` - Business logic errors
+- `RepositoryException` - Data access errors
+- `TenantException` - Multi-tenancy errors
+- `ValidationException` - Input validation errors
+
+**Example**:
+```php
+use App\Core\Exceptions\ServiceException;
+
+try {
+    $result = $this->repository->create($data);
+} catch (Exception $e) {
+    Log::error('User creation failed', ['error' => $e->getMessage()]);
+    throw new ServiceException('Failed to create user: ' . $e->getMessage());
+}
+```
+
+### API Error Responses
+
+Use `ApiResponse` trait for consistent responses:
+
+```php
+// Success
+return $this->successResponse($data, 'Operation successful');
+
+// Created
+return $this->createdResponse($data, 'Resource created');
+
+// Error
+return $this->errorResponse('Error message', 400);
+
+// Not Found
+return $this->notFoundResponse('Resource not found');
+
+// Validation Error
+return $this->validationErrorResponse($errors);
+```
+
+## Performance Best Practices
+
+### Database Optimization
+
+- **Avoid N+1 queries**: Always use eager loading
+```php
+// Bad
+$users = User::all();
+foreach ($users as $user) {
+    $user->posts; // N+1 query
+}
+
+// Good
+$users = User::with('posts')->get();
+```
+
+- **Pagination**: Always paginate large datasets
+```php
+return $this->repository->paginate(15);
+```
+
+### Caching
+
+- Use `CacheHelper` for tenant-aware caching
+- Cache expensive operations
+- Set appropriate TTLs using `CacheDuration` enum
+
+```php
+use App\Core\Helpers\CacheHelper;
+use App\Core\Enums\CacheDuration;
+
+$users = CacheHelper::remember(
+    'users.active',
+    CacheDuration::ONE_HOUR->value,
+    fn() => $this->repository->getActive()
+);
+```
+
+### Queue Jobs
+
+- Use queues for heavy operations
+- Email sending, file processing, reports
+- Pass tenant context in job payload
+
+## Vue.js Frontend (Optional)
+
+### Framework & Tools
+
+- Vue.js 3 with Composition API
+- Vite for building
+- Tailwind CSS for styling
+- Pinia for state management
+- Vue Router for routing
+- Vue I18n for internationalization
+
+### Build Commands
+
+```bash
+# Development
+npm run dev
+
+# Production build
+npm run build
+```
+
+## Database Migrations
+
+### Best Practices
+
+- One migration per change
+- Reversible migrations (up/down methods)
+- Use descriptive names
+- Include foreign key constraints
+- Add indexes for queried columns
+
+**Naming**:
+- Create: `create_users_table`
+- Add column: `add_status_to_users_table`
+- Modify: `modify_users_table_add_indexes`
+
+## Git Workflow
+
+### Commit Messages
+
+Follow Conventional Commits:
+
+```
+<type>(<scope>): <subject>
+
+feat(user): add email verification endpoint
+fix(auth): resolve token expiration issue
+docs(readme): update installation instructions
+refactor(service): extract common logic to base service
+test(user): add user creation tests
+```
+
+### Types
+
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation only
+- `style`: Code formatting (no logic change)
+- `refactor`: Code refactoring
+- `test`: Adding/updating tests
+- `chore`: Maintenance tasks
 
 ## Documentation Requirements
 
-- **Update Documentation**: Keep all project documentation current
-- **Align with Insights**: Reflect extracted knowledge and best practices
-- **Clear Domain Boundaries**: Document module boundaries and responsibilities
-- **Architecture Documentation**: Maintain comprehensive architecture documentation
+### PHPDoc Requirements
 
-## Reference Resources
+**All classes and methods MUST have PHPDoc**:
 
-### Architecture and Design Patterns
-- [Clean Code Blog](https://blog.cleancoder.com/atom.xml)
-- [Modular Design - Wikipedia](https://en.wikipedia.org/wiki/Modular_design)
-- [Plugin Architecture - Wikipedia](https://en.wikipedia.org/wiki/Plug-in_(computing))
-- [SOLID Principles - Wikipedia](https://en.wikipedia.org/wiki/SOLID)
-- [Enterprise Resource Planning - Wikipedia](https://en.wikipedia.org/wiki/Enterprise_resource_planning)
+```php
+/**
+ * User Service
+ * 
+ * Handles business logic for user management including
+ * creation, updates, role assignment, and permissions.
+ */
+class UserService
+{
+    /**
+     * Create a new user
+     *
+     * @param array<string, mixed> $data User data
+     * @return Model The created user model
+     * @throws ServiceException If user creation fails
+     */
+    public function create(array $data): Model
+    {
+        // Implementation
+    }
+}
+```
 
-### Laravel Resources
-- [Laravel Official Repository](https://github.com/laravel/laravel)
-- [Laravel 12.x Documentation - Packages](https://laravel.com/docs/12.x/packages)
-- [Laravel 12.x Documentation - Filesystem](https://laravel.com/docs/12.x/filesystem)
-- [Laravel 12.x Documentation - Processes](https://laravel.com/docs/12.x/processes)
-- [Laravel 12.x Documentation - Pipeline Helper](https://laravel.com/docs/12.x/helpers#pipeline)
-- [Laravel 12.x Documentation - Authentication](https://laravel.com/docs/12.x/authentication)
-- [Laravel 12.x Documentation - Localization](https://laravel.com/docs/12.x/localization)
-- [Building Multi-Tenant Architecture - Laravel](https://laravel.com/blog/building-a-multi-tenant-architecture-platform-to-scale-the-emmys)
+### README Updates
 
-### Laravel Best Practices and Patterns
-- [Building Modular Systems in Laravel](https://sevalla.com/blog/building-modular-systems-laravel)
-- [Modular Laravel](https://dev.to/keljtanoski/modular-laravel-3dkf)
-- [Uploading Files in Laravel](https://laravel-news.com/uploading-files-laravel)
-- [Managing Data Races with Pessimistic Locking](https://laravel-news.com/managing-data-races-with-pessimistic-locking-in-laravel)
-- [Multi-Guard Authentication with Laravel 12](https://dev.to/preciousaang/multi-guard-authentication-with-laravel-12-1jg3)
-- [Building Polymorphic Translatable Models](https://dev.to/rafaelogic/building-a-polymorphic-translatable-model-in-laravel-with-autoloaded-translations-3d99)
+- Update README.md for major features
+- Include examples and usage
+- Update API documentation section
+- Keep installation instructions current
 
-### Database and Concurrency
-- [Understanding Database Locking and Concurrency in Laravel](https://dev.to/bhaidar/understanding-database-locking-and-concurrency-in-laravel-a-deep-dive-2k4m)
-- [Pessimistic & Optimistic Locking in Laravel](https://dev.to/tegos/pessimistic-optimistic-locking-in-laravel-23dk)
-- [Handling Decimal Calculations in PHP 8.4](https://dev.to/takeshiyu/handling-decimal-calculations-in-php-84-with-the-new-bcmath-object-api-442j)
+## Common Patterns
 
-### Frontend and UI
-The following are **optional examples** of frontend or build-time tooling. They are not required or assumed to be pre-installed. You may use similar tools where appropriate, but avoid introducing new backend PHP runtime dependencies without explicit approval.
-- [AdminLTE](https://adminlte.io) – optional admin UI/theme reference; treat as a design/example resource rather than a mandated package
-- [Tailwind CSS](https://tailwindcss.com) – allowed as an optional build-time CSS utility framework if it fits the chosen frontend stack
+### DTOs (Data Transfer Objects)
 
-### API Documentation
-Tooling such as Swagger/OpenAPI may be used for **API design and documentation generation only** and does not imply any additional PHP runtime dependency. Treat these as optional documentation tools, not required libraries.
-- [Swagger/OpenAPI](https://swagger.io)
+Use for complex data structures:
 
-### Reference Implementations
-- [AutoERP](https://github.com/kasunvimarshana/AutoERP)
+```php
+use App\Core\DTOs\BaseDTO;
 
-## Workflow Guidelines
+class UserDTO extends BaseDTO
+{
+    public function __construct(
+        public readonly string $name,
+        public readonly string $email,
+        public readonly ?string $phone = null,
+    ) {}
+}
+```
 
-### Before Implementation
-1. **Audit and Review**: Thoroughly audit all existing documentation, code, schemas, and configurations
-2. **Analyze Resources**: Extract concepts, patterns, and best practices from reference materials
-3. **Build Conceptual Model**: Create complete conceptual and technical model
-4. **Identify Gaps**: Detect all missing or incomplete modules
-5. **Plan Architecture**: Design according to domain boundaries and relationships
+### Enums
 
-### During Implementation
-1. **Follow Standards**: Adhere strictly to all architectural and coding standards
-2. **Use Native Features**: Rely exclusively on native Laravel and Vue features
-3. **Implement Manually**: Build features manually instead of using third-party libraries
-4. **Maintain Isolation**: Keep modules loosely coupled and independently deployable
-5. **Test Thoroughly**: Ensure all functionality works as expected
+Use for type-safe constants (PHP 8.1+):
 
-### After Implementation
-1. **Update Documentation**: Reflect all changes in documentation
-2. **Validate Quality**: Ensure code meets all quality standards
-3. **Security Review**: Verify security best practices are followed
-4. **Performance Check**: Validate scalability and performance
-5. **No Placeholders**: Ensure complete implementation with no placeholders
+```php
+enum UserStatus: string
+{
+    case ACTIVE = 'active';
+    case INACTIVE = 'inactive';
+    case SUSPENDED = 'suspended';
+}
 
-## Critical Rules
+// Usage
+$user->status = UserStatus::ACTIVE->value;
+```
 
-### Must Follow
-✅ Use native Laravel and Vue features exclusively
-✅ Implement features manually
-✅ Maintain strict modular architecture
-✅ Ensure complete tenant and organizational isolation
-✅ Use enums and `.env` for all configuration
-✅ Implement comprehensive audit logging
-✅ Follow Clean Architecture and DDD principles
-✅ Make all code production-ready
-✅ Maintain clear documentation
-✅ Ensure data integrity and concurrency safety
+### Query Scopes
 
-### Must Avoid
-❌ Unapproved backend/server-side third-party runtime libraries or Laravel/PHP packages (frontend build-time UI tools like Tailwind/AdminLTE and API documentation tooling such as Swagger/OpenAPI are allowed as optional development-time or UI dependencies)
-❌ Hardcoded values in code
-❌ Circular dependencies between modules
-❌ Shared state across modules
-❌ Direct cross-module imports
-❌ Server-side sessions (must be stateless)
-❌ Placeholders or partial implementations
-❌ Experimental, deprecated, or abandoned dependencies
-❌ Security vulnerabilities
-❌ Committing secrets to code
-❌ Unsupported integrations
-❌ Code duplication and redundancy
+Use for reusable query logic:
 
-## Summary
+```php
+use App\Core\Scopes\ActiveScope;
+use App\Core\Scopes\Filterable;
 
-Build a **multi-tenant, distributed, hierarchical multi-organization, enterprise-grade ERP/CRM SaaS platform** that is:
-- **Fully modular**: Plugin-style, loosely coupled modules that can be independently installed, removed, replaced, or extended
-- **Metadata-driven**: Runtime-configurable without code changes; all UI, workflows, permissions, rules, pricing, calculations, and module behaviors customizable via metadata
-- **Stateless**: JWT authentication per user × device × organization, no server-side sessions
-- **Secure**: Enterprise-grade security and data protection with comprehensive audit logging
-- **Data Integrity**: Database transactions, foreign key constraints, optimistic and pessimistic locking, versioning, idempotent APIs
-- **Scalable**: Designed for horizontal and vertical scaling with distributed architecture
-- **Maintainable**: Clean, readable, well-documented, production-ready code
-- **Fault-tolerant**: Resilient and gracefully degrading
-- **Standards-compliant**: Following Clean Architecture, DDD, SOLID, DRY, KISS, and API-first principles
-- **Event-driven**: Native events, queues, processes, pipelines for asynchronous workflows
-- **Extensible**: Pluggable pricing engines, flexible product models, rule-driven computations
+class User extends Model
+{
+    use Filterable;
+    
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new ActiveScope());
+    }
+    
+    public function scopeVerified($query)
+    {
+        return $query->whereNotNull('email_verified_at');
+    }
+}
+```
 
-All implementations must use **native Laravel and Vue features only**, be **manually implemented**, use only **unavoidable stable LTS dependencies**, maintain **strict module isolation**, ensure **data integrity**, support **concurrent access**, eliminate **duplication and coupling**, and be **fully production-ready** with **no placeholders, partial implementations, or unsupported integrations**.
+## Tools & Commands
+
+### Development
+
+```bash
+# Start development server
+php artisan serve
+
+# Watch and compile assets
+npm run dev
+
+# Run all development services
+composer dev
+```
+
+### Code Quality
+
+```bash
+# Format code
+./vendor/bin/pint
+
+# Run tests
+php artisan test
+
+# Static analysis (if configured)
+./vendor/bin/phpstan analyse
+```
+
+### Module Management
+
+```bash
+# Create module
+php artisan module:make ModuleName
+
+# List modules
+php artisan module:list
+
+# Enable module
+php artisan module:enable ModuleName
+
+# Disable module
+php artisan module:disable ModuleName
+```
+
+## Important Files
+
+- **ARCHITECTURE.md** - Detailed architecture documentation
+- **CONTRIBUTING.md** - Contribution guidelines
+- **SECURITY.md** - Security implementation guide
+- **DEPLOYMENT.md** - Production deployment guide
+- **README.md** - Project overview and quick start
+
+## Key Dependencies
+
+### Backend
+- Laravel 11.x (LTS)
+- PHP 8.2+ (required), 8.3+ (recommended for advanced features)
+- nwidart/laravel-modules - Modular architecture
+- spatie/laravel-permission - RBAC
+- stancl/tenancy - Multi-tenancy
+- laravel/sanctum - API authentication
+
+### Frontend
+- Vue.js 3.x
+- Vite
+- Tailwind CSS
+
+## Final Reminders
+
+1. **ALWAYS** follow Controller → Service → Repository pattern
+2. **NEVER** put business logic in controllers or repositories
+3. **ALWAYS** use strict types and type hints
+4. **ALWAYS** write tests for new functionality
+5. **ALWAYS** use dependency injection
+6. **ALWAYS** consider multi-tenancy implications
+7. **ALWAYS** validate and sanitize input
+8. **ALWAYS** use FormRequests for validation
+9. **ALWAYS** use API Resources for responses
+10. **ALWAYS** format code with Pint before committing
+11. **ALWAYS** add PHPDoc comments
+12. **ALWAYS** check for N+1 queries
+13. **ALWAYS** use transactions for multi-step operations
+14. **ALWAYS** handle exceptions properly
+15. **ALWAYS** follow PSR-12 coding standards
+
+## Questions?
+
+Refer to:
+- Project documentation in root directory
+- Laravel documentation: https://laravel.com/docs
+- Vue.js documentation: https://vuejs.org
+- Laravel Modules: https://nwidart.com/laravel-modules/
