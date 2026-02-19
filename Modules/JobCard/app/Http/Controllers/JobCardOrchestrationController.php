@@ -215,7 +215,7 @@ class JobCardOrchestrationController extends Controller
             // This is a diagnostic endpoint
             $jobCard = \Modules\JobCard\Models\JobCard::with([
                 'invoice',
-                'parts . inventoryItem',
+                'parts.inventoryItem',
                 'serviceRecords',
             ])->findOrFail($id);
 

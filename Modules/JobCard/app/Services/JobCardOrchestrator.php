@@ -105,7 +105,7 @@ class JobCardOrchestrator extends BaseOrchestrator
             // This is CRITICAL - must be transactional
             $inventoryTransactions = [];
             if (! ($options['skip_inventory'] ?? false)) {
-                $jobCard->load('parts . inventoryItem');
+                $jobCard->load('parts.inventoryItem');
 
                 foreach ($jobCard->parts as $part) {
                     if ($part->inventoryItem && ! $part->inventoryItem->is_dummy_item) {
