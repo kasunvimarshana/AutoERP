@@ -4,9 +4,11 @@ namespace App\Services;
 
 use App\Enums\AuditAction;
 use App\Enums\OrderStatus;
+use App\Events\OrderCreated;
 use App\Models\Order;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 
 class OrderService
@@ -59,7 +61,10 @@ class OrderService
                 newValues: ['order_number' => $order->order_number, 'total' => $order->total]
             );
 
-            return $order->fresh(['lines']);
+            $freshOrder = $order->fresh(['lines']);
+            Event::dispatch(new OrderCreated($freshOrder));
+
+            return $freshOrder;
         });
     }
 

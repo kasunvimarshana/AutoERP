@@ -6,6 +6,7 @@ use App\Http\Middleware\TenantMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Middleware\HandleCors;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -20,7 +21,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'locale' => SetLocale::class,
             'org.access' => EnsureOrganizationAccess::class,
         ]);
+        $middleware->prependToGroup('api', HandleCors::class);
         $middleware->appendToGroup('api', SetLocale::class);
+        $middleware->throttleApi('api');
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

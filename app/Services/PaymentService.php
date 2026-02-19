@@ -5,11 +5,13 @@ namespace App\Services;
 use App\Enums\AuditAction;
 use App\Enums\InvoiceStatus;
 use App\Enums\PaymentStatus;
+use App\Events\PaymentRecorded;
 use App\Models\Invoice;
 use App\Models\Payment;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 
 class PaymentService
@@ -58,7 +60,10 @@ class PaymentService
                 newValues: ['amount' => $amount, 'payment_number' => $payment->payment_number]
             );
 
-            return $payment->fresh();
+            $freshPayment = $payment->fresh();
+            Event::dispatch(new PaymentRecorded($freshPayment));
+
+            return $freshPayment;
         });
     }
 

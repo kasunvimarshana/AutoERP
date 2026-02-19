@@ -4,9 +4,11 @@ namespace App\Services;
 
 use App\Enums\AuditAction;
 use App\Enums\InvoiceStatus;
+use App\Events\InvoiceCreated;
 use App\Models\Invoice;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 
 class InvoiceService
@@ -58,7 +60,10 @@ class InvoiceService
                 newValues: ['invoice_number' => $invoice->invoice_number, 'total' => $invoice->total]
             );
 
-            return $invoice->fresh(['items']);
+            $freshInvoice = $invoice->fresh(['items']);
+            Event::dispatch(new InvoiceCreated($freshInvoice));
+
+            return $freshInvoice;
         });
     }
 

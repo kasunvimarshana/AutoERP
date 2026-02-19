@@ -35,21 +35,21 @@ Infrastructure Layer → Repositories, Migrations, External Services
 | **Tenant** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
 | **Organization** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
 | **User** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
-| **RBAC** | ✅ | ✅ | ✅ (Seeder) | ⬜ | ⬜ | ⬜ | 🟡 In Progress |
-| **Product** | ✅ | ✅ | ✅ | ✅ | ✅ | ⬜ | 🟡 In Progress |
-| **Pricing Engine** | ✅ | ✅ | ✅ | ⬜ | ⬜ | ⬜ | 🟡 In Progress |
-| **Inventory** | ✅ | ✅ | ✅ | ✅ | ✅ | ⬜ | 🟡 In Progress |
+| **RBAC** | ✅ | ✅ | ✅ (Seeder) | ✅ | ✅ | ✅ | ✅ Done |
+| **Product** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Pricing Engine** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Inventory** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
 | **Order** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
 | **Invoice** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
-| **Payment** | ✅ | ✅ | ✅ | ✅ | ✅ | ⬜ | 🟡 In Progress |
+| **Payment** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
 | **CRM** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
-| **HR** | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 🔴 Planned |
-| **Accounting** | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 🔴 Planned |
-| **Reporting** | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 🔴 Planned |
-| **Notification** | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 🔴 Planned |
-| **File Manager** | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 🔴 Planned |
-| **Audit** | ✅ | ✅ | ✅ | ⬜ | ⬜ | ⬜ | 🟡 In Progress |
-| **Webhook** | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 🔴 Planned |
+| **HR** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Accounting** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Reporting** | N/A | N/A | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Notification** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **File Manager** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Audit** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Webhook** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
 
 ### Status Legend
 - ✅ Implemented
@@ -147,6 +147,93 @@ Infrastructure Layer → Repositories, Migrations, External Services
 | GET | `/api/v1/crm/opportunities` | List opportunities |
 | POST | `/api/v1/crm/opportunities` | Create opportunity |
 
+### RBAC
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/roles` | List roles with permissions |
+| POST | `/api/v1/roles` | Create role |
+| PUT | `/api/v1/roles/{id}` | Update role |
+| DELETE | `/api/v1/roles/{id}` | Delete role |
+| PATCH | `/api/v1/roles/{id}/sync-permissions` | Sync role permissions |
+| GET | `/api/v1/roles/permissions` | List all permissions |
+
+### Pricing
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/price-lists` | List price lists |
+| POST | `/api/v1/price-lists` | Create price list |
+| PUT | `/api/v1/price-lists/{id}` | Update price list |
+| DELETE | `/api/v1/price-lists/{id}` | Delete price list |
+| GET | `/api/v1/price-lists/{id}/rules` | List rules for a price list |
+| POST | `/api/v1/price-lists/{id}/rules` | Add rule to price list |
+
+### Audit
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/audit-logs` | List audit logs (filterable) |
+
+### HR
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/hr/employees` | List employees |
+| POST | `/api/v1/hr/employees` | Create employee |
+| PUT | `/api/v1/hr/employees/{id}` | Update employee |
+| PATCH | `/api/v1/hr/employees/{id}/terminate` | Terminate employee |
+| GET | `/api/v1/hr/departments` | List departments |
+| POST | `/api/v1/hr/departments` | Create department |
+| PUT | `/api/v1/hr/departments/{id}` | Update department |
+| GET | `/api/v1/hr/leave-requests` | List leave requests |
+| POST | `/api/v1/hr/leave-requests` | Create leave request |
+| PATCH | `/api/v1/hr/leave-requests/{id}/approve` | Approve leave request |
+| PATCH | `/api/v1/hr/leave-requests/{id}/reject` | Reject leave request |
+
+### Accounting
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/accounting/accounts` | List chart of accounts |
+| POST | `/api/v1/accounting/accounts` | Create account |
+| PUT | `/api/v1/accounting/accounts/{id}` | Update account |
+| GET | `/api/v1/accounting/periods` | List accounting periods |
+| POST | `/api/v1/accounting/periods` | Create period |
+| PATCH | `/api/v1/accounting/periods/{id}/close` | Close period |
+| GET | `/api/v1/accounting/journal-entries` | List journal entries |
+| POST | `/api/v1/accounting/journal-entries` | Create journal entry (balanced) |
+| PATCH | `/api/v1/accounting/journal-entries/{id}/post` | Post journal entry |
+
+### Notifications
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/notifications/templates` | List notification templates |
+| POST | `/api/v1/notifications/templates` | Create template |
+| PUT | `/api/v1/notifications/templates/{id}` | Update template |
+| POST | `/api/v1/notifications/send` | Send notification |
+| GET | `/api/v1/notifications/logs` | List notification logs |
+
+### File Manager
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/files` | List uploaded files |
+| POST | `/api/v1/files` | Upload file |
+| DELETE | `/api/v1/files/{id}` | Delete file |
+
+### Reports
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/reports/sales-summary` | Sales summary by status/period |
+| GET | `/api/v1/reports/inventory-summary` | Inventory summary |
+| GET | `/api/v1/reports/receivables-summary` | Receivables by status |
+| GET | `/api/v1/reports/top-products` | Top products by revenue |
+
+### Webhooks
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/webhooks` | List webhooks |
+| POST | `/api/v1/webhooks` | Create webhook |
+| PUT | `/api/v1/webhooks/{id}` | Update webhook |
+| DELETE | `/api/v1/webhooks/{id}` | Delete webhook |
+| GET | `/api/v1/webhooks/{id}/deliveries` | List webhook deliveries |
+| POST | `/api/v1/webhooks/{id}/test` | Test webhook delivery |
+
 ---
 
 ## Domain Entity Map
@@ -182,9 +269,33 @@ Infrastructure Layer → Repositories, Migrations, External Services
 - **Lead** → sales opportunity in early stage
 - **Opportunity** → qualified sales pipeline entry
 
+### HR Domain
+- **Department** → hierarchical org units with manager
+- **Employee** → staff members with employment details and leave tracking
+- **LeaveType** → configurable leave categories (annual, sick, etc.)
+- **LeaveRequest** → approval workflow for employee leave
+
+### Accounting Domain
+- **ChartOfAccount** → hierarchical account tree (asset/liability/equity/revenue/expense)
+- **AccountingPeriod** → fiscal periods with open/closed/locked lifecycle
+- **JournalEntry** → double-entry bookkeeping with balanced debit/credit lines
+- **JournalEntryLine** → individual debit/credit entries
+
+### Notification Domain
+- **NotificationTemplate** → reusable channel-aware templates with `{{variable}}` interpolation
+- **NotificationLog** → delivery records for all sent notifications
+
+### File Manager Domain
+- **FileCategory** → organizational taxonomy for files
+- **MediaFile** → polymorphic attachments with storage abstraction and checksum
+
+### Webhook Domain
+- **Webhook** → subscriber endpoints with event filters and retry config
+- **WebhookDelivery** → per-delivery attempt records with HTTP response tracking
+
 ---
 
-## RBAC Roles (48 permissions across 5 roles)
+## RBAC Roles (67 permissions across 5 roles)
 
 | Role | Description |
 |------|-------------|
@@ -209,12 +320,13 @@ Infrastructure Layer → Repositories, Migrations, External Services
 | Pessimistic Lock | lockForUpdate() in InventoryService | ✅ |
 | Soft Deletes | All domain models | ✅ |
 | Audit Trail | AuditService + AuditLog model | ✅ |
+| Domain Events | OrderCreated, InvoiceCreated, PaymentRecorded | ✅ |
 | Cache | Redis (configurable via .env) | ⬜ |
 | Queue | Redis / Database (configurable) | ⬜ |
 | Storage | Local / S3 (configurable) | ⬜ |
 | Frontend | Vue 3 + Vite | ⬜ |
 | API Docs | OpenAPI / Swagger | ⬜ |
-| Testing | PHPUnit 11 (14 tests passing) | ✅ |
+| Testing | PHPUnit 11 (47 tests passing) | ✅ |
 | CI/CD | GitHub Actions (ci.yml + tests.yml) | ✅ |
 
 ---
@@ -234,132 +346,7 @@ Infrastructure Layer → Repositories, Migrations, External Services
 - [x] Permission checks in controllers (can() + abort_unless)
 - [x] SQL injection prevention (Eloquent parameterized queries)
 - [x] PHP 8.3 minimum (no insecure PHP 8.2)
-- [ ] Rate limiting (planned)
-- [ ] CORS configuration (planned)
+- [x] Rate limiting (120 req/min auth users; 30 req/min guests; 10 req/min on login)
+- [x] CORS configuration (env-configurable via CORS_ALLOWED_ORIGINS)
 - [ ] HTTPS enforcement (env-based, planned)
 
-
-> Last Updated: 2026-02-19
-> Stack: Laravel 11 (PHP 8.3) + Vue 3 + JWT + Spatie Permissions
-> Architecture: Clean Architecture + DDD + SOLID + Modular Plugin-style
-
-## Architecture Overview
-
-The system follows a strict layered architecture:
-
-```
-Presentation Layer  → Controllers, Requests, Resources (API responses)
-Application Layer   → Services, Commands, Queries, DTOs
-Domain Layer        → Models, Events, Contracts, Value Objects
-Infrastructure Layer → Repositories, Migrations, External Services
-```
-
-### Core Principles
-- **Multi-tenancy**: Row-level isolation via `tenant_id` on all entities
-- **Hierarchical Orgs**: Nested set model for organization trees
-- **JWT Auth**: Stateless, multi-guard (user × device × org)
-- **RBAC/ABAC**: Spatie permissions + custom policies
-- **Event-Driven**: Laravel events, queues, pipelines
-- **Precision Finance**: BCMath for all monetary calculations
-- **Audit Trail**: Immutable audit_logs on all state changes
-
----
-
-## Module Status
-
-| Module | Domain Models | Migrations | Services | Controllers | Routes | Events | Tests | Status |
-|--------|--------------|------------|----------|-------------|--------|--------|-------|--------|
-| **Platform** | ✅ | ✅ | ✅ | ✅ | ✅ | ⬜ | ⬜ | 🟡 In Progress |
-| **Auth** | ✅ | ✅ | ✅ | ✅ | ✅ | ⬜ | ⬜ | 🟡 In Progress |
-| **Tenant** | ✅ | ✅ | ✅ | ✅ | ✅ | ⬜ | ⬜ | 🟡 In Progress |
-| **Organization** | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 🔴 Planned |
-| **User** | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 🔴 Planned |
-| **RBAC** | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 🔴 Planned |
-| **Product** | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 🔴 Planned |
-| **Pricing Engine** | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 🔴 Planned |
-| **Inventory** | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 🔴 Planned |
-| **Order** | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 🔴 Planned |
-| **Invoice** | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 🔴 Planned |
-| **Payment** | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 🔴 Planned |
-| **CRM** | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 🔴 Planned |
-| **HR** | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 🔴 Planned |
-| **Accounting** | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 🔴 Planned |
-| **Reporting** | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 🔴 Planned |
-| **Notification** | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 🔴 Planned |
-| **File Manager** | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 🔴 Planned |
-| **Audit** | ✅ | ✅ | ✅ | ⬜ | ⬜ | ⬜ | ⬜ | 🟡 In Progress |
-| **Webhook** | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 🔴 Planned |
-
-### Status Legend
-- ✅ Implemented
-- 🟡 In Progress
-- 🔴 Planned
-- ⬜ Not Started
-
----
-
-## Domain Entity Map
-
-### Core Entities
-- **Tenant** → top-level isolation boundary
-- **Organization** → hierarchical (nested set), belongs to Tenant
-- **User** → belongs to Tenant + Organization(s), JWT subject
-- **AuditLog** → immutable event record for all state changes
-
-### Planned Entities (Product Domain)
-- **Product** → polymorphic (goods/service/digital/bundle/composite)
-- **ProductVariant** → SKU-level attributes
-- **Unit** → configurable buy/sell units
-- **PriceList** → location/org/tier-based pricing
-- **PriceRule** → flat/percentage/tiered/rule-based
-
-### Planned Entities (Order Domain)
-- **Order** → header with tenant/org isolation
-- **OrderLine** → line items with precision quantities
-- **Invoice** → billing document
-- **Payment** → payment records with reconciliation
-
----
-
-## Infrastructure
-
-| Concern | Technology | Status |
-|---------|-----------|--------|
-| Framework | Laravel 11 (PHP 8.3) | ✅ |
-| Auth | tymon/jwt-auth 2.x | ✅ |
-| Permissions | spatie/laravel-permission 6.x | ✅ |
-| Database | MySQL / PostgreSQL (configurable) | ✅ |
-| Cache | Redis (configurable via .env) | ⬜ |
-| Queue | Redis / Database (configurable) | ⬜ |
-| Storage | Local / S3 (configurable) | ⬜ |
-| Search | Scout + Driver (configurable) | ⬜ |
-| Frontend | Vue 3 + Vite | ⬜ |
-| API Docs | OpenAPI / Swagger | ⬜ |
-| Testing | PHPUnit 11 | ⬜ |
-| CI/CD | GitHub Actions | ⬜ |
-
----
-
-## Security Checklist
-
-- [x] JWT stateless auth (no sessions)
-- [x] Tenant isolation via row-level security (tenant_id)
-- [x] RBAC via Spatie permissions
-- [x] Middleware for tenant resolution
-- [x] Soft deletes on all entities
-- [x] Audit log for all state changes
-- [ ] Rate limiting
-- [ ] Input sanitization
-- [ ] API versioning (v1 in place)
-- [ ] HTTPS enforcement
-- [ ] CORS configuration
-- [ ] SQL injection prevention (Eloquent parameterized queries)
-
----
-
-## Financial Precision
-
-All monetary values use:
-- **Database**: `DECIMAL(20,8)` columns
-- **PHP**: BCMath for all arithmetic operations
-- **API responses**: String representation to avoid floating point errors
