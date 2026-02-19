@@ -51,7 +51,13 @@
             "Modules\\Inventory\\Database\\Seeders\\": "Modules/Inventory/database/seeders/",
             "Modules\\Invoice\\": "Modules/Invoice/app/",
             "Modules\\Invoice\\Database\\Factories\\": "Modules/Invoice/database/factories/",
-            "Modules\\Invoice\\Database\\Seeders\\": "Modules/Invoice/database/seeders/"
+            "Modules\\Invoice\\Database\\Seeders\\": "Modules/Invoice/database/seeders/",
+            "Modules\\Product\\": "Modules/Product/app/",
+            "Modules\\Product\\Database\\Factories\\": "Modules/Product/database/factories/",
+            "Modules\\Product\\Database\\Seeders\\": "Modules/Product/database/seeders/",
+            "Modules\\Pricing\\": "Modules/Pricing/app/",
+            "Modules\\Pricing\\Database\\Factories\\": "Modules/Pricing/database/factories/",
+            "Modules\\Pricing\\Database\\Seeders\\": "Modules/Pricing/database/seeders/"
         }
     },
     "autoload-dev": {
@@ -64,7 +70,9 @@
             "Modules\\Appointment\\Tests\\": "Modules/Appointment/tests/",
             "Modules\\JobCard\\Tests\\": "Modules/JobCard/tests/",
             "Modules\\Inventory\\Tests\\": "Modules/Inventory/tests/",
-            "Modules\\Invoice\\Tests\\": "Modules/Invoice/tests/"
+            "Modules\\Invoice\\Tests\\": "Modules/Invoice/tests/",
+            "Modules\\Product\\Tests\\": "Modules/Product/tests/",
+            "Modules\\Pricing\\Tests\\": "Modules/Pricing/tests/"
         }
     },
     "scripts": {

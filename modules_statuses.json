@@ -6,5 +6,7 @@
     "Appointment": true,
     "JobCard": true,
     "Inventory": true,
-    "Invoice": true
+    "Invoice": true,
+    "Product": true,
+    "Pricing": true
 }
