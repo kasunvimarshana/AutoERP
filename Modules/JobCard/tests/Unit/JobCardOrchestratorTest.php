@@ -177,7 +177,7 @@ class JobCardOrchestratorTest extends TestCase
         // Act & Assert
         $this->expectException(ServiceException::class);
         // The orchestrator wraps the exception with retry context and operation name
-        $this->expectExceptionMessageMatches('/CompleteJobCardOrchestration failed: . *Operation failed after . *attempts/');
+        $this->expectExceptionMessageMatches('/CompleteJobCardOrchestration failed: .*Operation failed after .*attempts/');
 
         $this->orchestrator->completeJobCardWithFullOrchestration($jobCardId);
 
