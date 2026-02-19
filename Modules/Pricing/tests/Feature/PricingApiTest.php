@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Pricing\Tests\Feature;
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Organization\Models\Branch;
 use Modules\Pricing\Models\PriceList;
 use Modules\Product\Models\Product;
-use Modules\User\Models\User;
 use Tests\TestCase;
 
 class PricingApiTest extends TestCase
