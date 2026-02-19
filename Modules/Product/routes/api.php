@@ -15,7 +15,7 @@ use Modules\Product\Http\Controllers\ProductController;
 Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     // Products
     Route::apiResource('products', ProductController::class)->names('product');
-    
+
     // Product Categories
     Route::get('product-categories/tree', [ProductCategoryController::class, 'tree'])->name('product-categories.tree');
     Route::apiResource('product-categories', ProductCategoryController::class)->names('product-categories');

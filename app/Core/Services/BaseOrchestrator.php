@@ -35,8 +35,8 @@ abstract class BaseOrchestrator
     /**
      * Execute an orchestrated operation with automatic transaction management
      *
-     * @param  callable  $operation The operation to execute
-     * @param  string  $operationName Name for logging
+     * @param  callable  $operation  The operation to execute
+     * @param  string  $operationName  Name for logging
      * @return mixed The result of the operation
      *
      * @throws ServiceException
@@ -74,7 +74,7 @@ abstract class BaseOrchestrator
             // Reusing existing transaction
             $this->transactionActive = false;
         }
-        
+
         $this->completedSteps = [];
 
         Log::info("{$operationName}: Transaction started", [
@@ -157,8 +157,8 @@ abstract class BaseOrchestrator
     /**
      * Execute multiple operations in sequence with automatic rollback on failure
      *
-     * @param  array<string, callable>  $steps Array of step name => callable pairs
-     * @param  string  $operationName Name for logging
+     * @param  array<string, callable>  $steps  Array of step name => callable pairs
+     * @param  string  $operationName  Name for logging
      * @return array Results from each step
      *
      * @throws ServiceException
@@ -189,9 +189,9 @@ abstract class BaseOrchestrator
     /**
      * Execute an operation with retry logic
      *
-     * @param  callable  $operation The operation to execute
-     * @param  int  $maxAttempts Maximum number of attempts
-     * @param  int  $delayMs Delay between attempts in milliseconds
+     * @param  callable  $operation  The operation to execute
+     * @param  int  $maxAttempts  Maximum number of attempts
+     * @param  int  $delayMs  Delay between attempts in milliseconds
      * @return mixed The result of the operation
      *
      * @throws ServiceException
@@ -229,7 +229,7 @@ abstract class BaseOrchestrator
     /**
      * Validate prerequisites before executing an operation
      *
-     * @param  array<string, callable>  $validations Array of validation name => callable pairs
+     * @param  array<string, callable>  $validations  Array of validation name => callable pairs
      *
      * @throws ServiceException If any validation fails
      */
