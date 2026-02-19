@@ -109,7 +109,7 @@ class AppointmentRepository extends BaseRepository
     {
         /** @var Appointment|null */
         return $this->model->newQuery()
-            ->with(['customer', 'vehicle', 'branch', 'assignedTechnician', 'baySchedules . bay'])
+            ->with(['customer', 'vehicle', 'branch', 'assignedTechnician', 'baySchedules.bay'])
             ->find($id);
     }
 
