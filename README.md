@@ -128,7 +128,7 @@ ModularSaaS-LaravelVue/
 │   └── Providers/
 │       └── TenancyServiceProvider.php # Tenancy configuration
 ├── Modules/                           # Modular application components
-│   ├── Auth/                          # ✨ NEW: Authentication & Authorization module
+│   ├── Auth/                          # ✨ Authentication & Authorization module
 │   │   ├── app/
 │   │   │   ├── Http/Controllers/      # Auth endpoints (login, register, etc.)
 │   │   │   ├── Services/              # Auth business logic & audit logging
@@ -143,34 +143,61 @@ ModularSaaS-LaravelVue/
 │   │   ├── routes/                    # Auth API routes
 │   │   ├── tests/                     # Feature tests
 │   │   └── README.md                  # Auth module documentation
-│   └── User/                          # Example: User module
+│   ├── User/                          # User management module
+│   │   ├── app/
+│   │   │   ├── Http/
+│   │   │   │   └── Controllers/       # Module controllers
+│   │   │   │       └── UserController.php
+│   │   │   ├── Models/                # Eloquent models
+│   │   │   │   └── User.php
+│   │   │   ├── Repositories/          # Data access layer
+│   │   │   │   └── UserRepository.php
+│   │   │   ├── Services/              # Business logic layer
+│   │   │   │   └── UserService.php
+│   │   │   ├── Requests/              # Form request validation
+│   │   │   │   ├── StoreUserRequest.php
+│   │   │   │   └── UpdateUserRequest.php
+│   │   │   └── Resources/             # API resources
+│   │   │       └── UserResource.php
+│   │   ├── database/
+│   │   │   ├── migrations/            # Module migrations
+│   │   │   └── seeders/               # Module seeders
+│   │   ├── lang/                      # Module translations
+│   │   │   ├── en/
+│   │   │   ├── es/
+│   │   │   └── fr/
+│   │   ├── resources/                 # Module views/assets
+│   │   ├── routes/
+│   │   │   ├── api.php               # API routes
+│   │   │   └── web.php               # Web routes
+│   │   └── tests/                    # Module tests
+│   ├── Customer/                      # ✨ Customer & Vehicle Management
+│   ├── Organization/                  # ✨ Multi-branch organization structure
+│   ├── Appointment/                   # ✨ Service appointment scheduling
+│   ├── JobCard/                       # ✨ Service job tracking & execution
+│   ├── Inventory/                     # ✨ Stock & supply chain management
+│   ├── Invoice/                       # ✨ Billing & payment processing
+│   ├── Product/                       # ✨✨ NEW: Product catalog management
+│   │   ├── app/
+│   │   │   ├── Models/                # Product, ProductCategory, ProductVariant, UoM
+│   │   │   ├── Services/              # Product business logic
+│   │   │   ├── Repositories/          # Product data access
+│   │   │   ├── Enums/                 # ProductType, ProductStatus
+│   │   │   └── Http/Controllers/      # Product API endpoints
+│   │   ├── database/migrations/       # Product schema
+│   │   ├── tests/                     # Product tests
+│   │   └── README.md                  # Product module documentation
+│   └── Pricing/                       # ✨✨ NEW: Extensible pricing engine
 │       ├── app/
-│       │   ├── Http/
-│       │   │   └── Controllers/       # Module controllers
-│       │   │       └── UserController.php
-│       │   ├── Models/                # Eloquent models
-│       │   │   └── User.php
-│       │   ├── Repositories/          # Data access layer
-│       │   │   └── UserRepository.php
-│       │   ├── Services/              # Business logic layer
-│       │   │   └── UserService.php
-│       │   ├── Requests/              # Form request validation
-│       │   │   ├── StoreUserRequest.php
-│       │   │   └── UpdateUserRequest.php
-│       │   └── Resources/             # API resources
-│       │       └── UserResource.php
-│       ├── database/
-│       │   ├── migrations/            # Module migrations
-│       │   └── seeders/               # Module seeders
-│       ├── lang/                      # Module translations
-│       │   ├── en/
-│       │   ├── es/
-│       │   └── fr/
-│       ├── resources/                 # Module views/assets
-│       ├── routes/
-│       │   ├── api.php               # API routes
-│       │   └── web.php               # Web routes
-│       └── tests/                    # Module tests
+│       │   ├── Models/                # PriceList, PriceRule, DiscountRule, TaxRate
+│       │   ├── Services/              # Pricing calculation & strategies
+│       │   │   └── Strategies/        # 6 pricing strategies
+│       │   ├── Repositories/          # Pricing data access
+│       │   ├── Enums/                 # PriceType, DiscountType
+│       │   └── Http/Controllers/      # Pricing API endpoints
+│       ├── database/migrations/       # Pricing schema
+│       ├── tests/                     # Pricing tests
+│       └── README.md                  # Pricing module documentation
 ├── config/
 │   ├── modules.php                   # Module configuration
 │   ├── permission.php                # Permission configuration
