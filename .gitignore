@@ -6,10 +6,10 @@
 /storage/*.key
 /storage/pail
 /vendor
-/Modules/*/vendor
 .env
 .env.backup
 .env.production
+.env.testing
 .phpactor.json
 .phpunit.result.cache
 Homestead.json
@@ -22,3 +22,8 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# SQLite database
+/database/*.sqlite
+/database/*.sqlite-shm
+/database/*.sqlite-wal

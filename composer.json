@@ -1,20 +1,16 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "kasunvimarshana/kv-enterprise-dynamic-saas-crm-erp",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
+    "description": "Dynamic, enterprise-grade SaaS ERP/CRM with modular Clean Architecture. Supports multi-tenant, multi-org, multi-currency, multi-language, RBAC/ABAC.",
+    "keywords": ["laravel", "erp", "crm", "saas", "multi-tenant", "enterprise"],
     "license": "MIT",
     "require": {
-        "php": "^8.2",
-        "darkaonline/l5-swagger": "^10.1",
-        "doctrine/annotations": "^2.0",
+        "php": "^8.3",
         "laravel/framework": "^11.31",
-        "laravel/sanctum": "^4.2",
         "laravel/tinker": "^2.9",
-        "nwidart/laravel-modules": "^12.0",
-        "spatie/laravel-permission": "^6.24",
-        "stancl/tenancy": "^3.9"
+        "spatie/laravel-permission": "^6.0",
+        "tymon/jwt-auth": "^2.1"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -30,49 +26,12 @@
             "App\\": "app/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/",
-            "Modules\\User\\": "Modules/User/app/",
-            "Modules\\User\\Database\\Factories\\": "Modules/User/database/factories/",
-            "Modules\\Auth\\": "Modules/Auth/app/",
-            "Modules\\Auth\\Database\\Factories\\": "Modules/Auth/database/factories/",
-            "Modules\\Customer\\": "Modules/Customer/app/",
-            "Modules\\Customer\\Database\\Factories\\": "Modules/Customer/database/factories/",
-            "Modules\\Customer\\Database\\Seeders\\": "Modules/Customer/database/seeders/",
-            "Modules\\Organization\\": "Modules/Organization/app/",
-            "Modules\\Organization\\Database\\Factories\\": "Modules/Organization/database/factories/",
-            "Modules\\Organization\\Database\\Seeders\\": "Modules/Organization/database/seeders/",
-            "Modules\\Appointment\\": "Modules/Appointment/app/",
-            "Modules\\Appointment\\Database\\Factories\\": "Modules/Appointment/database/factories/",
-            "Modules\\Appointment\\Database\\Seeders\\": "Modules/Appointment/database/seeders/",
-            "Modules\\JobCard\\": "Modules/JobCard/app/",
-            "Modules\\JobCard\\Database\\Factories\\": "Modules/JobCard/database/factories/",
-            "Modules\\JobCard\\Database\\Seeders\\": "Modules/JobCard/database/seeders/",
-            "Modules\\Inventory\\": "Modules/Inventory/app/",
-            "Modules\\Inventory\\Database\\Factories\\": "Modules/Inventory/database/factories/",
-            "Modules\\Inventory\\Database\\Seeders\\": "Modules/Inventory/database/seeders/",
-            "Modules\\Invoice\\": "Modules/Invoice/app/",
-            "Modules\\Invoice\\Database\\Factories\\": "Modules/Invoice/database/factories/",
-            "Modules\\Invoice\\Database\\Seeders\\": "Modules/Invoice/database/seeders/",
-            "Modules\\Product\\": "Modules/Product/app/",
-            "Modules\\Product\\Database\\Factories\\": "Modules/Product/database/factories/",
-            "Modules\\Product\\Database\\Seeders\\": "Modules/Product/database/seeders/",
-            "Modules\\Pricing\\": "Modules/Pricing/app/",
-            "Modules\\Pricing\\Database\\Factories\\": "Modules/Pricing/database/factories/",
-            "Modules\\Pricing\\Database\\Seeders\\": "Modules/Pricing/database/seeders/"
+            "Modules\\": "modules/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Tests\\": "tests/",
-            "Modules\\User\\Tests\\": "Modules/User/tests/",
-            "Modules\\Auth\\Tests\\": "Modules/Auth/tests/",
-            "Modules\\Customer\\Tests\\": "Modules/Customer/tests/",
-            "Modules\\Organization\\Tests\\": "Modules/Organization/tests/",
-            "Modules\\Appointment\\Tests\\": "Modules/Appointment/tests/",
-            "Modules\\JobCard\\Tests\\": "Modules/JobCard/tests/",
-            "Modules\\Inventory\\Tests\\": "Modules/Inventory/tests/",
-            "Modules\\Invoice\\Tests\\": "Modules/Invoice/tests/",
-            "Modules\\Product\\Tests\\": "Modules/Product/tests/",
-            "Modules\\Pricing\\Tests\\": "Modules/Pricing/tests/"
+            "Tests\\": "tests/"
         }
     },
     "scripts": {
@@ -107,8 +66,7 @@
         "sort-packages": true,
         "allow-plugins": {
             "pestphp/pest-plugin": true,
-            "php-http/discovery": true,
-            "wikimedia/composer-merge-plugin": true
+            "php-http/discovery": true
         }
     },
     "minimum-stability": "stable",

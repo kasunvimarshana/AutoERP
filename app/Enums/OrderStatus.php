@@ -1,0 +1,16 @@
+<?php
+
+namespace App\Enums;
+
+enum OrderStatus: string
+{
+    case Draft = 'draft';
+    case Pending = 'pending';
+    case Confirmed = 'confirmed';
+    case Processing = 'processing';
+    case Shipped = 'shipped';
+    case Delivered = 'delivered';
+    case Completed = 'completed';
+    case Cancelled = 'cancelled';
+    case Refunded = 'refunded';
+}

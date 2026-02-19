@@ -1,72 +1,81 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Models;
 
-use App\Core\Traits\AuditTrait;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\UserStatus;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
+use Tymon\JWTAuth\Contracts\JWTSubject;
 
-/**
- * User Model
- *
- * Core application user model with authentication, authorization,
- * and audit trail support.
- *
- * @property int $id
- * @property string $name
- * @property string $email
- * @property string $password
- * @property \Carbon\Carbon|null $email_verified_at
- * @property string|null $remember_token
- * @property \Carbon\Carbon $created_at
- * @property \Carbon\Carbon $updated_at
- */
-class User extends Authenticatable implements MustVerifyEmail
+class User extends Authenticatable implements JWTSubject
 {
-    use AuditTrait;
-    use HasApiTokens;
-    use HasFactory;
-    use HasRoles;
-    use Notifiable;
+    use HasFactory, HasRoles, HasUuids, Notifiable, SoftDeletes;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
+        'tenant_id',
+        'organization_id',
         'name',
         'email',
-        'password',
         'email_verified_at',
+        'password',
+        'status',
+        'locale',
+        'timezone',
+        'avatar',
+        'metadata',
+        'last_login_at',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
+            'last_login_at' => 'datetime',
             'password' => 'hashed',
+            'status' => UserStatus::class,
+            'metadata' => 'array',
         ];
+    }
+
+    public function getJWTIdentifier(): mixed
+    {
+        return $this->getKey();
+    }
+
+    public function getJWTCustomClaims(): array
+    {
+        return [
+            'tenant_id' => $this->tenant_id,
+            'organization_id' => $this->organization_id,
+            'email' => $this->email,
+        ];
+    }
+
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
+    public function organizations(): BelongsToMany
+    {
+        return $this->belongsToMany(Organization::class, 'organization_user')
+            ->withPivot(['role', 'is_primary', 'joined_at'])
+            ->withTimestamps();
     }
 }
