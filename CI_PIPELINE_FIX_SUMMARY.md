@@ -8,7 +8,7 @@
 
 ## Problems Identified
 
-### 1. Migration Ordering Error
+### 1. Migration Ordering Error (Fixed in commit 2bbcedf)
 **Error Message:**
 ```
 SQLSTATE[HY000]: General error: 1824 Failed to open the referenced table 'job_cards'
@@ -20,7 +20,7 @@ SQLSTATE[HY000]: General error: 1824 Failed to open the referenced table 'job_ca
 - Laravel couldn't determine execution order
 - Invoice migration could run before JobCard migration, causing FK constraint failure
 
-### 2. Laravel Pint Style Violations
+### 2. Laravel Pint Style Violations (Fixed in commit 2bbcedf)
 **Error Message:**
 ```
 FAIL ........................................ 498 files, 27 style issues
@@ -36,6 +36,19 @@ FAIL ........................................ 498 files, 27 style issues
   - `braces_position` - Inconsistent brace placement
   - `no_superfluous_phpdoc_tags` - Redundant @return void tags
   - `no_trailing_whitespace_in_comment` - Trailing whitespace in comments
+
+### 3. Config Key Spacing Error (Fixed in commit 27d9a33)
+**Error Message:**
+```
+TypeError: module_path(): Argument #2 ($path) must be of type string, null given,
+called in /home/runner/work/AutoERP/AutoERP/Modules/Invoice/app/Providers/InvoiceServiceProvider.php on line 84
+```
+
+**Root Cause:**
+- The automated style fixer (concat_space rule) incorrectly added spaces around dots inside string literals
+- `config('modules.paths.generator.config.path')` became `config('modules . paths . generator . config . path')`
+- This caused `config()` to return `null` (key doesn't exist with spaces)
+- `module_path()` then received `null` instead of expected string, triggering TypeError
 
 ---
 
@@ -141,6 +154,40 @@ Created PHP script to automatically fix common PSR-12 violations:
 
 ---
 
+### 3. Config Key Spacing Fix
+
+**Changes Made:**
+Corrected InvoiceServiceProvider.php to remove incorrect spaces in config keys:
+
+```php
+// BEFORE (broken):
+config('modules . paths . generator . config . path')
+config('modules . namespace')
+config('view . paths')
+str_replace([DIRECTORY_SEPARATOR, ' . php'], [' . ', ''], $config)
+explode(' . ', $this->nameLower . '.' . $config_key)
+
+// AFTER (fixed):
+config('modules.paths.generator.config.path')
+config('modules.namespace')
+config('view.paths')
+str_replace([DIRECTORY_SEPARATOR, '.php'], ['.', ''], $config)
+explode('.', $this->nameLower . '.' . $config_key)
+```
+
+**Files Fixed:**
+- `Modules/Invoice/app/Providers/InvoiceServiceProvider.php`
+  - Line 84: `config('modules.paths.generator.config.path')`
+  - Line 92: String literal `.php` in `str_replace()`
+  - Line 93: String literal `.` in `explode()`
+  - Line 103: String literal `config.php` comparison
+  - Line 135: `config('modules.namespace')`
+  - Line 149: `config('view.paths')`
+
+**Result:** TypeError resolved, service provider loads correctly.
+
+---
+
 ## Verification
 
 ### Migration Order Verification
@@ -201,7 +248,7 @@ The CI/CD pipeline will now:
 
 ## Commit Details
 
-**Commit:** `2bbcedf`  
+### Commit 2bbcedf
 **Message:** "fix: resolve migration ordering and Laravel Pint style issues"
 
 **Files Changed:** 28 files
@@ -211,6 +258,22 @@ The CI/CD pipeline will now:
 **Lines Changed:**
 - +413 insertions
 - -271 deletions
+
+### Commit 4f003ad
+**Message:** "docs: add CI/CD pipeline stabilization summary"
+
+**Files Changed:** 1 file
+- Added CI_PIPELINE_FIX_SUMMARY.md
+
+### Commit 27d9a33
+**Message:** "fix: correct config key spacing in InvoiceServiceProvider"
+
+**Files Changed:** 1 file
+- Fixed InvoiceServiceProvider.php config key spacing
+
+**Lines Changed:**
+- +6 insertions
+- -6 deletions
 
 ---
 
@@ -226,6 +289,7 @@ The CI/CD pipeline will now:
 2. Enforce migration naming conventions
 3. Add migration dependency validation
 4. Automate style checking in local development
+5. **Improve automated style fixer** - Don't modify strings inside quotes/function calls
 
 ---
 
@@ -235,14 +299,16 @@ The CI/CD pipeline will now:
 2. **Timestamp Management:** Use consistent, meaningful timestamps for migrations (e.g., by feature/module)
 3. **Code Style:** Regularly run style checkers to catch issues early
 4. **CI/CD:** Test pipeline locally before pushing when possible
+5. **Automated Fixes:** Be careful with regex-based style fixers - they can break string literals and config keys
 
 ---
 
 ## Conclusion
 
 All CI/CD pipeline failures have been resolved:
-- ✅ Migration ordering fixed
-- ✅ Style violations corrected
+- ✅ Migration ordering fixed (commit 2bbcedf)
+- ✅ Style violations corrected (commit 2bbcedf)
+- ✅ Config key spacing fixed (commit 27d9a33)
 - ✅ Pipeline stabilized
 - ✅ No breaking changes
 - ✅ All modules remain production-ready
