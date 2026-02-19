@@ -22,8 +22,8 @@ class BranchService extends BaseService
     /**
      * BranchService constructor
      */
-
-    public function __construct(BranchRepository $repository) {
+    public function __construct(BranchRepository $repository)
+    {
         parent::__construct($repository);
     }
 
@@ -35,7 +35,6 @@ class BranchService extends BaseService
      * @throws ValidationException
      * @throws ServiceException
      */
-
     public function create(array $data): mixed
     {
         // Validate branch code uniqueness if provided
@@ -52,15 +51,12 @@ class BranchService extends BaseService
 
         // Check if we\'re already in a transaction (e . g., from orchestrator or test)
 
-
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
-
-
         try {
-                if ($shouldManageTransaction) {
-                    DB::beginTransaction();
-                }
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $branch = $this->repository->create($data);
 
@@ -73,7 +69,7 @@ class BranchService extends BaseService
             if ($shouldManageTransaction) {
                 DB::rollBack();
             }
-            throw new ServiceException('Failed to create branch: ' . $e->getMessage());
+            throw new ServiceException('Failed to create branch: '.$e->getMessage());
         }
     }
 
@@ -85,7 +81,6 @@ class BranchService extends BaseService
      * @throws ValidationException
      * @throws ServiceException
      */
-
     public function update(int $id, array $data): mixed
     {
         // Validate branch code uniqueness if provided and changed
@@ -97,15 +92,12 @@ class BranchService extends BaseService
 
         // Check if we\'re already in a transaction (e . g., from orchestrator or test)
 
-
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
-
-
         try {
-                if ($shouldManageTransaction) {
-                    DB::beginTransaction();
-                }
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $branch = $this->repository->update($id, $data);
 
@@ -118,28 +110,27 @@ class BranchService extends BaseService
             if ($shouldManageTransaction) {
                 DB::rollBack();
             }
-            throw new ServiceException('Failed to update branch: ' . $e->getMessage());
+            throw new ServiceException('Failed to update branch: '.$e->getMessage());
         }
     }
 
     /**
      * Generate a unique branch code
      */
-
     protected function generateUniqueBranchCode(?int $organizationId = null): string
     {
-        $prefix = $organizationId ? 'BR' . str_pad((string) $organizationId, 3, '0', STR_PAD_LEFT) : 'BR';
+        $prefix = $organizationId ? 'BR'.str_pad((string) $organizationId, 3, '0', STR_PAD_LEFT) : 'BR';
         $maxAttempts = 10;
         $attempt = 0;
 
         do {
-            $number = $prefix . date('ymd') . str_pad((string) random_int(1, 999), 3, '0', STR_PAD_LEFT);
+            $number = $prefix.date('ymd').str_pad((string) random_int(1, 999), 3, '0', STR_PAD_LEFT);
             $exists = $this->repository->branchCodeExists($number);
             $attempt++;
         } while ($exists && $attempt < $maxAttempts);
 
         if ($exists) {
-            throw new ServiceException('Failed to generate unique branch code after ' . $maxAttempts . ' attempts . ');
+            throw new ServiceException('Failed to generate unique branch code after '.$maxAttempts.' attempts . ');
         }
 
         return $number;
@@ -148,7 +139,6 @@ class BranchService extends BaseService
     /**
      * Get branches by organization
      */
-
     public function getByOrganization(int $organizationId): mixed
     {
         return $this->repository->getByOrganization($organizationId);
@@ -157,7 +147,6 @@ class BranchService extends BaseService
     /**
      * Get active branches
      */
-
     public function getActive(): mixed
     {
         return $this->repository->getActive();
@@ -166,7 +155,6 @@ class BranchService extends BaseService
     /**
      * Get active branches by organization
      */
-
     public function getActiveByOrganization(int $organizationId): mixed
     {
         return $this->repository->getActiveByOrganization($organizationId);
@@ -175,7 +163,6 @@ class BranchService extends BaseService
     /**
      * Search branches
      */
-
     public function search(string $query): mixed
     {
         return $this->repository->search($query);
@@ -186,7 +173,6 @@ class BranchService extends BaseService
      *
      * @param  float  $radius  Radius in kilometers
      */
-
     public function getNearby(float $latitude, float $longitude, float $radius = 10): mixed
     {
         return $this->repository->getNearby($latitude, $longitude, $radius);
@@ -195,7 +181,6 @@ class BranchService extends BaseService
     /**
      * Get branches by city
      */
-
     public function getByCity(string $city): mixed
     {
         return $this->repository->getByCity($city);
@@ -206,18 +191,16 @@ class BranchService extends BaseService
      *
      * @throws ServiceException
      */
-
     public function activate(int $id): mixed
     {
         // Check if we\'re already in a transaction (e . g., from orchestrator or test)
 
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
-
         try {
-                if ($shouldManageTransaction) {
-                    DB::beginTransaction();
-                }
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $branch = $this->repository->update($id, ['status' => 'active']);
 
@@ -230,7 +213,7 @@ class BranchService extends BaseService
             if ($shouldManageTransaction) {
                 DB::rollBack();
             }
-            throw new ServiceException('Failed to activate branch: ' . $e->getMessage());
+            throw new ServiceException('Failed to activate branch: '.$e->getMessage());
         }
     }
 
@@ -239,18 +222,16 @@ class BranchService extends BaseService
      *
      * @throws ServiceException
      */
-
     public function deactivate(int $id): mixed
     {
         // Check if we\'re already in a transaction (e . g., from orchestrator or test)
 
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
-
         try {
-                if ($shouldManageTransaction) {
-                    DB::beginTransaction();
-                }
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $branch = $this->repository->update($id, ['status' => 'inactive']);
 
@@ -263,7 +244,7 @@ class BranchService extends BaseService
             if ($shouldManageTransaction) {
                 DB::rollBack();
             }
-            throw new ServiceException('Failed to deactivate branch: ' . $e->getMessage());
+            throw new ServiceException('Failed to deactivate branch: '.$e->getMessage());
         }
     }
 
@@ -272,18 +253,16 @@ class BranchService extends BaseService
      *
      * @throws ServiceException
      */
-
     public function setMaintenance(int $id): mixed
     {
         // Check if we\'re already in a transaction (e . g., from orchestrator or test)
 
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
-
         try {
-                if ($shouldManageTransaction) {
-                    DB::beginTransaction();
-                }
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $branch = $this->repository->update($id, ['status' => 'maintenance']);
 
@@ -296,14 +275,13 @@ class BranchService extends BaseService
             if ($shouldManageTransaction) {
                 DB::rollBack();
             }
-            throw new ServiceException('Failed to set branch to maintenance: ' . $e->getMessage());
+            throw new ServiceException('Failed to set branch to maintenance: '.$e->getMessage());
         }
     }
 
     /**
      * Check branch capacity availability
      */
-
     public function checkCapacity(int $branchId, int $currentVehicles): array
     {
         $branch = $this->repository->findOrFail($branchId);

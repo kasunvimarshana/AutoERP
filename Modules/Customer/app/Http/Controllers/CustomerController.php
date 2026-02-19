@@ -24,7 +24,6 @@ class CustomerController extends Controller
     /**
      * CustomerController constructor
      */
-
     public function __construct(
         private readonly CustomerService $customerService
     ) {}
@@ -78,7 +77,6 @@ class CustomerController extends Controller
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
      */
-
     public function index(Request $request): JsonResponse
     {
         $filters = [
@@ -147,7 +145,6 @@ class CustomerController extends Controller
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationError"))
      * )
      */
-
     public function store(StoreCustomerRequest $request): JsonResponse
     {
         $customer = $this->customerService->create($request->validated());
@@ -194,7 +191,6 @@ class CustomerController extends Controller
      *     @OA\Response(response=404, description="Customer not found", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
      */
-
     public function show(int $id): JsonResponse
     {
         $customer = $this->customerService->getById($id);
@@ -268,7 +264,6 @@ class CustomerController extends Controller
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationError"))
      * )
      */
-
     public function update(UpdateCustomerRequest $request, int $id): JsonResponse
     {
         $customer = $this->customerService->update($id, $request->validated());
@@ -315,7 +310,6 @@ class CustomerController extends Controller
      *     @OA\Response(response=404, description="Customer not found", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
      */
-
     public function destroy(int $id): JsonResponse
     {
         $this->customerService->delete($id);
@@ -362,7 +356,6 @@ class CustomerController extends Controller
      *     @OA\Response(response=404, description="Customer not found", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
      */
-
     public function withVehicles(int $id): JsonResponse
     {
         $customer = $this->customerService->getWithVehicles($id);
@@ -414,7 +407,6 @@ class CustomerController extends Controller
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationError"))
      * )
      */
-
     public function search(Request $request): JsonResponse
     {
         $request->validate([
@@ -460,7 +452,6 @@ class CustomerController extends Controller
      *             @OA\Property(
      *                 property="data",
      *                 type="object",
-     *
      *                 @OA\Property(property="total_vehicles", type="integer", example=3),
      *                 @OA\Property(property="total_service_records", type="integer", example=15),
      *                 @OA\Property(property="total_spent", type="number", format="float", example=2500 . 00),
@@ -474,7 +465,6 @@ class CustomerController extends Controller
      *     @OA\Response(response=404, description="Customer not found", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
      */
-
     public function statistics(int $id): JsonResponse
     {
         $statistics = $this->customerService->getStatistics($id);

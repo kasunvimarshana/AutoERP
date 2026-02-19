@@ -35,15 +35,19 @@ class AppointmentOrchestrationController extends Controller
      * - Confirmation notifications (async)
      *
      * Supports both existing and new customers/vehicles . *
+     *
      * @OA\Post(
      *     path="/api/v1/appointments/book",
      *     tags={"Appointments"},
      *     summary="Book an appointment with full orchestration",
      *     description="Creates appointment, handles customer/vehicle registration, and validates availability",
+     *
      *     @OA\RequestBody(
      *         required=true,
+     *
      *         @OA\JsonContent(
      *             required={"scheduled_date", "scheduled_time", "branch_id"},
+     *
      *             @OA\Property(property="customer_id", type="integer", description="Existing customer ID"),
      *             @OA\Property(property="customer_email", type="string", format="email", description="Customer email (for new/lookup)"),
      *             @OA\Property(property="customer_phone", type="string", description="Customer phone (for new/lookup)"),
@@ -62,10 +66,13 @@ class AppointmentOrchestrationController extends Controller
      *             @OA\Property(property="estimated_duration", type="integer", description="Minutes", example=60)
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=201,
      *         description="Appointment booked successfully",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="data", type="object",
      *                 @OA\Property(property="appointment", ref="#/components/schemas/Appointment"),
@@ -76,11 +83,11 @@ class AppointmentOrchestrationController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(response=400, description="Validation error or availability conflict"),
      *     @OA\Response(response=500, description="Server error")
      * )
      */
-
     public function book(Request $request): JsonResponse
     {
         try {
@@ -97,7 +104,7 @@ class AppointmentOrchestrationController extends Controller
                 'license_plate' => 'required_without:vehicle_id|string|max:20',
                 'vehicle_make' => 'sometimes|string|max:100',
                 'vehicle_model' => 'sometimes|string|max:100',
-                'vehicle_year' => 'sometimes|integer|min:1900|max:' . (date('Y') + 1),
+                'vehicle_year' => 'sometimes|integer|min:1900|max:'.(date('Y') + 1),
                 'vin' => 'sometimes|string|max:17',
                 'vehicle_color' => 'sometimes|string|max:50',
 
@@ -145,16 +152,18 @@ class AppointmentOrchestrationController extends Controller
      *     tags={"Appointments"},
      *     summary="Confirm an appointment",
      *     security={{"sanctum":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\Response(response=200, description="Appointment confirmed")
      * )
      */
-
     public function confirm(int $id): JsonResponse
     {
         try {
@@ -179,7 +188,6 @@ class AppointmentOrchestrationController extends Controller
     /**
      * Build success message based on result
      */
-
     private function buildSuccessMessage(array $result): string
     {
         $messages = ['Appointment booked successfully . '];

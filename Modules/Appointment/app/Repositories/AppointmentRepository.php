@@ -19,7 +19,6 @@ class AppointmentRepository extends BaseRepository
     /**
      * {@inheritDoc}
      */
-
     protected function makeModel(): Model
     {
         return new Appointment;
@@ -28,7 +27,6 @@ class AppointmentRepository extends BaseRepository
     /**
      * Find appointment by appointment number
      */
-
     public function findByAppointmentNumber(string $appointmentNumber): ?Appointment
     {
         /** @var Appointment|null */
@@ -38,7 +36,6 @@ class AppointmentRepository extends BaseRepository
     /**
      * Check if appointment number exists
      */
-
     public function appointmentNumberExists(string $appointmentNumber, ?int $excludeId = null): bool
     {
         $query = $this->model->newQuery()->where('appointment_number', $appointmentNumber);
@@ -53,7 +50,6 @@ class AppointmentRepository extends BaseRepository
     /**
      * Get appointments by status
      */
-
     public function getByStatus(string $status): Collection
     {
         return $this->model->newQuery()->where('status', $status)->get();
@@ -62,7 +58,6 @@ class AppointmentRepository extends BaseRepository
     /**
      * Get appointments for a branch
      */
-
     public function getForBranch(int $branchId): Collection
     {
         return $this->model->newQuery()->where('branch_id', $branchId)->get();
@@ -71,7 +66,6 @@ class AppointmentRepository extends BaseRepository
     /**
      * Get appointments for a customer
      */
-
     public function getForCustomer(int $customerId): Collection
     {
         return $this->model->newQuery()->where('customer_id', $customerId)->get();
@@ -80,7 +74,6 @@ class AppointmentRepository extends BaseRepository
     /**
      * Get appointments for a vehicle
      */
-
     public function getForVehicle(int $vehicleId): Collection
     {
         return $this->model->newQuery()->where('vehicle_id', $vehicleId)->get();
@@ -89,7 +82,6 @@ class AppointmentRepository extends BaseRepository
     /**
      * Get appointments in date range
      */
-
     public function getInDateRange(string $startDate, string $endDate): Collection
     {
         return $this->model->newQuery()
@@ -101,7 +93,6 @@ class AppointmentRepository extends BaseRepository
     /**
      * Get upcoming appointments
      */
-
     public function getUpcoming(): Collection
     {
         return $this->model->newQuery()
@@ -114,7 +105,6 @@ class AppointmentRepository extends BaseRepository
     /**
      * Get appointment with all relations
      */
-
     public function findWithRelations(int $id): ?Appointment
     {
         /** @var Appointment|null */
@@ -126,14 +116,13 @@ class AppointmentRepository extends BaseRepository
     /**
      * Check for conflicting appointments
      */
-
     public function hasConflicts(int $vehicleId, string|\DateTimeInterface $scheduledDateTime, int $duration, ?int $excludeId = null): bool
     {
         // Convert Carbon/DateTime to string if necessary
         if ($scheduledDateTime instanceof \DateTimeInterface) {
             $scheduledDateTime = $scheduledDateTime->format('Y-m-d H:i:s');
         }
-        
+
         $endTime = date('Y-m-d H:i:s', strtotime($scheduledDateTime) + ($duration * 60));
 
         // Get all appointments for this vehicle in the relevant time window
@@ -167,7 +156,6 @@ class AppointmentRepository extends BaseRepository
     /**
      * Get appointments for technician
      */
-
     public function getForTechnician(int $technicianId): Collection
     {
         return $this->model->newQuery()
@@ -179,7 +167,6 @@ class AppointmentRepository extends BaseRepository
     /**
      * Search appointments
      */
-
     public function search(string $query): Collection
     {
         return $this->model->newQuery()

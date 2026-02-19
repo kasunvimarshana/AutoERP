@@ -22,8 +22,8 @@ class CustomerService extends BaseService
     /**
      * CustomerService constructor
      */
-
-    public function __construct(CustomerRepository $repository) {
+    public function __construct(CustomerRepository $repository)
+    {
         parent::__construct($repository);
     }
 
@@ -34,7 +34,6 @@ class CustomerService extends BaseService
      *
      * @throws ValidationException
      */
-
     public function create(array $data): mixed
     {
         // Validate email uniqueness if provided
@@ -59,7 +58,6 @@ class CustomerService extends BaseService
      *
      * @throws ValidationException
      */
-
     public function update(int $id, array $data): mixed
     {
         // Validate email uniqueness if provided
@@ -75,7 +73,6 @@ class CustomerService extends BaseService
     /**
      * Get customer with vehicles
      */
-
     public function getWithVehicles(int $id): mixed
     {
         return $this->repository->findWithVehicles($id);
@@ -84,7 +81,6 @@ class CustomerService extends BaseService
     /**
      * Search customers
      */
-
     public function search(string $query): mixed
     {
         return $this->repository->search($query);
@@ -93,7 +89,6 @@ class CustomerService extends BaseService
     /**
      * Get customers by type
      */
-
     public function getByType(string $type): mixed
     {
         return $this->repository->getByType($type);
@@ -102,7 +97,6 @@ class CustomerService extends BaseService
     /**
      * Get active customers
      */
-
     public function getActive(): mixed
     {
         return $this->repository->getActive();
@@ -111,7 +105,6 @@ class CustomerService extends BaseService
     /**
      * Get customers due for follow-up
      */
-
     public function getDueForFollowUp(int $daysThreshold = 30): mixed
     {
         return $this->repository->getDueForFollowUp($daysThreshold);
@@ -120,7 +113,6 @@ class CustomerService extends BaseService
     /**
      * Update customer last service date
      */
-
     public function updateLastServiceDate(int $id, string $date): mixed
     {
         return $this->update($id, ['last_service_date' => $date]);
@@ -129,7 +121,6 @@ class CustomerService extends BaseService
     /**
      * Change customer status
      */
-
     public function changeStatus(int $id, string $status): mixed
     {
         if (! in_array($status, ['active', 'inactive', 'blocked'])) {
@@ -144,7 +135,6 @@ class CustomerService extends BaseService
     /**
      * Generate unique customer number
      */
-
     protected function generateUniqueCustomerNumber(): string
     {
         $maxAttempts = 10;
@@ -165,7 +155,6 @@ class CustomerService extends BaseService
     /**
      * Get customer statistics
      */
-
     public function getStatistics(int $customerId): array
     {
         $customer = $this->repository->findWithVehicles($customerId);
@@ -187,18 +176,16 @@ class CustomerService extends BaseService
      *
      * Merges source customer into target customer and transfers all vehicles
      */
-
     public function mergeDuplicates(int $targetId, int $sourceId): mixed
     {
         // Check if we\'re already in a transaction (e . g., from orchestrator or test)
 
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
-
         try {
-                if ($shouldManageTransaction) {
-                    DB::beginTransaction();
-                }
+            if ($shouldManageTransaction) {
+                DB::beginTransaction();
+            }
 
             $target = $this->repository->findOrFail($targetId);
             $source = $this->repository->findOrFail($sourceId);

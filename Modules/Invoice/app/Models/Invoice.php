@@ -6,7 +6,6 @@ namespace Modules\Invoice\Models;
 
 use App\Core\Traits\AuditTrait;
 use App\Core\Traits\TenantAware;
-use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -55,7 +54,6 @@ class Invoice extends Model
 
     /**
      * Create a new factory instance for the model . */
-
     protected static function newFactory(): \Modules\Invoice\Database\Factories\InvoiceFactory
     {
         return \Modules\Invoice\Database\Factories\InvoiceFactory::new();
@@ -63,9 +61,9 @@ class Invoice extends Model
 
     /**
      * The attributes that are mass assignable . *
+     *
      * @var array<int, string>
      */
-
     protected $fillable = [
         'job_card_id',
         'customer_id',
@@ -90,9 +88,9 @@ class Invoice extends Model
 
     /**
      * The attributes that should be cast . *
+     *
      * @return array<string, string>
      */
-
     protected function casts(): array
     {
         return [
@@ -113,7 +111,6 @@ class Invoice extends Model
 
     /**
      * Get the job card that owns the invoice . */
-
     public function jobCard(): BelongsTo
     {
         return $this->belongsTo(JobCard::class);
@@ -121,7 +118,6 @@ class Invoice extends Model
 
     /**
      * Get the customer for the invoice . */
-
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
@@ -129,7 +125,6 @@ class Invoice extends Model
 
     /**
      * Get the vehicle for the invoice . */
-
     public function vehicle(): BelongsTo
     {
         return $this->belongsTo(Vehicle::class);
@@ -137,7 +132,6 @@ class Invoice extends Model
 
     /**
      * Get the branch for the invoice . */
-
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
@@ -145,7 +139,6 @@ class Invoice extends Model
 
     /**
      * Get the items for the invoice . */
-
     public function items(): HasMany
     {
         return $this->hasMany(InvoiceItem::class);
@@ -153,7 +146,6 @@ class Invoice extends Model
 
     /**
      * Get the payments for the invoice . */
-
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
@@ -161,7 +153,6 @@ class Invoice extends Model
 
     /**
      * Get the commissions for the invoice . */
-
     public function commissions(): HasMany
     {
         return $this->hasMany(DriverCommission::class);
@@ -169,29 +160,29 @@ class Invoice extends Model
 
     /**
      * Scope to filter by status . */
-
-    public function scopeOfStatus($query, string $status) {
+    public function scopeOfStatus($query, string $status)
+    {
         return $query->where('status', $status);
     }
 
     /**
      * Scope to filter by customer . */
-
-    public function scopeForCustomer($query, int $customerId) {
+    public function scopeForCustomer($query, int $customerId)
+    {
         return $query->where('customer_id', $customerId);
     }
 
     /**
      * Scope to filter by branch . */
-
-    public function scopeForBranch($query, int $branchId) {
+    public function scopeForBranch($query, int $branchId)
+    {
         return $query->where('branch_id', $branchId);
     }
 
     /**
      * Scope to filter overdue invoices . */
-
-    public function scopeOverdue($query) {
+    public function scopeOverdue($query)
+    {
         return $query->where('due_date', '<', now())
             ->where('balance', '>', 0)
             ->whereNotIn('status', ['paid', 'cancelled', 'refunded']);
@@ -199,15 +190,14 @@ class Invoice extends Model
 
     /**
      * Scope to filter outstanding invoices . */
-
-    public function scopeOutstanding($query) {
+    public function scopeOutstanding($query)
+    {
         return $query->where('balance', '>', 0)
             ->whereNotIn('status', ['paid', 'cancelled', 'refunded']);
     }
 
     /**
      * Generate a unique invoice number . */
-
     public static function generateInvoiceNumber(): string
     {
         do {
@@ -228,7 +218,6 @@ class Invoice extends Model
 
     /**
      * Check if invoice is overdue . */
-
     public function isOverdue(): bool
     {
         if (! $this->due_date || $this->balance <= 0) {
@@ -240,7 +229,6 @@ class Invoice extends Model
 
     /**
      * Check if invoice is fully paid . */
-
     public function isPaid(): bool
     {
         return $this->balance <= 0 || $this->status === 'paid';

@@ -59,7 +59,6 @@ class AppointmentOrchestrator extends BaseOrchestrator
      *
      * @throws ServiceException
      */
-
     public function bookAppointmentWithFullValidation(array $data): array
     {
         return $this->executeSteps([
@@ -250,12 +249,9 @@ class AppointmentOrchestrator extends BaseOrchestrator
     /**
      * Confirm appointment with SMS/Email notification
      *
-     * @param  int  $appointmentId
-     * @return Appointment
      *
      * @throws ServiceException
      */
-
     public function confirmAppointment(int $appointmentId): Appointment
     {
         return $this->executeInTransaction(function () use ($appointmentId) {
@@ -271,7 +267,6 @@ class AppointmentOrchestrator extends BaseOrchestrator
     /**
      * Compensation for failed appointment booking
      */
-
     protected function compensate(): void
     {
         Log::warning('Appointment booking failed, performing compensation', [

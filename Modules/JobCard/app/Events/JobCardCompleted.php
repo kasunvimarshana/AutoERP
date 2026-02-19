@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace Modules\JobCard\Events;
 
 use App\Core\Events\BaseDomainEvent;
-use Modules\JobCard\Models\JobCard;
 use Modules\Invoice\Models\Invoice;
+use Modules\JobCard\Models\JobCard;
 
 /**
  * Job Card Completed Event
  *
  * Dispatched when a job card is marked as completed . * Triggers:
  * - Invoice generation
- * - Inventory updates  
+ * - Inventory updates
  * - Customer notifications
  * - Service history updates
  * - Analytics/reporting
@@ -23,7 +23,6 @@ class JobCardCompleted extends BaseDomainEvent
     /**
      * Create a new event instance
      */
-
     public function __construct(
         public readonly JobCard $jobCard,
         public readonly ?Invoice $invoice = null
@@ -34,7 +33,6 @@ class JobCardCompleted extends BaseDomainEvent
     /**
      * {@inheritDoc}
      */
-
     public function getEventPayload(): array
     {
         return [
@@ -53,7 +51,6 @@ class JobCardCompleted extends BaseDomainEvent
      *
      * @return array<int, \Illuminate\Broadcasting\Channel>
      */
-
     public function broadcastOn(): array
     {
         return [

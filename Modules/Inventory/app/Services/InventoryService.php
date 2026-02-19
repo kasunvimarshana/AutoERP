@@ -31,11 +31,9 @@ class InventoryService
      * @param  string  $transactionType  Type of transaction (e . g., 'job_card_usage', 'purchase', 'return')
      * @param  int|null  $referenceId  ID of the related record (e . g., job card ID)
      * @param  string  $reason  Reason for adjustment
-     * @return InventoryTransaction
      *
      * @throws ServiceException
      */
-
     public function adjustInventory(
         int $itemId,
         float $quantity,
@@ -62,7 +60,7 @@ class InventoryService
             if ($newBalance < 0) {
                 throw new ServiceException(
                     "Insufficient stock for item '{$item->item_name}' . ".
-                    "Current: {$item->stock_on_hand}, Requested: " . abs($quantity)
+                    "Current: {$item->stock_on_hand}, Requested: ".abs($quantity)
                 );
             }
 
@@ -121,13 +119,10 @@ class InventoryService
      * Bulk adjust inventory for multiple items
      *
      * @param  array<int, array{item_id: int, quantity: float, reason: string}>  $adjustments
-     * @param  string  $transactionType
-     * @param  int|null  $referenceId
      * @return array<int, InventoryTransaction>
      *
      * @throws ServiceException
      */
-
     public function bulkAdjustInventory(
         array $adjustments,
         string $transactionType,

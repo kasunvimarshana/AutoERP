@@ -25,9 +25,13 @@ class JobCardOrchestratorTest extends TestCase
     use RefreshDatabase;
 
     private JobCardOrchestrator $orchestrator;
+
     private JobCardService $jobCardService;
+
     private InvoiceService $invoiceService;
+
     private InventoryService $inventoryService;
+
     private VehicleServiceRecordService $serviceRecordService;
 
     protected function setUp(): void
@@ -58,7 +62,6 @@ class JobCardOrchestratorTest extends TestCase
      * @param  bool  $exists  Whether the job card exists
      * @param  JobCard|null  $jobCard  The job card to return from findOrFail
      */
-
     private function createOrchestratorWithRepository(bool $exists = true, ?JobCard $jobCard = null): void
     {
         $repository = $this->createMock(JobCardRepository::class);
@@ -80,33 +83,32 @@ class JobCardOrchestratorTest extends TestCase
     /**
      * Test successful job card completion with all steps
      */
-
     public function test_completes_job_card_with_full_orchestration(): void
     {
         // Arrange
         $jobCardId = 1;
-        
+
         // Create a mock JobCard with proper property handling
         $jobCard = $this->getMockBuilder(JobCard::class)
             ->disableOriginalConstructor()
             ->onlyMethods(['fresh', '__get'])
             ->getMock();
-        
+
         // Set up properties
         $properties = [
             'id' => $jobCardId,
             'status' => 'completed',
             'grand_total' => 500 . 00,
         ];
-        
+
         // Mock the fresh() method to return self
         $jobCard->method('fresh')->willReturn($jobCard);
-        
+
         // Mock __get to return properties
         $jobCard->method('__get')->willReturnCallback(function ($key) use ($properties) {
             return $properties[$key] ?? null;
         });
-        
+
         // Set magic properties for direct access
         foreach ($properties as $key => $value) {
             $jobCard->$key = $value;
@@ -155,7 +157,6 @@ class JobCardOrchestratorTest extends TestCase
     /**
      * Test orchestrator rolls back on service failure
      */
-
     public function test_rolls_back_on_invoice_generation_failure(): void
     {
         // Arrange
@@ -188,7 +189,6 @@ class JobCardOrchestratorTest extends TestCase
     /**
      * Test prerequisite validation failure
      */
-
     public function test_fails_when_job_card_does_not_exist(): void
     {
         // Arrange
@@ -214,7 +214,6 @@ class JobCardOrchestratorTest extends TestCase
     /**
      * Test orchestrator with skip options
      */
-
     public function test_skips_invoice_when_option_provided(): void
     {
         // Arrange

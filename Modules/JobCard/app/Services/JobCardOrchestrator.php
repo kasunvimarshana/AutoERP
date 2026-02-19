@@ -53,13 +53,13 @@ class JobCardOrchestrator extends BaseOrchestrator
      * 6 . Dispatch events for async operations (notifications, etc . )
      *
      * All database operations are wrapped in a transaction . * If any step fails, everything is rolled back atomically . *
+     *
      * @param  int  $jobCardId  The job card to complete
      * @param  array<string, mixed>  $options  Additional options (e . g., skip_invoice)
      * @return array{jobCard: JobCard, invoice: ?\Modules\Invoice\Models\Invoice, inventoryTransactions: array, serviceRecord: mixed}
      *
      * @throws ServiceException If any step fails
      */
-
     public function completeJobCardWithFullOrchestration(int $jobCardId, array $options = []): array
     {
         return $this->executeInTransaction(function () use ($jobCardId, $options) {
@@ -172,7 +172,6 @@ class JobCardOrchestrator extends BaseOrchestrator
      *
      * This is called automatically if the transaction fails and is rolled back . * We can perform cleanup actions here (e . g., send alerts, log to external systems)
      */
-
     protected function compensate(): void
     {
         // Log compensation
@@ -189,12 +188,10 @@ class JobCardOrchestrator extends BaseOrchestrator
     /**
      * Start a job card with bay assignment and technician notification
      *
-     * @param  int  $jobCardId
      * @param  array<string, mixed>  $data  Contains technician_id, bay_id, etc . * @return JobCard
      *
      * @throws ServiceException
      */
-
     public function startJobCard(int $jobCardId, array $data): JobCard
     {
         return $this->executeInTransaction(function () use ($jobCardId, $data) {
