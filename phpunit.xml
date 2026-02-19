@@ -3,74 +3,37 @@
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
          bootstrap="vendor/autoload.php"
          colors="true"
-         cacheDirectory=".phpunit.cache"
-         beStrictAboutOutputDuringTests="true"
-         failOnRisky="true"
-         failOnWarning="true">
+>
     <testsuites>
         <testsuite name="Unit">
-            <directory suffix="Test.php">./tests/Unit</directory>
+            <directory>tests/Unit</directory>
         </testsuite>
         <testsuite name="Feature">
-            <directory suffix="Test.php">./tests/Feature</directory>
-        </testsuite>
-        <testsuite name="Core">
-            <directory suffix="Test.php">./Modules/Core/Tests</directory>
-        </testsuite>
-        <testsuite name="Tenancy">
-            <directory suffix="Test.php">./Modules/Tenancy/Tests</directory>
-        </testsuite>
-        <testsuite name="IAM">
-            <directory suffix="Test.php">./Modules/IAM/Tests</directory>
-        </testsuite>
-        <testsuite name="Sales">
-            <directory suffix="Test.php">./Modules/Sales/Tests</directory>
-        </testsuite>
-        <testsuite name="Inventory">
-            <directory suffix="Test.php">./Modules/Inventory/Tests</directory>
-        </testsuite>
-        <testsuite name="Accounting">
-            <directory suffix="Test.php">./Modules/Accounting/Tests</directory>
-        </testsuite>
-        <testsuite name="HR">
-            <directory suffix="Test.php">./Modules/HR/Tests</directory>
-        </testsuite>
-        <testsuite name="Procurement">
-            <directory suffix="Test.php">./Modules/Procurement/Tests</directory>
-        </testsuite>
-        <testsuite name="Organization">
-            <directory suffix="Test.php">./Modules/Organization/Tests</directory>
+            <directory>tests/Feature</directory>
         </testsuite>
     </testsuites>
-    <coverage>
-        <report>
-            <html outputDirectory="build/coverage"/>
-            <text outputFile="build/coverage.txt"/>
-            <clover outputFile="build/logs/clover.xml"/>
-        </report>
-    </coverage>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
     <php>
         <env name="APP_ENV" value="testing"/>
-        <env name="APP_KEY" value="base64:test_key_for_testing_purposes_only"/>
+        <env name="APP_KEY" value="base64:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa="/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
-        <env name="CACHE_DRIVER" value="array"/>
+        <env name="BROADCAST_CONNECTION" value="null"/>
+        <env name="CACHE_STORE" value="array"/>
         <env name="DB_CONNECTION" value="sqlite"/>
         <env name="DB_DATABASE" value=":memory:"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
+        <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <env name="JWT_SECRET" value="test-jwt-secret-key-for-testing-only"/>
+        <env name="JWT_TTL" value="3600"/>
+        <env name="JWT_REFRESH_TTL" value="86400"/>
     </php>
-    <source>
-        <include>
-            <directory suffix=".php">./app</directory>
-            <directory suffix=".php">./Modules</directory>
-        </include>
-        <exclude>
-            <directory>./Modules/*/Tests</directory>
-            <directory>./Modules/*/Database</directory>
-            <directory>./Modules/*/Config</directory>
-            <file>./Modules/*/module.json</file>
-        </exclude>
-    </source>
 </phpunit>

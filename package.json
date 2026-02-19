@@ -1,32 +1,36 @@
 {
-  "name": "autoerp",
-  "version": "1.0.0",
-  "description": "Dynamic, enterprise-grade SaaS ERP/CRM with modular, maintainable architecture",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-vue": "^5.0.0",
-    "autoprefixer": "^10.4.16",
-    "axios": "^1.6.0",
-    "laravel-vite-plugin": "^1.0.0",
-    "postcss": "^8.4.32",
-    "tailwindcss": "^3.4.0",
-    "vite": "^5.0.0",
-    "vue": "^3.4.0",
-    "vue-router": "^4.2.0"
-  },
-  "keywords": [
-    "laravel",
-    "vue",
-    "erp",
-    "crm",
-    "saas",
-    "multi-tenant",
-    "modular"
-  ],
-  "license": "MIT"
+    "$schema": "https://www.schemastore.org/package.json",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "vite build",
+        "dev": "vite",
+        "lint": "eslint resources/js --ext .js,.vue",
+        "format": "prettier --write resources/js"
+    },
+    "dependencies": {
+        "@headlessui/vue": "^1.7.23",
+        "@heroicons/vue": "^2.2.0",
+        "axios": "^1.11.0",
+        "pinia": "^2.3.0",
+        "vee-validate": "^4.15.1",
+        "vue": "^3.5.13",
+        "vue-router": "^4.5.0",
+        "yup": "^1.6.0"
+    },
+    "devDependencies": {
+        "@tailwindcss/forms": "^0.5.9",
+        "@tailwindcss/vite": "^4.0.0",
+        "@vitejs/plugin-vue": "^5.2.1",
+        "@vue/eslint-config-prettier": "^10.2.0",
+        "autoprefixer": "^10.4.20",
+        "concurrently": "^9.0.1",
+        "eslint": "^9.18.0",
+        "eslint-plugin-vue": "^9.32.0",
+        "laravel-vite-plugin": "^2.0.0",
+        "postcss": "^8.4.49",
+        "prettier": "^3.4.2",
+        "tailwindcss": "^4.0.0",
+        "vite": "^7.0.7"
+    }
 }

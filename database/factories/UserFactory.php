@@ -4,23 +4,18 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
-use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Modules\Auth\Models\User;
+use Modules\Tenant\Models\Organization;
+use Modules\Tenant\Models\Tenant;
 
 /**
- * User Factory
- *
- * Generates test users with permissions and tenant context.
- *
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\User>
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\Modules\Auth\Models\User>
  */
 class UserFactory extends Factory
 {
-    /**
-     * The name of the factory's corresponding model.
-     */
     protected $model = User::class;
 
     /**
@@ -35,15 +30,28 @@ class UserFactory extends Factory
      */
     public function definition(): array
     {
+        // Get a random tenant, or create one if none exist
+        $tenant = Tenant::inRandomOrder()->first() ?? Tenant::factory()->create();
+
+        // Get a random organization for the tenant, or create one if none exist
+        $organization = Organization::where('tenant_id', $tenant->id)
+            ->inRandomOrder()
+            ->first()
+            ?? Organization::factory()->create(['tenant_id' => $tenant->id]);
+
         return [
-            'tenant_id' => null,  // Nullable for testing without tenant context
+            'tenant_id' => $tenant->id,
+            'organization_id' => $organization->id,
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
-            'remember_token' => Str::random(10),
-            'permissions' => [],
+            'metadata' => [
+                'phone' => fake()->phoneNumber(),
+                'position' => fake()->jobTitle(),
+            ],
             'is_active' => true,
+            'remember_token' => Str::random(10),
         ];
     }
 
@@ -68,34 +76,45 @@ class UserFactory extends Factory
     }
 
     /**
-     * Indicate that the user has admin permissions.
+     * Set a specific tenant for the user.
      */
-    public function admin(): static
+    public function forTenant(Tenant|string $tenant): static
     {
-        return $this->state(fn (array $attributes) => [
-            'permissions' => [
-                '*',  // Wildcard for all permissions
-            ],
-        ]);
+        $tenantId = $tenant instanceof Tenant ? $tenant->id : $tenant;
+
+        return $this->state(function (array $attributes) use ($tenantId) {
+            // Get organization for tenant
+            $organization = Organization::where('tenant_id', $tenantId)
+                ->inRandomOrder()
+                ->first()
+                ?? Organization::factory()->create(['tenant_id' => $tenantId]);
+
+            return [
+                'tenant_id' => $tenantId,
+                'organization_id' => $organization->id,
+            ];
+        });
     }
 
     /**
-     * Indicate that the user has specific permissions.
+     * Set a specific organization for the user.
      */
-    public function withPermissions(array $permissions): static
+    public function forOrganization(Organization|string $organization): static
     {
-        return $this->state(fn (array $attributes) => [
-            'permissions' => $permissions,
-        ]);
-    }
+        return $this->state(function (array $attributes) use ($organization) {
+            if ($organization instanceof Organization) {
+                return [
+                    'tenant_id' => $organization->tenant_id,
+                    'organization_id' => $organization->id,
+                ];
+            }
 
-    /**
-     * Indicate that the user belongs to a specific tenant.
-     */
-    public function forTenant(int $tenantId): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'tenant_id' => $tenantId,
-        ]);
+            $org = Organization::findOrFail($organization);
+
+            return [
+                'tenant_id' => $org->tenant_id,
+                'organization_id' => $org->id,
+            ];
+        });
     }
 }

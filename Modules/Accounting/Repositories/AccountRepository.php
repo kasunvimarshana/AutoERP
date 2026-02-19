@@ -4,80 +4,132 @@ declare(strict_types=1);
 
 namespace Modules\Accounting\Repositories;
 
-use Illuminate\Database\Eloquent\Collection;
-use Modules\Accounting\Entities\Account;
-use Modules\Accounting\Repositories\Contracts\AccountRepositoryInterface;
+use Modules\Accounting\Enums\AccountStatus;
+use Modules\Accounting\Enums\AccountType;
+use Modules\Accounting\Exceptions\AccountNotFoundException;
+use Modules\Accounting\Models\Account;
 use Modules\Core\Repositories\BaseRepository;
 
-/**
- * Account Repository Implementation
- *
- * Handles all account data access operations.
- */
-class AccountRepository extends BaseRepository implements AccountRepositoryInterface
+class AccountRepository extends BaseRepository
 {
-    /**
-     * AccountRepository constructor.
-     */
     public function __construct(Account $model)
     {
         parent::__construct($model);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function findByAccountNumber(string $accountNumber): ?Account
+    protected function getModelClass(): string
     {
-        return $this->model->where('account_number', $accountNumber)->first();
+        return Account::class;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getByType(string $type): Collection
+    protected function getNotFoundExceptionClass(): string
     {
-        return $this->model->where('type', $type)->orderBy('account_number')->get();
+        return AccountNotFoundException::class;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getActiveAccounts(): Collection
+    public function findByCode(string $code): ?Account
     {
-        return $this->model->where('is_active', true)->orderBy('account_number')->get();
+        return $this->model->where('code', $code)->first();
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getChartOfAccounts(): Collection
+    public function findByCodeOrFail(string $code): Account
+    {
+        $account = $this->findByCode($code);
+
+        if (! $account) {
+            throw new AccountNotFoundException("Account with code {$code} not found");
+        }
+
+        return $account;
+    }
+
+    public function getByType(AccountType $type, int $perPage = 15)
+    {
+        return $this->model->where('type', $type)->latest()->paginate($perPage);
+    }
+
+    public function getByStatus(AccountStatus $status, int $perPage = 15)
+    {
+        return $this->model->where('status', $status)->latest()->paginate($perPage);
+    }
+
+    public function getParentAccounts()
+    {
+        return $this->model->whereHas('children')->get();
+    }
+
+    public function getLeafAccounts()
+    {
+        return $this->model->whereDoesntHave('children')->get();
+    }
+
+    public function getSystemAccounts()
+    {
+        return $this->model->where('is_system', true)->get();
+    }
+
+    public function getBankAccounts()
+    {
+        return $this->model->where('is_bank_account', true)->get();
+    }
+
+    public function getReconcilableAccounts()
+    {
+        return $this->model->where('is_reconcilable', true)->get();
+    }
+
+    public function getChartOfAccounts()
     {
         return $this->model
             ->whereNull('parent_id')
-            ->with('children.children')
-            ->orderBy('account_number')
+            ->with('children')
+            ->orderBy('code')
             ->get();
     }
 
     /**
-     * {@inheritdoc}
+     * Find accounts with filters and pagination.
      */
-    public function getChildAccounts(int $parentId): Collection
+    public function findWithFilters(array $filters, int $perPage = 15)
     {
-        return $this->model->where('parent_id', $parentId)->orderBy('account_number')->get();
-    }
+        $query = $this->model->newQuery()->with(['parent', 'organization']);
 
-    /**
-     * {@inheritdoc}
-     */
-    public function search(string $query): Collection
-    {
-        return $this->model
-            ->where('name', 'LIKE', "%{$query}%")
-            ->orWhere('account_number', 'LIKE', "%{$query}%")
-            ->orWhere('description', 'LIKE', "%{$query}%")
-            ->orderBy('account_number')
-            ->get();
+        if (isset($filters['type'])) {
+            $query->where('type', $filters['type']);
+        }
+
+        if (isset($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (isset($filters['organization_id'])) {
+            $query->where('organization_id', $filters['organization_id']);
+        }
+
+        if (isset($filters['parent_id'])) {
+            if ($filters['parent_id'] === 'null') {
+                $query->whereNull('parent_id');
+            } else {
+                $query->where('parent_id', $filters['parent_id']);
+            }
+        }
+
+        if (isset($filters['is_bank_account'])) {
+            $query->where('is_bank_account', $filters['is_bank_account']);
+        }
+
+        if (isset($filters['is_reconcilable'])) {
+            $query->where('is_reconcilable', $filters['is_reconcilable']);
+        }
+
+        if (isset($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('code', 'like', "%{$search}%")
+                    ->orWhere('name', 'like', "%{$search}%");
+            });
+        }
+
+        return $query->orderBy('code')->paginate($perPage);
     }
 }

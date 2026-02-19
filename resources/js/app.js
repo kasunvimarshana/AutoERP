@@ -1,23 +1,19 @@
 import './bootstrap';
+import '../css/app.css';
+
 import { createApp } from 'vue';
-import { createRouter, createWebHistory } from 'vue-router';
+import { createPinia } from 'pinia';
+import router from './router';
+import App from './App.vue';
 
-// Initialize Vue application
-const app = createApp({});
+// Create Vue app
+const app = createApp(App);
 
-// Configure router (placeholder - modules will register their own routes)
-const router = createRouter({
-    history: createWebHistory(),
-    routes: [
-        {
-            path: '/',
-            name: 'home',
-            component: () => import('./components/Home.vue')
-        }
-    ]
-});
+// Use Pinia for state management
+app.use(createPinia());
 
+// Use Vue Router
 app.use(router);
 
-// Mount the application
+// Mount the app
 app.mount('#app');

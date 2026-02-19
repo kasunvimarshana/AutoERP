@@ -4,41 +4,42 @@ declare(strict_types=1);
 
 namespace Modules\Core\Exceptions;
 
-use Exception;
-
 /**
- * Exception thrown when validation fails
+ * Validation Exception
  *
- * This is different from Laravel's validation exception
- * It's for domain-level validation failures
+ * Thrown when input validation fails.
  */
-class ValidationException extends Exception
+class ValidationException extends DomainException
 {
+    protected int $httpStatusCode = 422;
+
+    protected string $errorCode = 'VALIDATION_ERROR';
+
     /**
      * Validation errors
-     *
-     * @var array<string, array<string>>
      */
     protected array $errors = [];
 
     /**
-     * Create a new validation exception
+     * Create a new validation exception instance
      *
-     * @param  array<string, array<string>>  $errors
+     * @param  string  $message  Exception message
+     * @param  array  $errors  Validation errors
+     * @param  int  $code  Exception code
+     * @param  \Throwable|null  $previous  Previous exception
      */
     public function __construct(
-        string $message = 'Validation failed',
+        string $message = 'The given data was invalid.',
         array $errors = [],
+        int $code = 0,
         ?\Throwable $previous = null
     ) {
+        parent::__construct($message, $code, $previous);
         $this->errors = $errors;
-        parent::__construct($message, 422, $previous);
     }
 
     /**
      * Get validation errors
-     *
-     * @return array<string, array<string>>
      */
     public function getErrors(): array
     {
@@ -46,23 +47,12 @@ class ValidationException extends Exception
     }
 
     /**
-     * Create exception from errors array
-     *
-     * @param  array<string, array<string>>  $errors
+     * Set validation errors
      */
-    public static function withErrors(array $errors, string $message = 'Validation failed'): static
+    public function setErrors(array $errors): self
     {
-        return new static($message, $errors);
-    }
+        $this->errors = $errors;
 
-    /**
-     * Create exception for a single field
-     */
-    public static function forField(string $field, string $error): static
-    {
-        return new static(
-            "Validation failed for {$field}",
-            [$field => [$error]]
-        );
+        return $this;
     }
 }

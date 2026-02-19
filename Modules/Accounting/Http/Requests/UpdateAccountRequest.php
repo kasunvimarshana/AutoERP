@@ -5,45 +5,66 @@ declare(strict_types=1);
 namespace Modules\Accounting\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+use Modules\Accounting\Enums\AccountStatus;
+use Modules\Accounting\Enums\AccountType;
 
-/**
- * Update Account Request
- *
- * Validates data for updating an existing account.
- */
 class UpdateAccountRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
-        return true;
+        return $this->user()->can('update', $this->route('account'));
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
-        $accountId = $this->route('id');
+        $accountId = $this->route('account')->id ?? null;
 
         return [
-            'account_number' => ['nullable', 'string', 'max:50', "unique:accounts,account_number,{$accountId}"],
-            'name' => ['sometimes', 'required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'type' => ['sometimes', 'required', 'in:asset,liability,equity,revenue,expense'],
-            'sub_type' => ['nullable', 'string', 'max:100'],
-            'parent_id' => ['nullable', 'integer', 'exists:accounts,id'],
-            'currency' => ['sometimes', 'required', 'string', 'size:3'],
-            'is_active' => ['boolean'],
-            'is_system' => ['boolean'],
-            'allow_manual_entries' => ['boolean'],
-            'balance' => ['nullable', 'numeric'],
-            'tax_rate_id' => ['nullable', 'integer'],
-            'tags' => ['nullable', 'array'],
+            'organization_id' => [
+                'nullable',
+                Rule::exists('organizations', 'id')
+                    ->where('tenant_id', $this->user()->currentTenant()->id)
+                    ->whereNull('deleted_at'),
+            ],
+            'parent_id' => [
+                'nullable',
+                Rule::exists('accounts', 'id')
+                    ->where('tenant_id', $this->user()->currentTenant()->id)
+                    ->whereNull('deleted_at'),
+            ],
+            'code' => [
+                'nullable',
+                'string',
+                'max:50',
+                Rule::unique('accounts', 'code')
+                    ->where('tenant_id', $this->user()->currentTenant()->id)
+                    ->ignore($accountId)
+                    ->whereNull('deleted_at'),
+            ],
+            'name' => ['sometimes', 'required', 'string', 'max:200'],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'type' => ['sometimes', 'required', Rule::enum(AccountType::class)],
+            'status' => ['nullable', Rule::enum(AccountStatus::class)],
+            'normal_balance' => ['sometimes', 'required', 'in:debit,credit'],
+            'is_bank_account' => ['nullable', 'boolean'],
+            'is_reconcilable' => ['nullable', 'boolean'],
+            'allow_manual_entries' => ['nullable', 'boolean'],
+            'metadata' => ['nullable', 'array'],
+        ];
+    }
+
+    public function attributes(): array
+    {
+        return [
+            'organization_id' => 'organization',
+            'parent_id' => 'parent account',
+            'code' => 'account code',
+            'name' => 'account name',
+            'description' => 'description',
+            'type' => 'account type',
+            'status' => 'status',
+            'normal_balance' => 'normal balance',
         ];
     }
 }

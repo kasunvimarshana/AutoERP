@@ -1,11 +1,16 @@
 <?php
 
-use App\Http\Controllers\Api\DocumentationController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
+// Health check endpoint (for tests and monitoring)
+Route::get('/health', function () {
+    return response()->json([
+        'status' => 'ok',
+        'timestamp' => now()->toISOString(),
+    ]);
 });
 
-// API Documentation UI
-Route::get('/docs', [DocumentationController::class, 'index']);
+// Serve the Vue.js SPA for all routes (except API and health check)
+Route::get('/{any}', function () {
+    return view('app');
+})->where('any', '.*');

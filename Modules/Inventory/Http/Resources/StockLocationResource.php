@@ -9,28 +9,33 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class StockLocationResource extends JsonResource
 {
+    /**
+     * Transform the resource into an array.
+     *
+     * @return array<string, mixed>
+     */
     public function toArray(Request $request): array
     {
         return [
             'id' => $this->id,
-            'uuid' => $this->uuid,
+            'tenant_id' => $this->tenant_id,
             'warehouse_id' => $this->warehouse_id,
-            'parent_id' => $this->parent_id,
             'code' => $this->code,
             'name' => $this->name,
-            'location_type' => $this->location_type,
-            'full_code' => $this->getFullCode(),
             'aisle' => $this->aisle,
-            'rack' => $this->rack,
+            'bay' => $this->bay,
             'shelf' => $this->shelf,
             'bin' => $this->bin,
-            'capacity' => $this->capacity,
-            'capacity_unit' => $this->capacity_unit,
-            'remaining_capacity' => $this->getRemainingCapacity(),
             'is_active' => $this->is_active,
+            'notes' => $this->notes,
             'warehouse' => new WarehouseResource($this->whenLoaded('warehouse')),
-            'created_at' => $this->created_at?->toIso8601String(),
-            'updated_at' => $this->updated_at?->toIso8601String(),
+            'stock_items_count' => $this->when(
+                $this->relationLoaded('stockItems'),
+                fn () => $this->stockItems->count()
+            ),
+            'created_at' => $this->created_at?->toISOString(),
+            'updated_at' => $this->updated_at?->toISOString(),
+            'deleted_at' => $this->deleted_at?->toISOString(),
         ];
     }
 }

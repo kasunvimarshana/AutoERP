@@ -4,44 +4,31 @@ declare(strict_types=1);
 
 namespace Modules\Core\Exceptions;
 
-use Exception;
-
 /**
- * Exception thrown when a requested resource is not found
+ * Not Found Exception
+ *
+ * Thrown when a requested resource cannot be found.
  */
-class NotFoundException extends Exception
+class NotFoundException extends DomainException
 {
+    protected int $httpStatusCode = 404;
+
+    protected string $errorCode = 'NOT_FOUND';
+
     /**
-     * Create a new not found exception
+     * Create a new not found exception instance
      *
-     * @param  string  $resource  The resource type
-     * @param  string|int  $identifier  The identifier used
+     * @param  string  $message  Exception message
+     * @param  int  $code  Exception code
      * @param  \Throwable|null  $previous  Previous exception
+     * @param  array  $context  Additional context data
      */
     public function __construct(
-        string $resource,
-        string|int $identifier,
-        ?\Throwable $previous = null
+        string $message = 'The requested resource was not found.',
+        int $code = 0,
+        ?\Throwable $previous = null,
+        array $context = []
     ) {
-        $message = "{$resource} not found with identifier: {$identifier}";
-        parent::__construct($message, 404, $previous);
-    }
-
-    /**
-     * Create exception for entity not found by ID
-     */
-    public static function entity(string $entityClass, string|int $id): static
-    {
-        $entityName = class_basename($entityClass);
-
-        return new static($entityName, $id);
-    }
-
-    /**
-     * Create exception for resource not found
-     */
-    public static function resource(string $resourceType, string|int $identifier): static
-    {
-        return new static($resourceType, $identifier);
+        parent::__construct($message, $code, $previous, $context);
     }
 }

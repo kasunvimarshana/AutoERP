@@ -1,239 +1,245 @@
-# Inventory Management Module
-
----
-
-**⚠️ IMPLEMENTATION PRINCIPLE**: Rely strictly on native Laravel and Vue features. Always implement functionality manually instead of using third-party libraries.
-
----
-
+# Inventory Module
 
 ## Overview
 
-The Inventory Management module is a comprehensive, production-ready solution for managing products, warehouses, stock levels, and inventory movements in a multi-tenant Laravel ERP system.
+The Inventory Module provides comprehensive warehouse management, stock tracking, and inventory valuation capabilities for the ERP/CRM platform. It manages real-time stock levels, multi-warehouse operations, stock movements, physical counts, and integrates seamlessly with Sales and Purchase modules.
 
-## Architecture
+## Key Features
 
-This module follows Clean Architecture and Domain-Driven Design (DDD) principles:
+### 1. Warehouse Management
+- **Multi-warehouse support**: Manage multiple physical warehouses
+- **Bin location tracking**: Organize stock within warehouses using bin locations
+- **Warehouse status management**: Active, Inactive, Maintenance, Closed states
+- **Location hierarchy**: Support for complex warehouse layouts
 
-- **Entities**: Rich domain models with business logic
-- **Repositories**: Data access abstraction layer
-- **Services**: Application business logic
-- **Controllers**: HTTP request handling
-- **Events**: Domain events for cross-module communication
+### 2. Stock Tracking
+- **Real-time stock levels**: Instant visibility of available stock
+- **Stock movements**: Track all inventory transactions (receipts, issues, transfers, adjustments)
+- **Batch/Lot tracking**: Track products by batch or lot numbers
+- **Serial number tracking**: Individual item tracking via serial numbers
+- **Stock reservations**: Reserve stock for sales orders
 
-## Features
+### 3. Inventory Valuation
+- **Multiple valuation methods**:
+  - FIFO (First In First Out)
+  - LIFO (Last In First Out)
+  - Weighted Average
+  - Standard Cost
+- **Automatic cost calculation**: Based on selected valuation method
+- **Valuation reporting**: Stock value reports by warehouse, category, or product
 
-### Product Management
-- Multi-level product categorization
-- SKU and barcode tracking
-- Product types: Stockable, Consumable, Service
-- Unit of Measure (UoM) with conversions
-- Pricing and costing
-- Dimensions and weight tracking
-- Reorder point management
-- Serial and batch tracking support
+### 4. Stock Movements
+- **Receipt**: Receive stock into warehouse (from purchases)
+- **Issue**: Issue stock from warehouse (for sales/production)
+- **Transfer**: Move stock between warehouses or locations
+- **Adjustment**: Manual stock adjustments with approval workflow
+- **Scrap**: Write off damaged or obsolete stock
+- **Return**: Process customer/vendor returns
 
-### Warehouse Management
-- Multiple warehouse support
-- Warehouse types: Main, Secondary, Transit, Virtual
-- Hierarchical stock locations (zones, aisles, racks, shelves, bins)
-- Location capacity management
-- Geographic coordinates support
+### 5. Physical Stock Counts
+- **Planned counts**: Schedule periodic stock counts
+- **Cycle counting**: Continuous rolling inventory counts
+- **Count reconciliation**: Compare counted vs. system quantities
+- **Automatic adjustments**: Update stock levels based on counts
+- **Variance reporting**: Identify and analyze discrepancies
 
-### Stock Level Management
-- Real-time stock tracking
-- Quantity on-hand, reserved, and available
-- Stock valuation (FIFO, LIFO, Average)
-- Multi-warehouse stock visibility
-- Low stock alerts
+### 6. Reorder Management
+- **Reorder point alerts**: Automatic notifications when stock falls below threshold
+- **Min/Max levels**: Define minimum and maximum stock levels per product
+- **Safety stock**: Configure safety stock quantities
+- **Lead time tracking**: Track supplier lead times for reorder calculations
 
-### Stock Movements
-- Receipt (incoming stock)
-- Shipment (outgoing stock)
-- Inter-warehouse transfers
-- Stock adjustments
-- Full audit trail
-- Reference tracking (links to orders, etc.)
+## Module Structure
 
-## API Endpoints
+### Models
+- **Warehouse**: Physical storage locations
+- **StockLocation**: Bin/shelf locations within warehouses
+- **StockItem**: Product inventory records with quantities
+- **StockMovement**: All inventory transactions
+- **StockCount**: Physical inventory count records
+- **StockCountItem**: Individual count line items
+- **BatchLot**: Batch/lot tracking records
+- **SerialNumber**: Serial number tracking records
 
-### Products
-```
-GET    /api/v1/products                    - List products
-POST   /api/v1/products                    - Create product
-GET    /api/v1/products/{id}               - Get product
-PUT    /api/v1/products/{id}               - Update product
-DELETE /api/v1/products/{id}               - Delete product
-GET    /api/v1/products/search?q={query}   - Search products
-GET    /api/v1/products/by-category/{id}   - Get products by category
-```
+### Enums
+- **StockMovementType**: Receipt, Issue, Transfer, Adjustment, Count, Return, Scrap, Reserved, Released
+- **ValuationMethod**: FIFO, LIFO, WeightedAverage, StandardCost
+- **StockCountStatus**: Planned, InProgress, Completed, Reconciled, Cancelled
+- **WarehouseStatus**: Active, Inactive, Maintenance, Closed
 
-### Product Categories
-```
-GET    /api/v1/product-categories          - List categories
-POST   /api/v1/product-categories          - Create category
-GET    /api/v1/product-categories/{id}     - Get category
-PUT    /api/v1/product-categories/{id}     - Update category
-DELETE /api/v1/product-categories/{id}     - Delete category
-GET    /api/v1/product-categories/tree     - Get category tree
-```
+### Services
+- **WarehouseService**: Warehouse CRUD and management
+- **StockMovementService**: Process all types of stock movements
+- **InventoryValuationService**: Calculate stock values using different methods
+- **StockCountService**: Manage physical inventory counts
+- **ReorderService**: Analyze stock levels and generate reorder suggestions
+- **SerialNumberService**: Manage serial number tracking
 
-### Warehouses
-```
-GET    /api/v1/warehouses                  - List warehouses
-POST   /api/v1/warehouses                  - Create warehouse
-GET    /api/v1/warehouses/{id}             - Get warehouse
-PUT    /api/v1/warehouses/{id}             - Update warehouse
-DELETE /api/v1/warehouses/{id}             - Delete warehouse
-GET    /api/v1/warehouses/{id}/stock-summary - Get stock summary
-```
+### Repositories
+- **WarehouseRepository**: Warehouse data access
+- **StockItemRepository**: Stock item queries and reporting
+- **StockMovementRepository**: Movement history and analytics
+- **StockCountRepository**: Count data management
 
-### Stock Locations
-```
-GET    /api/v1/stock-locations                         - List locations
-POST   /api/v1/stock-locations                         - Create location
-GET    /api/v1/stock-locations/{id}                    - Get location
-PUT    /api/v1/stock-locations/{id}                    - Update location
-DELETE /api/v1/stock-locations/{id}                    - Delete location
-GET    /api/v1/stock-locations/by-warehouse/{id}       - Get locations by warehouse
-```
+### Controllers (API)
+- **WarehouseController**: Warehouse CRUD operations
+- **StockItemController**: Stock level queries and reports
+- **StockMovementController**: Stock movement processing
+- **StockCountController**: Physical count management
+- **ReorderController**: Reorder point analysis
 
-### Stock Levels
-```
-GET    /api/v1/stock-levels?product_id={id}&warehouse_id={id} - Get stock levels
-POST   /api/v1/stock-levels/adjust                            - Adjust stock
-```
-
-### Stock Movements
-```
-GET    /api/v1/stock-movements                 - List movements
-GET    /api/v1/stock-movements/{id}            - Get movement
-POST   /api/v1/stock-movements/receive         - Receive stock
-POST   /api/v1/stock-movements/ship            - Ship stock
-POST   /api/v1/stock-movements/transfer        - Transfer stock
-GET    /api/v1/stock-movements/history/{id}    - Get product movement history
-```
+### Policies
+- **WarehousePolicy**: Authorization for warehouse operations
+- **StockMovementPolicy**: Authorization for stock movements
+- **StockCountPolicy**: Authorization for inventory counts
 
 ## Database Schema
 
 ### Tables
-- `products` - Product master data
-- `product_categories` - Hierarchical product categories
-- `unit_of_measures` - Units of measure with conversions
-- `warehouses` - Warehouse definitions
-- `stock_locations` - Warehouse locations
-- `stock_levels` - Current stock by product/warehouse/location
-- `stock_movements` - Inventory transactions
+1. **warehouses**: Physical warehouse locations
+2. **stock_locations**: Bin/shelf locations within warehouses
+3. **stock_items**: Current stock quantities per product/warehouse
+4. **stock_movements**: Historical record of all inventory transactions
+5. **stock_counts**: Physical inventory count headers
+6. **stock_count_items**: Individual count line items
+7. **batch_lots**: Batch/lot tracking
+8. **serial_numbers**: Serial number tracking
 
-## Usage Examples
+### Key Indexes
+- Product + Warehouse for fast stock lookups
+- Movement date for historical queries
+- Status fields for filtering
+- Foreign keys for data integrity
 
-### Create a Product
-```php
-POST /api/v1/products
-{
-    "product_category_id": 1,
-    "unit_of_measure_id": 1,
-    "name": "Widget A",
-    "sku": "WID-001",
-    "product_type": "stockable",
-    "status": "active",
-    "list_price": 99.99,
-    "cost_price": 50.00,
-    "currency": "USD",
-    "reorder_level": 10,
-    "reorder_quantity": 50
-}
+## Integration Points
+
+### Sales Module
+- **Automatic stock reservation**: When order is confirmed
+- **Automatic stock issue**: When order is shipped/delivered
+- **Stock availability check**: Before order confirmation
+
+### Purchase Module
+- **Automatic goods receipt**: When goods are received
+- **Return processing**: Process vendor returns
+- **Stock update**: Update quantities on receipt
+
+### Accounting Module (Future)
+- **Inventory valuation entries**: Post to general ledger
+- **COGS calculation**: Calculate cost of goods sold
+- **Variance accounting**: Account for stock count variances
+
+## API Endpoints
+
+### Warehouses
+- `GET /api/v1/inventory/warehouses` - List all warehouses
+- `POST /api/v1/inventory/warehouses` - Create warehouse
+- `GET /api/v1/inventory/warehouses/{id}` - Get warehouse details
+- `PUT /api/v1/inventory/warehouses/{id}` - Update warehouse
+- `DELETE /api/v1/inventory/warehouses/{id}` - Delete warehouse
+- `POST /api/v1/inventory/warehouses/{id}/activate` - Activate warehouse
+- `POST /api/v1/inventory/warehouses/{id}/deactivate` - Deactivate warehouse
+
+### Stock Items
+- `GET /api/v1/inventory/stock-items` - List stock items
+- `GET /api/v1/inventory/stock-items/{id}` - Get stock item details
+- `GET /api/v1/inventory/stock-items/by-product/{productId}` - Get stock by product
+- `GET /api/v1/inventory/stock-items/low-stock` - Get low stock items
+- `GET /api/v1/inventory/stock-items/valuation` - Get stock valuation report
+
+### Stock Movements
+- `GET /api/v1/inventory/movements` - List all movements
+- `POST /api/v1/inventory/movements/receive` - Record receipt
+- `POST /api/v1/inventory/movements/issue` - Issue stock
+- `POST /api/v1/inventory/movements/transfer` - Transfer stock
+- `POST /api/v1/inventory/movements/adjust` - Adjust stock
+- `GET /api/v1/inventory/movements/{id}` - Get movement details
+- `POST /api/v1/inventory/movements/{id}/approve` - Approve adjustment
+
+### Stock Counts
+- `GET /api/v1/inventory/stock-counts` - List all counts
+- `POST /api/v1/inventory/stock-counts` - Create count
+- `GET /api/v1/inventory/stock-counts/{id}` - Get count details
+- `PUT /api/v1/inventory/stock-counts/{id}` - Update count
+- `POST /api/v1/inventory/stock-counts/{id}/start` - Start count
+- `POST /api/v1/inventory/stock-counts/{id}/complete` - Complete count
+- `POST /api/v1/inventory/stock-counts/{id}/reconcile` - Reconcile count
+
+## Configuration
+
+All configuration is managed via environment variables and `config/inventory.php`:
+
+```env
+# Code Prefixes
+INVENTORY_WAREHOUSE_CODE_PREFIX=WH-
+INVENTORY_STOCK_MOVEMENT_CODE_PREFIX=SM-
+INVENTORY_STOCK_COUNT_CODE_PREFIX=CNT-
+
+# Valuation
+INVENTORY_VALUATION_METHOD=FIFO
+
+# Stock Management
+INVENTORY_ENABLE_NEGATIVE_STOCK=false
+INVENTORY_AUTO_RESERVE_STOCK=true
+INVENTORY_ENABLE_REORDER_ALERTS=true
+
+# Tracking
+INVENTORY_ENABLE_BATCH_TRACKING=true
+INVENTORY_ENABLE_SERIAL_TRACKING=true
+
+# Stock Counts
+INVENTORY_COUNT_TOLERANCE_PERCENT=2.0
+INVENTORY_AUTO_ADJUST_ON_COUNT=false
+
+# Integration
+INVENTORY_AUTO_RECEIVE_FROM_PURCHASE=false
+INVENTORY_AUTO_ISSUE_FOR_SALES=false
+INVENTORY_SYNC_WITH_ACCOUNTING=true
+
+# Audit
+INVENTORY_AUDIT_ENABLED=true
+INVENTORY_AUDIT_ASYNC=true
 ```
-
-### Receive Stock
-```php
-POST /api/v1/stock-movements/receive
-{
-    "product_id": 1,
-    "warehouse_id": 1,
-    "quantity": 100,
-    "unit_cost": 50.00,
-    "currency": "USD",
-    "reference_type": "purchase_order",
-    "reference_id": 123,
-    "notes": "Received from supplier"
-}
-```
-
-### Transfer Stock
-```php
-POST /api/v1/stock-movements/transfer
-{
-    "product_id": 1,
-    "from_warehouse_id": 1,
-    "to_warehouse_id": 2,
-    "quantity": 25,
-    "currency": "USD",
-    "reason": "Stock rebalancing"
-}
-```
-
-### Check Stock Availability
-```php
-GET /api/v1/stock-levels?product_id=1&warehouse_id=1
-```
-
-## Events
-
-- `StockLevelChanged` - Fired when stock level is modified
-- `LowStockAlert` - Fired when stock falls below reorder point
-- `StockMovementRecorded` - Fired when a stock movement is recorded
-
-## Services
-
-### ProductService
-Handles product CRUD operations and business logic.
-
-### InventoryService
-Manages stock availability, reservations, and queries.
-
-### StockMovementService
-Handles all stock movements (receive, ship, transfer, adjust).
-
-### WarehouseService
-Manages warehouse operations.
-
-## Multi-Tenancy
-
-All entities are tenant-aware and automatically scoped to the current tenant using the `Tenantable` trait.
 
 ## Security
 
-All API endpoints require:
-- Authentication via Sanctum (`auth:sanctum` middleware)
-- Tenant context (`tenant` middleware)
+- **Policy-based authorization**: All operations protected by policies
+- **Tenant isolation**: Automatic tenant scoping on all queries
+- **Approval workflows**: Adjustments above threshold require approval
+- **Audit logging**: Complete audit trail of all stock movements
+
+## Performance
+
+- **Indexed queries**: Optimized for fast stock lookups
+- **Queue-based processing**: Heavy operations queued for background processing
+- **Cached stock levels**: Real-time stock cache for quick access
+- **Efficient valuation**: Optimized cost calculation algorithms
 
 ## Testing
 
-Run module tests:
-```bash
-php artisan test --testsuite=Inventory
-```
-
-## Installation
-
-The module is automatically registered via the service provider. To seed initial data:
-
-```bash
-php artisan db:seed --class=Modules\\Inventory\\Database\\Seeders\\InventorySeeder
-```
-
-## Dependencies
-
-- Core module (base traits and repositories)
-- Tenancy module (multi-tenant support)
+Comprehensive test coverage including:
+- Unit tests for valuation methods
+- Feature tests for API endpoints
+- Integration tests with Sales/Purchase modules
+- Concurrency tests for stock movements
 
 ## Future Enhancements
 
-- Batch and serial number tracking
-- Barcode generation
-- Stock forecasting
-- Automated reordering
-- Inventory valuation reports
-- Cycle counting
-- Warehouse optimization algorithms
+- **Barcode scanning**: Mobile app with barcode scanner
+- **Advanced analytics**: Inventory turnover, aging, ABC analysis
+- **Demand forecasting**: AI-powered demand prediction
+- **Automated replenishment**: Auto-generate purchase requisitions
+- **Multi-unit support**: Support different units for same product
+- **Consignment inventory**: Track consignment stock
+- **Quality control**: Inspection workflows for receipts
+
+## Dependencies
+
+- **Core Module**: Base infrastructure
+- **Tenant Module**: Multi-tenancy support
+- **Product Module**: Product catalog
+- **Auth Module**: Authentication and authorization
+- **Audit Module**: Audit logging
+
+## License
+
+MIT License - See LICENSE file for details

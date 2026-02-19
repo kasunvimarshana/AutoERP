@@ -1,39 +1,35 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Modules\Sales\Http\Controllers\Api\CustomerController;
-use Modules\Sales\Http\Controllers\Api\LeadController;
-use Modules\Sales\Http\Controllers\Api\SalesOrderController;
-use Modules\Sales\Http\Controllers\Api\SalesOrderLineController;
+use Modules\Sales\Http\Controllers\InvoiceController;
+use Modules\Sales\Http\Controllers\OrderController;
+use Modules\Sales\Http\Controllers\QuotationController;
 
 /*
 |--------------------------------------------------------------------------
-| API Routes
+| Sales API Routes
 |--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for the Sales module.
-|
 */
 
-Route::prefix('v1')->middleware(['auth:sanctum', 'tenant'])->group(function () {
-    // Customer search must be before resource routes
-    Route::get('customers/search', [CustomerController::class, 'search'])->name('customers.search');
+Route::prefix('api/v1')->middleware(['api', 'jwt.auth'])->group(function () {
 
-    // Customer routes
-    Route::apiResource('customers', CustomerController::class);
+    // Quotations
+    Route::apiResource('quotations', QuotationController::class);
+    Route::post('quotations/{quotation}/send', [QuotationController::class, 'send']);
+    Route::post('quotations/{quotation}/accept', [QuotationController::class, 'accept']);
+    Route::post('quotations/{quotation}/reject', [QuotationController::class, 'reject']);
+    Route::post('quotations/{quotation}/convert-to-order', [QuotationController::class, 'convertToOrder']);
 
-    // Lead routes
-    Route::get('leads/search', [LeadController::class, 'search'])->name('leads.search');
-    Route::post('leads/{id}/convert', [LeadController::class, 'convert'])->name('leads.convert');
-    Route::apiResource('leads', LeadController::class);
+    // Orders
+    Route::apiResource('orders', OrderController::class);
+    Route::post('orders/{order}/confirm', [OrderController::class, 'confirm']);
+    Route::post('orders/{order}/cancel', [OrderController::class, 'cancel']);
+    Route::post('orders/{order}/complete', [OrderController::class, 'complete']);
+    Route::post('orders/{order}/create-invoice', [OrderController::class, 'createInvoice']);
 
-    // Sales Order routes
-    Route::get('sales-orders/search', [SalesOrderController::class, 'search'])->name('sales-orders.search');
-    Route::post('sales-orders/{id}/confirm', [SalesOrderController::class, 'confirm'])->name('sales-orders.confirm');
-    Route::post('sales-orders/{id}/calculate-totals', [SalesOrderController::class, 'calculateTotals'])->name('sales-orders.calculate-totals');
-    Route::apiResource('sales-orders', SalesOrderController::class);
-
-    // Sales Order Line routes
-    Route::get('sales-order-lines/by-order/{salesOrderId}', [SalesOrderLineController::class, 'getByOrder'])->name('sales-order-lines.by-order');
-    Route::apiResource('sales-order-lines', SalesOrderLineController::class);
+    // Invoices
+    Route::apiResource('invoices', InvoiceController::class);
+    Route::post('invoices/{invoice}/send', [InvoiceController::class, 'send']);
+    Route::post('invoices/{invoice}/record-payment', [InvoiceController::class, 'recordPayment']);
+    Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel']);
 });

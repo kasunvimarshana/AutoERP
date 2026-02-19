@@ -4,116 +4,48 @@ declare(strict_types=1);
 
 namespace Modules\Accounting\Policies;
 
-use App\Policies\BasePolicy;
-use Modules\Accounting\Entities\Account;
+use Modules\Accounting\Models\Account;
+use Modules\Auth\Models\User;
 
-/**
- * Account Policy
- *
- * Authorization policy for chart of accounts management.
- * Handles CRUD operations and custom abilities like marking system accounts.
- */
-class AccountPolicy extends BasePolicy
+class AccountPolicy
 {
-    /**
-     * Permission prefix for account operations.
-     */
-    protected string $permissionPrefix = 'account';
-
-    /**
-     * Determine whether the user can mark the account as a system account.
-     *
-     * @param  \Illuminate\Foundation\Auth\User  $user
-     */
-    public function markSystemAccount($user, Account $account): bool
+    public function viewAny(User $user): bool
     {
-        return $this->checkPermission($user, 'mark-system-account') &&
-               $this->checkTenantIsolation($user, $account) &&
-               $this->hasAnyRole($user, ['admin', 'super-admin']);
+        return $user->hasPermission('accounts.view');
     }
 
-    /**
-     * Determine whether the user can activate the account.
-     *
-     * @param  \Illuminate\Foundation\Auth\User  $user
-     */
-    public function activate($user, Account $account): bool
+    public function view(User $user, Account $account): bool
     {
-        return $this->checkPermission($user, 'activate') &&
-               $this->checkTenantIsolation($user, $account) &&
-               ($this->hasAnyRole($user, ['admin', 'finance-manager']));
+        return $user->hasPermission('accounts.view')
+            && $user->tenant_id === $account->tenant_id;
     }
 
-    /**
-     * Determine whether the user can deactivate the account.
-     *
-     * @param  \Illuminate\Foundation\Auth\User  $user
-     */
-    public function deactivate($user, Account $account): bool
+    public function create(User $user): bool
     {
-        return $this->checkPermission($user, 'deactivate') &&
-               $this->checkTenantIsolation($user, $account) &&
-               ! $account->is_system &&
-               ($this->hasAnyRole($user, ['admin', 'finance-manager']));
+        return $user->hasPermission('accounts.create');
     }
 
-    /**
-     * Determine whether the user can reconcile the account.
-     *
-     * @param  \Illuminate\Foundation\Auth\User  $user
-     */
-    public function reconcile($user, Account $account): bool
+    public function update(User $user, Account $account): bool
     {
-        return $this->checkPermission($user, 'reconcile') &&
-               $this->checkTenantIsolation($user, $account) &&
-               ($this->hasAnyRole($user, ['admin', 'finance-manager', 'accountant']));
+        return $user->hasPermission('accounts.update')
+            && $user->tenant_id === $account->tenant_id;
     }
 
-    /**
-     * Determine whether the user can view account balance.
-     *
-     * @param  \Illuminate\Foundation\Auth\User  $user
-     */
-    public function viewBalance($user, Account $account): bool
+    public function delete(User $user, Account $account): bool
     {
-        return $this->checkPermission($user, 'view-balance') &&
-               $this->checkTenantIsolation($user, $account);
+        return $user->hasPermission('accounts.delete')
+            && $user->tenant_id === $account->tenant_id;
     }
 
-    /**
-     * Determine whether the user can view account transactions.
-     *
-     * @param  \Illuminate\Foundation\Auth\User  $user
-     */
-    public function viewTransactions($user, Account $account): bool
+    public function restore(User $user, Account $account): bool
     {
-        return $this->checkPermission($user, 'view-transactions') &&
-               $this->checkTenantIsolation($user, $account);
+        return $user->hasPermission('accounts.delete')
+            && $user->tenant_id === $account->tenant_id;
     }
 
-    /**
-     * Determine whether the user can delete the account (override to add system check).
-     *
-     * @param  \Illuminate\Foundation\Auth\User  $user
-     */
-    public function delete($user, Account $account): bool
+    public function forceDelete(User $user, Account $account): bool
     {
-        return parent::delete($user, $account) &&
-               ! $account->is_system;
-    }
-
-    /**
-     * Determine whether the user can update the account (override to add system check).
-     *
-     * @param  \Illuminate\Foundation\Auth\User  $user
-     */
-    public function update($user, Account $account): bool
-    {
-        // System accounts can only be updated by super-admin
-        if ($account->is_system && ! $user->hasRole('super-admin')) {
-            return false;
-        }
-
-        return parent::update($user, $account);
+        return $user->hasPermission('accounts.force_delete')
+            && $user->tenant_id === $account->tenant_id;
     }
 }

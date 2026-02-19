@@ -4,72 +4,85 @@ declare(strict_types=1);
 
 namespace Modules\Accounting\Repositories;
 
-use Illuminate\Database\Eloquent\Collection;
-use Modules\Accounting\Entities\JournalEntry;
-use Modules\Accounting\Repositories\Contracts\JournalEntryRepositoryInterface;
+use Modules\Accounting\Enums\JournalEntryStatus;
+use Modules\Accounting\Exceptions\JournalEntryNotFoundException;
+use Modules\Accounting\Models\JournalEntry;
 use Modules\Core\Repositories\BaseRepository;
 
-/**
- * Journal Entry Repository Implementation
- *
- * Handles all journal entry data access operations.
- */
-class JournalEntryRepository extends BaseRepository implements JournalEntryRepositoryInterface
+class JournalEntryRepository extends BaseRepository
 {
-    /**
-     * JournalEntryRepository constructor.
-     */
     public function __construct(JournalEntry $model)
     {
         parent::__construct($model);
     }
 
-    /**
-     * {@inheritdoc}
-     */
+    protected function getModelClass(): string
+    {
+        return JournalEntry::class;
+    }
+
+    protected function getNotFoundExceptionClass(): string
+    {
+        return JournalEntryNotFoundException::class;
+    }
+
     public function findByEntryNumber(string $entryNumber): ?JournalEntry
     {
         return $this->model->where('entry_number', $entryNumber)->first();
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getByStatus(string $status): Collection
+    public function findByEntryNumberOrFail(string $entryNumber): JournalEntry
     {
-        return $this->model->where('status', $status)->orderBy('entry_date', 'desc')->get();
+        $entry = $this->findByEntryNumber($entryNumber);
+
+        if (! $entry) {
+            throw new JournalEntryNotFoundException("Journal entry with number {$entryNumber} not found");
+        }
+
+        return $entry;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getByFiscalPeriod(int $fiscalPeriodId): Collection
+    public function getByStatus(JournalEntryStatus $status, int $perPage = 15)
     {
-        return $this->model
-            ->where('fiscal_period_id', $fiscalPeriodId)
-            ->orderBy('entry_date', 'desc')
-            ->get();
+        return $this->model->where('status', $status)->latest('entry_date')->paginate($perPage);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getByDateRange(\DateTimeInterface $startDate, \DateTimeInterface $endDate): Collection
+    public function getByFiscalPeriod(string $fiscalPeriodId, int $perPage = 15)
+    {
+        return $this->model->where('fiscal_period_id', $fiscalPeriodId)->latest('entry_date')->paginate($perPage);
+    }
+
+    public function getByDateRange(string $startDate, string $endDate, int $perPage = 15)
     {
         return $this->model
             ->whereBetween('entry_date', [$startDate, $endDate])
-            ->orderBy('entry_date', 'desc')
-            ->get();
+            ->latest('entry_date')
+            ->paginate($perPage);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getUnbalancedEntries(): Collection
+    public function getBySource(string $sourceType, string $sourceId): ?JournalEntry
     {
         return $this->model
-            ->whereRaw('total_debit != total_credit')
-            ->orderBy('entry_date', 'desc')
+            ->where('source_type', $sourceType)
+            ->where('source_id', $sourceId)
+            ->first();
+    }
+
+    public function getDraftEntries()
+    {
+        return $this->model->where('status', JournalEntryStatus::Draft)->get();
+    }
+
+    public function getPostedEntries()
+    {
+        return $this->model->where('status', JournalEntryStatus::Posted)->get();
+    }
+
+    public function getUnbalancedEntries()
+    {
+        return $this->model
+            ->where('status', JournalEntryStatus::Draft)
+            ->whereRaw('(SELECT SUM(debit) FROM journal_lines WHERE journal_entry_id = journal_entries.id) != (SELECT SUM(credit) FROM journal_lines WHERE journal_entry_id = journal_entries.id)')
             ->get();
     }
 }

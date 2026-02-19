@@ -1,56 +1,53 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Modules\Inventory\Http\Controllers\Api\ProductCategoryController;
-use Modules\Inventory\Http\Controllers\Api\ProductController;
-use Modules\Inventory\Http\Controllers\Api\StockLevelController;
-use Modules\Inventory\Http\Controllers\Api\StockLocationController;
-use Modules\Inventory\Http\Controllers\Api\StockMovementController;
-use Modules\Inventory\Http\Controllers\Api\UnitOfMeasureController;
-use Modules\Inventory\Http\Controllers\Api\WarehouseController;
+use Modules\Inventory\Http\Controllers\ReorderController;
+use Modules\Inventory\Http\Controllers\StockCountController;
+use Modules\Inventory\Http\Controllers\StockItemController;
+use Modules\Inventory\Http\Controllers\StockMovementController;
+use Modules\Inventory\Http\Controllers\WarehouseController;
 
 /*
 |--------------------------------------------------------------------------
-| API Routes
+| Inventory API Routes
 |--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for the Inventory module.
-|
 */
 
-Route::prefix('v1')->middleware(['auth:sanctum', 'tenant'])->group(function () {
-    // Product routes
-    Route::get('products/search', [ProductController::class, 'search'])->name('products.search');
-    Route::get('products/by-category/{categoryId}', [ProductController::class, 'byCategory'])->name('products.by-category');
-    Route::apiResource('products', ProductController::class);
+Route::prefix('api/v1')->middleware(['api', 'jwt.auth', 'tenant'])->group(function () {
 
-    // Product Category routes
-    Route::get('product-categories/tree', [ProductCategoryController::class, 'tree'])->name('product-categories.tree');
-    Route::apiResource('product-categories', ProductCategoryController::class);
-
-    // Warehouse routes
-    Route::get('warehouses/{id}/stock-summary', [WarehouseController::class, 'stockSummary'])->name('warehouses.stock-summary');
+    // Warehouses
     Route::apiResource('warehouses', WarehouseController::class);
+    Route::post('warehouses/{warehouse}/activate', [WarehouseController::class, 'activate']);
+    Route::post('warehouses/{warehouse}/deactivate', [WarehouseController::class, 'deactivate']);
+    Route::post('warehouses/{warehouse}/set-default', [WarehouseController::class, 'setDefault']);
 
-    // Stock Location routes
-    Route::get('stock-locations/by-warehouse/{warehouseId}', [StockLocationController::class, 'byWarehouse'])->name('stock-locations.by-warehouse');
-    Route::apiResource('stock-locations', StockLocationController::class);
+    // Stock Items
+    Route::get('stock-items', [StockItemController::class, 'index']);
+    Route::get('stock-items/{stockItem}', [StockItemController::class, 'show']);
+    Route::get('stock-items/by-product-warehouse', [StockItemController::class, 'getByProductAndWarehouse']);
+    Route::get('stock-items/reports/low-stock', [StockItemController::class, 'lowStock']);
+    Route::get('stock-items/reports/valuation', [StockItemController::class, 'valuationReport']);
+    Route::get('stock-items/reports/product-valuation', [StockItemController::class, 'productValuation']);
 
-    // Stock Level routes
-    Route::get('stock-levels', [StockLevelController::class, 'index'])->name('stock-levels.index');
-    Route::post('stock-levels/adjust', [StockLevelController::class, 'adjust'])->name('stock-levels.adjust');
+    // Stock Movements
+    Route::get('stock-movements', [StockMovementController::class, 'index']);
+    Route::get('stock-movements/{stockMovement}', [StockMovementController::class, 'show']);
+    Route::post('stock-movements/receive', [StockMovementController::class, 'receive']);
+    Route::post('stock-movements/issue', [StockMovementController::class, 'issue']);
+    Route::post('stock-movements/transfer', [StockMovementController::class, 'transfer']);
+    Route::post('stock-movements/adjust', [StockMovementController::class, 'adjust']);
 
-    // Stock Movement routes
-    Route::post('stock-movements/receive', [StockMovementController::class, 'receive'])->name('stock-movements.receive');
-    Route::post('stock-movements/ship', [StockMovementController::class, 'ship'])->name('stock-movements.ship');
-    Route::post('stock-movements/transfer', [StockMovementController::class, 'transfer'])->name('stock-movements.transfer');
-    Route::get('stock-movements/history/{productId}', [StockMovementController::class, 'history'])->name('stock-movements.history');
-    Route::get('stock-movements/{id}', [StockMovementController::class, 'show'])->name('stock-movements.show');
-    Route::get('stock-movements', [StockMovementController::class, 'index'])->name('stock-movements.index');
+    // Stock Counts
+    Route::apiResource('stock-counts', StockCountController::class);
+    Route::post('stock-counts/{stockCount}/start', [StockCountController::class, 'start']);
+    Route::post('stock-counts/{stockCount}/update-items', [StockCountController::class, 'updateItems']);
+    Route::post('stock-counts/{stockCount}/complete', [StockCountController::class, 'complete']);
+    Route::post('stock-counts/{stockCount}/reconcile', [StockCountController::class, 'reconcile']);
+    Route::post('stock-counts/{stockCount}/cancel', [StockCountController::class, 'cancel']);
 
-    // Unit of Measure routes
-    Route::get('unit-of-measures/active', [UnitOfMeasureController::class, 'active'])->name('unit-of-measures.active');
-    Route::get('unit-of-measures/base-units', [UnitOfMeasureController::class, 'baseUnits'])->name('unit-of-measures.base-units');
-    Route::post('unit-of-measures/convert', [UnitOfMeasureController::class, 'convert'])->name('unit-of-measures.convert');
-    Route::apiResource('unit-of-measures', UnitOfMeasureController::class);
+    // Reorder & Stock Analysis
+    Route::get('reorder/suggestions', [ReorderController::class, 'suggestions']);
+    Route::get('reorder/analyze-product', [ReorderController::class, 'analyzeProduct']);
+    Route::get('reorder/stock-health', [ReorderController::class, 'stockHealth']);
+    Route::get('reorder/check-reorder', [ReorderController::class, 'checkReorder']);
 });

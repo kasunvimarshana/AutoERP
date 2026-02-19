@@ -1,114 +1,59 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Core\Services\CodeGeneratorService;
+use Modules\Core\Services\ModuleRegistry;
+use Modules\Core\Services\TotalCalculationService;
 
+/**
+ * CoreServiceProvider
+ *
+ * Bootstraps the core module system
+ */
 class CoreServiceProvider extends ServiceProvider
 {
     /**
-     * @var string
+     * Register services
      */
-    protected $moduleName = 'Core';
-
-    /**
-     * @var string
-     */
-    protected $moduleNameLower = 'core';
-
-    /**
-     * Boot the application events.
-     *
-     * @return void
-     */
-    public function boot()
+    public function register(): void
     {
-        $this->registerTranslations();
-        $this->registerConfig();
-        $this->registerViews();
-        $this->loadMigrationsFrom(module_path($this->moduleName, 'Database/Migrations'));
-    }
+        // Register the module registry as a singleton
+        $this->app->singleton(ModuleRegistry::class, function ($app) {
+            return new ModuleRegistry;
+        });
 
-    /**
-     * Register the service provider.
-     *
-     * @return void
-     */
-    public function register()
-    {
-        $this->app->register(RouteServiceProvider::class);
-    }
+        // Register the code generator service as a singleton
+        $this->app->singleton(CodeGeneratorService::class, function ($app) {
+            return new CodeGeneratorService;
+        });
 
-    /**
-     * Register config.
-     *
-     * @return void
-     */
-    protected function registerConfig()
-    {
-        $this->publishes([
-            module_path($this->moduleName, 'Config/config.php') => config_path($this->moduleNameLower.'.php'),
-        ], 'config');
+        // Register the total calculation service as a singleton
+        $this->app->singleton(TotalCalculationService::class, function ($app) {
+            return new TotalCalculationService;
+        });
+
+        // Merge core configuration
         $this->mergeConfigFrom(
-            module_path($this->moduleName, 'Config/config.php'), $this->moduleNameLower
+            __DIR__.'/../Config/core.php',
+            'core'
         );
     }
 
     /**
-     * Register views.
-     *
-     * @return void
+     * Bootstrap services
      */
-    public function registerViews()
+    public function boot(): void
     {
-        $viewPath = resource_path('views/modules/'.$this->moduleNameLower);
-
-        $sourcePath = module_path($this->moduleName, 'Resources/views');
-
+        // Publish core configuration
         $this->publishes([
-            $sourcePath => $viewPath,
-        ], ['views', $this->moduleNameLower.'-module-views']);
+            __DIR__.'/../Config/core.php' => config_path('core.php'),
+        ], 'core-config');
 
-        $this->loadViewsFrom(array_merge($this->getPublishableViewPaths(), [$sourcePath]), $this->moduleNameLower);
-    }
-
-    /**
-     * Register translations.
-     *
-     * @return void
-     */
-    public function registerTranslations()
-    {
-        $langPath = resource_path('lang/modules/'.$this->moduleNameLower);
-
-        if (is_dir($langPath)) {
-            $this->loadTranslationsFrom($langPath, $this->moduleNameLower);
-            $this->loadJsonTranslationsFrom($langPath);
-        } else {
-            $this->loadTranslationsFrom(module_path($this->moduleName, 'Resources/lang'), $this->moduleNameLower);
-            $this->loadJsonTranslationsFrom(module_path($this->moduleName, 'Resources/lang'));
-        }
-    }
-
-    /**
-     * Get the services provided by the provider.
-     *
-     * @return array
-     */
-    public function provides()
-    {
-        return [];
-    }
-
-    private function getPublishableViewPaths(): array
-    {
-        $paths = [];
-        foreach (\Config::get('view.paths') as $path) {
-            if (is_dir($path.'/modules/'.$this->moduleNameLower)) {
-                $paths[] = $path.'/modules/'.$this->moduleNameLower;
-            }
-        }
-
-        return $paths;
+        // Load migrations
+        $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
     }
 }

@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 use Illuminate\Support\Str;
 
 return [
@@ -11,16 +9,16 @@ return [
     | Default Session Driver
     |--------------------------------------------------------------------------
     |
-    | This option defines the default session driver that is utilized for
+    | This option determines the default session driver that is utilized for
     | incoming requests. Laravel supports a variety of storage options to
-    | persist session data. Database storage is recommended for production
-    | environments with horizontal scaling.
+    | persist session data. Database storage is a great default choice.
     |
-    | Supported: "file", "cookie", "database", "apc", "memcached", "redis", "array"
+    | Supported: "file", "cookie", "database", "memcached",
+    |            "redis", "dynamodb", "array"
     |
     */
 
-    'driver' => env('SESSION_DRIVER', 'redis'),
+    'driver' => env('SESSION_DRIVER', 'database'),
 
     /*
     |--------------------------------------------------------------------------
@@ -29,11 +27,12 @@ return [
     |
     | Here you may specify the number of minutes that you wish the session
     | to be allowed to remain idle before it expires. If you want them
-    | to expire immediately when the browser is closed, set it to zero.
+    | to expire immediately when the browser is closed then you may
+    | indicate that via the expire_on_close configuration option.
     |
     */
 
-    'lifetime' => env('SESSION_LIFETIME', 120),
+    'lifetime' => (int) env('SESSION_LIFETIME', 120),
 
     'expire_on_close' => env('SESSION_EXPIRE_ON_CLOSE', false),
 
@@ -74,22 +73,20 @@ return [
     |
     */
 
-    'connection' => env('SESSION_CONNECTION', 'session'),
+    'connection' => env('SESSION_CONNECTION'),
 
     /*
     |--------------------------------------------------------------------------
-    | Session Database Table / Redis Connection
+    | Session Database Table
     |--------------------------------------------------------------------------
     |
     | When using the "database" session driver, you may specify the table to
-    | be used to store sessions. When using the "redis" session driver, you
-    | may specify the connection to use for storing sessions.
+    | be used to store sessions. Of course, a sensible default is defined
+    | for you; however, you're welcome to change this to another table.
     |
     */
 
     'table' => env('SESSION_TABLE', 'sessions'),
-
-    'store' => env('SESSION_STORE'),
 
     /*
     |--------------------------------------------------------------------------
@@ -98,11 +95,13 @@ return [
     |
     | When using one of the framework's cache driven session backends, you may
     | define the cache store which should be used to store the session data
-    | between requests. This must match one of the defined cache stores.
+    | between requests. This must match one of your defined cache stores.
+    |
+    | Affects: "dynamodb", "memcached", "redis"
     |
     */
 
-    'cache_store' => env('SESSION_CACHE_STORE', 'redis'),
+    'store' => env('SESSION_STORE'),
 
     /*
     |--------------------------------------------------------------------------
@@ -130,7 +129,7 @@ return [
 
     'cookie' => env(
         'SESSION_COOKIE',
-        Str::slug(env('APP_NAME', 'laravel'), '_').'_session'
+        Str::slug((string) env('APP_NAME', 'laravel')).'-session'
     ),
 
     /*
@@ -153,7 +152,7 @@ return [
     |
     | This value determines the domain and subdomains the session cookie is
     | available to. By default, the cookie will be available to the root
-    | domain and all subdomains. Typically, this shouldn't be changed.
+    | domain without subdomains. Typically, this shouldn't be changed.
     |
     */
 
@@ -165,12 +164,12 @@ return [
     |--------------------------------------------------------------------------
     |
     | By setting this option to true, session cookies will only be sent back
-    | to the server if the browser has an HTTPS connection. This will keep
+    | to the server if the browser has a HTTPS connection. This will keep
     | the cookie from being sent to you when it can't be done securely.
     |
     */
 
-    'secure' => env('SESSION_SECURE_COOKIE', env('APP_ENV') === 'production'),
+    'secure' => env('SESSION_SECURE_COOKIE'),
 
     /*
     |--------------------------------------------------------------------------
@@ -179,7 +178,7 @@ return [
     |
     | Setting this value to true will prevent JavaScript from accessing the
     | value of the cookie and the cookie will only be accessible through
-    | the HTTP protocol. It's highly recommended to keep this as true.
+    | the HTTP protocol. It's unlikely you should disable this option.
     |
     */
 
@@ -192,7 +191,9 @@ return [
     |
     | This option determines how your cookies behave when cross-site requests
     | take place, and can be used to mitigate CSRF attacks. By default, we
-    | will set this value to "lax" to permit secure cross-origin requests.
+    | will set this value to "lax" to permit secure cross-site requests.
+    |
+    | See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie#samesitesamesite-value
     |
     | Supported: "lax", "strict", "none", null
     |

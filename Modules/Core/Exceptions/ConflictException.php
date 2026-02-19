@@ -4,53 +4,32 @@ declare(strict_types=1);
 
 namespace Modules\Core\Exceptions;
 
-use Exception;
-
 /**
- * Exception thrown when a conflict occurs (e.g., duplicate resource)
+ * Conflict Exception
+ *
+ * Thrown when a request conflicts with the current state of the resource.
+ * Examples: duplicate resources, concurrent updates, constraint violations.
  */
-class ConflictException extends Exception
+class ConflictException extends DomainException
 {
+    protected int $httpStatusCode = 409;
+
+    protected string $errorCode = 'CONFLICT';
+
     /**
-     * Create a new conflict exception
+     * Create a new conflict exception instance
+     *
+     * @param  string  $message  Exception message
+     * @param  int  $code  Exception code
+     * @param  \Throwable|null  $previous  Previous exception
+     * @param  array  $context  Additional context data
      */
     public function __construct(
-        string $message = 'Resource conflict',
-        ?\Throwable $previous = null
+        string $message = 'The request conflicts with the current state of the resource.',
+        int $code = 0,
+        ?\Throwable $previous = null,
+        array $context = []
     ) {
-        parent::__construct($message, 409, $previous);
-    }
-
-    /**
-     * Create exception for duplicate resource
-     */
-    public static function duplicate(string $resourceType, string $field, string|int $value): static
-    {
-        return new static(
-            "{$resourceType} with {$field} '{$value}' already exists"
-        );
-    }
-
-    /**
-     * Create exception for resource already in use
-     */
-    public static function inUse(string $resourceType, string|int $identifier): static
-    {
-        return new static(
-            "{$resourceType} '{$identifier}' is currently in use and cannot be modified"
-        );
-    }
-
-    /**
-     * Create exception for state conflict
-     */
-    public static function stateConflict(
-        string $resource,
-        string $currentState,
-        string $requiredState
-    ): static {
-        return new static(
-            "{$resource} is in '{$currentState}' state, but '{$requiredState}' is required"
-        );
+        parent::__construct($message, $code, $previous, $context);
     }
 }

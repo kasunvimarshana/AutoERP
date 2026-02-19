@@ -4,54 +4,55 @@ declare(strict_types=1);
 
 namespace Modules\Accounting\Repositories;
 
-use Illuminate\Database\Eloquent\Collection;
-use Modules\Accounting\Entities\FiscalPeriod;
-use Modules\Accounting\Repositories\Contracts\FiscalPeriodRepositoryInterface;
+use Modules\Accounting\Enums\FiscalPeriodStatus;
+use Modules\Accounting\Exceptions\FiscalPeriodNotFoundException;
+use Modules\Accounting\Models\FiscalPeriod;
 use Modules\Core\Repositories\BaseRepository;
 
-/**
- * Fiscal Period Repository Implementation
- *
- * Handles all fiscal period data access operations.
- */
-class FiscalPeriodRepository extends BaseRepository implements FiscalPeriodRepositoryInterface
+class FiscalPeriodRepository extends BaseRepository
 {
-    /**
-     * FiscalPeriodRepository constructor.
-     */
     public function __construct(FiscalPeriod $model)
     {
         parent::__construct($model);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getByFiscalYear(int $fiscalYear): Collection
+    protected function getModelClass(): string
     {
-        return $this->model->where('fiscal_year', $fiscalYear)->orderBy('start_date')->get();
+        return FiscalPeriod::class;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getByStatus(string $status): Collection
+    protected function getNotFoundExceptionClass(): string
     {
-        return $this->model->where('status', $status)->orderBy('start_date')->get();
+        return FiscalPeriodNotFoundException::class;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getOpenPeriods(): Collection
+    public function findByCode(string $code): ?FiscalPeriod
     {
-        return $this->model->where('status', FiscalPeriod::STATUS_OPEN)->orderBy('start_date')->get();
+        return $this->model->where('code', $code)->first();
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function findByDate(\DateTimeInterface $date): ?FiscalPeriod
+    public function findByCodeOrFail(string $code): FiscalPeriod
+    {
+        $period = $this->findByCode($code);
+
+        if (! $period) {
+            throw new FiscalPeriodNotFoundException("Fiscal period with code {$code} not found");
+        }
+
+        return $period;
+    }
+
+    public function getByStatus(FiscalPeriodStatus $status, int $perPage = 15)
+    {
+        return $this->model->where('status', $status)->latest('start_date')->paginate($perPage);
+    }
+
+    public function getByFiscalYear(string $fiscalYearId, int $perPage = 15)
+    {
+        return $this->model->where('fiscal_year_id', $fiscalYearId)->orderBy('start_date')->paginate($perPage);
+    }
+
+    public function findByDate(string $date): ?FiscalPeriod
     {
         return $this->model
             ->where('start_date', '<=', $date)
@@ -59,11 +60,23 @@ class FiscalPeriodRepository extends BaseRepository implements FiscalPeriodRepos
             ->first();
     }
 
-    /**
-     * {@inheritdoc}
-     */
+    public function getOpenPeriods()
+    {
+        return $this->model->where('status', FiscalPeriodStatus::Open)->get();
+    }
+
+    public function getClosedPeriods()
+    {
+        return $this->model->where('status', FiscalPeriodStatus::Closed)->get();
+    }
+
+    public function getLockedPeriods()
+    {
+        return $this->model->where('status', FiscalPeriodStatus::Locked)->get();
+    }
+
     public function getCurrentPeriod(): ?FiscalPeriod
     {
-        return $this->findByDate(now());
+        return $this->findByDate(now()->toDateString());
     }
 }

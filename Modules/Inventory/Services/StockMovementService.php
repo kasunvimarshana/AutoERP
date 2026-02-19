@@ -4,280 +4,531 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Services;
 
-use Modules\Core\Services\BaseService;
-use Modules\Inventory\Entities\StockMovement;
-use Modules\Inventory\Events\StockLevelChanged;
-use Modules\Inventory\Events\StockMovementRecorded;
-use Modules\Inventory\Repositories\Contracts\StockLevelRepositoryInterface;
-use Modules\Inventory\Repositories\Contracts\StockMovementRepositoryInterface;
+use Modules\Core\Helpers\MathHelper;
+use Modules\Core\Helpers\TransactionHelper;
+use Modules\Inventory\Enums\StockMovementType;
+use Modules\Inventory\Events\ReorderPointReached;
+use Modules\Inventory\Events\StockAdjusted;
+use Modules\Inventory\Events\StockIssued;
+use Modules\Inventory\Events\StockReceived;
+use Modules\Inventory\Events\StockReleased;
+use Modules\Inventory\Events\StockReserved;
+use Modules\Inventory\Events\StockTransferred;
+use Modules\Inventory\Exceptions\InsufficientStockException;
+use Modules\Inventory\Exceptions\InvalidStockOperationException;
+use Modules\Inventory\Models\StockMovement;
+use Modules\Inventory\Repositories\StockItemRepository;
+use Modules\Inventory\Repositories\StockMovementRepository;
+use Modules\Inventory\Repositories\WarehouseRepository;
 
 /**
  * Stock Movement Service
  *
- * Handles business logic for stock movements (receipts, shipments, transfers, adjustments).
+ * Handles all stock movements including receive, issue, transfer, adjust,
+ * reserve, and release operations. Validates quantities, prevents negative
+ * stock, and maintains transaction integrity.
  */
-class StockMovementService extends BaseService
+class StockMovementService
 {
-    /**
-     * StockMovementService constructor.
-     */
     public function __construct(
-        protected StockMovementRepositoryInterface $stockMovementRepository,
-        protected StockLevelRepositoryInterface $stockLevelRepository
+        private StockMovementRepository $stockMovementRepository,
+        private StockItemRepository $stockItemRepository,
+        private WarehouseRepository $warehouseRepository
     ) {}
 
     /**
-     * Receive stock into warehouse.
+     * Process stock receipt (goods received into warehouse).
+     *
+     * @param  array  $data  Movement data
      */
-    public function receiveStock(array $data): StockMovement
+    public function processReceipt(array $data): StockMovement
     {
-        return $this->executeInTransaction(function () use ($data) {
-            $movement = $this->createStockMovement(array_merge($data, [
-                'movement_type' => 'receipt',
-            ]));
+        return TransactionHelper::execute(function () use ($data) {
+            // Validate warehouse can accept stock
+            $warehouse = $this->warehouseRepository->findOrFail($data['to_warehouse_id']);
+            if (! $warehouse->canAcceptStock()) {
+                throw new InvalidStockOperationException(
+                    "Warehouse {$warehouse->name} cannot accept stock"
+                );
+            }
 
-            $this->updateStockLevel(
-                $data['product_id'],
-                $data['warehouse_id'],
-                $data['quantity'],
-                'add',
-                $data['unit_cost'] ?? null,
-                $data['stock_location_id'] ?? null
-            );
+            // Validate quantity
+            $this->validatePositiveQuantity($data['quantity']);
 
-            event(new StockMovementRecorded($movement));
-
-            $this->logInfo('Stock received', [
-                'movement_id' => $movement->id,
+            // Create movement record
+            $movement = $this->stockMovementRepository->create([
+                'tenant_id' => $data['tenant_id'],
+                'organization_id' => $data['organization_id'] ?? null,
                 'product_id' => $data['product_id'],
-                'quantity' => $data['quantity'],
-            ]);
-
-            return $movement;
-        });
-    }
-
-    /**
-     * Ship stock out of warehouse.
-     */
-    public function shipStock(array $data): StockMovement
-    {
-        return $this->executeInTransaction(function () use ($data) {
-            $movement = $this->createStockMovement(array_merge($data, [
-                'movement_type' => 'shipment',
-            ]));
-
-            $this->updateStockLevel(
-                $data['product_id'],
-                $data['warehouse_id'],
-                $data['quantity'],
-                'remove',
-                null,
-                $data['stock_location_id'] ?? null
-            );
-
-            event(new StockMovementRecorded($movement));
-
-            $this->logInfo('Stock shipped', [
-                'movement_id' => $movement->id,
-                'product_id' => $data['product_id'],
-                'quantity' => $data['quantity'],
-            ]);
-
-            return $movement;
-        });
-    }
-
-    /**
-     * Transfer stock between warehouses or locations.
-     */
-    public function transferStock(array $data): array
-    {
-        return $this->executeInTransaction(function () use ($data) {
-            // Create outbound movement
-            $outboundMovement = $this->createStockMovement(array_merge($data, [
-                'movement_type' => 'transfer_out',
-                'warehouse_id' => $data['from_warehouse_id'],
-                'stock_location_id' => $data['from_location_id'] ?? null,
                 'to_warehouse_id' => $data['to_warehouse_id'],
-                'to_location_id' => $data['to_location_id'] ?? null,
-            ]));
+                'from_warehouse_id' => null,
+                'type' => StockMovementType::RECEIPT,
+                'quantity' => $data['quantity'],
+                'cost' => $data['unit_cost'] ?? $data['cost'] ?? null,
+                'reference_type' => $data['reference_type'] ?? null,
+                'reference_id' => $data['reference_id'] ?? null,
+                'reference_number' => $data['reference_number'] ?? null,
+                'movement_date' => $data['movement_date'] ?? now(),
+                'notes' => $data['notes'] ?? null,
+                'created_by' => $data['created_by'] ?? null,
+            ]);
 
-            // Create inbound movement
-            $inboundMovement = $this->createStockMovement(array_merge($data, [
-                'movement_type' => 'transfer_in',
-                'warehouse_id' => $data['to_warehouse_id'],
-                'stock_location_id' => $data['to_location_id'] ?? null,
-                'from_warehouse_id' => $data['from_warehouse_id'],
-                'from_location_id' => $data['from_location_id'] ?? null,
-            ]));
-
-            // Update stock levels
-            $this->updateStockLevel(
-                $data['product_id'],
-                $data['from_warehouse_id'],
-                $data['quantity'],
-                'remove',
-                null,
-                $data['from_location_id'] ?? null
-            );
-
-            $this->updateStockLevel(
+            // Update stock item
+            $this->increaseStock(
                 $data['product_id'],
                 $data['to_warehouse_id'],
                 $data['quantity'],
-                'add',
-                $data['unit_cost'] ?? null,
-                $data['to_location_id'] ?? null
+                $data['unit_cost'] ?? $data['cost'] ?? null
             );
 
-            event(new StockMovementRecorded($outboundMovement));
-            event(new StockMovementRecorded($inboundMovement));
+            // Fire event
+            event(new StockReceived($movement));
 
-            $this->logInfo('Stock transferred', [
+            return $movement->load(['product', 'toWarehouse']);
+        });
+    }
+
+    /**
+     * Process stock issue (goods issued from warehouse).
+     *
+     * @param  array  $data  Movement data
+     */
+    public function processIssue(array $data): StockMovement
+    {
+        return TransactionHelper::execute(function () use ($data) {
+            // Validate warehouse can issue stock
+            $warehouse = $this->warehouseRepository->findOrFail($data['from_warehouse_id']);
+            if (! $warehouse->canIssueStock()) {
+                throw new InvalidStockOperationException(
+                    "Warehouse {$warehouse->name} cannot issue stock"
+                );
+            }
+
+            // Validate quantity
+            $this->validatePositiveQuantity($data['quantity']);
+
+            // Check available stock
+            $this->validateSufficientStock(
+                $data['product_id'],
+                $data['from_warehouse_id'],
+                $data['quantity']
+            );
+
+            // Create movement record
+            $movement = $this->stockMovementRepository->create([
+                'tenant_id' => $data['tenant_id'],
+                'organization_id' => $data['organization_id'] ?? null,
+                'product_id' => $data['product_id'],
+                'from_warehouse_id' => $data['from_warehouse_id'],
+                'to_warehouse_id' => null,
+                'type' => StockMovementType::ISSUE,
+                'quantity' => $data['quantity'],
+                'cost' => $data['unit_cost'] ?? $data['cost'] ?? null,
+                'reference_type' => $data['reference_type'] ?? null,
+                'reference_id' => $data['reference_id'] ?? null,
+                'reference_number' => $data['reference_number'] ?? null,
+                'movement_date' => $data['movement_date'] ?? now(),
+                'notes' => $data['notes'] ?? null,
+                'created_by' => $data['created_by'] ?? null,
+            ]);
+
+            // Update stock item
+            $this->decreaseStock(
+                $data['product_id'],
+                $data['from_warehouse_id'],
+                $data['quantity']
+            );
+
+            // Fire event
+            event(new StockIssued($movement));
+
+            return $movement->load(['product', 'fromWarehouse']);
+        });
+    }
+
+    /**
+     * Process stock transfer (goods moved between warehouses).
+     *
+     * @param  array  $data  Movement data
+     */
+    public function processTransfer(array $data): StockMovement
+    {
+        return TransactionHelper::execute(function () use ($data) {
+            // Validate warehouses
+            $fromWarehouse = $this->warehouseRepository->findOrFail($data['from_warehouse_id']);
+            $toWarehouse = $this->warehouseRepository->findOrFail($data['to_warehouse_id']);
+
+            if ($data['from_warehouse_id'] === $data['to_warehouse_id']) {
+                throw new InvalidStockOperationException(
+                    'Cannot transfer stock to the same warehouse'
+                );
+            }
+
+            if (! $fromWarehouse->canIssueStock()) {
+                throw new InvalidStockOperationException(
+                    "Source warehouse {$fromWarehouse->name} cannot issue stock"
+                );
+            }
+
+            if (! $toWarehouse->canAcceptStock()) {
+                throw new InvalidStockOperationException(
+                    "Destination warehouse {$toWarehouse->name} cannot accept stock"
+                );
+            }
+
+            // Validate quantity
+            $this->validatePositiveQuantity($data['quantity']);
+
+            // Check available stock in source warehouse
+            $this->validateSufficientStock(
+                $data['product_id'],
+                $data['from_warehouse_id'],
+                $data['quantity']
+            );
+
+            // Create movement record
+            $movement = $this->stockMovementRepository->create([
+                'tenant_id' => $data['tenant_id'],
+                'organization_id' => $data['organization_id'] ?? null,
                 'product_id' => $data['product_id'],
                 'from_warehouse_id' => $data['from_warehouse_id'],
                 'to_warehouse_id' => $data['to_warehouse_id'],
+                'type' => StockMovementType::TRANSFER,
                 'quantity' => $data['quantity'],
+                'cost' => $data['unit_cost'] ?? $data['cost'] ?? null,
+                'reference_type' => $data['reference_type'] ?? null,
+                'reference_id' => $data['reference_id'] ?? null,
+                'reference_number' => $data['reference_number'] ?? null,
+                'movement_date' => $data['movement_date'] ?? now(),
+                'notes' => $data['notes'] ?? null,
+                'created_by' => $data['created_by'] ?? null,
             ]);
 
-            return [$outboundMovement, $inboundMovement];
+            // Update stock items
+            $this->decreaseStock($data['product_id'], $data['from_warehouse_id'], $data['quantity']);
+            $this->increaseStock(
+                $data['product_id'],
+                $data['to_warehouse_id'],
+                $data['quantity'],
+                $data['unit_cost'] ?? $data['cost'] ?? null
+            );
+
+            // Fire event
+            event(new StockTransferred($movement));
+
+            return $movement->load(['product', 'fromWarehouse', 'toWarehouse']);
         });
     }
 
     /**
-     * Adjust stock levels (inventory count adjustment).
+     * Process stock adjustment (manual correction).
+     *
+     * @param  array  $data  Movement data
      */
-    public function adjustStock(array $data): StockMovement
+    public function processAdjustment(array $data): StockMovement
     {
-        return $this->executeInTransaction(function () use ($data) {
-            $currentLevel = $this->stockLevelRepository->getByProductAndWarehouse(
-                $data['product_id'],
-                $data['warehouse_id']
-            );
+        return TransactionHelper::execute(function () use ($data) {
+            $warehouse = $this->warehouseRepository->findOrFail($data['warehouse_id']);
+            $adjustmentQuantity = (string) $data['adjustment_quantity'];
 
-            $currentQuantity = $currentLevel?->quantity_on_hand ?? 0;
-            $difference = $data['new_quantity'] - $currentQuantity;
+            // Validate adjustment is not zero
+            if (MathHelper::equals($adjustmentQuantity, '0')) {
+                throw new InvalidStockOperationException('Adjustment quantity cannot be zero');
+            }
 
-            $movementType = $difference >= 0 ? 'adjustment_in' : 'adjustment_out';
-            $quantity = abs($difference);
+            $isIncrease = MathHelper::greaterThan($adjustmentQuantity, '0');
+            $absoluteQuantity = MathHelper::abs($adjustmentQuantity);
 
-            $movement = $this->createStockMovement(array_merge($data, [
-                'movement_type' => $movementType,
-                'quantity' => $quantity,
-            ]));
+            // If decreasing, validate sufficient stock
+            if (! $isIncrease) {
+                $this->validateSufficientStock(
+                    $data['product_id'],
+                    $data['warehouse_id'],
+                    $absoluteQuantity
+                );
+            }
 
-            $this->updateStockLevel(
+            // Create movement record
+            $movement = $this->stockMovementRepository->create([
+                'tenant_id' => $data['tenant_id'],
+                'organization_id' => $data['organization_id'] ?? null,
+                'product_id' => $data['product_id'],
+                'from_warehouse_id' => $isIncrease ? null : $data['warehouse_id'],
+                'to_warehouse_id' => $isIncrease ? $data['warehouse_id'] : null,
+                'type' => StockMovementType::ADJUSTMENT,
+                'quantity' => $absoluteQuantity,
+                'cost' => $data['unit_cost'] ?? $data['cost'] ?? null,
+                'reference_type' => $data['reference_type'] ?? null,
+                'reference_id' => $data['reference_id'] ?? null,
+                'reference_number' => $data['reference_number'] ?? null,
+                'movement_date' => $data['movement_date'] ?? now(),
+                'notes' => $data['notes'] ?? null,
+                'created_by' => $data['created_by'] ?? null,
+            ]);
+
+            // Update stock item
+            if ($isIncrease) {
+                $this->increaseStock(
+                    $data['product_id'],
+                    $data['warehouse_id'],
+                    $absoluteQuantity,
+                    $data['unit_cost'] ?? $data['cost'] ?? null
+                );
+            } else {
+                $this->decreaseStock($data['product_id'], $data['warehouse_id'], $absoluteQuantity);
+            }
+
+            // Fire event
+            event(new StockAdjusted($movement));
+
+            return $movement->load(['product', 'fromWarehouse', 'toWarehouse']);
+        });
+    }
+
+    /**
+     * Reserve stock for orders or allocations.
+     *
+     * @param  array  $data  Movement data
+     */
+    public function reserveStock(array $data): StockMovement
+    {
+        return TransactionHelper::execute(function () use ($data) {
+            // Validate quantity
+            $this->validatePositiveQuantity($data['quantity']);
+
+            // Check available (unreserved) stock
+            $this->validateSufficientAvailableStock(
                 $data['product_id'],
                 $data['warehouse_id'],
-                $quantity,
-                $difference >= 0 ? 'add' : 'remove',
-                $data['unit_cost'] ?? null,
-                $data['stock_location_id'] ?? null
+                $data['quantity']
             );
 
-            event(new StockMovementRecorded($movement));
-
-            $this->logInfo('Stock adjusted', [
-                'movement_id' => $movement->id,
+            // Create movement record
+            $movement = $this->stockMovementRepository->create([
+                'tenant_id' => $data['tenant_id'],
+                'organization_id' => $data['organization_id'] ?? null,
                 'product_id' => $data['product_id'],
-                'old_quantity' => $currentQuantity,
-                'new_quantity' => $data['new_quantity'],
+                'from_warehouse_id' => $data['warehouse_id'],
+                'to_warehouse_id' => null,
+                'type' => StockMovementType::RESERVED,
+                'quantity' => $data['quantity'],
+                'reference_type' => $data['reference_type'] ?? null,
+                'reference_id' => $data['reference_id'] ?? null,
+                'reference_number' => $data['reference_number'] ?? null,
+                'movement_date' => $data['movement_date'] ?? now(),
+                'notes' => $data['notes'] ?? null,
+                'created_by' => $data['created_by'] ?? null,
             ]);
 
-            return $movement;
+            // Update reserved quantity
+            $this->reserveStockQuantity($data['product_id'], $data['warehouse_id'], $data['quantity']);
+
+            // Fire event
+            event(new StockReserved($movement));
+
+            return $movement->load(['product', 'fromWarehouse']);
         });
     }
 
     /**
-     * Get stock movements for a product.
+     * Release reserved stock.
+     *
+     * @param  array  $data  Movement data
      */
-    public function getMovementHistory(int $productId, ?int $limit = null)
+    public function releaseStock(array $data): StockMovement
     {
-        return $this->stockMovementRepository->getByProduct($productId, $limit);
+        return TransactionHelper::execute(function () use ($data) {
+            // Validate quantity
+            $this->validatePositiveQuantity($data['quantity']);
+
+            // Create movement record
+            $movement = $this->stockMovementRepository->create([
+                'tenant_id' => $data['tenant_id'],
+                'organization_id' => $data['organization_id'] ?? null,
+                'product_id' => $data['product_id'],
+                'from_warehouse_id' => null,
+                'to_warehouse_id' => $data['warehouse_id'],
+                'type' => StockMovementType::RELEASED,
+                'quantity' => $data['quantity'],
+                'reference_type' => $data['reference_type'] ?? null,
+                'reference_id' => $data['reference_id'] ?? null,
+                'reference_number' => $data['reference_number'] ?? null,
+                'movement_date' => $data['movement_date'] ?? now(),
+                'notes' => $data['notes'] ?? null,
+                'created_by' => $data['created_by'] ?? null,
+            ]);
+
+            // Update reserved quantity
+            $this->releaseStockQuantity($data['product_id'], $data['warehouse_id'], $data['quantity']);
+
+            // Fire event
+            event(new StockReleased($movement));
+
+            return $movement->load(['product', 'toWarehouse']);
+        });
     }
 
     /**
-     * Create a stock movement record.
+     * Increase stock quantity in warehouse.
      */
-    protected function createStockMovement(array $data): StockMovement
+    private function increaseStock(string $productId, string $warehouseId, string $quantity, ?string $unitCost = null): void
     {
-        if (empty($data['movement_number'])) {
-            $data['movement_number'] = $this->generateMovementNumber($data['movement_type']);
-        }
+        $stockItem = $this->stockItemRepository->findByProductAndWarehouse($productId, $warehouseId);
 
-        if (empty($data['movement_date'])) {
-            $data['movement_date'] = now();
-        }
-
-        return $this->stockMovementRepository->create($data);
-    }
-
-    /**
-     * Update stock level after movement.
-     */
-    protected function updateStockLevel(
-        int $productId,
-        int $warehouseId,
-        float $quantity,
-        string $operation,
-        ?float $unitCost = null,
-        ?int $locationId = null
-    ): void {
-        $stockLevel = $locationId
-            ? $this->stockLevelRepository->getByProductAndLocation($productId, $locationId)
-            : $this->stockLevelRepository->getByProductAndWarehouse($productId, $warehouseId);
-
-        if (! $stockLevel) {
-            $stockLevel = $this->stockLevelRepository->create([
+        if (! $stockItem) {
+            // Create new stock item
+            $this->stockItemRepository->create([
                 'product_id' => $productId,
                 'warehouse_id' => $warehouseId,
-                'stock_location_id' => $locationId,
-                'quantity_on_hand' => 0,
-                'quantity_reserved' => 0,
-                'quantity_available' => 0,
-                'unit_cost' => $unitCost ?? 0,
-                'currency' => 'USD',
+                'quantity' => $quantity,
+                'available_quantity' => $quantity,
+                'reserved_quantity' => '0',
+                'average_cost' => $unitCost ?? '0',
             ]);
-        }
-
-        if ($operation === 'add') {
-            $stockLevel->addQuantity($quantity, $unitCost);
         } else {
-            $stockLevel->removeQuantity($quantity);
-        }
+            // Update existing stock item
+            $newQuantity = MathHelper::add($stockItem->quantity, $quantity);
+            $newAvailable = MathHelper::add($stockItem->available_quantity, $quantity);
 
-        event(new StockLevelChanged($stockLevel));
+            $updateData = [
+                'quantity' => $newQuantity,
+                'available_quantity' => $newAvailable,
+            ];
+
+            // Update average cost if unit cost is provided
+            if ($unitCost !== null && MathHelper::greaterThan($unitCost, '0')) {
+                $totalValue = MathHelper::multiply($stockItem->quantity, $stockItem->average_cost);
+                $addedValue = MathHelper::multiply($quantity, $unitCost);
+                $newTotalValue = MathHelper::add($totalValue, $addedValue);
+                $updateData['average_cost'] = MathHelper::divide($newTotalValue, $newQuantity);
+            }
+
+            $this->stockItemRepository->update($stockItem->id, $updateData);
+        }
     }
 
     /**
-     * Generate a unique movement number.
+     * Decrease stock quantity in warehouse.
      */
-    protected function generateMovementNumber(string $movementType): string
+    private function decreaseStock(string $productId, string $warehouseId, string $quantity): void
     {
-        $prefix = match ($movementType) {
-            'receipt' => 'RCV',
-            'shipment' => 'SHP',
-            'transfer_in', 'transfer_out' => 'TRF',
-            'adjustment_in', 'adjustment_out' => 'ADJ',
-            default => 'MOV',
-        };
+        $stockItem = $this->stockItemRepository->findByProductAndWarehouseOrFail($productId, $warehouseId);
 
-        $date = date('Ymd');
+        $newQuantity = MathHelper::subtract($stockItem->quantity, $quantity);
+        $newAvailable = MathHelper::subtract($stockItem->available_quantity, $quantity);
 
-        $lastMovement = $this->stockMovementRepository
-            ->getModel()
-            ->where('movement_number', 'LIKE', "{$prefix}-{$date}-%")
-            ->orderBy('movement_number', 'desc')
-            ->first();
+        $this->stockItemRepository->update($stockItem->id, [
+            'quantity' => $newQuantity,
+            'available_quantity' => $newAvailable,
+        ]);
 
-        if ($lastMovement) {
-            $parts = explode('-', $lastMovement->movement_number);
-            $sequence = (int) end($parts) + 1;
-        } else {
-            $sequence = 1;
+        // Check reorder point
+        $this->checkReorderPoint($stockItem, $newAvailable);
+    }
+
+    /**
+     * Reserve stock quantity.
+     */
+    private function reserveStockQuantity(string $productId, string $warehouseId, string $quantity): void
+    {
+        $stockItem = $this->stockItemRepository->findByProductAndWarehouseOrFail($productId, $warehouseId);
+
+        $newReserved = MathHelper::add($stockItem->reserved_quantity, $quantity);
+        $newAvailable = MathHelper::subtract($stockItem->available_quantity, $quantity);
+
+        $this->stockItemRepository->update($stockItem->id, [
+            'reserved_quantity' => $newReserved,
+            'available_quantity' => $newAvailable,
+        ]);
+    }
+
+    /**
+     * Release reserved stock quantity.
+     */
+    private function releaseStockQuantity(string $productId, string $warehouseId, string $quantity): void
+    {
+        $stockItem = $this->stockItemRepository->findByProductAndWarehouseOrFail($productId, $warehouseId);
+
+        $newReserved = MathHelper::subtract($stockItem->reserved_quantity, $quantity);
+        $newAvailable = MathHelper::add($stockItem->available_quantity, $quantity);
+
+        $this->stockItemRepository->update($stockItem->id, [
+            'reserved_quantity' => MathHelper::max($newReserved, '0'),
+            'available_quantity' => $newAvailable,
+        ]);
+    }
+
+    /**
+     * Validate quantity is positive.
+     *
+     * @throws InvalidStockOperationException
+     */
+    private function validatePositiveQuantity(string $quantity): void
+    {
+        if (MathHelper::lessThan($quantity, '0') || MathHelper::equals($quantity, '0')) {
+            throw new InvalidStockOperationException('Quantity must be greater than zero');
+        }
+    }
+
+    /**
+     * Validate sufficient stock is available.
+     *
+     * @throws InsufficientStockException
+     */
+    private function validateSufficientStock(string $productId, string $warehouseId, string $quantity): void
+    {
+        $stockItem = $this->stockItemRepository->findByProductAndWarehouse($productId, $warehouseId);
+
+        if (! $stockItem || MathHelper::lessThan($stockItem->quantity, $quantity)) {
+            $available = $stockItem ? $stockItem->quantity : '0';
+            throw new InsufficientStockException(
+                "Insufficient stock. Required: {$quantity}, Available: {$available}"
+            );
         }
 
-        return sprintf('%s-%s-%04d', $prefix, $date, $sequence);
+        // Check if allow negative stock is disabled
+        if (! config('inventory.allow_negative_stock', false)) {
+            $resultingQuantity = MathHelper::subtract($stockItem->quantity, $quantity);
+            if (MathHelper::lessThan($resultingQuantity, '0')) {
+                throw new InsufficientStockException(
+                    "Operation would result in negative stock. Available: {$stockItem->quantity}"
+                );
+            }
+        }
+    }
+
+    /**
+     * Validate sufficient available (unreserved) stock.
+     *
+     * @throws InsufficientStockException
+     */
+    private function validateSufficientAvailableStock(string $productId, string $warehouseId, string $quantity): void
+    {
+        $stockItem = $this->stockItemRepository->findByProductAndWarehouse($productId, $warehouseId);
+
+        if (! $stockItem || MathHelper::lessThan($stockItem->available_quantity, $quantity)) {
+            $available = $stockItem ? $stockItem->available_quantity : '0';
+            throw new InsufficientStockException(
+                "Insufficient available stock. Required: {$quantity}, Available: {$available}"
+            );
+        }
+    }
+
+    /**
+     * Check if reorder point has been reached.
+     */
+    private function checkReorderPoint($stockItem, string $newAvailable): void
+    {
+        if ($stockItem->reorder_point !== null &&
+            MathHelper::lessThan($newAvailable, $stockItem->reorder_point) &&
+            MathHelper::greaterThan($stockItem->available_quantity, $stockItem->reorder_point)) {
+
+            event(new ReorderPointReached(
+                $stockItem->product_id,
+                $stockItem->warehouse_id,
+                $newAvailable,
+                $stockItem->reorder_point
+            ));
+        }
     }
 }

@@ -1,144 +1,88 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Sales\Providers;
 
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
-use Modules\Sales\Repositories\Contracts\CustomerRepositoryInterface;
-use Modules\Sales\Repositories\Contracts\LeadRepositoryInterface;
-use Modules\Sales\Repositories\Contracts\SalesOrderLineRepositoryInterface;
-use Modules\Sales\Repositories\Contracts\SalesOrderRepositoryInterface;
-use Modules\Sales\Repositories\CustomerRepository;
-use Modules\Sales\Repositories\LeadRepository;
-use Modules\Sales\Repositories\SalesOrderLineRepository;
-use Modules\Sales\Repositories\SalesOrderRepository;
+use Modules\Sales\Models\Invoice;
+use Modules\Sales\Models\Order;
+use Modules\Sales\Models\Quotation;
+use Modules\Sales\Policies\InvoicePolicy;
+use Modules\Sales\Policies\OrderPolicy;
+use Modules\Sales\Policies\QuotationPolicy;
 
 class SalesServiceProvider extends ServiceProvider
 {
-    /**
-     * @var string
-     */
-    protected $moduleName = 'Sales';
-
-    /**
-     * @var string
-     */
-    protected $moduleNameLower = 'sales';
-
-    /**
-     * Boot the application events.
-     *
-     * @return void
-     */
-    public function boot()
+    public function register(): void
     {
-        $this->registerTranslations();
-        $this->registerConfig();
-        $this->registerViews();
-        $this->loadMigrationsFrom(module_path($this->moduleName, 'Database/Migrations'));
-    }
-
-    /**
-     * Register the service provider.
-     *
-     * @return void
-     */
-    public function register()
-    {
-        $this->app->register(RouteServiceProvider::class);
-        $this->app->register(EventServiceProvider::class);
+        // Register module configuration
+        $this->mergeConfigFrom(__DIR__.'/../Config/sales.php', 'sales');
 
         // Register repositories
-        $this->app->bind(
-            CustomerRepositoryInterface::class,
-            CustomerRepository::class
-        );
+        $this->app->singleton(\Modules\Sales\Repositories\QuotationRepository::class);
+        $this->app->singleton(\Modules\Sales\Repositories\OrderRepository::class);
+        $this->app->singleton(\Modules\Sales\Repositories\InvoiceRepository::class);
 
-        $this->app->bind(
-            LeadRepositoryInterface::class,
-            LeadRepository::class
-        );
-
-        $this->app->bind(
-            SalesOrderRepositoryInterface::class,
-            SalesOrderRepository::class
-        );
-
-        $this->app->bind(
-            SalesOrderLineRepositoryInterface::class,
-            SalesOrderLineRepository::class
-        );
+        // Register services
+        $this->app->singleton(\Modules\Sales\Services\QuotationService::class);
+        $this->app->singleton(\Modules\Sales\Services\OrderService::class);
+        $this->app->singleton(\Modules\Sales\Services\InvoiceService::class);
     }
 
-    /**
-     * Register config.
-     *
-     * @return void
-     */
-    protected function registerConfig()
+    public function boot(): void
     {
-        $this->publishes([
-            module_path($this->moduleName, 'Config/config.php') => config_path($this->moduleNameLower.'.php'),
-        ], 'config');
-        $this->mergeConfigFrom(
-            module_path($this->moduleName, 'Config/config.php'), $this->moduleNameLower
-        );
-    }
+        // Load migrations
+        $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
 
-    /**
-     * Register views.
-     *
-     * @return void
-     */
-    public function registerViews()
-    {
-        $viewPath = resource_path('views/modules/'.$this->moduleNameLower);
+        // Load routes
+        $this->loadRoutesFrom(__DIR__.'/../routes/api.php');
 
-        $sourcePath = module_path($this->moduleName, 'Resources/views');
+        // Register policies
+        Gate::policy(Quotation::class, QuotationPolicy::class);
+        Gate::policy(Order::class, OrderPolicy::class);
+        Gate::policy(Invoice::class, InvoicePolicy::class);
 
-        $this->publishes([
-            $sourcePath => $viewPath,
-        ], ['views', $this->moduleNameLower.'-module-views']);
-
-        $this->loadViewsFrom(array_merge($this->getPublishableViewPaths(), [$sourcePath]), $this->moduleNameLower);
-    }
-
-    /**
-     * Register translations.
-     *
-     * @return void
-     */
-    public function registerTranslations()
-    {
-        $langPath = resource_path('lang/modules/'.$this->moduleNameLower);
-
-        if (is_dir($langPath)) {
-            $this->loadTranslationsFrom($langPath, $this->moduleNameLower);
-            $this->loadJsonTranslationsFrom($langPath);
-        } else {
-            $this->loadTranslationsFrom(module_path($this->moduleName, 'Resources/lang'), $this->moduleNameLower);
-            $this->loadJsonTranslationsFrom(module_path($this->moduleName, 'Resources/lang'));
+        // Register event listeners (if Audit module is available)
+        if (config('audit.enabled', false)) {
+            $this->registerEventListeners();
         }
     }
 
     /**
-     * Get the services provided by the provider.
-     *
-     * @return array
+     * Register event listeners for audit logging.
      */
-    public function provides()
+    private function registerEventListeners(): void
     {
-        return [];
-    }
-
-    private function getPublishableViewPaths(): array
-    {
-        $paths = [];
-        foreach (\Config::get('view.paths') as $path) {
-            if (is_dir($path.'/modules/'.$this->moduleNameLower)) {
-                $paths[] = $path.'/modules/'.$this->moduleNameLower;
-            }
+        // Check if event listeners exist before registering
+        if (class_exists(\Modules\Sales\Listeners\LogQuotationCreated::class)) {
+            Event::listen(
+                \Modules\Sales\Events\QuotationCreated::class,
+                \Modules\Sales\Listeners\LogQuotationCreated::class
+            );
         }
 
-        return $paths;
+        if (class_exists(\Modules\Sales\Listeners\LogOrderCreated::class)) {
+            Event::listen(
+                \Modules\Sales\Events\OrderCreated::class,
+                \Modules\Sales\Listeners\LogOrderCreated::class
+            );
+        }
+
+        if (class_exists(\Modules\Sales\Listeners\LogInvoiceCreated::class)) {
+            Event::listen(
+                \Modules\Sales\Events\InvoiceCreated::class,
+                \Modules\Sales\Listeners\LogInvoiceCreated::class
+            );
+        }
+
+        if (class_exists(\Modules\Sales\Listeners\LogInvoicePaymentRecorded::class)) {
+            Event::listen(
+                \Modules\Sales\Events\InvoicePaymentRecorded::class,
+                \Modules\Sales\Listeners\LogInvoicePaymentRecorded::class
+            );
+        }
     }
 }

@@ -4,154 +4,127 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Providers;
 
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
-use Modules\Inventory\Repositories\Contracts\ProductCategoryRepositoryInterface;
-use Modules\Inventory\Repositories\Contracts\ProductRepositoryInterface;
-use Modules\Inventory\Repositories\Contracts\StockLevelRepositoryInterface;
-use Modules\Inventory\Repositories\Contracts\StockLocationRepositoryInterface;
-use Modules\Inventory\Repositories\Contracts\StockMovementRepositoryInterface;
-use Modules\Inventory\Repositories\Contracts\UnitOfMeasureRepositoryInterface;
-use Modules\Inventory\Repositories\Contracts\WarehouseRepositoryInterface;
-use Modules\Inventory\Repositories\ProductCategoryRepository;
-use Modules\Inventory\Repositories\ProductRepository;
-use Modules\Inventory\Repositories\StockLevelRepository;
-use Modules\Inventory\Repositories\StockLocationRepository;
-use Modules\Inventory\Repositories\StockMovementRepository;
-use Modules\Inventory\Repositories\UnitOfMeasureRepository;
-use Modules\Inventory\Repositories\WarehouseRepository;
+use Modules\Inventory\Models\StockCount;
+use Modules\Inventory\Models\StockItem;
+use Modules\Inventory\Models\StockMovement;
+use Modules\Inventory\Models\Warehouse;
+use Modules\Inventory\Policies\StockCountPolicy;
+use Modules\Inventory\Policies\StockItemPolicy;
+use Modules\Inventory\Policies\StockMovementPolicy;
+use Modules\Inventory\Policies\WarehousePolicy;
 
 class InventoryServiceProvider extends ServiceProvider
 {
     /**
-     * @var string
-     */
-    protected $moduleName = 'Inventory';
-
-    /**
-     * @var string
-     */
-    protected $moduleNameLower = 'inventory';
-
-    /**
-     * Boot the application events.
-     */
-    public function boot(): void
-    {
-        $this->registerTranslations();
-        $this->registerConfig();
-        $this->registerViews();
-        $this->loadMigrationsFrom(module_path($this->moduleName, 'Database/Migrations'));
-    }
-
-    /**
-     * Register the service provider.
+     * Register services.
      */
     public function register(): void
     {
-        $this->app->register(RouteServiceProvider::class);
-        $this->app->register(EventServiceProvider::class);
+        // Register configuration
+        $this->mergeConfigFrom(
+            __DIR__.'/../Config/inventory.php',
+            'inventory'
+        );
 
         // Register repositories
         $this->app->bind(
-            ProductRepositoryInterface::class,
-            ProductRepository::class
+            \Modules\Inventory\Repositories\WarehouseRepository::class,
+            fn ($app) => new \Modules\Inventory\Repositories\WarehouseRepository
         );
 
         $this->app->bind(
-            ProductCategoryRepositoryInterface::class,
-            ProductCategoryRepository::class
+            \Modules\Inventory\Repositories\StockItemRepository::class,
+            fn ($app) => new \Modules\Inventory\Repositories\StockItemRepository
         );
 
         $this->app->bind(
-            WarehouseRepositoryInterface::class,
-            WarehouseRepository::class
+            \Modules\Inventory\Repositories\StockMovementRepository::class,
+            fn ($app) => new \Modules\Inventory\Repositories\StockMovementRepository
         );
 
         $this->app->bind(
-            StockLocationRepositoryInterface::class,
-            StockLocationRepository::class
+            \Modules\Inventory\Repositories\StockCountRepository::class,
+            fn ($app) => new \Modules\Inventory\Repositories\StockCountRepository
         );
 
         $this->app->bind(
-            StockLevelRepositoryInterface::class,
-            StockLevelRepository::class
+            \Modules\Inventory\Repositories\SerialNumberRepository::class,
+            fn ($app) => new \Modules\Inventory\Repositories\SerialNumberRepository
         );
 
-        $this->app->bind(
-            StockMovementRepositoryInterface::class,
-            StockMovementRepository::class
+        // Register services
+        $this->app->singleton(
+            \Modules\Inventory\Services\WarehouseService::class,
+            fn ($app) => new \Modules\Inventory\Services\WarehouseService(
+                $app->make(\Modules\Inventory\Repositories\WarehouseRepository::class)
+            )
         );
 
-        $this->app->bind(
-            UnitOfMeasureRepositoryInterface::class,
-            UnitOfMeasureRepository::class
+        $this->app->singleton(
+            \Modules\Inventory\Services\StockMovementService::class,
+            fn ($app) => new \Modules\Inventory\Services\StockMovementService(
+                $app->make(\Modules\Inventory\Repositories\StockMovementRepository::class),
+                $app->make(\Modules\Inventory\Repositories\StockItemRepository::class),
+                $app->make(\Modules\Inventory\Repositories\WarehouseRepository::class)
+            )
+        );
+
+        $this->app->singleton(
+            \Modules\Inventory\Services\InventoryValuationService::class,
+            fn ($app) => new \Modules\Inventory\Services\InventoryValuationService(
+                $app->make(\Modules\Inventory\Repositories\StockItemRepository::class),
+                $app->make(\Modules\Inventory\Repositories\StockMovementRepository::class)
+            )
+        );
+
+        $this->app->singleton(
+            \Modules\Inventory\Services\StockCountService::class,
+            fn ($app) => new \Modules\Inventory\Services\StockCountService(
+                $app->make(\Modules\Inventory\Repositories\StockCountRepository::class),
+                $app->make(\Modules\Inventory\Repositories\StockItemRepository::class),
+                $app->make(\Modules\Inventory\Services\StockMovementService::class)
+            )
+        );
+
+        $this->app->singleton(
+            \Modules\Inventory\Services\ReorderService::class,
+            fn ($app) => new \Modules\Inventory\Services\ReorderService(
+                $app->make(\Modules\Inventory\Repositories\StockItemRepository::class)
+            )
+        );
+
+        $this->app->singleton(
+            \Modules\Inventory\Services\SerialNumberService::class,
+            fn ($app) => new \Modules\Inventory\Services\SerialNumberService(
+                $app->make(\Modules\Inventory\Repositories\SerialNumberRepository::class)
+            )
         );
     }
 
     /**
-     * Register config.
+     * Bootstrap services.
      */
-    protected function registerConfig(): void
+    public function boot(): void
     {
-        $this->publishes([
-            module_path($this->moduleName, 'Config/config.php') => config_path($this->moduleNameLower.'.php'),
-        ], 'config');
-        $this->mergeConfigFrom(
-            module_path($this->moduleName, 'Config/config.php'), $this->moduleNameLower
-        );
-    }
+        // Load migrations
+        $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
 
-    /**
-     * Register views.
-     */
-    public function registerViews(): void
-    {
-        $viewPath = resource_path('views/modules/'.$this->moduleNameLower);
-        $sourcePath = module_path($this->moduleName, 'Resources/views');
+        // Load routes
+        $this->loadRoutesFrom(__DIR__.'/../routes/api.php');
 
-        $this->publishes([
-            $sourcePath => $viewPath,
-        ], ['views', $this->moduleNameLower.'-module-views']);
+        // Register policies
+        Gate::policy(Warehouse::class, WarehousePolicy::class);
+        Gate::policy(StockItem::class, StockItemPolicy::class);
+        Gate::policy(StockMovement::class, StockMovementPolicy::class);
+        Gate::policy(StockCount::class, StockCountPolicy::class);
 
-        $this->loadViewsFrom(array_merge($this->getPublishableViewPaths(), [$sourcePath]), $this->moduleNameLower);
-    }
-
-    /**
-     * Register translations.
-     */
-    public function registerTranslations(): void
-    {
-        $langPath = resource_path('lang/modules/'.$this->moduleNameLower);
-
-        if (is_dir($langPath)) {
-            $this->loadTranslationsFrom($langPath, $this->moduleNameLower);
-            $this->loadJsonTranslationsFrom($langPath);
-        } else {
-            $this->loadTranslationsFrom(module_path($this->moduleName, 'Resources/lang'), $this->moduleNameLower);
-            $this->loadJsonTranslationsFrom(module_path($this->moduleName, 'Resources/lang'));
+        // Publish configuration
+        if ($this->app->runningInConsole()) {
+            $this->publishes([
+                __DIR__.'/../Config/inventory.php' => config_path('inventory.php'),
+            ], 'inventory-config');
         }
-    }
-
-    /**
-     * Get the services provided by the provider.
-     */
-    public function provides(): array
-    {
-        return [];
-    }
-
-    /**
-     * Get publishable view paths.
-     */
-    private function getPublishableViewPaths(): array
-    {
-        $paths = [];
-        foreach (\Config::get('view.paths') as $path) {
-            if (is_dir($path.'/modules/'.$this->moduleNameLower)) {
-                $paths[] = $path.'/modules/'.$this->moduleNameLower;
-            }
-        }
-
-        return $paths;
     }
 }
