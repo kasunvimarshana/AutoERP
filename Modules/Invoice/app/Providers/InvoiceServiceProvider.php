@@ -81,7 +81,7 @@ class InvoiceServiceProvider extends ServiceProvider
 
     protected function registerConfig(): void
     {
-        $configPath = module_path($this->name, config('modules . paths . generator . config . path'));
+        $configPath = module_path($this->name, config('modules.paths.generator.config.path'));
 
         if (is_dir($configPath)) {
             $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($configPath));
@@ -89,8 +89,8 @@ class InvoiceServiceProvider extends ServiceProvider
             foreach ($iterator as $file) {
                 if ($file->isFile() && $file->getExtension() === 'php') {
                     $config = str_replace($configPath . DIRECTORY_SEPARATOR, '', $file->getPathname());
-                    $config_key = str_replace([DIRECTORY_SEPARATOR, ' . php'], [' . ', ''], $config);
-                    $segments = explode(' . ', $this->nameLower . '.' . $config_key);
+                    $config_key = str_replace([DIRECTORY_SEPARATOR, '.php'], ['.', ''], $config);
+                    $segments = explode('.', $this->nameLower . '.' . $config_key);
 
                     // Remove duplicated adjacent segments
                     $normalized = [];
@@ -100,7 +100,7 @@ class InvoiceServiceProvider extends ServiceProvider
                         }
                     }
 
-                    $key = ($config === 'config . php') ? $this->nameLower : implode(' . ', $normalized);
+                    $key = ($config === 'config.php') ? $this->nameLower : implode('.', $normalized);
 
                     $this->publishes([$file->getPathname() => config_path($config)], 'config');
                     $this->merge_config_from($file->getPathname(), $key);
@@ -132,7 +132,7 @@ class InvoiceServiceProvider extends ServiceProvider
 
         $this->loadViewsFrom(array_merge($this->getPublishableViewPaths(), [$sourcePath]), $this->nameLower);
 
-        Blade::componentNamespace(config('modules . namespace') . '\\' . $this->name . '\\View\\Components', $this->nameLower);
+        Blade::componentNamespace(config('modules.namespace') . '\\' . $this->name . '\\View\\Components', $this->nameLower);
     }
 
     /**
@@ -146,7 +146,7 @@ class InvoiceServiceProvider extends ServiceProvider
     private function getPublishableViewPaths(): array
     {
         $paths = [];
-        foreach (config('view . paths') as $path) {
+        foreach (config('view.paths') as $path) {
             if (is_dir($path . '/modules/' . $this->nameLower)) {
                 $paths[] = $path . '/modules/' . $this->nameLower;
             }
