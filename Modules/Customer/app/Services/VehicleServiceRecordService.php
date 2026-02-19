@@ -24,6 +24,7 @@ class VehicleServiceRecordService extends BaseService
     /**
      * VehicleServiceRecordService constructor
      */
+
     public function __construct(
         VehicleServiceRecordRepository $repository,
         private readonly VehicleRepository $vehicleRepository,
@@ -40,6 +41,7 @@ class VehicleServiceRecordService extends BaseService
      * @throws ValidationException
      * @throws ServiceException
      */
+
     public function create(array $data): mixed
     {
         // Validate vehicle exists
@@ -69,7 +71,7 @@ class VehicleServiceRecordService extends BaseService
             $data['total_cost'] = ($data['labor_cost'] ?? 0) + ($data['parts_cost'] ?? 0);
         }
 
-        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        // Check if we\'re already in a transaction (e . g., from orchestrator or test)
 
 
         $shouldManageTransaction = DB::transactionLevel() === 0;
@@ -127,6 +129,7 @@ class VehicleServiceRecordService extends BaseService
      *
      * @throws ValidationException
      */
+
     public function update(int $id, array $data): mixed
     {
         // Recalculate total cost if labor or parts cost changed
@@ -143,6 +146,7 @@ class VehicleServiceRecordService extends BaseService
     /**
      * Get service records for a vehicle
      */
+
     public function getByVehicle(int $vehicleId): mixed
     {
         return $this->repository->getByVehicle($vehicleId);
@@ -151,6 +155,7 @@ class VehicleServiceRecordService extends BaseService
     /**
      * Get service records for a customer across all vehicles
      */
+
     public function getByCustomer(int $customerId): mixed
     {
         return $this->repository->getByCustomer($customerId);
@@ -159,6 +164,7 @@ class VehicleServiceRecordService extends BaseService
     /**
      * Get service records by branch (cross-branch query)
      */
+
     public function getByBranch(string $branchId): mixed
     {
         return $this->repository->getByBranch($branchId);
@@ -167,6 +173,7 @@ class VehicleServiceRecordService extends BaseService
     /**
      * Get cross-branch service history for a vehicle
      */
+
     public function getCrossBranchHistory(int $vehicleId): mixed
     {
         return $this->repository->getCrossBranchHistory($vehicleId);
@@ -175,6 +182,7 @@ class VehicleServiceRecordService extends BaseService
     /**
      * Get service records by service type
      */
+
     public function getByServiceType(string $serviceType): mixed
     {
         return $this->repository->getByServiceType($serviceType);
@@ -183,6 +191,7 @@ class VehicleServiceRecordService extends BaseService
     /**
      * Get service records by status
      */
+
     public function getByStatus(string $status): mixed
     {
         return $this->repository->getByStatus($status);
@@ -191,6 +200,7 @@ class VehicleServiceRecordService extends BaseService
     /**
      * Get service records within date range
      */
+
     public function getByDateRange(string $startDate, string $endDate): mixed
     {
         return $this->repository->getByDateRange($startDate, $endDate);
@@ -199,6 +209,7 @@ class VehicleServiceRecordService extends BaseService
     /**
      * Get service record with relations
      */
+
     public function getWithRelations(int $id): mixed
     {
         return $this->repository->findWithRelations($id);
@@ -207,6 +218,7 @@ class VehicleServiceRecordService extends BaseService
     /**
      * Get latest service record for a vehicle
      */
+
     public function getLatestForVehicle(int $vehicleId): mixed
     {
         return $this->repository->getLatestForVehicle($vehicleId);
@@ -215,6 +227,7 @@ class VehicleServiceRecordService extends BaseService
     /**
      * Get pending service records
      */
+
     public function getPending(): mixed
     {
         return $this->repository->getPending();
@@ -223,6 +236,7 @@ class VehicleServiceRecordService extends BaseService
     /**
      * Get in-progress service records
      */
+
     public function getInProgress(): mixed
     {
         return $this->repository->getInProgress();
@@ -231,9 +245,10 @@ class VehicleServiceRecordService extends BaseService
     /**
      * Complete a service record
      */
+
     public function complete(int $id): mixed
     {
-        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        // Check if we\'re already in a transaction (e . g., from orchestrator or test)
 
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
@@ -292,11 +307,12 @@ class VehicleServiceRecordService extends BaseService
     /**
      * Cancel a service record
      */
+
     public function cancel(int $id, ?string $reason = null): mixed
     {
         $data = ['status' => 'cancelled'];
         if ($reason) {
-            $data['notes'] = ($data['notes'] ?? '')."\nCancellation Reason: {$reason}";
+            $data['notes'] = ($data['notes'] ?? '') . "\nCancellation Reason: {$reason}";
         }
 
         return $this->update($id, $data);
@@ -305,6 +321,7 @@ class VehicleServiceRecordService extends BaseService
     /**
      * Get service statistics for a vehicle
      */
+
     public function getVehicleStatistics(int $vehicleId): array
     {
         return $this->repository->getVehicleStatistics($vehicleId);
@@ -313,6 +330,7 @@ class VehicleServiceRecordService extends BaseService
     /**
      * Get service statistics for a customer
      */
+
     public function getCustomerStatistics(int $customerId): array
     {
         return $this->repository->getCustomerStatistics($customerId);
@@ -321,6 +339,7 @@ class VehicleServiceRecordService extends BaseService
     /**
      * Search service records
      */
+
     public function search(string $query): mixed
     {
         return $this->repository->search($query);
@@ -329,6 +348,7 @@ class VehicleServiceRecordService extends BaseService
     /**
      * Generate unique service number
      */
+
     protected function generateUniqueServiceNumber(): string
     {
         $maxAttempts = 10;
@@ -351,6 +371,7 @@ class VehicleServiceRecordService extends BaseService
      *
      * Provides a comprehensive summary of all services across all branches
      */
+
     public function getVehicleServiceHistorySummary(int $vehicleId): array
     {
         $services = $this->repository->getCrossBranchHistory($vehicleId);
@@ -378,13 +399,13 @@ class VehicleServiceRecordService extends BaseService
      * Create a service record from a job card
      *
      * This method is called by the JobCardOrchestrator when a job card is completed
-     * to create a corresponding vehicle service record.
-     *
+     * to create a corresponding vehicle service record . *
      * @param  \Modules\JobCard\Models\JobCard  $jobCard
      * @return VehicleServiceRecord
      *
      * @throws ServiceException
      */
+
     public function createFromJobCard($jobCard): mixed
     {
         // Extract data from job card to create service record
@@ -398,7 +419,7 @@ class VehicleServiceRecordService extends BaseService
             'labor_cost' => $jobCard->labor_cost ?? 0,
             'parts_cost' => $jobCard->parts_cost ?? 0,
             'total_cost' => $jobCard->grand_total ?? 0,
-            'description' => $jobCard->description ?? 'Service from Job Card #'.$jobCard->job_number,
+            'description' => $jobCard->description ?? 'Service from Job Card #' . $jobCard->job_number,
             'technician_id' => $jobCard->technician_id ?? null,
             'status' => 'completed',
             'notes' => "Created from Job Card #{$jobCard->job_number}",

@@ -22,6 +22,7 @@ class AppointmentService extends BaseService
     /**
      * AppointmentService constructor
      */
+
     public function __construct(
         AppointmentRepository $repository,
         private readonly BayScheduleRepository $bayScheduleRepository
@@ -36,6 +37,7 @@ class AppointmentService extends BaseService
      *
      * @throws ValidationException|ServiceException
      */
+
     public function create(array $data): mixed
     {
         // Generate unique appointment number if not provided
@@ -50,7 +52,7 @@ class AppointmentService extends BaseService
             $data['duration']
         )) {
             throw ValidationException::withMessages([
-                'scheduled_date_time' => ['This vehicle already has an appointment at this time.'],
+                'scheduled_date_time' => ['This vehicle already has an appointment at this time . '],
             ]);
         }
 
@@ -64,6 +66,7 @@ class AppointmentService extends BaseService
      *
      * @throws ValidationException
      */
+
     public function update(int $id, array $data): mixed
     {
         // Check for conflicts if time or vehicle changed
@@ -75,7 +78,7 @@ class AppointmentService extends BaseService
 
             if ($this->repository->hasConflicts($vehicleId, $scheduledDateTime, $duration, $id)) {
                 throw ValidationException::withMessages([
-                    'scheduled_date_time' => ['This vehicle already has an appointment at this time.'],
+                    'scheduled_date_time' => ['This vehicle already has an appointment at this time . '],
                 ]);
             }
         }
@@ -86,6 +89,7 @@ class AppointmentService extends BaseService
     /**
      * Get appointment with all relations
      */
+
     public function getWithRelations(int $id): mixed
     {
         return $this->repository->findWithRelations($id);
@@ -94,6 +98,7 @@ class AppointmentService extends BaseService
     /**
      * Get appointments by status
      */
+
     public function getByStatus(string $status): mixed
     {
         return $this->repository->getByStatus($status);
@@ -102,6 +107,7 @@ class AppointmentService extends BaseService
     /**
      * Get appointments for a branch
      */
+
     public function getForBranch(int $branchId): mixed
     {
         return $this->repository->getForBranch($branchId);
@@ -110,6 +116,7 @@ class AppointmentService extends BaseService
     /**
      * Get appointments for a customer
      */
+
     public function getForCustomer(int $customerId): mixed
     {
         return $this->repository->getForCustomer($customerId);
@@ -118,6 +125,7 @@ class AppointmentService extends BaseService
     /**
      * Get appointments for a vehicle
      */
+
     public function getForVehicle(int $vehicleId): mixed
     {
         return $this->repository->getForVehicle($vehicleId);
@@ -126,6 +134,7 @@ class AppointmentService extends BaseService
     /**
      * Get appointments in date range
      */
+
     public function getInDateRange(string $startDate, string $endDate): mixed
     {
         return $this->repository->getInDateRange($startDate, $endDate);
@@ -134,6 +143,7 @@ class AppointmentService extends BaseService
     /**
      * Get upcoming appointments
      */
+
     public function getUpcoming(): mixed
     {
         return $this->repository->getUpcoming();
@@ -142,6 +152,7 @@ class AppointmentService extends BaseService
     /**
      * Search appointments
      */
+
     public function search(string $query): mixed
     {
         return $this->repository->search($query);
@@ -150,6 +161,7 @@ class AppointmentService extends BaseService
     /**
      * Confirm appointment
      */
+
     public function confirm(int $id): mixed
     {
         return $this->update($id, [
@@ -161,9 +173,10 @@ class AppointmentService extends BaseService
     /**
      * Start appointment
      */
+
     public function start(int $id): mixed
     {
-        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        // Check if we\'re already in a transaction (e . g., from orchestrator or test)
 
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
@@ -199,9 +212,10 @@ class AppointmentService extends BaseService
     /**
      * Complete appointment
      */
+
     public function complete(int $id): mixed
     {
-        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        // Check if we\'re already in a transaction (e . g., from orchestrator or test)
 
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
@@ -237,9 +251,10 @@ class AppointmentService extends BaseService
     /**
      * Cancel appointment
      */
+
     public function cancel(int $id, ?string $reason = null): mixed
     {
-        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        // Check if we\'re already in a transaction (e . g., from orchestrator or test)
 
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
@@ -278,9 +293,10 @@ class AppointmentService extends BaseService
      *
      * @param  array<string, mixed>  $data
      */
+
     public function reschedule(int $id, array $data): mixed
     {
-        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        // Check if we\'re already in a transaction (e . g., from orchestrator or test)
 
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
@@ -300,7 +316,7 @@ class AppointmentService extends BaseService
                 $id
             )) {
                 throw ValidationException::withMessages([
-                    'scheduled_date_time' => ['This vehicle already has an appointment at this time.'],
+                    'scheduled_date_time' => ['This vehicle already has an appointment at this time . '],
                 ]);
             }
 
@@ -328,9 +344,10 @@ class AppointmentService extends BaseService
      *
      * @param  array<string, mixed>  $scheduleData
      */
+
     public function assignBay(int $id, int $bayId, array $scheduleData = []): mixed
     {
-        // Check if we\'re already in a transaction (e.g., from orchestrator or test)
+        // Check if we\'re already in a transaction (e . g., from orchestrator or test)
 
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
@@ -376,6 +393,7 @@ class AppointmentService extends BaseService
     /**
      * Check availability for appointment
      */
+
     public function checkAvailability(int $branchId, string $startTime, int $duration): array
     {
         $endTime = date('Y-m-d H:i:s', strtotime($startTime) + ($duration * 60));
@@ -386,8 +404,8 @@ class AppointmentService extends BaseService
             ->whereNotExists(function ($query) use ($startTime, $endTime) {
                 $query->select(DB::raw(1))
                     ->from('bay_schedules')
-                    ->whereColumn('bay_schedules.bay_id', 'bays.id')
-                    ->whereIn('bay_schedules.status', ['scheduled', 'active'])
+                    ->whereColumn('bay_schedules . bay_id', 'bays . id')
+                    ->whereIn('bay_schedules . status', ['scheduled', 'active'])
                     ->where(function ($q) use ($startTime, $endTime) {
                         $q->whereBetween('start_time', [$startTime, $endTime])
                             ->orWhereBetween('end_time', [$startTime, $endTime])
@@ -410,6 +428,7 @@ class AppointmentService extends BaseService
     /**
      * Generate unique appointment number
      */
+
     protected function generateUniqueAppointmentNumber(): string
     {
         $maxAttempts = 10;

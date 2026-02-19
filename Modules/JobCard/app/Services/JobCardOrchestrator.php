@@ -39,29 +39,27 @@ class JobCardOrchestrator extends BaseOrchestrator
         private readonly InvoiceService $invoiceService,
         private readonly InventoryService $inventoryService,
         private readonly VehicleServiceRecordService $serviceRecordService
-    ) {
-    }
+    ) {}
 
     /**
      * Complete a job card with full orchestration
      *
      * This method orchestrates the complete job card completion workflow:
-     * 1. Validate job card can be completed
-     * 2. Complete the job card (update status, calculate totals)
-     * 3. Generate invoice from job card
-     * 4. Update inventory (deduct used parts) - TRANSACTIONAL
-     * 5. Create vehicle service record
-     * 6. Dispatch events for async operations (notifications, etc.)
+     * 1 . Validate job card can be completed
+     * 2 . Complete the job card (update status, calculate totals)
+     * 3 . Generate invoice from job card
+     * 4 . Update inventory (deduct used parts) - TRANSACTIONAL
+     * 5 . Create vehicle service record
+     * 6 . Dispatch events for async operations (notifications, etc . )
      *
-     * All database operations are wrapped in a transaction.
-     * If any step fails, everything is rolled back atomically.
-     *
+     * All database operations are wrapped in a transaction . * If any step fails, everything is rolled back atomically . *
      * @param  int  $jobCardId  The job card to complete
-     * @param  array<string, mixed>  $options  Additional options (e.g., skip_invoice)
+     * @param  array<string, mixed>  $options  Additional options (e . g., skip_invoice)
      * @return array{jobCard: JobCard, invoice: ?\Modules\Invoice\Models\Invoice, inventoryTransactions: array, serviceRecord: mixed}
      *
      * @throws ServiceException If any step fails
      */
+
     public function completeJobCardWithFullOrchestration(int $jobCardId, array $options = []): array
     {
         return $this->executeInTransaction(function () use ($jobCardId, $options) {
@@ -107,7 +105,7 @@ class JobCardOrchestrator extends BaseOrchestrator
             // This is CRITICAL - must be transactional
             $inventoryTransactions = [];
             if (! ($options['skip_inventory'] ?? false)) {
-                $jobCard->load('parts.inventoryItem');
+                $jobCard->load('parts . inventoryItem');
 
                 foreach ($jobCard->parts as $part) {
                     if ($part->inventoryItem && ! $part->inventoryItem->is_dummy_item) {
@@ -172,9 +170,9 @@ class JobCardOrchestrator extends BaseOrchestrator
     /**
      * Compensation logic for failed job card completion
      *
-     * This is called automatically if the transaction fails and is rolled back.
-     * We can perform cleanup actions here (e.g., send alerts, log to external systems)
+     * This is called automatically if the transaction fails and is rolled back . * We can perform cleanup actions here (e . g., send alerts, log to external systems)
      */
+
     protected function compensate(): void
     {
         // Log compensation
@@ -183,9 +181,7 @@ class JobCardOrchestrator extends BaseOrchestrator
         ]);
 
         // Notify operations team
-        // Could send email, Slack notification, create ticket, etc.
-
-        // Example: If we got to invoice generation but failed later,
+        // Could send email, Slack notification, create ticket, etc . // Example: If we got to invoice generation but failed later,
         // we might want to mark the invoice as "draft" or "cancelled"
         // (Though in our case, database rollback handles this automatically)
     }
@@ -194,11 +190,11 @@ class JobCardOrchestrator extends BaseOrchestrator
      * Start a job card with bay assignment and technician notification
      *
      * @param  int  $jobCardId
-     * @param  array<string, mixed>  $data  Contains technician_id, bay_id, etc.
-     * @return JobCard
+     * @param  array<string, mixed>  $data  Contains technician_id, bay_id, etc . * @return JobCard
      *
      * @throws ServiceException
      */
+
     public function startJobCard(int $jobCardId, array $data): JobCard
     {
         return $this->executeInTransaction(function () use ($jobCardId, $data) {

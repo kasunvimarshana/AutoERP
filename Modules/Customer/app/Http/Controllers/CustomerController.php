@@ -24,6 +24,7 @@ class CustomerController extends Controller
     /**
      * CustomerController constructor
      */
+
     public function __construct(
         private readonly CustomerService $customerService
     ) {}
@@ -77,6 +78,7 @@ class CustomerController extends Controller
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
      */
+
     public function index(Request $request): JsonResponse
     {
         $filters = [
@@ -88,7 +90,7 @@ class CustomerController extends Controller
 
         return $this->successResponse(
             CustomerResource::collection($customers),
-            __('customer::messages.customers_retrieved')
+            __('customer::messages . customers_retrieved')
         );
     }
 
@@ -111,7 +113,7 @@ class CustomerController extends Controller
      *
      *             @OA\Property(property="first_name", type="string", example="John", description="Customer's first name"),
      *             @OA\Property(property="last_name", type="string", example="Doe", description="Customer's last name"),
-     *             @OA\Property(property="email", type="string", format="email", example="john.doe@example.com", description="Customer's email"),
+     *             @OA\Property(property="email", type="string", format="email", example="john . doe@example . com", description="Customer's email"),
      *             @OA\Property(property="phone", type="string", example="+1234567890", description="Customer's phone number"),
      *             @OA\Property(property="mobile", type="string", example="+1234567890", description="Customer's mobile number"),
      *             @OA\Property(property="address_line_1", type="string", example="123 Main St", description="Address line 1"),
@@ -145,13 +147,14 @@ class CustomerController extends Controller
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationError"))
      * )
      */
+
     public function store(StoreCustomerRequest $request): JsonResponse
     {
         $customer = $this->customerService->create($request->validated());
 
         return $this->createdResponse(
             new CustomerResource($customer),
-            __('customer::messages.customer_created')
+            __('customer::messages . customer_created')
         );
     }
 
@@ -191,13 +194,14 @@ class CustomerController extends Controller
      *     @OA\Response(response=404, description="Customer not found", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
      */
+
     public function show(int $id): JsonResponse
     {
         $customer = $this->customerService->getById($id);
 
         return $this->successResponse(
             new CustomerResource($customer),
-            __('customer::messages.customer_retrieved')
+            __('customer::messages . customer_retrieved')
         );
     }
 
@@ -228,7 +232,7 @@ class CustomerController extends Controller
      *
      *             @OA\Property(property="first_name", type="string", example="John", description="Customer's first name"),
      *             @OA\Property(property="last_name", type="string", example="Doe", description="Customer's last name"),
-     *             @OA\Property(property="email", type="string", format="email", example="john.doe@example.com", description="Customer's email"),
+     *             @OA\Property(property="email", type="string", format="email", example="john . doe@example . com", description="Customer's email"),
      *             @OA\Property(property="phone", type="string", example="+1234567890", description="Customer's phone number"),
      *             @OA\Property(property="mobile", type="string", example="+1234567890", description="Customer's mobile number"),
      *             @OA\Property(property="address_line_1", type="string", example="123 Main St", description="Address line 1"),
@@ -264,13 +268,14 @@ class CustomerController extends Controller
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationError"))
      * )
      */
+
     public function update(UpdateCustomerRequest $request, int $id): JsonResponse
     {
         $customer = $this->customerService->update($id, $request->validated());
 
         return $this->successResponse(
             new CustomerResource($customer),
-            __('customer::messages.customer_updated')
+            __('customer::messages . customer_updated')
         );
     }
 
@@ -310,13 +315,14 @@ class CustomerController extends Controller
      *     @OA\Response(response=404, description="Customer not found", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
      */
+
     public function destroy(int $id): JsonResponse
     {
         $this->customerService->delete($id);
 
         return $this->successResponse(
             null,
-            __('customer::messages.customer_deleted')
+            __('customer::messages . customer_deleted')
         );
     }
 
@@ -356,13 +362,14 @@ class CustomerController extends Controller
      *     @OA\Response(response=404, description="Customer not found", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
      */
+
     public function withVehicles(int $id): JsonResponse
     {
         $customer = $this->customerService->getWithVehicles($id);
 
         return $this->successResponse(
             new CustomerResource($customer),
-            __('customer::messages.customer_retrieved')
+            __('customer::messages . customer_retrieved')
         );
     }
 
@@ -407,6 +414,7 @@ class CustomerController extends Controller
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationError"))
      * )
      */
+
     public function search(Request $request): JsonResponse
     {
         $request->validate([
@@ -417,7 +425,7 @@ class CustomerController extends Controller
 
         return $this->successResponse(
             CustomerResource::collection($customers),
-            __('customer::messages.customers_retrieved')
+            __('customer::messages . customers_retrieved')
         );
     }
 
@@ -455,7 +463,7 @@ class CustomerController extends Controller
      *
      *                 @OA\Property(property="total_vehicles", type="integer", example=3),
      *                 @OA\Property(property="total_service_records", type="integer", example=15),
-     *                 @OA\Property(property="total_spent", type="number", format="float", example=2500.00),
+     *                 @OA\Property(property="total_spent", type="number", format="float", example=2500 . 00),
      *                 @OA\Property(property="last_service_date", type="string", format="date-time", example="2024-01-15T10:00:00Z"),
      *                 @OA\Property(property="active_vehicles", type="integer", example=2)
      *             )
@@ -466,13 +474,14 @@ class CustomerController extends Controller
      *     @OA\Response(response=404, description="Customer not found", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
      */
+
     public function statistics(int $id): JsonResponse
     {
         $statistics = $this->customerService->getStatistics($id);
 
         return $this->successResponse(
             $statistics,
-            __('customer::messages.statistics_retrieved')
+            __('customer::messages . statistics_retrieved')
         );
     }
 }

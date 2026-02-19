@@ -21,8 +21,7 @@ class AppointmentOrchestrationController extends Controller
 {
     public function __construct(
         private readonly AppointmentOrchestrator $orchestrator
-    ) {
-    }
+    ) {}
 
     /**
      * Book appointment with full validation and orchestration
@@ -35,8 +34,7 @@ class AppointmentOrchestrationController extends Controller
      * - Bay slot reservation
      * - Confirmation notifications (async)
      *
-     * Supports both existing and new customers/vehicles.
-     *
+     * Supports both existing and new customers/vehicles . *
      * @OA\Post(
      *     path="/api/v1/appointments/book",
      *     tags={"Appointments"},
@@ -82,6 +80,7 @@ class AppointmentOrchestrationController extends Controller
      *     @OA\Response(response=500, description="Server error")
      * )
      */
+
     public function book(Request $request): JsonResponse
     {
         try {
@@ -98,7 +97,7 @@ class AppointmentOrchestrationController extends Controller
                 'license_plate' => 'required_without:vehicle_id|string|max:20',
                 'vehicle_make' => 'sometimes|string|max:100',
                 'vehicle_model' => 'sometimes|string|max:100',
-                'vehicle_year' => 'sometimes|integer|min:1900|max:'.(date('Y') + 1),
+                'vehicle_year' => 'sometimes|integer|min:1900|max:' . (date('Y') + 1),
                 'vin' => 'sometimes|string|max:17',
                 'vehicle_color' => 'sometimes|string|max:50',
 
@@ -134,7 +133,7 @@ class AppointmentOrchestrationController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return $this->errorResponse('An unexpected error occurred while booking the appointment.', 500);
+            return $this->errorResponse('An unexpected error occurred while booking the appointment . ', 500);
         }
     }
 
@@ -155,6 +154,7 @@ class AppointmentOrchestrationController extends Controller
      *     @OA\Response(response=200, description="Appointment confirmed")
      * )
      */
+
     public function confirm(int $id): JsonResponse
     {
         try {
@@ -162,7 +162,7 @@ class AppointmentOrchestrationController extends Controller
 
             return $this->successResponse(
                 new AppointmentResource($appointment),
-                'Appointment confirmed successfully. Confirmation sent to customer.'
+                'Appointment confirmed successfully . Confirmation sent to customer . '
             );
         } catch (ServiceException $e) {
             return $this->errorResponse($e->getMessage(), 400);
@@ -172,26 +172,27 @@ class AppointmentOrchestrationController extends Controller
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->errorResponse('An unexpected error occurred.', 500);
+            return $this->errorResponse('An unexpected error occurred . ', 500);
         }
     }
 
     /**
      * Build success message based on result
      */
+
     private function buildSuccessMessage(array $result): string
     {
-        $messages = ['Appointment booked successfully.'];
+        $messages = ['Appointment booked successfully . '];
 
         if ($result['isNewCustomer']) {
-            $messages[] = 'Welcome! Your customer profile has been created.';
+            $messages[] = 'Welcome! Your customer profile has been created . ';
         }
 
         if ($result['isNewVehicle']) {
-            $messages[] = 'Vehicle registered successfully.';
+            $messages[] = 'Vehicle registered successfully . ';
         }
 
-        $messages[] = 'Confirmation notification sent.';
+        $messages[] = 'Confirmation notification sent . ';
 
         return implode(' ', $messages);
     }

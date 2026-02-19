@@ -58,6 +58,7 @@ class JobCardOrchestratorTest extends TestCase
      * @param  bool  $exists  Whether the job card exists
      * @param  JobCard|null  $jobCard  The job card to return from findOrFail
      */
+
     private function createOrchestratorWithRepository(bool $exists = true, ?JobCard $jobCard = null): void
     {
         $repository = $this->createMock(JobCardRepository::class);
@@ -79,6 +80,7 @@ class JobCardOrchestratorTest extends TestCase
     /**
      * Test successful job card completion with all steps
      */
+
     public function test_completes_job_card_with_full_orchestration(): void
     {
         // Arrange
@@ -94,7 +96,7 @@ class JobCardOrchestratorTest extends TestCase
         $properties = [
             'id' => $jobCardId,
             'status' => 'completed',
-            'grand_total' => 500.00,
+            'grand_total' => 500 . 00,
         ];
         
         // Mock the fresh() method to return self
@@ -112,7 +114,7 @@ class JobCardOrchestratorTest extends TestCase
 
         $invoice = new \Modules\Invoice\Models\Invoice([
             'id' => 1,
-            'total_amount' => 500.00,
+            'total_amount' => 500 . 00,
         ]);
 
         // Setup orchestrator with mocked repository that returns in_progress initially
@@ -153,6 +155,7 @@ class JobCardOrchestratorTest extends TestCase
     /**
      * Test orchestrator rolls back on service failure
      */
+
     public function test_rolls_back_on_invoice_generation_failure(): void
     {
         // Arrange
@@ -173,7 +176,7 @@ class JobCardOrchestratorTest extends TestCase
         // Act & Assert
         $this->expectException(ServiceException::class);
         // The orchestrator wraps the exception with retry context and operation name
-        $this->expectExceptionMessageMatches('/CompleteJobCardOrchestration failed:.*Operation failed after.*attempts/');
+        $this->expectExceptionMessageMatches('/CompleteJobCardOrchestration failed: . *Operation failed after . *attempts/');
 
         $this->orchestrator->completeJobCardWithFullOrchestration($jobCardId);
 
@@ -185,6 +188,7 @@ class JobCardOrchestratorTest extends TestCase
     /**
      * Test prerequisite validation failure
      */
+
     public function test_fails_when_job_card_does_not_exist(): void
     {
         // Arrange
@@ -210,6 +214,7 @@ class JobCardOrchestratorTest extends TestCase
     /**
      * Test orchestrator with skip options
      */
+
     public function test_skips_invoice_when_option_provided(): void
     {
         // Arrange

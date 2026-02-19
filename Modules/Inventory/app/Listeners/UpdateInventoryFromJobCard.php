@@ -23,19 +23,21 @@ class UpdateInventoryFromJobCard implements ShouldQueue
     /**
      * The number of times the listener may be attempted
      */
+
     public int $tries = 3;
 
     /**
      * Create the event listener
      */
+
     public function __construct(
         private readonly InventoryService $inventoryService
-    ) {
-    }
+    ) {}
 
     /**
      * Handle the event
      */
+
     public function handle(JobCardCompleted $event): void
     {
         try {
@@ -84,6 +86,7 @@ class UpdateInventoryFromJobCard implements ShouldQueue
     /**
      * Handle a job failure
      */
+
     public function failed(JobCardCompleted $event, \Throwable $exception): void
     {
         Log::error('Failed to update inventory after all retries', [

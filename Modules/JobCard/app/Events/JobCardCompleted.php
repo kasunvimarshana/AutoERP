@@ -11,8 +11,7 @@ use Modules\Invoice\Models\Invoice;
 /**
  * Job Card Completed Event
  *
- * Dispatched when a job card is marked as completed.
- * Triggers:
+ * Dispatched when a job card is marked as completed . * Triggers:
  * - Invoice generation
  * - Inventory updates  
  * - Customer notifications
@@ -24,6 +23,7 @@ class JobCardCompleted extends BaseDomainEvent
     /**
      * Create a new event instance
      */
+
     public function __construct(
         public readonly JobCard $jobCard,
         public readonly ?Invoice $invoice = null
@@ -34,6 +34,7 @@ class JobCardCompleted extends BaseDomainEvent
     /**
      * {@inheritDoc}
      */
+
     public function getEventPayload(): array
     {
         return [
@@ -52,11 +53,12 @@ class JobCardCompleted extends BaseDomainEvent
      *
      * @return array<int, \Illuminate\Broadcasting\Channel>
      */
+
     public function broadcastOn(): array
     {
         return [
-            new \Illuminate\Broadcasting\PrivateChannel("customer.{$this->jobCard->customer_id}"),
-            new \Illuminate\Broadcasting\PrivateChannel("vehicle.{$this->jobCard->vehicle_id}"),
+            new \Illuminate\Broadcasting\PrivateChannel("customer . {$this->jobCard->customer_id}"),
+            new \Illuminate\Broadcasting\PrivateChannel("vehicle . {$this->jobCard->vehicle_id}"),
         ];
     }
 }

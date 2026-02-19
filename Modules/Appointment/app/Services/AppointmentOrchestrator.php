@@ -40,26 +40,26 @@ class AppointmentOrchestrator extends BaseOrchestrator
         private readonly VehicleService $vehicleService,
         private readonly BayService $bayService,
         private readonly BranchService $branchService
-    ) {
-    }
+    ) {}
 
     /**
      * Book appointment with full validation and orchestration
      *
      * Workflow:
-     * 1. Validate or create customer
-     * 2. Validate or register vehicle
-     * 3. Check bay availability
-     * 4. Validate branch capacity
-     * 5. Create appointment
-     * 6. Reserve bay slot
-     * 7. Send confirmation (via events)
+     * 1 . Validate or create customer
+     * 2 . Validate or register vehicle
+     * 3 . Check bay availability
+     * 4 . Validate branch capacity
+     * 5 . Create appointment
+     * 6 . Reserve bay slot
+     * 7 . Send confirmation (via events)
      *
      * @param  array<string, mixed>  $data  Appointment data including customer, vehicle, schedule info
      * @return array{appointment: Appointment, customer: mixed, vehicle: mixed, isNewCustomer: bool, isNewVehicle: bool}
      *
      * @throws ServiceException
      */
+
     public function bookAppointmentWithFullValidation(array $data): array
     {
         return $this->executeSteps([
@@ -227,7 +227,7 @@ class AppointmentOrchestrator extends BaseOrchestrator
         $isNewCustomer = $customerResult['isNewCustomer'];
         $isNewVehicle = $vehicleResult['isNewVehicle'];
 
-        // Dispatch events for async operations (notifications, etc.)
+        // Dispatch events for async operations (notifications, etc . )
         event(new AppointmentBooked($appointment, $isNewCustomer, $isNewVehicle));
 
         Log::info('Appointment booked successfully', [
@@ -255,6 +255,7 @@ class AppointmentOrchestrator extends BaseOrchestrator
      *
      * @throws ServiceException
      */
+
     public function confirmAppointment(int $appointmentId): Appointment
     {
         return $this->executeInTransaction(function () use ($appointmentId) {
@@ -270,13 +271,13 @@ class AppointmentOrchestrator extends BaseOrchestrator
     /**
      * Compensation for failed appointment booking
      */
+
     protected function compensate(): void
     {
         Log::warning('Appointment booking failed, performing compensation', [
             'completed_steps' => $this->completedSteps,
         ]);
 
-        // Could release reserved bay slots, send failure notifications, etc.
-        // In our case, database rollback handles most of the cleanup
+        // Could release reserved bay slots, send failure notifications, etc . // In our case, database rollback handles most of the cleanup
     }
 }

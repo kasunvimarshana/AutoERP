@@ -21,21 +21,21 @@ class InventoryService
     public function __construct(
         private readonly InventoryItemService $inventoryItemService,
         private readonly InventoryTransactionRepository $transactionRepository
-    ) {
-    }
+    ) {}
 
     /**
      * Adjust inventory with full transaction tracking
      *
      * @param  int  $itemId  Inventory item ID
      * @param  float  $quantity  Quantity to adjust (positive for add, negative for deduct)
-     * @param  string  $transactionType  Type of transaction (e.g., 'job_card_usage', 'purchase', 'return')
-     * @param  int|null  $referenceId  ID of the related record (e.g., job card ID)
+     * @param  string  $transactionType  Type of transaction (e . g., 'job_card_usage', 'purchase', 'return')
+     * @param  int|null  $referenceId  ID of the related record (e . g., job card ID)
      * @param  string  $reason  Reason for adjustment
      * @return InventoryTransaction
      *
      * @throws ServiceException
      */
+
     public function adjustInventory(
         int $itemId,
         float $quantity,
@@ -43,7 +43,7 @@ class InventoryService
         ?int $referenceId = null,
         string $reason = ''
     ): InventoryTransaction {
-        // Check if we're already in a transaction (e.g., from orchestrator or test)
+        // Check if we're already in a transaction (e . g., from orchestrator or test)
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
         try {
@@ -61,8 +61,8 @@ class InventoryService
             $newBalance = $item->stock_on_hand + $quantity;
             if ($newBalance < 0) {
                 throw new ServiceException(
-                    "Insufficient stock for item '{$item->item_name}'. ".
-                    "Current: {$item->stock_on_hand}, Requested: ".abs($quantity)
+                    "Insufficient stock for item '{$item->item_name}' . ".
+                    "Current: {$item->stock_on_hand}, Requested: " . abs($quantity)
                 );
             }
 
@@ -88,7 +88,7 @@ class InventoryService
                 DB::commit();
             }
 
-            // Dispatch event for async processing (notifications, alerts, etc.)
+            // Dispatch event for async processing (notifications, alerts, etc . )
             event(new InventoryAdjusted($transaction, $reason));
 
             Log::info('Inventory adjusted successfully', [
@@ -127,12 +127,13 @@ class InventoryService
      *
      * @throws ServiceException
      */
+
     public function bulkAdjustInventory(
         array $adjustments,
         string $transactionType,
         ?int $referenceId = null
     ): array {
-        // Check if we're already in a transaction (e.g., from orchestrator or test)
+        // Check if we're already in a transaction (e . g., from orchestrator or test)
         $shouldManageTransaction = DB::transactionLevel() === 0;
 
         try {

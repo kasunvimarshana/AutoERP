@@ -21,8 +21,7 @@ class JobCardOrchestrationController extends Controller
 {
     public function __construct(
         private readonly JobCardOrchestrator $orchestrator
-    ) {
-    }
+    ) {}
 
     /**
      * Complete a job card with full orchestration
@@ -34,9 +33,7 @@ class JobCardOrchestrationController extends Controller
      * - Service history tracking
      * - Customer notifications (async via events)
      *
-     * All database operations are wrapped in a transaction.
-     * If any step fails, everything is rolled back automatically.
-     *
+     * All database operations are wrapped in a transaction . * If any step fails, everything is rolled back automatically . *
      * @OA\Post(
      *     path="/api/v1/job-cards/{id}/complete",
      *     tags={"JobCards"},
@@ -76,6 +73,7 @@ class JobCardOrchestrationController extends Controller
      *     @OA\Response(response=500, description="Server error")
      * )
      */
+
     public function complete(int $id, Request $request): JsonResponse
     {
         try {
@@ -85,8 +83,8 @@ class JobCardOrchestrationController extends Controller
                 'skip_inventory' => 'sometimes|boolean',
                 'skip_service_record' => 'sometimes|boolean',
                 'invoice_data' => 'sometimes|array',
-                'invoice_data.due_date' => 'sometimes|date',
-                'invoice_data.notes' => 'sometimes|string|max:1000',
+                'invoice_data . due_date' => 'sometimes|date',
+                'invoice_data . notes' => 'sometimes|string|max:1000',
             ]);
 
             // Execute orchestrated operation
@@ -97,7 +95,7 @@ class JobCardOrchestrationController extends Controller
                 'invoice' => $result['invoice'] ? new \Modules\Invoice\Resources\InvoiceResource($result['invoice']) : null,
                 'inventory_transactions_count' => count($result['inventoryTransactions'] ?? []),
                 'service_record' => $result['serviceRecord'] ?? null,
-                'message' => 'Job card completed successfully. Invoice generated and customer notified.',
+                'message' => 'Job card completed successfully . Invoice generated and customer notified . ',
             ]);
         } catch (ServiceException $e) {
             return $this->errorResponse($e->getMessage(), 400);
@@ -110,7 +108,7 @@ class JobCardOrchestrationController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            return $this->errorResponse('An unexpected error occurred while completing the job card.', 500);
+            return $this->errorResponse('An unexpected error occurred while completing the job card . ', 500);
         }
     }
 
@@ -137,6 +135,7 @@ class JobCardOrchestrationController extends Controller
      *     @OA\Response(response=200, description="Job card started successfully")
      * )
      */
+
     public function start(int $id, Request $request): JsonResponse
     {
         try {
@@ -149,7 +148,7 @@ class JobCardOrchestrationController extends Controller
 
             return $this->successResponse(
                 new JobCardResource($jobCard),
-                'Job card started successfully. Technician has been notified.'
+                'Job card started successfully . Technician has been notified . '
             );
         } catch (ServiceException $e) {
             return $this->errorResponse($e->getMessage(), 400);
@@ -159,7 +158,7 @@ class JobCardOrchestrationController extends Controller
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->errorResponse('An unexpected error occurred.', 500);
+            return $this->errorResponse('An unexpected error occurred . ', 500);
         }
     }
 
@@ -191,13 +190,14 @@ class JobCardOrchestrationController extends Controller
      *     )
      * )
      */
+
     public function getOrchestrationStatus(int $id): JsonResponse
     {
         try {
             // This is a diagnostic endpoint
             $jobCard = \Modules\JobCard\Models\JobCard::with([
                 'invoice',
-                'parts.inventoryItem',
+                'parts . inventoryItem',
                 'serviceRecords',
             ])->findOrFail($id);
 
@@ -222,13 +222,13 @@ class JobCardOrchestrationController extends Controller
                     'latest' => $jobCard->serviceRecords->first(),
                 ],
                 'events' => [
-                    'note' => 'Events are processed asynchronously. Check queue workers and logs for details.',
+                    'note' => 'Events are processed asynchronously . Check queue workers and logs for details . ',
                 ],
             ];
 
             return $this->successResponse($status);
         } catch (\Exception $e) {
-            return $this->errorResponse('Job card not found or error occurred.', 404);
+            return $this->errorResponse('Job card not found or error occurred . ', 404);
         }
     }
 }

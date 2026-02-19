@@ -44,6 +44,7 @@ class InvoiceServiceTest extends TestCase
     /**
      * Test invoice totals calculation
      */
+
     public function test_invoice_totals_calculation(): void
     {
         $invoice = Invoice::factory()->create([
@@ -84,6 +85,7 @@ class InvoiceServiceTest extends TestCase
     /**
      * Test invoice number generation is unique
      */
+
     public function test_invoice_number_is_unique(): void
     {
         $invoice1 = $this->invoiceService->create([
@@ -102,6 +104,7 @@ class InvoiceServiceTest extends TestCase
     /**
      * Test outstanding invoices query
      */
+
     public function test_get_outstanding_invoices(): void
     {
         Invoice::factory()->create([

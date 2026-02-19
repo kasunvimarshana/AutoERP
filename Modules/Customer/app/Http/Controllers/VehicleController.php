@@ -24,6 +24,7 @@ class VehicleController extends Controller
     /**
      * VehicleController constructor
      */
+
     public function __construct(
         private readonly VehicleService $vehicleService
     ) {}
@@ -77,6 +78,7 @@ class VehicleController extends Controller
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
      */
+
     public function index(Request $request): JsonResponse
     {
         $filters = [
@@ -88,7 +90,7 @@ class VehicleController extends Controller
 
         return $this->successResponse(
             VehicleResource::collection($vehicles),
-            __('customer::messages.vehicles_retrieved')
+            __('customer::messages . vehicles_retrieved')
         );
     }
 
@@ -148,13 +150,14 @@ class VehicleController extends Controller
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationError"))
      * )
      */
+
     public function store(StoreVehicleRequest $request): JsonResponse
     {
         $vehicle = $this->vehicleService->create($request->validated());
 
         return $this->createdResponse(
             new VehicleResource($vehicle),
-            __('customer::messages.vehicle_created')
+            __('customer::messages . vehicle_created')
         );
     }
 
@@ -194,13 +197,14 @@ class VehicleController extends Controller
      *     @OA\Response(response=404, description="Vehicle not found", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
      */
+
     public function show(int $id): JsonResponse
     {
         $vehicle = $this->vehicleService->getById($id);
 
         return $this->successResponse(
             new VehicleResource($vehicle),
-            __('customer::messages.vehicle_retrieved')
+            __('customer::messages . vehicle_retrieved')
         );
     }
 
@@ -267,13 +271,14 @@ class VehicleController extends Controller
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationError"))
      * )
      */
+
     public function update(UpdateVehicleRequest $request, int $id): JsonResponse
     {
         $vehicle = $this->vehicleService->update($id, $request->validated());
 
         return $this->successResponse(
             new VehicleResource($vehicle),
-            __('customer::messages.vehicle_updated')
+            __('customer::messages . vehicle_updated')
         );
     }
 
@@ -313,13 +318,14 @@ class VehicleController extends Controller
      *     @OA\Response(response=404, description="Vehicle not found", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
      */
+
     public function destroy(int $id): JsonResponse
     {
         $this->vehicleService->delete($id);
 
         return $this->successResponse(
             null,
-            __('customer::messages.vehicle_deleted')
+            __('customer::messages . vehicle_deleted')
         );
     }
 
@@ -359,13 +365,14 @@ class VehicleController extends Controller
      *     @OA\Response(response=404, description="Vehicle not found", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
      */
+
     public function withRelations(int $id): JsonResponse
     {
         $vehicle = $this->vehicleService->getWithRelations($id);
 
         return $this->successResponse(
             new VehicleResource($vehicle),
-            __('customer::messages.vehicle_retrieved')
+            __('customer::messages . vehicle_retrieved')
         );
     }
 
@@ -410,13 +417,14 @@ class VehicleController extends Controller
      *     @OA\Response(response=404, description="Customer not found", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
      */
+
     public function byCustomer(int $customerId): JsonResponse
     {
         $vehicles = $this->vehicleService->getByCustomer($customerId);
 
         return $this->successResponse(
             VehicleResource::collection($vehicles),
-            __('customer::messages.vehicles_retrieved')
+            __('customer::messages . vehicles_retrieved')
         );
     }
 
@@ -461,6 +469,7 @@ class VehicleController extends Controller
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationError"))
      * )
      */
+
     public function search(Request $request): JsonResponse
     {
         $request->validate([
@@ -471,7 +480,7 @@ class VehicleController extends Controller
 
         return $this->successResponse(
             VehicleResource::collection($vehicles),
-            __('customer::messages.vehicles_retrieved')
+            __('customer::messages . vehicles_retrieved')
         );
     }
 
@@ -506,13 +515,14 @@ class VehicleController extends Controller
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
      */
+
     public function dueForService(): JsonResponse
     {
         $vehicles = $this->vehicleService->getDueForService();
 
         return $this->successResponse(
             VehicleResource::collection($vehicles),
-            __('customer::messages.vehicles_due_for_service')
+            __('customer::messages . vehicles_due_for_service')
         );
     }
 
@@ -556,6 +566,7 @@ class VehicleController extends Controller
      *     @OA\Response(response=401, description="Unauthenticated", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
      */
+
     public function expiringInsurance(Request $request): JsonResponse
     {
         $daysThreshold = $request->integer('days', 30);
@@ -563,7 +574,7 @@ class VehicleController extends Controller
 
         return $this->successResponse(
             VehicleResource::collection($vehicles),
-            __('customer::messages.vehicles_expiring_insurance')
+            __('customer::messages . vehicles_expiring_insurance')
         );
     }
 
@@ -614,6 +625,7 @@ class VehicleController extends Controller
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationError"))
      * )
      */
+
     public function updateMileage(Request $request, int $id): JsonResponse
     {
         $request->validate([
@@ -624,7 +636,7 @@ class VehicleController extends Controller
 
         return $this->successResponse(
             new VehicleResource($vehicle),
-            __('customer::messages.mileage_updated')
+            __('customer::messages . mileage_updated')
         );
     }
 
@@ -676,6 +688,7 @@ class VehicleController extends Controller
      *     @OA\Response(response=422, description="Validation error", @OA\JsonContent(ref="#/components/schemas/ValidationError"))
      * )
      */
+
     public function transferOwnership(Request $request, int $id): JsonResponse
     {
         $request->validate([
@@ -691,7 +704,7 @@ class VehicleController extends Controller
 
         return $this->successResponse(
             new VehicleResource($vehicle),
-            __('customer::messages.ownership_transferred')
+            __('customer::messages . ownership_transferred')
         );
     }
 
@@ -728,10 +741,10 @@ class VehicleController extends Controller
      *                 type="object",
      *
      *                 @OA\Property(property="total_services", type="integer", example=5),
-     *                 @OA\Property(property="total_spent", type="number", format="float", example=625.00),
+     *                 @OA\Property(property="total_spent", type="number", format="float", example=625 . 00),
      *                 @OA\Property(property="last_service_date", type="string", format="date-time", example="2024-01-10T10:00:00Z"),
      *                 @OA\Property(property="next_service_due", type="string", format="date", example="2024-06-10"),
-     *                 @OA\Property(property="average_service_cost", type="number", format="float", example=125.00)
+     *                 @OA\Property(property="average_service_cost", type="number", format="float", example=125 . 00)
      *             )
      *         )
      *     ),
@@ -740,13 +753,14 @@ class VehicleController extends Controller
      *     @OA\Response(response=404, description="Vehicle not found", @OA\JsonContent(ref="#/components/schemas/Error"))
      * )
      */
+
     public function serviceStatistics(int $id): JsonResponse
     {
         $statistics = $this->vehicleService->getServiceStatistics($id);
 
         return $this->successResponse(
             $statistics,
-            __('customer::messages.statistics_retrieved')
+            __('customer::messages . statistics_retrieved')
         );
     }
 }

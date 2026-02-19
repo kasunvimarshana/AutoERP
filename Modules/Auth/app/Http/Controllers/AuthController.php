@@ -26,6 +26,7 @@ class AuthController extends Controller
     /**
      * AuthController constructor
      */
+
     public function __construct(
         private readonly AuthService $authService
     ) {}
@@ -36,7 +37,7 @@ class AuthController extends Controller
      * @OA\Post(
      *     path="/api/v1/auth/register",
      *     summary="Register a new user",
-     *     description="Create a new user account with email and password. Optionally assign a role during registration.",
+     *     description="Create a new user account with email and password . Optionally assign a role during registration . ",
      *     operationId="register",
      *     tags={"Authentication"},
      *     @OA\RequestBody(
@@ -45,7 +46,7 @@ class AuthController extends Controller
      *         @OA\JsonContent(
      *             required={"name", "email", "password", "password_confirmation"},
      *             @OA\Property(property="name", type="string", example="John Doe", description="User's full name"),
-     *             @OA\Property(property="email", type="string", format="email", example="john@example.com", description="User's email address (must be unique)"),
+     *             @OA\Property(property="email", type="string", format="email", example="john@example . com", description="User's email address (must be unique)"),
      *             @OA\Property(property="password", type="string", format="password", example="SecurePassword123!", description="User's password (minimum 8 characters)"),
      *             @OA\Property(property="password_confirmation", type="string", format="password", example="SecurePassword123!", description="Password confirmation (must match password)"),
      *             @OA\Property(property="role", type="string", example="user", description="Optional role to assign (must exist in roles table)", nullable=true)
@@ -83,13 +84,14 @@ class AuthController extends Controller
      *     )
      * )
      */
+
     public function register(RegisterRequest $request): JsonResponse
     {
         $result = $this->authService->register($request->validated());
 
         return $this->createdResponse(
             new AuthResource($result),
-            __('auth::messages.registration_successful')
+            __('auth::messages . registration_successful')
         );
     }
 
@@ -107,7 +109,7 @@ class AuthController extends Controller
      *         description="User credentials",
      *         @OA\JsonContent(
      *             required={"email", "password"},
-     *             @OA\Property(property="email", type="string", format="email", example="john@example.com", description="User's email address"),
+     *             @OA\Property(property="email", type="string", format="email", example="john@example . com", description="User's email address"),
      *             @OA\Property(property="password", type="string", format="password", example="SecurePassword123!", description="User's password"),
      *             @OA\Property(property="revoke_other_tokens", type="boolean", example=false, description="Revoke all other tokens for this user", nullable=true)
      *         )
@@ -147,13 +149,14 @@ class AuthController extends Controller
      *     )
      * )
      */
+
     public function login(LoginRequest $request): JsonResponse
     {
         $result = $this->authService->login($request->validated());
 
         return $this->successResponse(
             new AuthResource($result),
-            __('auth::messages.login_successful')
+            __('auth::messages . login_successful')
         );
     }
 
@@ -180,18 +183,19 @@ class AuthController extends Controller
      *         response=401,
      *         description="Unauthenticated",
      *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *             @OA\Property(property="message", type="string", example="Unauthenticated . ")
      *         )
      *     )
      * )
      */
+
     public function logout(Request $request): JsonResponse
     {
         $this->authService->logout($request->user());
 
         return $this->successResponse(
             null,
-            __('auth::messages.logout_successful')
+            __('auth::messages . logout_successful')
         );
     }
 
@@ -218,18 +222,19 @@ class AuthController extends Controller
      *         response=401,
      *         description="Unauthenticated",
      *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *             @OA\Property(property="message", type="string", example="Unauthenticated . ")
      *         )
      *     )
      * )
      */
+
     public function logoutAll(Request $request): JsonResponse
     {
         $this->authService->logoutAll($request->user());
 
         return $this->successResponse(
             null,
-            __('auth::messages.logout_all_successful')
+            __('auth::messages . logout_all_successful')
         );
     }
 
@@ -260,11 +265,12 @@ class AuthController extends Controller
      *         response=401,
      *         description="Unauthenticated",
      *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *             @OA\Property(property="message", type="string", example="Unauthenticated . ")
      *         )
      *     )
      * )
      */
+
     public function me(Request $request): JsonResponse
     {
         return $this->successResponse(
@@ -272,7 +278,7 @@ class AuthController extends Controller
                 'user' => $request->user()->load(['roles', 'permissions']),
                 'token' => null,
             ]),
-            __('auth::messages.user_retrieved')
+            __('auth::messages . user_retrieved')
         );
     }
 
@@ -310,18 +316,19 @@ class AuthController extends Controller
      *         response=401,
      *         description="Unauthenticated",
      *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *             @OA\Property(property="message", type="string", example="Unauthenticated . ")
      *         )
      *     )
      * )
      */
+
     public function refresh(Request $request): JsonResponse
     {
         $result = $this->authService->refreshToken($request->user());
 
         return $this->successResponse(
             new AuthResource($result),
-            __('auth::messages.token_refreshed')
+            __('auth::messages . token_refreshed')
         );
     }
 
@@ -339,7 +346,7 @@ class AuthController extends Controller
      *         description="Email address for password reset",
      *         @OA\JsonContent(
      *             required={"email"},
-     *             @OA\Property(property="email", type="string", format="email", example="john@example.com", description="User's registered email address")
+     *             @OA\Property(property="email", type="string", format="email", example="john@example . com", description="User's registered email address")
      *         )
      *     ),
      *     @OA\Response(
@@ -366,13 +373,14 @@ class AuthController extends Controller
      *     )
      * )
      */
+
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
         $this->authService->sendPasswordResetLink($request->validated());
 
         return $this->successResponse(
             null,
-            __('auth::messages.password_reset_link_sent')
+            __('auth::messages . password_reset_link_sent')
         );
     }
 
@@ -390,7 +398,7 @@ class AuthController extends Controller
      *         description="Password reset data",
      *         @OA\JsonContent(
      *             required={"email", "token", "password", "password_confirmation"},
-     *             @OA\Property(property="email", type="string", format="email", example="john@example.com", description="User's email address"),
+     *             @OA\Property(property="email", type="string", format="email", example="john@example . com", description="User's email address"),
      *             @OA\Property(property="token", type="string", example="abc123token...", description="Password reset token from email"),
      *             @OA\Property(property="password", type="string", format="password", example="NewSecurePassword123!", description="New password"),
      *             @OA\Property(property="password_confirmation", type="string", format="password", example="NewSecurePassword123!", description="Password confirmation")
@@ -420,13 +428,14 @@ class AuthController extends Controller
      *     )
      * )
      */
+
     public function resetPassword(ResetPasswordRequest $request): JsonResponse
     {
         $this->authService->resetPassword($request->validated());
 
         return $this->successResponse(
             null,
-            __('auth::messages.password_reset_successful')
+            __('auth::messages . password_reset_successful')
         );
     }
 
@@ -467,25 +476,26 @@ class AuthController extends Controller
      *         description="Verification failed",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Email verification failed. Invalid or expired link.")
+     *             @OA\Property(property="message", type="string", example="Email verification failed . Invalid or expired link . ")
      *         )
      *     )
      * )
      */
+
     public function verifyEmail(Request $request, string $id, string $hash): JsonResponse
     {
         $result = $this->authService->verifyEmail($id, $hash);
 
         if (! $result) {
             return $this->errorResponse(
-                __('auth::messages.email_verification_failed'),
+                __('auth::messages . email_verification_failed'),
                 422
             );
         }
 
         return $this->successResponse(
             null,
-            __('auth::messages.email_verified')
+            __('auth::messages . email_verified')
         );
     }
 
@@ -512,18 +522,19 @@ class AuthController extends Controller
      *         response=401,
      *         description="Unauthenticated",
      *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *             @OA\Property(property="message", type="string", example="Unauthenticated . ")
      *         )
      *     )
      * )
      */
+
     public function resendEmailVerification(Request $request): JsonResponse
     {
         $this->authService->resendEmailVerification($request->user());
 
         return $this->successResponse(
             null,
-            __('auth::messages.verification_link_sent')
+            __('auth::messages . verification_link_sent')
         );
     }
 }
