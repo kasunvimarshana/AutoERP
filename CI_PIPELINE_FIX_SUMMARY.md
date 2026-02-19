@@ -8,7 +8,7 @@
 
 ## Problems Identified
 
-### 1. Migration Ordering Error (Fixed in commit 2bbcedf)
+### 1. Migration Ordering Error - Invoice (Fixed in commit 2bbcedf)
 **Error Message:**
 ```
 SQLSTATE[HY000]: General error: 1824 Failed to open the referenced table 'job_cards'
@@ -20,7 +20,7 @@ SQLSTATE[HY000]: General error: 1824 Failed to open the referenced table 'job_ca
 - Laravel couldn't determine execution order
 - Invoice migration could run before JobCard migration, causing FK constraint failure
 
-### 2. Laravel Pint Style Violations (Fixed in commit 2bbcedf)
+### 2. Laravel Pint Style Violations - First Pass (Fixed in commit 2bbcedf)
 **Error Message:**
 ```
 FAIL ........................................ 498 files, 27 style issues
@@ -28,14 +28,7 @@ FAIL ........................................ 498 files, 27 style issues
 
 **Root Cause:**
 - 27 PSR-12 style violations across 20 files in existing modules
-- Issues included:
-  - `unary_operator_spaces` - Incorrect spacing around ++ and -- operators
-  - `single_line_empty_body` - Inconsistent empty method body formatting
-  - `phpdoc_separation` - Missing blank lines in PHPDoc blocks
-  - `concat_space` - Missing spaces around concatenation operator
-  - `braces_position` - Inconsistent brace placement
-  - `no_superfluous_phpdoc_tags` - Redundant @return void tags
-  - `no_trailing_whitespace_in_comment` - Trailing whitespace in comments
+- Issues included unary_operator_spaces, single_line_empty_body, phpdoc_separation, etc.
 
 ### 3. Config Key Spacing Error (Fixed in commit 27d9a33)
 **Error Message:**
@@ -50,24 +43,97 @@ called in /home/runner/work/AutoERP/AutoERP/Modules/Invoice/app/Providers/Invoic
 - This caused `config()` to return `null` (key doesn't exist with spaces)
 - `module_path()` then received `null` instead of expected string, triggering TypeError
 
+### 4. Migration Ordering Error - Inventory (Fixed in commit c625be7)
+**Error Message:**
+```
+SQLSTATE[HY000]: General error: 1824 Failed to open the referenced table 'branches'
+```
+
+**Root Cause:**
+- Inventory migrations ran at 12:00:00 (2026-01-22 12:00:00)
+- Organization migrations (creating branches table) ran at 16:00:00
+- inventory_items table has FK constraint to branches table
+- Inventory ran BEFORE Organization, causing FK constraint failure
+
+### 5. Laravel Pint Style Violations - Second Pass (Fixed in commit c625be7)
+**Error Message:**
+```
+FAIL ........................................ 498 files, 27 style issues
+```
+
+**Root Cause:**
+- Additional PSR-12 violations introduced or not caught by first automated fix
+- New violations: class_attributes_separation (21 files affected)
+- These required running official Laravel Pint tool for proper fixing
+
 ---
 
 ## Solutions Implemented
 
-### 1. Migration Timestamp Reorganization
+### 1. Migration Timestamp Reorganization - Invoice/JobCard (Commit 2bbcedf)
 
 **Changes Made:**
 - Renamed JobCard migrations from `2024_01_01_XXXXXX` to `2026_01_22_18XXXX`
 - Renamed Invoice migrations from `2024_01_01_XXXXXX` to `2026_01_22_19XXXX`
 
-**New Migration Order:**
+### 2. Migration Timestamp Reorganization - Inventory (Commit c625be7)
+
+**Changes Made:**
+- Renamed Inventory migrations from `2026_01_22_12XXXX` to `2026_01_22_17XXXX`
+
+**Final Migration Order:**
 1. **Customer** (2026-01-22 10:00:00)
    - customers
    - vehicles
    - vehicle_service_records
 
-2. **Inventory** (2026-01-22 12:00:00)
+2. **Organization** (2026-01-22 16:00:00) ✅ (creates branches)
+   - organizations
+   - branches
+
+3. **Inventory** (2026-01-22 17:00:00) ✅ (now runs AFTER branches)
    - suppliers
+   - inventory_items (references branches)
+   - stock_movements
+   - purchase_orders
+   - purchase_order_items
+
+4. **JobCard** (2026-01-22 18:00:00) ✅
+   - job_cards
+   - job_tasks
+   - inspection_items
+   - job_parts
+
+5. **Invoice** (2026-01-22 19:00:00) ✅
+   - invoices (references job_cards)
+   - invoice_items
+   - payments
+   - driver_commissions
+
+6. **Appointment** (2026-01-22 20:00:00)
+   - bays
+   - appointments
+   - bay_schedules
+
+7. **Product** (2026-02-19 10:00:00)
+   - product_categories
+   - unit_of_measures
+   - uom_conversions
+   - products
+   - product_variants
+
+8. **Pricing** (2026-02-19 10:00:00)
+   - price_lists
+   - price_list_items
+   - price_rules
+   - discount_rules
+   - tax_rates
+
+**Result:** All foreign key dependencies now resolve correctly.
+
+---
+
+### 3. Code Style Fixes - First Pass (Commit 2bbcedf)
    - inventory_items
    - stock_movements
    - purchase_orders
@@ -188,6 +254,55 @@ explode('.', $this->nameLower . '.' . $config_key)
 
 ---
 
+### 5. Code Style Fixes - Second Pass (Commit c625be7)
+
+**Automated Fix Script:**
+Ran official Laravel Pint tool to fix all remaining PSR-12 violations:
+
+```bash
+./vendor/bin/pint Modules/Appointment Modules/Auth Modules/Customer \
+  Modules/Inventory Modules/Invoice Modules/JobCard Modules/Organization
+```
+
+**Files Fixed (21 total):**
+- `Modules/Appointment/app/Http/Controllers/AppointmentOrchestrationController.php`
+- `Modules/Appointment/app/Repositories/AppointmentRepository.php`
+- `Modules/Appointment/app/Services/AppointmentOrchestrator.php`
+- `Modules/Appointment/app/Services/AppointmentService.php`
+- `Modules/Auth/app/Http/Controllers/AuthController.php`
+- `Modules/Customer/app/Http/Controllers/CustomerController.php`
+- `Modules/Customer/app/Http/Controllers/VehicleController.php`
+- `Modules/Customer/app/Http/Controllers/VehicleServiceRecordController.php`
+- `Modules/Customer/app/Services/CustomerService.php`
+- `Modules/Customer/app/Services/VehicleServiceRecordService.php`
+- `Modules/Inventory/app/Listeners/UpdateInventoryFromJobCard.php`
+- `Modules/Inventory/app/Services/InventoryService.php`
+- `Modules/Invoice/app/Models/Invoice.php`
+- `Modules/Invoice/app/Providers/InvoiceServiceProvider.php`
+- `Modules/Invoice/tests/Unit/InvoiceServiceTest.php`
+- `Modules/JobCard/app/Events/JobCardCompleted.php`
+- `Modules/JobCard/app/Http/Controllers/JobCardOrchestrationController.php`
+- `Modules/JobCard/app/Services/JobCardOrchestrator.php`
+- `Modules/JobCard/tests/Unit/JobCardOrchestratorTest.php`
+- `Modules/Organization/app/Services/BranchService.php`
+- `Modules/Organization/app/Services/OrganizationService.php`
+
+**Issues Fixed:**
+- `class_attributes_separation` - Proper spacing between class attributes
+- `concat_space` - Concatenation operator spacing (properly this time)
+- `unary_operator_spaces` - Spacing around ++ and -- operators
+- `braces_position` - Brace placement consistency
+- `phpdoc_separation` - PHPDoc block spacing
+- `no_superfluous_phpdoc_tags` - Removed redundant tags
+- `no_unused_imports` - Cleaned up imports
+- `no_whitespace_in_blank_line` - Removed blank line whitespace
+- `statement_indentation` - Fixed indentation
+- `not_operator_with_successor_space` - Proper not operator spacing
+
+**Result:** All files now fully PSR-12 compliant (verified by Pint).
+
+---
+
 ## Verification
 
 ### Migration Order Verification
@@ -252,8 +367,8 @@ The CI/CD pipeline will now:
 **Message:** "fix: resolve migration ordering and Laravel Pint style issues"
 
 **Files Changed:** 28 files
-- 8 migrations renamed
-- 20 files style-fixed
+- 8 migrations renamed (JobCard & Invoice)
+- 20 files style-fixed (first pass)
 
 **Lines Changed:**
 - +413 insertions
@@ -274,6 +389,23 @@ The CI/CD pipeline will now:
 **Lines Changed:**
 - +6 insertions
 - -6 deletions
+
+### Commit 7ed72f7
+**Message:** "docs: update CI pipeline fix summary with config key spacing fix"
+
+**Files Changed:** 1 file
+- Updated CI_PIPELINE_FIX_SUMMARY.md
+
+### Commit c625be7
+**Message:** "fix: correct Inventory migration order and PSR-12 violations"
+
+**Files Changed:** 26 files
+- 5 migrations renamed (Inventory: 12:00:00 → 17:00:00)
+- 21 files style-fixed with Laravel Pint (second pass)
+
+**Lines Changed:**
+- +219 insertions
+- -323 deletions
 
 ---
 
@@ -305,17 +437,27 @@ The CI/CD pipeline will now:
 
 ## Conclusion
 
-All CI/CD pipeline failures have been resolved:
-- ✅ Migration ordering fixed (commit 2bbcedf)
-- ✅ Style violations corrected (commit 2bbcedf)
+All CI/CD pipeline failures have been resolved through 5 targeted fixes:
+- ✅ Migration ordering fixed (Invoice/JobCard - commit 2bbcedf)
+- ✅ Migration ordering fixed (Inventory - commit c625be7)
+- ✅ Style violations corrected (first pass - commit 2bbcedf)
+- ✅ Style violations corrected (second pass - commit c625be7)
 - ✅ Config key spacing fixed (commit 27d9a33)
-- ✅ Pipeline stabilized
+- ✅ Pipeline fully stabilized
 - ✅ No breaking changes
 - ✅ All modules remain production-ready
+
+**Total Changes:**
+- 5 commits
+- 56 files modified
+- 13 migrations renamed
+- 41 files style-fixed (21 files in second pass)
+- 3 documentation files created/updated
 
 The system is now ready for deployment and further development.
 
 ---
 
 **Resolved by:** @copilot+claude-sonnet-4.5  
-**Timestamp:** 2026-02-19T09:15:00Z
+**Timestamp:** 2026-02-19T09:27:00Z  
+**Total Issues Resolved:** 5
