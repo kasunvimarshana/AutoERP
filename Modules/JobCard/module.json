@@ -1,0 +1,11 @@
+{
+    "name": "JobCard",
+    "alias": "jobcard",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\JobCard\\Providers\\JobCardServiceProvider"
+    ],
+    "files": []
+}
