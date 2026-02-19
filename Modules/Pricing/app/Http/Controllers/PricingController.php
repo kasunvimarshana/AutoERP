@@ -1,56 +1,52 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Pricing\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\Pricing\Requests\CalculatePriceRequest;
+use Modules\Pricing\Services\PricingService;
 
 class PricingController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function __construct(
+        private readonly PricingService $pricingService
+    ) {}
+
+    public function calculate(CalculatePriceRequest $request): JsonResponse
     {
-        return view('pricing::index');
+        $result = $this->pricingService->calculatePrice(
+            $request->integer('product_id'),
+            (string) $request->input('quantity', '1'),
+            $request->except('product_id', 'quantity')
+        );
+
+        return $this->successResponse($result, 'Price calculated successfully');
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    public function calculateCart(Request $request): JsonResponse
     {
-        return view('pricing::create');
+        $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|integer|exists:products,id',
+            'items.*.quantity' => 'sometimes|numeric|min:0.01',
+        ]);
+
+        $result = $this->pricingService->calculateCartPrice(
+            $request->input('items'),
+            $request->except('items')
+        );
+
+        return $this->successResponse($result, 'Cart price calculated successfully');
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request) {}
-
-    /**
-     * Show the specified resource.
-     */
-    public function show($id)
+    public function strategies(): JsonResponse
     {
-        return view('pricing::show');
+        $strategies = $this->pricingService->getAvailableStrategies();
+
+        return $this->successResponse($strategies, 'Pricing strategies retrieved successfully');
     }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit($id)
-    {
-        return view('pricing::edit');
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, $id) {}
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy($id) {}
 }
