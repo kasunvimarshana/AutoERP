@@ -30,6 +30,8 @@ class User extends Authenticatable implements JWTSubject
         'avatar',
         'metadata',
         'last_login_at',
+        'is_sales_commission_agent',
+        'commission_rate',
     ];
 
     protected $hidden = [
@@ -45,6 +47,8 @@ class User extends Authenticatable implements JWTSubject
             'password' => 'hashed',
             'status' => UserStatus::class,
             'metadata' => 'array',
+            'is_sales_commission_agent' => 'boolean',
+            'commission_rate' => 'float',
         ];
     }
 
@@ -76,6 +80,13 @@ class User extends Authenticatable implements JWTSubject
     {
         return $this->belongsToMany(Organization::class, 'organization_user')
             ->withPivot(['role', 'is_primary', 'joined_at'])
+            ->withTimestamps();
+    }
+
+    /** Contacts this user is explicitly allowed to access (empty = all contacts). */
+    public function allowedContacts(): BelongsToMany
+    {
+        return $this->belongsToMany(Contact::class, 'user_contact_access')
             ->withTimestamps();
     }
 }

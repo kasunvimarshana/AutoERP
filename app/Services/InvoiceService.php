@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Contracts\Services\InvoiceServiceInterface;
 use App\Enums\AuditAction;
 use App\Enums\InvoiceStatus;
 use App\Events\InvoiceCreated;
@@ -11,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 
-class InvoiceService
+class InvoiceService implements InvoiceServiceInterface
 {
     public function __construct(
         private readonly AuditService $auditService

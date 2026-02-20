@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Contracts\Services\OrderServiceInterface;
 use App\Enums\AuditAction;
 use App\Enums\OrderStatus;
 use App\Events\OrderCreated;
@@ -11,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 
-class OrderService
+class OrderService implements OrderServiceInterface
 {
     public function __construct(
         private readonly AuditService $auditService

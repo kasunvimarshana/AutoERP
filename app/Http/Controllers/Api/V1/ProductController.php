@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Product\CreateProductRequest;
 use App\Http\Requests\Product\UpdateProductRequest;
+use App\Http\Resources\ProductResource;
 use App\Services\ProductService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\ResourceCollection;
 
 class ProductController extends Controller
 {
@@ -15,13 +17,13 @@ class ProductController extends Controller
         private readonly ProductService $productService
     ) {}
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request): ResourceCollection
     {
         $tenantId = $request->user()->tenant_id;
         $perPage = min((int) $request->query('per_page', 15), 100);
         $filters = $request->only(['type', 'is_active', 'search']);
 
-        return response()->json($this->productService->paginate($tenantId, $filters, $perPage));
+        return ProductResource::collection($this->productService->paginate($tenantId, $filters, $perPage));
     }
 
     public function store(CreateProductRequest $request): JsonResponse
@@ -31,14 +33,14 @@ class ProductController extends Controller
 
         $product = $this->productService->create($data);
 
-        return response()->json($product, 201);
+        return (new ProductResource($product))->response()->setStatusCode(201);
     }
 
     public function update(UpdateProductRequest $request, string $id): JsonResponse
     {
         $product = $this->productService->update($id, $request->validated());
 
-        return response()->json($product);
+        return (new ProductResource($product))->response();
     }
 
     public function destroy(Request $request, string $id): JsonResponse

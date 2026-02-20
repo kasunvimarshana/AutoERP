@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Middleware\EnsureOrganizationAccess;
+use App\Http\Middleware\ForceHttps;
+use App\Http\Middleware\IdempotencyMiddleware;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\TenantMiddleware;
 use Illuminate\Foundation\Application;
@@ -20,9 +22,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant' => TenantMiddleware::class,
             'locale' => SetLocale::class,
             'org.access' => EnsureOrganizationAccess::class,
+            'idempotency' => IdempotencyMiddleware::class,
+            'force.https' => ForceHttps::class,
         ]);
+        $middleware->prepend(ForceHttps::class);
         $middleware->prependToGroup('api', HandleCors::class);
         $middleware->appendToGroup('api', SetLocale::class);
+        $middleware->appendToGroup('api', IdempotencyMiddleware::class);
         $middleware->throttleApi('api');
     })
     ->withExceptions(function (Exceptions $exceptions) {

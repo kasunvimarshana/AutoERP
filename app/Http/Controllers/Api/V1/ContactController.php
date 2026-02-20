@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Services\ContactService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -145,5 +146,44 @@ class ContactController extends Controller
         $data['organization_id'] ??= $request->user()->organization_id;
 
         return response()->json($this->contactService->createOpportunity($data), 201);
+    }
+
+    // ── User Contact Access ────────────────────────────────────────────
+
+    /** GET /api/v1/crm/users/{userId}/contact-access — list allowed contacts. */
+    public function userContactAccess(Request $request, string $userId): JsonResponse
+    {
+        abort_unless($request->user()?->can('crm.contacts.view'), 403);
+
+        $user = User::where('tenant_id', $request->user()->tenant_id)->findOrFail($userId);
+
+        return response()->json($user->allowedContacts()->get(['contacts.id', 'contacts.first_name', 'contacts.last_name', 'contacts.company_name']));
+    }
+
+    /** PUT /api/v1/crm/users/{userId}/contact-access — sync allowed contacts (replace). */
+    public function syncUserContactAccess(Request $request, string $userId): JsonResponse
+    {
+        abort_unless($request->user()?->can('crm.contacts.manage'), 403);
+
+        $data = $request->validate([
+            'contact_ids' => ['required', 'array'],
+            'contact_ids.*' => ['uuid', 'exists:contacts,id'],
+        ]);
+
+        $user = User::where('tenant_id', $request->user()->tenant_id)->findOrFail($userId);
+        $user->allowedContacts()->sync($data['contact_ids']);
+
+        return response()->json(['synced' => count($data['contact_ids'])]);
+    }
+
+    /** DELETE /api/v1/crm/users/{userId}/contact-access — remove all access restrictions. */
+    public function clearUserContactAccess(Request $request, string $userId): JsonResponse
+    {
+        abort_unless($request->user()?->can('crm.contacts.manage'), 403);
+
+        $user = User::where('tenant_id', $request->user()->tenant_id)->findOrFail($userId);
+        $user->allowedContacts()->detach();
+
+        return response()->json(null, 204);
     }
 }

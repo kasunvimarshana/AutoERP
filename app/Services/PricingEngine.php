@@ -100,7 +100,39 @@ class PricingEngine implements PricingEngineInterface
                 8
             ),
             PricingType::Tiered => $this->applyTieredRule($rule, $basePrice, $quantity),
+            PricingType::Conditional => $this->applyConditionalRule($rule, $basePrice),
             PricingType::RuleBased => bcadd($rule->value, '0', 8),
+        };
+    }
+
+    /**
+     * Apply a conditional pricing rule.
+     *
+     * The rule's `conditions` JSON may contain an `adjustment` object with:
+     *   - type: 'flat' | 'percentage' | 'fixed'
+     *   - value: numeric string
+     * When no matching condition is found the base price is returned unchanged.
+     */
+    private function applyConditionalRule(PriceRule $rule, string $basePrice): string
+    {
+        $conditions = $rule->conditions ?? [];
+        $adjustment = $conditions['adjustment'] ?? null;
+
+        if (! $adjustment) {
+            return bcadd($basePrice, '0', 8);
+        }
+
+        $adjustValue = (string) ($adjustment['value'] ?? '0');
+        $adjustType = $adjustment['type'] ?? 'flat';
+
+        return match ($adjustType) {
+            'percentage' => bcadd(
+                $basePrice,
+                bcdiv(bcmul($basePrice, $adjustValue, 8), '100', 8),
+                8
+            ),
+            'fixed' => bcadd($adjustValue, '0', 8),
+            default => bcadd($basePrice, $adjustValue, 8), // flat delta on base price
         };
     }
 

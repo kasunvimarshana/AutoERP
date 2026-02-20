@@ -29,7 +29,10 @@ class RbacSeeder extends Seeder
         'webhooks.view', 'webhooks.create', 'webhooks.update', 'webhooks.delete',
         'reports.view', 'reports.export',
         'audit.view',
-        'settings.view', 'settings.update',
+        'settings.view', 'settings.update', 'settings.edit',
+        'stock_transfers.view', 'stock_transfers.create', 'stock_transfers.dispatch', 'stock_transfers.receive', 'stock_transfers.cancel',
+        'invoice_schemes.view', 'invoice_schemes.create', 'invoice_schemes.edit', 'invoice_schemes.delete',
+        'workflow.view', 'workflow.manage',
     ];
 
     private array $roles = [
@@ -46,6 +49,7 @@ class RbacSeeder extends Seeder
             'crm.contacts.view', 'crm.contacts.create', 'crm.contacts.update',
             'crm.leads.view', 'crm.leads.create', 'crm.leads.update', 'crm.leads.convert',
             'reports.view', 'audit.view', 'settings.view', 'settings.update',
+            'workflow.view', 'workflow.manage',
         ],
         'manager' => [
             'organizations.view',
@@ -58,6 +62,7 @@ class RbacSeeder extends Seeder
             'crm.contacts.view', 'crm.contacts.create', 'crm.contacts.update',
             'crm.leads.view', 'crm.leads.create', 'crm.leads.update', 'crm.leads.convert',
             'reports.view',
+            'workflow.view', 'workflow.manage',
         ],
         'staff' => [
             'products.view',
@@ -67,12 +72,14 @@ class RbacSeeder extends Seeder
             'payments.view',
             'crm.contacts.view', 'crm.contacts.create',
             'crm.leads.view', 'crm.leads.create',
+            'workflow.view',
         ],
         'viewer' => [
             'products.view', 'inventory.view', 'orders.view',
             'invoices.view', 'payments.view',
             'crm.contacts.view', 'crm.leads.view',
             'reports.view',
+            'workflow.view',
         ],
     ];
 

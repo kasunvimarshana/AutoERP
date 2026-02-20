@@ -2,13 +2,16 @@
 
 namespace App\Services;
 
+use App\Contracts\Services\ProductServiceInterface;
 use App\Enums\AuditAction;
+use App\Events\ProductCreated;
 use App\Models\Product;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 
-class ProductService
+class ProductService implements ProductServiceInterface
 {
     public function __construct(
         private readonly AuditService $auditService
@@ -49,7 +52,10 @@ class ProductService
                 newValues: $data
             );
 
-            return $product->fresh(['category', 'buyUnit', 'sellUnit']);
+            $fresh = $product->fresh(['category', 'buyUnit', 'sellUnit']);
+            Event::dispatch(new ProductCreated($fresh));
+
+            return $fresh;
         });
     }
 

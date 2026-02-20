@@ -16,7 +16,7 @@ class Product extends Model
     use HasFactory, HasUuids, SoftDeletes;
 
     protected $fillable = [
-        'tenant_id', 'category_id', 'type', 'sku', 'name', 'slug',
+        'tenant_id', 'category_id', 'brand_id', 'type', 'sku', 'name', 'slug',
         'description', 'is_active', 'is_purchasable', 'is_saleable',
         'is_trackable', 'buy_unit_id', 'sell_unit_id', 'buy_unit_cost',
         'base_price', 'currency', 'tax_rate', 'attributes', 'metadata',
@@ -47,6 +47,11 @@ class Product extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(ProductCategory::class);
+    }
+
+    public function brand(): BelongsTo
+    {
+        return $this->belongsTo(Brand::class);
     }
 
     public function buyUnit(): BelongsTo

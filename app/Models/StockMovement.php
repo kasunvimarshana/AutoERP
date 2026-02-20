@@ -12,6 +12,7 @@ class StockMovement extends Model
 
     protected $fillable = [
         'tenant_id', 'warehouse_id', 'product_id', 'variant_id',
+        'batch_number', 'lot_number', 'serial_number', 'expiry_date', 'valuation_method',
         'movement_type', 'quantity', 'cost_per_unit', 'reference_type',
         'reference_id', 'notes', 'user_id', 'moved_at',
     ];
@@ -21,6 +22,7 @@ class StockMovement extends Model
         return [
             'quantity' => 'string',
             'cost_per_unit' => 'string',
+            'expiry_date' => 'date',
             'moved_at' => 'datetime',
         ];
     }

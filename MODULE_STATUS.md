@@ -1,9 +1,5 @@
 # ERP/CRM Module Implementation Status
 
-> Last Updated: 2026-02-19
-> Stack: Laravel 11 (PHP 8.3) + Vue 3 + JWT + Spatie Permissions
-> Architecture: Clean Architecture + DDD + SOLID + Modular Plugin-style
-
 ## Architecture Overview
 
 ```
@@ -17,12 +13,17 @@ Infrastructure Layer → Repositories, Migrations, External Services
 - **Multi-tenancy**: Row-level isolation via `tenant_id` on all entities
 - **Hierarchical Orgs**: Nested set model (lft/rgt/depth) for organization trees
 - **JWT Auth**: Stateless, multi-guard (user × device × org claims in token)
-- **RBAC/ABAC**: Spatie permissions + custom policies + Form Request authorize()
-- **Event-Driven**: Laravel events, queues, pipelines
+- **RBAC/ABAC**: Spatie permissions + Laravel Policies (Product, Order, Invoice) + Form Request authorize()
+- **Event-Driven**: Laravel events + queued jobs (DeliverWebhookJob) + WebhookEventSubscriber pipeline
 - **Precision Finance**: BCMath (8 decimal places) for ALL monetary calculations
 - **Audit Trail**: Immutable audit_logs on all state changes
 - **Optimistic Locking**: `lock_version` on Product, Order, Invoice, StockItem
 - **Pessimistic Locking**: `lockForUpdate()` in InventoryService for stock adjustments
+- **Repository Pattern**: BaseRepository + ProductRepository + OrderRepository implementations
+- **Service Contracts**: All major services bound to interfaces via AppServiceProvider
+- **Cache Layer**: Laravel cache (Redis / DB) for business settings + in-memory per-request fallback
+- **HTTPS Enforcement**: ForceHttps middleware with HSTS header (configurable via FORCE_HTTPS env var)
+- **Vue 3 SPA**: Composition API + Pinia + Vue Router 4, served via `app.blade.php` catch-all
 
 ---
 
@@ -39,6 +40,8 @@ Infrastructure Layer → Repositories, Migrations, External Services
 | **Product** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
 | **Pricing Engine** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
 | **Inventory** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Stock Alerts (low-stock/expiry)** | ✅ | ✅ (stock_batches) | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **FIFO / FEFO Valuation** | ✅ (StockBatch) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
 | **Order** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
 | **Invoice** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
 | **Payment** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
@@ -50,6 +53,46 @@ Infrastructure Layer → Repositories, Migrations, External Services
 | **File Manager** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
 | **Audit** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
 | **Webhook** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Tax Rate** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Brand** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Customer Group** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Business Location** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Payment Account** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **POS (Point of Sale)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Purchase/Procurement** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Expense** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Stock Adjustment** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Brand→Product link** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Variation Templates** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Currency** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Selling Price Groups** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **POS Return/Refund** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Reference Numbers** | ✅ | ✅ | ✅ | N/A | ✅ | N/A | ✅ Done |
+| **Idempotency Keys** | ✅ | ✅ | ✅ (Middleware) | N/A | ✅ (global api group) | ✅ | ✅ Done |
+| **Business Settings** | ✅ | ✅ | ✅ + Cache | ✅ | ✅ | ✅ | ✅ Done |
+| **Invoice Schemes** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Stock Transfers** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Barcode** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Invoice Layouts** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Printer** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Product Rack** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Restaurant Module** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Purchase Return** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Opening Stock** | N/A | N/A | N/A | ✅ | ✅ | ✅ | ✅ Done |
+| **Sales Commission Agent** | ✅ (User) | ✅ | N/A | ✅ | ✅ | ✅ | ✅ Done |
+| **Extended Reports (parity)** | N/A | N/A | ✅ | ✅ | ✅ | N/A | ✅ Done |
+| **Product Category API** | ✅ (existed) | ✅ (existed) | ✅ | ✅ | ✅ | ✅ | ✅ Done |
+| **Restaurant Kitchen Display** | ✅ (PosTransaction) | ✅ | N/A | ✅ | ✅ | N/A | ✅ Done |
+| **User Contact Access** | ✅ | ✅ | N/A | ✅ | ✅ | ✅ | ✅ Done |
+| **Workflow Engine** | ✅ (WorkflowDefinition, WorkflowState, WorkflowTransition, WorkflowInstance, WorkflowHistory) | ✅ | ✅ (WorkflowEngineService + Interface) | ✅ (WorkflowController) | ✅ (7 endpoints) | ✅ (15 tests) | ✅ Done |
+| **Repository Layer** | ✅ | N/A | N/A | N/A | N/A | ✅ | ✅ Done |
+| **Service Contracts** | ✅ | N/A | N/A | N/A | N/A | ✅ | ✅ Done |
+| **Domain Events** | ✅ | N/A | N/A | N/A | N/A | ✅ | ✅ Done |
+| **Event Listeners** | ✅ | N/A | N/A | N/A | N/A | N/A | ✅ Done |
+| **Webhook Queue Job** | ✅ | N/A | N/A | N/A | N/A | N/A | ✅ Done |
+| **Laravel Policies** | ✅ | N/A | N/A | N/A | N/A | ✅ | ✅ Done |
+| **ForceHttps Middleware** | N/A | N/A | N/A | N/A | ✅ (global) | ✅ | ✅ Done |
+| **Vue 3 SPA Frontend** | N/A | N/A | N/A | N/A | ✅ (catch-all) | N/A | ✅ Done |
 
 ### Status Legend
 - ✅ Implemented
@@ -223,6 +266,90 @@ Infrastructure Layer → Repositories, Migrations, External Services
 | GET | `/api/v1/reports/inventory-summary` | Inventory summary |
 | GET | `/api/v1/reports/receivables-summary` | Receivables by status |
 | GET | `/api/v1/reports/top-products` | Top products by revenue |
+| GET | `/api/v1/reports/pos-sales-summary` | POS sales summary by location |
+| GET | `/api/v1/reports/purchase-summary` | Purchase summary by status |
+| GET | `/api/v1/reports/expense-summary` | Expense summary by category |
+| GET | `/api/v1/reports/profit-loss` | Profit & Loss: gross sales − COGS − expenses |
+| GET | `/api/v1/reports/tax-report` | Tax collected on sales |
+| GET | `/api/v1/reports/stock-expiry` | Items expiring within N days |
+| GET | `/api/v1/reports/register-report` | Cash register pay-in / pay-out summary |
+| GET | `/api/v1/reports/customer-group` | Sales breakdown by customer group |
+| GET | `/api/v1/reports/product-sell` | Product-level sell quantities & revenue |
+| GET | `/api/v1/reports/product-purchase` | Product-level purchase quantities & cost |
+| GET | `/api/v1/reports/sales-representative` | Sales by commission agent |
+| GET | `/api/v1/reports/trending-products` | Top products by units sold |
+| GET | `/api/v1/reports/lot-report` | Stock on hand grouped by lot number |
+
+### Barcodes
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/barcodes` | List barcode label templates |
+| POST | `/api/v1/barcodes` | Create barcode template |
+| PUT | `/api/v1/barcodes/{id}` | Update barcode template |
+| DELETE | `/api/v1/barcodes/{id}` | Delete barcode template |
+| PATCH | `/api/v1/barcodes/{id}/set-default` | Set default barcode template |
+
+### Invoice Layouts
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/invoice-layouts` | List invoice layout templates |
+| POST | `/api/v1/invoice-layouts` | Create invoice layout |
+| PUT | `/api/v1/invoice-layouts/{id}` | Update invoice layout |
+| DELETE | `/api/v1/invoice-layouts/{id}` | Delete invoice layout |
+| PATCH | `/api/v1/invoice-layouts/{id}/set-default` | Set default invoice layout |
+
+### Printers
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/printers` | List configured printers |
+| POST | `/api/v1/printers` | Create printer |
+| PUT | `/api/v1/printers/{id}` | Update printer |
+| DELETE | `/api/v1/printers/{id}` | Delete printer |
+| GET | `/api/v1/printers/capability-profiles` | Available capability profiles |
+| GET | `/api/v1/printers/connection-types` | Available connection types |
+
+### Product Racks
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/product-racks` | List product rack/shelf locations |
+| POST | `/api/v1/product-racks` | Create or update rack location (upsert) |
+| DELETE | `/api/v1/product-racks/{id}` | Delete rack entry |
+
+### Restaurant Module
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/restaurant/tables` | List restaurant tables |
+| POST | `/api/v1/restaurant/tables` | Create table |
+| PUT | `/api/v1/restaurant/tables/{id}` | Update table |
+| DELETE | `/api/v1/restaurant/tables/{id}` | Delete table |
+| GET | `/api/v1/restaurant/modifier-sets` | List modifier sets (add-ons) |
+| POST | `/api/v1/restaurant/modifier-sets` | Create modifier set with options |
+| PUT | `/api/v1/restaurant/modifier-sets/{id}` | Update modifier set + options |
+| DELETE | `/api/v1/restaurant/modifier-sets/{id}` | Delete modifier set |
+| GET | `/api/v1/restaurant/bookings` | List table bookings |
+| POST | `/api/v1/restaurant/bookings` | Create booking |
+| PUT | `/api/v1/restaurant/bookings/{id}` | Update booking |
+| DELETE | `/api/v1/restaurant/bookings/{id}` | Delete booking |
+
+### Purchase Returns
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/purchase-returns` | List purchase returns |
+| POST | `/api/v1/purchase-returns` | Create purchase return (with lines) |
+| PATCH | `/api/v1/purchase-returns/{id}/cancel` | Cancel purchase return |
+
+### Opening Stock
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/opening-stock` | List opening stock entries |
+| POST | `/api/v1/opening-stock` | Record initial stock quantities |
+
+### Sales Commission Agents
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/sales-commission-agents` | List sales commission agents |
+| GET | `/api/v1/sales-commission-agents/{id}/total-sell` | Agent's total sales in period |
+| GET | `/api/v1/sales-commission-agents/{id}/total-commission` | Agent's commission amount in period |
 
 ### Webhooks
 | Method | Endpoint | Description |
@@ -320,13 +447,13 @@ Infrastructure Layer → Repositories, Migrations, External Services
 | Pessimistic Lock | lockForUpdate() in InventoryService | ✅ |
 | Soft Deletes | All domain models | ✅ |
 | Audit Trail | AuditService + AuditLog model | ✅ |
-| Domain Events | OrderCreated, InvoiceCreated, PaymentRecorded | ✅ |
+| Domain Events | OrderCreated, InvoiceCreated, PaymentRecorded, ProductCreated, StockAdjusted, WorkflowTransitioned | ✅ |
 | Cache | Redis (configurable via .env) | ⬜ |
 | Queue | Redis / Database (configurable) | ⬜ |
 | Storage | Local / S3 (configurable) | ⬜ |
-| Frontend | Vue 3 + Vite | ⬜ |
-| API Docs | OpenAPI / Swagger | ⬜ |
-| Testing | PHPUnit 11 (47 tests passing) | ✅ |
+| Frontend | Vue 3 + Vite + Pinia + Vue Router 4 | ✅ |
+| API Docs | OpenAPI 3.1 (docs/openapi.yaml) | ✅ |
+| Testing | PHPUnit 11 (226 tests passing, 351 assertions) | ✅ |
 | CI/CD | GitHub Actions (ci.yml + tests.yml) | ✅ |
 
 ---
@@ -336,7 +463,8 @@ Infrastructure Layer → Repositories, Migrations, External Services
 - [x] JWT stateless auth (no sessions) — per user×device×org
 - [x] Tenant isolation via `tenant_id` on all entities
 - [x] RBAC via Spatie permissions (48 permissions, 5 roles)
-- [x] Middleware: TenantMiddleware, SetLocale, EnsureOrganizationAccess
+- [x] Middleware: TenantMiddleware, SetLocale, EnsureOrganizationAccess, IdempotencyMiddleware
+- [x] Idempotency Keys for all POST/PUT/PATCH (prevent duplicate mutations on retry)
 - [x] Soft deletes on all domain entities
 - [x] Immutable AuditLog for all state changes
 - [x] BCMath precision for all financial calculations
@@ -348,5 +476,5 @@ Infrastructure Layer → Repositories, Migrations, External Services
 - [x] PHP 8.3 minimum (no insecure PHP 8.2)
 - [x] Rate limiting (120 req/min auth users; 30 req/min guests; 10 req/min on login)
 - [x] CORS configuration (env-configurable via CORS_ALLOWED_ORIGINS)
-- [ ] HTTPS enforcement (env-based, planned)
+- [x] HTTPS enforcement via `ForceHttps` middleware (set `FORCE_HTTPS=true` in production) + HSTS
 

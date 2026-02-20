@@ -1,0 +1,1959 @@
+openapi: 3.1.0
+info:
+  title: AutoERP API
+  version: 1.0.0
+  description: |
+    Multi-tenant, hierarchical, enterprise-grade ERP/CRM SaaS REST API.
+
+    ## Authentication
+    All endpoints (except `/auth/login`) require a Bearer JWT token:
+    ```
+    Authorization: Bearer <token>
+    ```
+
+    ## Idempotency
+    To prevent duplicate processing on retries, include an `Idempotency-Key` header
+    on all POST, PUT, and PATCH requests:
+    ```
+    Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000
+    ```
+    If a request with the same key has already been processed, the original response
+    is replayed with `X-Idempotent-Replayed: true`.
+
+    ## Multi-tenancy
+    Optionally pass `X-Tenant-ID` to identify the tenant, or use subdomain-based
+    routing (`{tenant-slug}.yourdomain.com`).
+
+    ## Precision
+    All monetary values are strings with 8 decimal places (BCMath precision).
+    Quantities use the same convention.
+
+  contact:
+    name: Platform Engineering
+    url: https://github.com/kasunvimarshana/AutoERP
+  license:
+    name: MIT
+
+servers:
+  - url: https://{tenant}.yourdomain.com/api/v1
+    description: Production (subdomain-based tenant routing)
+    variables:
+      tenant:
+        default: demo
+        description: Tenant slug
+  - url: http://localhost:8000/api/v1
+    description: Local development
+
+tags:
+  - name: Auth
+    description: JWT authentication
+  - name: Platform
+    description: Tenant management (super-admin only)
+  - name: Organizations
+    description: Hierarchical organization management
+  - name: Users
+    description: User management with RBAC
+  - name: RBAC
+    description: Roles and permissions
+  - name: Products
+    description: Product catalog (goods, service, digital, bundle, composite)
+  - name: Pricing
+    description: Price lists and rules
+  - name: Inventory
+    description: Warehouse stock management with FIFO/FEFO valuation
+  - name: Orders
+    description: Sales and purchase orders
+  - name: Invoices
+    description: Billing and invoicing
+  - name: Payments
+    description: Payment recording
+  - name: POS
+    description: Point of Sale operations
+  - name: Purchases
+    description: Supplier purchase orders
+  - name: Expenses
+    description: Expense categories and records
+  - name: Stock Adjustments
+    description: Manual stock adjustments
+  - name: CRM
+    description: Contacts, leads, and opportunities
+  - name: HR
+    description: Employees, departments, and leave management
+  - name: Accounting
+    description: Chart of accounts, journal entries, accounting periods
+  - name: Reports
+    description: Analytics and reporting endpoints
+  - name: Notifications
+    description: Notification templates and delivery logs
+  - name: File Manager
+    description: File upload and management
+  - name: Webhooks
+    description: Outbound webhook subscriptions
+  - name: Audit
+    description: Immutable audit log
+  - name: Settings
+    description: Runtime-configurable tenant settings (key-value store)
+  - name: Invoice Schemes
+    description: Configurable invoice numbering formats and prefixes
+  - name: Stock Transfers
+    description: Inter-warehouse stock transfer management (draft → in_transit → received)
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 255
+        example: 550e8400-e29b-41d4-a716-446655440000
+      description: Client-generated idempotency key (UUID v4 recommended). Enables safe retries.
+
+    XTenantId:
+      name: X-Tenant-ID
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Tenant identifier (UUID or slug). Not required when using subdomain routing.
+
+    PageQuery:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    PerPageQuery:
+      name: per_page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 15
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+
+    Pagination:
+      type: object
+      properties:
+        current_page:
+          type: integer
+        last_page:
+          type: integer
+        per_page:
+          type: integer
+        total:
+          type: integer
+        from:
+          type: integer
+        to:
+          type: integer
+
+    JwtTokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          example: bearer
+        expires_in:
+          type: integer
+          description: Token TTL in seconds
+      required: [access_token, token_type, expires_in]
+
+    Tenant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: ulid
+        name:
+          type: string
+        slug:
+          type: string
+        domain:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, suspended, trial]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Organization:
+      type: object
+      properties:
+        id:
+          type: string
+          format: ulid
+        tenant_id:
+          type: string
+        parent_id:
+          type: string
+          nullable: true
+        name:
+          type: string
+        code:
+          type: string
+          nullable: true
+        lft:
+          type: integer
+        rgt:
+          type: integer
+        depth:
+          type: integer
+        status:
+          type: string
+          enum: [active, inactive]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        tenant_id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        status:
+          type: string
+          enum: [active, suspended, invited]
+        roles:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          format: ulid
+        tenant_id:
+          type: string
+        type:
+          type: string
+          enum: [goods, service, digital, bundle, composite]
+        name:
+          type: string
+        slug:
+          type: string
+        sku:
+          type: string
+          nullable: true
+        barcode:
+          type: string
+          nullable: true
+        base_price:
+          type: string
+          description: BCMath string, 8 decimal places
+          example: "29.99000000"
+        currency:
+          type: string
+          example: USD
+        is_active:
+          type: boolean
+        lock_version:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          format: ulid
+        tenant_id:
+          type: string
+        type:
+          type: string
+          enum: [sale, purchase, return]
+        status:
+          type: string
+          enum: [draft, confirmed, cancelled]
+        currency:
+          type: string
+        subtotal:
+          type: string
+          example: "100.00000000"
+        tax_amount:
+          type: string
+          example: "10.00000000"
+        discount_amount:
+          type: string
+          example: "0.00000000"
+        total:
+          type: string
+          example: "110.00000000"
+        lock_version:
+          type: integer
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderLine'
+
+    OrderLine:
+      type: object
+      properties:
+        id:
+          type: string
+          format: ulid
+        product_id:
+          type: string
+          nullable: true
+        product_name:
+          type: string
+        quantity:
+          type: string
+        unit_price:
+          type: string
+        tax_rate:
+          type: string
+        subtotal:
+          type: string
+        total:
+          type: string
+
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: ulid
+        tenant_id:
+          type: string
+        order_id:
+          type: string
+          nullable: true
+        contact_id:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [draft, sent, partially_paid, paid, overdue, void]
+        currency:
+          type: string
+        subtotal:
+          type: string
+        tax_amount:
+          type: string
+        total:
+          type: string
+        amount_paid:
+          type: string
+        amount_due:
+          type: string
+        due_date:
+          type: string
+          format: date
+          nullable: true
+        lock_version:
+          type: integer
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: ulid
+        invoice_id:
+          type: string
+        amount:
+          type: string
+        currency:
+          type: string
+        method:
+          type: string
+          enum: [cash, card, bank_transfer, cheque, digital_wallet, other]
+        status:
+          type: string
+          enum: [pending, completed, failed, refunded]
+        paid_at:
+          type: string
+          format: date-time
+          nullable: true
+        reference:
+          type: string
+          nullable: true
+
+    StockItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: ulid
+        warehouse_id:
+          type: string
+        product_id:
+          type: string
+        variant_id:
+          type: string
+          nullable: true
+        quantity_on_hand:
+          type: string
+        quantity_reserved:
+          type: string
+        quantity_available:
+          type: string
+        reorder_point:
+          type: string
+          nullable: true
+        cost_per_unit:
+          type: string
+        currency:
+          type: string
+
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: ulid
+        tenant_id:
+          type: string
+        user_id:
+          type: integer
+          nullable: true
+        action:
+          type: string
+          enum: [created, updated, deleted, login, logout, status_changed, permission_changed]
+        auditable_type:
+          type: string
+        auditable_id:
+          type: string
+        old_values:
+          type: object
+          nullable: true
+        new_values:
+          type: object
+          nullable: true
+        ip_address:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+paths:
+  # ──────────────────────────────────────────
+  # Auth
+  # ──────────────────────────────────────────
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Authenticate and receive JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JwtTokenResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Invalidate JWT token
+      responses:
+        '200':
+          description: Logged out
+        '401':
+          description: Unauthenticated
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh JWT token
+      responses:
+        '200':
+          description: New JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JwtTokenResponse'
+        '401':
+          description: Token invalid or expired
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user profile
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  # ──────────────────────────────────────────
+  # Platform — Tenant Management
+  # ──────────────────────────────────────────
+  /platform/tenants:
+    get:
+      tags: [Platform]
+      summary: List all tenants
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/PerPageQuery'
+      responses:
+        '200':
+          description: Paginated tenant list
+    post:
+      tags: [Platform]
+      summary: Create a new tenant
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, slug]
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                domain:
+                  type: string
+      responses:
+        '201':
+          description: Tenant created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+
+  /platform/tenants/{id}:
+    put:
+      tags: [Platform]
+      summary: Update tenant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                domain:
+                  type: string
+      responses:
+        '200':
+          description: Tenant updated
+
+  /platform/tenants/{id}/suspend:
+    patch:
+      tags: [Platform]
+      summary: Suspend a tenant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Tenant suspended
+
+  /platform/tenants/{id}/activate:
+    patch:
+      tags: [Platform]
+      summary: Activate a suspended tenant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Tenant activated
+
+  # ──────────────────────────────────────────
+  # Organizations
+  # ──────────────────────────────────────────
+  /organizations:
+    get:
+      tags: [Organizations]
+      summary: List organizations (paginated)
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/PerPageQuery'
+      responses:
+        '200':
+          description: Organization list
+    post:
+      tags: [Organizations]
+      summary: Create organization
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                parent_id:
+                  type: string
+                  nullable: true
+                code:
+                  type: string
+      responses:
+        '201':
+          description: Organization created
+
+  /organizations/tree:
+    get:
+      tags: [Organizations]
+      summary: Full organization hierarchy as a nested tree
+      responses:
+        '200':
+          description: Nested tree of organizations
+
+  /organizations/{id}:
+    put:
+      tags: [Organizations]
+      summary: Update organization
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Updated organization
+    delete:
+      tags: [Organizations]
+      summary: Delete organization (soft delete)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Deleted
+
+  # ──────────────────────────────────────────
+  # Users
+  # ──────────────────────────────────────────
+  /users:
+    get:
+      tags: [Users]
+      summary: List users (tenant-scoped)
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/PerPageQuery'
+      responses:
+        '200':
+          description: User list
+    post:
+      tags: [Users]
+      summary: Create user
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+                roles:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: User created
+
+  /users/{id}:
+    put:
+      tags: [Users]
+      summary: Update user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: User updated
+
+  /users/{id}/suspend:
+    patch:
+      tags: [Users]
+      summary: Suspend user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: User suspended
+
+  /users/{id}/activate:
+    patch:
+      tags: [Users]
+      summary: Activate user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: User activated
+
+  # ──────────────────────────────────────────
+  # RBAC
+  # ──────────────────────────────────────────
+  /roles:
+    get:
+      tags: [RBAC]
+      summary: List roles with permissions
+      responses:
+        '200':
+          description: Role list
+    post:
+      tags: [RBAC]
+      summary: Create role
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                permissions:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: Role created
+
+  /roles/permissions:
+    get:
+      tags: [RBAC]
+      summary: List all available permissions
+      responses:
+        '200':
+          description: Permission list
+
+  /roles/{id}:
+    put:
+      tags: [RBAC]
+      summary: Update role
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Role updated
+    delete:
+      tags: [RBAC]
+      summary: Delete role
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Role deleted
+
+  /roles/{id}/sync-permissions:
+    patch:
+      tags: [RBAC]
+      summary: Sync permissions for a role
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [permissions]
+              properties:
+                permissions:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Permissions synced
+
+  # ──────────────────────────────────────────
+  # Products
+  # ──────────────────────────────────────────
+  /products:
+    get:
+      tags: [Products]
+      summary: List products
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/PerPageQuery'
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [goods, service, digital, bundle, composite]
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: active
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Product list
+    post:
+      tags: [Products]
+      summary: Create product
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, type, base_price, currency]
+              properties:
+                name:
+                  type: string
+                type:
+                  type: string
+                  enum: [goods, service, digital, bundle, composite]
+                sku:
+                  type: string
+                base_price:
+                  type: string
+                currency:
+                  type: string
+      responses:
+        '201':
+          description: Product created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+
+  /products/{id}:
+    put:
+      tags: [Products]
+      summary: Update product (optimistic locking via lock_version)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lock_version]
+              properties:
+                lock_version:
+                  type: integer
+                name:
+                  type: string
+                base_price:
+                  type: string
+      responses:
+        '200':
+          description: Product updated
+        '409':
+          description: Optimistic lock conflict
+    delete:
+      tags: [Products]
+      summary: Soft-delete product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Deleted
+
+  # ──────────────────────────────────────────
+  # Pricing
+  # ──────────────────────────────────────────
+  /price-lists:
+    get:
+      tags: [Pricing]
+      summary: List price lists
+      responses:
+        '200':
+          description: Price list collection
+    post:
+      tags: [Pricing]
+      summary: Create price list
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, currency]
+              properties:
+                name:
+                  type: string
+                currency:
+                  type: string
+                valid_from:
+                  type: string
+                  format: date
+                valid_to:
+                  type: string
+                  format: date
+      responses:
+        '201':
+          description: Price list created
+
+  /price-lists/{id}/rules:
+    get:
+      tags: [Pricing]
+      summary: List rules for a price list
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rule list
+    post:
+      tags: [Pricing]
+      summary: Add rule to price list
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pricing_type, value]
+              properties:
+                product_id:
+                  type: string
+                  nullable: true
+                pricing_type:
+                  type: string
+                  enum: [flat, percentage, tiered, rule_based, conditional]
+                value:
+                  type: string
+                min_quantity:
+                  type: string
+                  nullable: true
+                max_quantity:
+                  type: string
+                  nullable: true
+      responses:
+        '201':
+          description: Rule added
+
+  # ──────────────────────────────────────────
+  # Inventory
+  # ──────────────────────────────────────────
+  /warehouses:
+    get:
+      tags: [Inventory]
+      summary: List warehouses
+      responses:
+        '200':
+          description: Warehouse list
+    post:
+      tags: [Inventory]
+      summary: Create warehouse
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, code]
+              properties:
+                name:
+                  type: string
+                code:
+                  type: string
+                is_active:
+                  type: boolean
+      responses:
+        '201':
+          description: Warehouse created
+
+  /inventory/stock:
+    get:
+      tags: [Inventory]
+      summary: Paginated stock levels across all warehouses
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/PerPageQuery'
+        - name: warehouse_id
+          in: query
+          schema:
+            type: string
+        - name: product_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Stock level list
+
+  /inventory/alerts/low-stock:
+    get:
+      tags: [Inventory]
+      summary: Items at or below their reorder point
+      parameters:
+        - name: warehouse_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Low-stock alert list
+
+  /inventory/alerts/expiring:
+    get:
+      tags: [Inventory]
+      summary: Stock batches expiring within a given window
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 30
+        - name: warehouse_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Expiring batch list
+
+  /inventory/fifo-cost:
+    get:
+      tags: [Inventory]
+      summary: Weighted-average FIFO cost for a product in a warehouse
+      parameters:
+        - name: warehouse_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: product_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cost per unit
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cost_per_unit:
+                    type: string
+                    example: "6.00000000"
+
+  # ──────────────────────────────────────────
+  # Orders
+  # ──────────────────────────────────────────
+  /orders:
+    get:
+      tags: [Orders]
+      summary: List orders
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/PerPageQuery'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, confirmed, cancelled]
+        - name: organization_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order list
+    post:
+      tags: [Orders]
+      summary: Create order
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type:
+                  type: string
+                  enum: [sale, purchase, return]
+                currency:
+                  type: string
+                  default: USD
+                contact_id:
+                  type: string
+                  nullable: true
+                notes:
+                  type: string
+                  nullable: true
+                lines:
+                  type: array
+                  items:
+                    type: object
+                    required: [product_name, quantity, unit_price]
+                    properties:
+                      product_id:
+                        type: string
+                        nullable: true
+                      product_name:
+                        type: string
+                      quantity:
+                        type: string
+                      unit_price:
+                        type: string
+                      tax_rate:
+                        type: string
+                        default: "0"
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '403':
+          description: Insufficient permissions
+
+  /orders/{id}/confirm:
+    patch:
+      tags: [Orders]
+      summary: Confirm a draft order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Order confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '422':
+          description: Order is not in draft state
+
+  /orders/{id}/cancel:
+    patch:
+      tags: [Orders]
+      summary: Cancel an order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Order cancelled
+
+  # ──────────────────────────────────────────
+  # Invoices
+  # ──────────────────────────────────────────
+  /invoices:
+    get:
+      tags: [Invoices]
+      summary: List invoices
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/PerPageQuery'
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Invoice list
+    post:
+      tags: [Invoices]
+      summary: Create invoice
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                order_id:
+                  type: string
+                  nullable: true
+                contact_id:
+                  type: string
+                  nullable: true
+                currency:
+                  type: string
+                due_date:
+                  type: string
+                  format: date
+                items:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        '201':
+          description: Invoice created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+
+  /invoices/{id}/send:
+    patch:
+      tags: [Invoices]
+      summary: Mark invoice as sent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Invoice sent
+
+  /invoices/{id}/void:
+    patch:
+      tags: [Invoices]
+      summary: Void an invoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Invoice voided
+
+  # ──────────────────────────────────────────
+  # Payments
+  # ──────────────────────────────────────────
+  /payments:
+    get:
+      tags: [Payments]
+      summary: List payments
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/PerPageQuery'
+      responses:
+        '200':
+          description: Payment list
+    post:
+      tags: [Payments]
+      summary: Record a payment (auto-reconciles invoice status)
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [invoice_id, amount, currency, method]
+              properties:
+                invoice_id:
+                  type: string
+                amount:
+                  type: string
+                currency:
+                  type: string
+                method:
+                  type: string
+                  enum: [cash, card, bank_transfer, cheque, digital_wallet, other]
+                reference:
+                  type: string
+                  nullable: true
+      responses:
+        '201':
+          description: Payment recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+
+  # ──────────────────────────────────────────
+  # Audit
+  # ──────────────────────────────────────────
+  /audit-logs:
+    get:
+      tags: [Audit]
+      summary: List audit logs (filterable, immutable)
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/PerPageQuery'
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: auditable_type
+          in: query
+          schema:
+            type: string
+        - name: user_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Audit log list
+
+  # ──────────────────────────────────────────
+  # Reports
+  # ──────────────────────────────────────────
+  /reports/sales-summary:
+    get:
+      tags: [Reports]
+      summary: Sales summary by status and period
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Sales summary
+
+  /reports/inventory-summary:
+    get:
+      tags: [Reports]
+      summary: Current inventory valuation summary
+      responses:
+        '200':
+          description: Inventory summary
+
+  /reports/receivables-summary:
+    get:
+      tags: [Reports]
+      summary: Accounts receivable by invoice status
+      responses:
+        '200':
+          description: Receivables summary
+
+  /reports/top-products:
+    get:
+      tags: [Reports]
+      summary: Top products by revenue
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Top products list
+
+  /reports/pos-sales-summary:
+    get:
+      tags: [Reports]
+      summary: POS transaction summary
+      responses:
+        '200':
+          description: POS sales summary
+
+  /reports/purchase-summary:
+    get:
+      tags: [Reports]
+      summary: Procurement spend summary
+      responses:
+        '200':
+          description: Purchase summary
+
+  /reports/expense-summary:
+    get:
+      tags: [Reports]
+      summary: Expense totals by category
+      responses:
+        '200':
+          description: Expense summary
+
+  # ──────────────────────────────────────────
+  # Webhooks
+  # ──────────────────────────────────────────
+  /webhooks:
+    get:
+      tags: [Webhooks]
+      summary: List registered webhooks
+      responses:
+        '200':
+          description: Webhook list
+    post:
+      tags: [Webhooks]
+      summary: Register a new webhook
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url, events]
+              properties:
+                url:
+                  type: string
+                  format: uri
+                events:
+                  type: array
+                  items:
+                    type: string
+                secret:
+                  type: string
+                  nullable: true
+      responses:
+        '201':
+          description: Webhook registered
+
+  /webhooks/{id}/deliveries:
+    get:
+      tags: [Webhooks]
+      summary: List delivery attempts for a webhook
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Delivery list
+
+  /webhooks/{id}/test:
+    post:
+      tags: [Webhooks]
+      summary: Send a test delivery to a webhook endpoint
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Test delivery dispatched
+
+  # ──────────────────────────────────────────
+  # Business Settings
+  # ──────────────────────────────────────────
+  /settings:
+    get:
+      tags: [Settings]
+      summary: List all tenant settings (optionally filtered by group)
+      parameters:
+        - name: group
+          in: query
+          schema:
+            type: string
+            example: general
+      responses:
+        '200':
+          description: Settings list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        key:
+                          type: string
+                        value:
+                          type: string
+                          nullable: true
+                        group:
+                          type: string
+                        is_public:
+                          type: boolean
+    put:
+      tags: [Settings]
+      summary: Bulk-upsert settings
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [settings]
+              properties:
+                settings:
+                  type: array
+                  items:
+                    type: object
+                    required: [key]
+                    properties:
+                      key:
+                        type: string
+                        maxLength: 255
+                      value:
+                        type: string
+                        nullable: true
+                      group:
+                        type: string
+                        default: general
+                      is_public:
+                        type: boolean
+                        default: false
+                group:
+                  type: string
+                  description: Default group applied to all items that do not specify one
+      responses:
+        '200':
+          description: Settings saved
+
+  /settings/{key}:
+    delete:
+      tags: [Settings]
+      summary: Delete a single setting by key
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Deleted
+
+  # ──────────────────────────────────────────
+  # Invoice Schemes
+  # ──────────────────────────────────────────
+  /invoice-schemes:
+    get:
+      tags: [Invoice Schemes]
+      summary: List invoice numbering schemes for the tenant
+      responses:
+        '200':
+          description: Scheme list
+    post:
+      tags: [Invoice Schemes]
+      summary: Create an invoice numbering scheme
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                scheme_type:
+                  type: string
+                  enum: [purchase, sell, purchase_n_sell, expense, stock_adjustment, stock_transfer]
+                  default: purchase_n_sell
+                prefix:
+                  type: string
+                  nullable: true
+                  maxLength: 20
+                  example: "INV-"
+                suffix:
+                  type: string
+                  nullable: true
+                  maxLength: 20
+                start_number:
+                  type: integer
+                  minimum: 1
+                  default: 1
+                number_of_digits:
+                  type: integer
+                  minimum: 1
+                  maximum: 10
+                  default: 4
+                  description: Zero-padding width for the numeric portion
+                is_default:
+                  type: boolean
+                  default: false
+      responses:
+        '201':
+          description: Scheme created
+
+  /invoice-schemes/{id}:
+    put:
+      tags: [Invoice Schemes]
+      summary: Update an invoice scheme
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Scheme updated
+    delete:
+      tags: [Invoice Schemes]
+      summary: Soft-delete an invoice scheme
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Deleted
+
+  /invoice-schemes/{id}/set-default:
+    patch:
+      tags: [Invoice Schemes]
+      summary: Make this scheme the default for its type
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Default updated
+
+  /invoice-schemes/{id}/next-number:
+    get:
+      tags: [Invoice Schemes]
+      summary: Preview (and consume) the next reference number for this scheme
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Next reference number
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      reference_number:
+                        type: string
+                        example: "INV-00042"
+
+  # ──────────────────────────────────────────
+  # Stock Transfers
+  # ──────────────────────────────────────────
+  /stock-transfers:
+    get:
+      tags: [Stock Transfers]
+      summary: List inter-warehouse stock transfers
+      parameters:
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/PerPageQuery'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, in_transit, received, cancelled]
+        - name: from_warehouse_id
+          in: query
+          schema:
+            type: string
+        - name: to_warehouse_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Transfer list
+    post:
+      tags: [Stock Transfers]
+      summary: Create a draft stock transfer
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from_warehouse_id, to_warehouse_id, lines]
+              properties:
+                from_warehouse_id:
+                  type: string
+                  description: Source warehouse ULID
+                to_warehouse_id:
+                  type: string
+                  description: Destination warehouse ULID (must differ from source)
+                notes:
+                  type: string
+                  nullable: true
+                lines:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [product_id, quantity]
+                    properties:
+                      product_id:
+                        type: string
+                      variant_id:
+                        type: string
+                        nullable: true
+                      quantity:
+                        type: string
+                        example: "10.00000000"
+                      cost_per_unit:
+                        type: string
+                        nullable: true
+                      batch_number:
+                        type: string
+                        nullable: true
+                      lot_number:
+                        type: string
+                        nullable: true
+                      expiry_date:
+                        type: string
+                        format: date
+                        nullable: true
+      responses:
+        '201':
+          description: Draft transfer created
+        '422':
+          description: Validation error (e.g. same source and destination)
+
+  /stock-transfers/{id}/dispatch:
+    patch:
+      tags: [Stock Transfers]
+      summary: Dispatch a draft transfer (status → in_transit, deducts from source warehouse)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Transfer dispatched
+        '404':
+          description: Transfer not found or not in draft status
+
+  /stock-transfers/{id}/receive:
+    patch:
+      tags: [Stock Transfers]
+      summary: Receive a dispatched transfer (status → received, adds to destination warehouse)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Transfer received
+        '404':
+          description: Transfer not found or not in_transit
+
+  /stock-transfers/{id}/cancel:
+    patch:
+      tags: [Stock Transfers]
+      summary: Cancel a draft or in_transit transfer (reverses inventory if already dispatched)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Transfer cancelled

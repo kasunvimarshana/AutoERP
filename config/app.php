@@ -123,4 +123,16 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Force HTTPS
+    |--------------------------------------------------------------------------
+    |
+    | When set to true the ForceHttps middleware will redirect all plain HTTP
+    | requests to HTTPS and attach HSTS headers.  Enable this in production.
+    |
+    */
+
+    'force_https' => env('FORCE_HTTPS', false),
+
 ];

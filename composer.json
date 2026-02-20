@@ -1,6 +1,6 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "kasunvimarshana/kv-enterprise-dynamic-saas-crm-erp",
+    "name": "kasunvimarshana/autoerp",
     "type": "project",
     "description": "Dynamic, enterprise-grade SaaS ERP/CRM with modular Clean Architecture. Supports multi-tenant, multi-org, multi-currency, multi-language, RBAC/ABAC.",
     "keywords": ["laravel", "erp", "crm", "saas", "multi-tenant", "enterprise"],
