@@ -1,0 +1,11 @@
+{
+    "name": "AssetManagement",
+    "alias": "asset_management",
+    "description": "Asset Management module — fixed asset categories, asset registration, BCMath depreciation calculation, disposal lifecycle",
+    "version": "1.0.0",
+    "keywords": ["assets", "fixed-assets", "depreciation", "disposal", "finance"],
+    "active": true,
+    "order": 24,
+    "providers": ["Modules\\AssetManagement\\Providers\\AssetManagementServiceProvider"],
+    "dependencies": ["Tenant", "User", "Accounting", "Audit"]
+}

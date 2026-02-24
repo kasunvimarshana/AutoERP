@@ -1,0 +1,13 @@
+{
+    "name": "Inventory",
+    "alias": "inventory",
+    "description": "Inventory management module - products, warehouses, locations, and stock movements",
+    "version": "1.0.0",
+    "keywords": ["inventory", "products", "warehouse", "stock", "movements"],
+    "active": true,
+    "order": 13,
+    "providers": [
+        "Modules\\Inventory\\Providers\\InventoryServiceProvider"
+    ],
+    "dependencies": ["Tenant", "User", "Setting", "Notification", "Media"]
+}

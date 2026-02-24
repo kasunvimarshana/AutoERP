@@ -1,0 +1,11 @@
+{
+    "name": "Reporting",
+    "alias": "reporting",
+    "description": "Reporting module — configurable dashboards, custom report builder, and standard reports library with tenant isolation",
+    "version": "1.0.0",
+    "keywords": ["reporting", "dashboards", "analytics", "reports", "kpi"],
+    "active": true,
+    "order": 33,
+    "providers": ["Modules\\Reporting\\Providers\\ReportingServiceProvider"],
+    "dependencies": ["Tenant", "Auth"]
+}

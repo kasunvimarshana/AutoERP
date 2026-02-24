@@ -1,0 +1,1 @@
+{"name":"Audit","alias":"audit","version":"1.0.0","description":"Immutable audit trail for all tenant operations.","dependencies":["Tenant"],"enabled":true}

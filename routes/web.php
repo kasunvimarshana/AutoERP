@@ -2,7 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 
-// Serve the Vue SPA for all non-API routes (catch-all for client-side routing)
+// Serve the Vue SPA for all non-API, non-Horizon, non-telescope routes
 Route::get('/{any?}', function () {
     return view('app');
-})->where('any', '^(?!api).*$');
+})->where('any', '^(?!api|horizon|telescope).*');

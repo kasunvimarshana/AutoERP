@@ -1,0 +1,13 @@
+{
+    "name": "Accounting",
+    "alias": "accounting",
+    "description": "Accounting module - chart of accounts, double-entry journal entries, and invoicing",
+    "version": "1.0.0",
+    "keywords": ["accounting", "journal", "invoice", "finance", "ledger"],
+    "active": true,
+    "order": 12,
+    "providers": [
+        "Modules\\Accounting\\Providers\\AccountingServiceProvider"
+    ],
+    "dependencies": ["Tenant", "User", "Setting", "Notification", "Audit"]
+}

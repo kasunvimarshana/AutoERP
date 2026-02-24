@@ -1,0 +1,11 @@
+{
+    "name": "Manufacturing",
+    "alias": "manufacturing",
+    "description": "Manufacturing module — Bill of Materials, Work Orders, production tracking",
+    "version": "1.0.0",
+    "keywords": ["manufacturing", "bom", "work-order", "production"],
+    "active": true,
+    "order": 18,
+    "providers": ["Modules\\Manufacturing\\Providers\\ManufacturingServiceProvider"],
+    "dependencies": ["Tenant", "User", "Inventory", "Audit"]
+}

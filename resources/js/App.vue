@@ -1,20 +1,20 @@
 <template>
   <RouterView />
-  <AppToast />
 </template>
 
-<script setup lang="ts">
-import { onMounted } from 'vue';
-import { RouterView } from 'vue-router';
+<script setup>
+import { onMounted, onUnmounted } from 'vue';
+import { RouterView, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
-import AppToast from '@/components/AppToast.vue';
 
 const auth = useAuthStore();
+const router = useRouter();
 
-onMounted(async () => {
-  if (auth.isAuthenticated) {
-    // Silently restore user profile; http interceptor handles token expiry
-    await auth.fetchMe().catch(() => undefined);
-  }
-});
+function handleUnauthorized() {
+    auth.clearAuth();
+    router.push({ name: 'login' });
+}
+
+onMounted(() => window.addEventListener('auth:unauthorized', handleUnauthorized));
+onUnmounted(() => window.removeEventListener('auth:unauthorized', handleUnauthorized));
 </script>

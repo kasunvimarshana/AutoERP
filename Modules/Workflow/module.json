@@ -1,0 +1,11 @@
+{
+    "name": "Workflow",
+    "alias": "workflow",
+    "description": "Workflow engine — configurable state machines, approval chains, transition guards, and workflow history per document",
+    "version": "1.0.0",
+    "keywords": ["workflow", "state-machine", "approval", "transitions", "automation"],
+    "active": true,
+    "order": 34,
+    "providers": ["Modules\\Workflow\\Providers\\WorkflowServiceProvider"],
+    "dependencies": ["Tenant", "Auth"]
+}

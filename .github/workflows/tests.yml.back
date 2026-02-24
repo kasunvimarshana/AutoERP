@@ -15,13 +15,11 @@ permissions:
 jobs:
   tests:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
 
     strategy:
       fail-fast: true
       matrix:
-        php: [8.3, 8.4]
+        php: [8.2, 8.3, 8.4]
 
     name: PHP ${{ matrix.php }}
 
@@ -33,7 +31,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite
           coverage: none
 
       - name: Install Composer dependencies
@@ -46,4 +44,4 @@ jobs:
         run: php artisan key:generate
 
       - name: Execute tests
-        run: vendor/bin/phpunit
+        run: php artisan test

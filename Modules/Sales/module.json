@@ -1,0 +1,13 @@
+{
+    "name": "Sales",
+    "alias": "sales",
+    "description": "Sales management module - customers, quotations, and orders",
+    "version": "1.0.0",
+    "keywords": ["sales", "customers", "quotations", "orders"],
+    "active": true,
+    "order": 11,
+    "providers": [
+        "Modules\\Sales\\Providers\\SalesServiceProvider"
+    ],
+    "dependencies": ["Tenant", "User", "Setting", "Notification", "CRM"]
+}

@@ -2,5 +2,6 @@
 
 return [
     App\Providers\AppServiceProvider::class,
-    App\Providers\RepositoryServiceProvider::class,
+    Modules\Shared\Providers\SharedServiceProvider::class,
+    App\Providers\ModuleServiceProvider::class,
 ];

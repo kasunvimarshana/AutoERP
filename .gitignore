@@ -1,4 +1,3 @@
-/.phpunit.cache
 /node_modules
 /public/build
 /public/hot
@@ -9,21 +8,15 @@
 .env
 .env.backup
 .env.production
-.env.testing
 .phpactor.json
-.phpunit.result.cache
+auth.json
 Homestead.json
 Homestead.yaml
 npm-debug.log
 yarn-error.log
-/auth.json
 /.fleet
 /.idea
 /.nova
 /.vscode
-/.zed
-
-# SQLite database
-/database/*.sqlite
-/database/*.sqlite-shm
-/database/*.sqlite-wal
+*.sqlite
+*.sqlite-journal

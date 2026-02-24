@@ -1,0 +1,11 @@
+{
+    "name": "Shared",
+    "alias": "shared",
+    "description": "Shared utility module — value objects, base contracts, tenant scope trait, audit log trait, and response formatter",
+    "version": "1.0.0",
+    "keywords": ["shared", "utilities", "value-objects", "contracts", "tenant-scope"],
+    "active": true,
+    "order": 0,
+    "providers": ["Modules\\Shared\\Providers\\SharedServiceProvider"],
+    "dependencies": []
+}

@@ -1,0 +1,11 @@
+{
+    "name": "Expense",
+    "alias": "expense",
+    "description": "Expense Management module — expense categories, employee expense claims with line items, approval and reimbursement workflow",
+    "version": "1.0.0",
+    "keywords": ["expense", "claims", "reimbursement", "hr", "finance"],
+    "active": true,
+    "order": 23,
+    "providers": ["Modules\\Expense\\Providers\\ExpenseServiceProvider"],
+    "dependencies": ["Tenant", "User", "HR", "Accounting", "Notification", "Audit"]
+}

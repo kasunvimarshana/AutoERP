@@ -1,0 +1,13 @@
+{
+    "name": "Purchase",
+    "alias": "purchase",
+    "description": "Purchase management module - vendors, purchase orders, and goods receipts",
+    "version": "1.0.0",
+    "keywords": ["purchase", "vendors", "purchase-orders", "goods-receipt"],
+    "active": true,
+    "order": 12,
+    "providers": [
+        "Modules\\Purchase\\Providers\\PurchaseServiceProvider"
+    ],
+    "dependencies": ["Tenant", "User", "Setting", "Notification", "Inventory"]
+}

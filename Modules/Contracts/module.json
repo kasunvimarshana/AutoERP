@@ -1,0 +1,11 @@
+{
+    "name": "Contracts",
+    "alias": "contracts",
+    "description": "Contracts module — contract lifecycle management (draft→active→terminated/expired), BCMath total_value, party details, payment terms, domain events",
+    "version": "1.0.0",
+    "keywords": ["contracts", "agreement", "legal", "crm", "sales"],
+    "active": true,
+    "order": 31,
+    "providers": ["Modules\\Contracts\\Providers\\ContractsServiceProvider"],
+    "dependencies": ["Tenant", "User", "CRM", "Sales"]
+}

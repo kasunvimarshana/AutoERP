@@ -1,0 +1,13 @@
+{
+    "name": "CRM",
+    "alias": "crm",
+    "description": "Customer Relationship Management module",
+    "version": "1.0.0",
+    "keywords": ["crm", "leads", "opportunities", "contacts", "accounts", "activities"],
+    "active": true,
+    "order": 10,
+    "providers": [
+        "Modules\\CRM\\Providers\\CRMServiceProvider"
+    ],
+    "dependencies": ["Tenant", "User", "Setting", "Notification"]
+}

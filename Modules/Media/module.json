@@ -1,0 +1,1 @@
+{"name":"Media","alias":"media","version":"1.0.0","description":"Tenant-scoped file upload and media management with multi-disk support.","dependencies":["Tenant"],"enabled":true}

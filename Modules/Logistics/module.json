@@ -1,0 +1,11 @@
+{
+    "name": "Logistics",
+    "alias": "logistics",
+    "description": "Logistics and Delivery module — carriers, delivery orders, route tracking",
+    "version": "1.0.0",
+    "keywords": ["logistics", "delivery", "carrier", "tracking", "shipping"],
+    "active": true,
+    "order": 17,
+    "providers": ["Modules\\Logistics\\Providers\\LogisticsServiceProvider"],
+    "dependencies": ["Tenant", "User", "Inventory", "Sales", "Audit"]
+}

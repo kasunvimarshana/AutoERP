@@ -1,0 +1,11 @@
+{
+    "name": "Helpdesk",
+    "alias": "helpdesk",
+    "description": "Helpdesk module — ticket categories, support tickets, SLA tracking, assign/resolve/close workflow",
+    "version": "1.0.0",
+    "keywords": ["helpdesk", "support", "tickets", "sla", "crm"],
+    "active": true,
+    "order": 27,
+    "providers": ["Modules\\Helpdesk\\Providers\\HelpdeskServiceProvider"],
+    "dependencies": ["Tenant", "User", "CRM", "Notification", "Audit"]
+}
