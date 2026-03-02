@@ -612,11 +612,16 @@ No module is complete without coverage.
 
 * Business logic in controllers
 * Query builder in controllers
-* Cross-module tight coupling
-* Hardcoded IDs
+* Cross-module tight coupling or direct database access between modules
+* Hardcoded IDs, tenant conditions, or business rules
 * Floating-point financial math
 * Partial implementations
 * TODO without tracking issue
+* Silent exception swallowing
+* Implicit UOM conversion
+* Duplicate stock deduction logic
+* Skipping transactions for inventory mutations
+* Cross-tenant data access
 
 Immediate refactor required if detected.
 
@@ -660,7 +665,7 @@ All pull requests must be verified against this checklist before merge:
 
 - [ ] No business logic present in any controller
 - [ ] No query builder calls in any controller
-- [ ] All new tables include tenant_id with global scope applied
+- [ ] All new tables include `tenant_id` with global scope applied
 - [ ] All new endpoints covered by authorization tests
 - [ ] All financial and quantity calculations use BCMath (no float), minimum 4 decimal places
 - [ ] Module README updated

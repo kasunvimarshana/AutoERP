@@ -383,6 +383,7 @@ The following are **immediately refactorable** violations:
 - Implicit UOM conversion
 - Duplicate stock deduction logic
 - Skipping transactions for inventory mutations
+- Cross-tenant data access
 
 ---
 

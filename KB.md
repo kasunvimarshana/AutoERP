@@ -961,7 +961,6 @@ Dashboards may use Tailwind-based admin templates (e.g., TailAdmin, AdminLTE).
 - Tamper-resistant records
 - Expiry override logging
 - High-risk medication access logging
-- Strict input validation
 
 ---
 
@@ -1122,11 +1121,11 @@ The following are strictly disallowed:
 - Partial implementations
 - TODO without tracking issue
 - Hardcoded tenant conditions
-- Cross-tenant data queries
+- Cross-tenant data access
 - Silent exception swallowing
 - Implicit UOM conversion
 - Duplicate stock deduction logic
-- Skipping transactions for inventory mutation
+- Skipping transactions for inventory mutations
 - Direct database queries in services (bypass repository)
 
 Immediate refactor required if detected.
