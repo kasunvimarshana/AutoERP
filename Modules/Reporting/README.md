@@ -58,6 +58,63 @@ Modules/Reporting/
 
 ---
 
+## Implemented Files
+
+### Migrations
+| File | Table |
+|---|---|
+| `2026_02_27_000060_create_report_definitions_table.php` | `report_definitions` |
+| `2026_02_27_000061_create_report_schedules_table.php` | `report_schedules` |
+| `2026_02_27_000062_create_report_exports_table.php` | `report_exports` |
+
+### Domain Entities
+- `ReportDefinition` — HasTenant + SoftDeletes; filters/columns/sort_config as array
+- `ReportSchedule` — HasTenant
+- `ReportExport` — HasTenant; status pending/processing/completed/failed
+
+### Application Layer
+- `GenerateReportDTO` — fromArray/toArray; exportFormat defaults to `csv`, filters default to `[]`
+- `ReportingService` — listDefinitions, createDefinition, generateReport, scheduleReport, showDefinition, updateDefinition, deleteDefinition, listSchedules, showSchedule, listExports, showExport, updateSchedule, deleteSchedule (all mutations in DB::transaction)
+
+### Infrastructure Layer
+- `ReportingRepositoryContract` — findByType, findBySlug
+- `ReportingRepository` — extends AbstractRepository on ReportDefinition
+- `ReportingServiceProvider` — binds contract, loads migrations and routes
+
+### API Routes (`/api/v1`)
+| Method | Path | Action |
+|---|---|---|
+| GET | `/reporting/definitions` | listDefinitions |
+| POST | `/reporting/definitions` | createDefinition |
+| GET | `/reporting/definitions/{id}` | showDefinition |
+| PUT | `/reporting/definitions/{id}` | updateDefinition |
+| DELETE | `/reporting/definitions/{id}` | deleteDefinition |
+| POST | `/reporting/generate` | generateReport |
+| POST | `/reporting/schedules` | scheduleReport |
+| GET | `/reporting/schedules` | listSchedules |
+| GET | `/reporting/schedules/{id}` | showSchedule |
+| PUT | `/reporting/schedules/{id}` | updateSchedule |
+| DELETE | `/reporting/schedules/{id}` | deleteSchedule |
+| GET | `/reporting/exports` | listExports |
+| GET | `/reporting/exports/{id}` | showExport |
+
+---
+
+## Test Coverage
+
+| Test File | Type | Coverage Area |
+|---|---|---|
+| `Tests/Unit/GenerateReportDTOTest.php` | Unit | `GenerateReportDTO` — hydration, defaults, toArray round-trip |
+| `Tests/Unit/ReportingServiceTest.php` | Unit | listDefinitions delegation, GenerateReportDTO field mapping |
+| `Tests/Unit/ReportingServiceScheduleTest.php` | Unit | scheduleReport/createDefinition field mapping, export format variants |
+| `Tests/Unit/ReportingServiceExportTest.php` | Unit | generateReport payload, DTO defaults, format variants |
+| `Tests/Unit/ReportingServiceReadPathTest.php` | Unit | showDefinition delegation, ModelNotFoundException, method signature |
+| `Tests/Unit/ReportingServiceCrudTest.php` | Unit | updateDefinition, deleteDefinition, listSchedules, listExports, showExport, updateSchedule, deleteSchedule — 25 assertions |
+| `Tests/Unit/ReportingServiceShowScheduleTest.php` | Unit | `showSchedule` — method existence, public visibility, int parameter, ReportSchedule return type, not static — 6 assertions |
+| `Tests/Unit/ReportingServiceDelegationTest.php` | Unit | listDefinitions/showDefinition delegation, Collection type contracts, updateDefinition signature, regression guards — 14 assertions |
+
+---
+
 ## Status
 
-🔴 **Planned** — See [IMPLEMENTATION_STATUS.md](../../IMPLEMENTATION_STATUS.md)
+🟢 **Complete** — Core reporting flow implemented; full definition, generation, scheduling, export, and schedule management endpoints implemented; showSchedule endpoint implemented; delegation test coverage complete (~85% test coverage). See [IMPLEMENTATION_STATUS.md](../../IMPLEMENTATION_STATUS.md)

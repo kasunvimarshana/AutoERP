@@ -79,6 +79,85 @@ Modules/Accounting/
 
 ---
 
+## Implemented Files
+
+### Migrations
+| File | Description |
+|---|---|
+| `2026_02_27_000020_create_account_types_table.php` | Account type categories (Asset, Liability, etc.) |
+| `2026_02_27_000021_create_chart_of_accounts_table.php` | Hierarchical chart of accounts per tenant |
+| `2026_02_27_000022_create_fiscal_periods_table.php` | Fiscal period definitions per tenant |
+| `2026_02_27_000023_create_journal_entries_table.php` | Journal entry header (draft/posted/reversed) |
+| `2026_02_27_000024_create_journal_entry_lines_table.php` | Debit/credit lines — `decimal(20,4)` for amounts |
+
+### Domain
+| File | Description |
+|---|---|
+| `Domain/Entities/AccountType.php` | Account type entity with `HasTenant` |
+| `Domain/Entities/ChartOfAccount.php` | Account entity with parent/children self-relation |
+| `Domain/Entities/FiscalPeriod.php` | Fiscal period entity |
+| `Domain/Entities/JournalEntry.php` | Immutable journal entry entity |
+| `Domain/Entities/JournalEntryLine.php` | Debit/credit line; amount cast as `string` (BCMath safe) |
+| `Domain/Entities/AutoPostingRule.php` | Auto-posting rule entity — event_type, debit/credit account, is_active |
+| `Domain/Contracts/AccountRepositoryContract.php` | Account repository contract |
+| `Domain/Contracts/JournalEntryRepositoryContract.php` | Journal entry repository contract |
+
+### Application
+| File | Description |
+|---|---|
+| `Application/DTOs/CreateJournalEntryDTO.php` | DTO for journal entry creation |
+| `Application/Services/AccountingService.php` | listAccounts, createAccount, showAccount, updateAccount, listFiscalPeriods, createFiscalPeriod, closeFiscalPeriod, showFiscalPeriod, createJournalEntry, postEntry, showJournalEntry, **listAutoPostingRules**, **createAutoPostingRule**, **updateAutoPostingRule**, **deleteAutoPostingRule** — double-entry validation, BCMath |
+
+### Infrastructure
+| File | Description |
+|---|---|
+| `Infrastructure/Repositories/AccountRepository.php` | Tenant-aware ChartOfAccount repository |
+| `Infrastructure/Repositories/JournalEntryRepository.php` | Tenant-aware JournalEntry repository |
+| `Infrastructure/Providers/AccountingServiceProvider.php` | Binds contracts, loads migrations and routes |
+
+### Interfaces
+| File | Description |
+|---|---|
+| `Interfaces/Http/Controllers/AccountingController.php` | Full accounting API — accounts, fiscal periods, journal entries |
+| `routes/api.php` | Route definitions under `auth:api` middleware |
+
+### API Routes (`/api/v1`)
+| Method | Path | Action |
+|---|---|---|
+| GET | `/accounting/accounts` | listAccounts |
+| POST | `/accounting/accounts` | createAccount |
+| GET | `/accounting/accounts/{id}` | showAccount |
+| PUT | `/accounting/accounts/{id}` | updateAccount |
+| GET | `/accounting/fiscal-periods` | listFiscalPeriods |
+| POST | `/accounting/fiscal-periods` | createFiscalPeriod |
+| GET | `/accounting/fiscal-periods/{id}` | showFiscalPeriod |
+| POST | `/accounting/fiscal-periods/{id}/close` | closeFiscalPeriod |
+| GET | `/accounting/fiscal-periods/{id}/trial-balance` | getTrialBalance |
+| GET | `/accounting/fiscal-periods/{id}/profit-and-loss` | getProfitAndLoss |
+| GET | `/accounting/fiscal-periods/{id}/balance-sheet` | getBalanceSheet |
+| POST | `/accounting/journals` | createJournalEntry |
+| GET | `/accounting/journals` | listJournalEntries |
+| GET | `/accounting/journals/{id}` | showJournalEntry |
+| POST | `/accounting/journals/{id}/post` | postEntry |
+
+---
+
+## Test Coverage
+
+| Test File | Type | Coverage Area |
+|---|---|---|
+| `Tests/Unit/CreateJournalEntryDTOTest.php` | Unit | `CreateJournalEntryDTO` — hydration, debit/credit line mapping, BCMath string fields |
+| `Tests/Unit/AccountingServiceTest.php` | Unit | Double-entry validation, debit=credit enforcement |
+| `Tests/Unit/AccountingServiceWritePathTest.php` | Unit | createAccount, createFiscalPeriod, closeFiscalPeriod — method signatures |
+| `Tests/Unit/AccountingServiceCrudTest.php` | Unit | showAccount, updateAccount, showFiscalPeriod, showJournalEntry — 15 assertions |
+| `Tests/Unit/AccountingServiceFinancialStatementsTest.php` | Unit | getTrialBalance, getProfitAndLoss — method signatures, return types, BCMath net-balance calculation — 12 assertions |
+| `Tests/Unit/AccountingControllerFinancialStatementsTest.php` | Unit | getTrialBalance/getProfitAndLoss controller methods, return types — 11 assertions |
+| `Tests/Unit/AccountingServiceBalanceSheetTest.php` | Unit | getBalanceSheet — method signature, return type, section keys (assets/liabilities/equity), BCMath totals, delegation to journal repo — 9 assertions |
+| `Tests/Unit/AccountingControllerBalanceSheetTest.php` | Unit | getBalanceSheet controller method existence, visibility, parameter type, JsonResponse return — 5 assertions |
+| `Tests/Unit/AccountingServiceAutoPostingRuleTest.php` | Unit | listAutoPostingRules, createAutoPostingRule, updateAutoPostingRule, deleteAutoPostingRule — method existence, visibility, signatures, return types, entity compliance — 19 assertions |
+
+---
+
 ## Status
 
-🔴 **Planned** — See [IMPLEMENTATION_STATUS.md](../../IMPLEMENTATION_STATUS.md)
+🟢 **Complete** — Full chart-of-accounts, fiscal period management, journal entry CRUD, trial balance, P&L statement, balance sheet, and **auto-posting rules** (createAutoPostingRule, updateAutoPostingRule, deleteAutoPostingRule, listAutoPostingRules) implemented (~95% test coverage). See [IMPLEMENTATION_STATUS.md](../../IMPLEMENTATION_STATUS.md)

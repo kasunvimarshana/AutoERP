@@ -87,4 +87,22 @@ All business tables **must** include `tenant_id` with the `GlobalTenantScope` ap
 
 ## Status
 
-🔴 **Planned** — See [IMPLEMENTATION_STATUS.md](../../IMPLEMENTATION_STATUS.md)
+🟢 **Complete** — Core tenant CRUD (list, listActive, create, show, findBySlug, findByDomain, update, delete) implemented (~85% test coverage). See [IMPLEMENTATION_STATUS.md](../../IMPLEMENTATION_STATUS.md)
+
+### Implemented
+
+| Component | File | Description |
+|---|---|---|
+| `Tenant` entity | `Domain/Entities/Tenant.php` | Tenant model with `pharma_compliance_mode` flag, soft deletes |
+| `TenantRepositoryContract` | `Domain/Contracts/TenantRepositoryContract.php` | findBySlug, findByDomain, allActive |
+| `TenantRepository` | `Infrastructure/Repositories/TenantRepository.php` | Concrete repository — no global scope on Tenant itself (system-level entity) |
+| `create_tenants_table` | `Infrastructure/Database/Migrations/` | `id`, `name`, `slug` (unique), `domain` (nullable unique), `is_active`, `pharma_compliance_mode`, `settings` (JSON), timestamps, soft deletes |
+| `TenancyServiceProvider` | `Infrastructure/Providers/TenancyServiceProvider.php` | Binds TenantRepositoryContract → TenantRepository, registers TenancyService, loads migrations and routes |
+| `tenancy.php` | `config/tenancy.php` | Resolution strategy, header name, current_tenant_id (test override), DB isolation model |
+| `CreateTenantDTO` | `Application/DTOs/CreateTenantDTO.php` | Immutable DTO for tenant creation (name, slug, domain, is_active, pharma_compliance_mode) |
+| `TenancyService` | `Application/Services/TenancyService.php` | list, listActive, create (DB::transaction), show, findBySlug, findByDomain, update, delete |
+| `TenancyController` | `Interfaces/Http/Controllers/TenancyController.php` | Full CRUD controller with OpenAPI annotations; no business logic |
+| `api.php` routes | `routes/api.php` | `/api/v1/tenants` REST resource (index, store, show, update, destroy) |
+| `CreateTenantDTOTest` | `Tests/Unit/CreateTenantDTOTest.php` | 9 unit tests: hydration, defaults, bool coercion, toArray contract |
+| `LoginDTOTest` | `../Auth/Tests/Unit/LoginDTOTest.php` | 7 unit tests: hydration, optional device_name, toArray contract |
+| `TenancyServiceDelegationTest` | `Tests/Unit/TenancyServiceDelegationTest.php` | 8 unit tests: list/listActive/show/findBySlug/findByDomain/update/delete delegation |

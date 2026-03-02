@@ -1,0 +1,25 @@
+<?php
+
+return [
+    App\Providers\AppServiceProvider::class,
+    Nwidart\Modules\LaravelModulesServiceProvider::class,
+    Modules\Core\Infrastructure\Providers\CoreServiceProvider::class,
+    Modules\Tenancy\Infrastructure\Providers\TenancyServiceProvider::class,
+    Modules\Auth\Infrastructure\Providers\AuthServiceProvider::class,
+    Modules\Organisation\Infrastructure\Providers\OrganisationServiceProvider::class,
+    Modules\Metadata\Infrastructure\Providers\MetadataServiceProvider::class,
+    Modules\Workflow\Infrastructure\Providers\WorkflowServiceProvider::class,
+    Modules\Product\Infrastructure\Providers\ProductServiceProvider::class,
+    Modules\Accounting\Infrastructure\Providers\AccountingServiceProvider::class,
+    Modules\Pricing\Infrastructure\Providers\PricingServiceProvider::class,
+    Modules\Inventory\Infrastructure\Providers\InventoryServiceProvider::class,
+    Modules\Warehouse\Infrastructure\Providers\WarehouseServiceProvider::class,
+    Modules\Sales\Infrastructure\Providers\SalesServiceProvider::class,
+    Modules\POS\Infrastructure\Providers\POSServiceProvider::class,
+    Modules\CRM\Infrastructure\Providers\CRMServiceProvider::class,
+    Modules\Procurement\Infrastructure\Providers\ProcurementServiceProvider::class,
+    Modules\Reporting\Infrastructure\Providers\ReportingServiceProvider::class,
+    Modules\Notification\Infrastructure\Providers\NotificationServiceProvider::class,
+    Modules\Integration\Infrastructure\Providers\IntegrationServiceProvider::class,
+    Modules\Plugin\Infrastructure\Providers\PluginServiceProvider::class,
+];

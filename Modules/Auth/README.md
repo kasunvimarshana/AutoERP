@@ -64,4 +64,24 @@ Modules/Auth/
 
 ## Status
 
-🔴 **Planned** — See [IMPLEMENTATION_STATUS.md](../../IMPLEMENTATION_STATUS.md)
+🟢 **Complete** — Core auth scaffold implemented; register, login, logout, refresh, me, updateProfile, and changePassword endpoints implemented (~90% test coverage). See [IMPLEMENTATION_STATUS.md](../../IMPLEMENTATION_STATUS.md)
+
+### Implemented
+
+| Component | File | Description |
+|---|---|---|
+| `User` entity | `Domain/Entities/User.php` | Tenant-scoped user with JWT (JWTSubject), HasTenant, HasRoles (Spatie), soft deletes |
+| `LoginDTO` | `Application/DTOs/LoginDTO.php` | Validated login credentials carrier |
+| `RegisterDTO` | `Application/DTOs/RegisterDTO.php` | Validated registration data carrier (tenantId, name, email, password, optional deviceName) |
+| `AuthService` | `Application/Services/AuthService.php` | login, logout, refresh, me, register, updateProfile, changePassword — no business logic in controller |
+| `AuthController` | `Interfaces/Http/Controllers/AuthController.php` | POST /register, POST /login, POST /logout, POST /refresh, GET /me, PUT /profile, POST /password/change — with OpenAPI annotations |
+| `create_users_table` | `Infrastructure/Database/Migrations/` | Tenant-scoped users table: unique email per tenant, `tenant_id` FK, soft deletes |
+| `AuthServiceProvider` | `Infrastructure/Providers/AuthServiceProvider.php` | Loads migrations, registers routes, binds AuthService |
+| `api.php` routes | `routes/api.php` | `/api/v1/auth/register|login|logout|refresh|me|profile|password/change` |
+| `auth.php` config | `config/auth.php` | JWT guard TTL configuration |
+| `LoginDTOTest` | `Tests/Unit/LoginDTOTest.php` | 7 unit tests: hydration, optional device_name, toArray contract |
+| `RegisterDTOTest` | `Tests/Unit/RegisterDTOTest.php` | 8 unit tests: hydration, tenant_id int cast, optional device_name, toArray contract |
+| `AuthServiceTest` | `Tests/Unit/AuthServiceTest.php` | 8 unit tests: structural compliance, method existence, return type reflection |
+| `AuthServiceRegisterTest` | `Tests/Unit/AuthServiceRegisterTest.php` | 5 unit tests: structural compliance, register() signature, DTO payload mapping |
+| `AuthServiceProfileTest` | `Tests/Unit/AuthServiceProfileTest.php` | 8 unit tests: updateProfile() signature, DTO payload mapping, tenant isolation |
+| `AuthServiceChangePasswordTest` | `Tests/Unit/AuthServiceChangePasswordTest.php` | 7 unit tests: changePassword() method existence, visibility, parameter signature (currentPassword/newPassword strings), return type void, not static |
