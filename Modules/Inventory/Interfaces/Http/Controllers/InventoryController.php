@@ -4,176 +4,352 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Interfaces\Http\Controllers;
 
+use App\Shared\Abstractions\BaseController;
+use DomainException;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Routing\Controller;
 use Modules\Inventory\Application\Commands\AdjustStockCommand;
+use Modules\Inventory\Application\Commands\ReceiveStockCommand;
+use Modules\Inventory\Application\Commands\ReleaseReservationCommand;
+use Modules\Inventory\Application\Commands\ReserveStockCommand;
+use Modules\Inventory\Application\Commands\ReturnStockCommand;
+use Modules\Inventory\Application\Commands\ShipStockCommand;
 use Modules\Inventory\Application\Commands\TransferStockCommand;
-use Modules\Inventory\Application\Handlers\AdjustStockHandler;
-use Modules\Inventory\Application\Handlers\TransferStockHandler;
-use Modules\Inventory\Domain\Contracts\InventoryRepositoryInterface;
+use Modules\Inventory\Application\Services\InventoryService;
+use Modules\Inventory\Interfaces\Http\Requests\AdjustStockRequest;
+use Modules\Inventory\Interfaces\Http\Requests\ReceiveStockRequest;
+use Modules\Inventory\Interfaces\Http\Requests\ReleaseReservationRequest;
+use Modules\Inventory\Interfaces\Http\Requests\ReserveStockRequest;
+use Modules\Inventory\Interfaces\Http\Requests\ReturnStockRequest;
+use Modules\Inventory\Interfaces\Http\Requests\ShipStockRequest;
+use Modules\Inventory\Interfaces\Http\Requests\TransferStockRequest;
+use Modules\Inventory\Interfaces\Http\Resources\StockBalanceResource;
+use Modules\Inventory\Interfaces\Http\Resources\StockLedgerResource;
 
-class InventoryController extends Controller
+class InventoryController extends BaseController
 {
     public function __construct(
-        private readonly InventoryRepositoryInterface $inventory,
-        private readonly AdjustStockHandler           $adjustHandler,
-        private readonly TransferStockHandler         $transferHandler,
+        private readonly InventoryService $inventoryService,
     ) {}
 
-    /**
-     * GET /api/v1/inventory/stock/{productId}/{warehouseId}
-     */
-    public function getStockLevel(Request $request, int $productId, int $warehouseId): JsonResponse
+    public function receive(ReceiveStockRequest $request): JsonResponse
     {
-        $tenantId = (int) $request->attributes->get('tenant_id');
-        $level    = $this->inventory->getStockLevel($productId, $warehouseId, $tenantId);
+        try {
+            $entry = $this->inventoryService->receiveStock(new ReceiveStockCommand(
+                tenantId: (int) $request->validated('tenant_id'),
+                warehouseId: (int) $request->validated('warehouse_id'),
+                productId: (int) $request->validated('product_id'),
+                quantity: (string) $request->validated('quantity'),
+                unitCost: (string) $request->validated('unit_cost'),
+                referenceType: $request->validated('reference_type'),
+                referenceId: $request->validated('reference_id'),
+                notes: $request->validated('notes'),
+            ));
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Stock level retrieved successfully.',
-            'data'    => [
-                'product_id'   => $productId,
-                'warehouse_id' => $warehouseId,
-                'quantity'     => $level,
+            return $this->success(
+                data: (new StockLedgerResource($entry))->resolve(),
+                message: 'Stock received successfully',
+                status: 201,
+            );
+        } catch (DomainException $e) {
+            return $this->error($e->getMessage(), status: 422);
+        }
+    }
+
+    public function adjust(AdjustStockRequest $request): JsonResponse
+    {
+        try {
+            $entry = $this->inventoryService->adjustStock(new AdjustStockCommand(
+                tenantId: (int) $request->validated('tenant_id'),
+                warehouseId: (int) $request->validated('warehouse_id'),
+                productId: (int) $request->validated('product_id'),
+                quantity: (string) $request->validated('quantity'),
+                unitCost: (string) $request->validated('unit_cost'),
+                adjustmentType: $request->validated('adjustment_type'),
+                notes: $request->validated('notes'),
+            ));
+
+            return $this->success(
+                data: (new StockLedgerResource($entry))->resolve(),
+                message: 'Stock adjusted successfully',
+                status: 201,
+            );
+        } catch (DomainException $e) {
+            return $this->error($e->getMessage(), status: 422);
+        }
+    }
+
+    public function transfer(TransferStockRequest $request): JsonResponse
+    {
+        try {
+            $result = $this->inventoryService->transferStock(new TransferStockCommand(
+                tenantId: (int) $request->validated('tenant_id'),
+                sourceWarehouseId: (int) $request->validated('source_warehouse_id'),
+                destinationWarehouseId: (int) $request->validated('destination_warehouse_id'),
+                productId: (int) $request->validated('product_id'),
+                quantity: (string) $request->validated('quantity'),
+                unitCost: (string) $request->validated('unit_cost'),
+                notes: $request->validated('notes'),
+            ));
+
+            return $this->success(
+                data: [
+                    'transfer_out' => (new StockLedgerResource($result['transfer_out']))->resolve(),
+                    'transfer_in' => (new StockLedgerResource($result['transfer_in']))->resolve(),
+                ],
+                message: 'Stock transferred successfully',
+                status: 201,
+            );
+        } catch (DomainException $e) {
+            return $this->error($e->getMessage(), status: 422);
+        }
+    }
+
+    public function stock(): JsonResponse
+    {
+        $tenantId = (int) request('tenant_id');
+        $warehouseId = request('warehouse_id') ? (int) request('warehouse_id') : null;
+        $page = (int) request('page', 1);
+        $perPage = (int) request('per_page', 25);
+
+        $result = $this->inventoryService->listStockBalances($tenantId, $warehouseId, $page, $perPage);
+
+        return $this->success(
+            data: array_map(
+                fn ($balance) => (new StockBalanceResource($balance))->resolve(),
+                $result['items']
+            ),
+            message: 'Stock balances retrieved successfully',
+            meta: [
+                'current_page' => $result['current_page'],
+                'last_page' => $result['last_page'],
+                'per_page' => $result['per_page'],
+                'total' => $result['total'],
             ],
-            'errors'  => null,
-        ]);
+        );
     }
 
-    /**
-     * POST /api/v1/inventory/adjust
-     */
-    public function adjust(Request $request): JsonResponse
+    public function ledger(): JsonResponse
     {
-        $validated = $request->validate([
-            'product_id'   => 'required|integer|exists:products,id',
-            'variant_id'   => 'nullable|integer|exists:product_variants,id',
-            'warehouse_id' => 'required|integer|exists:warehouses,id',
-            'quantity'     => 'required|numeric|min:0.0001',
-            'type'         => 'required|string|in:IN,OUT,ADJUSTMENT_ADD,ADJUSTMENT_REMOVE',
-            'reason'       => 'required|string|max:500',
-            'unit_cost'    => 'nullable|numeric|min:0',
-        ]);
+        $tenantId = (int) request('tenant_id');
+        $warehouseId = (int) request('warehouse_id');
+        $productId = (int) request('product_id');
+        $page = (int) request('page', 1);
+        $perPage = (int) request('per_page', 25);
 
-        try {
-            $entry = $this->adjustHandler->handle(new AdjustStockCommand(
-                tenantId: (int) $request->attributes->get('tenant_id'),
-                productId: (int) $validated['product_id'],
-                variantId: isset($validated['variant_id']) ? (int) $validated['variant_id'] : null,
-                warehouseId: (int) $validated['warehouse_id'],
-                quantity: (string) $validated['quantity'],
-                type: $validated['type'],
-                reason: $validated['reason'],
-                unitCost: (string) ($validated['unit_cost'] ?? '0'),
-                createdBy: $request->user()?->id,
-            ));
+        $result = $this->inventoryService->listLedgerEntries($tenantId, $warehouseId, $productId, $page, $perPage);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Stock adjustment recorded successfully.',
-                'data'    => [
-                    'entry_id'    => $entry->getId(),
-                    'type'        => $entry->getType()->value,
-                    'quantity'    => $entry->getQuantity(),
-                    'created_at'  => $entry->getCreatedAt()->format('Y-m-d\TH:i:sP'),
-                ],
-                'errors'  => null,
-            ], 201);
-        } catch (\DomainException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'data'    => null,
-                'errors'  => ['stock' => [$e->getMessage()]],
-            ], 422);
+        return $this->success(
+            data: array_map(
+                fn ($entry) => (new StockLedgerResource($entry))->resolve(),
+                $result['items']
+            ),
+            message: 'Stock ledger retrieved successfully',
+            meta: [
+                'current_page' => $result['current_page'],
+                'last_page' => $result['last_page'],
+                'per_page' => $result['per_page'],
+                'total' => $result['total'],
+            ],
+        );
+    }
+
+    public function abcAnalysis(): JsonResponse
+    {
+        $tenantId = (int) request('tenant_id');
+        $warehouseId = request('warehouse_id') ? (int) request('warehouse_id') : null;
+
+        $items = $this->inventoryService->computeAbcAnalysis($tenantId, $warehouseId);
+
+        return $this->success(
+            data: $items,
+            message: 'ABC analysis computed successfully',
+        );
+    }
+
+    public function valuation(): JsonResponse
+    {
+        $tenantId = (int) request('tenant_id');
+        $warehouseId = request('warehouse_id') ? (int) request('warehouse_id') : null;
+
+        $result = $this->inventoryService->computeValuation($tenantId, $warehouseId);
+
+        return $this->success(
+            data: $result['items'],
+            message: 'Inventory valuation computed successfully',
+            meta: ['grand_total_value' => $result['grand_total_value']],
+        );
+    }
+
+    public function demandForecast(): JsonResponse
+    {
+        $tenantId = (int) request('tenant_id');
+        $warehouseId = request('warehouse_id') ? (int) request('warehouse_id') : null;
+        $periodDays = max(1, (int) request('period_days', 90));
+
+        $items = $this->inventoryService->computeDemandForecast($tenantId, $warehouseId, $periodDays);
+
+        return $this->success(
+            data: $items,
+            message: 'Demand forecast computed successfully',
+        );
+    }
+
+    public function turnover(): JsonResponse
+    {
+        $tenantId = (int) request('tenant_id');
+        $warehouseId = request('warehouse_id') ? (int) request('warehouse_id') : null;
+        $periodDays = max(1, (int) request('period_days', 90));
+
+        $items = $this->inventoryService->computeTurnoverRate($tenantId, $warehouseId, $periodDays);
+
+        return $this->success(
+            data: $items,
+            message: 'Inventory turnover computed successfully',
+        );
+    }
+
+    public function scan(): JsonResponse
+    {
+        $tenantId = (int) request('tenant_id');
+        $barcode = (string) request('barcode', '');
+
+        if ($barcode === '') {
+            return $this->error('The barcode field is required.', status: 422);
         }
-    }
 
-    /**
-     * POST /api/v1/inventory/transfer
-     */
-    public function transfer(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'product_id'        => 'required|integer|exists:products,id',
-            'variant_id'        => 'nullable|integer|exists:product_variants,id',
-            'warehouse_from_id' => 'required|integer|exists:warehouses,id',
-            'warehouse_to_id'   => 'required|integer|exists:warehouses,id|different:warehouse_from_id',
-            'quantity'          => 'required|numeric|min:0.0001',
-            'notes'             => 'nullable|string|max:500',
-        ]);
+        $result = $this->inventoryService->scanByBarcode($tenantId, $barcode);
 
-        try {
-            $result = $this->transferHandler->handle(new TransferStockCommand(
-                tenantId: (int) $request->attributes->get('tenant_id'),
-                productId: (int) $validated['product_id'],
-                variantId: isset($validated['variant_id']) ? (int) $validated['variant_id'] : null,
-                warehouseFromId: (int) $validated['warehouse_from_id'],
-                warehouseToId: (int) $validated['warehouse_to_id'],
-                quantity: (string) $validated['quantity'],
-                notes: $validated['notes'] ?? null,
-                createdBy: $request->user()?->id,
-            ));
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Stock transfer completed successfully.',
-                'data'    => [
-                    'out_entry_id' => $result['out']->getId(),
-                    'in_entry_id'  => $result['in']->getId(),
-                    'quantity'     => $validated['quantity'],
-                ],
-                'errors'  => null,
-            ], 201);
-        } catch (\DomainException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'data'    => null,
-                'errors'  => ['transfer' => [$e->getMessage()]],
-            ], 422);
+        if ($result === null) {
+            return $this->error('No product found for the given barcode.', status: 404);
         }
-    }
 
-    /**
-     * GET /api/v1/inventory/history
-     */
-    public function history(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'product_id'   => 'required|integer',
-            'warehouse_id' => 'required|integer',
-            'page'         => 'nullable|integer|min:1',
-            'per_page'     => 'nullable|integer|min:1|max:100',
-        ]);
-
-        $tenantId   = (int) $request->attributes->get('tenant_id');
-        $page       = (int) ($validated['page'] ?? 1);
-        $perPage    = (int) ($validated['per_page'] ?? 25);
-
-        $entries = $this->inventory->getHistory(
-            $tenantId,
-            (int) $validated['product_id'],
-            (int) $validated['warehouse_id'],
-            $page,
-            $perPage
+        $result['balances'] = array_map(
+            fn ($balance) => (new StockBalanceResource($balance))->resolve(),
+            $result['balances']
         );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Stock history retrieved successfully.',
-            'data'    => array_map(fn ($e) => [
-                'id'             => $e->getId(),
-                'type'           => $e->getType()->value,
-                'quantity'       => $e->getQuantity(),
-                'unit_cost'      => $e->getUnitCost(),
-                'reference_type' => $e->getReferenceType(),
-                'reference_id'   => $e->getReferenceId(),
-                'notes'          => $e->getNotes(),
-                'created_at'     => $e->getCreatedAt()->format('Y-m-d\TH:i:sP'),
-            ], $entries),
-            'errors'  => null,
-        ]);
+        return $this->success(
+            data: $result,
+            message: 'Barcode scan successful',
+        );
+    }
+
+    public function ship(ShipStockRequest $request): JsonResponse
+    {
+        try {
+            $entry = $this->inventoryService->shipStock(new ShipStockCommand(
+                tenantId: (int) $request->validated('tenant_id'),
+                warehouseId: (int) $request->validated('warehouse_id'),
+                productId: (int) $request->validated('product_id'),
+                quantity: (string) $request->validated('quantity'),
+                unitCost: (string) $request->validated('unit_cost'),
+                referenceType: $request->validated('reference_type'),
+                referenceId: $request->validated('reference_id'),
+                notes: $request->validated('notes'),
+            ));
+
+            return $this->success(
+                data: (new StockLedgerResource($entry))->resolve(),
+                message: 'Stock shipped successfully',
+                status: 201,
+            );
+        } catch (DomainException $e) {
+            return $this->error($e->getMessage(), status: 422);
+        }
+    }
+
+    public function reserveStock(ReserveStockRequest $request): JsonResponse
+    {
+        try {
+            $balance = $this->inventoryService->reserveStock(new ReserveStockCommand(
+                tenantId: (int) $request->validated('tenant_id'),
+                warehouseId: (int) $request->validated('warehouse_id'),
+                productId: (int) $request->validated('product_id'),
+                quantity: (string) $request->validated('quantity'),
+                referenceType: $request->validated('reference_type'),
+                referenceId: $request->validated('reference_id'),
+                notes: $request->validated('notes'),
+            ));
+
+            return $this->success(
+                data: (new StockBalanceResource($balance))->resolve(),
+                message: 'Stock reserved successfully',
+                status: 201,
+            );
+        } catch (DomainException $e) {
+            return $this->error($e->getMessage(), status: 422);
+        }
+    }
+
+    public function releaseStock(ReleaseReservationRequest $request): JsonResponse
+    {
+        try {
+            $balance = $this->inventoryService->releaseReservation(new ReleaseReservationCommand(
+                tenantId: (int) $request->validated('tenant_id'),
+                warehouseId: (int) $request->validated('warehouse_id'),
+                productId: (int) $request->validated('product_id'),
+                quantity: (string) $request->validated('quantity'),
+                notes: $request->validated('notes'),
+            ));
+
+            return $this->success(
+                data: (new StockBalanceResource($balance))->resolve(),
+                message: 'Reservation released successfully',
+            );
+        } catch (DomainException $e) {
+            return $this->error($e->getMessage(), status: 422);
+        }
+    }
+
+    public function returnStock(ReturnStockRequest $request): JsonResponse
+    {
+        try {
+            $entry = $this->inventoryService->returnStock(new ReturnStockCommand(
+                tenantId: (int) $request->validated('tenant_id'),
+                warehouseId: (int) $request->validated('warehouse_id'),
+                productId: (int) $request->validated('product_id'),
+                quantity: (string) $request->validated('quantity'),
+                unitCost: (string) $request->validated('unit_cost'),
+                referenceType: $request->validated('reference_type'),
+                referenceId: $request->validated('reference_id'),
+                notes: $request->validated('notes'),
+            ));
+
+            return $this->success(
+                data: (new StockLedgerResource($entry))->resolve(),
+                message: 'Stock returned successfully',
+                status: 201,
+            );
+        } catch (DomainException $e) {
+            return $this->error($e->getMessage(), status: 422);
+        }
+    }
+
+    public function carryingCosts(): JsonResponse
+    {
+        $tenantId = (int) request('tenant_id');
+        $warehouseId = request('warehouse_id') ? (int) request('warehouse_id') : null;
+        $periodDays = max(1, (int) request('period_days', 365));
+        $carryingRate = request('carrying_rate', '0.25');
+
+        // Clamp carrying rate to a safe range [0.0001, 10.0]
+        if (bccomp($carryingRate, '0.0001', 4) < 0) {
+            $carryingRate = '0.0001';
+        }
+        if (bccomp($carryingRate, '10.0', 4) > 0) {
+            $carryingRate = '10.0';
+        }
+
+        $result = $this->inventoryService->computeCarryingCosts($tenantId, $warehouseId, $periodDays, $carryingRate);
+
+        return $this->success(
+            data: $result['items'],
+            message: 'Carrying costs computed successfully',
+            meta: [
+                'grand_total_carrying_cost' => $result['grand_total_carrying_cost'],
+                'carrying_rate' => $carryingRate,
+                'period_days' => $periodDays,
+            ],
+        );
     }
 }

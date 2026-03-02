@@ -1,13 +1,9 @@
 {
-    "name": "CRM",
+    "name": "Crm",
     "alias": "crm",
-    "description": "Lead management, opportunity pipeline and contact management",
+    "description": "CRM module: Contacts, Leads, and Activity tracking",
     "version": "1.0.0",
-    "keywords": [],
-    "active": 1,
-    "order": 7,
-    "providers": ["Modules\\CRM\\Providers\\CRMServiceProvider"],
-    "aliases": {},
-    "files": [],
-    "requires": ["Core"]
+    "requires": ["Core", "Tenant"],
+    "providers": ["Modules\\Crm\\Providers\\CrmServiceProvider"],
+    "aliases": {}
 }

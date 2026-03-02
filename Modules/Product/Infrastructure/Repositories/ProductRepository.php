@@ -4,17 +4,21 @@ declare(strict_types=1);
 
 namespace Modules\Product\Infrastructure\Repositories;
 
+use App\Shared\Abstractions\BaseRepository;
 use Modules\Product\Domain\Contracts\ProductRepositoryInterface;
-use Modules\Product\Domain\Entities\Product as ProductEntity;
-use Modules\Product\Domain\Enums\ProductType;
-use Modules\Product\Domain\ValueObjects\SKU;
-use Modules\Product\Infrastructure\Models\Product as ProductModel;
+use Modules\Product\Domain\Entities\Product;
+use Modules\Product\Infrastructure\Models\ProductModel;
 
-class ProductRepository implements ProductRepositoryInterface
+class ProductRepository extends BaseRepository implements ProductRepositoryInterface
 {
-    public function findById(int $id, int $tenantId): ?ProductEntity
+    protected function model(): string
     {
-        $model = ProductModel::withoutGlobalScope('tenant')
+        return ProductModel::class;
+    }
+
+    public function findById(int $id, int $tenantId): ?Product
+    {
+        $model = $this->newQuery()
             ->where('id', $id)
             ->where('tenant_id', $tenantId)
             ->first();
@@ -22,10 +26,20 @@ class ProductRepository implements ProductRepositoryInterface
         return $model ? $this->toDomain($model) : null;
     }
 
-    public function findBySku(SKU $sku, int $tenantId): ?ProductEntity
+    public function findBySku(string $sku, int $tenantId): ?Product
     {
-        $model = ProductModel::withoutGlobalScope('tenant')
-            ->where('sku', $sku->getValue())
+        $model = $this->newQuery()
+            ->where('sku', $sku)
+            ->where('tenant_id', $tenantId)
+            ->first();
+
+        return $model ? $this->toDomain($model) : null;
+    }
+
+    public function findByBarcode(string $barcode, int $tenantId): ?Product
+    {
+        $model = $this->newQuery()
+            ->where('barcode', $barcode)
             ->where('tenant_id', $tenantId)
             ->first();
 
@@ -34,80 +48,82 @@ class ProductRepository implements ProductRepositoryInterface
 
     public function findAll(int $tenantId, int $page = 1, int $perPage = 25): array
     {
-        return ProductModel::withoutGlobalScope('tenant')
+        $paginator = $this->newQuery()
             ->where('tenant_id', $tenantId)
             ->orderBy('name')
-            ->forPage($page, $perPage)
-            ->get()
-            ->map(fn (ProductModel $m): ProductEntity => $this->toDomain($m))
-            ->all();
-    }
+            ->paginate($perPage, ['*'], 'page', $page);
 
-    public function skuExistsForTenant(SKU $sku, int $tenantId, ?int $excludeId = null): bool
-    {
-        $query = ProductModel::withoutGlobalScope('tenant')
-            ->where('sku', $sku->getValue())
-            ->where('tenant_id', $tenantId);
-
-        if ($excludeId !== null) {
-            $query->where('id', '!=', $excludeId);
-        }
-
-        return $query->exists();
-    }
-
-    public function save(ProductEntity $product): ProductEntity
-    {
-        $data = [
-            'tenant_id'     => $product->getTenantId(),
-            'name'          => $product->getName(),
-            'sku'           => $product->getSku()->getValue(),
-            'category_id'   => $product->getCategoryId(),
-            'brand_id'      => $product->getBrandId(),
-            'unit_id'       => $product->getUnitId(),
-            'type'          => $product->getType()->value,
-            'cost_price'    => $product->getCostPrice(),
-            'selling_price' => $product->getSellingPrice(),
-            'reorder_point' => $product->getReorderPoint(),
-            'is_active'     => $product->isActive(),
-            'description'   => $product->getDescription(),
+        return [
+            'items' => $paginator->getCollection()->map(fn (ProductModel $m) => $this->toDomain($m))->all(),
+            'total' => $paginator->total(),
+            'current_page' => $paginator->currentPage(),
+            'last_page' => $paginator->lastPage(),
+            'per_page' => $paginator->perPage(),
         ];
+    }
 
-        if ($product->getId() > 0) {
-            $model = ProductModel::withoutGlobalScope('tenant')->findOrFail($product->getId());
-            $model->update($data);
+    public function save(Product $product): Product
+    {
+        if ($product->id !== null) {
+            $model = $this->newQuery()
+                ->where('id', $product->id)
+                ->where('tenant_id', $product->tenantId)
+                ->firstOrFail();
         } else {
-            $model = ProductModel::create($data);
+            $model = new ProductModel;
         }
 
-        return $this->toDomain($model->fresh());
+        $model->tenant_id = $product->tenantId;
+        $model->sku = $product->sku;
+        $model->name = $product->name;
+        $model->description = $product->description;
+        $model->type = $product->type;
+        $model->uom = $product->uom;
+        $model->buying_uom = $product->buyingUom;
+        $model->selling_uom = $product->sellingUom;
+        $model->costing_method = $product->costingMethod;
+        $model->cost_price = $product->costPrice;
+        $model->sale_price = $product->salePrice;
+        $model->barcode = $product->barcode;
+        $model->status = $product->status;
+        $model->save();
+
+        return $this->toDomain($model);
     }
 
     public function delete(int $id, int $tenantId): void
     {
-        ProductModel::withoutGlobalScope('tenant')
+        $model = $this->newQuery()
             ->where('id', $id)
             ->where('tenant_id', $tenantId)
-            ->first()
-            ?->delete();
+            ->first();
+
+        if ($model === null) {
+            throw new \DomainException("Product with ID {$id} not found.");
+        }
+
+        $model->delete();
     }
 
-    private function toDomain(ProductModel $model): ProductEntity
+    private function toDomain(ProductModel $model): Product
     {
-        return new ProductEntity(
-            id: (int) $model->id,
-            tenantId: (int) $model->tenant_id,
-            name: (string) $model->name,
-            sku: new SKU((string) $model->sku),
-            categoryId: $model->category_id ? (int) $model->category_id : null,
-            brandId: $model->brand_id ? (int) $model->brand_id : null,
-            unitId: $model->unit_id ? (int) $model->unit_id : null,
-            type: $model->type instanceof ProductType ? $model->type : ProductType::from((string) $model->type),
-            costPrice: (string) $model->cost_price,
-            sellingPrice: (string) $model->selling_price,
-            reorderPoint: (string) $model->reorder_point,
-            isActive: (bool) $model->is_active,
+        return new Product(
+            id: $model->id,
+            tenantId: $model->tenant_id,
+            sku: $model->sku,
+            name: $model->name,
             description: $model->description,
+            type: $model->type,
+            uom: $model->uom,
+            buyingUom: $model->buying_uom,
+            sellingUom: $model->selling_uom,
+            costingMethod: $model->costing_method,
+            costPrice: $model->cost_price,
+            salePrice: $model->sale_price,
+            barcode: $model->barcode,
+            status: $model->status,
+            createdAt: $model->created_at?->toIso8601String(),
+            updatedAt: $model->updated_at?->toIso8601String(),
         );
     }
 }

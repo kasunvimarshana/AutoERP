@@ -1,15 +1,9 @@
 {
     "name": "Inventory",
     "alias": "inventory",
-    "description": "Stock ledger, warehouse management and inventory adjustments",
     "version": "1.0.0",
-    "keywords": [],
-    "active": 1,
-    "order": 4,
-    "providers": [
-        "Modules\\Inventory\\Providers\\InventoryServiceProvider"
-    ],
-    "aliases": {},
-    "files": [],
-    "requires": ["Core", "Product"]
+    "description": "Ledger-driven inventory management with warehouse management, stock transactions, and BCMath precision",
+    "requires": ["Core", "Product"],
+    "providers": ["Modules\\Inventory\\Providers\\InventoryServiceProvider"],
+    "aliases": {}
 }

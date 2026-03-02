@@ -4,81 +4,111 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Infrastructure\Repositories;
 
+use App\Shared\Abstractions\BaseRepository;
+use Illuminate\Support\Facades\Hash;
 use Modules\Auth\Domain\Contracts\UserRepositoryInterface;
-use Modules\Auth\Domain\Entities\User as UserEntity;
-use Modules\Auth\Domain\ValueObjects\Email;
-use Modules\Auth\Infrastructure\Models\User as UserModel;
+use Modules\Auth\Domain\Entities\User;
+use Modules\Auth\Infrastructure\Models\UserModel;
 
-class UserRepository implements UserRepositoryInterface
+class UserRepository extends BaseRepository implements UserRepositoryInterface
 {
-    public function findById(int $id): ?UserEntity
+    protected function model(): string
     {
-        $model = UserModel::find($id);
-
-        return $model ? $this->toDomain($model) : null;
+        return UserModel::class;
     }
 
-    public function findByEmail(Email $email, int $tenantId): ?UserEntity
+    public function findById(int $id, int $tenantId): ?User
     {
-        $model = UserModel::where('email', $email->getValue())
+        $model = $this->newQuery()
+            ->where('id', $id)
             ->where('tenant_id', $tenantId)
             ->first();
 
         return $model ? $this->toDomain($model) : null;
     }
 
-    public function findActiveByEmail(Email $email): ?UserEntity
+    public function findByEmail(string $email, int $tenantId): ?User
     {
-        $model = UserModel::where('email', $email->getValue())
-            ->where('is_active', true)
+        $model = $this->newQuery()
+            ->where('email', $email)
+            ->where('tenant_id', $tenantId)
             ->first();
 
         return $model ? $this->toDomain($model) : null;
     }
 
-    public function save(UserEntity $user): UserEntity
+    public function save(User $user): User
     {
-        $data = [
-            'tenant_id'       => $user->getTenantId(),
-            'organisation_id' => $user->getOrganisationId(),
-            'name'            => $user->getName(),
-            'email'           => $user->getEmail()->getValue(),
-            'is_active'       => $user->isActive(),
-        ];
-
-        if ($user->getPasswordHash() !== null) {
-            $data['password'] = $user->getPasswordHash();
+        if ($user->id !== null) {
+            $model = $this->newQuery()->findOrFail($user->id);
+        } else {
+            $model = new UserModel;
         }
 
-        $model = UserModel::updateOrCreate(
-            ['id' => $user->getId()],
-            $data
-        );
+        $model->tenant_id = $user->tenantId;
+        $model->name = $user->name;
+        $model->email = $user->email;
+        $model->status = $user->status;
+
+        if ($user->passwordHash !== null) {
+            $model->password = $user->passwordHash;
+        }
+
+        $model->save();
 
         return $this->toDomain($model);
     }
 
-    public function delete(int $id): void
+    public function delete(int $id, int $tenantId): void
     {
-        UserModel::find($id)?->delete();
+        $this->newQuery()
+            ->where('id', $id)
+            ->where('tenant_id', $tenantId)
+            ->firstOrFail()
+            ->delete();
     }
 
-    public function updateLastLoginAt(int $id): void
+    public function verifyPassword(int $userId, int $tenantId, string $plainPassword): bool
     {
-        UserModel::where('id', $id)->update(['last_login_at' => now()]);
+        $model = $this->newQuery()
+            ->where('id', $userId)
+            ->where('tenant_id', $tenantId)
+            ->first();
+
+        return $model !== null && Hash::check($plainPassword, $model->password);
     }
 
-    private function toDomain(UserModel $model): UserEntity
+    public function createAuthToken(int $userId, int $tenantId, string $deviceName): string
     {
-        return new UserEntity(
-            id: (int) $model->id,
-            tenantId: (int) $model->tenant_id,
-            organisationId: (int) $model->organisation_id,
-            name: (string) $model->name,
-            email: new Email((string) $model->email),
-            role: (string) ($model->role_id ?? 'user'),
-            isActive: (bool) $model->is_active,
-            passwordHash: $model->getRawOriginal('password'),
+        /** @var UserModel $model */
+        $model = $this->newQuery()
+            ->where('id', $userId)
+            ->where('tenant_id', $tenantId)
+            ->firstOrFail();
+
+        return $model->createToken($deviceName)->plainTextToken;
+    }
+
+    public function revokeTokenByBearerString(int $userId, int $tenantId, string $bearerToken): void
+    {
+        $token = \Laravel\Sanctum\PersonalAccessToken::findToken($bearerToken);
+
+        if ($token !== null && (int) $token->tokenable_id === $userId) {
+            $token->delete();
+        }
+    }
+
+    private function toDomain(UserModel $model): User
+    {
+        return new User(
+            id: $model->id,
+            tenantId: $model->tenant_id,
+            name: $model->name,
+            email: $model->email,
+            passwordHash: null,
+            status: $model->status ?? 'active',
+            createdAt: $model->created_at?->toIso8601String(),
+            updatedAt: $model->updated_at?->toIso8601String(),
         );
     }
 }

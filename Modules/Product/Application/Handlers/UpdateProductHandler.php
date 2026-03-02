@@ -4,49 +4,58 @@ declare(strict_types=1);
 
 namespace Modules\Product\Application\Handlers;
 
+use App\Shared\Abstractions\BaseHandler;
+use Illuminate\Pipeline\Pipeline;
+use Modules\Core\Application\Pipes\AuditLogPipe;
+use Modules\Core\Application\Pipes\ValidateCommandPipe;
 use Modules\Product\Application\Commands\UpdateProductCommand;
 use Modules\Product\Domain\Contracts\ProductRepositoryInterface;
-use Modules\Product\Domain\Entities\Product as ProductEntity;
-use Modules\Product\Domain\Enums\ProductType;
-use Illuminate\Support\Facades\DB;
+use Modules\Product\Domain\Entities\Product;
 
-class UpdateProductHandler
+class UpdateProductHandler extends BaseHandler
 {
     public function __construct(
-        private readonly ProductRepositoryInterface $products,
+        private readonly ProductRepositoryInterface $productRepository,
+        private readonly Pipeline $pipeline,
     ) {}
 
-    /**
-     * Handle product update.
-     *
-     * @throws \DomainException If product not found.
-     */
-    public function handle(UpdateProductCommand $command): ProductEntity
+    public function handle(UpdateProductCommand $command): Product
     {
-        $existing = $this->products->findById($command->id, $command->tenantId);
+        return $this->transaction(function () use ($command): Product {
+            $product = $this->productRepository->findById($command->id, $command->tenantId);
 
-        if ($existing === null) {
-            throw new \DomainException("Product #{$command->id} not found.");
-        }
+            if ($product === null) {
+                throw new \DomainException("Product with ID {$command->id} not found.");
+            }
 
-        return DB::transaction(function () use ($command, $existing): ProductEntity {
-            $product = new ProductEntity(
-                id: $existing->getId(),
-                tenantId: $existing->getTenantId(),
-                name: $command->name,
-                sku: $existing->getSku(),
-                categoryId: $command->categoryId,
-                brandId: $command->brandId,
-                unitId: $command->unitId,
-                type: ProductType::from($command->type),
-                costPrice: bcadd($command->costPrice, '0', 4),
-                sellingPrice: bcadd($command->sellingPrice, '0', 4),
-                reorderPoint: bcadd($command->reorderPoint, '0', 4),
-                isActive: $command->isActive,
-                description: $command->description,
-            );
+            return $this->pipeline
+                ->send($command)
+                ->through([
+                    ValidateCommandPipe::class,
+                    AuditLogPipe::class,
+                ])
+                ->then(function (UpdateProductCommand $cmd) use ($product): Product {
+                    $updated = new Product(
+                        id: $product->id,
+                        tenantId: $product->tenantId,
+                        sku: $product->sku,
+                        name: $cmd->name,
+                        description: $cmd->description,
+                        type: $product->type,
+                        uom: $cmd->uom,
+                        buyingUom: $cmd->buyingUom,
+                        sellingUom: $cmd->sellingUom,
+                        costingMethod: $cmd->costingMethod,
+                        costPrice: $cmd->costPrice,
+                        salePrice: $cmd->salePrice,
+                        barcode: $cmd->barcode,
+                        status: $cmd->status,
+                        createdAt: $product->createdAt,
+                        updatedAt: null,
+                    );
 
-            return $this->products->save($product);
+                    return $this->productRepository->save($updated);
+                });
         });
     }
 }

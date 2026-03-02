@@ -4,33 +4,34 @@ declare(strict_types=1);
 
 namespace Modules\Product\Domain\ValueObjects;
 
-final class SKU
+use InvalidArgumentException;
+
+final readonly class SKU
 {
-    private readonly string $value;
+    public readonly string $value;
 
     public function __construct(string $value)
     {
         $trimmed = strtoupper(trim($value));
 
-        if (empty($trimmed)) {
-            throw new \InvalidArgumentException('SKU cannot be empty.');
+        if ($trimmed === '') {
+            throw new InvalidArgumentException('SKU cannot be empty.');
         }
 
-        if (! preg_match('/^[A-Z0-9][A-Z0-9\-]{0,49}$/', $trimmed)) {
-            throw new \InvalidArgumentException(
-                "Invalid SKU format \"{$value}\". Must be alphanumeric with optional dashes, up to 50 characters."
+        if (strlen($trimmed) > 100) {
+            throw new InvalidArgumentException('SKU must not exceed 100 characters.');
+        }
+
+        if (! preg_match('/^[A-Z0-9\-_\.]+$/', $trimmed)) {
+            throw new InvalidArgumentException(
+                "SKU must contain only uppercase letters, digits, hyphens, underscores, or dots: {$trimmed}"
             );
         }
 
         $this->value = $trimmed;
     }
 
-    public function getValue(): string
-    {
-        return $this->value;
-    }
-
-    public function equals(SKU $other): bool
+    public function equals(self $other): bool
     {
         return $this->value === $other->value;
     }

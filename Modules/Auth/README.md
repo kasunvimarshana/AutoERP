@@ -1,55 +1,28 @@
 # Auth Module
 
-Handles JWT-based authentication, RBAC, and multi-device session management.
-
-## Responsibilities
-
-- User registration and login (JWT)
-- Token refresh and invalidation
-- Role and permission management (RBAC)
-- Multi-tenant user isolation
+Handles multi-tenant authentication using Laravel Sanctum API tokens.
 
 ## Architecture
 
-```
-Auth/
-├── Domain/
-│   ├── ValueObjects/Email.php         — Validated email VO
-│   ├── ValueObjects/Password.php      — BCrypt password VO
-│   ├── Entities/User.php              — Pure domain entity
-│   └── Contracts/UserRepositoryInterface.php
-├── Application/
-│   ├── Commands/LoginCommand.php
-│   ├── Commands/RegisterCommand.php
-│   ├── Handlers/LoginHandler.php
-│   └── Handlers/RegisterHandler.php
-├── Infrastructure/
-│   ├── Models/User.php                — Eloquent + JWTSubject
-│   ├── Models/Role.php
-│   ├── Models/Permission.php
-│   ├── Repositories/UserRepository.php
-│   └── Database/Migrations/
-├── Interfaces/
-│   └── Http/
-│       ├── Controllers/AuthController.php
-│       ├── Requests/LoginRequest.php
-│       └── Resources/UserResource.php
-└── Providers/AuthServiceProvider.php
-```
+Follows the **Controller → Handler → Repository → Entity** pattern.
+
+- **Domain Layer**: `User` entity, `UserRepositoryInterface` (includes `verifyPassword()`, `createAuthToken()`, `revokeTokenByBearerString()`), `UserStatus` enum
+- **Application Layer**: `RegisterUserCommand/Handler`, `LoginCommand/Handler`, `LogoutCommand/Handler`
+- **Infrastructure Layer**: `UserModel` (Eloquent + `HasApiTokens`), `UserRepository` (all Sanctum/Eloquent access encapsulated here)
+- **Interface Layer**: `AuthController` (injects handlers only; no direct Eloquent), `RegisterRequest`, `LoginRequest`, `UserResource`
 
 ## API Endpoints
 
-| Method | Endpoint              | Auth | Description            |
-|--------|-----------------------|------|------------------------|
-| POST   | /api/v1/auth/login    | No   | Obtain JWT token       |
-| POST   | /api/v1/auth/register | No   | Register a new user    |
-| POST   | /api/v1/auth/logout   | Yes  | Invalidate token       |
-| POST   | /api/v1/auth/refresh  | Yes  | Refresh JWT token      |
-| GET    | /api/v1/auth/me       | Yes  | Get authenticated user |
+| Method | URI | Auth | Description |
+|--------|-----|------|-------------|
+| POST | `/api/v1/auth/register` | No | Register a new user |
+| POST | `/api/v1/auth/login` | No | Login and get token |
+| POST | `/api/v1/auth/logout` | Bearer | Revoke current token |
+| GET | `/api/v1/auth/me` | Bearer | Get authenticated user |
 
-## Security
+## Multi-Tenancy
 
-- Passwords hashed with BCrypt (cost 12)
-- JWT tokens with configurable TTL
-- Token blacklisting on logout
-- Per-tenant email uniqueness enforced at DB level
+Every user is scoped to a `tenant_id`. Authentication is always tenant-aware:
+- Login requires `tenant_id` in the request
+- Tokens are scoped per user-device pair
+- All user queries filter by `tenant_id` in `UserRepository`

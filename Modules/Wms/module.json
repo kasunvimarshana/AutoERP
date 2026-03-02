@@ -1,0 +1,9 @@
+{
+    "name": "Wms",
+    "alias": "wms",
+    "description": "Warehouse Management System: zones, aisles, bins, and cycle counting for physical inventory location management.",
+    "version": "1.0.0",
+    "requires": ["Core", "Tenant", "Inventory"],
+    "providers": ["Modules\\Wms\\Providers\\WmsServiceProvider"],
+    "aliases": {}
+}

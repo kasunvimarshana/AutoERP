@@ -1,15 +1,9 @@
 {
     "name": "Core",
     "alias": "core",
-    "description": "Core tenant and organisation management",
+    "description": "Core shared infrastructure: tenant isolation, global scopes, pipeline pipes, middleware, value objects",
     "version": "1.0.0",
-    "keywords": [],
-    "active": 1,
-    "order": 1,
-    "providers": [
-        "Modules\\Core\\Providers\\CoreServiceProvider"
-    ],
-    "aliases": {},
-    "files": [],
-    "requires": []
+    "requires": [],
+    "providers": ["Modules\\Core\\Providers\\CoreServiceProvider"],
+    "aliases": {}
 }

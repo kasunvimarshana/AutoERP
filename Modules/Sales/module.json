@@ -1,1 +1,9 @@
-{"name":"Sales","alias":"sales","description":"Sales orders, invoicing, POS and payment management","version":"1.0.0","keywords":[],"active":1,"order":5,"providers":["Modules\\Sales\\Providers\\SalesServiceProvider"],"aliases":{},"files":[],"requires":["Core","Product","Inventory"]}
+{
+    "name": "Sales",
+    "alias": "sales",
+    "version": "1.0.0",
+    "description": "Sales order management with full Quotation → Order → Delivery → Invoice → Payment workflow",
+    "requires": ["Core", "Tenant", "Product"],
+    "providers": ["Modules\\Sales\\Providers\\SalesServiceProvider"],
+    "aliases": {}
+}

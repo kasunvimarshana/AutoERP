@@ -5,21 +5,32 @@ declare(strict_types=1);
 namespace Modules\Auth\Domain\Contracts;
 
 use Modules\Auth\Domain\Entities\User;
-use Modules\Auth\Domain\ValueObjects\Email;
 
 interface UserRepositoryInterface
 {
-    public function findById(int $id): ?User;
+    public function findById(int $id, int $tenantId): ?User;
 
-    public function findByEmail(Email $email, int $tenantId): ?User;
-
-    /** Find an active user by email (no tenant filter — used for login). */
-    public function findActiveByEmail(Email $email): ?User;
+    public function findByEmail(string $email, int $tenantId): ?User;
 
     public function save(User $user): User;
 
-    public function delete(int $id): void;
+    public function delete(int $id, int $tenantId): void;
 
-    /** Record the login timestamp for the given user ID. */
-    public function updateLastLoginAt(int $id): void;
+    /**
+     * Verify a plain-text password against the stored hash for the given user.
+     * Kept in the repository so the Application layer never touches the Eloquent model.
+     */
+    public function verifyPassword(int $userId, int $tenantId, string $plainPassword): bool;
+
+    /**
+     * Issue a new Sanctum API token for the given user and return the plain-text token string.
+     * Kept in the repository so the Application layer never references HasApiTokens directly.
+     */
+    public function createAuthToken(int $userId, int $tenantId, string $deviceName): string;
+
+    /**
+     * Revoke the Sanctum access token identified by the raw Bearer token string.
+     * Kept in the repository so the controller layer never calls ->delete() on an Eloquent model.
+     */
+    public function revokeTokenByBearerString(int $userId, int $tenantId, string $bearerToken): void;
 }

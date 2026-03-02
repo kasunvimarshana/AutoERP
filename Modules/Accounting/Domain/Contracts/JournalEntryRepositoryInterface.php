@@ -8,14 +8,13 @@ use Modules\Accounting\Domain\Entities\JournalEntry;
 
 interface JournalEntryRepositoryInterface
 {
+    public function nextEntryNumber(int $tenantId): string;
+
     public function findById(int $id, int $tenantId): ?JournalEntry;
 
-    /**
-     * Paginated list of journal entries with their lines.
-     *
-     * @return array{data: JournalEntry[], total: int, per_page: int, current_page: int, last_page: int}
-     */
-    public function findPaginated(int $tenantId, int $page = 1, int $perPage = 25): array;
+    public function findAll(int $tenantId, int $page, int $perPage): array;
 
     public function save(JournalEntry $entry): JournalEntry;
+
+    public function delete(int $id, int $tenantId): void;
 }

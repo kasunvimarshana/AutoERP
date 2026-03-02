@@ -1,0 +1,9 @@
+{
+    "name": "Pos",
+    "alias": "pos",
+    "description": "Point of Sale module with session/shift management, POS orders, multi-payment support, and receipt tracking.",
+    "version": "1.0.0",
+    "requires": ["Core", "Tenant", "Product", "Inventory"],
+    "providers": ["Modules\\Pos\\Providers\\PosServiceProvider"],
+    "aliases": {}
+}

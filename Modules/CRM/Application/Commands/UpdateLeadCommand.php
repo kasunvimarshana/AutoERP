@@ -2,19 +2,20 @@
 
 declare(strict_types=1);
 
-namespace Modules\CRM\Application\Commands;
+namespace Modules\Crm\Application\Commands;
 
 final readonly class UpdateLeadCommand
 {
     public function __construct(
-        public int     $id,
-        public int     $tenantId,
-        public string  $title,
-        public string  $status,
-        public ?string $source            = null,
-        public string  $value             = '0',
+        public int $id,
+        public int $tenantId,
+        public ?string $title = null,
+        public ?string $description = null,
+        public ?int $contactId = null,
+        public ?string $status = null,
+        public ?string $estimatedValue = null,
+        public ?string $currency = null,
         public ?string $expectedCloseDate = null,
-        public ?int    $assignedTo        = null,
-        public ?string $notes             = null,
+        public ?string $notes = null,
     ) {}
 }

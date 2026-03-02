@@ -4,64 +4,95 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Application\Handlers;
 
-use DateTimeImmutable;
-use Illuminate\Support\Facades\DB;
+use App\Shared\Abstractions\BaseHandler;
+use Illuminate\Pipeline\Pipeline;
+use Modules\Core\Application\Pipes\AuditLogPipe;
+use Modules\Core\Application\Pipes\ValidateCommandPipe;
 use Modules\Inventory\Application\Commands\AdjustStockCommand;
-use Modules\Inventory\Domain\Contracts\InventoryRepositoryInterface;
+use Modules\Inventory\Application\Pipes\ValidateStockAvailabilityPipe;
+use Modules\Inventory\Domain\Contracts\StockLedgerRepositoryInterface;
+use Modules\Inventory\Domain\Entities\StockBalance;
 use Modules\Inventory\Domain\Entities\StockLedgerEntry;
-use Modules\Inventory\Domain\Enums\LedgerEntryType;
+use Modules\Inventory\Domain\Enums\TransactionType;
 
-class AdjustStockHandler
+class AdjustStockHandler extends BaseHandler
 {
     public function __construct(
-        private readonly InventoryRepositoryInterface $inventory
+        private readonly StockLedgerRepositoryInterface $stockLedgerRepository,
+        private readonly Pipeline $pipeline,
     ) {}
 
-    /**
-     * Handle a stock adjustment command.
-     * Uses pessimistic locking to prevent race conditions.
-     *
-     * @throws \DomainException If the adjustment would result in negative stock.
-     */
     public function handle(AdjustStockCommand $command): StockLedgerEntry
     {
-        $type = LedgerEntryType::from($command->type);
+        return $this->transaction(function () use ($command): StockLedgerEntry {
+            return $this->pipeline
+                ->send($command)
+                ->through([
+                    ValidateCommandPipe::class,
+                    AuditLogPipe::class,
+                    ValidateStockAvailabilityPipe::class,
+                ])
+                ->then(function (AdjustStockCommand $cmd): StockLedgerEntry {
+                    $type = TransactionType::from($cmd->adjustmentType);
+                    $totalCost = bcmul($cmd->quantity, $cmd->unitCost, 4);
 
-        return DB::transaction(function () use ($command, $type): StockLedgerEntry {
-            // Acquire pessimistic lock before reading current stock
-            $currentStock = $this->inventory->getStockLevelForUpdate(
-                $command->productId,
-                $command->warehouseId,
-                $command->tenantId
-            );
+                    $entry = new StockLedgerEntry(
+                        id: null,
+                        tenantId: $cmd->tenantId,
+                        warehouseId: $cmd->warehouseId,
+                        productId: $cmd->productId,
+                        transactionType: $type->value,
+                        quantity: $cmd->quantity,
+                        unitCost: $cmd->unitCost,
+                        totalCost: $totalCost,
+                        referenceType: null,
+                        referenceId: null,
+                        notes: $cmd->notes,
+                        createdAt: null,
+                    );
 
-            // Calculate new balance and validate for outbound adjustments
-            $newBalance = $type->isInbound()
-                ? bcadd($currentStock, $command->quantity, 4)
-                : bcsub($currentStock, $command->quantity, 4);
+                    $saved = $this->stockLedgerRepository->appendEntry($entry);
+                    $this->applyBalanceChange($cmd, $type);
 
-            if ($type->isOutbound() && bccomp($newBalance, '0', 4) < 0) {
-                throw new \DomainException(
-                    "Insufficient stock. Available: {$currentStock}, requested: {$command->quantity}."
-                );
-            }
-
-            $entry = new StockLedgerEntry(
-                id: 0,
-                tenantId: $command->tenantId,
-                productId: $command->productId,
-                variantId: $command->variantId,
-                warehouseId: $command->warehouseId,
-                type: $type,
-                quantity: bcadd($command->quantity, '0', 4),
-                unitCost: bcadd($command->unitCost, '0', 4),
-                referenceType: 'adjustment',
-                referenceId: $command->referenceId,
-                notes: $command->reason,
-                createdAt: new DateTimeImmutable(),
-            );
-
-            return $this->inventory->recordEntry($entry);
+                    return $saved;
+                });
         });
+    }
+
+    private function applyBalanceChange(AdjustStockCommand $cmd, TransactionType $type): void
+    {
+        $balance = $this->stockLedgerRepository->lockBalance($cmd->tenantId, $cmd->warehouseId, $cmd->productId);
+
+        $currentQty = $balance?->quantityOnHand ?? '0.0000';
+        $reservedQty = $balance?->quantityReserved ?? '0.0000';
+        $currentCost = $balance?->averageCost ?? $cmd->unitCost;
+
+        if ($type->isPositive()) {
+            $newQty = bcadd($currentQty, $cmd->quantity, 4);
+            $totalValue = bcadd(
+                bcmul($currentQty, $currentCost, 4),
+                bcmul($cmd->quantity, $cmd->unitCost, 4),
+                4
+            );
+            $avgCost = bccomp($newQty, '0', 4) > 0
+                ? bcdiv($totalValue, $newQty, 4)
+                : '0.0000';
+        } else {
+            $newQty = bcsub($currentQty, $cmd->quantity, 4);
+            $avgCost = $currentCost;
+        }
+
+        $newBalance = new StockBalance(
+            id: $balance?->id,
+            tenantId: $cmd->tenantId,
+            warehouseId: $cmd->warehouseId,
+            productId: $cmd->productId,
+            quantityOnHand: $newQty,
+            quantityReserved: $reservedQty,
+            averageCost: $avgCost,
+            updatedAt: null,
+        );
+
+        $this->stockLedgerRepository->saveBalance($newBalance);
     }
 }

@@ -4,119 +4,43 @@ declare(strict_types=1);
 
 namespace Modules\Product\Domain\Entities;
 
-use Modules\Product\Domain\Enums\ProductType;
-use Modules\Product\Domain\ValueObjects\SKU;
-
-class Product
+final class Product
 {
     public function __construct(
-        private readonly int $id,
-        private readonly int $tenantId,
-        private string $name,
-        private readonly SKU $sku,
-        private ?int $categoryId,
-        private ?int $brandId,
-        private ?int $unitId,
-        private ProductType $type,
-        private string $costPrice,
-        private string $sellingPrice,
-        private string $reorderPoint,
-        private bool $isActive,
-        private ?string $description,
+        public readonly ?int $id,
+        public readonly int $tenantId,
+        public readonly string $sku,
+        public readonly string $name,
+        public readonly ?string $description,
+        public readonly string $type,
+        /** Inventory / stock-tracking UOM (base unit). */
+        public readonly string $uom,
+        /** Purchasing UOM. Defaults to $uom when null. */
+        public readonly ?string $buyingUom,
+        /** Sales UOM. Defaults to $uom when null. */
+        public readonly ?string $sellingUom,
+        public readonly string $costingMethod,
+        public readonly string $costPrice,
+        public readonly string $salePrice,
+        public readonly ?string $barcode,
+        public readonly string $status,
+        public readonly ?string $createdAt,
+        public readonly ?string $updatedAt,
     ) {}
 
-    public function getId(): int
+    /**
+     * Returns the effective buying UOM (falls back to inventory UOM).
+     */
+    public function effectiveBuyingUom(): string
     {
-        return $this->id;
-    }
-
-    public function getTenantId(): int
-    {
-        return $this->tenantId;
-    }
-
-    public function getName(): string
-    {
-        return $this->name;
-    }
-
-    public function getSku(): SKU
-    {
-        return $this->sku;
-    }
-
-    public function getCategoryId(): ?int
-    {
-        return $this->categoryId;
-    }
-
-    public function getBrandId(): ?int
-    {
-        return $this->brandId;
-    }
-
-    public function getUnitId(): ?int
-    {
-        return $this->unitId;
-    }
-
-    public function getType(): ProductType
-    {
-        return $this->type;
-    }
-
-    public function getCostPrice(): string
-    {
-        return $this->costPrice;
-    }
-
-    public function getSellingPrice(): string
-    {
-        return $this->sellingPrice;
-    }
-
-    public function getReorderPoint(): string
-    {
-        return $this->reorderPoint;
-    }
-
-    public function isActive(): bool
-    {
-        return $this->isActive;
-    }
-
-    public function getDescription(): ?string
-    {
-        return $this->description;
+        return $this->buyingUom ?? $this->uom;
     }
 
     /**
-     * Calculates gross margin percentage using BCMath.
-     * Formula: (sellingPrice - costPrice) / sellingPrice * 100
+     * Returns the effective selling UOM (falls back to inventory UOM).
      */
-    public function calculateMargin(): string
+    public function effectiveSellingUom(): string
     {
-        if (bccomp($this->sellingPrice, '0', 4) === 0) {
-            return '0.0000';
-        }
-
-        $diff   = bcsub($this->sellingPrice, $this->costPrice, 4);
-        $margin = bcdiv($diff, $this->sellingPrice, 8);
-
-        return bcmul($margin, '100', 4);
-    }
-
-    public function updatePricing(string $costPrice, string $sellingPrice): void
-    {
-        if (bccomp($costPrice, '0', 4) < 0) {
-            throw new \DomainException('Cost price cannot be negative.');
-        }
-
-        if (bccomp($sellingPrice, '0', 4) < 0) {
-            throw new \DomainException('Selling price cannot be negative.');
-        }
-
-        $this->costPrice    = bcadd($costPrice, '0', 4);
-        $this->sellingPrice = bcadd($sellingPrice, '0', 4);
+        return $this->sellingUom ?? $this->uom;
     }
 }

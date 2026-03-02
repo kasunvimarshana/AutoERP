@@ -2,82 +2,112 @@
 
 declare(strict_types=1);
 
-namespace Modules\CRM\Infrastructure\Repositories;
+namespace Modules\Crm\Infrastructure\Repositories;
 
-use Modules\CRM\Domain\Contracts\LeadRepositoryInterface;
-use Modules\CRM\Domain\Entities\Lead as LeadEntity;
-use Modules\CRM\Domain\Enums\LeadStatus;
-use Modules\CRM\Infrastructure\Models\Lead as LeadModel;
+use App\Shared\Abstractions\BaseRepository;
+use Modules\Crm\Domain\Contracts\LeadRepositoryInterface;
+use Modules\Crm\Domain\Entities\Lead;
+use Modules\Crm\Domain\Enums\LeadStatus;
+use Modules\Crm\Infrastructure\Models\LeadModel;
 
-class LeadRepository implements LeadRepositoryInterface
+class LeadRepository extends BaseRepository implements LeadRepositoryInterface
 {
-    public function findById(int $id, int $tenantId): ?LeadEntity
+    protected function model(): string
     {
-        $m = LeadModel::withoutGlobalScope('tenant')
+        return LeadModel::class;
+    }
+
+    public function findById(int $id, int $tenantId): ?Lead
+    {
+        $model = $this->newQuery()
             ->where('id', $id)
             ->where('tenant_id', $tenantId)
             ->first();
 
-        return $m ? $this->toDomain($m) : null;
+        return $model ? $this->toDomain($model) : null;
     }
 
     public function findAll(int $tenantId, int $page = 1, int $perPage = 25): array
     {
-        return LeadModel::withoutGlobalScope('tenant')
+        $paginator = $this->newQuery()
             ->where('tenant_id', $tenantId)
-            ->orderByDesc('created_at')
-            ->forPage($page, $perPage)
+            ->orderByDesc('id')
+            ->paginate($perPage, ['*'], 'page', $page);
+
+        return [
+            'items' => $paginator->getCollection()->map(fn (LeadModel $m) => $this->toDomain($m))->all(),
+            'total' => $paginator->total(),
+            'current_page' => $paginator->currentPage(),
+            'last_page' => $paginator->lastPage(),
+            'per_page' => $paginator->perPage(),
+        ];
+    }
+
+    public function findByContact(int $contactId, int $tenantId): array
+    {
+        return $this->newQuery()
+            ->where('contact_id', $contactId)
+            ->where('tenant_id', $tenantId)
+            ->orderByDesc('id')
             ->get()
-            ->map(fn (LeadModel $m): LeadEntity => $this->toDomain($m))
+            ->map(fn (LeadModel $m) => $this->toDomain($m))
             ->all();
     }
 
-    public function save(LeadEntity $lead): LeadEntity
+    public function save(Lead $lead): Lead
     {
-        $data = [
-            'tenant_id'           => $lead->getTenantId(),
-            'contact_id'          => $lead->getContactId(),
-            'title'               => $lead->getTitle(),
-            'status'              => $lead->getStatus()->value,
-            'source'              => $lead->getSource(),
-            'value'               => $lead->getValue(),
-            'expected_close_date' => $lead->getExpectedCloseDate(),
-            'assigned_to'         => $lead->getAssignedTo(),
-            'notes'               => $lead->getNotes(),
-        ];
-
-        if ($lead->getId() > 0) {
-            $m = LeadModel::withoutGlobalScope('tenant')->findOrFail($lead->getId());
-            $m->update($data);
+        if ($lead->id !== null) {
+            $model = $this->newQuery()
+                ->where('id', $lead->id)
+                ->where('tenant_id', $lead->tenantId)
+                ->firstOrFail();
         } else {
-            $m = LeadModel::create($data);
+            $model = new LeadModel;
+            $model->tenant_id = $lead->tenantId;
         }
 
-        return $this->toDomain($m->fresh());
+        $model->contact_id = $lead->contactId;
+        $model->title = $lead->title;
+        $model->description = $lead->description;
+        $model->status = $lead->status->value;
+        $model->estimated_value = $lead->estimatedValue;
+        $model->currency = $lead->currency;
+        $model->expected_close_date = $lead->expectedCloseDate;
+        $model->notes = $lead->notes;
+        $model->save();
+
+        return $this->toDomain($model);
     }
 
     public function delete(int $id, int $tenantId): void
     {
-        LeadModel::withoutGlobalScope('tenant')
+        $model = $this->newQuery()
             ->where('id', $id)
             ->where('tenant_id', $tenantId)
-            ->first()
-            ?->delete();
+            ->first();
+
+        if ($model === null) {
+            throw new \DomainException("Lead with ID {$id} not found.");
+        }
+
+        $model->delete();
     }
 
-    private function toDomain(LeadModel $m): LeadEntity
+    private function toDomain(LeadModel $model): Lead
     {
-        return new LeadEntity(
-            id: (int) $m->id,
-            tenantId: (int) $m->tenant_id,
-            contactId: $m->contact_id ? (int) $m->contact_id : null,
-            title: (string) $m->title,
-            status: $m->status instanceof LeadStatus ? $m->status : LeadStatus::from((string) $m->status),
-            source: $m->source,
-            value: (string) $m->value,
-            expectedCloseDate: $m->expected_close_date?->toDateString(),
-            assignedTo: $m->assigned_to ? (int) $m->assigned_to : null,
-            notes: $m->notes,
+        return new Lead(
+            id: $model->id,
+            tenantId: $model->tenant_id,
+            contactId: $model->contact_id,
+            title: $model->title,
+            description: $model->description,
+            status: LeadStatus::from($model->status),
+            estimatedValue: bcadd((string) ($model->estimated_value ?? '0'), '0', 4),
+            currency: $model->currency,
+            expectedCloseDate: $model->expected_close_date?->toDateString(),
+            notes: $model->notes,
+            createdAt: $model->created_at?->toIso8601String(),
+            updatedAt: $model->updated_at?->toIso8601String(),
         );
     }
 }

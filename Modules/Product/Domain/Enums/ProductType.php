@@ -6,28 +6,28 @@ namespace Modules\Product\Domain\Enums;
 
 enum ProductType: string
 {
-    case SINGLE   = 'single';
-    case VARIABLE = 'variable';
-    case COMBO    = 'combo';
-    case SERVICE  = 'service';
+    case Stockable = 'stockable';
+    case Consumable = 'consumable';
+    case Service = 'service';
+    case Digital = 'digital';
+    case Bundle = 'bundle';
+    case Composite = 'composite';
+    /** Variant-based product: a configurable template whose purchasable/saleable
+     *  units are distinct variants (e.g. a T-shirt sold in multiple sizes/colours).
+     *  Variant management infrastructure is planned; this type is registered now
+     *  so API consumers can classify products correctly from day one. */
+    case Variant = 'variant';
 
     public function label(): string
     {
         return match ($this) {
-            self::SINGLE   => 'Single Product',
-            self::VARIABLE => 'Variable Product',
-            self::COMBO    => 'Combo / Bundle',
-            self::SERVICE  => 'Service',
+            ProductType::Stockable => 'Stockable',
+            ProductType::Consumable => 'Consumable',
+            ProductType::Service => 'Service',
+            ProductType::Digital => 'Digital',
+            ProductType::Bundle => 'Bundle',
+            ProductType::Composite => 'Composite',
+            ProductType::Variant => 'Variant',
         };
-    }
-
-    public function isPhysical(): bool
-    {
-        return $this !== self::SERVICE;
-    }
-
-    public function supportsVariants(): bool
-    {
-        return $this === self::VARIABLE;
     }
 }

@@ -4,50 +4,64 @@ declare(strict_types=1);
 
 namespace Modules\Product\Application\Handlers;
 
+use App\Shared\Abstractions\BaseHandler;
+use Illuminate\Pipeline\Pipeline;
+use Modules\Core\Application\Pipes\AuditLogPipe;
+use Modules\Core\Application\Pipes\ValidateCommandPipe;
 use Modules\Product\Application\Commands\CreateProductCommand;
 use Modules\Product\Domain\Contracts\ProductRepositoryInterface;
-use Modules\Product\Domain\Entities\Product as ProductEntity;
-use Modules\Product\Domain\Enums\ProductType;
+use Modules\Product\Domain\Entities\Product;
 use Modules\Product\Domain\ValueObjects\SKU;
-use Illuminate\Support\Facades\DB;
 
-class CreateProductHandler
+class CreateProductHandler extends BaseHandler
 {
     public function __construct(
-        private readonly ProductRepositoryInterface $products
+        private readonly ProductRepositoryInterface $productRepository,
+        private readonly Pipeline $pipeline,
     ) {}
 
-    /**
-     * Handle product creation.
-     *
-     * @throws \DomainException If SKU already exists for this tenant.
-     */
-    public function handle(CreateProductCommand $command): ProductEntity
+    public function handle(CreateProductCommand $command): Product
     {
-        $sku = new SKU($command->sku);
+        return $this->transaction(function () use ($command): Product {
+            return $this->pipeline
+                ->send($command)
+                ->through([
+                    ValidateCommandPipe::class,
+                    AuditLogPipe::class,
+                ])
+                ->then(function (CreateProductCommand $cmd): Product {
+                    $existing = $this->productRepository->findBySku(
+                        (new SKU($cmd->sku))->value,
+                        $cmd->tenantId
+                    );
 
-        if ($this->products->skuExistsForTenant($sku, $command->tenantId)) {
-            throw new \DomainException("SKU \"{$sku}\" already exists for this tenant.");
-        }
+                    if ($existing !== null) {
+                        throw new \DomainException(
+                            "A product with SKU '{$cmd->sku}' already exists in this tenant."
+                        );
+                    }
 
-        return DB::transaction(function () use ($command, $sku): ProductEntity {
-            $product = new ProductEntity(
-                id: 0,
-                tenantId: $command->tenantId,
-                name: $command->name,
-                sku: $sku,
-                categoryId: $command->categoryId,
-                brandId: $command->brandId,
-                unitId: $command->unitId,
-                type: ProductType::from($command->type),
-                costPrice: bcadd($command->costPrice, '0', 4),
-                sellingPrice: bcadd($command->sellingPrice, '0', 4),
-                reorderPoint: bcadd($command->reorderPoint, '0', 4),
-                isActive: $command->isActive,
-                description: $command->description,
-            );
+                    $product = new Product(
+                        id: null,
+                        tenantId: $cmd->tenantId,
+                        sku: (new SKU($cmd->sku))->value,
+                        name: $cmd->name,
+                        description: $cmd->description,
+                        type: $cmd->type,
+                        uom: $cmd->uom,
+                        buyingUom: $cmd->buyingUom,
+                        sellingUom: $cmd->sellingUom,
+                        costingMethod: $cmd->costingMethod,
+                        costPrice: $cmd->costPrice,
+                        salePrice: $cmd->salePrice,
+                        barcode: $cmd->barcode,
+                        status: $cmd->status,
+                        createdAt: null,
+                        updatedAt: null,
+                    );
 
-            return $this->products->save($product);
+                    return $this->productRepository->save($product);
+                });
         });
     }
 }

@@ -1,0 +1,9 @@
+{
+    "name": "Organisation",
+    "alias": "organisation",
+    "version": "1.0.0",
+    "description": "Optional nested hierarchical organisational structure (Organisation → Branch → Location → Department) with full tenant isolation",
+    "requires": ["Core", "Tenant"],
+    "providers": ["Modules\\Organisation\\Providers\\OrganisationServiceProvider"],
+    "aliases": {}
+}

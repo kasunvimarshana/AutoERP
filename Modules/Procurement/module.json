@@ -1,1 +1,9 @@
-{"name":"Procurement","alias":"procurement","description":"Purchase orders, vendor management and goods receipt","version":"1.0.0","keywords":[],"active":1,"order":6,"providers":["Modules\\Procurement\\Providers\\ProcurementServiceProvider"],"aliases":{},"files":[],"requires":["Core","Product","Inventory"]}
+{
+    "name": "Procurement",
+    "alias": "procurement",
+    "description": "Supplier management and purchase order lifecycle (draft → confirmed → received → billed → cancelled)",
+    "version": "1.0.0",
+    "requires": ["Core", "Tenant", "Product", "Inventory"],
+    "providers": ["Modules\\Procurement\\Providers\\ProcurementServiceProvider"],
+    "aliases": {}
+}

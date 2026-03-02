@@ -2,133 +2,146 @@
 
 declare(strict_types=1);
 
-namespace Modules\CRM\Interfaces\Http\Controllers;
+namespace Modules\Crm\Interfaces\Http\Controllers;
 
+use App\Shared\Abstractions\BaseController;
+use DomainException;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Routing\Controller;
-use Modules\CRM\Application\Commands\ConvertLeadCommand;
-use Modules\CRM\Application\Commands\CreateLeadCommand;
-use Modules\CRM\Application\Commands\UpdateLeadCommand;
-use Modules\CRM\Application\Handlers\ConvertLeadHandler;
-use Modules\CRM\Application\Handlers\CreateLeadHandler;
-use Modules\CRM\Application\Handlers\UpdateLeadHandler;
-use Modules\CRM\Domain\Contracts\LeadRepositoryInterface;
+use Modules\Crm\Application\Commands\CreateLeadCommand;
+use Modules\Crm\Application\Commands\DeleteLeadCommand;
+use Modules\Crm\Application\Commands\UpdateLeadCommand;
+use Modules\Crm\Application\Services\LeadService;
+use Modules\Crm\Interfaces\Http\Requests\CreateLeadRequest;
+use Modules\Crm\Interfaces\Http\Requests\UpdateLeadRequest;
+use Modules\Crm\Interfaces\Http\Resources\ActivityResource;
+use Modules\Crm\Interfaces\Http\Resources\LeadResource;
 
-class LeadController extends Controller
+class LeadController extends BaseController
 {
     public function __construct(
-        private readonly CreateLeadHandler      $createHandler,
-        private readonly UpdateLeadHandler      $updateHandler,
-        private readonly ConvertLeadHandler     $convertHandler,
-        private readonly LeadRepositoryInterface $leads,
+        private readonly LeadService $leadService,
     ) {}
 
-    public function index(Request $request): JsonResponse
+    public function index(): JsonResponse
     {
-        $tenantId = (int) $request->attributes->get('tenant_id');
-        $items    = $this->leads->findAll($tenantId, (int) $request->query('page', 1), (int) $request->query('per_page', 25));
+        $tenantId = (int) request('tenant_id');
+        $page = (int) request('page', 1);
+        $perPage = (int) request('per_page', 25);
 
-        return response()->json(['success' => true, 'message' => 'Leads retrieved.', 'data' => array_map(fn ($l) => [
-            'id'     => $l->getId(), 'title' => $l->getTitle(), 'status' => $l->getStatus()->value,
-            'value'  => $l->getValue(), 'source' => $l->getSource(),
-        ], $items), 'errors' => null]);
+        $result = $this->leadService->listLeads($tenantId, $page, $perPage);
+
+        return $this->success(
+            data: array_map(
+                fn ($lead) => (new LeadResource($lead))->resolve(),
+                $result['items']
+            ),
+            message: 'Leads retrieved successfully',
+            meta: [
+                'current_page' => $result['current_page'],
+                'last_page' => $result['last_page'],
+                'per_page' => $result['per_page'],
+                'total' => $result['total'],
+            ],
+        );
     }
 
-    public function show(Request $request, int $id): JsonResponse
+    public function store(CreateLeadRequest $request): JsonResponse
     {
-        $tenantId = (int) $request->attributes->get('tenant_id');
-        $lead     = $this->leads->findById($id, $tenantId);
+        try {
+            $lead = $this->leadService->createLead(new CreateLeadCommand(
+                tenantId: (int) $request->validated('tenant_id'),
+                title: $request->validated('title'),
+                description: $request->validated('description'),
+                contactId: $request->validated('contact_id') ? (int) $request->validated('contact_id') : null,
+                status: $request->validated('status'),
+                estimatedValue: $request->validated('estimated_value') !== null ? (string) $request->validated('estimated_value') : null,
+                currency: $request->validated('currency'),
+                expectedCloseDate: $request->validated('expected_close_date'),
+                notes: $request->validated('notes'),
+            ));
 
-        if (! $lead) {
-            return response()->json(['success' => false, 'message' => 'Lead not found.', 'data' => null, 'errors' => null], 404);
+            return $this->success(
+                data: (new LeadResource($lead))->resolve(),
+                message: 'Lead created successfully',
+                status: 201,
+            );
+        } catch (DomainException $e) {
+            return $this->error($e->getMessage(), status: 422);
+        }
+    }
+
+    public function show(int $id): JsonResponse
+    {
+        $tenantId = (int) request('tenant_id');
+        $lead = $this->leadService->findLeadById($id, $tenantId);
+
+        if ($lead === null) {
+            return $this->error('Lead not found', status: 404);
         }
 
-        return response()->json(['success' => true, 'message' => 'Lead retrieved.', 'data' => [
-            'id'                  => $lead->getId(), 'title' => $lead->getTitle(),
-            'status'              => $lead->getStatus()->value, 'value' => $lead->getValue(),
-            'source'              => $lead->getSource(), 'expected_close_date' => $lead->getExpectedCloseDate(),
-            'notes'               => $lead->getNotes(),
-        ], 'errors' => null]);
+        return $this->success(
+            data: (new LeadResource($lead))->resolve(),
+            message: 'Lead retrieved successfully',
+        );
     }
 
-    public function store(Request $request): JsonResponse
+    public function update(UpdateLeadRequest $request, int $id): JsonResponse
     {
-        $validated = $request->validate([
-            'title'               => 'required|string|max:255',
-            'contact_id'          => 'nullable|integer|exists:contacts,id',
-            'source'              => 'nullable|string|max:100',
-            'value'               => 'nullable|numeric|min:0',
-            'expected_close_date' => 'nullable|date',
-            'assigned_to'         => 'nullable|integer|exists:users,id',
-            'notes'               => 'nullable|string',
-        ]);
-
-        $lead = $this->createHandler->handle(new CreateLeadCommand(
-            tenantId: (int) $request->attributes->get('tenant_id'),
-            title: $validated['title'],
-            contactId: isset($validated['contact_id']) ? (int) $validated['contact_id'] : null,
-            source: $validated['source'] ?? null,
-            value: (string) ($validated['value'] ?? '0'),
-            expectedCloseDate: $validated['expected_close_date'] ?? null,
-            assignedTo: isset($validated['assigned_to']) ? (int) $validated['assigned_to'] : null,
-            notes: $validated['notes'] ?? null,
-        ));
-
-        return response()->json(['success' => true, 'message' => 'Lead created.', 'data' => ['id' => $lead->getId(), 'title' => $lead->getTitle()], 'errors' => null], 201);
-    }
-
-    public function update(Request $request, int $id): JsonResponse
-    {
-        $validated = $request->validate([
-            'title'               => 'required|string|max:255',
-            'status'              => 'required|string|in:new,contacted,qualified,proposal,negotiation,won,lost,unqualified',
-            'source'              => 'nullable|string|max:100',
-            'value'               => 'nullable|numeric|min:0',
-            'expected_close_date' => 'nullable|date',
-            'assigned_to'         => 'nullable|integer|exists:users,id',
-            'notes'               => 'nullable|string',
-        ]);
-
         try {
-            $lead = $this->updateHandler->handle(new UpdateLeadCommand(
+            $tenantId = (int) $request->query('tenant_id', '0');
+
+            $lead = $this->leadService->updateLead(new UpdateLeadCommand(
                 id: $id,
-                tenantId: (int) $request->attributes->get('tenant_id'),
-                title: $validated['title'],
-                status: $validated['status'],
-                source: $validated['source'] ?? null,
-                value: (string) ($validated['value'] ?? '0'),
-                expectedCloseDate: $validated['expected_close_date'] ?? null,
-                assignedTo: isset($validated['assigned_to']) ? (int) $validated['assigned_to'] : null,
-                notes: $validated['notes'] ?? null,
+                tenantId: $tenantId,
+                title: $request->validated('title'),
+                description: $request->validated('description'),
+                contactId: $request->validated('contact_id') ? (int) $request->validated('contact_id') : null,
+                status: $request->validated('status'),
+                estimatedValue: $request->validated('estimated_value') !== null ? (string) $request->validated('estimated_value') : null,
+                currency: $request->validated('currency'),
+                expectedCloseDate: $request->validated('expected_close_date'),
+                notes: $request->validated('notes'),
             ));
-        } catch (\DomainException $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage(), 'data' => null, 'errors' => null], 404);
+
+            return $this->success(
+                data: (new LeadResource($lead))->resolve(),
+                message: 'Lead updated successfully',
+            );
+        } catch (DomainException $e) {
+            return $this->error($e->getMessage(), status: 422);
         }
-
-        return response()->json(['success' => true, 'message' => 'Lead updated.', 'data' => ['id' => $lead->getId(), 'title' => $lead->getTitle(), 'status' => $lead->getStatus()->value], 'errors' => null]);
     }
 
-    public function destroy(Request $request, int $id): JsonResponse
+    public function destroy(int $id): JsonResponse
     {
-        $tenantId = (int) $request->attributes->get('tenant_id');
-        $this->leads->delete($id, $tenantId);
+        $tenantId = (int) request('tenant_id');
 
-        return response()->json(['success' => true, 'message' => 'Lead deleted.', 'data' => null, 'errors' => null]);
-    }
-
-    public function convert(Request $request, int $id): JsonResponse
-    {
         try {
-            $opportunity = $this->convertHandler->handle(new ConvertLeadCommand(
-                leadId: $id,
-                tenantId: (int) $request->attributes->get('tenant_id'),
-            ));
-        } catch (\DomainException $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage(), 'data' => null, 'errors' => null], 404);
+            $this->leadService->deleteLead(new DeleteLeadCommand($id, $tenantId));
+
+            return $this->success(message: 'Lead deleted successfully');
+        } catch (DomainException $e) {
+            return $this->error($e->getMessage(), status: 404);
+        }
+    }
+
+    public function activities(int $id): JsonResponse
+    {
+        $tenantId = (int) request('tenant_id');
+        $lead = $this->leadService->findLeadById($id, $tenantId);
+
+        if ($lead === null) {
+            return $this->error('Lead not found', status: 404);
         }
 
-        return response()->json(['success' => true, 'message' => 'Lead converted to opportunity.', 'data' => ['opportunity_id' => $opportunity->getId()], 'errors' => null], 201);
+        $activities = $this->leadService->listActivitiesByLead($id, $tenantId);
+
+        return $this->success(
+            data: array_map(
+                fn ($activity) => (new ActivityResource($activity))->resolve(),
+                $activities
+            ),
+            message: 'Activities retrieved successfully',
+        );
     }
 }
-

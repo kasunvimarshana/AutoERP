@@ -1,15 +1,9 @@
 {
     "name": "Auth",
     "alias": "auth",
-    "description": "JWT authentication, RBAC and multi-device session management",
+    "description": "User registration, Sanctum-based authentication, and stateless API token management",
     "version": "1.0.0",
-    "keywords": [],
-    "active": 1,
-    "order": 2,
-    "providers": [
-        "Modules\\Auth\\Providers\\AuthServiceProvider"
-    ],
-    "aliases": {},
-    "files": [],
-    "requires": ["Core"]
+    "requires": ["Tenant"],
+    "providers": ["Modules\\Auth\\Providers\\AuthModuleServiceProvider"],
+    "aliases": {}
 }

@@ -1,0 +1,9 @@
+{
+    "name": "Workflow",
+    "alias": "workflow",
+    "description": "Database-driven state machine workflow engine: custom workflow definitions, approval chains, instance lifecycle management, and full audit logging",
+    "version": "1.0.0",
+    "requires": ["Core", "Tenant"],
+    "providers": ["Modules\\Workflow\\Providers\\WorkflowServiceProvider"],
+    "aliases": {}
+}

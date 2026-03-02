@@ -1,0 +1,9 @@
+{
+    "name": "Notification",
+    "alias": "notification",
+    "description": "Tenant-scoped notification system with template management, multi-channel support (in-app, email, SMS), and per-user notification tracking.",
+    "version": "1.0.0",
+    "requires": ["Core", "Tenant"],
+    "providers": ["Modules\\Notification\\Providers\\NotificationServiceProvider"],
+    "aliases": {}
+}

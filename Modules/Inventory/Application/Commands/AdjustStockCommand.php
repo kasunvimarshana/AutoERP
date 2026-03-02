@@ -8,14 +8,11 @@ final readonly class AdjustStockCommand
 {
     public function __construct(
         public int $tenantId,
-        public int $productId,
-        public ?int $variantId,
         public int $warehouseId,
+        public int $productId,
         public string $quantity,
-        public string $type,
-        public string $reason,
-        public ?int $referenceId = null,
-        public string $unitCost = '0',
-        public ?int $createdBy = null,
+        public string $unitCost,
+        public string $adjustmentType,
+        public ?string $notes,
     ) {}
 }

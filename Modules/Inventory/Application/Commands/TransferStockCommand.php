@@ -8,13 +8,11 @@ final readonly class TransferStockCommand
 {
     public function __construct(
         public int $tenantId,
+        public int $sourceWarehouseId,
+        public int $destinationWarehouseId,
         public int $productId,
-        public ?int $variantId,
-        public int $warehouseFromId,
-        public int $warehouseToId,
         public string $quantity,
-        public string $unitCost = '0',
-        public ?string $notes = null,
-        public ?int $createdBy = null,
+        public string $unitCost,
+        public ?string $notes,
     ) {}
 }

@@ -1,1450 +1,1139 @@
-Below is the **Enterprise SaaS ERP Knowledge Base (Authoritative Reference Edition)**.
+# KB.md — Enterprise ERP/CRM SaaS Platform Knowledge Base
 
-This knowledge base consolidates:
-
-* Industry ERP standards
-* Modular SaaS architecture patterns
-* Multi-tenant best practices
-* Enterprise accounting doctrine
-* Inventory & costing methodologies
-* Customization & metadata engines
-* Concurrency & financial precision rules
-* Plugin marketplace design principles
-* Localization & internationalization patterns
-* E-commerce & POS integration knowledge
-* Frontend architecture guidance
-* Business process modeling & workflow patterns
-* Barcode / QR / GS1 standards
-* OpenAPI documentation standards
-* Laravel-specific implementation patterns
-* **Controller-Service-Repository architecture pattern** (added v3.0)
-* **Native Laravel solution-first strategy** (added v3.0)
+Version: 1.0  
+Scope: Entire Repository  
+Status: Authoritative Reference  
 
 ---
 
-# ENTERPRISE SaaS ERP KNOWLEDGE BASE
+# TABLE OF CONTENTS
 
-Version: 3.0
-Purpose: Foundational reference for building a fully customizable, reusable SaaS ERP platform
+1. [System Mission & Purpose](#1-system-mission--purpose)
+2. [Core Architecture](#2-core-architecture)
+3. [Multi-Tenancy](#3-multi-tenancy)
+4. [Authorization Model](#4-authorization-model)
+5. [Metadata-Driven Core](#5-metadata-driven-core)
+6. [Product Domain](#6-product-domain)
+7. [Multi-UOM Design](#7-multi-uom-design)
+8. [Pricing & Discounts](#8-pricing--discounts)
+9. [Inventory Management System (IMS)](#9-inventory-management-system-ims)
+10. [Pharmaceutical Inventory Management](#10-pharmaceutical-inventory-management)
+11. [Warehouse Management System (WMS)](#11-warehouse-management-system-wms)
+12. [Sales & POS](#12-sales--pos)
+13. [Accounting](#13-accounting)
+14. [CRM](#14-crm)
+15. [Procurement](#15-procurement)
+16. [Workflow Engine](#16-workflow-engine)
+17. [SaaS Architecture](#17-saas-architecture)
+18. [Organizational Hierarchy](#18-organizational-hierarchy)
+19. [API Design](#19-api-design)
+20. [Frontend Architecture](#20-frontend-architecture)
+21. [Security](#21-security)
+22. [Data Integrity & Concurrency](#22-data-integrity--concurrency)
+23. [Performance & Scalability](#23-performance--scalability)
+24. [Audit & Compliance](#24-audit--compliance)
+25. [Enterprise Reporting](#25-enterprise-reporting)
+26. [Plugin Marketplace](#26-plugin-marketplace)
+27. [Testing Requirements](#27-testing-requirements)
+28. [Prohibited Practices](#28-prohibited-practices)
+29. [Definition of Done](#29-definition-of-done)
+30. [System Guarantees](#30-system-guarantees)
+31. [Business Objectives](#31-business-objectives)
+32. [Autonomous Agent Execution Rules](#32-autonomous-agent-execution-rules)
+33. [Implementation Tracking](#33-implementation-tracking)
+34. [References](#34-references)
 
 ---
 
-# CONTROLLER – SERVICE – REPOSITORY PATTERN
+# 1. System Mission & Purpose
 
-## Overview
+Build a **production-grade, enterprise, multi-tenant, modular ERP/CRM SaaS platform** using:
 
-Every request flow in this platform MUST pass through exactly three layers:
+- Laravel (LTS only)
+- React (LTS only)
+- Native framework capabilities first
+- No unstable or experimental dependencies
+
+The platform covers:
+
+- Inventory Management
+- Pharmaceutical Inventory Management
+- Warehouse Management (WMS)
+- Sales & Point of Sale (POS)
+- Accounting & Finance
+- CRM (Customer Relationship Management)
+- Procurement
+- ERP/CRM Integration
+
+The system must be:
+
+- Modular Monolith (plugin-ready)
+- Fully metadata-driven
+- API-first
+- Stateless
+- Horizontally scalable
+- Vertically scalable
+- Financially precise
+- Strictly tenant-isolated
+- Replaceable per module
+- Zero architectural debt tolerance
+
+---
+
+# 2. Core Architecture
+
+## 2.1 Governing Principles
+
+- SOLID principles (Single Responsibility, Open/Closed, Liskov, Interface Segregation, Dependency Inversion)
+- DRY — no duplication of business logic
+- KISS — minimal complexity
+- Explicit domain boundaries
+- Clear separation of concerns
+- Immutable financial calculations
+- Deterministic behavior
+
+## 2.2 Mandatory Rules
+
+- Controllers contain no business logic.
+- Controllers never use query builder directly.
+- No circular dependencies.
+- Domain logic isolated from infrastructure.
+- Module boundaries strictly respected.
+- Cross-module communication via contracts/events only.
+
+## 2.3 Application Flow (Mandatory)
+
+Every feature must follow:
 
 ```
-HTTP Request
-    ↓
-Controller  (Interfaces/Http/Controllers)
-    ↓
-Service / Handler  (Application/Handlers or Application/Services)
-    ↓
-Repository  (Infrastructure/Repositories, bound via Domain/Contracts)
-    ↓
-Database / External System
+Controller → Service → Handler (Pipeline) → Repository → Entity
 ```
 
-Reference: https://oneuptime.com/blog/post/2026-02-03-laravel-repository-pattern/view
+### Layer Responsibilities
 
-## Layer Responsibilities
+**Controller**
+- Input validation
+- Authorization
+- Response formatting
+- No business logic
 
-### Controller Layer
-- Receives HTTP request and validates input (or delegates to FormRequest)
-- Constructs Command/DTO and passes to Service/Handler
-- Returns formatted JSON response using standard envelope
-- **MUST NOT** contain business logic
-- **MUST NOT** reference Eloquent Models or query builder directly
-- **MUST NOT** call Repositories directly (except for read-only lookups where no handler exists yet)
+**Service**
+- Orchestrates use cases
+- Defines transaction boundaries
+- Calls handlers/pipelines
 
-### Service / Handler Layer (Application)
-- Implements one use-case per class
-- Orchestrates domain entities and repository calls
-- Enforces domain rules (validation, state transitions)
-- Wraps write operations in `DB::transaction()`
-- **MUST NOT** reference HTTP layer (Request, Response)
-- **MUST** use Repository interfaces (never Eloquent Models directly)
+**Handler (Pipeline)**
+- Single-responsibility processing steps
+- Transformations
+- Domain rules
+- Reusable logic units
 
-### Repository Layer (Domain Contract + Infrastructure Implementation)
-- `Domain/Contracts/XxxRepositoryInterface.php` — pure PHP interface
-- `Infrastructure/Repositories/XxxRepository.php` — Eloquent implementation
-- Maps between Eloquent Models and Domain Entities (`toDomain()` method)
-- All queries are encapsulated here
-- Bound via ServiceProvider: `$this->app->bind(Interface::class, Implementation::class)`
+**Repository**
+- Data access only
+- No domain logic
+- Tenant-aware queries
 
-## Module Directory Structure (Canonical)
+**Entity**
+- Pure domain model
+- Relationships
+- Attribute casting
+- No orchestration logic
+
+## 2.4 Module Structure (Per Module)
 
 ```
-Modules/{ModuleName}/
-├── Application/
-│   ├── Commands/          CreateXxxCommand.php, UpdateXxxCommand.php
-│   ├── Handlers/          CreateXxxHandler.php, UpdateXxxHandler.php
-│   ├── DTOs/              (optional data transfer objects)
-│   ├── Queries/           (optional CQRS read models)
-│   └── Services/          (optional domain services, e.g. BarcodeService)
-├── Domain/
-│   ├── Contracts/         XxxRepositoryInterface.php
-│   ├── Entities/          Xxx.php (pure PHP, no Eloquent)
-│   ├── Enums/             XxxStatus.php
-│   └── ValueObjects/      Money.php, Email.php, SKU.php
-├── Infrastructure/
-│   ├── Database/
-│   │   └── Migrations/
-│   ├── Models/            Xxx.php (Eloquent, with global scopes)
-│   └── Repositories/      XxxRepository.php (implements interface)
-├── Interfaces/
-│   └── Http/
-│       ├── Controllers/   XxxController.php
-│       ├── Requests/      CreateXxxRequest.php
-│       └── Resources/     XxxResource.php
-└── Providers/
-    └── XxxServiceProvider.php
+Modules/
+ └── {ModuleName}/
+     ├── Application/       # Use cases, commands, queries, DTOs, service orchestration
+     ├── Domain/            # Entities, value objects, domain events, repository contracts, business rules
+     ├── Infrastructure/    # Repository implementations, external service adapters, persistence
+     ├── Interfaces/        # HTTP controllers, API resources, form requests, console commands
+     ├── module.json
+     └── README.md
 ```
 
-## Standard Command + Handler Pattern
+Each module must be independently replaceable.
 
-```php
-// Command (immutable DTO)
-final readonly class CreateXxxCommand {
-    public function __construct(
-        public int    $tenantId,
-        public string $name,
-        // ...
-    ) {}
-}
+---
 
-// Handler (service layer)
-class CreateXxxHandler {
-    public function __construct(
-        private readonly XxxRepositoryInterface $repo,
-    ) {}
+# 3. Multi-Tenancy
 
-    public function handle(CreateXxxCommand $cmd): XxxEntity {
-        // 1. Domain validation
-        // 2. Build domain entity
-        // 3. Persist via repository
-        return DB::transaction(fn() => $this->repo->save($entity));
-    }
-}
+## 3.1 Hierarchy Model
 
-// Controller
-class XxxController extends Controller {
-    public function __construct(
-        private readonly CreateXxxHandler       $createHandler,
-        private readonly XxxRepositoryInterface $repo,
-    ) {}
-
-    public function store(Request $request): JsonResponse {
-        $validated = $request->validate([...]);
-        $entity = $this->createHandler->handle(new CreateXxxCommand(...));
-        return response()->json(['success' => true, 'data' => [...], 'errors' => null], 201);
-    }
-}
+```
+Tenant
+ └── Organisation
+      └── Branch
+           └── Location
+                └── Department
 ```
 
-## Repository Interface Pattern
+## 3.2 Multi-Tenant Models
 
-```php
-// Domain/Contracts/XxxRepositoryInterface.php
-interface XxxRepositoryInterface {
-    public function findById(int $id, int $tenantId): ?Xxx;
-    public function findAll(int $tenantId, int $page = 1, int $perPage = 25): array;
-    public function save(Xxx $entity): Xxx;
-    public function delete(int $id, int $tenantId): void;
-}
-
-// Infrastructure/Repositories/XxxRepository.php
-class XxxRepository implements XxxRepositoryInterface {
-    public function findById(int $id, int $tenantId): ?XxxEntity {
-        $m = XxxModel::withoutGlobalScope('tenant')
-            ->where('id', $id)->where('tenant_id', $tenantId)->first();
-        return $m ? $this->toDomain($m) : null;
-    }
-    // ... other methods ...
-    private function toDomain(XxxModel $m): XxxEntity {
-        return new XxxEntity(id: $m->id, ...);
-    }
-}
-
-// Providers/XxxServiceProvider.php
-$this->app->bind(XxxRepositoryInterface::class, XxxRepository::class);
-```
-
-## Prohibited Patterns
-
-| Violation | Correct Alternative |
-|---|---|
-| `$model = SomeModel::create([...])` in Controller | Use Handler → Repository |
-| `SomeModel::where('tenant_id', $id)->get()` in Controller | Use Repository `findAll()` |
-| `SomeModel::find($id)` in Handler | Use Repository `findById()` |
-| Handler without constructor-injected Repository | Always inject via interface |
-| Repository returning Eloquent Model | Repository returns Domain Entity |
-| Cross-module Model import | Use Cross-module Contract/Event |
-
-## Native Laravel Solutions (Preferred over Third-Party)
-
-| Need | Native Laravel Solution | Avoid |
+| Model | Description | Trade-offs |
 |---|---|---|
-| Authentication | `Illuminate\Auth` + JWT or Sanctum | Custom auth from scratch |
-| Validation | `$request->validate()` / FormRequest | Manual `isset()` chains |
-| DB Transactions | `DB::transaction()` | Manual BEGIN/COMMIT |
-| Queues | `Illuminate\Queue` | Custom queue tables |
-| Events | `Illuminate\Events` | Direct coupling |
-| Caching | `Illuminate\Cache` | Direct Redis calls |
-| Localization | `Lang::get()` / `__()` | Hardcoded strings |
-| File Storage | `Storage::disk()` | Direct file_put_contents |
-| Password Hashing | `password_hash()` with BCRYPT | md5/sha1 |
-| Rate Limiting | `RateLimiter` middleware | Custom throttle tables |
-| Scheduled Jobs | `Illuminate\Console\Scheduling` | Cron scripts |
-| Testing | PHPUnit + `RefreshDatabase` | External test runners |
+| Shared DB, Shared Schema | All tenants in one schema with row-level isolation via `tenant_id` | Lowest cost, simplest ops; requires strict global scope enforcement |
+| Shared DB, Separate Schema | Each tenant gets its own schema within one database | Better isolation; schema migrations per tenant can be complex |
+| Separate DB per Tenant | Dedicated database per tenant | Maximum isolation and performance; highest operational overhead |
+
+Recommended default: Shared DB + Strict Row-Level Isolation + Optional DB-per-tenant upgrade path.
+
+## 3.3 Mandatory Enforcement
+
+- `tenant_id` on every business table
+- Global scope enforcement
+- Tenant-scoped cache
+- Tenant-scoped queues
+- Tenant-scoped storage
+- Tenant-scoped configs
+- JWT per user × device × organisation
+- Stateless authentication
+- Tenant resolution via:
+  - Subdomain
+  - Header
+  - JWT claim
+
+Failure to isolate tenants = Critical Violation.
 
 ---
 
-# ERP FOUNDATIONAL PRINCIPLES
+# 4. Authorization Model
 
-## ERP Definition
+Hybrid enforcement:
 
-An ERP (Enterprise Resource Planning) system integrates:
+- RBAC (roles & permissions)
+- ABAC (policy-based rules)
+- Multi-guard
+- Scoped API keys
+- Tenant-level feature flags
+- Feature-level gating
 
-* Finance
-* Inventory
-* Sales
-* Procurement
-* CRM
-* Operations
-* Human resources (optional extension)
+Rules:
 
-Core ERP characteristics:
-
-* Single source of truth
-* Transaction-driven
-* Financially reconcilable
-* Cross-module traceable
-* Audit-safe
+- Policy classes only.
+- No permission logic in controllers.
+- No hardcoded role checks.
+- Unauthorized cross-tenant access is strictly prohibited.
 
 ---
 
-# SaaS ERP ARCHITECTURAL KNOWLEDGE
+# 5. Metadata-Driven Core
 
-## Multi-Tenant Models
+All configurable logic must be:
 
-Three models:
+- Database-driven
+- Enum-controlled
+- Runtime-resolvable
+- Replaceable without deployment
 
-1. Shared DB, Shared Schema (row-level isolation)
-2. Shared DB, Separate Schema
-3. Separate DB per Tenant
+Includes:
 
-Recommended default for scalable SaaS ERP:
-Shared DB + Strict Row-Level Isolation + Optional DB-per-tenant upgrade path.
+- Dynamic forms & custom fields
+- Validation rules & conditional visibility
+- Computed fields
+- Workflow states
+- Approval chains
+- Pricing rules
+- Tax rules
+- Notification templates
+- UI layout definitions
+- Feature toggles
 
-Mandatory:
-
-* tenant_id on all business tables
-* Tenant-scoped cache
-* Tenant-scoped queues
-* Tenant-scoped storage
-* Tenant-scoped configs
-
----
-
-# DOMAIN KNOWLEDGE – CORE ERP
-
----
-
-# PRODUCT DOMAIN
-
-## Product Types
-
-* Stockable (Physical)
-* Consumable
-* Service
-* Digital
-* Bundle (Kit)
-* Composite (Manufactured)
-* Variant-based
-
-## Key Concepts
-
-* SKU
-* UOM (Unit of Measure)
-* Conversion Matrix
-* Costing Method
-* Valuation Method
-* Traceability (Serial / Batch / Lot)
-* GS1 compatibility (optional enterprise feature)
-* Multi-image management
-* Multi-location pricing
-* Multi-currency pricing
-
-## Costing Methods
-
-* FIFO (First In First Out)
-* LIFO (Last In First Out)
-* Weighted Average
-
-Inventory valuation impacts accounting directly.
+Hardcoded business rules are prohibited.
 
 ---
 
-# INVENTORY KNOWLEDGE
+# 6. Product Domain
 
-Inventory is:
+## 6.1 Supported Product Types
 
-* Ledger-driven
-* Transactional
-* Immutable (historical entries)
+- Physical (Stockable)
+- Consumable
+- Service
+- Digital
+- Bundle (Kit)
+- Composite (Manufactured)
+- Variant-based
 
-Key rules:
+## 6.2 Key Concepts
 
-* Stock is never edited directly
-* All changes via transactions
-* Reservation precedes deduction
-* Deduction must be atomic
+- SKU
+- UOM (Unit of Measure) with conversion matrix
+- Costing method (FIFO / LIFO / Weighted Average)
+- Valuation method
+- Traceability (Serial / Batch / Lot) — optional by default; mandatory when pharmaceutical compliance mode is enabled
+- GS1 compatibility — optional enterprise feature
+- Multi-image management (0..n)
+- Multi-location pricing
+- Multi-currency pricing
 
-Critical flows:
+## 6.3 Mandatory Capabilities
 
-* Purchase Receipt
-* Sales Shipment
-* Internal Transfer
-* Adjustment
-* Return
+- Optional traceability (Serial / Batch / Lot; mandatory in pharmaceutical mode)
+- Optional Barcode / QR
+- Optional GS1 compatibility
+- 0..n images per product
+- Required base UOM (`uom`)
+- Optional buying UOM
+- Optional selling UOM
+- UOM conversion matrix
+- Multi-location pricing
+- Multi-currency pricing
+- Tiered pricing
+- Rule-based pricing engine
+- Fully traceable inventory flow
 
-Concurrency control is mandatory.
+## 6.4 Financial Rules
+
+- Arbitrary precision decimals only (BCMath or equivalent)
+- Floating-point arithmetic strictly forbidden
+- Tax inclusive/exclusive support
+- Double-entry bookkeeping compatibility
 
 ---
 
-# ACCOUNTING KNOWLEDGE
+# 7. Multi-UOM Design
 
-ERP-grade accounting requires:
+## 7.1 UOM Structure
 
-## Double-Entry Bookkeeping
+Each product supports:
+
+- `uom` → Base inventory tracking unit (required)
+- `buying_uom` → Purchasing unit (optional; fallback to `uom`)
+- `selling_uom` → Sales unit (optional; fallback to `uom`)
+
+## 7.2 UOM Conversions
+
+`uom_conversions` table fields:
+
+- `product_id`
+- `from_uom`
+- `to_uom`
+- `factor`
+
+Example: 1 box = 12 pcs
+
+## 7.3 Conversion Rules
+
+- Direct path: `from_uom` → `to_uom`
+- Inverse path: reciprocal calculation (`to_uom` → `from_uom`)
+- Product-specific conversion factors
+- No global assumptions
+- No implicit conversion
+
+## 7.4 Arithmetic Precision
+
+- All calculations use BCMath
+- Precision: 4 decimal places minimum
+- No floating-point arithmetic permitted
+- Deterministic and reversible
+
+---
+
+# 8. Pricing & Discounts
+
+Buying price, selling price, purchase discount, and sales discount may vary by:
+
+- Location
+- Batch
+- Lot
+- Other applicable factors
+
+Discount formats:
+
+- Flat amount
+- Percentage
+- Other applicable formats
+
+---
+
+# 9. Inventory Management System (IMS)
+
+A modern Inventory Management System serves as a central hub for tracking, organizing, and optimizing company stock across the entire supply chain. It streamlines stock tracking using real-time data, barcode scanning, automation, and multi-channel synchronization to optimize stock levels and reduce operational costs.
+
+## 9.1 Inventory is Ledger-Driven
+
+- Stock is never edited directly.
+- All changes occur via transactions.
+- Reservation precedes deduction.
+- Deduction must be atomic.
+- Historical entries are immutable.
+
+## 9.2 Critical Flows
+
+- Purchase Receipt
+- Sales Shipment
+- Internal Transfer
+- Adjustment
+- Return
+
+## 9.3 Core Capabilities
+
+### 9.3.1 Real-Time Inventory Tracking
+- Instant visibility into current stock quantities and physical locations
+- Automatic updates as items move from receiving to final sale
+- Continuous monitoring across warehouses and stores
+
+### 9.3.2 Automated Reordering & Alerts
+- Predefined reorder points
+- Automatic purchase order generation
+- Low-stock notifications
+- Prevention of stockouts and overstocking
+- Historical consumption-based forecasting
+
+### 9.3.3 Centralized Order Management
+- Consolidates multi-channel sales (e-commerce, POS, marketplaces)
+- Unified dashboard with consistent stock counts across platforms
+- Full order lifecycle tracking: order received → picking → packing → shipping → delivery
+
+### 9.3.4 Multi-Location & Multi-Channel Management
+- Synchronization across multiple warehouses, retail stores, and distribution centers
+- Seamless inter-location stock transfers
+- Channel consistency (website, POS, marketplaces)
+
+### 9.3.5 Barcode & RFID Scanning
+- Digital scanning via Barcode, QR Code, RFID
+- Reduces manual entry errors
+- Accelerates receiving, picking, packing, and shipping
+
+### 9.3.6 Demand Forecasting
+- Historical sales analysis
+- Seasonal trend modeling
+- Market-based projections
+- Optimization of stock levels
+
+### 9.3.7 Traceability (Lot, Batch & Serial Tracking)
+- Track by lot number, batch number, or serial number
+- Manage expiry dates, product recalls, and quality control
+- Critical for pharmaceutical, food & beverage, and high-value electronics
+
+### 9.3.8 Supplier & Vendor Management
+- Centralized vendor records
+- Lead time and performance tracking
+- Product–vendor mapping
+- Reordering workflows
+
+### 9.3.9 Inventory Optimization (ABC Analysis)
+- Categorization by value and turnover rate:
+  - High-value (A)
+  - Medium-value (B)
+  - Low-value (C)
+- Resource allocation efficiency
+
+### 9.3.10 Cycle Counting
+- Partial inventory audits (scheduled subset counting)
+- Maintains high accuracy with minimal operational disruption
+- Alternative to full-scale audits
+
+### 9.3.11 Reporting & Analytics
+- KPIs: inventory turnover, carrying cost, order cycle time, profitability per product, labor efficiency, inventory accuracy
+- Data-driven forecasting and strategic planning
+
+### 9.3.12 Third-Party Integrations
+- Accounting systems (e.g., QuickBooks)
+- E-commerce platforms (e.g., Shopify, WooCommerce)
+- ERP systems
+- POS systems
+
+### 9.3.13 Cloud & Mobile Accessibility
+- Smartphone and tablet support
+- Warehouse floor operations
+- Remote access and 24/7 secure availability
+
+## 9.4 Additional Capabilities
+
+- Multi-warehouse
+- Multi-bin locations
+- Stock ledger
+- FIFO / LIFO / Weighted Average costing
+- Reservations
+- Transfers
+- Adjustments
+- Cycle counting
+- Expiry tracking
+- Damage handling
+- Reorder rules
+- Procurement suggestions
+- Backorders
+- Drop-shipping
+
+## 9.5 Concurrency Controls
+
+- Pessimistic locking for stock deduction
+- Optimistic locking for updates
+- Atomic stock transactions
+- Idempotent stock APIs
+
+---
+
+# 10. Pharmaceutical Inventory Management
+
+A pharmaceutical inventory system extends standard inventory management with regulatory, compliance, and safety-focused functionality.
+
+Primary goals: Compliance, Efficiency, Safety, Traceability.
+
+## 10.1 Core Inventory & Real-Time Control
+
+- Real-time multi-branch visibility
+- Barcode & RFID scanning
+- Inter-branch transfers
+
+## 10.2 Expiry Control & FEFO
+
+- First-Expired, First-Out (FEFO) strategy
+- Expiry date tracking and alerts
+- Expired product quarantine
+- Waste minimization
+
+## 10.3 Lot & Batch Traceability
+
+- Mandatory traceability
+- Recall management support
+- Quality assurance compliance
+
+## 10.4 High-Risk Medication Monitoring
+
+- Flag expensive drugs
+- Controlled substances tracking
+- Low-demand monitoring
+- Restricted access controls
+
+## 10.5 Automated Reordering & Demand Forecasting
+
+- Threshold-based purchase order generation
+- Seasonal consumption analysis
+- Drug shortage prevention
+
+## 10.6 Regulatory Compliance & Security
+
+Compliance frameworks:
+- FDA
+- DEA
+- DSCSA (Drug Supply Chain Security Act)
+- Drug serial number tracking
+
+Security:
+- Tamper-proof transaction logs
+- Full user activity history
+- Audit-ready reporting
+
+## 10.7 Integration Capabilities
+
+- EHR / EMR systems
+- POS systems
+- Billing platforms
+- ERP systems
+
+## 10.8 Pharmaceutical Compliance Mode
+
+When pharmaceutical mode is enabled:
+
+- Lot tracking is mandatory
+- Expiry date is mandatory
+- FEFO is enforced
+- Serial tracking required where applicable
+- Audit trail cannot be disabled
+- Regulatory reports must be available
+
+Compliance is NOT optional.
+
+---
+
+# 11. Warehouse Management System (WMS)
+
+A WMS optimizes warehouse operations through real-time inventory tracking, efficient order fulfillment (picking/packing/shipping), accurate labor management, and integration with ERP and e-commerce platforms.
+
+## 11.1 Real-Time Inventory Visibility
+
+- Bin-level and location-level tracking
+- Movement history logs
+- Accurate up-to-the-minute data on stock levels and locations
+
+## 11.2 Receiving & Putaway
+
+- Automated receiving
+- Intelligent storage location suggestion based on:
+  - Turnover rate
+  - Size
+  - Space availability
+
+## 11.3 Order Picking & Packing Optimization
+
+- Optimized route generation
+- Picking strategies:
+  - Batch picking
+  - Wave picking
+  - Zone picking
+- Reduced travel time
+
+## 11.4 Labor Management
+
+- Productivity tracking
+- Skill-based task assignment
+- Proximity-based task allocation
+- Performance metrics
+
+## 11.5 Warehouse Layout Optimization
+
+- Movement pattern analysis
+- Storage reconfiguration
+- Travel distance reduction
+
+## 11.6 Returns Management (Reverse Logistics)
+
+- Return inspection
+- Restocking workflows
+- Damage classification
+- Credit processing
+
+## 11.7 Integration Capabilities
+
+- ERP systems
+- Transportation systems
+- E-commerce platforms
+
+## 11.8 Reporting & KPIs
+
+- Inventory accuracy
+- Order cycle time
+- Labor efficiency
+
+---
+
+# 12. Sales & POS
+
+## 12.1 Sales Flow
+
+```
+Quotation → Sales Order → Delivery → Invoice → Payment
+```
+
+## 12.2 Capabilities
+
+- POS terminal mode
+- Offline-ready sync design
+- Draft / Hold receipts
+- Split payments
+- Refund handling
+- Backorders
+- Cash drawer tracking
+- Receipt templating
+- Commission engine
+- Rule-based discount engine
+- Tax calculation
+- Loyalty system
+- Gift cards
+- Coupons
+- E-commerce API compatibility
+
+## 12.3 POS Requirements
+
+- Offline-first design
+- Local transaction queue
+- Sync reconciliation engine
+
+---
+
+# 13. Accounting
+
+## 13.1 Mandatory Capabilities
+
+- Double-entry bookkeeping
+- Chart of accounts per tenant
+- Journal entries
+- Auto-posting rules
+- Tax engine
+- Fiscal periods
+- Trial balance
+- Profit & Loss
+- Balance sheet
+- Immutable audit trail
+
+## 13.2 Double-Entry Rule
 
 Every transaction must:
 
-Debit one account
-Credit another account
+- Debit one account
+- Credit another account
+- Total Debits = Total Credits
 
-Total Debits = Total Credits
+## 13.3 Financial Integrity Rules
 
-## Core Accounting Structures
+- No floating-point arithmetic
+- Arbitrary precision decimals only (BCMath)
+- Deterministic rounding
+- Immutable journal entries
 
-* Chart of Accounts
-* Journal Entries
-* Fiscal Periods
-* Tax Rules
-* Trial Balance
-* Profit & Loss
-* Balance Sheet
-
-## Financial Integrity Rules
-
-* No floating-point arithmetic
-* Arbitrary precision decimals only
-* Deterministic rounding
-* Immutable journal entries
-
-Accounting must reconcile with inventory valuation.
+Accounting must reconcile with inventory valuation.  
+Financial integrity cannot be bypassed.
 
 ---
 
-# SALES DOMAIN
+# 14. CRM
 
-Sales Flow:
+## 14.1 CRM Pipeline
 
-Quotation → Sales Order → Delivery → Invoice → Payment
+```
+Lead → Opportunity → Proposal → Closed Won / Closed Lost
+```
 
-Important Concepts:
+## 14.2 Capabilities
 
-* Discount engine
-* Tax calculation
-* Commission engine
-* Split payments
-* Refund workflows
-* Backorders
-
-POS requires:
-
-* Offline-first design
-* Local transaction queue
-* Sync reconciliation engine
+- Leads
+- Opportunities
+- Pipeline stages
+- Activities
+- Campaign tracking
+- Campaign attribution
+- Email integration
+- SLA tracking & timers
+- Notes & attachments
+- Customer segmentation
 
 ---
 
-# PROCUREMENT DOMAIN
+# 15. Procurement
 
-Procurement Flow:
+## 15.1 Procurement Flow
 
+```
 Purchase Request → RFQ → Vendor Selection → Purchase Order → Goods Receipt → Vendor Bill → Payment
+```
 
-Important:
+## 15.2 Capabilities
 
-* Three-way matching (PO, Receipt, Invoice)
-* Vendor scoring
-* Price comparison logic
-
----
-
-# CRM DOMAIN
-
-CRM is pipeline-driven:
-
-Lead → Opportunity → Proposal → Closed Won/Lost
-
-Must support:
-
-* Activity tracking
-* SLA timers
-* Campaign attribution
-* Customer segmentation
-* Notes & attachments
+- Purchase requests
+- RFQ (Request for Quotation)
+- Vendor comparison
+- Purchase orders
+- Goods receipt
+- Three-way matching (PO, Receipt, Invoice)
+- Vendor bills
+- Vendor scoring
+- Price comparison logic
 
 ---
 
-# CUSTOMIZATION KNOWLEDGE
+# 16. Workflow Engine
 
-Enterprise SaaS ERP must be customizable without redeployment.
+## 16.1 State Machine Model
 
-## Metadata-Driven Schema
-
-* Custom fields
-* Validation rules
-* Dynamic forms
-* Conditional visibility
-* Computed fields
-
-## Workflow Engine
-
-State machine model:
-
+```
 State → Event → Transition → Guard → Action
+```
 
-Supports:
+## 16.2 Must Support
 
-* Approval chains
-* Escalation
-* SLA enforcement
-* Background tasks
+- State machine flows
+- Approval chains
+- Escalation rules
+- SLA enforcement
+- Event-based triggers
+- Background jobs
+- Scheduled tasks
 
-## Rule Engine
-
-Declarative rule patterns:
-
-IF condition
-THEN action
-
-Used for:
-
-* Pricing
-* Discounts
-* Taxes
-* Commissions
-* Inventory reservation logic
+No hardcoded approval logic.
 
 ---
 
-# CONCURRENCY & DATA SAFETY KNOWLEDGE
+# 17. SaaS Architecture
 
-ERP systems are highly concurrent.
+## 17.1 Definition
 
-Mandatory controls:
+SaaS (Software-as-a-Service) is a cloud-based architecture where a single application instance serves multiple tenants via the internet, focusing on scalability, cost-efficiency, and centralized management.
 
-* Pessimistic locking (stock deduction)
-* Optimistic locking (updates)
-* DB transactions
-* Idempotency keys
-* Version tracking
+## 17.2 Multi-Tenancy Models
 
+### Multi-Tenant (Default)
+- Shared infrastructure
+- Single application version
+- Cost-effective model
+- Requires strict tenant data isolation
+
+### Single-Tenant
+- Dedicated instance per customer
+- Dedicated database
+- Higher isolation and customization
+- Higher operational cost
+
+### Database Strategies
+- Shared database with `tenant_id`
+- Schema-per-tenant
+- Database-per-tenant
+
+## 17.3 Scalability
+
+- Horizontal scaling
+- Stateless services
+- Centralized updates and maintenance
+- Automated deployment
+
+## 17.4 Identity & Access Management
+
+- Role-based access control (RBAC)
+- Multi-guard authentication
+- Policy-based authorization
+- Dynamic middleware
+- Cross-tenant isolation
+
+## 17.5 Microservices (Optional Extraction)
+
+- Independent service modules (billing, user management, inventory, reporting)
+- API-based communication
+- Supports microservice extraction if required
+
+---
+
+# 18. Organizational Hierarchy
+
+A nested hierarchical organizational structure where each level is a subset of the level above, forming a layered tree-like model.
+
+## 18.1 Hierarchy Levels
+
+```
+Tenant
+ └── Organisation
+      └── Branch
+           └── Location
+                └── Department
+```
+
+Or in enterprise expansion:
+
+```
+Company → Division → Region → Warehouse → Department → Sub-unit
+```
+
+## 18.2 Rules
+
+- Parent-child relationships enforced
+- Recursive querying supported
+- Tenant-bound hierarchy
+- No circular relationships allowed
+- Supports geographically dispersed operations
+
+---
+
+# 19. API Design
+
+- RESTful
+- Versioned (`/api/v1`)
+- Idempotent endpoints
+- Standard response envelope
+- Structured error format
+- Pagination required
+- OpenAPI/Swagger documentation required
+- No hidden behavior
+
+## 19.1 Integration Capabilities
+
+- Webhooks
+- Event publishing
+- Third-party connectors
+- E-commerce sync
+- Payment gateway support
+
+## 19.2 Documentation Standard
+
+Every public endpoint must:
+
+- Be documented using OpenAPI
+- Include request validation schemas
+- Include response schemas
+- Be versioned
+
+---
+
+# 20. Frontend Architecture
+
+If React frontend exists:
+
+- Micro-frontend ready
+- Module federation compatible
+- Feature-based architecture
+- No business logic duplication from backend
+- Strict API contract adherence
+
+Dashboards may use Tailwind-based admin templates (e.g., TailAdmin, AdminLTE).
+
+---
+
+# 21. Security
+
+## 21.1 Mandatory Controls
+
+- CSRF protection
+- XSS prevention
+- SQL injection prevention
+- Rate limiting
+- Token rotation
+- Argon2/bcrypt hashing
+- Strict file validation
+- Signed URLs
+- Audit logging
+- Suspicious activity detection
+- Role-based access control
+- Attribute-based policies
+- Tenant isolation enforcement
+
+## 21.2 Pharmaceutical-Specific Security
+
+- Full audit trail of stock mutations
+- User action logging
+- Tamper-resistant records
+- Expiry override logging
+- High-risk medication access logging
+- Strict input validation
+
+---
+
+# 22. Data Integrity & Concurrency
+
+ERP systems are highly concurrent. The following controls are mandatory:
+
+- DB transactions
+- Foreign keys
+- Unique constraints
+- Optimistic locking
+- Pessimistic locking
+- Idempotency keys
+- Version tracking
+- Immutable logs
+
+## 22.1 Stock Transaction Rules
+
+All stock mutations must:
+
+- Execute inside database transactions
+- Guarantee atomicity
+- Prevent partial writes
+
+## 22.2 Locking Strategy
+
+- Pessimistic locking for stock deduction
+- Optimistic locking for general updates
+- Deadlock-aware retry mechanisms
+
+All writes must be safe under parallel load.  
 Stock and accounting must never be inconsistent.
 
 ---
 
-# SECURITY KNOWLEDGE
-
-ERP systems manage sensitive financial data.
-
-Required:
-
-* Role-based access control
-* Attribute-based policies
-* Tenant isolation enforcement
-* Audit trails
-* Suspicious activity detection
-* Token rotation
-* Secure hashing
-* File validation
-
----
-
-# API & INTEGRATION KNOWLEDGE
-
-Modern ERP must be:
-
-* API-first
-* Versioned
-* Idempotent
-* Documented (OpenAPI)
-
-Integration capabilities:
-
-* Webhooks
-* Event publishing
-* Third-party connectors
-* E-commerce sync
-* Payment gateway support
-
----
-
-# PERFORMANCE & SCALABILITY KNOWLEDGE
+# 23. Performance & Scalability
 
 ERP bottlenecks typically occur in:
 
-* Inventory deduction
-* Accounting posting
-* Reporting aggregation
-* Workflow engines
+- Inventory deduction
+- Accounting posting
+- Reporting aggregation
+- Workflow engines
 
 Mitigation strategies:
 
-* Event-driven design
-* Queue processing
-* Read replicas
-* Caching abstraction
-* Partitioned reporting tables
-* Background reconciliation jobs
+- Event-driven design
+- Queue processing
+- Read replicas
+- Caching abstraction
+- Partitioned reporting tables
+- Background reconciliation jobs
 
 ---
 
-# AUDIT & COMPLIANCE KNOWLEDGE
+# 24. Audit & Compliance
 
 ERP must support:
 
-* Immutable logs
-* Versioned records
-* Traceable financial flows
-* Historical state reconstruction
-* Regulatory export capability
+- Immutable logs
+- Versioned records
+- Traceable financial flows
+- Historical state reconstruction
+- Regulatory export capability
 
 Audit trail is non-optional.
 
 ---
 
-# REUSABILITY PRINCIPLES
-
-Reusable ERP modules must:
-
-* Avoid business-specific assumptions
-* Be configuration-driven
-* Avoid hardcoded logic
-* Expose contracts, not implementations
-* Remain independently replaceable
-
-Design for:
-
-* Multi-industry support
-* Multi-country tax extension
-* Marketplace plugin ecosystem
-
----
-
-# PLUGIN MARKETPLACE KNOWLEDGE
-
-A marketplace-ready ERP requires:
-
-* Module manifest definition
-* Dependency graph validation
-* Version compatibility rules
-* Sandboxed execution
-* Tenant-scoped enablement
-* Upgrade migration paths
-
----
-
-# ENTERPRISE REPORTING KNOWLEDGE
+# 25. Enterprise Reporting
 
 Reports must support:
 
-* Aggregated financial statements
-* Inventory valuation reports
-* Aging reports
-* Tax summaries
-* Custom report builder
-* Export formats (CSV, PDF)
+- Aggregated financial statements
+- Inventory valuation reports
+- Aging reports
+- Tax summaries
+- Custom report builder
+- Export formats (CSV, PDF)
+
+Reports must also be:
+
+- Tenant-scoped
+- Filterable
+- Auditable
 
 Reports must never break transactional integrity.
 
 ---
 
-Reports must never break transactional integrity.
+# 26. Plugin Marketplace
+
+A marketplace-ready ERP requires:
+
+- Module manifest definition (`module.json`)
+- Dependency graph validation
+- Version compatibility rules
+- Sandboxed execution
+- Tenant-scoped enablement
+- Upgrade migration paths
+
+## 26.1 Extensibility Rules
+
+Modules must:
+
+- Be open for extension
+- Closed for modification
+- Avoid cross-module direct database access
+- Communicate through services or events
 
 ---
 
-# MODULAR ARCHITECTURE KNOWLEDGE
+# 27. Testing Requirements
 
-## Modular Monolith Pattern
+Each module must include:
 
-A modular monolith organizes a single deployable application into strongly bounded modules that can be independently replaced, upgraded, or extracted into microservices without breaking other modules.
+- Unit tests
+- Feature tests
+- Authorization tests
+- Tenant isolation tests
+- Concurrency tests
+- Financial precision tests
 
-Key principles:
-* Each module owns its domain, infrastructure, and interface layers
-* Modules communicate only via contracts (interfaces) or domain events — never direct instantiation
-* No cross-module query builder calls
-* Module boundaries are enforced at the code level
-
-## Module Structure (Laravel)
-
-Standard layout per module:
-
-```
-Modules/{ModuleName}/
-├── Application/       # Use cases, commands, queries, DTOs, handlers
-├── Domain/            # Entities, value objects, domain events, repository contracts
-├── Infrastructure/    # Repository implementations, Eloquent models, migrations, adapters
-├── Interfaces/        # HTTP controllers, API resources, form requests, console commands
-├── Providers/         # Service provider, event bindings, route registration
-├── Tests/             # Unit, feature, integration, tenant isolation tests
-├── module.json        # Module manifest (name, version, dependencies)
-└── README.md          # Module documentation
-```
-
-## Module Registration (nWidart/laravel-modules)
-
-Using `nwidart/laravel-modules` for module discovery:
-
-* Modules auto-register via `ModuleServiceProvider`
-* Each module has its own `ServiceProvider` bootstrapped by the framework
-* Module routes, migrations, views, translations, and configurations are loaded from within the module directory
-* Dependency graph validation ensures no circular dependencies between modules
-
-## Module Manifest (module.json)
-
-```json
-{
-  "name": "Inventory",
-  "alias": "inventory",
-  "version": "1.0.0",
-  "requires": ["Core", "Product"],
-  "providers": ["Modules\\Inventory\\Providers\\InventoryServiceProvider"],
-  "aliases": {}
-}
-```
-
-## Inter-Module Communication
-
-Allowed patterns:
-1. **Contracts / Interfaces** — Inject a shared interface; implementation in one module, consumer in another
-2. **Domain Events** — Emit an event from Module A; Module B listens via an event listener
-3. **Shared Kernel** — Place reusable value objects and contracts in the Core module
-
-Prohibited:
-* Direct Eloquent model imports across module boundaries
-* Direct query builder calls in other modules
-* Shared mutable state between modules
+No module is complete without coverage.
 
 ---
 
-# LARAVEL IMPLEMENTATION PATTERNS
+# 28. Prohibited Practices
 
-## Pipeline Pattern
+The following are strictly disallowed:
 
-Laravel's Pipeline helper chains a payload through a series of stages (pipes). Each pipe receives the payload and a `$next` closure.
+- Business logic in controllers
+- Query builder in controllers
+- Cross-module tight coupling
+- Hardcoded IDs
+- Floating-point financial math
+- Partial implementations
+- TODO without tracking issue
+- Hardcoded tenant conditions
+- Cross-tenant data queries
+- Silent exception swallowing
+- Implicit UOM conversion
+- Duplicate stock deduction logic
+- Skipping transactions for inventory mutation
 
-```php
-$result = app(Pipeline::class)
-    ->send($order)
-    ->through([
-        ValidateInventoryPipe::class,
-        ReserveStockPipe::class,
-        PostAccountingEntryPipe::class,
-        SendConfirmationPipe::class,
-    ])
-    ->thenReturn();
-```
-
-Use in ERP for:
-* Order processing pipelines
-* Invoice approval chains
-* Validation chains before financial posting
-* Multi-step import workflows
-
-## Service Provider Pattern
-
-Each module registers bindings, event listeners, routes, migrations, and translations through its `ServiceProvider`:
-
-```php
-public function register(): void
-{
-    $this->app->bind(ProductRepositoryInterface::class, ProductRepository::class);
-}
-
-public function boot(): void
-{
-    $this->loadMigrationsFrom(__DIR__.'/../Infrastructure/Database/Migrations');
-    $this->loadRoutesFrom(__DIR__.'/../Interfaces/Http/routes.php');
-    $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'product');
-}
-```
-
-## Repository Pattern
-
-Repositories abstract persistence from the domain. Domain entities and use cases depend on repository interfaces defined in the Domain layer; implementations live in Infrastructure.
-
-```php
-// Domain/Contracts/ProductRepositoryInterface.php
-interface ProductRepositoryInterface {
-    public function findById(int $id): ?Product;
-    public function save(Product $product): void;
-    public function delete(int $id): void;
-}
-
-// Infrastructure/Repositories/ProductRepository.php
-class ProductRepository implements ProductRepositoryInterface { ... }
-```
-
-## Command / Handler Pattern (CQRS-lite)
-
-Separate write (Command) from read (Query) operations:
-
-* `CreateProductCommand` — carries intent and validated data
-* `CreateProductHandler` — executes the use case, calls repository, dispatches events
-* `GetProductQuery` — read-side query, returns DTO or resource
-
-## BCMath for Financial Precision
-
-All monetary and quantity arithmetic must use PHP's BCMath extension:
-
-```php
-// Correct
-$total = bcmul($unitPrice, $quantity, 4);
-$tax   = bcmul($total, bcdiv($taxRate, '100', 6), 4);
-$grand = bcadd($total, $tax, 4);
-
-// Prohibited
-$total = $unitPrice * $quantity; // floating-point — forbidden
-```
-
-BCMath Object API (PHP 8.4+):
-```php
-use BcMath\Number;
-$total = new Number($unitPrice) * new Number($quantity);
-```
-
-Scale (decimal places) must be fixed per domain:
-* Money: 4 decimal places internally, 2 for display
-* Quantity: 4 decimal places
-* Tax rates: 6 decimal places
-* Final rounding: deterministic (HALF_UP)
-
-## Database Transactions
-
-Wrap all multi-step writes in explicit transactions:
-
-```php
-DB::transaction(function () use ($command): void {
-    $order = $this->orderRepository->create($command);
-    $this->inventoryRepository->reserveStock($command->lines);
-    $this->accountingRepository->postEntry($command->journalEntry);
-    event(new OrderCreated($order));
-});
-```
-
-* Use `DB::transaction()` for automatic rollback on exception
-* Nested transactions use savepoints automatically
-* Always set `lockForUpdate()` on rows susceptible to race conditions before deducting
-
-## Pessimistic Locking
-
-For concurrent stock deduction:
-
-```php
-$stock = StockLedgerEntry::where('product_id', $productId)
-    ->where('warehouse_id', $warehouseId)
-    ->lockForUpdate()
-    ->first();
-
-// Deduct safely inside transaction
-```
-
-## Optimistic Locking
-
-For non-critical updates with version tracking:
-
-```php
-// Use Eloquent's version column
-$model->save(); // throws StaleModelLockingException if version changed
-```
-
-## Idempotency
-
-All state-changing API endpoints must support idempotency keys:
-
-```php
-// Client sends: X-Idempotency-Key: {uuid}
-// Server checks cache/DB before processing
-// Returns stored result on duplicate key
-```
+Immediate refactor required if detected.
 
 ---
 
-# MULTI-GUARD AUTHENTICATION
+# 29. Definition of Done
 
-## Guards Overview
+A module is complete only if:
 
-Laravel supports multiple authentication guards allowing different user types to authenticate via different mechanisms:
-
-```php
-// config/auth.php
-'guards' => [
-    'api'         => ['driver' => 'jwt',     'provider' => 'users'],
-    'admin'       => ['driver' => 'jwt',     'provider' => 'admins'],
-    'pos'         => ['driver' => 'session', 'provider' => 'pos_users'],
-]
-```
-
-## JWT Per User × Device × Organisation
-
-Each JWT token carries:
-* `sub` — user UUID
-* `tenant_id` — tenant identifier
-* `org_id` — organisation scope
-* `device_id` — device fingerprint (for revocation)
-* `permissions` — cached RBAC claims
-
-Token lifecycle:
-1. Login → issue access token (short TTL) + refresh token (long TTL)
-2. Access token expires → use refresh token to rotate
-3. Logout → blacklist token pair
-4. Device revoked → blacklist all tokens for that device
-
-## Tenant Resolution
-
-Tenants are resolved from:
-1. JWT `tenant_id` claim (primary)
-2. `X-Tenant-ID` header (fallback)
-3. Subdomain extraction (optional)
-
-Tenant middleware applies global scope to all queries after resolution.
+- Clean Architecture respected
+- No duplication
+- Tenant isolation enforced
+- Authorization enforced
+- Concurrency handled
+- Financial precision validated
+- Events emitted correctly
+- API documented
+- Tests pass
+- Documentation updated
+- No technical debt introduced
 
 ---
 
-# LOCALIZATION & INTERNATIONALIZATION
-
-## Translation Architecture
-
-All user-facing strings must be stored in language files or translatable model fields:
-
-```
-resources/lang/
-├── en/
-│   ├── products.php
-│   └── validation.php
-└── ar/
-    ├── products.php
-    └── validation.php
-```
-
-Module-scoped translations:
-```php
-// Loaded in ServiceProvider
-$this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'product');
-
-// Used in code
-__('product::products.created_successfully')
-```
-
-## Polymorphic Translatable Models
-
-Use spatie/laravel-translatable or a custom polymorphic pattern:
-
-```php
-// Product model with translatable fields
-use Spatie\Translatable\HasTranslations;
-
-class Product extends Model {
-    use HasTranslations;
-    public $translatable = ['name', 'description'];
-}
-
-// Usage
-$product->setTranslation('name', 'en', 'Widget');
-$product->setTranslation('name', 'ar', 'ويدجت');
-$product->getTranslation('name', 'ar'); // ويدجت
-```
-
-Alternative: Astrotomic/laravel-translatable for relationship-based translation tables.
-
-## Locale Middleware
-
-Detect and apply locale from:
-1. `Accept-Language` header
-2. User profile locale preference
-3. Tenant default locale
-4. System fallback locale
-
-```php
-app()->setLocale($resolvedLocale);
-```
-
-## RTL Support
-
-UI must support right-to-left languages (Arabic, Hebrew, Urdu):
-* CSS `dir="rtl"` on HTML root for RTL locales
-* AdminLTE and TailAdmin both provide RTL variants
-* TailwindCSS supports `rtl:` prefix variants
-
----
-
-# BARCODE / QR CODE / GS1 STANDARDS
-
-## Barcode Types
-
-| Standard | Use Case | Structure |
-|---|---|---|
-| EAN-13 | Retail product identification | 12 digits + 1 check digit |
-| Code 128 | Logistics, variable-length alphanumeric | Auto-selected subsets A/B/C |
-| QR Code | URLs, product info, digital menus | 2D matrix, up to 3KB |
-| Data Matrix | Small parts, electronics | 2D matrix, compact |
-| ITF-14 | Carton/outer case labeling | 14 digits, GTIN-14 |
-
-## GS1 Standards
-
-GS1 provides globally unique identifiers:
-
-* **GTIN** (Global Trade Item Number) — identifies products
-  * GTIN-8, GTIN-12 (UPC-A), GTIN-13 (EAN-13), GTIN-14
-* **GLN** (Global Location Number) — identifies locations
-* **SSCC** (Serial Shipping Container Code) — identifies logistics units
-* **GS1-128** — application identifier barcodes for lot, expiry, serial
-
-GS1 Application Identifiers (AIs):
-* `(01)` — GTIN
-* `(10)` — Lot/Batch Number
-* `(17)` — Expiry Date
-* `(21)` — Serial Number
-
-## EAN-13 Check Digit Algorithm
-
-```php
-function ean13CheckDigit(string $digits12): int
-{
-    $sum = 0;
-    for ($i = 0; $i < 12; $i++) {
-        $sum += (int)$digits12[$i] * ($i % 2 === 0 ? 1 : 3);
-    }
-    return (10 - ($sum % 10)) % 10;
-}
-```
-
-## QR Code Generation
-
-QR codes encode structured data for:
-* Product URLs
-* Stocktake scanning
-* Customer loyalty cards
-* Mobile payment deep links
-
----
-
-# E-COMMERCE INTEGRATION
-
-## E-commerce Types
-
-| Type | Description |
-|---|---|
-| B2C | Business to consumer — retail storefront |
-| B2B | Business to business — wholesale portal |
-| D2C | Direct to consumer — brand sells without intermediary |
-| Headless | API-only backend, decoupled frontend |
-| Marketplace | Multi-vendor platform |
-
-## Headless Commerce
-
-An API-first approach where the commerce engine (ERP/backend) is completely decoupled from the presentation layer. The ERP exposes:
-* Product catalog API
-* Inventory availability API
-* Pricing / promotion API
-* Order management API
-* Customer account API
-
-Frontend (React, mobile app, kiosk) consumes these APIs independently.
-
-## WooCommerce Sync Pattern
-
-When integrating with WooCommerce:
-
-1. **Product Sync** — Push products from ERP to WooCommerce via REST API; track `wc_product_id` in ERP
-2. **Order Pull** — Webhook from WooCommerce `woocommerce_new_order` → ERP creates Sales Order
-3. **Stock Push** — On ERP stock change, push updated stock level to WooCommerce via `PUT /products/{id}`
-4. **Customer Sync** — Bidirectional customer/contact sync with deduplication
-
-WooCommerce REST API endpoints used:
-```
-GET  /wp-json/wc/v3/products
-POST /wp-json/wc/v3/products
-PUT  /wp-json/wc/v3/products/{id}
-GET  /wp-json/wc/v3/orders
-PUT  /wp-json/wc/v3/products/{id} (stock update)
-```
-
-## E-commerce API Compatibility Layer
-
-The ERP must expose e-commerce compatible endpoints:
-```
-GET  /api/v1/catalog/products           # Public product listing
-GET  /api/v1/catalog/products/{slug}    # Single product with variants/pricing
-GET  /api/v1/catalog/categories         # Category tree
-POST /api/v1/storefront/cart            # Add to cart (reservation)
-POST /api/v1/storefront/checkout        # Place order
-GET  /api/v1/storefront/orders/{id}     # Order status
-```
-
----
-
-# POINT OF SALE (POS) ARCHITECTURE
-
-## POS Design Principles
-
-A production-grade POS terminal must support:
-
-* **Offline-first** — operates without internet connectivity
-* **Local transaction queue** — orders stored locally until sync
-* **Sync reconciliation** — resolves conflicts when connectivity restored
-* **Cash drawer control** — open/close events logged
-* **Receipt templating** — configurable receipt layouts
-* **Split payments** — cash + card + store credit in one transaction
-* **Draft / hold** — park transactions and recall
-* **Loyalty & discounts** — apply at point of sale
-* **Shift management** — open/close register with cash count
-
-## POS Transaction Flow
-
-```
-Open Register → Session Start
-  ↓
-Scan / Add Product Lines
-  ↓
-Apply Discounts / Coupons
-  ↓
-Calculate Taxes
-  ↓
-Choose Payment Method(s)
-  ↓
-Process Payment
-  ↓
-Deduct Stock (Pessimistic Lock)
-  ↓
-Post Accounting Entry
-  ↓
-Print / Email Receipt
-  ↓
-Close Register → Session End → Z-Report
-```
-
-## Offline Sync Architecture
-
-```
-POS Terminal (Browser/App)
-  ├── IndexedDB / LocalStorage — offline transaction queue
-  ├── Service Worker — intercepts network requests
-  └── Sync Worker — uploads queue when online
-        ↓
-ERP Backend
-  ├── Idempotency key validation (prevent double-posting)
-  ├── Conflict resolution (timestamp-wins or manual review)
-  └── Stock reconciliation
-```
-
-## Z-Report (End of Day)
-
-The Z-Report summarizes:
-* Total sales by payment method
-* Total discounts applied
-* Total tax collected
-* Net cash in drawer
-* Discrepancies vs expected
-* Signed off by manager
-
----
-
-# WAREHOUSE MANAGEMENT SYSTEM (WMS)
-
-## WMS Core Concepts
-
-| Concept | Description |
-|---|---|
-| Warehouse | Physical facility |
-| Zone | Logical area within warehouse (receiving, picking, dispatch) |
-| Aisle | Row of rack systems |
-| Rack | Vertical shelf unit |
-| Bin / Location | Individual shelf position — smallest addressable unit |
-| Lot / Batch | Group of same product received together |
-| Serial Number | Unique identifier for individual item |
-| Expiry Date | Best-before or use-by date |
-
-## Stock Ledger Entries
-
-All stock movements are recorded as immutable ledger entries:
-
-| Entry Type | Effect |
-|---|---|
-| PURCHASE_RECEIPT | + stock (inbound) |
-| SALES_SHIPMENT | − stock (outbound) |
-| INTERNAL_TRANSFER_OUT | − stock (source location) |
-| INTERNAL_TRANSFER_IN | + stock (destination location) |
-| ADJUSTMENT_POSITIVE | + stock (counted more than system) |
-| ADJUSTMENT_NEGATIVE | − stock (counted less than system) |
-| RETURN_FROM_CUSTOMER | + stock (returned inbound) |
-| RETURN_TO_VENDOR | − stock (returned outbound) |
-| MANUFACTURING_CONSUMPTION | − stock (components used) |
-| MANUFACTURING_OUTPUT | + stock (finished goods produced) |
-
-## Cycle Counting
-
-Instead of full annual stocktakes:
-* Random sample of bin locations counted daily
-* Discrepancies flagged for investigation
-* Corrections posted as adjustment entries
-* ABC classification drives frequency: A items counted monthly, B quarterly, C annually
-
-## FIFO Costing Implementation
-
-For FIFO (First-In First-Out):
-1. Each purchase receipt records `unit_cost` at time of receipt
-2. On stock deduction, consume oldest-received units first
-3. Cost of Goods Sold (COGS) = cost of oldest units consumed
-4. Remaining inventory valued at most recent receipt cost
-
----
-
-# BUSINESS PROCESS MODELING
-
-## BPMN (Business Process Model and Notation)
-
-BPMN defines standard notation for process modeling:
-
-* **Start Event** — process trigger (message, timer, signal)
-* **End Event** — process termination
-* **Task** — atomic unit of work (User Task, Service Task, Script Task)
-* **Gateway** — decision point (Exclusive, Parallel, Inclusive)
-* **Sequence Flow** — transition between elements
-* **Message Flow** — communication between pools
-* **Pool / Lane** — represents participants or departments
-
-ERP flows modeled as BPMN:
-* Sales Order lifecycle (Quotation → Delivery → Invoice → Payment)
-* Procurement cycle (PR → RFQ → PO → GR → Bill → Payment)
-* Manufacturing order (BOM → Production → QC → Stock)
-* Approval workflows (multi-level, escalation on SLA breach)
-
-## Workflow State Machine
-
-```
-States:    DRAFT → PENDING_APPROVAL → APPROVED → IN_PROGRESS → COMPLETED
-                                   ↘ REJECTED ↗
-                                   
-Transitions are guarded by:
-  - Authorization policies (who can approve)
-  - Business rules (minimum order value, credit limit check)
-  - Data validation (all required fields filled)
-```
-
-## Gap Analysis
-
-Gap analysis compares current state vs. desired state:
-
-| Dimension | Current State | Target State | Gap |
-|---|---|---|---|
-| Feature | Manual Excel-based ordering | Automated PO generation | Procurement automation |
-| Process | No approval workflow | 3-level approval chain | Workflow engine |
-| Integration | No e-commerce sync | Real-time WooCommerce sync | API integration layer |
-
-Gap analysis drives the implementation roadmap and module prioritization.
-
----
-
-# FRONTEND ARCHITECTURE
-
-## Technology Stack
-
-* **React (LTS)** — component-based UI, JSX, hooks
-* **TailwindCSS** — utility-first CSS framework
-* **AdminLTE** — admin dashboard template (Bootstrap-based)
-* **TailAdmin** — Tailwind-based admin dashboard template
-
-## AdminLTE Integration
-
-AdminLTE provides:
-* Pre-built admin dashboard layout
-* Sidebar navigation
-* Data tables
-* Form components
-* Cards and widgets
-* React port available via madewithreact.com/reactjs-adminlte
-
-## TailAdmin Integration
-
-TailAdmin provides a modern Tailwind + React dashboard:
-* TypeScript-ready
-* Dark mode support
-* RTL support
-* Component library: tables, charts, forms, modals
-
-## API Client Pattern
-
-Frontend communicates with ERP backend via versioned REST API:
-
-```typescript
-// Standard response envelope
-interface ApiResponse<T> {
-  success: boolean;
-  message: string;
-  data: T | null;
-  errors: Record<string, string[]> | null;
-  meta?: PaginationMeta;
-}
-
-// Axios instance with interceptors
-const apiClient = axios.create({ baseURL: '/api/v1' });
-apiClient.interceptors.request.use(config => {
-  config.headers.Authorization = `Bearer ${getToken()}`;
-  config.headers['X-Tenant-ID'] = getTenantId();
-  return config;
-});
-```
-
-## State Management
-
-For ERP frontend state:
-* **Server state** — React Query / TanStack Query (caching, invalidation)
-* **Local state** — React useState / useReducer
-* **Form state** — React Hook Form with Zod validation
-* **Global state** — Zustand (lightweight) for auth, tenant context
-
----
-
-# OPENAPI / SWAGGER DOCUMENTATION
-
-## L5-Swagger Integration
-
-Using `darkaonline/l5-swagger` for Laravel:
-
-```php
-// Controller-level annotation
-/**
- * @OA\Get(
- *     path="/api/v1/products",
- *     summary="List products",
- *     tags={"Products"},
- *     security={{"bearerAuth":{}}},
- *     @OA\Parameter(name="page", in="query", @OA\Schema(type="integer")),
- *     @OA\Response(response=200, description="Success",
- *         @OA\JsonContent(ref="#/components/schemas/ProductCollection")
- *     )
- * )
- */
-public function index(Request $request): JsonResponse { ... }
-```
-
-## Standard Response Envelope
-
-Every API response must follow:
-
-```json
-{
-  "success": true,
-  "message": "Products retrieved successfully",
-  "data": { ... },
-  "errors": null,
-  "meta": {
-    "current_page": 1,
-    "per_page": 15,
-    "total": 234,
-    "last_page": 16
-  }
-}
-```
-
-Error response:
-```json
-{
-  "success": false,
-  "message": "Validation failed",
-  "data": null,
-  "errors": {
-    "sku": ["The SKU has already been taken."],
-    "price": ["The price must be greater than 0."]
-  }
-}
-```
-
-## OpenAPI Schema Definitions
-
-Define reusable schemas in a central location:
-
-```php
-/**
- * @OA\Schema(
- *   schema="Product",
- *   @OA\Property(property="id", type="integer"),
- *   @OA\Property(property="sku", type="string"),
- *   @OA\Property(property="name", type="string"),
- *   @OA\Property(property="price", type="string", example="19.9900"),
- *   @OA\Property(property="type", type="string", enum={"physical","service","digital"})
- * )
- */
-```
-
----
-
-# LARAVEL PACKAGES & ECOSYSTEM
-
-## Package Development
-
-When building reusable Laravel packages:
-
-1. Create a `ServiceProvider` that registers bindings, routes, migrations, views
-2. Use `composer.json` `extra.laravel.providers` for auto-discovery
-3. Publish configuration: `php artisan vendor:publish --tag=package-config`
-4. Publish migrations: `php artisan vendor:publish --tag=package-migrations`
-5. Write tests using Laravel's `TestCase` and `RefreshDatabase`
-
-## Key Packages Used
-
-| Package | Purpose |
-|---|---|
-| `nwidart/laravel-modules` | Module system with auto-discovery |
-| `tymon/jwt-auth` | JWT authentication |
-| `darkaonline/l5-swagger` | OpenAPI documentation generation |
-| `spatie/laravel-permission` | RBAC roles & permissions |
-| `spatie/laravel-translatable` | Translatable model attributes |
-| `spatie/laravel-multitenancy` | Multi-tenancy infrastructure |
-| `league/flysystem-aws-s3-v3` | S3-compatible cloud file storage |
-| `predis/predis` | Redis client for caching/queues |
-
-## Laravel Filesystem & File Upload
-
-Secure file uploads:
-
-```php
-// Validate file type and size
-$request->validate([
-    'image' => 'required|image|mimes:jpeg,png,webp|max:2048',
-    'document' => 'required|file|mimes:pdf|max:10240',
-]);
-
-// Store with hashed filename (prevents path traversal)
-$path = $request->file('image')->store("tenants/{$tenantId}/products", 'private');
-
-// Generate time-limited signed URL for access
-$url = Storage::temporaryUrl($path, now()->addMinutes(30));
-```
-
-Storage must be:
-* Tenant-scoped paths
-* Private by default
-* Accessible only via signed URLs
-* Validated for type and content (not just extension)
-
-## Laravel Process API
-
-For background tasks requiring shell execution:
-
-```php
-use Illuminate\Support\Facades\Process;
-
-$result = Process::run('php artisan queue:work --stop-when-empty');
-
-if ($result->failed()) {
-    Log::error('Queue worker failed', ['output' => $result->errorOutput()]);
-}
-```
-
----
-
-# SECURITY KNOWLEDGE (EXPANDED)
-
-## CSRF Protection
-
-All web routes must use CSRF tokens. API routes using JWT are stateless and exempt from CSRF (bearer token provides equivalent protection).
-
-## XSS Prevention
-
-* Escape all output in Blade: `{{ $var }}` (not `{!! $var !!}`)
-* Sanitize rich text inputs using HTMLPurifier
-* Set `Content-Security-Policy` headers
-* Use `httpOnly` and `SameSite=Strict` cookies
-
-## SQL Injection Prevention
-
-* Always use Eloquent ORM or parameterized query builder
-* Never interpolate user input into raw SQL
-* Use `whereRaw('column = ?', [$userInput])` if raw is unavoidable
-
-## Rate Limiting
-
-```php
-// Per tenant, per endpoint
-Route::middleware(['throttle:api,60,1'])->group(...);
-
-// Custom throttle using tenant ID
-RateLimiter::for('api', function (Request $request) {
-    return Limit::perMinute(60)->by($request->user()?->tenant_id ?: $request->ip());
-});
-```
-
-## Audit Logging
-
-Every write operation must log:
-* Who (user ID, tenant ID)
-* What (model, action: create/update/delete)
-* When (timestamp with timezone)
-* Before state (old values)
-* After state (new values)
-* IP address
-* Request ID
-
-Audit logs are append-only and must never be edited or deleted.
-
-## Token Rotation
-
-JWT refresh token rotation:
-1. Refresh token is single-use
-2. On use, old refresh token is invalidated, new pair issued
-3. Simultaneous use of same refresh token triggers security alert and full revocation
-
----
-
-# CORE SYSTEM GUARANTEES
+# 30. System Guarantees
 
 The system must guarantee:
 
-* Tenant isolation
-* Financial correctness
-* Transactional consistency
-* Replaceable modules
-* Deterministic calculations
-* Audit safety
-* Horizontal scalability
-* Extensibility without refactor debt
+- Tenant isolation
+- Financial correctness
+- Transactional consistency
+- Replaceable modules
+- Deterministic calculations
+- Audit safety
+- Horizontal scalability
+- Extensibility without refactor debt
 
 ---
 
-# STRATEGIC DESIGN GOAL
+# 31. Business Objectives
 
-Build not just an ERP.
+The platform must:
 
-Build:
-
-* A configurable ERP framework
-* A reusable SaaS engine
-* A domain-driven enterprise core
-* A plugin-ready platform
-* A long-term maintainable system
+- Reduce operational costs
+- Increase stock accuracy
+- Prevent stockouts
+- Minimize expiry waste
+- Ensure pharmaceutical compliance
+- Improve warehouse efficiency
+- Support ERP-level integration
+- Maintain high scalability
+- Preserve financial integrity
+- Reduce labor costs
+- Minimize human error
+- Increase profitability
+- Improve customer satisfaction
+- Enable data-driven decisions
+- Ensure regulatory compliance
+- Improve patient safety (pharmaceutical context)
 
 ---
 
-# REFERENCES
+# 32. Autonomous Agent Execution Rules
+
+Any AI agent must:
+
+1. Analyze entire affected module before changes.
+2. Refactor violations before adding features.
+3. Preserve tenant isolation.
+4. Maintain architecture boundaries.
+5. Update module README.
+6. Update OpenAPI docs.
+7. Update IMPLEMENTATION_STATUS.md.
+8. Avoid introducing coupling.
+9. Ensure regression tests pass.
+
+## 32.1 Compliance Validation Checklist
+
+All pull requests must be verified against this checklist before merge:
+
+- [ ] No business logic present in any controller
+- [ ] No query builder calls in any controller
+- [ ] All new tables include `tenant_id` with global scope applied
+- [ ] All new endpoints covered by authorization tests
+- [ ] All financial calculations use BCMath (no float)
+- [ ] Module README updated
+- [ ] OpenAPI docs updated
+- [ ] IMPLEMENTATION_STATUS.md updated
+- [ ] No cross-module direct dependency introduced
+
+---
+
+# 33. Implementation Tracking
+
+A continuously maintained `IMPLEMENTATION_STATUS.md` must track:
+
+- Module name
+- Status (Planned / In Progress / Complete / Refactor Required)
+- Test coverage %
+- Violations found
+- Refactor actions
+- Concurrency compliance
+- Tenant compliance verification
+
+---
+
+# 34. References
 
 These references provide guidance on modular design, Laravel best practices, multi-tenancy, ERP/CRM design, and other principles relevant to this repository:
 
@@ -1601,18 +1290,18 @@ These references provide guidance on modular design, Laravel best practices, mul
 
 This system must evolve into a:
 
-* Fully modular
-* Fully pluggable
-* Fully configurable
-* Fully tenant-isolated
-* Fully enterprise-grade
-* Financially precise
-* Horizontally scalable
-* Vertically scalable
-* Audit-safe ERP/CRM SaaS platform
+- Fully modular
+- Fully pluggable
+- Fully configurable
+- Fully tenant-isolated
+- Fully enterprise-grade
+- Financially precise
+- Horizontally scalable
+- Vertically scalable
+- Audit-safe ERP/CRM SaaS platform
 
-Zero regression tolerance.
-Zero architectural violations.
-Zero technical debt acceptance.
+Zero regression tolerance.  
+Zero architectural violations.  
+Zero technical debt acceptance.  
 
 This contract is binding for all contributors and AI agents.

@@ -7,8 +7,9 @@ namespace Modules\Auth\Application\Commands;
 final readonly class LoginCommand
 {
     public function __construct(
-        public string $email,
-        public string $password,
-        public string $deviceName = 'default',
+        public readonly int $tenantId,
+        public readonly string $email,
+        public readonly string $password,
+        public readonly string $deviceName = 'api',
     ) {}
 }

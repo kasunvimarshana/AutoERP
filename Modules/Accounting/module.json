@@ -1,13 +1,9 @@
 {
     "name": "Accounting",
     "alias": "accounting",
-    "description": "Double-entry bookkeeping, journal entries, tax rates and fiscal periods",
     "version": "1.0.0",
-    "keywords": [],
-    "active": 1,
-    "order": 8,
+    "description": "Double-entry bookkeeping with Chart of Accounts and Journal Entries",
+    "requires": ["Core", "Tenant"],
     "providers": ["Modules\\Accounting\\Providers\\AccountingServiceProvider"],
-    "aliases": {},
-    "files": [],
-    "requires": ["Core"]
+    "aliases": {}
 }

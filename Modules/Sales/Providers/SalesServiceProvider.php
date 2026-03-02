@@ -5,24 +5,22 @@ declare(strict_types=1);
 namespace Modules\Sales\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Modules\Sales\Application\Handlers\CreateSaleHandler;
-use Modules\Sales\Domain\Contracts\ContactRepositoryInterface;
-use Modules\Sales\Domain\Contracts\SaleRepositoryInterface;
-use Modules\Sales\Infrastructure\Repositories\ContactRepository;
-use Modules\Sales\Infrastructure\Repositories\SaleRepository;
+use Modules\Sales\Application\Services\SalesOrderService;
+use Modules\Sales\Domain\Contracts\SalesOrderRepositoryInterface;
+use Modules\Sales\Infrastructure\Repositories\SalesOrderRepository;
 
 class SalesServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->bind(SaleRepositoryInterface::class, SaleRepository::class);
-        $this->app->bind(ContactRepositoryInterface::class, ContactRepository::class);
-        $this->app->singleton(CreateSaleHandler::class);
+        $this->app->bind(SalesOrderRepositoryInterface::class, SalesOrderRepository::class);
+
+        $this->app->singleton(SalesOrderService::class);
     }
 
     public function boot(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/../Infrastructure/Database/Migrations');
+        $this->loadRoutesFrom(__DIR__.'/../Interfaces/Http/routes.php');
     }
 }
-
