@@ -1,9 +1,16 @@
 {
-    "name": "Crm",
+    "name": "CRM",
     "alias": "crm",
-    "description": "CRM module: Contacts, Leads, and Activity tracking",
+    "description": "Customer Relationship Management module: Lead → Opportunity → Proposal → Closed. Pipeline stages, activities, campaign tracking, email integration, SLA timers, notes, customer segmentation.",
+    "keywords": ["crm", "lead", "opportunity", "pipeline", "campaign", "customer"],
+    "priority": 14,
     "version": "1.0.0",
-    "requires": ["Core", "Tenant"],
-    "providers": ["Modules\\Crm\\Providers\\CrmServiceProvider"],
-    "aliases": {}
+    "active": true,
+    "order": 14,
+    "providers": [
+        "Modules\\CRM\\Infrastructure\\Providers\\CRMServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": ["core", "tenancy", "workflow"]
 }

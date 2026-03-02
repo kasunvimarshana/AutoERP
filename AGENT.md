@@ -199,9 +199,9 @@ Hardcoded business rules are prohibited.
 * Optional Barcode / QR
 * Optional GS1 compatibility
 * 0..n images per product
-* Optional base UOM
-* Optional buying UOM
-* Optional selling UOM
+* Base UOM (`uom`) — required (base inventory tracking unit)
+* Buying UOM (`buying_uom`) — optional, fallback to base UOM
+* Selling UOM (`selling_uom`) — optional, fallback to base UOM
 * UOM conversion matrix
 * Multi-location pricing
 * Multi-currency pricing
@@ -260,6 +260,22 @@ Must support:
 * Optimistic locking for updates
 * Atomic stock transactions
 * Idempotent stock APIs
+
+---
+
+# PHARMACEUTICAL COMPLIANCE MODE
+
+When pharmaceutical compliance mode is enabled for a tenant:
+
+* Lot tracking and expiry date are mandatory
+* FEFO (First-Expired, First-Out) is enforced
+* Serial tracking required where applicable
+* Audit trail cannot be disabled
+* Regulatory reports must be available (FDA / DEA / DSCSA aligned)
+* Quarantine workflows for expired or recalled items are enforced
+* Expiry override logging and high-risk medication access logging are required
+
+Compliance is NOT optional.
 
 ---
 
@@ -469,6 +485,14 @@ Mandatory:
 * Attribute-based policies
 * Tenant isolation enforcement
 
+Pharmaceutical-specific:
+
+* Full audit trail of stock mutations
+* User action logging
+* Tamper-resistant records
+* Expiry override logging
+* High-risk medication access logging
+
 ---
 
 # DATA INTEGRITY & CONCURRENCY
@@ -638,11 +662,12 @@ All pull requests must be verified against this checklist before merge:
 - [ ] No query builder calls in any controller
 - [ ] All new tables include tenant_id with global scope applied
 - [ ] All new endpoints covered by authorization tests
-- [ ] All financial calculations use BCMath (no float)
+- [ ] All financial and quantity calculations use BCMath (no float), minimum 4 decimal places
 - [ ] Module README updated
 - [ ] OpenAPI docs updated
 - [ ] IMPLEMENTATION_STATUS.md updated
 - [ ] No cross-module direct dependency introduced
+- [ ] Pharmaceutical compliance mode respected (if applicable)
 
 ---
 

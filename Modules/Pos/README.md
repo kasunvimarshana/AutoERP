@@ -1,32 +1,79 @@
 # POS Module
 
-Point of Sale module for the KV Enterprise ERP/CRM SaaS platform.
+## Overview
 
-## Features
+The **POS** module provides a point-of-sale terminal mode with offline-first design, local transaction queuing, and sync reconciliation engine.
 
-- **Session Management**: Open and close POS shifts/sessions with opening/closing float tracking
-- **Order Processing**: Create POS orders with multiple line items
-- **Multi-Payment Support**: Accept cash, card, digital, or mixed payments
-- **Refunds**: Full and partial refund support
-- **BCMath Precision**: All financial calculations use BCMath for accuracy
-- **Tenant Isolation**: All data is scoped to tenants
+---
 
-## Endpoints
+## Responsibilities
 
-### Sessions
-- `GET /api/v1/pos/sessions` — List sessions
-- `POST /api/v1/pos/sessions` — Open a new session
-- `GET /api/v1/pos/sessions/{id}` — Get session details
-- `PUT /api/v1/pos/sessions/{id}/close` — Close a session
-- `DELETE /api/v1/pos/sessions/{id}` — Delete a session
+- POS terminal session management
+- Offline-first transaction processing
+- Local transaction queue with sync reconciliation engine
+- Draft / hold receipt management
+- Split payment support
+- Refund handling
+- Cash drawer tracking
+- Receipt template engine
+- Loyalty system integration
+- Gift card and coupon processing
 
-### Orders
-- `GET /api/v1/pos/orders` — List orders
-- `POST /api/v1/pos/orders` — Create a new order
-- `GET /api/v1/pos/orders/{id}` — Get order details
-- `POST /api/v1/pos/orders/{id}/pay` — Process payment
-- `POST /api/v1/pos/orders/{id}/cancel` — Cancel a draft order
-- `POST /api/v1/pos/orders/{id}/refund` — Refund a paid order
-- `GET /api/v1/pos/orders/{id}/lines` — Get order line items
-- `GET /api/v1/pos/orders/{id}/payments` — Get order payments
-- `DELETE /api/v1/pos/orders/{id}` — Delete an order
+## Offline Design
+
+- Transactions queued locally when offline
+- Full sync reconciliation on reconnect
+- Conflict resolution strategy defined per tenant
+
+---
+
+## Financial Rules
+
+- All calculations use **BCMath only** — minimum **4 decimal places**
+- Intermediate calculations (further divided or multiplied before final rounding): **8+ decimal places**
+- Final monetary values: rounded to the **currency's standard precision (typically 2 decimal places)**
+- No floating-point arithmetic
+
+---
+
+## Architecture Layer
+
+```
+Modules/POS/
+ ├── Application/       # Open/close session, process sale, sync queue, void/refund use cases
+ ├── Domain/            # POSSession, POSTransaction, OfflineQueue entities
+ ├── Infrastructure/    # POSRepository, POSServiceProvider, sync reconciliation engine
+ ├── Interfaces/        # POSController, ReceiptController, SyncController
+ ├── module.json
+ └── README.md
+```
+
+---
+
+## Architecture Compliance
+
+| Rule | Status |
+|---|---|
+| No business logic in controllers | ✅ Enforced |
+| No query builder calls in controllers | ✅ Enforced |
+| Tenant isolation enforced (`tenant_id` + global scope) | ✅ Enforced |
+| All financial calculations use BCMath (no float) | ✅ Enforced |
+| Offline-first design with local queue and sync reconciliation | ✅ Required |
+| Full audit trail | ✅ Enforced |
+| No cross-module coupling (communicates via contracts/events) | ✅ Enforced |
+
+---
+
+## Dependencies
+
+- `core`
+- `tenancy`
+- `sales`
+- `pricing`
+- `accounting`
+
+---
+
+## Status
+
+🔴 **Planned** — See [IMPLEMENTATION_STATUS.md](../../IMPLEMENTATION_STATUS.md)

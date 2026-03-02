@@ -1,9 +1,16 @@
 {
     "name": "Product",
     "alias": "product",
-    "description": "Product catalog with multi-UOM, multi-image, and dynamic extensible attributes",
+    "description": "Product catalog module: multi-type products (Physical, Consumable, Service, Digital, Bundle, Composite, Variant), SKU management, UOM conversion matrix, multi-image, multi-currency/location pricing.",
+    "keywords": ["product", "catalog", "sku", "uom", "variant", "pricing"],
+    "priority": 7,
     "version": "1.0.0",
-    "requires": ["Core"],
-    "providers": ["Modules\\Product\\Providers\\ProductServiceProvider"],
-    "aliases": {}
+    "active": true,
+    "order": 7,
+    "providers": [
+        "Modules\\Product\\Infrastructure\\Providers\\ProductServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": ["core", "tenancy", "metadata"]
 }

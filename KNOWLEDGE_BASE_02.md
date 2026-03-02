@@ -265,12 +265,15 @@ Buying price, selling price, purchase discount, and sales discount may vary by:
 - Location
 - Batch
 - Lot
-- Other applicable factors
+- Date range
+- Customer tier
+- Minimum quantity
 
 Discount formats:
-- Flat amount
+- Flat (fixed) amount
 - Percentage
-- Other applicable formats
+
+All prices and discounts must use BCMath; no floating-point arithmetic.
 
 ---
 
@@ -294,8 +297,11 @@ Discount formats:
 ## 5.3 Arithmetic Rules
 
 - All calculations use BCMath
-- Precision: 4 decimal places
+- Precision: 4 decimal places minimum
+- Intermediate calculations (further divided or multiplied before final rounding): 8+ decimal places
+- Final monetary values: rounded to the currency's standard precision (typically 2 decimal places)
 - No floating-point arithmetic permitted
+- Deterministic and reversible
 
 ---
 

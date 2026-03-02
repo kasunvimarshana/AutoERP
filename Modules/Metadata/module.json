@@ -1,0 +1,16 @@
+{
+    "name": "Metadata",
+    "alias": "metadata",
+    "description": "Metadata-driven core: custom fields, dynamic forms, validation rules, conditional visibility, computed fields, UI layout definitions, and feature toggles. All configurable without redeployment.",
+    "keywords": ["metadata", "custom-fields", "dynamic-forms", "feature-flags"],
+    "priority": 5,
+    "version": "1.0.0",
+    "active": true,
+    "order": 5,
+    "providers": [
+        "Modules\\Metadata\\Infrastructure\\Providers\\MetadataServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": ["core", "tenancy"]
+}

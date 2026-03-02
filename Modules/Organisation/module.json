@@ -1,9 +1,16 @@
 {
     "name": "Organisation",
     "alias": "organisation",
+    "description": "Organisational hierarchy module: Tenant → Organisation → Branch → Location → Department. Manages the structural configuration of a tenant's business units.",
+    "keywords": ["organisation", "branch", "location", "department", "hierarchy"],
+    "priority": 4,
     "version": "1.0.0",
-    "description": "Optional nested hierarchical organisational structure (Organisation → Branch → Location → Department) with full tenant isolation",
-    "requires": ["Core", "Tenant"],
-    "providers": ["Modules\\Organisation\\Providers\\OrganisationServiceProvider"],
-    "aliases": {}
+    "active": true,
+    "order": 4,
+    "providers": [
+        "Modules\\Organisation\\Infrastructure\\Providers\\OrganisationServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": ["core", "tenancy"]
 }

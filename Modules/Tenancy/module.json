@@ -1,0 +1,16 @@
+{
+    "name": "Tenancy",
+    "alias": "tenancy",
+    "description": "Multi-tenancy module providing tenant resolution (subdomain, header, JWT), global tenant scope enforcement, tenant-scoped cache/queue/storage, and per-tenant configuration.",
+    "keywords": ["tenancy", "multi-tenant", "tenant", "isolation"],
+    "priority": 2,
+    "version": "1.0.0",
+    "active": true,
+    "order": 2,
+    "providers": [
+        "Modules\\Tenancy\\Infrastructure\\Providers\\TenancyServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": ["core"]
+}

@@ -2,112 +2,86 @@
 
 ## Overview
 
-The Product Module is the foundational catalog module for the ERP system. It manages product definitions including SKU, variants, multiple Units of Measure (UOM), costing methods, multiple product images, multiple dynamic extensible attributes, and GS1/barcode support.
+The **Product** module manages the enterprise product catalog. It supports multiple product types, SKU management, multi-UOM with conversion matrix, product variants, multi-image management, and multi-currency/location pricing.
 
-## Architecture
+---
 
-This module follows the strict **Controller → Service → Handler (with Pipeline) → Repository → Entity** pattern.
+## Supported Product Types
 
-| Layer | Location | Responsibility |
-|---|---|---|
-| Domain | `Domain/` | Entities, contracts, enums, value objects |
-| Application | `Application/` | Commands, handlers, services, pipeline |
-| Infrastructure | `Infrastructure/` | Eloquent models, repositories, migrations |
-| Interfaces | `Interfaces/` | HTTP controllers, requests, resources, routes |
-
-## API Endpoints
-
-### Products
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/products?tenant_id={id}` | List all products for a tenant |
-| POST | `/api/v1/products` | Create a new product |
-| GET | `/api/v1/products/{id}?tenant_id={id}` | Get a product by ID |
-| PUT | `/api/v1/products/{id}?tenant_id={id}` | Update a product |
-| DELETE | `/api/v1/products/{id}?tenant_id={id}` | Soft-delete a product |
-
-### Units of Measure (UOM) Conversions
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/products/{id}/uom-conversions?tenant_id={id}` | List UOM conversions |
-| POST | `/api/v1/products/{id}/uom-conversions` | Set/replace UOM conversions |
-
-### Product Images
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/products/{id}/images?tenant_id={id}` | List product images |
-| POST | `/api/v1/products/{id}/images` | Set URL-sourced images (JSON) |
-| POST | `/api/v1/products/{id}/images/upload` | Upload a single image file |
-| DELETE | `/api/v1/products/{id}/images/{imageId}` | Delete a product image |
-
-### Product Attributes
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/products/{id}/attributes?tenant_id={id}` | List product attributes |
-| POST | `/api/v1/products/{id}/attributes` | Set/replace all attributes |
-
-## Product Types
-
-- `stockable` — Physical product tracked in inventory
-- `consumable` — Consumed product, not tracked in inventory
-- `service` — Service product, no physical stock
-- `digital` — Digital product (downloads, licenses)
-- `bundle` — Kit/bundle of multiple products
-- `composite` — Manufactured product from BOM
-- `variant` — Configurable product template; purchasable/saleable units are distinct variants (e.g. a T-shirt in multiple sizes/colours). Variant management infrastructure is planned; this type is registered now so API consumers can classify products correctly.
-
-## Costing Methods
-
-- `fifo` — First In, First Out
-- `lifo` — Last In, First Out
-- `weighted_average` — Weighted Average Cost
-
-## Units of Measure (Multi-UOM)
-
-Each product supports three independent UOM fields:
-
-| Field | Description | Nullable |
-|---|---|---|
-| `uom` | Inventory / stock UOM (e.g. `pcs`) | No |
-| `buying_uom` | UOM used when purchasing (e.g. `box`) | Yes (falls back to `uom`) |
-| `selling_uom` | UOM used when selling (e.g. `pack`) | Yes (falls back to `uom`) |
-
-UOM conversion factors are stored per-product in the `uom_conversions` table. The repository resolves conversions bidirectionally: first by a direct row match (`from_uom → to_uom`), then by an inverse row match (`to_uom → from_uom`) with the factor automatically inverted via `bcdiv`. All arithmetic uses BCMath.
-
-## Product Images
-
-Images support two sources controlled by the `image_source_type` discriminator:
-
-| Source Type | Description |
+| Type | Description |
 |---|---|
-| `url` | External image URL; set via JSON batch (`POST /images`) |
-| `upload` | Platform-stored file; uploaded via multipart (`POST /images/upload`) |
+| Physical (Stockable) | Tracked inventory item |
+| Consumable | Consumed on use, not tracked in stock |
+| Service | Non-physical service offering |
+| Digital | Downloadable digital goods |
+| Bundle (Kit) | Pre-packaged set of individual products |
+| Composite (Manufactured) | Product assembled from components |
+| Variant-based | Products with attribute variants (size, color, etc.) |
 
-Files are stored on the private `local` disk under `tenants/{tenantId}/products/`. Uploaded images are served via 30-minute temporary signed URLs.
+---
 
-## Product Attributes
+## Responsibilities
 
-Dynamic, extensible key-value attributes support rich metadata per product:
+- Product CRUD (tenant-scoped)
+- SKU management and uniqueness enforcement
+- UOM (Unit of Measure) configuration:
+  - Base UOM (`uom`) — required
+  - Buying UOM (`buying_uom`) — optional, fallback to base
+  - Selling UOM (`selling_uom`) — optional, fallback to base
+- UOM conversion matrix (`uom_conversions` table)
+- Product variant management
+- Multi-image management (0..n images per product)
+- Barcode / QR code support
+- GS1 compatibility (optional enterprise feature)
+- Costing method configuration (FIFO / LIFO / Weighted Average)
+- Traceability configuration (Serial / Batch / Lot — optional)
 
-| Field | Type | Description |
-|---|---|---|
-| `attribute_key` | string | Unique key per product (e.g. `material`) |
-| `attribute_label` | string | Human-readable label (e.g. `Material`) |
-| `attribute_value` | string | The value (e.g. `Cotton`) |
-| `attribute_type` | string | Data type hint: `text`, `number`, `boolean`, `date`, `url` (driven by `ProductAttributeType` enum) |
-| `sort_order` | int | Display order |
+## Financial Rules
 
-## Key Design Decisions
+- All price and cost calculations use **BCMath only**
+- Minimum **4 decimal places** precision
+- Intermediate calculations (further divided or multiplied before final rounding): **8+ decimal places**
+- Final monetary values: rounded to the **currency's standard precision (typically 2 decimal places)**
+- No floating-point arithmetic
 
-- SKU is immutable after creation (stored as value object, normalised to uppercase)
-- Pipeline pattern applied in all write handlers (`ValidateCommandPipe → AuditLogPipe → persistence`)
-- Tenant isolation enforced via `BelongsToTenant` trait on all product-related Eloquent models
-- Monetary values stored as `DECIMAL(20,4)` using BCMath for precision
-- Unique constraint on `(tenant_id, sku)` at the database level
-- `buying_uom` / `selling_uom` nullable; helper methods `effectiveBuyingUom()` / `effectiveSellingUom()` on domain entity fall back to `uom` when null
-- `replaceForProduct()` pattern used for UOM conversions, images, and attributes (atomic delete + re-insert)
-- Inverse UOM conversion is computed at **read time** (`convert()` call) — only one direction needs to be stored per conversion pair; the inverse factor is derived via `bcdiv` on-demand and is never persisted separately
+---
+
+## Architecture Layer
+
+```
+Modules/Product/
+ ├── Application/       # Product CRUD, variant management, image upload use cases
+ ├── Domain/            # Product entity, UOM value objects, ProductRepository contract
+ ├── Infrastructure/    # ProductRepository, ProductServiceProvider, image storage
+ ├── Interfaces/        # ProductController, ProductResource, StoreProductRequest
+ ├── module.json
+ └── README.md
+```
+
+---
+
+## Architecture Compliance
+
+| Rule | Status |
+|---|---|
+| No business logic in controllers | ✅ Enforced |
+| No query builder calls in controllers | ✅ Enforced |
+| Tenant isolation enforced (`tenant_id` + global scope) | ✅ Enforced |
+| All financial calculations use BCMath (no float) | ✅ Enforced |
+| Base UOM (`uom`) is required on every product | ✅ Required |
+| UOM conversions use explicit product-specific factors only (no implicit conversion) | ✅ Enforced |
+| No cross-module coupling (communicates via contracts/events) | ✅ Enforced |
+
+---
+
+## Dependencies
+
+- `core`
+- `tenancy`
+- `metadata`
+
+---
+
+## Status
+
+🔴 **Planned** — See [IMPLEMENTATION_STATUS.md](../../IMPLEMENTATION_STATUS.md)

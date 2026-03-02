@@ -1,47 +1,51 @@
 # KB.md — Enterprise ERP/CRM SaaS Platform Knowledge Base
 
-Version: 1.0  
-Scope: Entire Repository  
-Status: Authoritative Reference  
+Version: 2.0
+Scope: Entire Repository
+Status: Authoritative Reference — Strictly Enforced
 
 ---
 
 # TABLE OF CONTENTS
 
 1. [System Mission & Purpose](#1-system-mission--purpose)
-2. [Core Architecture](#2-core-architecture)
-3. [Multi-Tenancy](#3-multi-tenancy)
-4. [Authorization Model](#4-authorization-model)
-5. [Metadata-Driven Core](#5-metadata-driven-core)
-6. [Product Domain](#6-product-domain)
-7. [Multi-UOM Design](#7-multi-uom-design)
-8. [Pricing & Discounts](#8-pricing--discounts)
-9. [Inventory Management System (IMS)](#9-inventory-management-system-ims)
-10. [Pharmaceutical Inventory Management](#10-pharmaceutical-inventory-management)
-11. [Warehouse Management System (WMS)](#11-warehouse-management-system-wms)
-12. [Sales & POS](#12-sales--pos)
-13. [Accounting](#13-accounting)
-14. [CRM](#14-crm)
-15. [Procurement](#15-procurement)
-16. [Workflow Engine](#16-workflow-engine)
-17. [SaaS Architecture](#17-saas-architecture)
-18. [Organizational Hierarchy](#18-organizational-hierarchy)
-19. [API Design](#19-api-design)
-20. [Frontend Architecture](#20-frontend-architecture)
-21. [Security](#21-security)
-22. [Data Integrity & Concurrency](#22-data-integrity--concurrency)
-23. [Performance & Scalability](#23-performance--scalability)
-24. [Audit & Compliance](#24-audit--compliance)
-25. [Enterprise Reporting](#25-enterprise-reporting)
-26. [Plugin Marketplace](#26-plugin-marketplace)
-27. [Testing Requirements](#27-testing-requirements)
-28. [Prohibited Practices](#28-prohibited-practices)
-29. [Definition of Done](#29-definition-of-done)
-30. [System Guarantees](#30-system-guarantees)
-31. [Business Objectives](#31-business-objectives)
-32. [Autonomous Agent Execution Rules](#32-autonomous-agent-execution-rules)
-33. [Implementation Tracking](#33-implementation-tracking)
-34. [References](#34-references)
+2. [ERP Foundational Principles](#2-erp-foundational-principles)
+3. [Core Architecture](#3-core-architecture)
+4. [Multi-Tenancy](#4-multi-tenancy)
+5. [Authorization Model](#5-authorization-model)
+6. [Metadata-Driven Core](#6-metadata-driven-core)
+7. [Product Domain](#7-product-domain)
+8. [Multi-UOM Design](#8-multi-uom-design)
+9. [Pricing & Discounts](#9-pricing--discounts)
+10. [Inventory Management System (IMS)](#10-inventory-management-system-ims)
+11. [Pharmaceutical Inventory Management](#11-pharmaceutical-inventory-management)
+12. [Warehouse Management System (WMS)](#12-warehouse-management-system-wms)
+13. [Sales & POS](#13-sales--pos)
+14. [Accounting](#14-accounting)
+15. [CRM](#15-crm)
+16. [Procurement](#16-procurement)
+17. [Workflow Engine](#17-workflow-engine)
+18. [Customization & Rule Engine](#18-customization--rule-engine)
+19. [SaaS Architecture](#19-saas-architecture)
+20. [Organizational Hierarchy](#20-organizational-hierarchy)
+21. [API Design](#21-api-design)
+22. [Frontend Architecture](#22-frontend-architecture)
+23. [Security](#23-security)
+24. [Data Integrity & Concurrency](#24-data-integrity--concurrency)
+25. [Performance & Scalability](#25-performance--scalability)
+26. [Audit & Compliance](#26-audit--compliance)
+27. [Enterprise Reporting](#27-enterprise-reporting)
+28. [Plugin Marketplace](#28-plugin-marketplace)
+29. [Reusability Principles](#29-reusability-principles)
+30. [Testing Requirements](#30-testing-requirements)
+31. [Prohibited Practices](#31-prohibited-practices)
+32. [Definition of Done](#32-definition-of-done)
+33. [System Guarantees](#33-system-guarantees)
+34. [Business Objectives](#34-business-objectives)
+35. [Autonomous Agent Execution Rules](#35-autonomous-agent-execution-rules)
+36. [Implementation Tracking](#36-implementation-tracking)
+37. [Strategic Design Goal](#37-strategic-design-goal)
+38. [References](#38-references)
 
 ---
 
@@ -64,6 +68,7 @@ The platform covers:
 - CRM (Customer Relationship Management)
 - Procurement
 - ERP/CRM Integration
+- Human Resources (optional extension)
 
 The system must be:
 
@@ -80,11 +85,33 @@ The system must be:
 
 ---
 
-# 2. Core Architecture
+# 2. ERP Foundational Principles
 
-## 2.1 Governing Principles
+An ERP (Enterprise Resource Planning) system integrates:
 
-- SOLID principles (Single Responsibility, Open/Closed, Liskov, Interface Segregation, Dependency Inversion)
+- Finance
+- Inventory
+- Sales
+- Procurement
+- CRM
+- Operations
+- Human Resources (optional extension)
+
+Core ERP characteristics:
+
+- Single source of truth
+- Transaction-driven
+- Financially reconcilable
+- Cross-module traceable
+- Audit-safe
+
+---
+
+# 3. Core Architecture
+
+## 3.1 Governing Principles
+
+- SOLID principles (Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion)
 - DRY — no duplication of business logic
 - KISS — minimal complexity
 - Explicit domain boundaries
@@ -92,7 +119,7 @@ The system must be:
 - Immutable financial calculations
 - Deterministic behavior
 
-## 2.2 Mandatory Rules
+## 3.2 Mandatory Rules
 
 - Controllers contain no business logic.
 - Controllers never use query builder directly.
@@ -101,7 +128,7 @@ The system must be:
 - Module boundaries strictly respected.
 - Cross-module communication via contracts/events only.
 
-## 2.3 Application Flow (Mandatory)
+## 3.3 Application Flow (Mandatory)
 
 Every feature must follow:
 
@@ -139,7 +166,7 @@ Controller → Service → Handler (Pipeline) → Repository → Entity
 - Attribute casting
 - No orchestration logic
 
-## 2.4 Module Structure (Per Module)
+## 3.4 Module Structure (Per Module)
 
 ```
 Modules/
@@ -156,9 +183,9 @@ Each module must be independently replaceable.
 
 ---
 
-# 3. Multi-Tenancy
+# 4. Multi-Tenancy
 
-## 3.1 Hierarchy Model
+## 4.1 Hierarchy Model
 
 ```
 Tenant
@@ -168,7 +195,7 @@ Tenant
                 └── Department
 ```
 
-## 3.2 Multi-Tenant Models
+## 4.2 Multi-Tenant Models
 
 | Model | Description | Trade-offs |
 |---|---|---|
@@ -178,7 +205,7 @@ Tenant
 
 Recommended default: Shared DB + Strict Row-Level Isolation + Optional DB-per-tenant upgrade path.
 
-## 3.3 Mandatory Enforcement
+## 4.3 Mandatory Enforcement
 
 - `tenant_id` on every business table
 - Global scope enforcement
@@ -197,7 +224,7 @@ Failure to isolate tenants = Critical Violation.
 
 ---
 
-# 4. Authorization Model
+# 5. Authorization Model
 
 Hybrid enforcement:
 
@@ -214,10 +241,12 @@ Rules:
 - No permission logic in controllers.
 - No hardcoded role checks.
 - Unauthorized cross-tenant access is strictly prohibited.
+- Dynamic middleware for permission enforcement.
+- Tenant-scoped permissions enforced at repository layer.
 
 ---
 
-# 5. Metadata-Driven Core
+# 6. Metadata-Driven Core
 
 All configurable logic must be:
 
@@ -243,9 +272,9 @@ Hardcoded business rules are prohibited.
 
 ---
 
-# 6. Product Domain
+# 7. Product Domain
 
-## 6.1 Supported Product Types
+## 7.1 Supported Product Types
 
 - Physical (Stockable)
 - Consumable
@@ -255,7 +284,7 @@ Hardcoded business rules are prohibited.
 - Composite (Manufactured)
 - Variant-based
 
-## 6.2 Key Concepts
+## 7.2 Key Concepts
 
 - SKU
 - UOM (Unit of Measure) with conversion matrix
@@ -267,7 +296,7 @@ Hardcoded business rules are prohibited.
 - Multi-location pricing
 - Multi-currency pricing
 
-## 6.3 Mandatory Capabilities
+## 7.3 Mandatory Capabilities
 
 - Optional traceability (Serial / Batch / Lot; mandatory in pharmaceutical mode)
 - Optional Barcode / QR
@@ -283,7 +312,7 @@ Hardcoded business rules are prohibited.
 - Rule-based pricing engine
 - Fully traceable inventory flow
 
-## 6.4 Financial Rules
+## 7.4 Financial Rules
 
 - Arbitrary precision decimals only (BCMath or equivalent)
 - Floating-point arithmetic strictly forbidden
@@ -292,9 +321,9 @@ Hardcoded business rules are prohibited.
 
 ---
 
-# 7. Multi-UOM Design
+# 8. Multi-UOM Design
 
-## 7.1 UOM Structure
+## 8.1 UOM Structure
 
 Each product supports:
 
@@ -302,7 +331,7 @@ Each product supports:
 - `buying_uom` → Purchasing unit (optional; fallback to `uom`)
 - `selling_uom` → Sales unit (optional; fallback to `uom`)
 
-## 7.2 UOM Conversions
+## 8.2 UOM Conversions
 
 `uom_conversions` table fields:
 
@@ -313,7 +342,7 @@ Each product supports:
 
 Example: 1 box = 12 pcs
 
-## 7.3 Conversion Rules
+## 8.3 Conversion Rules
 
 - Direct path: `from_uom` → `to_uom`
 - Inverse path: reciprocal calculation (`to_uom` → `from_uom`)
@@ -321,37 +350,42 @@ Example: 1 box = 12 pcs
 - No global assumptions
 - No implicit conversion
 
-## 7.4 Arithmetic Precision
+## 8.4 Arithmetic Precision
 
 - All calculations use BCMath
 - Precision: 4 decimal places minimum
+- Intermediate calculations (further divided or multiplied before final rounding): 8+ decimal places
+- Final monetary values: rounded to the currency's standard precision (typically 2 decimal places)
 - No floating-point arithmetic permitted
 - Deterministic and reversible
 
 ---
 
-# 8. Pricing & Discounts
+# 9. Pricing & Discounts
 
 Buying price, selling price, purchase discount, and sales discount may vary by:
 
 - Location
 - Batch
 - Lot
-- Other applicable factors
+- Date range
+- Customer tier
+- Minimum quantity
 
 Discount formats:
 
-- Flat amount
+- Flat (fixed) amount
 - Percentage
-- Other applicable formats
+
+All prices and discounts must use BCMath; no floating-point arithmetic.
 
 ---
 
-# 9. Inventory Management System (IMS)
+# 10. Inventory Management System (IMS)
 
 A modern Inventory Management System serves as a central hub for tracking, organizing, and optimizing company stock across the entire supply chain. It streamlines stock tracking using real-time data, barcode scanning, automation, and multi-channel synchronization to optimize stock levels and reduce operational costs.
 
-## 9.1 Inventory is Ledger-Driven
+## 10.1 Inventory is Ledger-Driven
 
 - Stock is never edited directly.
 - All changes occur via transactions.
@@ -359,7 +393,7 @@ A modern Inventory Management System serves as a central hub for tracking, organ
 - Deduction must be atomic.
 - Historical entries are immutable.
 
-## 9.2 Critical Flows
+## 10.2 Critical Flows
 
 - Purchase Receipt
 - Sales Shipment
@@ -367,80 +401,81 @@ A modern Inventory Management System serves as a central hub for tracking, organ
 - Adjustment
 - Return
 
-## 9.3 Core Capabilities
+## 10.3 Core Capabilities
 
-### 9.3.1 Real-Time Inventory Tracking
+### 10.3.1 Real-Time Inventory Tracking
 - Instant visibility into current stock quantities and physical locations
-- Automatic updates as items move from receiving to final sale
+- Automatic updates as items move through: receiving → storage → picking → packing → shipping → final sale
 - Continuous monitoring across warehouses and stores
 
-### 9.3.2 Automated Reordering & Alerts
+### 10.3.2 Automated Reordering & Alerts
 - Predefined reorder points
 - Automatic purchase order generation
 - Low-stock notifications
 - Prevention of stockouts and overstocking
 - Historical consumption-based forecasting
 
-### 9.3.3 Centralized Order Management
+### 10.3.3 Centralized Order Management
 - Consolidates multi-channel sales (e-commerce, POS, marketplaces)
 - Unified dashboard with consistent stock counts across platforms
 - Full order lifecycle tracking: order received → picking → packing → shipping → delivery
 
-### 9.3.4 Multi-Location & Multi-Channel Management
+### 10.3.4 Multi-Location & Multi-Channel Management
 - Synchronization across multiple warehouses, retail stores, and distribution centers
 - Seamless inter-location stock transfers
 - Channel consistency (website, POS, marketplaces)
 
-### 9.3.5 Barcode & RFID Scanning
+### 10.3.5 Barcode & RFID Scanning
 - Digital scanning via Barcode, QR Code, RFID
 - Reduces manual entry errors
 - Accelerates receiving, picking, packing, and shipping
+- GS1-compatible standards support
 
-### 9.3.6 Demand Forecasting
+### 10.3.6 Demand Forecasting
 - Historical sales analysis
 - Seasonal trend modeling
 - Market-based projections
 - Optimization of stock levels
 
-### 9.3.7 Traceability (Lot, Batch & Serial Tracking)
+### 10.3.7 Traceability (Lot, Batch & Serial Tracking)
 - Track by lot number, batch number, or serial number
 - Manage expiry dates, product recalls, and quality control
 - Critical for pharmaceutical, food & beverage, and high-value electronics
 
-### 9.3.8 Supplier & Vendor Management
+### 10.3.8 Supplier & Vendor Management
 - Centralized vendor records
 - Lead time and performance tracking
 - Product–vendor mapping
 - Reordering workflows
 
-### 9.3.9 Inventory Optimization (ABC Analysis)
+### 10.3.9 Inventory Optimization (ABC Analysis)
 - Categorization by value and turnover rate:
-  - High-value (A)
-  - Medium-value (B)
-  - Low-value (C)
+  - High-value (A): prioritized resource allocation
+  - Medium-value (B): balanced management
+  - Low-value (C): minimal oversight
 - Resource allocation efficiency
 
-### 9.3.10 Cycle Counting
+### 10.3.10 Cycle Counting
 - Partial inventory audits (scheduled subset counting)
 - Maintains high accuracy with minimal operational disruption
 - Alternative to full-scale audits
 
-### 9.3.11 Reporting & Analytics
+### 10.3.11 Reporting & Analytics
 - KPIs: inventory turnover, carrying cost, order cycle time, profitability per product, labor efficiency, inventory accuracy
 - Data-driven forecasting and strategic planning
 
-### 9.3.12 Third-Party Integrations
+### 10.3.12 Third-Party Integrations
 - Accounting systems (e.g., QuickBooks)
 - E-commerce platforms (e.g., Shopify, WooCommerce)
 - ERP systems
 - POS systems
 
-### 9.3.13 Cloud & Mobile Accessibility
+### 10.3.13 Cloud & Mobile Accessibility
 - Smartphone and tablet support
 - Warehouse floor operations
 - Remote access and 24/7 secure availability
 
-## 9.4 Additional Capabilities
+## 10.4 Additional Capabilities
 
 - Multi-warehouse
 - Multi-bin locations
@@ -457,7 +492,7 @@ A modern Inventory Management System serves as a central hub for tracking, organ
 - Backorders
 - Drop-shipping
 
-## 9.5 Concurrency Controls
+## 10.5 Concurrency Controls
 
 - Pessimistic locking for stock deduction
 - Optimistic locking for updates
@@ -466,90 +501,95 @@ A modern Inventory Management System serves as a central hub for tracking, organ
 
 ---
 
-# 10. Pharmaceutical Inventory Management
+# 11. Pharmaceutical Inventory Management
 
 A pharmaceutical inventory system extends standard inventory management with regulatory, compliance, and safety-focused functionality.
 
 Primary goals: Compliance, Efficiency, Safety, Traceability.
 
-## 10.1 Core Inventory & Real-Time Control
+## 11.1 Core Inventory & Real-Time Control
 
 - Real-time multi-branch visibility
 - Barcode & RFID scanning
 - Inter-branch transfers
 
-## 10.2 Expiry Control & FEFO
+## 11.2 Expiry Control & FEFO
 
 - First-Expired, First-Out (FEFO) strategy
 - Expiry date tracking and alerts
-- Expired product quarantine
+- Expired product quarantine workflows
 - Waste minimization
 
-## 10.3 Lot & Batch Traceability
+## 11.3 Lot & Batch Traceability
 
 - Mandatory traceability
-- Recall management support
+- Full recall management support
 - Quality assurance compliance
+- Drug serial number tracking
 
-## 10.4 High-Risk Medication Monitoring
+## 11.4 High-Risk Medication Monitoring
 
 - Flag expensive drugs
 - Controlled substances tracking
 - Low-demand monitoring
 - Restricted access controls
+- Enhanced security for controlled substances
 
-## 10.5 Automated Reordering & Demand Forecasting
+## 11.5 Automated Reordering & Demand Forecasting
 
 - Threshold-based purchase order generation
 - Seasonal consumption analysis
 - Drug shortage prevention
 
-## 10.6 Regulatory Compliance & Security
+## 11.6 Regulatory Compliance & Security
 
 Compliance frameworks:
 - FDA
 - DEA
 - DSCSA (Drug Supply Chain Security Act)
-- Drug serial number tracking
 
 Security:
 - Tamper-proof transaction logs
 - Full user activity history
 - Audit-ready reporting
+- Expiry override logging
+- High-risk medication access logging
 
-## 10.7 Integration Capabilities
+## 11.7 Integration Capabilities
 
 - EHR / EMR systems
 - POS systems
 - Billing platforms
 - ERP systems
 
-## 10.8 Pharmaceutical Compliance Mode
+## 11.8 Pharmaceutical Compliance Mode
 
-When pharmaceutical mode is enabled:
+When pharmaceutical compliance mode is enabled:
 
 - Lot tracking is mandatory
 - Expiry date is mandatory
 - FEFO is enforced
 - Serial tracking required where applicable
 - Audit trail cannot be disabled
-- Regulatory reports must be available
+- Regulatory reports must be available (FDA / DEA / DSCSA aligned)
+- Quarantine workflows for expired or recalled items are enforced
+- Expiry override logging and high-risk medication access logging are required
 
 Compliance is NOT optional.
 
 ---
 
-# 11. Warehouse Management System (WMS)
+# 12. Warehouse Management System (WMS)
 
-A WMS optimizes warehouse operations through real-time inventory tracking, efficient order fulfillment (picking/packing/shipping), accurate labor management, and integration with ERP and e-commerce platforms.
+A WMS optimizes warehouse operations through real-time inventory tracking, efficient order fulfillment (picking/packing/shipping), accurate labor management, and integration with ERP and e-commerce platforms to reduce errors and improve efficiency.
 
-## 11.1 Real-Time Inventory Visibility
+## 12.1 Real-Time Inventory Visibility
 
 - Bin-level and location-level tracking
 - Movement history logs
 - Accurate up-to-the-minute data on stock levels and locations
 
-## 11.2 Receiving & Putaway
+## 12.2 Receiving & Putaway
 
 - Automated receiving
 - Intelligent storage location suggestion based on:
@@ -557,7 +597,7 @@ A WMS optimizes warehouse operations through real-time inventory tracking, effic
   - Size
   - Space availability
 
-## 11.3 Order Picking & Packing Optimization
+## 12.3 Order Picking & Packing Optimization
 
 - Optimized route generation
 - Picking strategies:
@@ -565,50 +605,52 @@ A WMS optimizes warehouse operations through real-time inventory tracking, effic
   - Wave picking
   - Zone picking
 - Reduced travel time
+- Packing validation
 
-## 11.4 Labor Management
+## 12.4 Labor Management
 
 - Productivity tracking
 - Skill-based task assignment
 - Proximity-based task allocation
 - Performance metrics
 
-## 11.5 Warehouse Layout Optimization
+## 12.5 Warehouse Layout Optimization
 
 - Movement pattern analysis
-- Storage reconfiguration
+- Storage reconfiguration for efficiency
 - Travel distance reduction
 
-## 11.6 Returns Management (Reverse Logistics)
+## 12.6 Returns Management (Reverse Logistics)
 
 - Return inspection
 - Restocking workflows
 - Damage classification
 - Credit processing
 
-## 11.7 Integration Capabilities
+## 12.7 Integration Capabilities
 
 - ERP systems
 - Transportation systems
 - E-commerce platforms
 
-## 11.8 Reporting & KPIs
+## 12.8 Reporting & KPIs
 
 - Inventory accuracy
 - Order cycle time
 - Labor efficiency
+- Expiry risk analysis (pharmaceutical context)
 
 ---
 
-# 12. Sales & POS
+# 13. Sales & POS
 
-## 12.1 Sales Flow
+## 13.1 Sales Flow
 
 ```
 Quotation → Sales Order → Delivery → Invoice → Payment
 ```
 
-## 12.2 Capabilities
+## 13.2 Capabilities
 
 - POS terminal mode
 - Offline-ready sync design
@@ -626,7 +668,7 @@ Quotation → Sales Order → Delivery → Invoice → Payment
 - Coupons
 - E-commerce API compatibility
 
-## 12.3 POS Requirements
+## 13.3 POS Requirements
 
 - Offline-first design
 - Local transaction queue
@@ -634,9 +676,9 @@ Quotation → Sales Order → Delivery → Invoice → Payment
 
 ---
 
-# 13. Accounting
+# 14. Accounting
 
-## 13.1 Mandatory Capabilities
+## 14.1 Mandatory Capabilities
 
 - Double-entry bookkeeping
 - Chart of accounts per tenant
@@ -649,7 +691,7 @@ Quotation → Sales Order → Delivery → Invoice → Payment
 - Balance sheet
 - Immutable audit trail
 
-## 13.2 Double-Entry Rule
+## 14.2 Double-Entry Rule
 
 Every transaction must:
 
@@ -657,27 +699,27 @@ Every transaction must:
 - Credit another account
 - Total Debits = Total Credits
 
-## 13.3 Financial Integrity Rules
+## 14.3 Financial Integrity Rules
 
 - No floating-point arithmetic
 - Arbitrary precision decimals only (BCMath)
 - Deterministic rounding
 - Immutable journal entries
 
-Accounting must reconcile with inventory valuation.  
+Accounting must reconcile with inventory valuation.
 Financial integrity cannot be bypassed.
 
 ---
 
-# 14. CRM
+# 15. CRM
 
-## 14.1 CRM Pipeline
+## 15.1 CRM Pipeline
 
 ```
 Lead → Opportunity → Proposal → Closed Won / Closed Lost
 ```
 
-## 14.2 Capabilities
+## 15.2 Capabilities
 
 - Leads
 - Opportunities
@@ -692,15 +734,15 @@ Lead → Opportunity → Proposal → Closed Won / Closed Lost
 
 ---
 
-# 15. Procurement
+# 16. Procurement
 
-## 15.1 Procurement Flow
+## 16.1 Procurement Flow
 
 ```
 Purchase Request → RFQ → Vendor Selection → Purchase Order → Goods Receipt → Vendor Bill → Payment
 ```
 
-## 15.2 Capabilities
+## 16.2 Capabilities
 
 - Purchase requests
 - RFQ (Request for Quotation)
@@ -714,15 +756,15 @@ Purchase Request → RFQ → Vendor Selection → Purchase Order → Goods Recei
 
 ---
 
-# 16. Workflow Engine
+# 17. Workflow Engine
 
-## 16.1 State Machine Model
+## 17.1 State Machine Model
 
 ```
 State → Event → Transition → Guard → Action
 ```
 
-## 16.2 Must Support
+## 17.2 Must Support
 
 - State machine flows
 - Approval chains
@@ -736,13 +778,44 @@ No hardcoded approval logic.
 
 ---
 
-# 17. SaaS Architecture
+# 18. Customization & Rule Engine
 
-## 17.1 Definition
+Enterprise SaaS ERP must be customizable without redeployment.
+
+## 18.1 Metadata-Driven Schema
+
+- Custom fields
+- Validation rules
+- Dynamic forms
+- Conditional visibility
+- Computed fields
+
+## 18.2 Declarative Rule Engine
+
+Rule pattern:
+
+```
+IF condition
+THEN action
+```
+
+Used for:
+
+- Pricing
+- Discounts
+- Taxes
+- Commissions
+- Inventory reservation logic
+
+---
+
+# 19. SaaS Architecture
+
+## 19.1 Definition
 
 SaaS (Software-as-a-Service) is a cloud-based architecture where a single application instance serves multiple tenants via the internet, focusing on scalability, cost-efficiency, and centralized management.
 
-## 17.2 Multi-Tenancy Models
+## 19.2 Multi-Tenancy Models
 
 ### Multi-Tenant (Default)
 - Shared infrastructure
@@ -761,14 +834,16 @@ SaaS (Software-as-a-Service) is a cloud-based architecture where a single applic
 - Schema-per-tenant
 - Database-per-tenant
 
-## 17.3 Scalability
+## 19.3 Scalability
 
 - Horizontal scaling
 - Stateless services
 - Centralized updates and maintenance
 - Automated deployment
+- Avoid tenant-specific code branches
+- Use centralized configuration
 
-## 17.4 Identity & Access Management
+## 19.4 Identity & Access Management
 
 - Role-based access control (RBAC)
 - Multi-guard authentication
@@ -776,7 +851,7 @@ SaaS (Software-as-a-Service) is a cloud-based architecture where a single applic
 - Dynamic middleware
 - Cross-tenant isolation
 
-## 17.5 Microservices (Optional Extraction)
+## 19.5 Microservices (Optional Extraction)
 
 - Independent service modules (billing, user management, inventory, reporting)
 - API-based communication
@@ -784,11 +859,11 @@ SaaS (Software-as-a-Service) is a cloud-based architecture where a single applic
 
 ---
 
-# 18. Organizational Hierarchy
+# 20. Organizational Hierarchy
 
-A nested hierarchical organizational structure where each level is a subset of the level above, forming a layered tree-like model.
+A nested hierarchical organizational structure where each level is a subset of the level above, forming a layered tree-like model that supports complex, geographically dispersed enterprises.
 
-## 18.1 Hierarchy Levels
+## 20.1 Hierarchy Levels
 
 ```
 Tenant
@@ -804,17 +879,18 @@ Or in enterprise expansion:
 Company → Division → Region → Warehouse → Department → Sub-unit
 ```
 
-## 18.2 Rules
+## 20.2 Rules
 
 - Parent-child relationships enforced
 - Recursive querying supported
 - Tenant-bound hierarchy
 - No circular relationships allowed
 - Supports geographically dispersed operations
+- Multi-branch operations supported
 
 ---
 
-# 19. API Design
+# 21. API Design
 
 - RESTful
 - Versioned (`/api/v1`)
@@ -825,7 +901,7 @@ Company → Division → Region → Warehouse → Department → Sub-unit
 - OpenAPI/Swagger documentation required
 - No hidden behavior
 
-## 19.1 Integration Capabilities
+## 21.1 Integration Capabilities
 
 - Webhooks
 - Event publishing
@@ -833,7 +909,7 @@ Company → Division → Region → Warehouse → Department → Sub-unit
 - E-commerce sync
 - Payment gateway support
 
-## 19.2 Documentation Standard
+## 21.2 Documentation Standard
 
 Every public endpoint must:
 
@@ -842,9 +918,11 @@ Every public endpoint must:
 - Include response schemas
 - Be versioned
 
+Internal modules must expose clean service contracts.
+
 ---
 
-# 20. Frontend Architecture
+# 22. Frontend Architecture
 
 If React frontend exists:
 
@@ -858,9 +936,9 @@ Dashboards may use Tailwind-based admin templates (e.g., TailAdmin, AdminLTE).
 
 ---
 
-# 21. Security
+# 23. Security
 
-## 21.1 Mandatory Controls
+## 23.1 Mandatory Controls
 
 - CSRF protection
 - XSS prevention
@@ -876,7 +954,7 @@ Dashboards may use Tailwind-based admin templates (e.g., TailAdmin, AdminLTE).
 - Attribute-based policies
 - Tenant isolation enforcement
 
-## 21.2 Pharmaceutical-Specific Security
+## 23.2 Pharmaceutical-Specific Security
 
 - Full audit trail of stock mutations
 - User action logging
@@ -887,7 +965,7 @@ Dashboards may use Tailwind-based admin templates (e.g., TailAdmin, AdminLTE).
 
 ---
 
-# 22. Data Integrity & Concurrency
+# 24. Data Integrity & Concurrency
 
 ERP systems are highly concurrent. The following controls are mandatory:
 
@@ -900,7 +978,7 @@ ERP systems are highly concurrent. The following controls are mandatory:
 - Version tracking
 - Immutable logs
 
-## 22.1 Stock Transaction Rules
+## 24.1 Stock Transaction Rules
 
 All stock mutations must:
 
@@ -908,18 +986,18 @@ All stock mutations must:
 - Guarantee atomicity
 - Prevent partial writes
 
-## 22.2 Locking Strategy
+## 24.2 Locking Strategy
 
 - Pessimistic locking for stock deduction
 - Optimistic locking for general updates
 - Deadlock-aware retry mechanisms
 
-All writes must be safe under parallel load.  
+All writes must be safe under parallel load.
 Stock and accounting must never be inconsistent.
 
 ---
 
-# 23. Performance & Scalability
+# 25. Performance & Scalability
 
 ERP bottlenecks typically occur in:
 
@@ -939,7 +1017,7 @@ Mitigation strategies:
 
 ---
 
-# 24. Audit & Compliance
+# 26. Audit & Compliance
 
 ERP must support:
 
@@ -953,7 +1031,7 @@ Audit trail is non-optional.
 
 ---
 
-# 25. Enterprise Reporting
+# 27. Enterprise Reporting
 
 Reports must support:
 
@@ -968,13 +1046,14 @@ Reports must also be:
 
 - Tenant-scoped
 - Filterable
+- Exportable
 - Auditable
 
 Reports must never break transactional integrity.
 
 ---
 
-# 26. Plugin Marketplace
+# 28. Plugin Marketplace
 
 A marketplace-ready ERP requires:
 
@@ -985,7 +1064,7 @@ A marketplace-ready ERP requires:
 - Tenant-scoped enablement
 - Upgrade migration paths
 
-## 26.1 Extensibility Rules
+## 28.1 Extensibility Rules
 
 Modules must:
 
@@ -994,9 +1073,29 @@ Modules must:
 - Avoid cross-module direct database access
 - Communicate through services or events
 
+Plugin-style architecture is encouraged for all non-core features.
+
 ---
 
-# 27. Testing Requirements
+# 29. Reusability Principles
+
+Reusable ERP modules must:
+
+- Avoid business-specific assumptions
+- Be configuration-driven
+- Avoid hardcoded logic
+- Expose contracts, not implementations
+- Remain independently replaceable
+
+Design for:
+
+- Multi-industry support
+- Multi-country tax extension
+- Marketplace plugin ecosystem
+
+---
+
+# 30. Testing Requirements
 
 Each module must include:
 
@@ -1011,7 +1110,7 @@ No module is complete without coverage.
 
 ---
 
-# 28. Prohibited Practices
+# 31. Prohibited Practices
 
 The following are strictly disallowed:
 
@@ -1028,12 +1127,13 @@ The following are strictly disallowed:
 - Implicit UOM conversion
 - Duplicate stock deduction logic
 - Skipping transactions for inventory mutation
+- Direct database queries in services (bypass repository)
 
 Immediate refactor required if detected.
 
 ---
 
-# 29. Definition of Done
+# 32. Definition of Done
 
 A module is complete only if:
 
@@ -1051,7 +1151,7 @@ A module is complete only if:
 
 ---
 
-# 30. System Guarantees
+# 33. System Guarantees
 
 The system must guarantee:
 
@@ -1066,7 +1166,7 @@ The system must guarantee:
 
 ---
 
-# 31. Business Objectives
+# 34. Business Objectives
 
 The platform must:
 
@@ -1089,7 +1189,7 @@ The platform must:
 
 ---
 
-# 32. Autonomous Agent Execution Rules
+# 35. Autonomous Agent Execution Rules
 
 Any AI agent must:
 
@@ -1103,7 +1203,7 @@ Any AI agent must:
 8. Avoid introducing coupling.
 9. Ensure regression tests pass.
 
-## 32.1 Compliance Validation Checklist
+## 35.1 Compliance Validation Checklist
 
 All pull requests must be verified against this checklist before merge:
 
@@ -1111,15 +1211,16 @@ All pull requests must be verified against this checklist before merge:
 - [ ] No query builder calls in any controller
 - [ ] All new tables include `tenant_id` with global scope applied
 - [ ] All new endpoints covered by authorization tests
-- [ ] All financial calculations use BCMath (no float)
+- [ ] All financial and quantity calculations use BCMath (no float), minimum 4 decimal places
 - [ ] Module README updated
 - [ ] OpenAPI docs updated
 - [ ] IMPLEMENTATION_STATUS.md updated
 - [ ] No cross-module direct dependency introduced
+- [ ] Pharmaceutical compliance mode respected (if applicable)
 
 ---
 
-# 33. Implementation Tracking
+# 36. Implementation Tracking
 
 A continuously maintained `IMPLEMENTATION_STATUS.md` must track:
 
@@ -1133,7 +1234,21 @@ A continuously maintained `IMPLEMENTATION_STATUS.md` must track:
 
 ---
 
-# 34. References
+# 37. Strategic Design Goal
+
+Build not just an ERP.
+
+Build:
+
+- A configurable ERP framework
+- A reusable SaaS engine
+- A domain-driven enterprise core
+- A plugin-ready platform
+- A long-term maintainable system
+
+---
+
+# 38. References
 
 These references provide guidance on modular design, Laravel best practices, multi-tenancy, ERP/CRM design, and other principles relevant to this repository:
 
@@ -1300,8 +1415,8 @@ This system must evolve into a:
 - Vertically scalable
 - Audit-safe ERP/CRM SaaS platform
 
-Zero regression tolerance.  
-Zero architectural violations.  
-Zero technical debt acceptance.  
+Zero regression tolerance.
+Zero architectural violations.
+Zero technical debt acceptance.
 
 This contract is binding for all contributors and AI agents.

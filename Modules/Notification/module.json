@@ -1,9 +1,16 @@
 {
     "name": "Notification",
     "alias": "notification",
-    "description": "Tenant-scoped notification system with template management, multi-channel support (in-app, email, SMS), and per-user notification tracking.",
+    "description": "Notification engine: configurable notification templates, multi-channel delivery (email, SMS, push, in-app), tenant-scoped, event-driven, database-driven template management.",
+    "keywords": ["notification", "email", "sms", "push", "template", "event-driven"],
+    "priority": 17,
     "version": "1.0.0",
-    "requires": ["Core", "Tenant"],
-    "providers": ["Modules\\Notification\\Providers\\NotificationServiceProvider"],
-    "aliases": {}
+    "active": true,
+    "order": 17,
+    "providers": [
+        "Modules\\Notification\\Infrastructure\\Providers\\NotificationServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": ["core", "tenancy"]
 }

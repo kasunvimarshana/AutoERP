@@ -1,9 +1,16 @@
 {
     "name": "Accounting",
     "alias": "accounting",
+    "description": "Double-entry bookkeeping accounting module: chart of accounts, journal entries, auto-posting rules, tax engine, fiscal periods, trial balance, P&L, balance sheet, and immutable audit trail.",
+    "keywords": ["accounting", "double-entry", "journal", "ledger", "chart-of-accounts", "tax", "fiscal"],
+    "priority": 8,
     "version": "1.0.0",
-    "description": "Double-entry bookkeeping with Chart of Accounts and Journal Entries",
-    "requires": ["Core", "Tenant"],
-    "providers": ["Modules\\Accounting\\Providers\\AccountingServiceProvider"],
-    "aliases": {}
+    "active": true,
+    "order": 8,
+    "providers": [
+        "Modules\\Accounting\\Infrastructure\\Providers\\AccountingServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": ["core", "tenancy"]
 }

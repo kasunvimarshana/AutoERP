@@ -1,9 +1,0 @@
-{
-    "name": "Ecommerce",
-    "alias": "ecommerce",
-    "description": "Headless e-commerce storefront module with product catalog, shopping cart, checkout flow, and order management.",
-    "version": "1.0.0",
-    "requires": ["Core", "Tenant", "Product"],
-    "providers": ["Modules\\Ecommerce\\Providers\\EcommerceServiceProvider"],
-    "aliases": {}
-}

@@ -1,0 +1,16 @@
+{
+    "name": "Reporting",
+    "alias": "reporting",
+    "description": "Enterprise reporting module: financial statements, inventory valuation, aging reports, tax summaries, custom report builder, CSV/PDF export. Tenant-scoped, filterable, auditable.",
+    "keywords": ["reporting", "analytics", "financial-statements", "export", "dashboard"],
+    "priority": 16,
+    "version": "1.0.0",
+    "active": true,
+    "order": 16,
+    "providers": [
+        "Modules\\Reporting\\Infrastructure\\Providers\\ReportingServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": ["core", "tenancy"]
+}

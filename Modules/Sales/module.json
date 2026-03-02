@@ -1,9 +1,16 @@
 {
     "name": "Sales",
     "alias": "sales",
+    "description": "Sales management module: Quotation → Sales Order → Delivery → Invoice → Payment. Supports backorders, rule-based discounts, tax calculation, commissions, and e-commerce API compatibility.",
+    "keywords": ["sales", "order", "quotation", "delivery", "invoice", "payment"],
+    "priority": 12,
     "version": "1.0.0",
-    "description": "Sales order management with full Quotation → Order → Delivery → Invoice → Payment workflow",
-    "requires": ["Core", "Tenant", "Product"],
-    "providers": ["Modules\\Sales\\Providers\\SalesServiceProvider"],
-    "aliases": {}
+    "active": true,
+    "order": 12,
+    "providers": [
+        "Modules\\Sales\\Infrastructure\\Providers\\SalesServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": ["core", "tenancy", "product", "inventory", "pricing", "accounting"]
 }

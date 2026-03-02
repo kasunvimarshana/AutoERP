@@ -1,0 +1,16 @@
+{
+    "name": "Integration",
+    "alias": "integration",
+    "description": "Third-party integration and API gateway module: webhooks, event publishing, e-commerce sync (WooCommerce), payment gateway connectors, ERP/CRM external connectors, OpenAPI documentation.",
+    "keywords": ["integration", "webhook", "api-gateway", "woocommerce", "payment-gateway", "openapi"],
+    "priority": 18,
+    "version": "1.0.0",
+    "active": true,
+    "order": 18,
+    "providers": [
+        "Modules\\Integration\\Infrastructure\\Providers\\IntegrationServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": ["core", "tenancy"]
+}

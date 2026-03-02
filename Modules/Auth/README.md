@@ -1,28 +1,67 @@
 # Auth Module
 
-Handles multi-tenant authentication using Laravel Sanctum API tokens.
+## Overview
 
-## Architecture
+The **Auth** module provides stateless JWT-based authentication with multi-guard support, role-based access control (RBAC), attribute-based access control (ABAC) via Laravel Policies, and tenant-scoped API key management.
 
-Follows the **Controller → Handler → Repository → Entity** pattern.
+---
 
-- **Domain Layer**: `User` entity, `UserRepositoryInterface` (includes `verifyPassword()`, `createAuthToken()`, `revokeTokenByBearerString()`), `UserStatus` enum
-- **Application Layer**: `RegisterUserCommand/Handler`, `LoginCommand/Handler`, `LogoutCommand/Handler`
-- **Infrastructure Layer**: `UserModel` (Eloquent + `HasApiTokens`), `UserRepository` (all Sanctum/Eloquent access encapsulated here)
-- **Interface Layer**: `AuthController` (injects handlers only; no direct Eloquent), `RegisterRequest`, `LoginRequest`, `UserResource`
+## Responsibilities
 
-## API Endpoints
+- JWT token issuance, refresh, and rotation per user × device × organisation
+- Multi-guard authentication (web, api, tenant-api)
+- Role and permission management (RBAC via Spatie Laravel Permission)
+- Policy classes for ABAC (no hardcoded role checks in controllers)
+- Tenant-level feature flags
+- Feature-level gating
+- Scoped API key management
+- Suspicious activity detection
+- Rate limiting per tenant/user
 
-| Method | URI | Auth | Description |
-|--------|-----|------|-------------|
-| POST | `/api/v1/auth/register` | No | Register a new user |
-| POST | `/api/v1/auth/login` | No | Login and get token |
-| POST | `/api/v1/auth/logout` | Bearer | Revoke current token |
-| GET | `/api/v1/auth/me` | Bearer | Get authenticated user |
+---
 
-## Multi-Tenancy
+## Authorization Rules
 
-Every user is scoped to a `tenant_id`. Authentication is always tenant-aware:
-- Login requires `tenant_id` in the request
-- Tokens are scoped per user-device pair
-- All user queries filter by `tenant_id` in `UserRepository`
+- **Policy classes only** — no permission logic in controllers
+- No hardcoded role checks anywhere in the codebase
+- All policies are tenant-scoped
+
+---
+
+## Architecture Compliance
+
+| Rule | Status |
+|---|---|
+| No business logic in controllers | ✅ Enforced |
+| No query builder calls in controllers | ✅ Enforced |
+| Policy classes only (no hardcoded role checks) | ✅ Enforced |
+| JWT per user × device × organisation | ✅ Required |
+| Tenant-scoped permissions | ✅ Enforced |
+| No cross-module coupling | ✅ Enforced |
+
+---
+
+## Architecture Layer
+
+```
+Modules/Auth/
+ ├── Application/       # Login/logout/refresh use cases, API key issuance
+ ├── Domain/            # User entity, Role/Permission value objects, AuthRepository contract
+ ├── Infrastructure/    # AuthServiceProvider, JWT guards, AuthRepository implementation
+ ├── Interfaces/        # AuthController, LoginRequest, TokenResource
+ ├── module.json
+ └── README.md
+```
+
+---
+
+## Dependencies
+
+- `core`
+- `tenancy`
+
+---
+
+## Status
+
+🔴 **Planned** — See [IMPLEMENTATION_STATUS.md](../../IMPLEMENTATION_STATUS.md)

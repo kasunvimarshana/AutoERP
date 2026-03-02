@@ -2,66 +2,150 @@
 
 ## Overview
 
-Ledger-driven inventory management module following Clean Architecture and **Controller → Service → Handler (with Pipeline) → Repository → Entity** pattern.
+The **Inventory** module implements a **ledger-driven, transactional, immutable** inventory management system. Stock is never edited directly — all changes occur via transactions logged in the stock ledger.
 
-## Architecture
+This module handles both standard inventory management and **pharmaceutical compliance mode**. When pharmaceutical mode is enabled for a tenant, all pharmaceutical-specific rules become mandatory and cannot be bypassed.
 
-| Layer | Location | Responsibility |
-|---|---|---|
-| Domain | `Domain/` | Entities, contracts, enums, value objects |
-| Application | `Application/` | Commands, handlers, pipeline pipes |
-| Infrastructure | `Infrastructure/` | Eloquent models, repositories, migrations |
-| Interfaces | `Interfaces/` | HTTP controllers, requests, resources, routes |
+---
 
-## Key Design Decisions
+## Core Rules
 
-- **Immutable ledger**: `stock_ledger_entries` is append-only (no updates, no deletes). Historical accuracy is preserved.
-- **Balance cache**: `stock_balances` holds a materialised view of current stock per (tenant, warehouse, product). Updated atomically under pessimistic locking inside `DB::transaction()`.
-- **BCMath**: All quantity and monetary arithmetic uses BCMath (4 decimal places). Float arithmetic is strictly prohibited.
-- **Pessimistic locking**: `lockForUpdate()` on `stock_balances` before every deduction or transfer to prevent race conditions.
-- **Pipeline pattern**: `AdjustStockHandler` and `TransferStockHandler` use Laravel Pipeline chaining `ValidateCommandPipe → AuditLogPipe → ValidateStockAvailabilityPipe` before persistence.
-- **Tenant isolation**: `WarehouseModel` uses `BelongsToTenant` trait; all repository queries filter by `tenant_id`.
+- Stock is **never edited directly**
+- All stock changes occur via **transactions**
+- Reservation **precedes** deduction
+- Deduction must be **atomic**
+- Historical ledger entries are **immutable**
 
-## API Endpoints
+---
 
-| Method | URL | Description |
-|---|---|---|
-| GET | `/api/v1/warehouses` | List warehouses for tenant |
-| POST | `/api/v1/warehouses` | Create warehouse |
-| GET | `/api/v1/warehouses/{id}` | Get warehouse by ID |
-| POST | `/api/v1/inventory/receive` | Receive stock (goods receipt) |
-| POST | `/api/v1/inventory/adjust` | Adjust stock (in or out) |
-| POST | `/api/v1/inventory/transfer` | Transfer stock between warehouses |
-| GET | `/api/v1/inventory/scan` | Look up product and stock balances by barcode |
-| GET | `/api/v1/inventory/stock` | Get current stock balances |
-| GET | `/api/v1/inventory/ledger` | Get stock ledger entries |
+## Supported Flows
 
-## Transaction Types
+| Flow | Description |
+|---|---|
+| Purchase Receipt | Stock in from supplier |
+| Sales Shipment | Stock out to customer |
+| Internal Transfer | Move stock between locations |
+| Adjustment | Manual correction with reason |
+| Return | Customer/supplier returns |
 
-| Type | Direction | Description |
-|---|---|---|
-| `receipt` | + | Goods received from supplier |
-| `shipment` | − | Goods shipped to customer |
-| `adjustment_in` | + | Positive stock correction |
-| `adjustment_out` | − | Negative stock correction |
-| `transfer_in` | + | Received from another warehouse |
-| `transfer_out` | − | Sent to another warehouse |
-| `return_in` | + | Customer return received |
+---
 
-## Barcode & RFID Scanning
+## Responsibilities
 
-`GET /api/v1/inventory/scan?tenant_id=X&barcode=Y`
+- Stock ledger (immutable transaction log)
+- Stock deduction with pessimistic locking
+- Stock reservation system
+- FIFO / LIFO / Weighted Average costing
+- Multi-warehouse support
+- Multi-bin location tracking
+- Expiry date tracking
+- Serial / Batch / Lot traceability (optional in standard mode; mandatory in pharmaceutical mode)
+- Cycle counting
+- Reorder rules and procurement suggestions
+- Backorder management
+- Drop-shipping support
+- Damage handling and quarantine workflows
+- Idempotent stock APIs
 
-Scans a barcode (or RFID tag value stored as barcode) and returns the matching product identity with all current stock balances across warehouses. Uses `ProductRepositoryInterface::findByBarcode()` — a cross-module domain contract with no Eloquent coupling.
+---
 
-- Returns **200** with `{product_id, sku, name, barcode, uom, balances[]}` on success
-- Returns **404** when no product matches the barcode within the tenant
-- Returns **422** when `barcode` query parameter is omitted
+## Pharmaceutical Compliance Mode
 
-## Concurrency Safety
+When pharmaceutical compliance mode is enabled for a tenant, the following rules are enforced and **cannot be bypassed**:
 
-All stock deduction flows acquire a `FOR UPDATE` lock on the `stock_balances` row before modifying it, within a `DB::transaction()`. This ensures no two concurrent requests can both succeed when insufficient stock exists.
+| Rule | Enforcement |
+|---|---|
+| Lot tracking | Mandatory |
+| Expiry date tracking | Mandatory |
+| FEFO (First-Expired, First-Out) | Strictly enforced (overrides FIFO/LIFO) |
+| Serial tracking (where applicable) | Required |
+| Audit trail | Cannot be disabled |
+| Quarantine for expired/recalled items | Enforced |
 
-## Tests
+### Regulatory Compliance
 
-See `tests/Feature/Modules/Inventory/InventoryTest.php`.
+- **FDA** (Food and Drug Administration) alignment
+- **DEA** (Drug Enforcement Administration) alignment
+- **DSCSA** (Drug Supply Chain Security Act) adherence
+- Drug serial number tracking
+- Tamper-resistant audit logs
+- Expiry override logging (with justification)
+- High-risk medication access logging
+
+### Pharmaceutical Responsibilities
+
+- FEFO picking enforcement
+- Expiry alert and quarantine workflows
+- Lot/batch mandatory traceability
+- High-risk medication flagging and restricted access
+- Controlled substance tracking
+- Recall management workflows
+- Regulatory compliance reports (FDA/DEA/DSCSA)
+- Tamper-proof audit trail for all stock mutations
+
+---
+
+## Concurrency Controls
+
+- **Pessimistic locking** for all stock deduction operations
+- **Optimistic locking** for non-critical updates
+- **Atomic transactions** for all stock mutations
+- **Deadlock-aware retry** mechanisms
+
+## Financial Rules
+
+- All cost calculations use **BCMath only** — minimum **4 decimal places**
+- Intermediate calculations (further divided or multiplied before final rounding): **8+ decimal places**
+- Final monetary values: rounded to the **currency's standard precision (typically 2 decimal places)**
+- No floating-point arithmetic permitted
+- Costing method must reconcile with Accounting module
+
+---
+
+## Architecture Layer
+
+```
+Modules/Inventory/
+ ├── Application/       # Stock in/out/transfer/adjust use cases, reservation service,
+ │                      # FEFO picking, quarantine, recall, compliance report use cases
+ ├── Domain/            # StockLedger entity, StockReservation entity,
+ │                      # InventoryRepository contract, PharmaceuticalStockRule,
+ │                      # ExpiryAlert, RecallEvent entities
+ ├── Infrastructure/    # InventoryRepository, InventoryServiceProvider, locking strategies,
+ │                      # compliance report generators
+ ├── Interfaces/        # StockController, StockResource, StockAdjustmentRequest,
+ │                      # PharmaceuticalStockController, ComplianceReportController
+ ├── module.json
+ └── README.md
+```
+
+---
+
+## Architecture Compliance
+
+| Rule | Status |
+|---|---|
+| No business logic in controllers | ✅ Enforced |
+| No query builder calls in controllers | ✅ Enforced |
+| Tenant isolation enforced (`tenant_id` + global scope) | ✅ Enforced |
+| All financial calculations use BCMath (no float) | ✅ Enforced |
+| All stock mutations wrapped in DB transactions with pessimistic locking | ✅ Enforced |
+| Reservation precedes deduction | ✅ Enforced |
+| Historical ledger entries are immutable | ✅ Enforced |
+| Pharmaceutical compliance mode enforced when enabled (FEFO, lot/expiry mandatory, audit trail) | ✅ Enforced |
+| Full audit trail (cannot be disabled) | ✅ Enforced |
+| No cross-module coupling (communicates via contracts/events) | ✅ Enforced |
+
+---
+
+## Dependencies
+
+- `core`
+- `tenancy`
+- `product`
+
+---
+
+## Status
+
+🔴 **Planned** — See [IMPLEMENTATION_STATUS.md](../../IMPLEMENTATION_STATUS.md)

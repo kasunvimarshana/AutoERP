@@ -1,0 +1,16 @@
+{
+    "name": "Plugin",
+    "alias": "plugin",
+    "description": "Plugin marketplace module: module manifest validation, dependency graph resolution, version compatibility, tenant-scoped enablement, sandboxed execution, and upgrade migration paths.",
+    "keywords": ["plugin", "marketplace", "module-federation", "extension", "manifest"],
+    "priority": 19,
+    "version": "1.0.0",
+    "active": true,
+    "order": 19,
+    "providers": [
+        "Modules\\Plugin\\Infrastructure\\Providers\\PluginServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": ["core", "tenancy"]
+}

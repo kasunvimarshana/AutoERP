@@ -209,15 +209,27 @@ buying_uom — purchasing UOM (optional; falls back to uom)
 selling_uom — sales UOM (optional; falls back to uom)  
 uom_conversions table stores product-specific factors (e.g. 1 box = 12 pcs)  
 Conversion supports direct path (from_uom → to_uom) and inverse path (to_uom → from_uom, reciprocal)  
-All conversion arithmetic uses BCMath (4 d.p.) — no floating-point
+All conversion arithmetic uses BCMath — minimum 4 decimal places; intermediate calculations (further divided or multiplied before final rounding) use 8+ decimal places; final monetary values are rounded to the currency's standard precision (typically 2 decimal places) — no floating-point
 
 ---
 
 # 7. Pricing & Discounts
 
-Buying price, selling price, purchase discount, and sales discount may vary depending on location, batch, lot, or other applicable factors.
+Buying price, selling price, purchase discount, and sales discount may vary by:
 
-Discounts may be applied as a flat amount, a percentage, or other applicable formats.
+- Location
+- Batch
+- Lot
+- Date range
+- Customer tier
+- Minimum quantity
+
+Discount formats:
+
+- Flat (fixed) amount
+- Percentage
+
+All prices and discounts must use BCMath; no floating-point arithmetic.
 
 ---
 

@@ -1,0 +1,16 @@
+{
+    "name": "Warehouse",
+    "alias": "warehouse",
+    "description": "Warehouse Management System (WMS): bin-level tracking, intelligent putaway, batch/wave/zone picking, packing validation, labor tracking, reverse logistics, and warehouse layout optimization.",
+    "keywords": ["warehouse", "wms", "putaway", "picking", "packing", "bin", "labor"],
+    "priority": 11,
+    "version": "1.0.0",
+    "active": true,
+    "order": 11,
+    "providers": [
+        "Modules\\Warehouse\\Infrastructure\\Providers\\WarehouseServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": ["core", "tenancy", "inventory"]
+}

@@ -1,9 +1,16 @@
 {
     "name": "Core",
     "alias": "core",
-    "description": "Core shared infrastructure: tenant isolation, global scopes, pipeline pipes, middleware, value objects",
+    "description": "Core foundation module providing shared infrastructure: base repositories, service providers, pipeline traits, BCMath helpers, response envelopes, and cross-cutting concerns.",
+    "keywords": ["core", "foundation", "base", "shared"],
+    "priority": 1,
     "version": "1.0.0",
-    "requires": [],
-    "providers": ["Modules\\Core\\Providers\\CoreServiceProvider"],
-    "aliases": {}
+    "active": true,
+    "order": 1,
+    "providers": [
+        "Modules\\Core\\Infrastructure\\Providers\\CoreServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": []
 }

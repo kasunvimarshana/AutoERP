@@ -1,9 +1,0 @@
-{
-    "name": "Tenant",
-    "alias": "tenant",
-    "description": "Multi-tenant root entity management with per-tenant currency configuration",
-    "version": "1.0.0",
-    "requires": [],
-    "providers": ["Modules\\Tenant\\Providers\\TenantServiceProvider"],
-    "aliases": {}
-}

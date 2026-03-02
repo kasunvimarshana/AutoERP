@@ -1,9 +1,0 @@
-{
-    "name": "Customization",
-    "alias": "customization",
-    "description": "Metadata-driven custom fields engine for dynamic, configurable entity attributes without schema migrations.",
-    "version": "1.0.0",
-    "requires": ["Core", "Tenant"],
-    "providers": ["Modules\\Customization\\Providers\\CustomizationServiceProvider"],
-    "aliases": {}
-}

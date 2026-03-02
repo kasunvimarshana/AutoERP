@@ -1,57 +1,84 @@
 # Accounting Module
 
-Double-entry bookkeeping with Chart of Accounts and Journal Entries for the KV Enterprise Dynamic SaaS CRM/ERP platform.
-
 ## Overview
 
-The Accounting module provides a complete double-entry bookkeeping system, including:
+The **Accounting** module implements a full double-entry bookkeeping system per tenant, with immutable journal entries, auto-posting rules, and comprehensive financial reporting.
 
-- **Chart of Accounts** — hierarchical account structure with five account types
-- **Journal Entries** — double-entry transactions with draft/post workflow
+---
 
-## Architecture
+## Double-Entry Rule
 
-Follows the platform's **Controller → Service → Handler → Repository → Entity** pattern.
+Every transaction must:
+- **Debit** one account
+- **Credit** another account
+- **Total Debits = Total Credits** at all times
 
-## Account Types
+Violations of this rule are a **Critical Violation**.
 
-| Type       | Normal Balance |
-|------------|---------------|
-| Asset      | Debit         |
-| Expense    | Debit         |
-| Liability  | Credit        |
-| Equity     | Credit        |
-| Revenue    | Credit        |
+---
 
-## API Endpoints
+## Responsibilities
 
-### Chart of Accounts
+- Chart of accounts management (per tenant)
+- Journal entry creation (immutable once posted)
+- Auto-posting rules (event-driven posting)
+- Tax engine (inclusive/exclusive, multi-tax)
+- Fiscal period management (open/close periods)
+- Financial statements:
+  - Trial Balance
+  - Profit & Loss (Income Statement)
+  - Balance Sheet
+- Reconciliation with inventory valuation
+- Audit trail (cannot be disabled)
 
-| Method | Endpoint               | Description          |
-|--------|------------------------|----------------------|
-| GET    | /api/v1/accounts       | List accounts        |
-| POST   | /api/v1/accounts       | Create account       |
-| GET    | /api/v1/accounts/{id}  | Get account by ID    |
-| PUT    | /api/v1/accounts/{id}  | Update account       |
-| DELETE | /api/v1/accounts/{id}  | Delete account       |
+## Financial Integrity Rules
 
-### Journal Entries
+- **No floating-point arithmetic** — BCMath only
+- **Arbitrary precision decimals** — minimum 4 decimal places
+- **Intermediate calculations** (further divided or multiplied before final rounding): 8+ decimal places
+- **Final monetary values**: rounded to the currency's standard precision (typically 2 decimal places)
+- **Deterministic rounding**
+- **Immutable journal entries** — never edited, only reversed
+- Financial integrity **cannot be bypassed**
 
-| Method | Endpoint                                    | Description            |
-|--------|---------------------------------------------|------------------------|
-| GET    | /api/v1/accounting/journal-entries          | List journal entries   |
-| POST   | /api/v1/accounting/journal-entries          | Create journal entry   |
-| GET    | /api/v1/accounting/journal-entries/{id}     | Get journal entry      |
-| POST   | /api/v1/accounting/journal-entries/{id}/post | Post journal entry    |
-| DELETE | /api/v1/accounting/journal-entries/{id}     | Delete draft entry     |
+---
 
-## Journal Entry Workflow
+## Architecture Layer
 
-1. Create a journal entry (status: `draft`)
-2. Entry must have at least 2 lines with `total_debit == total_credit`
-3. Post the entry (status: `posted`) — updates account balances
-4. Posted entries cannot be deleted
+```
+Modules/Accounting/
+ ├── Application/       # Post journal entry, close period, generate reports use cases
+ ├── Domain/            # Account, JournalEntry, FiscalPeriod entities, AccountingRepository contract
+ ├── Infrastructure/    # AccountingRepository, AccountingServiceProvider, auto-posting engine
+ ├── Interfaces/        # AccountController, JournalController, FinancialReportController
+ ├── module.json
+ └── README.md
+```
 
-## Financial Precision
+---
 
-All monetary values use BCMath with 4 decimal places.
+## Architecture Compliance
+
+| Rule | Status |
+|---|---|
+| No business logic in controllers | ✅ Enforced |
+| No query builder calls in controllers | ✅ Enforced |
+| Tenant isolation enforced (`tenant_id` + global scope) | ✅ Enforced |
+| All financial calculations use BCMath (no float) | ✅ Enforced |
+| Journal entries are immutable (never edited, only reversed) | ✅ Enforced |
+| Total Debits = Total Credits at all times | ✅ Enforced |
+| Full audit trail (cannot be disabled) | ✅ Enforced |
+| No cross-module coupling (communicates via contracts/events) | ✅ Enforced |
+
+---
+
+## Dependencies
+
+- `core`
+- `tenancy`
+
+---
+
+## Status
+
+🔴 **Planned** — See [IMPLEMENTATION_STATUS.md](../../IMPLEMENTATION_STATUS.md)

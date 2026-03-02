@@ -1,39 +1,69 @@
 # CRM Module
 
-Manages **Contacts**, **Leads**, and **Activities** for the enterprise ERP/CRM SaaS platform.
+## Overview
 
-## Features
+The **CRM** module manages the full customer relationship lifecycle from lead acquisition to closed deal, with pipeline management, activity tracking, and campaign attribution.
 
-- Contact management (create, update, delete, list)
-- Lead/opportunity tracking with status workflow
-- Activity logging (calls, emails, meetings, notes, tasks)
-- Full tenant isolation
+---
 
-## Architecture
+## CRM Pipeline
 
-Follows Clean Architecture with Domain → Application → Infrastructure → Interfaces layering.
+```
+Lead → Opportunity → Proposal → Closed Won / Closed Lost
+```
 
-## API Endpoints
+---
 
-### Contacts
-- `GET    /api/v1/crm/contacts`
-- `POST   /api/v1/crm/contacts`
-- `GET    /api/v1/crm/contacts/{id}`
-- `PUT    /api/v1/crm/contacts/{id}`
-- `DELETE /api/v1/crm/contacts/{id}`
-- `GET    /api/v1/crm/contacts/{id}/leads`
-- `GET    /api/v1/crm/contacts/{id}/activities`
+## Responsibilities
 
-### Leads
-- `GET    /api/v1/crm/leads`
-- `POST   /api/v1/crm/leads`
-- `GET    /api/v1/crm/leads/{id}`
-- `PUT    /api/v1/crm/leads/{id}`
-- `DELETE /api/v1/crm/leads/{id}`
-- `GET    /api/v1/crm/leads/{id}/activities`
+- Lead management (capture, qualify, assign)
+- Opportunity management
+- Pipeline stage configuration
+- Activity tracking (calls, emails, meetings, tasks)
+- Campaign tracking and attribution
+- Email integration
+- SLA tracking and timers
+- Notes and attachments
+- Customer segmentation
+- Deal forecasting
 
-### Activities
-- `GET    /api/v1/crm/activities`
-- `POST   /api/v1/crm/activities`
-- `GET    /api/v1/crm/activities/{id}`
-- `DELETE /api/v1/crm/activities/{id}`
+---
+
+## Architecture Layer
+
+```
+Modules/CRM/
+ ├── Application/       # Create lead, advance opportunity, close deal, track activity use cases
+ ├── Domain/            # Lead, Opportunity, Pipeline, Activity entities, CRMRepository contract
+ ├── Infrastructure/    # CRMRepository, CRMServiceProvider, email integration adapters
+ ├── Interfaces/        # LeadController, OpportunityController, PipelineController
+ ├── module.json
+ └── README.md
+```
+
+---
+
+## Dependencies
+
+- `core`
+- `tenancy`
+- `workflow`
+
+---
+
+## Architecture Compliance
+
+| Rule | Status |
+|---|---|
+| No business logic in controllers | ✅ Enforced |
+| No query builder calls in controllers | ✅ Enforced |
+| Tenant isolation enforced | ✅ Enforced |
+| Pipeline stages and deal statuses database-driven | ✅ Required |
+| Full audit trail | ✅ Enforced |
+| No cross-module coupling (communicates via contracts/events) | ✅ Enforced |
+
+---
+
+## Status
+
+🔴 **Planned** — See [IMPLEMENTATION_STATUS.md](../../IMPLEMENTATION_STATUS.md)

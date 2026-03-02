@@ -1,9 +1,16 @@
 {
     "name": "Inventory",
     "alias": "inventory",
+    "description": "Ledger-driven inventory management system (IMS): stock transactions, FIFO/LIFO/Weighted Average costing, reservations, transfers, adjustments, cycle counting, reorder rules, backorders. Includes pharmaceutical compliance mode: mandatory lot/expiry tracking, FEFO enforcement, controlled substance monitoring, FDA/DEA/DSCSA compliance, quarantine workflows, audit trails.",
+    "keywords": ["inventory", "stock", "ledger", "fifo", "lifo", "warehouse", "reservation", "pharmaceutical", "fefo", "lot-tracking", "expiry", "fda", "dea", "dscsa", "compliance"],
+    "priority": 10,
     "version": "1.0.0",
-    "description": "Ledger-driven inventory management with warehouse management, stock transactions, and BCMath precision",
-    "requires": ["Core", "Product"],
-    "providers": ["Modules\\Inventory\\Providers\\InventoryServiceProvider"],
-    "aliases": {}
+    "active": true,
+    "order": 10,
+    "providers": [
+        "Modules\\Inventory\\Infrastructure\\Providers\\InventoryServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": ["core", "tenancy", "product"]
 }

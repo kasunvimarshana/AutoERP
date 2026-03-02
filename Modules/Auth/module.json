@@ -1,9 +1,16 @@
 {
     "name": "Auth",
     "alias": "auth",
-    "description": "User registration, Sanctum-based authentication, and stateless API token management",
+    "description": "Authentication and authorization module. JWT-based stateless auth with multi-guard support, RBAC (roles & permissions), ABAC (policy-based), tenant-scoped API keys, and feature flags.",
+    "keywords": ["auth", "authentication", "authorization", "rbac", "abac", "jwt"],
+    "priority": 3,
     "version": "1.0.0",
-    "requires": ["Tenant"],
-    "providers": ["Modules\\Auth\\Providers\\AuthModuleServiceProvider"],
-    "aliases": {}
+    "active": true,
+    "order": 3,
+    "providers": [
+        "Modules\\Auth\\Infrastructure\\Providers\\AuthServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": ["core", "tenancy"]
 }

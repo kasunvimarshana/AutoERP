@@ -393,9 +393,11 @@ Example:
 ## 5.4 Arithmetic Precision
 
 - All calculations use BCMath
-- Precision: 4 decimal places
+- Precision: 4 decimal places minimum
+- Intermediate calculations (further divided or multiplied before final rounding): 8+ decimal places
+- Final monetary values: rounded to the currency's standard precision (typically 2 decimal places)
 - No floating-point arithmetic
-- Deterministic financial-safe math
+- Deterministic and reversible
 
 ---
 

@@ -1,9 +1,16 @@
 {
     "name": "Procurement",
     "alias": "procurement",
-    "description": "Supplier management and purchase order lifecycle (draft → confirmed → received → billed → cancelled)",
+    "description": "Procurement module: Purchase Request → RFQ → Vendor Selection → Purchase Order → Goods Receipt → Vendor Bill → Payment. Three-way matching, vendor scoring, price comparison.",
+    "keywords": ["procurement", "purchase-order", "rfq", "vendor", "goods-receipt", "three-way-matching"],
+    "priority": 15,
     "version": "1.0.0",
-    "requires": ["Core", "Tenant", "Product", "Inventory"],
-    "providers": ["Modules\\Procurement\\Providers\\ProcurementServiceProvider"],
-    "aliases": {}
+    "active": true,
+    "order": 15,
+    "providers": [
+        "Modules\\Procurement\\Infrastructure\\Providers\\ProcurementServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": ["core", "tenancy", "product", "inventory", "accounting", "workflow"]
 }
