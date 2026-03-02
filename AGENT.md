@@ -212,6 +212,9 @@ Hardcoded business rules are prohibited.
 ## Financial Rules
 
 * Arbitrary precision decimals only (BCMath or equivalent)
+* Minimum 4 decimal places
+* Intermediate calculations (further divided or multiplied before final rounding): 8+ decimal places
+* Final monetary values: rounded to the currency's standard precision (typically 2 decimal places)
 * Floating-point arithmetic strictly forbidden
 * Tax inclusive/exclusive support
 * Double-entry bookkeeping compatibility
@@ -340,6 +343,9 @@ Every transaction must:
 
 * No floating-point arithmetic
 * Arbitrary precision decimals only
+* Minimum 4 decimal places
+* Intermediate calculations (further divided or multiplied before final rounding): 8+ decimal places
+* Final monetary values: rounded to the currency's standard precision (typically 2 decimal places)
 * Deterministic rounding
 * Immutable journal entries
 

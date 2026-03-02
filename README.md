@@ -30,12 +30,12 @@
 | [Metadata](Modules/Metadata/README.md) | Custom fields, dynamic forms, feature toggles | 🔴 Planned |
 | [Workflow](Modules/Workflow/README.md) | State machine engine, approvals, SLA | 🔴 Planned |
 | [Product](Modules/Product/README.md) | Product catalog, UOM, variants, pricing | 🔴 Planned |
+| [Accounting](Modules/Accounting/README.md) | Double-entry bookkeeping, journal entries, statements | 🔴 Planned |
 | [Pricing](Modules/Pricing/README.md) | Rule-based pricing & discount engine | 🔴 Planned |
 | [Inventory](Modules/Inventory/README.md) | Ledger-driven IMS, FIFO/LIFO/WA, concurrency; includes pharmaceutical compliance mode (FEFO, lot/expiry, FDA/DEA/DSCSA) | 🔴 Planned |
 | [Warehouse](Modules/Warehouse/README.md) | WMS: bin tracking, putaway, picking, reverse logistics | 🔴 Planned |
 | [Sales](Modules/Sales/README.md) | Quotation → Order → Delivery → Invoice → Payment | 🔴 Planned |
 | [POS](Modules/POS/README.md) | Offline-first POS terminal, sync reconciliation | 🔴 Planned |
-| [Accounting](Modules/Accounting/README.md) | Double-entry bookkeeping, journal entries, statements | 🔴 Planned |
 | [CRM](Modules/CRM/README.md) | Lead → Opportunity → Proposal → Closed | 🔴 Planned |
 | [Procurement](Modules/Procurement/README.md) | PO → Goods Receipt → Vendor Bill, three-way match | 🔴 Planned |
 | [Reporting](Modules/Reporting/README.md) | Financial statements, inventory reports, custom builder | 🔴 Planned |
