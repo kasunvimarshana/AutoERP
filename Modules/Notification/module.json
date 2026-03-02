@@ -1,1 +1,0 @@
-{"name":"Notification","alias":"notification","version":"1.0.0","description":"Multi-channel notification system with templates and delivery records.","dependencies":["Tenant","User"],"enabled":true}

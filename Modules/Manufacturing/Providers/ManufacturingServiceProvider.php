@@ -1,31 +1,32 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Manufacturing\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Modules\Manufacturing\Domain\Contracts\BomLineRepositoryInterface;
-use Modules\Manufacturing\Domain\Contracts\BomRepositoryInterface;
-use Modules\Manufacturing\Domain\Contracts\WorkOrderLineRepositoryInterface;
-use Modules\Manufacturing\Domain\Contracts\WorkOrderRepositoryInterface;
-use Modules\Manufacturing\Infrastructure\Repositories\BomLineRepository;
-use Modules\Manufacturing\Infrastructure\Repositories\BomRepository;
-use Modules\Manufacturing\Infrastructure\Repositories\WorkOrderLineRepository;
-use Modules\Manufacturing\Infrastructure\Repositories\WorkOrderRepository;
+use Modules\Manufacturing\Application\Handlers\CreateBomHandler;
+use Modules\Manufacturing\Application\Handlers\CreateProductionOrderHandler;
+use Modules\Manufacturing\Application\Handlers\CompleteProductionOrderHandler;
+use Modules\Manufacturing\Domain\Contracts\ManufacturingRepositoryInterface;
+use Modules\Manufacturing\Infrastructure\Repositories\ManufacturingRepository;
 
 class ManufacturingServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->bind(BomRepositoryInterface::class, BomRepository::class);
-        $this->app->bind(BomLineRepositoryInterface::class, BomLineRepository::class);
-        $this->app->bind(WorkOrderRepositoryInterface::class, WorkOrderRepository::class);
-        $this->app->bind(WorkOrderLineRepositoryInterface::class, WorkOrderLineRepository::class);
-        $this->mergeConfigFrom(__DIR__ . '/../config.php', 'manufacturing');
+        $this->app->bind(
+            ManufacturingRepositoryInterface::class,
+            ManufacturingRepository::class
+        );
+
+        $this->app->singleton(CreateBomHandler::class);
+        $this->app->singleton(CreateProductionOrderHandler::class);
+        $this->app->singleton(CompleteProductionOrderHandler::class);
     }
 
     public function boot(): void
     {
-        $this->loadMigrationsFrom(__DIR__ . '/../Infrastructure/Migrations');
-        $this->loadRoutesFrom(__DIR__ . '/../routes.php');
+        $this->loadMigrationsFrom(__DIR__.'/../Infrastructure/Database/Migrations');
     }
 }

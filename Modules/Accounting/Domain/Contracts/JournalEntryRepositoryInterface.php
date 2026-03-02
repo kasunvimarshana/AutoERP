@@ -1,11 +1,21 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Accounting\Domain\Contracts;
 
-use Modules\Shared\Domain\Contracts\RepositoryInterface;
+use Modules\Accounting\Domain\Entities\JournalEntry;
 
-interface JournalEntryRepositoryInterface extends RepositoryInterface
+interface JournalEntryRepositoryInterface
 {
-    public function nextNumber(string $tenantId): string;
-    public function paginate(array $filters, int $perPage = 15): object;
+    public function findById(int $id, int $tenantId): ?JournalEntry;
+
+    /**
+     * Paginated list of journal entries with their lines.
+     *
+     * @return array{data: JournalEntry[], total: int, per_page: int, current_page: int, last_page: int}
+     */
+    public function findPaginated(int $tenantId, int $page = 1, int $perPage = 25): array;
+
+    public function save(JournalEntry $entry): JournalEntry;
 }

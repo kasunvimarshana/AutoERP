@@ -1,1 +1,15 @@
-{"name":"Auth","alias":"auth","version":"1.0.0","description":"Authentication and token lifecycle management.","dependencies":["Tenant","User"],"enabled":true}
+{
+    "name": "Auth",
+    "alias": "auth",
+    "description": "JWT authentication, RBAC and multi-device session management",
+    "version": "1.0.0",
+    "keywords": [],
+    "active": 1,
+    "order": 2,
+    "providers": [
+        "Modules\\Auth\\Providers\\AuthServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": ["Core"]
+}

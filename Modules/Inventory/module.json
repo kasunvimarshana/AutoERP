@@ -1,13 +1,15 @@
 {
     "name": "Inventory",
     "alias": "inventory",
-    "description": "Inventory management module - products, warehouses, locations, and stock movements",
+    "description": "Stock ledger, warehouse management and inventory adjustments",
     "version": "1.0.0",
-    "keywords": ["inventory", "products", "warehouse", "stock", "movements"],
-    "active": true,
-    "order": 13,
+    "keywords": [],
+    "active": 1,
+    "order": 4,
     "providers": [
         "Modules\\Inventory\\Providers\\InventoryServiceProvider"
     ],
-    "dependencies": ["Tenant", "User", "Setting", "Notification", "Media"]
+    "aliases": {},
+    "files": [],
+    "requires": ["Core", "Product"]
 }

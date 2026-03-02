@@ -1,8 +1,0 @@
-{
-    "name": "Tenant",
-    "alias": "tenant",
-    "version": "1.0.0",
-    "description": "Multi-tenancy, organisation hierarchy, and tenant lifecycle management.",
-    "dependencies": [],
-    "enabled": true
-}

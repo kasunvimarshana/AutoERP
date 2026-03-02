@@ -1,37 +1,69 @@
 <?php
-
+declare(strict_types=1);
 namespace Modules\Accounting\Infrastructure\Repositories;
-
 use Modules\Accounting\Domain\Contracts\AccountRepositoryInterface;
-use Modules\Accounting\Infrastructure\Models\AccountModel;
-use Modules\Shared\Infrastructure\Repositories\BaseEloquentRepository;
-
-class AccountRepository extends BaseEloquentRepository implements AccountRepositoryInterface
-{
-    public function __construct()
-    {
-        parent::__construct(new AccountModel());
+use Modules\Accounting\Domain\Entities\Account as AccountEntity;
+use Modules\Accounting\Domain\Enums\AccountType;
+use Modules\Accounting\Infrastructure\Models\Account as AccountModel;
+class AccountRepository implements AccountRepositoryInterface {
+    public function findById(int $id, int $tenantId): ?AccountEntity {
+        $m = AccountModel::withoutGlobalScope('tenant')->where('id',$id)->where('tenant_id',$tenantId)->first();
+        return $m ? $this->toDomain($m) : null;
     }
-
-    public function findByCode(string $tenantId, string $code): ?object
-    {
-        return AccountModel::where('tenant_id', $tenantId)->where('code', $code)->first();
+    public function findByCode(string $code, int $tenantId): ?AccountEntity {
+        $m = AccountModel::withoutGlobalScope('tenant')->where('code',$code)->where('tenant_id',$tenantId)->first();
+        return $m ? $this->toDomain($m) : null;
     }
-
-    public function paginate(array $filters = [], int $perPage = 15): object
-    {
-        $query = AccountModel::query();
-
-        if (! empty($filters['type'])) {
-            $query->where('type', $filters['type']);
-        }
-        if (isset($filters['is_active'])) {
-            $query->where('is_active', (bool) $filters['is_active']);
-        }
-        if (! empty($filters['parent_id'])) {
-            $query->where('parent_id', $filters['parent_id']);
-        }
-
-        return $query->orderBy('code')->paginate($perPage);
+    public function findAll(int $tenantId): array {
+        return AccountModel::withoutGlobalScope('tenant')
+            ->where('tenant_id', $tenantId)
+            ->orderBy('code')
+            ->get()
+            ->map(fn(AccountModel $m): AccountEntity => $this->toDomain($m))
+            ->all();
+    }
+    public function findActiveByTypes(array $types, int $tenantId): array {
+        return AccountModel::withoutGlobalScope('tenant')
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->whereIn('type', $types)
+            ->orderBy('type')
+            ->orderBy('code')
+            ->get()
+            ->map(fn(AccountModel $m): AccountEntity => $this->toDomain($m))
+            ->all();
+    }
+    public function save(AccountEntity $account): AccountEntity {
+        $type = $account->getType();
+        $m = AccountModel::withoutGlobalScope('tenant')->updateOrCreate(
+            ['id' => $account->getId()],
+            [
+                'tenant_id'      => $account->getTenantId(),
+                'parent_id'      => $account->getParentId(),
+                'code'           => $account->getCode(),
+                'name'           => $account->getName(),
+                'type'           => $type->value,
+                'normal_balance' => $type->normalBalance(),
+                'is_active'      => $account->isActive(),
+            ]
+        );
+        return $this->toDomain($m->fresh());
+    }
+    public function delete(int $id, int $tenantId): void {
+        AccountModel::withoutGlobalScope('tenant')->where('id',$id)->where('tenant_id',$tenantId)->first()?->delete();
+    }
+    private function toDomain(AccountModel $m): AccountEntity {
+        $type = $m->type instanceof AccountType ? $m->type : AccountType::from((string)$m->type);
+        return new AccountEntity(
+            id: (int)$m->id,
+            tenantId: (int)$m->tenant_id,
+            code: (string)$m->code,
+            name: (string)$m->name,
+            type: $type,
+            parentId: $m->parent_id ? (int)$m->parent_id : null,
+            isActive: (bool)$m->is_active,
+            normalBalance: $type->normalBalance(),
+            currentBalance: bcadd((string)($m->current_balance ?? '0'), '0', 4),
+        );
     }
 }

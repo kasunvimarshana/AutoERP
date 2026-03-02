@@ -1,44 +1,83 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Modules\CRM\Infrastructure\Repositories;
+
 use Modules\CRM\Domain\Contracts\LeadRepositoryInterface;
-use Modules\CRM\Infrastructure\Models\LeadModel;
+use Modules\CRM\Domain\Entities\Lead as LeadEntity;
+use Modules\CRM\Domain\Enums\LeadStatus;
+use Modules\CRM\Infrastructure\Models\Lead as LeadModel;
+
 class LeadRepository implements LeadRepositoryInterface
 {
-    public function findById(string $id): ?object
+    public function findById(int $id, int $tenantId): ?LeadEntity
     {
-        return LeadModel::find($id);
+        $m = LeadModel::withoutGlobalScope('tenant')
+            ->where('id', $id)
+            ->where('tenant_id', $tenantId)
+            ->first();
+
+        return $m ? $this->toDomain($m) : null;
     }
-    public function findByEmail(string $email): ?object
+
+    public function findAll(int $tenantId, int $page = 1, int $perPage = 25): array
     {
-        return LeadModel::where('email', $email)->first();
+        return LeadModel::withoutGlobalScope('tenant')
+            ->where('tenant_id', $tenantId)
+            ->orderByDesc('created_at')
+            ->forPage($page, $perPage)
+            ->get()
+            ->map(fn (LeadModel $m): LeadEntity => $this->toDomain($m))
+            ->all();
     }
-    public function paginate(array $filters, int $perPage = 15): object
+
+    public function save(LeadEntity $lead): LeadEntity
     {
-        $query = LeadModel::query();
-        if (!empty($filters['status'])) $query->where('status', $filters['status']);
-        if (!empty($filters['source'])) $query->where('source', $filters['source']);
-        if (!empty($filters['assigned_to'])) $query->where('assigned_to', $filters['assigned_to']);
-        if (!empty($filters['search'])) {
-            $query->where(function ($q) use ($filters) {
-                $q->where('name', 'like', '%'.$filters['search'].'%')
-                  ->orWhere('email', 'like', '%'.$filters['search'].'%')
-                  ->orWhere('company', 'like', '%'.$filters['search'].'%');
-            });
+        $data = [
+            'tenant_id'           => $lead->getTenantId(),
+            'contact_id'          => $lead->getContactId(),
+            'title'               => $lead->getTitle(),
+            'status'              => $lead->getStatus()->value,
+            'source'              => $lead->getSource(),
+            'value'               => $lead->getValue(),
+            'expected_close_date' => $lead->getExpectedCloseDate(),
+            'assigned_to'         => $lead->getAssignedTo(),
+            'notes'               => $lead->getNotes(),
+        ];
+
+        if ($lead->getId() > 0) {
+            $m = LeadModel::withoutGlobalScope('tenant')->findOrFail($lead->getId());
+            $m->update($data);
+        } else {
+            $m = LeadModel::create($data);
         }
-        return $query->latest()->paginate($perPage);
+
+        return $this->toDomain($m->fresh());
     }
-    public function create(array $data): object
+
+    public function delete(int $id, int $tenantId): void
     {
-        return LeadModel::create($data);
+        LeadModel::withoutGlobalScope('tenant')
+            ->where('id', $id)
+            ->where('tenant_id', $tenantId)
+            ->first()
+            ?->delete();
     }
-    public function update(string $id, array $data): object
+
+    private function toDomain(LeadModel $m): LeadEntity
     {
-        $lead = LeadModel::findOrFail($id);
-        $lead->update($data);
-        return $lead->fresh();
-    }
-    public function delete(string $id): bool
-    {
-        return LeadModel::findOrFail($id)->delete();
+        return new LeadEntity(
+            id: (int) $m->id,
+            tenantId: (int) $m->tenant_id,
+            contactId: $m->contact_id ? (int) $m->contact_id : null,
+            title: (string) $m->title,
+            status: $m->status instanceof LeadStatus ? $m->status : LeadStatus::from((string) $m->status),
+            source: $m->source,
+            value: (string) $m->value,
+            expectedCloseDate: $m->expected_close_date?->toDateString(),
+            assignedTo: $m->assigned_to ? (int) $m->assigned_to : null,
+            notes: $m->notes,
+        );
     }
 }

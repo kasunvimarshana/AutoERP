@@ -1,30 +1,28 @@
 <?php
-
+declare(strict_types=1);
 namespace Modules\Accounting\Domain\Entities;
-
 use Modules\Accounting\Domain\Enums\AccountType;
-
-class Account
-{
+class Account {
     public function __construct(
-        private readonly string           $id,
-        private readonly string           $tenantId,
-        private readonly string           $code,
-        private readonly string           $name,
-        private readonly AccountType      $type,
-        private readonly ?string          $parentId,
-        private readonly bool             $isActive,
-        private readonly string           $balance,
-        private readonly \DateTimeImmutable $createdAt,
+        private readonly int         $id,
+        private readonly int         $tenantId,
+        private string               $code,
+        private string               $name,
+        private AccountType          $type,
+        private ?int                 $parentId,
+        private bool                 $isActive,
+        private readonly string      $normalBalance,
+        private string               $currentBalance = '0.0000',
     ) {}
-
-    public function getId(): string { return $this->id; }
-    public function getTenantId(): string { return $this->tenantId; }
+    public function getId(): int { return $this->id; }
+    public function getTenantId(): int { return $this->tenantId; }
     public function getCode(): string { return $this->code; }
     public function getName(): string { return $this->name; }
     public function getType(): AccountType { return $this->type; }
-    public function getParentId(): ?string { return $this->parentId; }
+    public function getParentId(): ?int { return $this->parentId; }
     public function isActive(): bool { return $this->isActive; }
-    public function getBalance(): string { return $this->balance; }
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
+    public function getNormalBalance(): string { return $this->normalBalance; }
+    public function getCurrentBalance(): string { return $this->currentBalance; }
+    public function isDebitNormal(): bool { return $this->normalBalance === 'debit'; }
+    public function isCreditNormal(): bool { return $this->normalBalance === 'credit'; }
 }

@@ -1,171 +1,110 @@
-# Copilot Instructions
+# GitHub Copilot Instructions
 
-This repository implements a production-grade, enterprise, multi-tenant, modular ERP/CRM SaaS platform. The full governance contract is defined in [`AGENT.md`](../AGENT.md) at the repository root — all contributors and AI agents must follow it.
+This repository is a **production-grade, enterprise, multi-tenant, modular ERP/CRM SaaS platform** built with **Laravel (LTS)** on the backend and **React (LTS)** on the frontend.
 
-The key points summarised below are enforced at all times.
+For the full governance contract, see [`AGENT.md`](../AGENT.md).  
+For the domain knowledge base, see [`KB.md`](../KB.md).
 
 ---
 
 ## Tech Stack
 
-- **Backend**: Laravel (latest stable LTS release, e.g. 10.x or 11.x)
-- **Frontend**: Vue (latest stable LTS release, e.g. 3.x)
-- Native framework features only — no unstable or experimental dependencies
+- **Backend:** Laravel (LTS only), PHP 8.x, BCMath for all financial arithmetic
+- **Frontend:** React (LTS only), TailwindCSS / AdminLTE
+- **Architecture:** Modular Monolith (Clean Architecture), API-first, stateless
+- **Multi-tenancy:** Shared DB with strict row-level isolation (`tenant_id` on every business table)
+- **Auth:** JWT per user × device × organisation, RBAC + ABAC via Laravel Policies
 
 ---
 
-## Architecture
-
-Strict Clean Architecture with four layers (top → bottom):
-
-| Layer | Responsibilities |
-|-------|-----------------|
-| **Presentation** | Controllers, API routes, request validation, response formatting — no business logic |
-| **Application** | Use cases, services, orchestrators, transaction management, domain event emission |
-| **Domain** | Entities, Value Objects, Aggregates, Enums, Contracts — no framework dependency |
-| **Infrastructure** | Repositories, DB models, external integrations, file systems, queue adapters |
-
----
-
-## Module Structure
-
-Every feature must be an isolated module under `Modules/`:
+## Repository Structure
 
 ```
 Modules/
  └── {ModuleName}/
-     ├── Domain/
-     ├── Application/
-     ├── Infrastructure/
-     ├── Presentation/
-     ├── Providers/
-     ├── routes.php
-     ├── config.php
+     ├── Application/       # Use cases, commands, queries, DTOs
+     ├── Domain/            # Entities, value objects, domain events, repository contracts
+     ├── Infrastructure/    # Repository implementations, external adapters
+     ├── Interfaces/        # HTTP controllers, API resources, form requests
      ├── module.json
      └── README.md
 ```
 
-- No direct cross-module calls — communicate only via Contracts, Events, or API
-- No shared state, no circular dependencies
-- Each module must be capable of being independently enabled or disabled
-
 ---
 
-## Multi-Tenancy
+## Mandatory Conventions
 
-- `tenant_id` is mandatory in every persistent table
-- All queries must be tenant-scoped via global scope
-- JWT is issued per user × device × organization
-- No cross-tenant queries — violations are critical
+### Architecture
+- Controllers must contain **no business logic** and must **never** call the query builder directly.
+- All cross-module communication goes through **contracts or domain events only** — no direct dependencies between modules.
+- Domain logic must be isolated from infrastructure.
 
----
+### Multi-Tenancy
+- Every new database table must include a `tenant_id` column with a **global scope** applied.
+- Tenant isolation failures are treated as critical violations.
 
-## Authorization
+### Financial Precision
+- **All** monetary and quantity calculations must use `BCMath` (arbitrary precision).  
+- Floating-point arithmetic is **strictly forbidden** for financial values.
+- Rounding must be deterministic.
 
-- RBAC + ABAC using Laravel Policies only
-- Authorization enforced via middleware, never inside controllers
+### Authorization
+- Use **Policy classes only** — no permission checks inside controllers.
+- No hardcoded role or ID checks.
 
----
+### API
+- All endpoints must be RESTful, versioned (`/api/v1`), idempotent, and documented with OpenAPI.
+- Responses must follow the standard envelope format with structured errors and pagination.
 
-## Financial Integrity
+### Security
+- CSRF protection, XSS/SQL-injection prevention, rate limiting, token rotation, Argon2/bcrypt hashing, signed URLs, and audit logging are all mandatory.
 
-- Use `DECIMAL(18,8)` — **floating-point arithmetic is forbidden** for financial operations
-- Use BCMath for all monetary calculations
-- All write operations must be wrapped in DB transactions
-- Use pessimistic locking for stock deductions, optimistic locking via `version` column
+### Concurrency
+- Use pessimistic locking for stock deduction and accounting posts.
+- All writes must be safe under parallel load; stock and accounting must never be inconsistent.
 
----
-
-## Metadata-Driven Design
-
-The following must **never** be hardcoded — store them in the database:
-
-- Pricing rules
-- Workflow states
-- UI component definitions
-- Permissions
-- Tax logic
-- Calculation strategies
-
----
-
-## Event-Driven Communication
-
-- Modules communicate via Laravel Events, Queues, Pipelines, and Jobs
-- Direct synchronous cross-module invocation is **forbidden**
-
----
-
-## Security
-
-- CSRF protection, XSS prevention, SQL injection prevention
-- Rate limiting, token rotation, secure password hashing
-- Strict validation on every request
-- Stateless JWT — refresh token rotation and token version invalidation required
-
----
-
-## API Design
-
-- RESTful, versioned endpoints
-- Consistent response format and structured error responses
-- Idempotency keys for critical write operations
-- Pagination enforced on all list endpoints
-
----
-
-## Testing
-
-Every module must include:
-
-- Unit tests
-- Feature tests
-- Authorization / policy tests
-- Tenant isolation tests
-- Concurrency tests
-
-No module is considered complete without full test coverage.
+### Metadata-Driven Design
+- Hardcoded business rules, workflow states, pricing/tax logic, and UI layouts are **prohibited**.  
+- All such configuration must be database-driven and runtime-resolvable.
 
 ---
 
 ## Prohibited Practices
 
-- Business logic inside controllers
+- Business logic in controllers
 - Query builder usage in controllers
-- Global or shared mutable state
-- Static service calls across modules
-- Hardcoded pricing or workflow logic
-- Direct model coupling between modules
-- Bypassing policies
-- Partial or incomplete implementations
-- Floating-point arithmetic for financial calculations
+- Cross-module tight coupling
+- Hardcoded IDs or role strings
+- Floating-point arithmetic for financial math
+- Partial implementations or `TODO` comments without a linked tracking issue
 
 ---
 
 ## Definition of Done
 
-A module is complete only when:
+A feature or module is complete only when:
 
-1. Architecture layer boundaries are respected
-2. No code duplication exists
-3. Tenant isolation is enforced
-4. Authorization is enforced
-5. Domain events are emitted correctly
-6. Concurrency is handled safely
-7. All tests pass
-8. Module documentation is updated
-9. CI pipeline passes
-10. No technical debt introduced
+- [ ] Clean Architecture respected (correct layer placement)
+- [ ] No business logic in any controller
+- [ ] All new tables include `tenant_id` with global scope applied
+- [ ] All financial calculations use BCMath (no float)
+- [ ] Authorization enforced via Policy classes
+- [ ] Concurrency handled (appropriate locking)
+- [ ] API endpoint documented (OpenAPI)
+- [ ] Unit, feature, authorization, and tenant-isolation tests pass
+- [ ] Module `README.md` updated
+- [ ] `IMPLEMENTATION_STATUS.md` updated
+- [ ] No cross-module direct dependency introduced
+- [ ] No technical debt introduced
 
 ---
 
-## Agent Workflow
+## Key Domain Flows
 
-Before modifying any code:
-
-1. Analyse the entire affected module
-2. Refactor any existing violations before adding new code
-3. Preserve tenant isolation at all times
-4. Update documentation alongside implementation
-5. Avoid introducing coupling between modules
-6. Maintain strict Clean Architecture and modular independence
+| Domain | Flow |
+|---|---|
+| Sales | Quotation → Sales Order → Delivery → Invoice → Payment |
+| Procurement | Purchase Request → RFQ → Vendor Selection → PO → Goods Receipt → Vendor Bill → Payment |
+| CRM | Lead → Opportunity → Proposal → Closed Won / Closed Lost |
+| Inventory | All stock changes via immutable ledger transactions (never direct edits) |
+| Accounting | Double-entry only — every transaction debits one account and credits another; Total Debits = Total Credits |

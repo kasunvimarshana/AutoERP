@@ -1,13 +1,13 @@
 {
     "name": "Accounting",
     "alias": "accounting",
-    "description": "Accounting module - chart of accounts, double-entry journal entries, and invoicing",
+    "description": "Double-entry bookkeeping, journal entries, tax rates and fiscal periods",
     "version": "1.0.0",
-    "keywords": ["accounting", "journal", "invoice", "finance", "ledger"],
-    "active": true,
-    "order": 12,
-    "providers": [
-        "Modules\\Accounting\\Providers\\AccountingServiceProvider"
-    ],
-    "dependencies": ["Tenant", "User", "Setting", "Notification", "Audit"]
+    "keywords": [],
+    "active": 1,
+    "order": 8,
+    "providers": ["Modules\\Accounting\\Providers\\AccountingServiceProvider"],
+    "aliases": {},
+    "files": [],
+    "requires": ["Core"]
 }

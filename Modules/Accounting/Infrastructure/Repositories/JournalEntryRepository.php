@@ -1,75 +1,86 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Accounting\Infrastructure\Repositories;
 
+use DateTimeImmutable;
 use Modules\Accounting\Domain\Contracts\JournalEntryRepositoryInterface;
-use Modules\Accounting\Infrastructure\Models\JournalEntryModel;
-use Modules\Accounting\Infrastructure\Models\JournalLineModel;
-use Modules\Shared\Infrastructure\Repositories\BaseEloquentRepository;
+use Modules\Accounting\Domain\Entities\JournalEntry as JournalEntryEntity;
+use Modules\Accounting\Domain\Entities\JournalLine as JournalLineEntity;
+use Modules\Accounting\Infrastructure\Models\JournalEntry as JournalEntryModel;
 
-class JournalEntryRepository extends BaseEloquentRepository implements JournalEntryRepositoryInterface
+class JournalEntryRepository implements JournalEntryRepositoryInterface
 {
-    public function __construct()
+    public function findById(int $id, int $tenantId): ?JournalEntryEntity
     {
-        parent::__construct(new JournalEntryModel());
+        $m = JournalEntryModel::withoutGlobalScope('tenant')
+            ->where('id', $id)
+            ->where('tenant_id', $tenantId)
+            ->with('lines')
+            ->first();
+
+        return $m ? $this->toDomain($m) : null;
     }
 
-    public function findById(string $id): ?object
+    public function findPaginated(int $tenantId, int $page = 1, int $perPage = 25): array
     {
-        return JournalEntryModel::with('lines')->find($id);
+        $paginator = JournalEntryModel::withoutGlobalScope('tenant')
+            ->where('tenant_id', $tenantId)
+            ->with('lines')
+            ->orderByDesc('entry_date')
+            ->paginate($perPage, ['*'], 'page', $page);
+
+        return [
+            'data'         => collect($paginator->items())
+                ->map(fn (JournalEntryModel $m): JournalEntryEntity => $this->toDomain($m))
+                ->all(),
+            'total'        => $paginator->total(),
+            'per_page'     => $paginator->perPage(),
+            'current_page' => $paginator->currentPage(),
+            'last_page'    => $paginator->lastPage(),
+        ];
     }
 
-    public function create(array $data): object
+    public function save(JournalEntryEntity $entry): JournalEntryEntity
     {
-        $lines = $data['lines'] ?? [];
-        unset($data['lines']);
+        $m = JournalEntryModel::withoutGlobalScope('tenant')->updateOrCreate(
+            ['id' => $entry->getId()],
+            [
+                'tenant_id'      => $entry->getTenantId(),
+                'entry_number'   => $entry->getEntryNumber(),
+                'entry_date'     => $entry->getEntryDate()->format('Y-m-d'),
+                'description'    => $entry->getDescription(),
+                'reference_type' => $entry->getReferenceType(),
+                'reference_id'   => $entry->getReferenceId(),
+                'is_posted'      => $entry->isPosted(),
+                'is_reversed'    => $entry->isReversed(),
+            ]
+        );
 
-        $entry = JournalEntryModel::create($data);
-
-        foreach ($lines as $line) {
-            $line['journal_entry_id'] = $entry->id;
-            JournalLineModel::create($line);
-        }
-
-        return $entry->load('lines');
+        return $this->toDomain($m->load('lines'));
     }
 
-    public function update(string $id, array $data): object
+    private function toDomain(JournalEntryModel $m): JournalEntryEntity
     {
-        $entry = JournalEntryModel::findOrFail($id);
-        $lines = $data['lines'] ?? null;
-        unset($data['lines']);
+        $lines = $m->lines->map(fn ($l): JournalLineEntity => new JournalLineEntity(
+            accountId: (int) $l->account_id,
+            description: $l->description,
+            debitAmount: bcadd((string) $l->debit_amount, '0', 4),
+            creditAmount: bcadd((string) $l->credit_amount, '0', 4),
+        ))->all();
 
-        $entry->update($data);
-
-        if ($lines !== null) {
-            $entry->lines()->delete();
-            foreach ($lines as $line) {
-                $line['journal_entry_id'] = $entry->id;
-                JournalLineModel::create($line);
-            }
-        }
-
-        return $entry->load('lines');
-    }
-
-    public function paginate(array $filters = [], int $perPage = 15): object
-    {
-        $query = JournalEntryModel::with('lines');
-
-        if (! empty($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
-        if (! empty($filters['entry_date'])) {
-            $query->whereDate('entry_date', $filters['entry_date']);
-        }
-
-        return $query->latest()->paginate($perPage);
-    }
-
-    public function nextNumber(string $tenantId): string
-    {
-        $count = JournalEntryModel::withTrashed()->where('tenant_id', $tenantId)->count();
-        return 'JE-' . str_pad($count + 1, 6, '0', STR_PAD_LEFT);
+        return new JournalEntryEntity(
+            id: (int) $m->id,
+            tenantId: (int) $m->tenant_id,
+            entryNumber: (string) $m->entry_number,
+            entryDate: new DateTimeImmutable((string) $m->entry_date),
+            description: (string) $m->description,
+            referenceType: $m->reference_type,
+            referenceId: $m->reference_id ? (int) $m->reference_id : null,
+            isPosted: (bool) $m->is_posted,
+            isReversed: (bool) $m->is_reversed,
+            lines: $lines,
+        );
     }
 }

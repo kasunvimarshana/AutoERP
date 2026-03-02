@@ -1,43 +1,69 @@
 # Manufacturing Module
 
-Provides Bill of Materials (BOM) management, Work Order creation, and production tracking for the ERP platform.
+## Overview
 
-## Features
+The Manufacturing module provides **Bill of Materials (BOM)** and **Production Order** management for the ERP platform.
 
-- **Bill of Materials (BOM)**: Define multi-level BOMs with component lines, quantities, units, and scrap rates. Supports draft/active/obsolete lifecycle.
-- **Work Orders**: Create work orders from active BOMs. Component requirements are automatically calculated using BCMath with scrap rate adjustments.
-- **Production Tracking**: Start and complete work orders, recording actual start/end timestamps and quantity produced.
+Derived from the manufacturing concepts in the `stock-manager-pro-with-pos` reference, re-implemented following strict Clean Architecture and multi-tenant isolation.
 
-## Architecture
+## Domain Concepts
 
-Follows strict Clean Architecture with four layers:
+| Entity | Description |
+|---|---|
+| `Bom` | Bill of Materials — defines the component inputs required to produce a finished product |
+| `BomLine` | A single component line in a BOM (product, quantity) |
+| `ProductionOrder` | An instruction to manufacture a quantity of a finished product using a BOM |
 
-- **Domain**: Entities (`BillOfMaterials`, `BomLine`, `WorkOrder`, `WorkOrderLine`), Enums (`BomStatus`, `WorkOrderStatus`), Events (`WorkOrderStarted`, `WorkOrderCompleted`), and Repository Contracts.
-- **Infrastructure**: Eloquent models with `HasTenantScope` and UUID primary keys, migrations (`mfg_boms`, `mfg_bom_lines`, `mfg_work_orders`, `mfg_work_order_lines`), and repository implementations.
-- **Application**: Use cases — `CreateBomUseCase`, `CreateWorkOrderUseCase`, `StartWorkOrderUseCase`, `CompleteWorkOrderUseCase`.
-- **Presentation**: Form request validation, `BomController`, `WorkOrderController`.
+## Status
+
+| Layer | Status |
+|---|---|
+| Domain (Entities, Enums, Contracts) | ✅ Scaffolded |
+| Application (Commands, Handlers) | ✅ Scaffolded |
+| Infrastructure (Models, Repository, Migrations) | ✅ Scaffolded |
+| Interfaces (Controller, Routes) | ✅ Scaffolded |
 
 ## API Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/manufacturing/boms` | List BOMs (paginated) |
-| POST | `/api/v1/manufacturing/boms` | Create BOM with lines |
-| GET | `/api/v1/manufacturing/boms/{id}` | Get BOM detail |
-| PUT | `/api/v1/manufacturing/boms/{id}` | Update BOM |
-| DELETE | `/api/v1/manufacturing/boms/{id}` | Delete BOM |
-| GET | `/api/v1/manufacturing/work-orders` | List work orders (paginated) |
-| POST | `/api/v1/manufacturing/work-orders` | Create work order from BOM |
-| GET | `/api/v1/manufacturing/work-orders/{id}` | Get work order detail |
-| PUT | `/api/v1/manufacturing/work-orders/{id}` | Update work order |
-| DELETE | `/api/v1/manufacturing/work-orders/{id}` | Delete work order |
-| POST | `/api/v1/manufacturing/work-orders/{id}/start` | Start production |
-| POST | `/api/v1/manufacturing/work-orders/{id}/complete` | Complete production |
+All endpoints require authentication (`auth:api`) and tenant middleware.
 
-## Key Design Decisions
+| Method | URI | Description |
+|---|---|---|
+| `GET` | `/api/v1/manufacturing/boms` | List bills of materials |
+| `POST` | `/api/v1/manufacturing/boms` | Create a new BOM |
+| `GET` | `/api/v1/manufacturing/boms/{id}` | Retrieve a specific BOM |
+| `GET` | `/api/v1/manufacturing/orders` | List production orders |
+| `POST` | `/api/v1/manufacturing/orders` | Create a production order |
+| `GET` | `/api/v1/manufacturing/orders/{id}` | Retrieve a production order |
+| `PATCH` | `/api/v1/manufacturing/orders/{id}/status` | Update production order status |
 
-- All monetary/quantity calculations use BCMath (scale 8) — no floating-point arithmetic.
-- Reference numbers follow the format `WO-YYYY-XXXXXX` (zero-padded 6-digit sequence per tenant per year).
-- All write operations are wrapped in `DB::transaction()`.
-- Tenant isolation enforced via `HasTenantScope` global scope on all models.
-- Domain events (`WorkOrderStarted`, `WorkOrderCompleted`) emitted on state transitions.
+## Production Order Lifecycle
+
+```
+draft → confirmed → in_progress → completed
+                 ↘ cancelled
+```
+
+## Database Tables
+
+| Table | Description |
+|---|---|
+| `boms` | Bill of Materials headers (tenant-scoped) |
+| `bom_lines` | BOM component lines |
+| `production_orders` | Production order records (tenant-scoped) |
+
+## Architecture
+
+- `Bom.scaledComponents()` uses BCMath for precision when scaling component quantities
+- All production calculations are BCMath-safe
+- Tenant isolation enforced via global scopes on all models
+- Production Orders are immutable once completed
+
+## Pending Tasks
+
+- [ ] Write unit tests for BOM domain entity
+- [ ] Write feature tests for ManufacturingController
+- [ ] Implement stock deduction on production completion (via Inventory module events)
+- [ ] Add stock reservation for planned production
+- [ ] Add cost calculation based on component unit costs
+- [ ] Add OpenAPI documentation

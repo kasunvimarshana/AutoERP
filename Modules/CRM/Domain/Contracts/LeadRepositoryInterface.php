@@ -1,11 +1,10 @@
 <?php
+declare(strict_types=1);
 namespace Modules\CRM\Domain\Contracts;
-interface LeadRepositoryInterface
-{
-    public function findById(string $id): ?object;
-    public function findByEmail(string $email): ?object;
-    public function paginate(array $filters, int $perPage = 15): object;
-    public function create(array $data): object;
-    public function update(string $id, array $data): object;
-    public function delete(string $id): bool;
+use Modules\CRM\Domain\Entities\Lead;
+interface LeadRepositoryInterface {
+    public function findById(int $id, int $tenantId): ?Lead;
+    public function save(Lead $lead): Lead;
+    public function delete(int $id, int $tenantId): void;
+    public function findAll(int $tenantId, int $page, int $perPage): array;
 }

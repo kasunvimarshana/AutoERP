@@ -1,0 +1,1 @@
+{"name":"Procurement","alias":"procurement","description":"Purchase orders, vendor management and goods receipt","version":"1.0.0","keywords":[],"active":1,"order":6,"providers":["Modules\\Procurement\\Providers\\ProcurementServiceProvider"],"aliases":{},"files":[],"requires":["Core","Product","Inventory"]}

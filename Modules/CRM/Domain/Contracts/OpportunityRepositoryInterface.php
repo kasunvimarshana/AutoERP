@@ -1,11 +1,22 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Modules\CRM\Domain\Contracts;
+
+use Modules\CRM\Domain\Entities\Opportunity;
+
 interface OpportunityRepositoryInterface
 {
-    public function findById(string $id): ?object;
-    public function paginate(array $filters, int $perPage = 15): object;
-    public function findByStage(string $stage): object;
-    public function create(array $data): object;
-    public function update(string $id, array $data): object;
-    public function delete(string $id): bool;
+    public function findById(int $id, int $tenantId): ?Opportunity;
+
+    /** @return Opportunity[] */
+    public function findAll(int $tenantId, ?string $stage, int $page, int $perPage): array;
+
+    /** @return Opportunity[] */
+    public function findOpen(int $tenantId): array;
+
+    public function save(Opportunity $opportunity): Opportunity;
+
+    public function delete(int $id, int $tenantId): void;
 }

@@ -1,19 +1,27 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Manufacturing\Domain\Entities;
 
+/**
+ * Bill of Materials line: one component required to produce the finished good.
+ */
 class BomLine
 {
     public function __construct(
-        public readonly string $id,
-        public readonly string $tenant_id,
-        public readonly string $bom_id,
-        public readonly string $component_product_id,
-        public readonly string $component_name,
-        public readonly string $quantity,
-        public readonly string $unit,
-        public readonly string $scrap_rate,
-        public readonly string $created_at,
-        public readonly string $updated_at,
+        private readonly int     $id,
+        private readonly int     $bomId,
+        private readonly int     $componentProductId,
+        private readonly ?int    $componentVariantId,
+        private readonly string  $quantity,
+        private readonly ?string $notes,
     ) {}
+
+    public function getId(): int               { return $this->id; }
+    public function getBomId(): int            { return $this->bomId; }
+    public function getComponentProductId(): int  { return $this->componentProductId; }
+    public function getComponentVariantId(): ?int { return $this->componentVariantId; }
+    public function getQuantity(): string      { return $this->quantity; }
+    public function getNotes(): ?string        { return $this->notes; }
 }

@@ -1,22 +1,29 @@
 <?php
-
+declare(strict_types=1);
 namespace Modules\Accounting\Domain\Entities;
-
-class JournalLine
-{
+class JournalLine {
     public function __construct(
-        private readonly string  $id,
-        private readonly string  $journalEntryId,
-        private readonly string  $accountId,
-        private readonly string  $debit,
-        private readonly string  $credit,
+        private readonly int    $accountId,
         private readonly ?string $description,
-    ) {}
-
-    public function getId(): string { return $this->id; }
-    public function getJournalEntryId(): string { return $this->journalEntryId; }
-    public function getAccountId(): string { return $this->accountId; }
-    public function getDebit(): string { return $this->debit; }
-    public function getCredit(): string { return $this->credit; }
+        private readonly string $debitAmount,
+        private readonly string $creditAmount,
+    ) {
+        $hasDebit  = bccomp($debitAmount, '0', 4) > 0;
+        $hasCredit = bccomp($creditAmount, '0', 4) > 0;
+        if ($hasDebit && $hasCredit) {
+            throw new \DomainException('A journal line cannot have both a debit and credit amount.');
+        }
+        if (!$hasDebit && !$hasCredit) {
+            throw new \DomainException('A journal line must have either a debit or credit amount.');
+        }
+    }
+    public function getAccountId(): int { return $this->accountId; }
     public function getDescription(): ?string { return $this->description; }
+    public function getDebitAmount(): string { return $this->debitAmount; }
+    public function getCreditAmount(): string { return $this->creditAmount; }
+    public function isDebit(): bool { return bccomp($this->debitAmount, '0', 4) > 0; }
+    public function isCredit(): bool { return bccomp($this->creditAmount, '0', 4) > 0; }
+    public function getAmount(): string {
+        return $this->isDebit() ? $this->debitAmount : $this->creditAmount;
+    }
 }

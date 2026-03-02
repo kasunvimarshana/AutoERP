@@ -1,1 +1,0 @@
-{"name":"User","alias":"user","version":"1.0.0","description":"User management, roles, permissions, and RBAC.","dependencies":["Tenant"],"enabled":true}
