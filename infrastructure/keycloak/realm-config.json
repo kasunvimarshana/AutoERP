@@ -1,0 +1,437 @@
+{
+  "id": "inventory-management",
+  "realm": "inventory-management",
+  "displayName": "Inventory Management System",
+  "displayNameHtml": "<strong>Inventory Management</strong>",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 5,
+  "accessTokenLifespan": 300,
+  "accessTokenLifespanForImplicitFlow": 900,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "offlineSessionIdleTimeout": 2592000,
+  "accessCodeLifespan": 60,
+  "accessCodeLifespanUserAction": 300,
+  "accessCodeLifespanLogin": 1800,
+  "defaultSignatureAlgorithm": "RS256",
+
+  "roles": {
+    "realm": [
+      {
+        "id": "role-admin",
+        "name": "admin",
+        "description": "Full administrative access to all resources",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "inventory-management",
+        "attributes": {}
+      },
+      {
+        "id": "role-manager",
+        "name": "manager",
+        "description": "Can manage products, inventory and orders",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "inventory-management",
+        "attributes": {}
+      },
+      {
+        "id": "role-viewer",
+        "name": "viewer",
+        "description": "Read-only access to resources",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "inventory-management",
+        "attributes": {}
+      }
+    ],
+    "client": {
+      "inventory-api": [
+        {
+          "id": "client-role-product-read",
+          "name": "product:read",
+          "description": "Read products",
+          "composite": false,
+          "clientRole": true
+        },
+        {
+          "id": "client-role-product-write",
+          "name": "product:write",
+          "description": "Create / update products",
+          "composite": false,
+          "clientRole": true
+        },
+        {
+          "id": "client-role-inventory-read",
+          "name": "inventory:read",
+          "description": "Read inventory levels",
+          "composite": false,
+          "clientRole": true
+        },
+        {
+          "id": "client-role-inventory-write",
+          "name": "inventory:write",
+          "description": "Adjust stock",
+          "composite": false,
+          "clientRole": true
+        },
+        {
+          "id": "client-role-order-read",
+          "name": "order:read",
+          "description": "Read orders",
+          "composite": false,
+          "clientRole": true
+        },
+        {
+          "id": "client-role-order-write",
+          "name": "order:write",
+          "description": "Create / update orders",
+          "composite": false,
+          "clientRole": true
+        },
+        {
+          "id": "client-role-user-read",
+          "name": "user:read",
+          "description": "Read user profiles",
+          "composite": false,
+          "clientRole": true
+        },
+        {
+          "id": "client-role-user-write",
+          "name": "user:write",
+          "description": "Manage users",
+          "composite": false,
+          "clientRole": true
+        }
+      ]
+    }
+  },
+
+  "clients": [
+    {
+      "id": "client-frontend-app",
+      "clientId": "frontend-app",
+      "name": "Inventory Frontend",
+      "description": "React SPA frontend for the Inventory Management System",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "publicClient": true,
+      "bearerOnly": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://localhost/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "http://localhost"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "defaultClientScopes": [
+        "web-origins",
+        "roles",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access"
+      ]
+    },
+    {
+      "id": "client-inventory-api",
+      "clientId": "inventory-api",
+      "name": "Inventory API",
+      "description": "Confidential client for backend microservices (token introspection & service accounts)",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "your-client-secret",
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": true,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "http://localhost/*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "defaultClientScopes": [
+        "web-origins",
+        "roles",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "offline_access",
+        "microprofile-jwt"
+      ],
+      "authorizationSettings": {
+        "allowRemoteResourceManagement": true,
+        "policyEnforcementMode": "ENFORCING",
+        "decisionStrategy": "UNANIMOUS",
+        "resources": [
+          {
+            "name": "Products Resource",
+            "uris": ["/api/products/*"],
+            "type": "urn:inventory-api:resource:product",
+            "scopes": [{"name": "product:read"}, {"name": "product:write"}]
+          },
+          {
+            "name": "Inventory Resource",
+            "uris": ["/api/inventory/*"],
+            "type": "urn:inventory-api:resource:inventory",
+            "scopes": [{"name": "inventory:read"}, {"name": "inventory:write"}]
+          },
+          {
+            "name": "Orders Resource",
+            "uris": ["/api/orders/*"],
+            "type": "urn:inventory-api:resource:order",
+            "scopes": [{"name": "order:read"}, {"name": "order:write"}]
+          },
+          {
+            "name": "Users Resource",
+            "uris": ["/api/users/*"],
+            "type": "urn:inventory-api:resource:user",
+            "scopes": [{"name": "user:read"}, {"name": "user:write"}]
+          }
+        ],
+        "policies": [
+          {
+            "name": "Admin Policy",
+            "description": "Grants full access to admin role",
+            "type": "role",
+            "logic": "POSITIVE",
+            "decisionStrategy": "UNANIMOUS",
+            "config": {
+              "roles": "[{\"id\":\"admin\",\"required\":true}]"
+            }
+          },
+          {
+            "name": "Manager Policy",
+            "description": "Grants read/write access to manager role",
+            "type": "role",
+            "logic": "POSITIVE",
+            "decisionStrategy": "UNANIMOUS",
+            "config": {
+              "roles": "[{\"id\":\"manager\",\"required\":true}]"
+            }
+          },
+          {
+            "name": "Viewer Policy",
+            "description": "Grants read-only access to viewer role",
+            "type": "role",
+            "logic": "POSITIVE",
+            "decisionStrategy": "UNANIMOUS",
+            "config": {
+              "roles": "[{\"id\":\"viewer\",\"required\":true}]"
+            }
+          }
+        ]
+      }
+    }
+  ],
+
+  "clientScopes": [
+    {
+      "id": "scope-roles",
+      "name": "roles",
+      "description": "OpenID Connect scope for add user roles to the access token",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "id": "mapper-realm-roles",
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "id": "mapper-client-roles",
+          "name": "client roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "claim.name": "resource_access.${client_id}.roles",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    }
+  ],
+
+  "users": [
+    {
+      "id": "user-admin-001",
+      "username": "admin",
+      "email": "admin@inventory.local",
+      "firstName": "System",
+      "lastName": "Admin",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["admin"],
+      "clientRoles": {
+        "inventory-api": [
+          "product:read", "product:write",
+          "inventory:read", "inventory:write",
+          "order:read", "order:write",
+          "user:read", "user:write"
+        ]
+      },
+      "attributes": {
+        "department": ["IT"]
+      }
+    },
+    {
+      "id": "user-manager-001",
+      "username": "manager",
+      "email": "manager@inventory.local",
+      "firstName": "Inventory",
+      "lastName": "Manager",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "manager123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["manager"],
+      "clientRoles": {
+        "inventory-api": [
+          "product:read", "product:write",
+          "inventory:read", "inventory:write",
+          "order:read", "order:write",
+          "user:read"
+        ]
+      },
+      "attributes": {
+        "department": ["Operations"]
+      }
+    },
+    {
+      "id": "user-viewer-001",
+      "username": "viewer",
+      "email": "viewer@inventory.local",
+      "firstName": "Read",
+      "lastName": "Only",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "viewer123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["viewer"],
+      "clientRoles": {
+        "inventory-api": [
+          "product:read",
+          "inventory:read",
+          "order:read",
+          "user:read"
+        ]
+      },
+      "attributes": {
+        "department": ["Sales"]
+      }
+    }
+  ],
+
+  "requiredActions": [
+    {
+      "alias": "CONFIGURE_TOTP",
+      "name": "Configure OTP",
+      "providerId": "CONFIGURE_TOTP",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 10
+    },
+    {
+      "alias": "VERIFY_EMAIL",
+      "name": "Verify Email",
+      "providerId": "VERIFY_EMAIL",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 50
+    },
+    {
+      "alias": "UPDATE_PASSWORD",
+      "name": "Update Password",
+      "providerId": "UPDATE_PASSWORD",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 30
+    }
+  ],
+
+  "browserSecurityHeaders": {
+    "contentSecurityPolicyReportOnly": "",
+    "xContentTypeOptions": "nosniff",
+    "xRobotsTag": "none",
+    "xFrameOptions": "SAMEORIGIN",
+    "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self'; object-src 'none';",
+    "xXSSProtection": "1; mode=block",
+    "strictTransportSecurity": "max-age=31536000; includeSubDomains"
+  },
+
+  "smtpServer": {},
+
+  "eventsEnabled": true,
+  "eventsListeners": ["jboss-logging"],
+  "enabledEventTypes": [
+    "LOGIN", "LOGIN_ERROR",
+    "LOGOUT", "LOGOUT_ERROR",
+    "REGISTER", "REGISTER_ERROR",
+    "TOKEN_EXCHANGE", "CLIENT_LOGIN",
+    "CODE_TO_TOKEN", "CODE_TO_TOKEN_ERROR"
+  ],
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": true
+}

@@ -1,1 +1,1 @@
-# LaravelInventory
+# LaravelMS

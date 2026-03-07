@@ -3,31 +3,27 @@
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
          bootstrap="vendor/autoload.php"
          colors="true"
-         stopOnFailure="false"
 >
     <testsuites>
+        <testsuite name="Unit">
+            <directory suffix="Test.php">./tests/Unit</directory>
+        </testsuite>
         <testsuite name="Feature">
-            <directory>tests/Feature</directory>
+            <directory suffix="Test.php">./tests/Feature</directory>
         </testsuite>
     </testsuites>
-
     <source>
         <include>
-            <directory>app</directory>
+            <directory suffix=".php">./app</directory>
         </include>
     </source>
-
     <php>
-        <env name="APP_ENV"        value="testing"/>
-        <env name="APP_KEY"        value="base64:2fl+Ktvkfl+Fuz4Qp/A75G2RTiWVA/ZoKZvp6fiiM10="/>
-        <env name="DB_CONNECTION"  value="sqlite"/>
-        <env name="DB_DATABASE"    value=":memory:"/>
-        <env name="CACHE_DRIVER"   value="array"/>
-        <env name="SESSION_DRIVER" value="array"/>
+        <env name="APP_ENV" value="testing"/>
+        <env name="APP_KEY" value="base64:2fl+Ktvkfl+Fuz4Qp/A75G2RTiWVA/ZoKZvp6fiiM10="/>
+        <env name="CACHE_DRIVER" value="array"/>
+        <env name="DB_CONNECTION" value="sqlite"/>
+        <env name="DB_DATABASE" value=":memory:"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
-        <env name="RABBITMQ_HOST"  value="localhost"/>
-        <env name="KEYCLOAK_BASE_URL" value="http://localhost:8080"/>
-        <env name="KEYCLOAK_REALM"    value="test"/>
-        <env name="KEYCLOAK_CLIENT_ID" value="product-service-test"/>
+        <env name="SESSION_DRIVER" value="array"/>
     </php>
 </phpunit>
