@@ -6,140 +6,231 @@ use App\DTOs\ProductDTO;
 use App\Events\ProductCreated;
 use App\Events\ProductDeleted;
 use App\Events\ProductUpdated;
+use App\MessageBroker\Contracts\MessageBrokerInterface;
 use App\Models\Product;
-use App\Repositories\ProductRepository;
-use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\DB;
+use App\Repositories\Contracts\ProductRepositoryInterface;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
-class ProductService
+class ProductService extends BaseService
 {
-    public function __construct(private readonly ProductRepository $productRepository) {}
+    public function __construct(
+        protected ProductRepositoryInterface $repository,
+        private readonly MessageBrokerInterface $broker,
+    ) {}
 
-    public function listProducts(string $tenantId, array $filters = [], int $perPage = 15, int $page = 1): LengthAwarePaginator
+    // -------------------------------------------------------------------------
+    // CRUD
+    // -------------------------------------------------------------------------
+
+    /**
+     * Retrieve products with filtering, searching, sorting, and conditional pagination.
+     */
+    public function getProducts(Request $request, ?int $tenantId = null): Collection|LengthAwarePaginator
     {
-        $repo = $this->productRepository->withTenant($tenantId);
+        $query = Product::query();
 
-        $query = $repo->newQuery();
+        if ($tenantId) {
+            $query->where('tenant_id', $tenantId);
+        }
 
-        if (!empty($filters['search'])) {
-            $term = $filters['search'];
-            $query->where(function ($q) use ($term): void {
-                $q->where('name', 'LIKE', '%' . $term . '%')
-                  ->orWhere('sku', 'LIKE', '%' . $term . '%')
-                  ->orWhere('category', 'LIKE', '%' . $term . '%');
+        // Search by name or SKU
+        if ($term = $request->input('search')) {
+            $query->where(function ($q) use ($term) {
+                $q->where('name', 'LIKE', "%{$term}%")
+                  ->orWhere('sku',  'LIKE', "%{$term}%");
             });
         }
 
-        if (!empty($filters['category'])) {
-            $query->where('category', $filters['category']);
+        // Filter by category
+        if ($categoryId = $request->input('category_id')) {
+            $query->where('category_id', $categoryId);
         }
 
-        if (!empty($filters['status'])) {
-            $query->where('status', $filters['status']);
+        // Filter by active status
+        if ($request->has('is_active')) {
+            $query->where('is_active', filter_var($request->input('is_active'), FILTER_VALIDATE_BOOLEAN));
         }
 
-        if (!empty($filters['low_stock'])) {
-            $query->whereColumn('stock_quantity', '<=', 'min_stock_level');
+        // Filter by price range
+        if ($minPrice = $request->input('min_price')) {
+            $query->where('price', '>=', (float) $minPrice);
         }
 
-        $sortColumn    = $filters['sort_by'] ?? 'created_at';
-        $sortDirection = $filters['sort_dir'] ?? 'desc';
-        $allowedSorts  = ['name', 'sku', 'price', 'stock_quantity', 'created_at'];
+        if ($maxPrice = $request->input('max_price')) {
+            $query->where('price', '<=', (float) $maxPrice);
+        }
+
+        // Filter low stock only
+        if ($request->boolean('low_stock')) {
+            $query->whereNotNull('reorder_point')
+                  ->whereNotNull('min_stock_level')
+                  ->whereColumn('min_stock_level', '<=', 'reorder_point');
+        }
+
+        // Eager load category
+        if ($request->boolean('with_category', true)) {
+            $query->with('category');
+        }
+
+        // Sort
+        $sortColumn    = $request->input('sort_by', 'created_at');
+        $sortDirection = $request->input('sort_dir', 'desc');
+        $allowedSorts  = ['name', 'sku', 'price', 'cost_price', 'created_at', 'updated_at'];
 
         if (in_array($sortColumn, $allowedSorts, true)) {
-            $query->orderBy($sortColumn, $sortDirection === 'desc' ? 'desc' : 'asc');
+            $query->orderBy($sortColumn, $sortDirection === 'asc' ? 'asc' : 'desc');
         }
 
-        return $query->paginate($perPage, ['*'], 'page', $page);
+        return $this->repository->paginateConditional($query, $request);
     }
 
-    public function getProduct(string $tenantId, string $productId): ?ProductDTO
+    /**
+     * Get a single product by ID with its category loaded.
+     */
+    public function getProductById(int|string $id): ?Model
     {
-        $product = $this->productRepository->withTenant($tenantId)->find($productId);
-
-        return $product ? ProductDTO::fromModel($product) : null;
+        return $this->repository->withRelations(['category'])->find($id);
     }
 
-    public function getProductBySku(string $tenantId, string $sku): ?ProductDTO
+    /**
+     * Create a new product, enforcing SKU uniqueness per tenant.
+     */
+    public function createProduct(ProductDTO $dto): Model
     {
-        $product = $this->productRepository->withTenant($tenantId)->findBySku($sku);
+        $this->assertSkuUnique($dto->sku, $dto->tenantId);
 
-        return $product ? ProductDTO::fromModel($product) : null;
+        $data = $dto->toArray();
+
+        $product = $this->repository->create($data);
+
+        event(new ProductCreated($product));
+
+        $this->broker->publish(
+            topic:   config('services.topics.products', 'products.events'),
+            payload: [
+                'event'      => 'product.created',
+                'product_id' => $product->id,
+                'sku'        => $product->sku,
+                'name'       => $product->name,
+                'tenant_id'  => $product->tenant_id,
+                'timestamp'  => now()->toIso8601String(),
+            ],
+        );
+
+        Log::info('Product created', ['product_id' => $product->id, 'tenant_id' => $product->tenant_id]);
+
+        return $product->load('category');
     }
 
-    public function createProduct(string $tenantId, array $data): ProductDTO
+    /**
+     * Update an existing product, re-validating SKU uniqueness if it changed.
+     */
+    public function updateProduct(int|string $id, array $data): Model
     {
-        $this->ensureSkuUnique($tenantId, $data['sku']);
+        $existing = $this->repository->find($id);
 
-        $product = DB::transaction(function () use ($tenantId, $data): Product {
-            $product = $this->productRepository->create([
-                'tenant_id'       => $tenantId,
-                'name'            => $data['name'],
-                'sku'             => $data['sku'],
-                'description'     => $data['description'] ?? null,
-                'category'        => $data['category'] ?? null,
-                'price'           => $data['price'],
-                'cost'            => $data['cost'],
-                'stock_quantity'  => $data['stock_quantity'],
-                'min_stock_level' => $data['min_stock_level'],
-                'unit'            => $data['unit'] ?? null,
-                'status'          => $data['status'] ?? 'active',
-                'metadata'        => $data['metadata'] ?? null,
-            ]);
-
-            event(new ProductCreated($product));
-
-            return $product;
-        });
-
-        return ProductDTO::fromModel($product);
-    }
-
-    public function updateProduct(string $tenantId, string $productId, array $data): ?ProductDTO
-    {
-        $product = $this->productRepository->withTenant($tenantId)->find($productId);
-
-        if ($product === null) {
-            return null;
+        if (! $existing) {
+            throw new \Illuminate\Database\Eloquent\ModelNotFoundException(
+                "Product [{$id}] not found."
+            );
         }
 
-        if (isset($data['sku']) && $data['sku'] !== $product->sku) {
-            $this->ensureSkuUnique($tenantId, $data['sku'], $productId);
+        // Re-check SKU uniqueness only when the SKU is being changed
+        if (isset($data['sku']) && $data['sku'] !== $existing->sku) {
+            $this->assertSkuUnique($data['sku'], $existing->tenant_id, $id);
         }
 
-        $updated = DB::transaction(function () use ($product, $data): Product {
-            $product->fill($data)->save();
-            event(new ProductUpdated($product->fresh()));
-            return $product->fresh();
-        });
+        $product = $this->repository->update($id, $data);
 
-        return ProductDTO::fromModel($updated);
+        event(new ProductUpdated($product));
+
+        Log::info('Product updated', ['product_id' => $product->id]);
+
+        return $product->load('category');
     }
 
-    public function deleteProduct(string $tenantId, string $productId): bool
+    /**
+     * Soft-delete a product and notify downstream services.
+     */
+    public function deleteProduct(int|string $id): bool
     {
-        $product = $this->productRepository->withTenant($tenantId)->find($productId);
+        $product = $this->repository->find($id);
 
-        if ($product === null) {
+        if (! $product) {
             return false;
         }
 
-        return DB::transaction(function () use ($product, $tenantId, $productId): bool {
-            $sku     = $product->sku;
-            $deleted = $this->productRepository->delete($productId);
+        $result = $this->repository->delete($id);
 
-            if ($deleted) {
-                event(new ProductDeleted($productId, $tenantId, $sku));
-            }
+        if ($result) {
+            event(new ProductDeleted($product));
 
-            return $deleted;
-        });
+            $this->broker->publish(
+                topic:   config('services.topics.products', 'products.events'),
+                payload: [
+                    'event'      => 'product.deleted',
+                    'product_id' => $product->id,
+                    'sku'        => $product->sku,
+                    'tenant_id'  => $product->tenant_id,
+                    'timestamp'  => now()->toIso8601String(),
+                ],
+            );
+
+            Log::info('Product deleted', ['product_id' => $id]);
+        }
+
+        return $result;
     }
 
-    private function ensureSkuUnique(string $tenantId, string $sku, ?string $excludeId = null): void
+    // -------------------------------------------------------------------------
+    // Cross-service helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Retrieve products by an array of IDs – used by the Inventory service.
+     *
+     * @param  array<int|string>  $ids
+     */
+    public function getProductsByIds(array $ids): Collection
     {
-        $query = Product::where('tenant_id', $tenantId)->where('sku', $sku);
+        return $this->repository->findByIds($ids);
+    }
+
+    // -------------------------------------------------------------------------
+    // Category-scoped helpers
+    // -------------------------------------------------------------------------
+
+    public function getProductsByCategory(int|string $categoryId): Collection
+    {
+        return $this->repository->findByCategory($categoryId);
+    }
+
+    public function getLowStockProducts(): Collection
+    {
+        return $this->repository->getLowStock();
+    }
+
+    // -------------------------------------------------------------------------
+    // Internal helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Ensure the given SKU is unique within the tenant scope.
+     *
+     * @throws ValidationException
+     */
+    private function assertSkuUnique(string $sku, ?int $tenantId, int|string|null $excludeId = null): void
+    {
+        $query = Product::where('sku', $sku);
+
+        if ($tenantId) {
+            $query->where('tenant_id', $tenantId);
+        }
 
         if ($excludeId !== null) {
             $query->where('id', '!=', $excludeId);
@@ -147,7 +238,7 @@ class ProductService
 
         if ($query->exists()) {
             throw ValidationException::withMessages([
-                'sku' => ['The SKU is already in use within this tenant.'],
+                'sku' => ["The SKU '{$sku}' already exists for this tenant."],
             ]);
         }
     }

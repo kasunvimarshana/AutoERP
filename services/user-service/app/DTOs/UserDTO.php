@@ -2,49 +2,71 @@
 
 namespace App\DTOs;
 
-use App\Models\User;
-
-class UserDTO
+/**
+ * Data Transfer Object for creating / updating a user.
+ */
+final class UserDTO
 {
     public function __construct(
-        public readonly string  $id,
-        public readonly string  $tenantId,
-        public readonly string  $name,
-        public readonly string  $email,
-        public readonly string  $role,
-        public readonly array   $permissions,
-        public readonly string  $status,
-        public readonly ?string $createdAt,
-        public readonly ?string $updatedAt,
+        public readonly string      $name,
+        public readonly string      $email,
+        public readonly string      $password,
+        public readonly ?int        $tenantId  = null,
+        public readonly array       $roleIds   = [],
+        public readonly bool        $isActive  = true,
+        public readonly array       $metadata  = [],
+        public readonly ?string     $ssoProvider = null,
+        public readonly ?string     $ssoId       = null,
     ) {}
 
-    public static function fromModel(User $user): self
+    // -------------------------------------------------------------------------
+    // Factory methods
+    // -------------------------------------------------------------------------
+
+    public static function fromArray(array $data): self
     {
         return new self(
-            id:          $user->id,
-            tenantId:    $user->tenant_id,
-            name:        $user->name,
-            email:       $user->email,
-            role:        $user->role,
-            permissions: $user->permissions ?? [],
-            status:      $user->status,
-            createdAt:   $user->created_at?->toIso8601String(),
-            updatedAt:   $user->updated_at?->toIso8601String(),
+            name:        $data['name'],
+            email:       $data['email'],
+            password:    $data['password']   ?? '',
+            tenantId:    isset($data['tenant_id']) ? (int) $data['tenant_id'] : null,
+            roleIds:     $data['role_ids']   ?? [],
+            isActive:    isset($data['is_active']) ? (bool) $data['is_active'] : true,
+            metadata:    $data['metadata']   ?? [],
+            ssoProvider: $data['sso_provider'] ?? null,
+            ssoId:       $data['sso_id']       ?? null,
         );
     }
 
+    // -------------------------------------------------------------------------
+    // Serialization
+    // -------------------------------------------------------------------------
+
+    /**
+     * Convert to array suitable for Eloquent create/fill.
+     */
     public function toArray(): array
     {
-        return [
-            'id'          => $this->id,
-            'tenant_id'   => $this->tenantId,
-            'name'        => $this->name,
-            'email'       => $this->email,
-            'role'        => $this->role,
-            'permissions' => $this->permissions,
-            'status'      => $this->status,
-            'created_at'  => $this->createdAt,
-            'updated_at'  => $this->updatedAt,
+        $data = [
+            'name'      => $this->name,
+            'email'     => $this->email,
+            'password'  => $this->password,
+            'is_active' => $this->isActive,
+            'metadata'  => $this->metadata,
         ];
+
+        if ($this->tenantId !== null) {
+            $data['tenant_id'] = $this->tenantId;
+        }
+
+        if ($this->ssoProvider !== null) {
+            $data['sso_provider'] = $this->ssoProvider;
+        }
+
+        if ($this->ssoId !== null) {
+            $data['sso_id'] = $this->ssoId;
+        }
+
+        return $data;
     }
 }

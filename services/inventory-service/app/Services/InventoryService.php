@@ -1,221 +1,350 @@
 <?php
+
 namespace App\Services;
 
-use App\DTOs\InventoryDTO;
 use App\Events\InventoryUpdated;
+use App\Events\StockDepleted;
 use App\Events\StockLow;
 use App\Models\Inventory;
 use App\Models\StockMovement;
-use App\Repositories\InventoryRepository;
-use Illuminate\Pagination\LengthAwarePaginator;
+use App\Repositories\Contracts\InventoryRepositoryInterface;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
-class InventoryService
+class InventoryService extends BaseService
 {
     public function __construct(
-        private readonly InventoryRepository  $inventoryRepository,
-        private readonly ProductServiceClient $productServiceClient,
-    ) {}
-
-    public function listInventory(string $tenantId, array $filters = [], int $perPage = 15, int $page = 1): LengthAwarePaginator
-    {
-        $repo  = $this->inventoryRepository->withTenant($tenantId);
-        $query = $repo->newQuery();
-
-        if (!empty($filters['product_id'])) {
-            $query->where('product_id', $filters['product_id']);
-        }
-
-        if (!empty($filters['warehouse_location'])) {
-            $query->where('warehouse_location', 'LIKE', '%' . $filters['warehouse_location'] . '%');
-        }
-
-        if (!empty($filters['low_stock'])) {
-            $query->whereColumn('quantity', '<=', 'min_level');
-        }
-
-        if (!empty($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        return $query->paginate($perPage, ['*'], 'page', $page);
+        protected InventoryRepositoryInterface   $repository,
+        private readonly CrossServiceInventoryService $crossService,
+    ) {
+        parent::__construct($repository);
     }
 
-    public function getInventory(string $tenantId, string $inventoryId): ?InventoryDTO
-    {
-        $inventory = $this->inventoryRepository->withTenant($tenantId)->find($inventoryId);
-        if ($inventory === null) {
-            return null;
-        }
-        return InventoryDTO::fromModel($inventory);
-    }
+    // -------------------------------------------------------------------------
+    // Stock operations
+    // -------------------------------------------------------------------------
 
-    public function createInventory(string $tenantId, array $data): InventoryDTO
-    {
-        $inventory = DB::transaction(function () use ($tenantId, $data): Inventory {
-            $inventory = $this->inventoryRepository->create([
-                'tenant_id'          => $tenantId,
-                'product_id'         => $data['product_id'],
-                'warehouse_location' => $data['warehouse_location'] ?? null,
-                'quantity'           => $data['quantity'],
-                'reserved_quantity'  => $data['reserved_quantity'] ?? 0,
-                'unit'               => $data['unit'] ?? null,
-                'min_level'          => $data['min_level'],
-                'max_level'          => $data['max_level'],
-                'status'             => $data['status'] ?? 'active',
-                'notes'              => $data['notes'] ?? null,
+    /**
+     * Adjust the stock quantity of an inventory record.
+     *
+     * @param  string  $inventoryId
+     * @param  int     $quantity    Positive to add, negative to remove
+     * @param  string  $type        StockMovement type (in/out/adjustment/…)
+     * @param  string  $reason      Human-readable reason / notes
+     * @param  string|null  $performedBy  User UUID performing the action
+     * @return Inventory
+     *
+     * @throws \InvalidArgumentException
+     * @throws \RuntimeException
+     */
+    public function adjustStock(
+        string  $inventoryId,
+        int     $quantity,
+        string  $type,
+        string  $reason,
+        ?string $performedBy = null,
+    ): Inventory {
+        return DB::transaction(function () use ($inventoryId, $quantity, $type, $reason, $performedBy) {
+            /** @var Inventory $inventory */
+            $inventory = Inventory::lockForUpdate()->findOrFail($inventoryId);
+
+            $previousQty = $inventory->quantity;
+            $newQty      = $previousQty + $quantity;
+
+            if ($newQty < 0) {
+                throw new \InvalidArgumentException(
+                    "Insufficient stock. Available: {$inventory->available_quantity}, Requested: " . abs($quantity)
+                );
+            }
+
+            $inventory->update([
+                'quantity'         => $newQty,
+                'last_movement_at' => now(),
             ]);
 
             StockMovement::create([
-                'tenant_id'     => $tenantId,
-                'inventory_id'  => $inventory->id,
-                'product_id'    => $inventory->product_id,
-                'movement_type' => 'in',
-                'quantity'      => $inventory->quantity,
-                'notes'         => 'Initial stock entry',
+                'tenant_id'         => $inventory->tenant_id,
+                'inventory_id'      => $inventory->id,
+                'product_id'        => $inventory->product_id,
+                'warehouse_id'      => $inventory->warehouse_id,
+                'type'              => $type,
+                'quantity'          => $quantity,
+                'previous_quantity' => $previousQty,
+                'new_quantity'      => $newQty,
+                'notes'             => $reason,
+                'performed_by'      => $performedBy,
             ]);
 
-            event(new InventoryUpdated($inventory));
+            $inventory->refresh();
+
+            $this->dispatchStockEvents($inventory);
+
+            Log::info('Stock adjusted', [
+                'inventory_id' => $inventoryId,
+                'type'         => $type,
+                'quantity'     => $quantity,
+                'new_qty'      => $newQty,
+            ]);
 
             return $inventory;
         });
-
-        return InventoryDTO::fromModel($inventory);
     }
 
-    public function updateInventory(string $tenantId, string $inventoryId, array $data): ?InventoryDTO
-    {
-        $inventory = $this->inventoryRepository->withTenant($tenantId)->find($inventoryId);
-        if ($inventory === null) {
-            return null;
+    /**
+     * Transfer stock between two inventory records (ACID transaction).
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function transferStock(
+        string  $fromInventoryId,
+        string  $toInventoryId,
+        int     $quantity,
+        ?string $notes       = null,
+        ?string $performedBy = null,
+    ): array {
+        if ($quantity <= 0) {
+            throw new \InvalidArgumentException('Transfer quantity must be positive.');
         }
 
-        $updated = DB::transaction(function () use ($inventory, $data): Inventory {
-            $inventory->fill($data)->save();
-            event(new InventoryUpdated($inventory->fresh()));
-            return $inventory->fresh();
-        });
-
-        return InventoryDTO::fromModel($updated);
-    }
-
-    public function deleteInventory(string $tenantId, string $inventoryId): bool
-    {
-        $inventory = $this->inventoryRepository->withTenant($tenantId)->find($inventoryId);
-        if ($inventory === null) {
-            return false;
+        if ($fromInventoryId === $toInventoryId) {
+            throw new \InvalidArgumentException('Source and destination inventory must differ.');
         }
 
-        return DB::transaction(fn () => $this->inventoryRepository->delete($inventoryId));
-    }
+        return DB::transaction(function () use ($fromInventoryId, $toInventoryId, $quantity, $notes, $performedBy) {
+            // Lock both rows in consistent order to avoid deadlocks
+            $ids     = collect([$fromInventoryId, $toInventoryId])->sort()->values();
+            $locked  = Inventory::lockForUpdate()->whereIn('id', $ids)->get()->keyBy('id');
 
-    public function adjustStock(string $tenantId, string $inventoryId, int $quantity, string $movementType, ?string $notes = null, ?string $referenceType = null, ?string $referenceId = null): ?InventoryDTO
-    {
-        $inventory = $this->inventoryRepository->withTenant($tenantId)->find($inventoryId);
-        if ($inventory === null) {
-            return null;
-        }
+            $source  = $locked->get($fromInventoryId);
+            $dest    = $locked->get($toInventoryId);
 
-        $updated = DB::transaction(function () use ($inventory, $tenantId, $quantity, $movementType, $notes, $referenceType, $referenceId): Inventory {
-            $delta = match ($movementType) {
-                'in'         => abs($quantity),
-                'out'        => -abs($quantity),
-                'adjustment' => $quantity,
-                'transfer'   => $quantity,
-                default      => $quantity,
-            };
-
-            $newQuantity = max(0, $inventory->quantity + $delta);
-            $inventory->update(['quantity' => $newQuantity]);
-
-            StockMovement::create([
-                'tenant_id'      => $tenantId,
-                'inventory_id'   => $inventory->id,
-                'product_id'     => $inventory->product_id,
-                'movement_type'  => $movementType,
-                'quantity'       => abs($quantity),
-                'reference_type' => $referenceType,
-                'reference_id'   => $referenceId,
-                'notes'          => $notes,
-            ]);
-
-            $fresh = $inventory->fresh();
-            event(new InventoryUpdated($fresh));
-
-            if ($fresh->isLowStock()) {
-                event(new StockLow($fresh));
+            if (! $source || ! $dest) {
+                throw new \RuntimeException('One or both inventory records not found.');
             }
 
-            return $fresh;
-        });
+            if ($source->available_quantity < $quantity) {
+                throw new \InvalidArgumentException(
+                    "Insufficient available stock. Available: {$source->available_quantity}, Requested: {$quantity}"
+                );
+            }
 
-        return InventoryDTO::fromModel($updated);
-    }
+            $sourcePrev = $source->quantity;
+            $destPrev   = $dest->quantity;
 
-    public function getByProduct(string $tenantId, string $productId): array
-    {
-        $inventories = $this->inventoryRepository->withTenant($tenantId)->findByProduct($productId);
-        return $inventories->map(fn ($inv) => InventoryDTO::fromModel($inv)->toArray())->all();
-    }
+            $source->update(['quantity' => $sourcePrev - $quantity, 'last_movement_at' => now()]);
+            $dest->update(['quantity'   => $destPrev  + $quantity, 'last_movement_at' => now()]);
 
-    public function listWithProductDetails(string $tenantId, int $perPage = 15, int $page = 1): array
-    {
-        $paginator   = $this->inventoryRepository->withTenant($tenantId)->getWithPagination($perPage, $page);
-        $inventories = collect($paginator->items());
-
-        $productIds   = $inventories->pluck('product_id')->unique()->values()->all();
-        $productsData = $this->productServiceClient->getProducts($productIds, $tenantId);
-        $productsMap  = collect($productsData)->keyBy('id');
-
-        $items = $inventories->map(function ($inv) use ($productsMap) {
-            $productData = $productsMap->get($inv->product_id);
-            return InventoryDTO::fromModel($inv, $productData)->toArray();
-        })->all();
-
-        return [
-            'data' => $items,
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'per_page'     => $paginator->perPage(),
-                'total'        => $paginator->total(),
-                'last_page'    => $paginator->lastPage(),
-            ],
-        ];
-    }
-
-    public function filterByProductName(string $tenantId, string $productName, int $perPage = 15, int $page = 1): array
-    {
-        $products = $this->productServiceClient->searchByName($productName, $tenantId);
-
-        if (empty($products)) {
-            return [
-                'data' => [],
-                'meta' => ['current_page' => 1, 'per_page' => $perPage, 'total' => 0, 'last_page' => 1],
+            $movementData = [
+                'tenant_id'         => $source->tenant_id,
+                'product_id'        => $source->product_id,
+                'type'              => 'transfer',
+                'quantity'          => $quantity,
+                'notes'             => $notes,
+                'performed_by'      => $performedBy,
             ];
+
+            StockMovement::create(array_merge($movementData, [
+                'inventory_id'      => $source->id,
+                'warehouse_id'      => $source->warehouse_id,
+                'previous_quantity' => $sourcePrev,
+                'new_quantity'      => $sourcePrev - $quantity,
+            ]));
+
+            StockMovement::create(array_merge($movementData, [
+                'inventory_id'      => $dest->id,
+                'warehouse_id'      => $dest->warehouse_id,
+                'quantity'          => $quantity,
+                'previous_quantity' => $destPrev,
+                'new_quantity'      => $destPrev + $quantity,
+            ]));
+
+            $source->refresh();
+            $dest->refresh();
+
+            $this->dispatchStockEvents($source);
+            $this->dispatchStockEvents($dest);
+
+            return ['source' => $source, 'destination' => $dest];
+        });
+    }
+
+    /**
+     * Reserve stock for an order (increases reserved_quantity).
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function reserveStock(
+        string  $productId,
+        int     $quantity,
+        string  $referenceId,
+        string  $tenantId,
+        ?string $warehouseId = null,
+        ?string $performedBy = null,
+    ): Inventory {
+        return DB::transaction(function () use ($productId, $quantity, $referenceId, $tenantId, $warehouseId, $performedBy) {
+            $query = Inventory::lockForUpdate()
+                              ->where('tenant_id', $tenantId)
+                              ->where('product_id', $productId);
+
+            if ($warehouseId) {
+                $query->where('warehouse_id', $warehouseId);
+            }
+
+            $inventory = $query->firstOrFail();
+
+            if ($inventory->available_quantity < $quantity) {
+                throw new \InvalidArgumentException(
+                    "Cannot reserve {$quantity} units. Available: {$inventory->available_quantity}"
+                );
+            }
+
+            $previousQty = $inventory->quantity;
+            $inventory->increment('reserved_quantity', $quantity);
+            $inventory->update(['last_movement_at' => now()]);
+
+            StockMovement::create([
+                'tenant_id'         => $tenantId,
+                'inventory_id'      => $inventory->id,
+                'product_id'        => $productId,
+                'warehouse_id'      => $inventory->warehouse_id,
+                'type'              => 'reservation',
+                'quantity'          => $quantity,
+                'previous_quantity' => $previousQty,
+                'new_quantity'      => $inventory->quantity,
+                'reference_type'    => 'order',
+                'reference_id'      => $referenceId,
+                'performed_by'      => $performedBy,
+            ]);
+
+            $inventory->refresh();
+            InventoryUpdated::dispatch($inventory, 'reservation', $quantity);
+
+            return $inventory;
+        });
+    }
+
+    /**
+     * Release a previously placed stock reservation.
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function releaseStock(
+        string  $productId,
+        int     $quantity,
+        string  $referenceId,
+        string  $tenantId,
+        ?string $warehouseId = null,
+        ?string $performedBy = null,
+    ): Inventory {
+        return DB::transaction(function () use ($productId, $quantity, $referenceId, $tenantId, $warehouseId, $performedBy) {
+            $query = Inventory::lockForUpdate()
+                              ->where('tenant_id', $tenantId)
+                              ->where('product_id', $productId);
+
+            if ($warehouseId) {
+                $query->where('warehouse_id', $warehouseId);
+            }
+
+            $inventory = $query->firstOrFail();
+
+            if ($inventory->reserved_quantity < $quantity) {
+                throw new \InvalidArgumentException(
+                    "Cannot release {$quantity} units. Only {$inventory->reserved_quantity} reserved."
+                );
+            }
+
+            $previousQty = $inventory->quantity;
+            $inventory->decrement('reserved_quantity', $quantity);
+            $inventory->update(['last_movement_at' => now()]);
+
+            StockMovement::create([
+                'tenant_id'         => $tenantId,
+                'inventory_id'      => $inventory->id,
+                'product_id'        => $productId,
+                'warehouse_id'      => $inventory->warehouse_id,
+                'type'              => 'release',
+                'quantity'          => $quantity,
+                'previous_quantity' => $previousQty,
+                'new_quantity'      => $inventory->quantity,
+                'reference_type'    => 'order',
+                'reference_id'      => $referenceId,
+                'performed_by'      => $performedBy,
+            ]);
+
+            $inventory->refresh();
+            InventoryUpdated::dispatch($inventory, 'release', $quantity);
+
+            return $inventory;
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // Cross-service enrichment
+    // -------------------------------------------------------------------------
+
+    /**
+     * Return paginated or full inventory list enriched with product data from the Product Service.
+     *
+     * @return array|\Illuminate\Contracts\Pagination\LengthAwarePaginator
+     */
+    public function getInventoryWithProductDetails(Request $request): mixed
+    {
+        $tenantId = $request->attributes->get('tenant_id');
+
+        $query = Inventory::query()
+                          ->when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))
+                          ->with('warehouse');
+
+        $result = $this->repository->paginateConditional($query, $request);
+
+        // Extract items whether paginated or plain collection
+        $items = $result instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator
+            ? $result->getCollection()
+            : $result;
+
+        $enriched = $this->crossService->enrichInventoryWithProducts($items);
+
+        if ($result instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator) {
+            $result->setCollection(collect($enriched));
+        } else {
+            $result = collect($enriched);
         }
 
-        $productIds  = array_column($products, 'id');
-        $productsMap = collect($products)->keyBy('id');
+        return $result;
+    }
 
-        $paginator = $this->inventoryRepository->withTenant($tenantId)
-            ->newQuery()
-            ->whereIn('product_id', $productIds)
-            ->paginate($perPage, ['*'], 'page', $page);
+    /**
+     * Filter inventory records whose product name matches the given term.
+     *
+     * @return Collection
+     */
+    public function filterByProductName(string $productName, ?string $tenantId = null): Collection
+    {
+        $productIds = $this->crossService->searchProductIdsByName($productName);
 
-        $items = collect($paginator->items())->map(function ($inv) use ($productsMap) {
-            $productData = $productsMap->get($inv->product_id);
-            return InventoryDTO::fromModel($inv, $productData)->toArray();
-        })->all();
+        if (empty($productIds)) {
+            return new Collection();
+        }
 
-        return [
-            'data' => $items,
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'per_page'     => $paginator->perPage(),
-                'total'        => $paginator->total(),
-                'last_page'    => $paginator->lastPage(),
-            ],
-        ];
+        return $this->repository->getByProductIds($productIds, $tenantId);
+    }
+
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    private function dispatchStockEvents(Inventory $inventory): void
+    {
+        $threshold = (int) config('tenant.low_stock_threshold', 10);
+
+        InventoryUpdated::dispatch($inventory, 'adjustment', 0);
+
+        if ($inventory->available_quantity <= 0) {
+            StockDepleted::dispatch($inventory);
+        } elseif ($inventory->available_quantity <= $threshold) {
+            StockLow::dispatch($inventory, $threshold);
+        }
     }
 }

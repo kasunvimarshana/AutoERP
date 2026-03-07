@@ -1,9 +1,10 @@
 <?php
+
 namespace App\Events;
 
 use App\Models\Inventory;
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -12,11 +13,18 @@ class InventoryUpdated implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public function __construct(public readonly Inventory $inventory) {}
+    public function __construct(
+        public readonly Inventory $inventory,
+        public readonly string    $movementType,
+        public readonly int       $quantityChanged,
+    ) {}
 
     public function broadcastOn(): array
     {
-        return [new Channel('tenant.' . $this->inventory->tenant_id . '.inventory')];
+        return [
+            new PrivateChannel('tenant.' . $this->inventory->tenant_id),
+            new PrivateChannel('inventory.' . $this->inventory->id),
+        ];
     }
 
     public function broadcastAs(): string
@@ -27,11 +35,16 @@ class InventoryUpdated implements ShouldBroadcast
     public function broadcastWith(): array
     {
         return [
-            'id'                 => $this->inventory->id,
-            'product_id'         => $this->inventory->product_id,
-            'quantity'           => $this->inventory->quantity,
-            'available_quantity' => $this->inventory->available_quantity,
-            'tenant_id'          => $this->inventory->tenant_id,
+            'inventory_id'      => $this->inventory->id,
+            'tenant_id'         => $this->inventory->tenant_id,
+            'product_id'        => $this->inventory->product_id,
+            'warehouse_id'      => $this->inventory->warehouse_id,
+            'quantity'          => $this->inventory->quantity,
+            'reserved_quantity' => $this->inventory->reserved_quantity,
+            'available_quantity'=> $this->inventory->available_quantity,
+            'movement_type'     => $this->movementType,
+            'quantity_changed'  => $this->quantityChanged,
+            'timestamp'         => now()->toIso8601String(),
         ];
     }
 }

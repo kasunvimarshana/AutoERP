@@ -2,84 +2,60 @@
 
 namespace App\DTOs;
 
-use App\Models\Order;
-
-class OrderDTO
+readonly class OrderDTO
 {
     public function __construct(
-        public readonly string  $id,
-        public readonly string  $tenantId,
-        public readonly string  $userId,
-        public readonly string  $orderNumber,
-        public readonly string  $status,
-        public readonly string  $subtotal,
-        public readonly string  $tax,
-        public readonly string  $discount,
-        public readonly string  $total,
-        public readonly string  $currency,
-        public readonly ?array  $shippingAddress,
-        public readonly ?array  $billingAddress,
-        public readonly ?string $notes,
-        public readonly ?array  $metadata,
-        public readonly array   $items,
-        public readonly ?string $createdAt,
-        public readonly ?string $updatedAt,
-    ) {}
+        public string  $tenantId,
+        public string  $customerId,
+        public string  $customerName,
+        public string  $customerEmail,
+        public array   $items,
+        public array   $shippingAddress,
+        public string  $paymentMethod,
+        public ?array  $billingAddress = null,
+        public ?string $notes = null,
+        public ?array  $metadata = null,
+        public string  $currency = 'USD',
+    ) {
+    }
 
-    public static function fromModel(Order $order): self
+    public static function fromArray(array $data): self
     {
         return new self(
-            id:              $order->id,
-            tenantId:        $order->tenant_id,
-            userId:          $order->user_id,
-            orderNumber:     $order->order_number,
-            status:          $order->status,
-            subtotal:        (string) $order->subtotal,
-            tax:             (string) $order->tax,
-            discount:        (string) $order->discount,
-            total:           (string) $order->total,
-            currency:        $order->currency,
-            shippingAddress: $order->shipping_address,
-            billingAddress:  $order->billing_address,
-            notes:           $order->notes,
-            metadata:        $order->metadata,
-            items:           $order->relationLoaded('items')
-                ? $order->items->map(fn ($item) => [
-                    'id'           => $item->id,
-                    'product_id'   => $item->product_id,
-                    'product_name' => $item->product_name,
-                    'sku'          => $item->sku,
-                    'quantity'     => $item->quantity,
-                    'unit_price'   => (string) $item->unit_price,
-                    'total_price'  => (string) $item->total_price,
-                    'metadata'     => $item->metadata,
-                ])->all()
-                : [],
-            createdAt: $order->created_at?->toIso8601String(),
-            updatedAt: $order->updated_at?->toIso8601String(),
+            tenantId:        $data['tenant_id'],
+            customerId:      $data['customer_id'],
+            customerName:    $data['customer_name'],
+            customerEmail:   $data['customer_email'],
+            items:           array_map(
+                fn(array $item) => OrderItemDTO::fromArray($item),
+                $data['items'] ?? []
+            ),
+            shippingAddress: $data['shipping_address'],
+            paymentMethod:   $data['payment_method'],
+            billingAddress:  $data['billing_address'] ?? null,
+            notes:           $data['notes'] ?? null,
+            metadata:        $data['metadata'] ?? null,
+            currency:        $data['currency'] ?? 'USD',
         );
     }
 
     public function toArray(): array
     {
         return [
-            'id'               => $this->id,
-            'tenant_id'        => $this->tenantId,
-            'user_id'          => $this->userId,
-            'order_number'     => $this->orderNumber,
-            'status'           => $this->status,
-            'subtotal'         => $this->subtotal,
-            'tax'              => $this->tax,
-            'discount'         => $this->discount,
-            'total'            => $this->total,
-            'currency'         => $this->currency,
+            'tenant_id'       => $this->tenantId,
+            'customer_id'     => $this->customerId,
+            'customer_name'   => $this->customerName,
+            'customer_email'  => $this->customerEmail,
+            'items'           => array_map(
+                fn(OrderItemDTO $item) => $item->toArray(),
+                $this->items
+            ),
             'shipping_address' => $this->shippingAddress,
+            'payment_method'   => $this->paymentMethod,
             'billing_address'  => $this->billingAddress,
             'notes'            => $this->notes,
             'metadata'         => $this->metadata,
-            'items'            => $this->items,
-            'created_at'       => $this->createdAt,
-            'updated_at'       => $this->updatedAt,
+            'currency'         => $this->currency,
         ];
     }
 }

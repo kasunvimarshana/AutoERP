@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
@@ -13,11 +14,20 @@ class AdjustStockRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'quantity'       => ['required', 'integer', 'not_in:0'],
-            'movement_type'  => ['required', 'in:in,out,adjustment,transfer'],
-            'notes'          => ['sometimes', 'nullable', 'string', 'max:500'],
-            'reference_type' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'reference_id'   => ['sometimes', 'nullable', 'uuid'],
+            'quantity' => ['required', 'integer', 'not_in:0'],
+            'type'     => ['required', 'string', 'in:in,out,adjustment'],
+            'reason'   => ['required', 'string', 'max:500'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'quantity.required' => 'A quantity (positive or negative) is required.',
+            'quantity.not_in'   => 'Quantity cannot be zero.',
+            'type.required'     => 'A movement type is required.',
+            'type.in'           => 'Type must be one of: in, out, adjustment.',
+            'reason.required'   => 'A reason for the adjustment is required.',
         ];
     }
 }

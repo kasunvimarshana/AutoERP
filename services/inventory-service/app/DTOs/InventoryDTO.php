@@ -1,4 +1,5 @@
 <?php
+
 namespace App\DTOs;
 
 use App\Models\Inventory;
@@ -6,41 +7,44 @@ use App\Models\Inventory;
 class InventoryDTO
 {
     public function __construct(
-        public readonly string  $id,
         public readonly string  $tenantId,
         public readonly string  $productId,
-        public readonly ?string $warehouseLocation,
+        public readonly string  $warehouseId,
         public readonly int     $quantity,
         public readonly int     $reservedQuantity,
         public readonly int     $availableQuantity,
-        public readonly ?string $unit,
-        public readonly int     $minLevel,
-        public readonly int     $maxLevel,
-        public readonly string  $status,
-        public readonly ?string $notes,
-        public readonly ?array  $product,
-        public readonly ?string $createdAt,
-        public readonly ?string $updatedAt,
+        public readonly float   $unitCost,
+        public readonly ?string $lastMovementAt,
+        public readonly ?string $id = null,
     ) {}
 
-    public static function fromModel(Inventory $inventory, ?array $product = null): self
+    public static function fromModel(Inventory $inventory): self
     {
         return new self(
-            id:                $inventory->id,
             tenantId:          $inventory->tenant_id,
             productId:         $inventory->product_id,
-            warehouseLocation: $inventory->warehouse_location,
+            warehouseId:       $inventory->warehouse_id,
             quantity:          $inventory->quantity,
             reservedQuantity:  $inventory->reserved_quantity,
             availableQuantity: $inventory->available_quantity,
-            unit:              $inventory->unit,
-            minLevel:          $inventory->min_level,
-            maxLevel:          $inventory->max_level,
-            status:            $inventory->status,
-            notes:             $inventory->notes,
-            product:           $product,
-            createdAt:         $inventory->created_at?->toIso8601String(),
-            updatedAt:         $inventory->updated_at?->toIso8601String(),
+            unitCost:          (float) $inventory->unit_cost,
+            lastMovementAt:    $inventory->last_movement_at?->toIso8601String(),
+            id:                $inventory->id,
+        );
+    }
+
+    public static function fromArray(array $data): self
+    {
+        return new self(
+            tenantId:          $data['tenant_id'],
+            productId:         $data['product_id'],
+            warehouseId:       $data['warehouse_id'],
+            quantity:          (int) ($data['quantity'] ?? 0),
+            reservedQuantity:  (int) ($data['reserved_quantity'] ?? 0),
+            availableQuantity: (int) ($data['available_quantity'] ?? 0),
+            unitCost:          (float) ($data['unit_cost'] ?? 0),
+            lastMovementAt:    $data['last_movement_at'] ?? null,
+            id:                $data['id'] ?? null,
         );
     }
 
@@ -50,18 +54,12 @@ class InventoryDTO
             'id'                 => $this->id,
             'tenant_id'          => $this->tenantId,
             'product_id'         => $this->productId,
-            'warehouse_location' => $this->warehouseLocation,
+            'warehouse_id'       => $this->warehouseId,
             'quantity'           => $this->quantity,
             'reserved_quantity'  => $this->reservedQuantity,
             'available_quantity' => $this->availableQuantity,
-            'unit'               => $this->unit,
-            'min_level'          => $this->minLevel,
-            'max_level'          => $this->maxLevel,
-            'status'             => $this->status,
-            'notes'              => $this->notes,
-            'product'            => $this->product,
-            'created_at'         => $this->createdAt,
-            'updated_at'         => $this->updatedAt,
+            'unit_cost'          => $this->unitCost,
+            'last_movement_at'   => $this->lastMovementAt,
         ];
     }
 }

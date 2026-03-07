@@ -7,177 +7,194 @@ use App\Events\UserCreated;
 use App\Events\UserDeleted;
 use App\Events\UserUpdated;
 use App\Models\User;
-use App\Repositories\UserRepository;
-use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\DB;
+use App\Repositories\Contracts\UserRepositoryInterface;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Log;
 
-class UserService
+class UserService extends BaseService
 {
-    public function __construct(private readonly UserRepository $userRepository) {}
+    public function __construct(protected UserRepositoryInterface $repository) {}
 
-    public function listUsers(string $tenantId, array $filters = [], int $perPage = 15, int $page = 1): LengthAwarePaginator
+    // -------------------------------------------------------------------------
+    // CRUD
+    // -------------------------------------------------------------------------
+
+    public function getAllUsers(Request $request, ?int $tenantId = null): Collection|LengthAwarePaginator
     {
-        $repo = $this->userRepository->withTenant($tenantId);
+        $query = User::query();
 
-        if (!empty($filters['search'])) {
-            return $repo->search($filters['search'], ['name', 'email'])
-                ->paginate($perPage, ['*'], 'page', $page);
+        if ($tenantId) {
+            $query->where('tenant_id', $tenantId);
         }
 
-        if (!empty($filters['role'])) {
-            return $repo->filter([['column' => 'role', 'operator' => 'eq', 'value' => $filters['role']]])
-                ->paginate($perPage, ['*'], 'page', $page);
+        // Search
+        if ($term = $request->input('search')) {
+            $query->where(function ($q) use ($term) {
+                $q->where('name', 'LIKE', "%{$term}%")
+                  ->orWhere('email', 'LIKE', "%{$term}%");
+            });
         }
 
-        if (!empty($filters['status'])) {
-            return $repo->filter([['column' => 'status', 'operator' => 'eq', 'value' => $filters['status']]])
-                ->paginate($perPage, ['*'], 'page', $page);
+        // Filter by role
+        if ($role = $request->input('role')) {
+            $query->whereHas('roles', fn ($q) => $q->where('name', $role));
         }
 
-        return $repo->getWithPagination($perPage, $page);
+        // Filter by active status
+        if ($request->has('is_active')) {
+            $query->where('is_active', filter_var($request->input('is_active'), FILTER_VALIDATE_BOOLEAN));
+        }
+
+        // Sort
+        $sortColumn    = $request->input('sort_by', 'created_at');
+        $sortDirection = $request->input('sort_dir', 'desc');
+        $allowedSorts  = ['name', 'email', 'created_at', 'updated_at'];
+
+        if (in_array($sortColumn, $allowedSorts, true)) {
+            $query->orderBy($sortColumn, $sortDirection === 'asc' ? 'asc' : 'desc');
+        }
+
+        return $this->repository->paginateConditional($query, $request);
     }
 
-    public function getUser(string $tenantId, string $userId): ?UserDTO
+    public function getUserById(int|string $id): ?Model
     {
-        $user = $this->userRepository->withTenant($tenantId)->find($userId);
-
-        if ($user === null) {
-            return null;
-        }
-
-        return UserDTO::fromModel($user);
+        return $this->repository->withRelations(['roles', 'permissions', 'tenant'])->find($id);
     }
 
-    public function createUser(string $tenantId, array $data): UserDTO
+    public function createUser(UserDTO $dto): Model
     {
-        $this->ensureEmailUnique($tenantId, $data['email']);
+        $data             = $dto->toArray();
+        $data['password'] = Hash::make($data['password']);
 
-        $user = DB::transaction(function () use ($tenantId, $data): User {
-            $user = $this->userRepository->create([
-                'tenant_id'   => $tenantId,
-                'name'        => $data['name'],
-                'email'       => $data['email'],
-                'password'    => Hash::make($data['password']),
-                'role'        => $data['role'] ?? 'user',
-                'permissions' => $data['permissions'] ?? [],
-                'status'      => $data['status'] ?? 'active',
-            ]);
+        $user = $this->repository->create($data);
 
-            event(new UserCreated($user));
-
-            return $user;
-        });
-
-        return UserDTO::fromModel($user);
-    }
-
-    public function updateUser(string $tenantId, string $userId, array $data): ?UserDTO
-    {
-        $user = $this->userRepository->withTenant($tenantId)->find($userId);
-
-        if ($user === null) {
-            return null;
+        // Assign default role if provided
+        if (! empty($dto->roleIds)) {
+            $this->repository->syncRoles($user->id, $dto->roleIds);
         }
 
-        if (isset($data['email']) && $data['email'] !== $user->email) {
-            $this->ensureEmailUnique($tenantId, $data['email'], $userId);
-        }
+        event(new UserCreated($user));
+        Log::info('User created', ['user_id' => $user->id, 'tenant_id' => $user->tenant_id]);
 
-        $updated = DB::transaction(function () use ($user, $data): User {
-            if (isset($data['password'])) {
-                $data['password'] = Hash::make($data['password']);
-            }
-
-            $user->fill($data)->save();
-
-            event(new UserUpdated($user->fresh()));
-
-            return $user->fresh();
-        });
-
-        return UserDTO::fromModel($updated);
+        return $user->load(['roles', 'permissions', 'tenant']);
     }
 
-    public function deleteUser(string $tenantId, string $userId): bool
+    public function updateUser(int|string $id, array $data): Model
     {
-        $user = $this->userRepository->withTenant($tenantId)->find($userId);
+        if (isset($data['password'])) {
+            $data['password'] = Hash::make($data['password']);
+        }
 
-        if ($user === null) {
+        if (isset($data['role_ids'])) {
+            $this->repository->syncRoles($id, $data['role_ids']);
+            unset($data['role_ids']);
+        }
+
+        if (isset($data['permission_ids'])) {
+            $this->repository->syncPermissions($id, $data['permission_ids']);
+            unset($data['permission_ids']);
+        }
+
+        $user = $this->repository->update($id, $data);
+
+        event(new UserUpdated($user));
+        Log::info('User updated', ['user_id' => $user->id]);
+
+        return $user->load(['roles', 'permissions', 'tenant']);
+    }
+
+    public function deleteUser(int|string $id): bool
+    {
+        $user   = $this->repository->find($id);
+        $result = $this->repository->delete($id);
+
+        if ($result && $user) {
+            event(new UserDeleted($user));
+            Log::info('User deleted', ['user_id' => $id]);
+        }
+
+        return $result;
+    }
+
+    // -------------------------------------------------------------------------
+    // Role / Permission management
+    // -------------------------------------------------------------------------
+
+    public function assignRolesToUser(int|string $userId, array $roleIds): Model
+    {
+        $this->repository->assignRoles($userId, $roleIds);
+
+        return $this->getUserById($userId);
+    }
+
+    public function syncUserRoles(int|string $userId, array $roleIds): Model
+    {
+        $this->repository->syncRoles($userId, $roleIds);
+
+        return $this->getUserById($userId);
+    }
+
+    public function assignPermissionsToUser(int|string $userId, array $permissionIds): Model
+    {
+        $this->repository->assignPermissions($userId, $permissionIds);
+
+        return $this->getUserById($userId);
+    }
+
+    // -------------------------------------------------------------------------
+    // Tenant-scoped helpers
+    // -------------------------------------------------------------------------
+
+    public function getTenantUsers(int|string $tenantId, Request $request): Collection|LengthAwarePaginator
+    {
+        $query = User::query()->where('tenant_id', $tenantId);
+
+        return $this->repository->paginateConditional($query, $request);
+    }
+
+    public function getActiveUsers(int|string $tenantId): Collection
+    {
+        return $this->repository->getActiveUsers($tenantId);
+    }
+
+    // -------------------------------------------------------------------------
+    // Profile
+    // -------------------------------------------------------------------------
+
+    public function updateProfile(int|string $userId, array $data): Model
+    {
+        // Strip sensitive fields that profile updates should not touch
+        unset($data['tenant_id'], $data['is_active'], $data['role_ids']);
+
+        return $this->updateUser($userId, $data);
+    }
+
+    public function changePassword(int|string $userId, string $newPassword): bool
+    {
+        $user = $this->repository->find($userId);
+
+        if (! $user) {
             return false;
         }
 
-        return DB::transaction(function () use ($user, $tenantId, $userId): bool {
-            $deleted = $this->userRepository->delete($userId);
+        $this->repository->update($userId, ['password' => Hash::make($newPassword)]);
 
-            if ($deleted) {
-                event(new UserDeleted($userId, $tenantId));
-            }
-
-            return $deleted;
-        });
+        return true;
     }
 
-    public function assignRole(string $tenantId, string $userId, string $role): ?UserDTO
+    // -------------------------------------------------------------------------
+    // Cross-service data fetch (example: fetch orders for a user)
+    // -------------------------------------------------------------------------
+
+    public function fetchUserOrders(int|string $userId): mixed
     {
-        $allowedRoles = ['admin', 'manager', 'user'];
+        $orderServiceUrl = config('services.order_service.url', 'http://order-service');
 
-        if (!in_array($role, $allowedRoles, true)) {
-            throw new \InvalidArgumentException("Invalid role: {$role}");
-        }
-
-        $updated = DB::transaction(function () use ($tenantId, $userId, $role): ?User {
-            $user = $this->userRepository->withTenant($tenantId)->find($userId);
-
-            if ($user === null) {
-                return null;
-            }
-
-            $user->role = $role;
-            $user->save();
-
-            event(new UserUpdated($user->fresh()));
-
-            return $user->fresh();
-        });
-
-        return $updated ? UserDTO::fromModel($updated) : null;
-    }
-
-    public function updatePermissions(string $tenantId, string $userId, array $permissions): ?UserDTO
-    {
-        $updated = DB::transaction(function () use ($tenantId, $userId, $permissions): ?User {
-            $user = $this->userRepository->withTenant($tenantId)->find($userId);
-
-            if ($user === null) {
-                return null;
-            }
-
-            $user->permissions = $permissions;
-            $user->save();
-
-            event(new UserUpdated($user->fresh()));
-
-            return $user->fresh();
-        });
-
-        return $updated ? UserDTO::fromModel($updated) : null;
-    }
-
-    private function ensureEmailUnique(string $tenantId, string $email, ?string $excludeId = null): void
-    {
-        $query = $this->userRepository->withTenant($tenantId)
-            ->filter([['column' => 'email', 'operator' => 'eq', 'value' => $email]]);
-
-        if ($excludeId !== null) {
-            $query = $query->where('id', '!=', $excludeId);
-        }
-
-        if ($query->exists()) {
-            throw ValidationException::withMessages([
-                'email' => ['The email address is already in use within this tenant.'],
-            ]);
-        }
+        return $this->repository->crossServiceFetch($orderServiceUrl, "/api/orders?user_id={$userId}");
     }
 }

@@ -2,100 +2,163 @@
 
 namespace App\Http\Controllers;
 
-use App\DTOs\OrderDTO;
 use App\Http\Requests\CreateOrderRequest;
-use App\Http\Requests\UpdateOrderStatusRequest;
+use App\Http\Requests\UpdateOrderRequest;
 use App\Services\OrderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
-class OrderController extends Controller
+class OrderController extends BaseController
 {
     public function __construct(private readonly OrderService $orderService) {}
 
+    /**
+     * GET /api/orders
+     * List orders with filtering, sorting, and optional pagination.
+     */
     public function index(Request $request): JsonResponse
     {
-        $tenantId  = $request->attributes->get('tenant_id');
-        $perPage   = (int) $request->query('per_page', 15);
-        $page      = (int) $request->query('page', 1);
-        $filters   = array_filter(['status' => $request->query('status'), 'user_id' => $request->query('user_id')]);
-        $paginator = $this->orderService->listOrders($tenantId, $filters, $perPage, $page);
+        try {
+            $result = $this->orderService->getOrders($request);
 
-        return response()->json([
-            'success' => true,
-            'data'    => collect($paginator->items())->map(fn ($o) => OrderDTO::fromModel($o)->toArray()),
-            'message' => 'Orders retrieved successfully.',
-            'meta'    => ['current_page' => $paginator->currentPage(), 'per_page' => $paginator->perPage(), 'total' => $paginator->total(), 'last_page' => $paginator->lastPage()],
-        ]);
-    }
+            return $this->paginatedResponse($result, 'Orders retrieved successfully');
+        } catch (Throwable $e) {
+            Log::error('OrderController@index failed', ['error' => $e->getMessage()]);
 
-    public function show(Request $request, string $id): JsonResponse
-    {
-        $dto = $this->orderService->getOrder($request->attributes->get('tenant_id'), $id);
-
-        if ($dto === null) {
-            return response()->json(['success' => false, 'data' => null, 'message' => 'Order not found.', 'meta' => []], 404);
+            return $this->errorResponse('Failed to retrieve orders', null, 500);
         }
-
-        return response()->json(['success' => true, 'data' => $dto->toArray(), 'message' => 'Order retrieved.', 'meta' => []]);
     }
 
+    /**
+     * POST /api/orders
+     * Create a new order via Saga orchestration.
+     */
     public function store(CreateOrderRequest $request): JsonResponse
     {
-        $tenantId = $request->attributes->get('tenant_id');
-        $userId   = $request->user()?->id ?? $request->input('user_id');
-
         try {
-            $dto = $this->orderService->createOrder($tenantId, $userId, $request->validated());
-        } catch (\Throwable $e) {
-            return response()->json(['success' => false, 'data' => null, 'message' => $e->getMessage(), 'meta' => []], 422);
+            $order = $this->orderService->createOrder($request->validated());
+
+            return $this->createdResponse($order, 'Order created successfully');
+        } catch (Throwable $e) {
+            Log::error('OrderController@store failed', ['error' => $e->getMessage()]);
+
+            return $this->errorResponse($e->getMessage(), null, 422);
         }
-
-        return response()->json(['success' => true, 'data' => $dto->toArray(), 'message' => 'Order created successfully.', 'meta' => []], 201);
     }
 
-    public function update(Request $request, string $id): JsonResponse
-    {
-        $validated = $request->validate(['shipping_address' => ['sometimes', 'array'], 'billing_address' => ['sometimes', 'array'], 'notes' => ['sometimes', 'nullable', 'string']]);
-        $dto       = $this->orderService->updateOrder($request->attributes->get('tenant_id'), $id, $validated);
-
-        if ($dto === null) {
-            return response()->json(['success' => false, 'data' => null, 'message' => 'Order not found.', 'meta' => []], 404);
-        }
-
-        return response()->json(['success' => true, 'data' => $dto->toArray(), 'message' => 'Order updated.', 'meta' => []]);
-    }
-
-    public function destroy(Request $request, string $id): JsonResponse
-    {
-        $deleted = $this->orderService->deleteOrder($request->attributes->get('tenant_id'), $id);
-
-        return response()->json(['success' => $deleted, 'data' => null, 'message' => $deleted ? 'Order deleted.' : 'Order not found.', 'meta' => []], $deleted ? 200 : 404);
-    }
-
-    public function cancel(Request $request, string $id): JsonResponse
+    /**
+     * GET /api/orders/{id}
+     * Retrieve a single order enriched with product data.
+     */
+    public function show(string $id): JsonResponse
     {
         try {
-            $dto = $this->orderService->cancelOrder($request->attributes->get('tenant_id'), $id);
-        } catch (\RuntimeException $e) {
-            return response()->json(['success' => false, 'data' => null, 'message' => $e->getMessage(), 'meta' => []], 422);
-        }
+            $order = $this->orderService->getOrderWithDetails($id);
 
-        if ($dto === null) {
-            return response()->json(['success' => false, 'data' => null, 'message' => 'Order not found.', 'meta' => []], 404);
-        }
+            if (! $order) {
+                return $this->notFoundResponse('Order not found');
+            }
 
-        return response()->json(['success' => true, 'data' => $dto->toArray(), 'message' => 'Order cancelled.', 'meta' => []]);
+            return $this->successResponse($order, 'Order retrieved successfully');
+        } catch (Throwable $e) {
+            Log::error('OrderController@show failed', ['id' => $id, 'error' => $e->getMessage()]);
+
+            return $this->errorResponse('Failed to retrieve order', null, 500);
+        }
     }
 
-    public function updateStatus(UpdateOrderStatusRequest $request, string $id): JsonResponse
+    /**
+     * PUT/PATCH /api/orders/{id}
+     * Update order fields (excluding status – use dedicated endpoint).
+     */
+    public function update(UpdateOrderRequest $request, string $id): JsonResponse
     {
-        $dto = $this->orderService->updateStatus($request->attributes->get('tenant_id'), $id, $request->input('status'));
+        try {
+            $order = $this->orderService->updateOrder($id, $request->validated());
 
-        if ($dto === null) {
-            return response()->json(['success' => false, 'data' => null, 'message' => 'Order not found.', 'meta' => []], 404);
+            if (! $order) {
+                return $this->notFoundResponse('Order not found');
+            }
+
+            return $this->successResponse($order, 'Order updated successfully');
+        } catch (Throwable $e) {
+            Log::error('OrderController@update failed', ['id' => $id, 'error' => $e->getMessage()]);
+
+            return $this->errorResponse($e->getMessage(), null, 422);
         }
+    }
 
-        return response()->json(['success' => true, 'data' => $dto->toArray(), 'message' => 'Order status updated.', 'meta' => []]);
+    /**
+     * DELETE /api/orders/{id}
+     * Soft-delete an order (must be in cancellable state).
+     */
+    public function destroy(string $id): JsonResponse
+    {
+        try {
+            $this->orderService->cancelOrder($id);
+
+            return $this->successResponse(null, 'Order cancelled successfully');
+        } catch (Throwable $e) {
+            Log::error('OrderController@destroy failed', ['id' => $id, 'error' => $e->getMessage()]);
+
+            return $this->errorResponse($e->getMessage(), null, 422);
+        }
+    }
+
+    /**
+     * PATCH /api/orders/{id}/status
+     * Transition order to a new status.
+     */
+    public function updateStatus(Request $request, string $id): JsonResponse
+    {
+        $request->validate([
+            'status' => 'required|string|in:pending,confirmed,processing,shipped,delivered,cancelled,refunded',
+        ]);
+
+        try {
+            $order = $this->orderService->updateOrderStatus($id, $request->input('status'));
+
+            return $this->successResponse($order, 'Order status updated successfully');
+        } catch (Throwable $e) {
+            Log::error('OrderController@updateStatus failed', ['id' => $id, 'error' => $e->getMessage()]);
+
+            return $this->errorResponse($e->getMessage(), null, 422);
+        }
+    }
+
+    /**
+     * GET /api/orders/status/{status}
+     * Retrieve all orders for a given status.
+     */
+    public function byStatus(string $status): JsonResponse
+    {
+        try {
+            $orders = $this->orderService->getOrdersByStatus($status);
+
+            return $this->successResponse($orders, "Orders with status '{$status}' retrieved");
+        } catch (Throwable $e) {
+            Log::error('OrderController@byStatus failed', ['status' => $status, 'error' => $e->getMessage()]);
+
+            return $this->errorResponse('Failed to retrieve orders by status', null, 500);
+        }
+    }
+
+    /**
+     * GET /api/orders/customer/{customerId}
+     * Retrieve all orders for a specific customer.
+     */
+    public function byCustomer(Request $request, string $customerId): JsonResponse
+    {
+        try {
+            $orders = $this->orderService->getOrdersByCustomer($customerId, $request);
+
+            return $this->paginatedResponse($orders, 'Customer orders retrieved successfully');
+        } catch (Throwable $e) {
+            Log::error('OrderController@byCustomer failed', ['customer_id' => $customerId, 'error' => $e->getMessage()]);
+
+            return $this->errorResponse('Failed to retrieve customer orders', null, 500);
+        }
     }
 }

@@ -2,37 +2,54 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class OrderItem extends Model
 {
-    use HasFactory, HasUuids;
-
-    public $timestamps = false;
+    use HasFactory;
 
     protected $fillable = [
         'order_id',
         'product_id',
         'product_name',
-        'sku',
+        'product_sku',
         'quantity',
         'unit_price',
-        'total_price',
-        'metadata',
+        'subtotal',
+        'tax',
+        'discount',
+        'attributes',
     ];
 
     protected $casts = [
-        'quantity'    => 'integer',
-        'unit_price'  => 'decimal:2',
-        'total_price' => 'decimal:2',
-        'metadata'    => 'array',
+        'attributes' => 'array',
+        'unit_price' => 'decimal:2',
+        'subtotal'   => 'decimal:2',
+        'tax'        => 'decimal:2',
+        'discount'   => 'decimal:2',
+        'quantity'   => 'integer',
     ];
+
+    // -------------------------------------------------------------------------
+    // Relationships
+    // -------------------------------------------------------------------------
 
     public function order(): BelongsTo
     {
-        return $this->belongsTo(Order::class);
+        return $this->belongsTo(Order::class, 'order_id');
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Compute line subtotal = (quantity × unit_price) − discount.
+     */
+    public function computeSubtotal(): float
+    {
+        return ($this->quantity * (float) $this->unit_price) - (float) ($this->discount ?? 0);
     }
 }

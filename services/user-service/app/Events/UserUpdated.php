@@ -3,8 +3,8 @@
 namespace App\Events;
 
 use App\Models\User;
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -17,7 +17,9 @@ class UserUpdated implements ShouldBroadcast
 
     public function broadcastOn(): array
     {
-        return [new Channel('tenant.' . $this->user->tenant_id . '.users')];
+        return [
+            new PrivateChannel('tenant.' . $this->user->tenant_id),
+        ];
     }
 
     public function broadcastAs(): string
@@ -28,11 +30,11 @@ class UserUpdated implements ShouldBroadcast
     public function broadcastWith(): array
     {
         return [
-            'id'        => $this->user->id,
+            'user_id'   => $this->user->id,
             'name'      => $this->user->name,
             'email'     => $this->user->email,
-            'role'      => $this->user->role,
             'tenant_id' => $this->user->tenant_id,
+            'timestamp' => now()->toIso8601String(),
         ];
     }
 }

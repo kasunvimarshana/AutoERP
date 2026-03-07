@@ -5,23 +5,32 @@ namespace App\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
-class HealthController extends Controller
+class HealthController extends BaseController
 {
     public function __invoke(): JsonResponse
     {
-        $dbStatus = 'ok';
-        try {
-            DB::connection()->getPdo();
-        } catch (\Throwable) {
-            $dbStatus = 'error';
-        }
+        $dbStatus = $this->checkDatabase();
 
         return response()->json([
-            'success'   => $dbStatus === 'ok',
+            'status'    => $dbStatus === 'ok' ? 'ok' : 'degraded',
             'service'   => 'product-service',
-            'status'    => $dbStatus === 'ok' ? 'healthy' : 'unhealthy',
-            'checks'    => ['database' => $dbStatus],
             'timestamp' => now()->toIso8601String(),
+            'version'   => config('app.version', '1.0.0'),
+            'env'       => config('app.env', 'production'),
+            'checks'    => [
+                'database' => $dbStatus,
+            ],
         ], $dbStatus === 'ok' ? 200 : 503);
+    }
+
+    private function checkDatabase(): string
+    {
+        try {
+            DB::connection()->getPdo();
+
+            return 'ok';
+        } catch (\Throwable) {
+            return 'error';
+        }
     }
 }

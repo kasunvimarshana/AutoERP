@@ -1,0 +1,55 @@
+<?php
+
+namespace App\Http\Middleware;
+
+use Closure;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
+
+class CheckPermission
+{
+    /**
+     * Usage:  Route::middleware('permission:edit-users')
+     *         Route::middleware('permission:edit-users|delete-users')  (any of the listed permissions)
+     */
+    public function handle(Request $request, Closure $next, string ...$permissions): Response
+    {
+        /** @var \App\Models\User|null $user */
+        $user = $request->user();
+
+        if (! $user) {
+            return $this->unauthorizedResponse();
+        }
+
+        // Super-admin bypasses all permission checks
+        if ($user->hasRole('super-admin')) {
+            return $next($request);
+        }
+
+        // Check whether the user holds at least one of the required permissions
+        foreach ($permissions as $permission) {
+            if ($user->hasPermission($permission)) {
+                return $next($request);
+            }
+        }
+
+        return $this->forbiddenResponse($permissions);
+    }
+
+    private function unauthorizedResponse(): JsonResponse
+    {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthenticated.',
+        ], 401);
+    }
+
+    private function forbiddenResponse(array $permissions): JsonResponse
+    {
+        return response()->json([
+            'success' => false,
+            'message' => 'Forbidden. Required permission(s): ' . implode(', ', $permissions),
+        ], 403);
+    }
+}

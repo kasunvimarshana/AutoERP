@@ -7,22 +7,16 @@ return [
     ],
 
     'guards' => [
-        'web' => ['driver' => 'session', 'provider' => 'users'],
-        'api' => ['driver' => 'passport', 'provider' => 'users'],
-    ],
-
-    'providers' => [
-        'users' => ['driver' => 'eloquent', 'model' => App\Models\User::class],
-    ],
-
-    'passwords' => [
-        'users' => [
+        'api' => [
+            'driver'   => 'passport',
             'provider' => 'users',
-            'table'    => 'password_reset_tokens',
-            'expire'   => 60,
-            'throttle' => 60,
         ],
     ],
 
-    'password_timeout' => 10800,
+    'providers' => [
+        'users' => [
+            'driver' => 'eloquent',
+            'model'  => App\Models\Order::class,
+        ],
+    ],
 ];

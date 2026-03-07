@@ -2,138 +2,255 @@
 
 namespace App\Services;
 
-use App\DTOs\OrderDTO;
 use App\Events\OrderCancelled;
-use App\Events\OrderCreated;
-use App\Events\OrderStatusUpdated;
+use App\Events\OrderStatusChanged;
 use App\Models\Order;
-use App\Repositories\OrderRepository;
-use App\Repositories\SagaRepository;
-use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\DB;
+use App\Repositories\Contracts\OrderRepositoryInterface;
+use App\Saga\SagaOrchestrator;
+use App\Saga\Steps\CreateOrderStep;
+use App\Saga\Steps\ProcessPaymentStep;
+use App\Saga\Steps\ReserveInventoryStep;
+use App\Saga\Steps\SendConfirmationStep;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class OrderService
+class OrderService extends BaseService
 {
     public function __construct(
-        private readonly OrderRepository       $orderRepository,
-        private readonly SagaRepository        $sagaRepository,
-        private readonly OrderSagaOrchestrator $sagaOrchestrator,
+        private readonly OrderRepositoryInterface $orderRepository,
+        private readonly SagaOrchestrator         $sagaOrchestrator,
     ) {}
 
-    public function listOrders(string $tenantId, array $filters = [], int $perPage = 15, int $page = 1): LengthAwarePaginator
-    {
-        $repo  = $this->orderRepository->withTenant($tenantId)->withRelations(['items']);
-        $query = $repo->newQuery()->orderBy('created_at', 'desc');
+    // -------------------------------------------------------------------------
+    // Create
+    // -------------------------------------------------------------------------
 
-        if (!empty($filters['status'])) {
-            $query->where('status', $filters['status']);
+    /**
+     * Create a new order by running the Saga with all 4 steps.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function createOrder(array $data): Order
+    {
+        $tenantId = $this->currentTenantId();
+
+        // Build a clean saga payload
+        $payload = array_merge($data, [
+            'tenant_id'    => $tenantId,
+            'order_number' => Order::generateOrderNumber($tenantId),
+        ]);
+
+        // Register saga steps in execution order
+        $this->sagaOrchestrator
+            ->reset()
+            ->addStep(app(ReserveInventoryStep::class))
+            ->addStep(app(CreateOrderStep::class))
+            ->addStep(app(ProcessPaymentStep::class))
+            ->addStep(app(SendConfirmationStep::class));
+
+        $result = $this->sagaOrchestrator->execute($payload);
+
+        if (! $result['success']) {
+            throw new \RuntimeException(
+                'Order creation failed: ' . ($result['error'] ?? 'Unknown error')
+            );
         }
 
-        if (!empty($filters['user_id'])) {
-            $query->where('user_id', $filters['user_id']);
+        /** @var Order $order */
+        $order = $result['context']['order'] ?? null;
+
+        if (! $order) {
+            throw new \RuntimeException('Order creation failed – saga did not produce an order.');
         }
 
-        return $query->paginate($perPage, ['*'], 'page', $page);
+        return $order->load('items');
     }
 
-    public function getOrder(string $tenantId, string $orderId): ?OrderDTO
-    {
-        $order = $this->orderRepository->withTenant($tenantId)->withRelations(['items'])->find($orderId);
+    // -------------------------------------------------------------------------
+    // Read
+    // -------------------------------------------------------------------------
 
-        return $order ? OrderDTO::fromModel($order) : null;
+    public function getOrders(Request $request): Collection|LengthAwarePaginator
+    {
+        $tenantId = $this->currentTenantId();
+
+        return $this->orderRepository->getByTenant($tenantId, $request);
     }
 
-    public function createOrder(string $tenantId, string $userId, array $data): OrderDTO
+    public function getOrdersByStatus(string $status): Collection
     {
-        $orderData           = $data;
-        $orderData['user_id'] = $userId;
-
-        $order = $this->sagaOrchestrator->execute($orderData, $tenantId);
-
-        event(new OrderCreated($order));
-
-        return OrderDTO::fromModel($order->load('items'));
+        return $this->orderRepository->getByStatus($this->currentTenantId(), $status);
     }
 
-    public function updateOrder(string $tenantId, string $orderId, array $data): ?OrderDTO
+    public function getOrdersByCustomer(string $customerId, Request $request): Collection|LengthAwarePaginator
     {
-        $order = $this->orderRepository->withTenant($tenantId)->find($orderId);
+        return $this->orderRepository->getByCustomer($this->currentTenantId(), $customerId, $request);
+    }
 
-        if ($order === null) {
+    /**
+     * Retrieve a single order and enrich order items with live product data.
+     */
+    public function getOrderWithDetails(string $id): ?array
+    {
+        $tenantId = $this->currentTenantId();
+
+        /** @var Order|null $order */
+        $order = $this->orderRepository->find($id);
+
+        if (! $order || $order->tenant_id !== $tenantId) {
             return null;
         }
 
-        $updated = DB::transaction(function () use ($order, $data): Order {
-            $order->fill(array_intersect_key($data, array_flip([
-                'shipping_address', 'billing_address', 'notes', 'metadata',
-            ])))->save();
+        $orderArray = $order->load('items')->toArray();
 
-            return $order->fresh(['items']);
-        });
-
-        return OrderDTO::fromModel($updated);
-    }
-
-    public function updateStatus(string $tenantId, string $orderId, string $status): ?OrderDTO
-    {
-        $order = $this->orderRepository->withTenant($tenantId)->find($orderId);
-
-        if ($order === null) {
-            return null;
-        }
-
-        $updated = DB::transaction(function () use ($order, $status): Order {
-            $previousStatus = $order->status;
-            $order->status  = $status;
-            $order->save();
-
-            event(new OrderStatusUpdated($order->fresh(), $previousStatus));
-
-            return $order->fresh(['items']);
-        });
-
-        return OrderDTO::fromModel($updated);
-    }
-
-    public function cancelOrder(string $tenantId, string $orderId): ?OrderDTO
-    {
-        $order = $this->orderRepository->withTenant($tenantId)->withRelations(['items'])->find($orderId);
-
-        if ($order === null) {
-            return null;
-        }
-
-        if (!$order->isCancellable()) {
-            throw new \RuntimeException("Order cannot be cancelled in status: {$order->status}");
-        }
-
-        $cancelled = DB::transaction(function () use ($order, $tenantId): Order {
-            $order->status = 'cancelled';
-            $order->save();
-
-            // Release inventory for each item
-            $inventoryClient = app(InventoryServiceClient::class);
-            foreach ($order->items as $item) {
-                $inventoryClient->releaseStock($item->product_id, $item->quantity, $tenantId, $order->id);
+        // Enrich with product data from Product Service
+        $orderArray['items'] = array_map(function (array $item) {
+            $productData = $this->fetchProductDetails($item['product_id']);
+            if ($productData) {
+                $item['product_details'] = $productData;
             }
 
-            event(new OrderCancelled($order->fresh(['items'])));
+            return $item;
+        }, $orderArray['items'] ?? []);
 
-            return $order->fresh(['items']);
-        });
-
-        return OrderDTO::fromModel($cancelled);
+        return $orderArray;
     }
 
-    public function deleteOrder(string $tenantId, string $orderId): bool
-    {
-        $order = $this->orderRepository->withTenant($tenantId)->find($orderId);
+    // -------------------------------------------------------------------------
+    // Update
+    // -------------------------------------------------------------------------
 
-        if ($order === null) {
-            return false;
+    public function updateOrder(string $id, array $data): ?Order
+    {
+        $tenantId = $this->currentTenantId();
+        $order    = $this->orderRepository->find($id);
+
+        if (! $order || $order->tenant_id !== $tenantId) {
+            return null;
         }
 
-        return DB::transaction(fn () => $this->orderRepository->delete($orderId));
+        return $this->orderRepository->update($id, $data);
+    }
+
+    public function updateOrderStatus(string $id, string $newStatus): Order
+    {
+        $tenantId = $this->currentTenantId();
+
+        /** @var Order|null $order */
+        $order = $this->orderRepository->find($id);
+
+        if (! $order || $order->tenant_id !== $tenantId) {
+            throw new \RuntimeException('Order not found.');
+        }
+
+        $oldStatus = $order->status;
+
+        /** @var Order $updated */
+        $updated = $this->orderRepository->update($id, ['status' => $newStatus]);
+
+        event(new OrderStatusChanged($order->id, $oldStatus, $newStatus));
+
+        Log::info('OrderService: status updated', [
+            'order_id'   => $id,
+            'old_status' => $oldStatus,
+            'new_status' => $newStatus,
+        ]);
+
+        return $updated;
+    }
+
+    // -------------------------------------------------------------------------
+    // Cancel
+    // -------------------------------------------------------------------------
+
+    /**
+     * Cancel an order and release any reserved inventory.
+     */
+    public function cancelOrder(string $id): void
+    {
+        $tenantId = $this->currentTenantId();
+
+        /** @var Order|null $order */
+        $order = $this->orderRepository->find($id);
+
+        if (! $order || $order->tenant_id !== $tenantId) {
+            throw new \RuntimeException('Order not found.');
+        }
+
+        if (! $order->isCancellable()) {
+            throw new \RuntimeException(
+                "Order cannot be cancelled from status '{$order->status}'."
+            );
+        }
+
+        $this->orderRepository->update($id, [
+            'status'         => Order::STATUS_CANCELLED,
+            'payment_status' => 'refunded',
+        ]);
+
+        // Release inventory reservations
+        $this->releaseInventory($order);
+
+        event(new OrderCancelled($order->id, 'Cancelled by user'));
+
+        Log::info('OrderService: order cancelled', ['order_id' => $id]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    private function fetchProductDetails(string $productId): ?array
+    {
+        $baseUrl = config('services.product_service.url', 'http://product-service');
+
+        try {
+            $response = Http::withHeaders([
+                'Accept'        => 'application/json',
+                'X-Service-Key' => config('services.internal_key', ''),
+            ])
+                ->timeout(5)
+                ->get("{$baseUrl}/api/products/{$productId}");
+
+            return $response->successful() ? $response->json('data') : null;
+        } catch (\Throwable $e) {
+            Log::warning('OrderService: failed to fetch product details', [
+                'product_id' => $productId,
+                'error'      => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    private function releaseInventory(Order $order): void
+    {
+        $baseUrl = config('services.inventory_service.url', 'http://inventory-service');
+
+        $items = $order->items->map(fn ($item) => [
+            'product_id' => $item->product_id,
+            'quantity'   => $item->quantity,
+        ])->toArray();
+
+        try {
+            Http::withHeaders([
+                'Accept'        => 'application/json',
+                'X-Service-Key' => config('services.internal_key', ''),
+            ])
+                ->timeout(10)
+                ->post("{$baseUrl}/api/inventory/release", [
+                    'tenant_id' => $order->tenant_id,
+                    'order_id'  => $order->id,
+                    'items'     => $items,
+                ]);
+        } catch (\Throwable $e) {
+            Log::error('OrderService: failed to release inventory', [
+                'order_id' => $order->id,
+                'error'    => $e->getMessage(),
+            ]);
+        }
     }
 }

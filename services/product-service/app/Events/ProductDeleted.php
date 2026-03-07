@@ -2,8 +2,9 @@
 
 namespace App\Events;
 
-use Illuminate\Broadcasting\Channel;
+use App\Models\Product;
 use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -12,15 +13,13 @@ class ProductDeleted implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public function __construct(
-        public readonly string $productId,
-        public readonly string $tenantId,
-        public readonly string $sku,
-    ) {}
+    public function __construct(public readonly Product $product) {}
 
     public function broadcastOn(): array
     {
-        return [new Channel('tenant.' . $this->tenantId . '.products')];
+        return [
+            new PrivateChannel('tenant.' . $this->product->tenant_id),
+        ];
     }
 
     public function broadcastAs(): string
@@ -31,9 +30,10 @@ class ProductDeleted implements ShouldBroadcast
     public function broadcastWith(): array
     {
         return [
-            'id'        => $this->productId,
-            'sku'       => $this->sku,
-            'tenant_id' => $this->tenantId,
+            'product_id' => $this->product->id,
+            'sku'        => $this->product->sku,
+            'tenant_id'  => $this->product->tenant_id,
+            'timestamp'  => now()->toIso8601String(),
         ];
     }
 }

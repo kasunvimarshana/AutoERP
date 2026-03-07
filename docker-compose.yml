@@ -1,0 +1,154 @@
+version: "3.9"
+
+services:
+  # ─── Databases ───────────────────────────────────────────────
+  db-user:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_DATABASE: user_service
+    volumes:
+      - db_user:/var/lib/mysql
+    networks: [saas]
+
+  db-product:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_DATABASE: product_service
+    volumes:
+      - db_product:/var/lib/mysql
+    networks: [saas]
+
+  db-inventory:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_DATABASE: inventory_service
+    volumes:
+      - db_inventory:/var/lib/mysql
+    networks: [saas]
+
+  db-order:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_DATABASE: order_service
+    volumes:
+      - db_order:/var/lib/mysql
+    networks: [saas]
+
+  # ─── Message Broker ──────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks: [saas]
+
+  # ─── Laravel Microservices ───────────────────────────────────
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8000"
+    environment:
+      APP_ENV: local
+      APP_KEY: base64:REPLACE_WITH_GENERATED_KEY
+      DB_HOST: db-user
+      DB_DATABASE: user_service
+      DB_USERNAME: root
+      DB_PASSWORD: secret
+      MESSAGE_BROKER_DRIVER: rabbitmq
+      RABBITMQ_HOST: rabbitmq
+    depends_on: [db-user, rabbitmq]
+    networks: [saas]
+
+  product-service:
+    build:
+      context: ./services/product-service
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8000"
+    environment:
+      APP_ENV: local
+      APP_KEY: base64:REPLACE_WITH_GENERATED_KEY
+      DB_HOST: db-product
+      DB_DATABASE: product_service
+      DB_USERNAME: root
+      DB_PASSWORD: secret
+      USER_SERVICE_URL: http://user-service:8000
+      MESSAGE_BROKER_DRIVER: rabbitmq
+      RABBITMQ_HOST: rabbitmq
+    depends_on: [db-product, rabbitmq, user-service]
+    networks: [saas]
+
+  inventory-service:
+    build:
+      context: ./services/inventory-service
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8000"
+    environment:
+      APP_ENV: local
+      APP_KEY: base64:REPLACE_WITH_GENERATED_KEY
+      DB_HOST: db-inventory
+      DB_DATABASE: inventory_service
+      DB_USERNAME: root
+      DB_PASSWORD: secret
+      USER_SERVICE_URL: http://user-service:8000
+      PRODUCT_SERVICE_URL: http://product-service:8000
+      MESSAGE_BROKER_DRIVER: rabbitmq
+      RABBITMQ_HOST: rabbitmq
+    depends_on: [db-inventory, rabbitmq, product-service]
+    networks: [saas]
+
+  order-service:
+    build:
+      context: ./services/order-service
+      dockerfile: Dockerfile
+    ports:
+      - "8004:8000"
+    environment:
+      APP_ENV: local
+      APP_KEY: base64:REPLACE_WITH_GENERATED_KEY
+      DB_HOST: db-order
+      DB_DATABASE: order_service
+      DB_USERNAME: root
+      DB_PASSWORD: secret
+      USER_SERVICE_URL: http://user-service:8000
+      PRODUCT_SERVICE_URL: http://product-service:8000
+      INVENTORY_SERVICE_URL: http://inventory-service:8000
+      MESSAGE_BROKER_DRIVER: rabbitmq
+      RABBITMQ_HOST: rabbitmq
+    depends_on: [db-order, rabbitmq, inventory-service]
+    networks: [saas]
+
+  # ─── React Frontend ───────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_USER_SERVICE_URL: http://localhost:8001
+      VITE_PRODUCT_SERVICE_URL: http://localhost:8002
+      VITE_INVENTORY_SERVICE_URL: http://localhost:8003
+      VITE_ORDER_SERVICE_URL: http://localhost:8004
+    depends_on: [user-service]
+    networks: [saas]
+
+volumes:
+  db_user:
+  db_product:
+  db_inventory:
+  db_order:
+
+networks:
+  saas:
+    driver: bridge

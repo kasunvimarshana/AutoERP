@@ -9,183 +9,186 @@ use App\Services\ProductService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
-class ProductController extends Controller
+class ProductController extends BaseController
 {
     public function __construct(private readonly ProductService $productService) {}
 
+    // -------------------------------------------------------------------------
+    // GET /api/products
+    // -------------------------------------------------------------------------
+
     public function index(Request $request): JsonResponse
     {
-        $tenantId = $request->attributes->get('tenant_id');
-        $perPage  = (int) $request->query('per_page', 15);
-        $page     = (int) $request->query('page', 1);
+        $tenantId = $this->resolveTenantId($request);
 
-        $filters = array_filter([
-            'search'    => $request->query('search'),
-            'category'  => $request->query('category'),
-            'status'    => $request->query('status'),
-            'low_stock' => $request->boolean('low_stock'),
-            'sort_by'   => $request->query('sort_by'),
-            'sort_dir'  => $request->query('sort_dir'),
-        ], fn ($v) => $v !== null && $v !== false && $v !== '');
+        $products = $this->productService->getProducts($request, $tenantId);
 
-        $paginator = $this->productService->listProducts($tenantId, $filters, $perPage, $page);
-
-        return response()->json([
-            'success' => true,
-            'data'    => collect($paginator->items())->map(
-                fn ($p) => ProductDTO::fromModel($p)->toArray()
-            ),
-            'message' => 'Products retrieved successfully.',
-            'meta'    => [
-                'current_page' => $paginator->currentPage(),
-                'per_page'     => $paginator->perPage(),
-                'total'        => $paginator->total(),
-                'last_page'    => $paginator->lastPage(),
-            ],
-        ]);
+        return $this->paginatedResponse($products, 'Products retrieved');
     }
 
-    public function show(Request $request, string $id): JsonResponse
-    {
-        $tenantId = $request->attributes->get('tenant_id');
-        $dto      = $this->productService->getProduct($tenantId, $id);
-
-        if ($dto === null) {
-            return response()->json([
-                'success' => false,
-                'data'    => null,
-                'message' => 'Product not found.',
-                'meta'    => [],
-            ], 404);
-        }
-
-        return response()->json([
-            'success' => true,
-            'data'    => $dto->toArray(),
-            'message' => 'Product retrieved successfully.',
-            'meta'    => [],
-        ]);
-    }
+    // -------------------------------------------------------------------------
+    // POST /api/products
+    // -------------------------------------------------------------------------
 
     public function store(CreateProductRequest $request): JsonResponse
     {
-        $tenantId = $request->attributes->get('tenant_id');
+        $tenantId = $this->resolveTenantId($request);
+
+        $dto = new ProductDTO(
+            name:          $request->validated('name'),
+            sku:           $request->validated('sku'),
+            price:         (float) $request->validated('price'),
+            tenantId:      $tenantId,
+            categoryId:    $request->validated('category_id'),
+            description:   $request->validated('description'),
+            costPrice:     (float) $request->validated('cost_price', 0),
+            unit:          $request->validated('unit'),
+            weight:        $request->validated('weight') !== null ? (float) $request->validated('weight') : null,
+            dimensions:    $request->validated('dimensions', []),
+            images:        $request->validated('images', []),
+            attributes:    $request->validated('attributes', []),
+            isActive:      (bool) $request->validated('is_active', true),
+            minStockLevel: $request->validated('min_stock_level') !== null ? (int) $request->validated('min_stock_level') : null,
+            maxStockLevel: $request->validated('max_stock_level') !== null ? (int) $request->validated('max_stock_level') : null,
+            reorderPoint:  $request->validated('reorder_point')  !== null ? (int) $request->validated('reorder_point')  : null,
+        );
 
         try {
-            $dto = $this->productService->createProduct($tenantId, $request->validated());
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'data'    => null,
-                'message' => 'Validation failed.',
-                'meta'    => ['errors' => $e->errors()],
-            ], 422);
-        }
+            $product = $this->productService->createProduct($dto);
 
-        return response()->json([
-            'success' => true,
-            'data'    => $dto->toArray(),
-            'message' => 'Product created successfully.',
-            'meta'    => [],
-        ], 201);
+            return $this->createdResponse($product, 'Product created successfully');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return $this->validationErrorResponse($e->errors(), 'Validation failed');
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to create product', $e->getMessage(), 500);
+        }
     }
 
-    public function update(UpdateProductRequest $request, string $id): JsonResponse
+    // -------------------------------------------------------------------------
+    // GET /api/products/{id}
+    // -------------------------------------------------------------------------
+
+    public function show(Request $request, int|string $id): JsonResponse
     {
-        $tenantId = $request->attributes->get('tenant_id');
+        $product = $this->productService->getProductById($id);
+
+        if (! $product) {
+            return $this->notFoundResponse('Product not found');
+        }
+
+        if (! $this->tenantMatches($request, $product->tenant_id)) {
+            return $this->forbiddenResponse('Access denied for this tenant');
+        }
+
+        return $this->successResponse($product, 'Product retrieved');
+    }
+
+    // -------------------------------------------------------------------------
+    // PUT/PATCH /api/products/{id}
+    // -------------------------------------------------------------------------
+
+    public function update(UpdateProductRequest $request, int|string $id): JsonResponse
+    {
+        $product = $this->productService->getProductById($id);
+
+        if (! $product) {
+            return $this->notFoundResponse('Product not found');
+        }
+
+        if (! $this->tenantMatches($request, $product->tenant_id)) {
+            return $this->forbiddenResponse('Access denied for this tenant');
+        }
 
         try {
-            $dto = $this->productService->updateProduct($tenantId, $id, $request->validated());
+            $updated = $this->productService->updateProduct($id, $request->validated());
+
+            return $this->successResponse($updated, 'Product updated successfully');
         } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'data'    => null,
-                'message' => 'Validation failed.',
-                'meta'    => ['errors' => $e->errors()],
-            ], 422);
+            return $this->validationErrorResponse($e->errors(), 'Validation failed');
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to update product', $e->getMessage(), 500);
         }
-
-        if ($dto === null) {
-            return response()->json([
-                'success' => false,
-                'data'    => null,
-                'message' => 'Product not found.',
-                'meta'    => [],
-            ], 404);
-        }
-
-        return response()->json([
-            'success' => true,
-            'data'    => $dto->toArray(),
-            'message' => 'Product updated successfully.',
-            'meta'    => [],
-        ]);
     }
 
-    public function destroy(Request $request, string $id): JsonResponse
+    // -------------------------------------------------------------------------
+    // DELETE /api/products/{id}
+    // -------------------------------------------------------------------------
+
+    public function destroy(Request $request, int|string $id): JsonResponse
     {
-        $tenantId = $request->attributes->get('tenant_id');
-        $deleted  = $this->productService->deleteProduct($tenantId, $id);
+        $product = $this->productService->getProductById($id);
 
-        return response()->json([
-            'success' => $deleted,
-            'data'    => null,
-            'message' => $deleted ? 'Product deleted successfully.' : 'Product not found.',
-            'meta'    => [],
-        ], $deleted ? 200 : 404);
-    }
-
-    public function getBySku(Request $request, string $sku): JsonResponse
-    {
-        $tenantId = $request->attributes->get('tenant_id');
-        $dto      = $this->productService->getProductBySku($tenantId, $sku);
-
-        if ($dto === null) {
-            return response()->json([
-                'success' => false,
-                'data'    => null,
-                'message' => 'Product not found.',
-                'meta'    => [],
-            ], 404);
+        if (! $product) {
+            return $this->notFoundResponse('Product not found');
         }
 
-        return response()->json([
-            'success' => true,
-            'data'    => $dto->toArray(),
-            'message' => 'Product retrieved successfully.',
-            'meta'    => [],
-        ]);
-    }
-
-    public function internalIndex(Request $request): JsonResponse
-    {
-        $tenantId = $request->attributes->get('tenant_id');
-        $ids      = $request->query('ids');
-        $perPage  = (int) $request->query('per_page', 100);
-
-        $repo = app(\App\Repositories\ProductRepository::class)->withTenant($tenantId);
-
-        if (!empty($ids)) {
-            $idArray  = explode(',', $ids);
-            $products = $repo->newQuery()->whereIn('id', $idArray)->get();
-            return response()->json([
-                'success' => true,
-                'data'    => $products->map(fn ($p) => ProductDTO::fromModel($p)->toArray()),
-                'message' => 'Products retrieved.',
-                'meta'    => [],
-            ]);
+        if (! $this->tenantMatches($request, $product->tenant_id)) {
+            return $this->forbiddenResponse('Access denied for this tenant');
         }
 
-        $paginator = $repo->getWithPagination($perPage);
-        return response()->json([
-            'success' => true,
-            'data'    => collect($paginator->items())->map(fn ($p) => ProductDTO::fromModel($p)->toArray()),
-            'message' => 'Products retrieved.',
-            'meta'    => [
-                'current_page' => $paginator->currentPage(),
-                'per_page'     => $paginator->perPage(),
-                'total'        => $paginator->total(),
-            ],
+        try {
+            $this->productService->deleteProduct($id);
+
+            return $this->successResponse(null, 'Product deleted successfully');
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to delete product', $e->getMessage(), 500);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /api/products/low-stock
+    // -------------------------------------------------------------------------
+
+    public function lowStock(Request $request): JsonResponse
+    {
+        $tenantId = $this->resolveTenantId($request);
+
+        $products = $this->productService->getLowStockProducts();
+
+        // Filter by tenant if present
+        if ($tenantId) {
+            $products = $products->filter(fn ($p) => (string) $p->tenant_id === (string) $tenantId)->values();
+        }
+
+        return $this->successResponse($products, 'Low stock products retrieved');
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /api/products/batch
+    // Retrieve multiple products by IDs (for cross-service calls from Inventory)
+    // -------------------------------------------------------------------------
+
+    public function batch(Request $request): JsonResponse
+    {
+        $request->validate([
+            'ids'   => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
         ]);
+
+        $products = $this->productService->getProductsByIds($request->input('ids'));
+
+        return $this->successResponse($products, 'Products retrieved');
+    }
+
+    // -------------------------------------------------------------------------
+    // Tenant helpers
+    // -------------------------------------------------------------------------
+
+    private function resolveTenantId(Request $request): ?int
+    {
+        $tenantId = $request->header('X-Tenant-ID') ?? $request->user()?->tenant_id;
+
+        return $tenantId ? (int) $tenantId : null;
+    }
+
+    private function tenantMatches(Request $request, mixed $resourceTenantId): bool
+    {
+        $tenantId = $request->header('X-Tenant-ID');
+
+        if (! $tenantId) {
+            return true;
+        }
+
+        return (string) $resourceTenantId === (string) $tenantId;
     }
 }

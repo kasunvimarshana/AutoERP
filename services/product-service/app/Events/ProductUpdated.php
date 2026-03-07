@@ -3,8 +3,8 @@
 namespace App\Events;
 
 use App\Models\Product;
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -17,7 +17,9 @@ class ProductUpdated implements ShouldBroadcast
 
     public function broadcastOn(): array
     {
-        return [new Channel('tenant.' . $this->product->tenant_id . '.products')];
+        return [
+            new PrivateChannel('tenant.' . $this->product->tenant_id),
+        ];
     }
 
     public function broadcastAs(): string
@@ -28,10 +30,13 @@ class ProductUpdated implements ShouldBroadcast
     public function broadcastWith(): array
     {
         return [
-            'id'        => $this->product->id,
-            'name'      => $this->product->name,
-            'sku'       => $this->product->sku,
-            'tenant_id' => $this->product->tenant_id,
+            'product_id'  => $this->product->id,
+            'sku'         => $this->product->sku,
+            'name'        => $this->product->name,
+            'price'       => $this->product->price,
+            'is_active'   => $this->product->is_active,
+            'tenant_id'   => $this->product->tenant_id,
+            'timestamp'   => now()->toIso8601String(),
         ];
     }
 }

@@ -8,209 +8,201 @@ use App\Http\Requests\UpdateUserRequest;
 use App\Services\UserService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
 
-class UserController extends Controller
+class UserController extends BaseController
 {
     public function __construct(private readonly UserService $userService) {}
 
+    // -------------------------------------------------------------------------
+    // GET /api/users
+    // -------------------------------------------------------------------------
+
     public function index(Request $request): JsonResponse
     {
-        Gate::authorize('viewAny', \App\Models\User::class);
+        $tenantId = $request->header('X-Tenant-ID') ?? $request->user()?->tenant_id;
 
-        $tenantId = $request->attributes->get('tenant_id');
-        $perPage  = (int) $request->query('per_page', 15);
-        $page     = (int) $request->query('page', 1);
+        $users = $this->userService->getAllUsers($request, $tenantId ? (int) $tenantId : null);
 
-        $filters = array_filter([
-            'search' => $request->query('search'),
-            'role'   => $request->query('role'),
-            'status' => $request->query('status'),
-        ]);
-
-        $paginator = $this->userService->listUsers($tenantId, $filters, $perPage, $page);
-
-        return response()->json([
-            'success' => true,
-            'data'    => collect($paginator->items())->map(
-                fn ($u) => UserDTO::fromModel($u)->toArray()
-            ),
-            'message' => 'Users retrieved successfully.',
-            'meta'    => [
-                'current_page' => $paginator->currentPage(),
-                'per_page'     => $paginator->perPage(),
-                'total'        => $paginator->total(),
-                'last_page'    => $paginator->lastPage(),
-            ],
-        ]);
+        return $this->paginatedResponse($users, 'Users retrieved');
     }
 
-    public function show(Request $request, string $id): JsonResponse
-    {
-        $tenantId = $request->attributes->get('tenant_id');
-        $user     = \App\Models\User::where('tenant_id', $tenantId)->find($id);
-
-        if ($user === null) {
-            return response()->json([
-                'success' => false,
-                'data'    => null,
-                'message' => 'User not found.',
-                'meta'    => [],
-            ], 404);
-        }
-
-        Gate::authorize('view', $user);
-
-        return response()->json([
-            'success' => true,
-            'data'    => UserDTO::fromModel($user)->toArray(),
-            'message' => 'User retrieved successfully.',
-            'meta'    => [],
-        ]);
-    }
+    // -------------------------------------------------------------------------
+    // POST /api/users
+    // -------------------------------------------------------------------------
 
     public function store(CreateUserRequest $request): JsonResponse
     {
-        Gate::authorize('create', \App\Models\User::class);
+        $tenantId = $request->header('X-Tenant-ID') ?? $request->user()?->tenant_id;
 
-        $tenantId = $request->attributes->get('tenant_id');
-
-        try {
-            $dto = $this->userService->createUser($tenantId, $request->validated());
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'data'    => null,
-                'message' => 'Validation failed.',
-                'meta'    => ['errors' => $e->errors()],
-            ], 422);
-        }
-
-        return response()->json([
-            'success' => true,
-            'data'    => $dto->toArray(),
-            'message' => 'User created successfully.',
-            'meta'    => [],
-        ], 201);
-    }
-
-    public function update(UpdateUserRequest $request, string $id): JsonResponse
-    {
-        $tenantId = $request->attributes->get('tenant_id');
-        $user     = \App\Models\User::where('tenant_id', $tenantId)->find($id);
-
-        if ($user === null) {
-            return response()->json([
-                'success' => false,
-                'data'    => null,
-                'message' => 'User not found.',
-                'meta'    => [],
-            ], 404);
-        }
-
-        Gate::authorize('update', $user);
+        $dto = new UserDTO(
+            name:      $request->validated('name'),
+            email:     $request->validated('email'),
+            password:  $request->validated('password'),
+            tenantId:  $tenantId ? (int) $tenantId : null,
+            roleIds:   $request->validated('role_ids', []),
+            isActive:  $request->validated('is_active', true),
+            metadata:  $request->validated('metadata', []),
+        );
 
         try {
-            $dto = $this->userService->updateUser($tenantId, $id, $request->validated());
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'data'    => null,
-                'message' => 'Validation failed.',
-                'meta'    => ['errors' => $e->errors()],
-            ], 422);
-        }
+            $user = $this->userService->createUser($dto);
 
-        return response()->json([
-            'success' => true,
-            'data'    => $dto?->toArray(),
-            'message' => 'User updated successfully.',
-            'meta'    => [],
-        ]);
+            return $this->createdResponse($user, 'User created successfully');
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to create user', $e->getMessage(), 500);
+        }
     }
 
-    public function destroy(Request $request, string $id): JsonResponse
+    // -------------------------------------------------------------------------
+    // GET /api/users/{id}
+    // -------------------------------------------------------------------------
+
+    public function show(Request $request, int|string $id): JsonResponse
     {
-        $tenantId = $request->attributes->get('tenant_id');
-        $user     = \App\Models\User::where('tenant_id', $tenantId)->find($id);
+        $user = $this->userService->getUserById($id);
 
-        if ($user === null) {
-            return response()->json([
-                'success' => false,
-                'data'    => null,
-                'message' => 'User not found.',
-                'meta'    => [],
-            ], 404);
+        if (! $user) {
+            return $this->notFoundResponse('User not found');
         }
 
-        Gate::authorize('delete', $user);
+        // Ensure tenant isolation
+        $tenantId = $request->header('X-Tenant-ID');
+        if ($tenantId && (string) $user->tenant_id !== (string) $tenantId) {
+            return $this->forbiddenResponse('Access denied for this tenant');
+        }
 
-        $deleted = $this->userService->deleteUser($tenantId, $id);
-
-        return response()->json([
-            'success' => $deleted,
-            'data'    => null,
-            'message' => $deleted ? 'User deleted successfully.' : 'Failed to delete user.',
-            'meta'    => [],
-        ], $deleted ? 200 : 500);
+        return $this->successResponse($user, 'User retrieved');
     }
 
-    public function assignRole(Request $request, string $id): JsonResponse
+    // -------------------------------------------------------------------------
+    // PUT/PATCH /api/users/{id}
+    // -------------------------------------------------------------------------
+
+    public function update(UpdateUserRequest $request, int|string $id): JsonResponse
     {
-        $request->validate(['role' => ['required', 'in:admin,manager,user']]);
+        $user = $this->userService->getUserById($id);
 
-        $tenantId = $request->attributes->get('tenant_id');
-        $user     = \App\Models\User::where('tenant_id', $tenantId)->find($id);
-
-        if ($user === null) {
-            return response()->json([
-                'success' => false,
-                'data'    => null,
-                'message' => 'User not found.',
-                'meta'    => [],
-            ], 404);
+        if (! $user) {
+            return $this->notFoundResponse('User not found');
         }
 
-        Gate::authorize('assignRole', $user);
+        // Tenant isolation check
+        $tenantId = $request->header('X-Tenant-ID');
+        if ($tenantId && (string) $user->tenant_id !== (string) $tenantId) {
+            return $this->forbiddenResponse('Access denied for this tenant');
+        }
 
-        $dto = $this->userService->assignRole($tenantId, $id, $request->input('role'));
+        try {
+            $updated = $this->userService->updateUser($id, $request->validated());
 
-        return response()->json([
-            'success' => true,
-            'data'    => $dto?->toArray(),
-            'message' => 'Role assigned successfully.',
-            'meta'    => [],
-        ]);
+            return $this->successResponse($updated, 'User updated successfully');
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to update user', $e->getMessage(), 500);
+        }
     }
 
-    public function updatePermissions(Request $request, string $id): JsonResponse
+    // -------------------------------------------------------------------------
+    // DELETE /api/users/{id}
+    // -------------------------------------------------------------------------
+
+    public function destroy(Request $request, int|string $id): JsonResponse
+    {
+        $user = $this->userService->getUserById($id);
+
+        if (! $user) {
+            return $this->notFoundResponse('User not found');
+        }
+
+        // Tenant isolation check
+        $tenantId = $request->header('X-Tenant-ID');
+        if ($tenantId && (string) $user->tenant_id !== (string) $tenantId) {
+            return $this->forbiddenResponse('Access denied for this tenant');
+        }
+
+        // Prevent self-deletion
+        if ((string) $request->user()?->id === (string) $id) {
+            return $this->errorResponse('You cannot delete your own account', null, 422);
+        }
+
+        try {
+            $this->userService->deleteUser($id);
+
+            return $this->successResponse(null, 'User deleted successfully');
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to delete user', $e->getMessage(), 500);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /api/users/{id}/roles
+    // -------------------------------------------------------------------------
+
+    public function assignRoles(Request $request, int|string $id): JsonResponse
     {
         $request->validate([
-            'permissions'   => ['required', 'array'],
-            'permissions.*' => ['string'],
+            'role_ids'   => ['required', 'array'],
+            'role_ids.*' => ['integer'],
         ]);
 
-        $tenantId = $request->attributes->get('tenant_id');
-        $user     = \App\Models\User::where('tenant_id', $tenantId)->find($id);
+        try {
+            $user = $this->userService->syncUserRoles($id, $request->input('role_ids'));
 
-        if ($user === null) {
-            return response()->json([
-                'success' => false,
-                'data'    => null,
-                'message' => 'User not found.',
-                'meta'    => [],
-            ], 404);
+            return $this->successResponse($user, 'Roles assigned');
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to assign roles', $e->getMessage(), 500);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /api/users/{id}/permissions
+    // -------------------------------------------------------------------------
+
+    public function assignPermissions(Request $request, int|string $id): JsonResponse
+    {
+        $request->validate([
+            'permission_ids'   => ['required', 'array'],
+            'permission_ids.*' => ['integer'],
+        ]);
+
+        try {
+            $user = $this->userService->assignPermissionsToUser($id, $request->input('permission_ids'));
+
+            return $this->successResponse($user, 'Permissions assigned');
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to assign permissions', $e->getMessage(), 500);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /api/users/me  – current user profile
+    // -------------------------------------------------------------------------
+
+    public function profile(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (! $user) {
+            return $this->errorResponse('Unauthenticated', null, 401);
         }
 
-        Gate::authorize('updatePermissions', $user);
+        return $this->successResponse($user->load(['roles', 'permissions', 'tenant']), 'Profile retrieved');
+    }
 
-        $dto = $this->userService->updatePermissions($tenantId, $id, $request->input('permissions'));
+    // -------------------------------------------------------------------------
+    // PUT /api/users/me  – update own profile
+    // -------------------------------------------------------------------------
 
-        return response()->json([
-            'success' => true,
-            'data'    => $dto?->toArray(),
-            'message' => 'Permissions updated successfully.',
-            'meta'    => [],
-        ]);
+    public function updateProfile(UpdateUserRequest $request): JsonResponse
+    {
+        /** @var \App\Models\User $authUser */
+        $authUser = $request->user();
+
+        try {
+            $user = $this->userService->updateProfile($authUser->id, $request->validated());
+
+            return $this->successResponse($user, 'Profile updated');
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Failed to update profile', $e->getMessage(), 500);
+        }
     }
 }

@@ -1,48 +1,59 @@
 <?php
+
 namespace App\Repositories;
 
+use App\Repositories\Contracts\BaseRepositoryInterface;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
-abstract class BaseRepository
+abstract class BaseRepository implements BaseRepositoryInterface
 {
     protected Model $model;
-    protected array $relations = [];
-    protected ?string $tenantId = null;
+
+    protected array $eagerLoads = [];
 
     public function __construct(Model $model)
     {
         $this->model = $model;
     }
 
+    // -------------------------------------------------------------------------
+    // Query builder helpers
+    // -------------------------------------------------------------------------
+
     protected function newQuery(): Builder
     {
         $query = $this->model->newQuery();
-        if (!empty($this->relations)) {
-            $query->with($this->relations);
+
+        if (! empty($this->eagerLoads)) {
+            $query->with($this->eagerLoads);
         }
-        if ($this->tenantId !== null) {
-            $query->where('tenant_id', $this->tenantId);
-        }
+
         return $query;
     }
 
-    public function all(): Collection
+    // -------------------------------------------------------------------------
+    // BaseRepositoryInterface
+    // -------------------------------------------------------------------------
+
+    public function all(array $columns = ['*']): Collection
     {
-        return $this->newQuery()->get();
+        return $this->newQuery()->get($columns);
     }
 
-    public function find(string|int $id): ?Model
+    public function find(int|string $id, array $columns = ['*']): ?Model
     {
-        return $this->newQuery()->find($id);
+        return $this->newQuery()->find($id, $columns);
     }
 
-    public function findBy(string $column, mixed $value): ?Model
+    public function findBy(string $column, mixed $value, array $columns = ['*']): Collection
     {
-        return $this->newQuery()->where($column, $value)->first();
+        return $this->newQuery()->where($column, $value)->get($columns);
     }
 
     public function create(array $data): Model
@@ -50,97 +61,142 @@ abstract class BaseRepository
         return $this->model->newQuery()->create($data);
     }
 
-    public function update(string|int $id, array $data): ?Model
+    public function update(int|string $id, array $data): Model
     {
-        $record = $this->find($id);
-        if ($record === null) {
-            return null;
-        }
+        $record = $this->newQuery()->findOrFail($id);
         $record->fill($data)->save();
-        return $record->fresh($this->relations);
+
+        return $record->fresh();
     }
 
-    public function delete(string|int $id): bool
+    public function delete(int|string $id): bool
     {
-        $record = $this->find($id);
-        if ($record === null) {
-            return false;
-        }
+        $record = $this->newQuery()->findOrFail($id);
+
         return (bool) $record->delete();
     }
 
-    public function paginate(?int $perPage = null, int $page = 1): LengthAwarePaginator|Collection
+    public function paginate(int $perPage = 15, array $columns = ['*']): LengthAwarePaginator
     {
-        if ($perPage === null) {
-            return $this->all();
-        }
-        return $this->newQuery()->paginate($perPage, ['*'], 'page', $page);
+        return $this->newQuery()->paginate($perPage, $columns);
     }
 
-    public function filter(array $filters): Builder
+    /**
+     * Search across multiple columns using LIKE.
+     */
+    public function search(string $term, array $columns): Collection
     {
         $query = $this->newQuery();
-        foreach ($filters as $filter) {
-            $column   = $filter['column']   ?? null;
-            $operator = $filter['operator'] ?? 'eq';
-            $value    = $filter['value']    ?? null;
-            if ($column === null) {
-                continue;
-            }
-            match ($operator) {
-                'eq'      => $query->where($column, '=', $value),
-                'like'    => $query->where($column, 'LIKE', '%' . $value . '%'),
-                'gt'      => $query->where($column, '>', $value),
-                'lt'      => $query->where($column, '<', $value),
-                'between' => $query->whereBetween($column, (array) $value),
-                'in'      => $query->whereIn($column, (array) $value),
-                default   => $query->where($column, '=', $value),
-            };
-        }
-        return $query;
-    }
 
-    public function search(string $term, array $columns): Builder
-    {
-        $query = $this->newQuery();
-        $query->where(function (Builder $q) use ($term, $columns): void {
-            foreach ($columns as $index => $column) {
-                $method = $index === 0 ? 'where' : 'orWhere';
-                $q->{$method}($column, 'LIKE', '%' . $term . '%');
+        $query->where(function (Builder $q) use ($term, $columns) {
+            foreach ($columns as $column) {
+                $q->orWhere($column, 'LIKE', '%' . $term . '%');
             }
         });
-        return $query;
+
+        return $query->get();
     }
 
-    public function sort(string $column, string $direction = 'asc'): Builder
+    /**
+     * Apply an associative array of where-clause filters.
+     * Each key may use dot-notation to denote operator, e.g. 'quantity:gte' => 10.
+     */
+    public function filter(array $filters): Collection
+    {
+        $query = $this->newQuery();
+
+        foreach ($filters as $key => $value) {
+            if (str_contains((string) $key, ':')) {
+                [$column, $operator] = explode(':', $key, 2);
+                $sqlOperator = match ($operator) {
+                    'gte'  => '>=',
+                    'lte'  => '<=',
+                    'gt'   => '>',
+                    'lt'   => '<',
+                    'ne'   => '!=',
+                    'like' => 'LIKE',
+                    default => '=',
+                };
+                $queryValue = $operator === 'like' ? '%' . $value . '%' : $value;
+                $query->where($column, $sqlOperator, $queryValue);
+            } elseif (is_array($value)) {
+                $query->whereIn((string) $key, $value);
+            } else {
+                $query->where((string) $key, $value);
+            }
+        }
+
+        return $query->get();
+    }
+
+    /**
+     * Apply dynamic ordering.
+     */
+    public function sort(string $column, string $direction = 'asc'): Collection
     {
         $direction = strtolower($direction) === 'desc' ? 'desc' : 'asc';
-        return $this->newQuery()->orderBy($column, $direction);
+
+        return $this->newQuery()->orderBy($column, $direction)->get();
     }
 
+    /**
+     * Return a paginator when `per_page` is in the request, otherwise all rows.
+     */
+    public function paginateConditional(Builder $query, Request $request): Collection|LengthAwarePaginator
+    {
+        if ($request->has('per_page')) {
+            $perPage = (int) $request->input('per_page', 15);
+
+            return $query->paginate(max(1, $perPage));
+        }
+
+        return $query->get();
+    }
+
+    /**
+     * Specify eager-loaded relationships for subsequent queries (fluent interface).
+     */
     public function withRelations(array $relations): static
     {
-        $clone            = clone $this;
-        $clone->relations = array_merge($clone->relations, $relations);
-        return $clone;
-    }
+        $this->eagerLoads = array_merge($this->eagerLoads, $relations);
 
-    public function withTenant(string $tenantId): static
-    {
-        $clone           = clone $this;
-        $clone->tenantId = $tenantId;
-        return $clone;
-    }
-
-    public function transaction(callable $callback): mixed
-    {
-        return DB::transaction($callback);
-    }
-
-    public function resetScope(): static
-    {
-        $this->relations = [];
-        $this->tenantId  = null;
         return $this;
+    }
+
+    /**
+     * Make an authenticated HTTP call to another microservice and return decoded JSON.
+     */
+    public function crossServiceFetch(string $serviceUrl, string $endpoint, array $params = []): mixed
+    {
+        $url = rtrim($serviceUrl, '/') . '/' . ltrim($endpoint, '/');
+
+        try {
+            $response = Http::withHeaders([
+                'Accept'        => 'application/json',
+                'X-Service-Key' => config('services.internal_key', ''),
+            ])
+                ->timeout(10)
+                ->retry(2, 200)
+                ->get($url, $params);
+
+            if ($response->successful()) {
+                return $response->json();
+            }
+
+            Log::warning('CrossServiceFetch non-success response', [
+                'url'    => $url,
+                'status' => $response->status(),
+                'body'   => $response->body(),
+            ]);
+
+            return null;
+        } catch (\Throwable $e) {
+            Log::error('CrossServiceFetch error', [
+                'url'       => $url,
+                'exception' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 }
