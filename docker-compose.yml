@@ -1,297 +1,414 @@
-services:
-  # ============================================================
-  # Infrastructure Services
-  # ============================================================
+# =============================================================================
+# Multi-Tenant SaaS Inventory Management System — Docker Compose
+# =============================================================================
+# Usage:
+#   docker compose up -d                 # start all services
+#   docker compose up -d user-service    # start a single service
+#   docker compose logs -f <service>     # tail logs
+#   docker compose exec <service> bash   # shell into a container
+# =============================================================================
 
-  mysql:
-    image: mysql:8.0
-    container_name: iam-mysql
+x-laravel-common: &laravel-common
+  build:
+    context: .
+    dockerfile: Dockerfile.laravel   # shared Laravel base image (php-fpm)
+  restart: unless-stopped
+  networks:
+    - saas_network
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    rabbitmq:
+      condition: service_healthy
+
+# ---------------------------------------------------------------------------
+# Top-level volumes (named, Docker-managed — survives container recreation)
+# ---------------------------------------------------------------------------
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  keycloak_data:
+    driver: local
+
+# ---------------------------------------------------------------------------
+# Shared network
+# ---------------------------------------------------------------------------
+networks:
+  saas_network:
+    driver: bridge
+    name: saas_network
+
+# =============================================================================
+# Services
+# =============================================================================
+services:
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — single instance, multiple logical databases
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: saas_postgres
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: secret
-      MYSQL_DATABASE: product_service
+      POSTGRES_USER: ${POSTGRES_USER:-saas_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-saas_secret}
+      POSTGRES_DB: user_db          # default DB; others are created via init script
     volumes:
-      - mysql_data:/var/lib/mysql
-      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
-      - "3306:3306"
+      - "${POSTGRES_PORT:-5432}:5432"
     networks:
-      - iam-network
+      - saas_network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      timeout: 20s
-      retries: 10
-
-  redis:
-    image: redis:7-alpine
-    container_name: iam-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    networks:
-      - iam-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-saas_user} -d user_db"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
+  # ---------------------------------------------------------------------------
+  # Redis — shared cache / sessions / queues
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: saas_redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-redis_secret}
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - saas_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_secret}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # RabbitMQ — async messaging between microservices
+  # ---------------------------------------------------------------------------
   rabbitmq:
-    image: rabbitmq:3.12-management-alpine
-    container_name: iam-rabbitmq
+    image: rabbitmq:3.13-management-alpine
+    container_name: saas_rabbitmq
     restart: unless-stopped
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    ports:
-      - "5672:5672"
-      - "15672:15672"   # Management UI
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-saas_rabbit}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-rabbit_secret}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-saas}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+      - ./docker/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./docker/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672"   # Management UI
     networks:
-      - iam-network
+      - saas_network
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 30s
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 15s
       timeout: 10s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
+  # ---------------------------------------------------------------------------
+  # Keycloak — Identity & Access Management (OIDC / OAuth 2.0)
+  # ---------------------------------------------------------------------------
   keycloak:
-    image: quay.io/keycloak/keycloak:23.0
-    container_name: iam-keycloak
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: saas_keycloak
     restart: unless-stopped
+    command: >
+      start-dev
+      --import-realm
+      --db postgres
+      --db-url jdbc:postgresql://postgres:5432/keycloak_db
+      --db-username ${POSTGRES_USER:-saas_user}
+      --db-password ${POSTGRES_PASSWORD:-saas_secret}
     environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-      KC_DB: mysql
-      KC_DB_URL: jdbc:mysql://mysql:3306/keycloak_db
-      KC_DB_USERNAME: root
-      KC_DB_PASSWORD: secret
-      KC_HOSTNAME: localhost
-    command: start-dev
+      KC_HOSTNAME: ${KEYCLOAK_HOSTNAME:-localhost}
+      KC_HOSTNAME_PORT: ${KEYCLOAK_PORT:-8080}
+      KC_HOSTNAME_STRICT_BACKCHANNEL: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin_secret}
+      KC_LOG_LEVEL: INFO
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
     ports:
-      - "8080:8080"
-    depends_on:
-      mysql:
-        condition: service_healthy
+      - "${KEYCLOAK_PORT:-8080}:8080"
     networks:
-      - iam-network
-
-  # ============================================================
-  # Microservices
-  # ============================================================
-
-  product-service:
-    build:
-      context: ./services/product-service
-      dockerfile: Dockerfile
-    container_name: iam-product-service
-    restart: unless-stopped
-    environment:
-      APP_NAME: "Product Service"
-      APP_ENV: production
-      APP_KEY: base64:replace_with_generated_key=
-      APP_DEBUG: "false"
-      APP_URL: http://product-service:8001
-      DB_CONNECTION: mysql
-      DB_HOST: mysql
-      DB_DATABASE: product_service
-      DB_USERNAME: root
-      DB_PASSWORD: secret
-      REDIS_HOST: redis
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USERNAME: guest
-      RABBITMQ_PASSWORD: guest
-      KEYCLOAK_BASE_URL: http://keycloak:8080
-      KEYCLOAK_REALM: inventory-realm
-      KEYCLOAK_CLIENT_ID: product-service
-      KEYCLOAK_CLIENT_SECRET: ${PRODUCT_SERVICE_CLIENT_SECRET}
-      INVENTORY_SERVICE_URL: http://inventory-service:8002
-    ports:
-      - "8001:8000"
+      - saas_network
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    networks:
-      - iam-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 10
+      start_period: 90s
 
-  inventory-service:
-    build:
-      context: ./services/inventory-service
-      dockerfile: Dockerfile
-    container_name: iam-inventory-service
-    restart: unless-stopped
-    environment:
-      APP_NAME: "Inventory Service"
-      APP_ENV: production
-      APP_KEY: base64:replace_with_generated_key=
-      APP_DEBUG: "false"
-      APP_URL: http://inventory-service:8002
-      DB_CONNECTION: mysql
-      DB_HOST: mysql
-      DB_DATABASE: inventory_service
-      DB_USERNAME: root
-      DB_PASSWORD: secret
-      REDIS_HOST: redis
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USERNAME: guest
-      RABBITMQ_PASSWORD: guest
-      KEYCLOAK_BASE_URL: http://keycloak:8080
-      KEYCLOAK_REALM: inventory-realm
-      KEYCLOAK_CLIENT_ID: inventory-service
-      KEYCLOAK_CLIENT_SECRET: ${INVENTORY_SERVICE_CLIENT_SECRET}
-      PRODUCT_SERVICE_URL: http://product-service:8001
-    ports:
-      - "8002:8000"
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    networks:
-      - iam-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  order-service:
-    build:
-      context: ./services/order-service
-      dockerfile: Dockerfile
-    container_name: iam-order-service
-    restart: unless-stopped
-    environment:
-      APP_NAME: "Order Service"
-      APP_ENV: production
-      APP_KEY: base64:replace_with_generated_key=
-      APP_DEBUG: "false"
-      APP_URL: http://order-service:8003
-      DB_CONNECTION: mysql
-      DB_HOST: mysql
-      DB_DATABASE: order_service
-      DB_USERNAME: root
-      DB_PASSWORD: secret
-      REDIS_HOST: redis
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_USERNAME: guest
-      RABBITMQ_PASSWORD: guest
-      KEYCLOAK_BASE_URL: http://keycloak:8080
-      KEYCLOAK_REALM: inventory-realm
-      KEYCLOAK_CLIENT_ID: order-service
-      KEYCLOAK_CLIENT_SECRET: ${ORDER_SERVICE_CLIENT_SECRET}
-      INVENTORY_SERVICE_URL: http://inventory-service:8002
-    ports:
-      - "8003:8000"
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - iam-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
+  # ---------------------------------------------------------------------------
+  # User Service — Laravel (manages tenants, users, auth)
+  # ---------------------------------------------------------------------------
   user-service:
+    <<: *laravel-common
+    container_name: saas_user_service
     build:
       context: ./services/user-service
       dockerfile: Dockerfile
-    container_name: iam-user-service
-    restart: unless-stopped
+    env_file:
+      - ./services/user-service/.env
     environment:
       APP_NAME: "User Service"
-      APP_ENV: production
-      APP_KEY: base64:replace_with_generated_key=
-      APP_DEBUG: "false"
-      APP_URL: http://user-service:8004
-      DB_CONNECTION: mysql
-      DB_HOST: mysql
-      DB_DATABASE: user_service
-      DB_USERNAME: root
-      DB_PASSWORD: secret
+      APP_PORT: 8001
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: user_db
+      DB_USERNAME: ${POSTGRES_USER:-saas_user}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-saas_secret}
       REDIS_HOST: redis
-      KEYCLOAK_BASE_URL: http://keycloak:8080
-      KEYCLOAK_REALM: inventory-realm
-      KEYCLOAK_CLIENT_ID: user-service
-      KEYCLOAK_CLIENT_SECRET: ${USER_SERVICE_CLIENT_SECRET}
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-saas_rabbit}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-rabbit_secret}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-saas}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: saas-inventory
+      KEYCLOAK_CLIENT_ID: inventory-api
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+    volumes:
+      - ./services/user-service:/var/www/html:cached
+      - ./services/user-service/storage:/var/www/html/storage
     ports:
-      - "8004:8000"
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - iam-network
+      - "8001:8001"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
+      test: ["CMD-SHELL", "curl -sf http://localhost:8001/api/v1/health || exit 1"]
+      interval: 20s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 60s
 
-  # ============================================================
-  # Frontend
-  # ============================================================
+  # ---------------------------------------------------------------------------
+  # Product Service — Laravel (manages products, categories, SKUs)
+  # ---------------------------------------------------------------------------
+  product-service:
+    <<: *laravel-common
+    container_name: saas_product_service
+    build:
+      context: ./services/product-service
+      dockerfile: Dockerfile
+    env_file:
+      - ./services/product-service/.env
+    environment:
+      APP_NAME: "Product Service"
+      APP_PORT: 8002
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: product_db
+      DB_USERNAME: ${POSTGRES_USER:-saas_user}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-saas_secret}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-saas_rabbit}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-rabbit_secret}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-saas}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: saas-inventory
+      KEYCLOAK_CLIENT_ID: inventory-api
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+    volumes:
+      - ./services/product-service:/var/www/html:cached
+      - ./services/product-service/storage:/var/www/html/storage
+    ports:
+      - "8002:8002"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8002/api/v1/health || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
+  # ---------------------------------------------------------------------------
+  # Inventory Service — Laravel (tracks stock levels, warehouses, movements)
+  # ---------------------------------------------------------------------------
+  inventory-service:
+    <<: *laravel-common
+    container_name: saas_inventory_service
+    build:
+      context: ./services/inventory-service
+      dockerfile: Dockerfile
+    env_file:
+      - ./services/inventory-service/.env
+    environment:
+      APP_NAME: "Inventory Service"
+      APP_PORT: 8003
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: inventory_db
+      DB_USERNAME: ${POSTGRES_USER:-saas_user}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-saas_secret}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-saas_rabbit}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-rabbit_secret}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-saas}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: saas-inventory
+      KEYCLOAK_CLIENT_ID: inventory-api
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+    volumes:
+      - ./services/inventory-service:/var/www/html:cached
+      - ./services/inventory-service/storage:/var/www/html/storage
+    ports:
+      - "8003:8003"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8003/api/v1/health || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ---------------------------------------------------------------------------
+  # Order Service — Laravel (purchase orders, sales orders, fulfilment)
+  # ---------------------------------------------------------------------------
+  order-service:
+    <<: *laravel-common
+    container_name: saas_order_service
+    build:
+      context: ./services/order-service
+      dockerfile: Dockerfile
+    env_file:
+      - ./services/order-service/.env
+    environment:
+      APP_NAME: "Order Service"
+      APP_PORT: 8004
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: order_db
+      DB_USERNAME: ${POSTGRES_USER:-saas_user}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-saas_secret}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-saas_rabbit}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-rabbit_secret}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-saas}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: saas-inventory
+      KEYCLOAK_CLIENT_ID: inventory-api
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+    volumes:
+      - ./services/order-service:/var/www/html:cached
+      - ./services/order-service/storage:/var/www/html/storage
+    ports:
+      - "8004:8004"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8004/api/v1/health || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ---------------------------------------------------------------------------
+  # Frontend — React / Vite (served by Node in dev; Nginx in production)
+  # ---------------------------------------------------------------------------
   frontend:
+    container_name: saas_frontend
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: iam-frontend
+      target: development     # switch to "production" for prod builds
     restart: unless-stopped
+    env_file:
+      - ./frontend/.env
+    environment:
+      NODE_ENV: development
+      VITE_API_BASE_URL: http://localhost/api/v1
+      VITE_KEYCLOAK_URL: http://localhost:8080
+      VITE_KEYCLOAK_REALM: saas-inventory
+      VITE_KEYCLOAK_CLIENT_ID: inventory-spa
+    volumes:
+      - ./frontend:/app:cached
+      - /app/node_modules          # anonymous volume — keeps container node_modules
     ports:
-      - "3000:80"
-    depends_on:
-      - product-service
-      - inventory-service
-      - order-service
-      - user-service
+      - "3000:3000"
     networks:
-      - iam-network
+      - saas_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000 || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
-  # ============================================================
-  # API Gateway (Nginx)
-  # ============================================================
-
+  # ---------------------------------------------------------------------------
+  # Nginx — API Gateway / Reverse Proxy
+  # ---------------------------------------------------------------------------
   nginx:
-    image: nginx:alpine
-    container_name: iam-nginx
+    container_name: saas_nginx
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
     restart: unless-stopped
     volumes:
-      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
     ports:
       - "80:80"
-    depends_on:
-      - product-service
-      - inventory-service
-      - order-service
-      - user-service
-      - frontend
+      - "443:443"
     networks:
-      - iam-network
-
-volumes:
-  mysql_data:
-  rabbitmq_data:
-
-networks:
-  iam-network:
-    driver: bridge
+      - saas_network
+    depends_on:
+      user-service:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t && curl -sf http://localhost/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s

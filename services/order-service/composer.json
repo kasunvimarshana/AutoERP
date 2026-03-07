@@ -1,24 +1,18 @@
 {
-    "name": "iam/order-service",
-    "description": "Order microservice for Laravel IAM Inventory Management System",
-    "keywords": ["laravel", "microservice", "order", "saga"],
-    "license": "MIT",
+    "name": "order-service/order-service",
+    "description": "Order Service for Multi-Tenant SaaS Inventory Management System",
     "type": "project",
     "require": {
-        "php": "^8.2",
-        "guzzlehttp/guzzle": "^7.2",
-        "laravel/framework": "^11.0",
-        "laravel/tinker": "^2.9",
-        "php-amqplib/php-amqplib": "^3.6",
-        "tymon/jwt-auth": "^2.1",
-        "vlucas/phpdotenv": "^5.6"
+        "php": "^8.1",
+        "laravel/framework": "^10.0",
+        "vlucas/phpdotenv": "^5.5",
+        "guzzlehttp/guzzle": "^7.5",
+        "php-amqplib/php-amqplib": "^3.5",
+        "predis/predis": "^2.1"
     },
     "require-dev": {
-        "fakerphp/faker": "^1.23",
-        "laravel/pint": "^1.13",
-        "mockery/mockery": "^1.6",
-        "nunomaduro/collision": "^8.0",
-        "phpunit/phpunit": "^11.0"
+        "phpunit/phpunit": "^10.0",
+        "mockery/mockery": "^1.5"
     },
     "autoload": {
         "psr-4": {
@@ -30,6 +24,29 @@
     "autoload-dev": {
         "psr-4": {
             "Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "post-autoload-dump": [
+            "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
+            "@php artisan package:discover --ansi"
+        ],
+        "post-update-cmd": [
+            "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
+        ],
+        "post-root-package-install": [
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
+        ],
+        "post-create-project-cmd": [
+            "@php artisan key:generate --ansi"
+        ],
+        "test": [
+            "@php artisan test"
+        ]
+    },
+    "extra": {
+        "laravel": {
+            "dont-discover": []
         }
     },
     "config": {

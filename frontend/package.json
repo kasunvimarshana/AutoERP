@@ -1,44 +1,29 @@
 {
-  "name": "iam-frontend",
+  "name": "inventory-management-frontend",
   "version": "1.0.0",
   "private": true,
-  "description": "React frontend for Laravel IAM Inventory Management System",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
-    "test": "vitest",
-    "lint": "eslint src --ext ts,tsx"
-  },
   "dependencies": {
-    "@tanstack/react-query": "^5.17.0",
-    "axios": "^1.6.5",
-    "keycloak-js": "^23.0.4",
+    "@tanstack/react-query": "^5.0.0",
+    "axios": "^1.6.0",
+    "keycloak-js": "^23.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.21.3",
-    "react-hook-form": "^7.49.3",
-    "@hookform/resolvers": "^3.3.4",
-    "zod": "^3.22.4",
-    "date-fns": "^3.2.0",
-    "clsx": "^2.1.0",
-    "lucide-react": "^0.312.0",
-    "sonner": "^1.4.0"
+    "react-router-dom": "^6.21.0",
+    "react-scripts": "5.0.1",
+    "zustand": "^4.4.0"
   },
-  "devDependencies": {
-    "@types/react": "^18.2.48",
-    "@types/react-dom": "^18.2.18",
-    "@vitejs/plugin-react": "^4.2.1",
-    "typescript": "^5.3.3",
-    "vite": "^5.0.11",
-    "vitest": "^1.2.0",
-    "eslint": "^8.56.0",
-    "@typescript-eslint/parser": "^6.19.0",
-    "@typescript-eslint/eslint-plugin": "^6.19.0",
-    "eslint-plugin-react": "^7.33.2",
-    "eslint-plugin-react-hooks": "^4.6.0",
-    "tailwindcss": "^3.4.1",
-    "autoprefixer": "^10.4.17",
-    "postcss": "^8.4.33"
-  }
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": ["react-app", "react-app/jest"]
+  },
+  "browserslist": {
+    "production": [">0.2%", "not dead", "not op_mini all"],
+    "development": ["last 1 chrome version", "last 1 firefox version", "last 1 safari version"]
+  },
+  "proxy": "http://nginx:80"
 }

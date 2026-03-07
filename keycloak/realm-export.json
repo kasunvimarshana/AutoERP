@@ -1,0 +1,392 @@
+{
+  "realm": "saas-inventory",
+  "displayName": "SaaS Inventory Management",
+  "displayNameHtml": "<strong>SaaS Inventory</strong> Management",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 5,
+  "accessTokenLifespan": 300,
+  "accessTokenLifespanForImplicitFlow": 900,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "offlineSessionIdleTimeout": 2592000,
+  "offlineSessionMaxLifespanEnabled": false,
+  "accessCodeLifespan": 60,
+  "accessCodeLifespanUserAction": 300,
+  "accessCodeLifespanLogin": 1800,
+  "actionTokenGeneratedByAdminLifespan": 43200,
+  "actionTokenGeneratedByUserLifespan": 300,
+  "internationalizationEnabled": true,
+  "supportedLocales": ["en", "fr", "de", "es", "pt-BR"],
+  "defaultLocale": "en",
+
+  "roles": {
+    "realm": [
+      {
+        "name": "super-admin",
+        "description": "Full platform-level access — can manage all tenants, users, and system configuration.",
+        "composite": false,
+        "clientRole": false
+      },
+      {
+        "name": "admin",
+        "description": "Tenant-level administrator — full access within a single tenant.",
+        "composite": false,
+        "clientRole": false
+      },
+      {
+        "name": "manager",
+        "description": "Tenant manager — can read and write products, inventory, and orders; cannot manage users.",
+        "composite": false,
+        "clientRole": false
+      },
+      {
+        "name": "staff",
+        "description": "Day-to-day operations — can view and update inventory/orders; limited write access to products.",
+        "composite": false,
+        "clientRole": false
+      },
+      {
+        "name": "viewer",
+        "description": "Read-only access to all resources within the assigned tenant.",
+        "composite": false,
+        "clientRole": false
+      }
+    ],
+    "client": {
+      "inventory-api": [
+        {
+          "name": "api-access",
+          "description": "Grants access to the inventory API.",
+          "composite": false,
+          "clientRole": true
+        }
+      ]
+    }
+  },
+
+  "defaultRoles": ["viewer"],
+
+  "groups": [
+    {
+      "name": "super-admins",
+      "path": "/super-admins",
+      "realmRoles": ["super-admin"]
+    },
+    {
+      "name": "tenant-admins",
+      "path": "/tenant-admins",
+      "realmRoles": ["admin"]
+    },
+    {
+      "name": "managers",
+      "path": "/managers",
+      "realmRoles": ["manager"]
+    },
+    {
+      "name": "staff",
+      "path": "/staff",
+      "realmRoles": ["staff"]
+    },
+    {
+      "name": "viewers",
+      "path": "/viewers",
+      "realmRoles": ["viewer"]
+    }
+  ],
+
+  "clientScopes": [
+    {
+      "name": "tenant:read",
+      "description": "Read access to tenant data.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true",
+        "consent.screen.text": "View tenant information"
+      }
+    },
+    {
+      "name": "tenant:write",
+      "description": "Write access to tenant data.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true",
+        "consent.screen.text": "Create and modify tenant information"
+      }
+    },
+    {
+      "name": "product:read",
+      "description": "Read access to product catalogue.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true",
+        "consent.screen.text": "View products and categories"
+      }
+    },
+    {
+      "name": "product:write",
+      "description": "Write access to product catalogue.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true",
+        "consent.screen.text": "Create and modify products"
+      }
+    },
+    {
+      "name": "inventory:read",
+      "description": "Read access to inventory levels and movements.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true",
+        "consent.screen.text": "View inventory levels and stock movements"
+      }
+    },
+    {
+      "name": "inventory:write",
+      "description": "Write access to inventory (adjustments, transfers).",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true",
+        "consent.screen.text": "Adjust inventory and record stock movements"
+      }
+    },
+    {
+      "name": "order:read",
+      "description": "Read access to purchase and sales orders.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true",
+        "consent.screen.text": "View orders"
+      }
+    },
+    {
+      "name": "order:write",
+      "description": "Write access to orders (create, update, cancel).",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true",
+        "consent.screen.text": "Create and modify orders"
+      }
+    },
+    {
+      "name": "user:read",
+      "description": "Read access to user and tenant membership data.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true",
+        "consent.screen.text": "View user profiles and memberships"
+      }
+    },
+    {
+      "name": "user:write",
+      "description": "Write access to user management (invite, deactivate, assign roles).",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true",
+        "consent.screen.text": "Manage users and role assignments"
+      }
+    },
+    {
+      "name": "webhook:manage",
+      "description": "Create, update, and delete webhook subscriptions.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true",
+        "consent.screen.text": "Manage webhook integrations"
+      }
+    }
+  ],
+
+  "defaultDefaultClientScopes": [
+    "profile",
+    "email",
+    "roles",
+    "web-origins"
+  ],
+
+  "defaultOptionalClientScopes": [
+    "offline_access",
+    "address",
+    "phone",
+    "microprofile-jwt"
+  ],
+
+  "clients": [
+    {
+      "clientId": "inventory-api",
+      "name": "Inventory API (Backend Services)",
+      "description": "Confidential client used by all backend microservices for machine-to-machine communication and token introspection.",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "REPLACE_WITH_KEYCLOAK_CLIENT_SECRET",
+      "_secret_note": "This placeholder is intentional. Keycloak realm imports do NOT perform environment variable substitution. After first boot, update the secret via the Keycloak Admin Console (Clients → inventory-api → Credentials → Regenerate) or the Admin REST API: PATCH /admin/realms/saas-inventory/clients/{id}/client-secret",
+      "redirectUris": [
+        "http://localhost:8001/*",
+        "http://localhost:8002/*",
+        "http://localhost:8003/*",
+        "http://localhost:8004/*"
+      ],
+      "webOrigins": ["*"],
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": true,
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "profile",
+        "email",
+        "roles",
+        "web-origins"
+      ],
+      "optionalClientScopes": [
+        "tenant:read",
+        "tenant:write",
+        "product:read",
+        "product:write",
+        "inventory:read",
+        "inventory:write",
+        "order:read",
+        "order:write",
+        "user:read",
+        "user:write",
+        "webhook:manage"
+      ],
+      "attributes": {
+        "access.token.lifespan": "300",
+        "use.refresh.tokens": "false",
+        "backchannel.logout.session.required": "true",
+        "backchannel.logout.revoke.offline.tokens": "false"
+      }
+    },
+    {
+      "clientId": "inventory-spa",
+      "name": "Inventory SPA (React Frontend)",
+      "description": "Public PKCE client for the React single-page application.",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://localhost/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "http://localhost"
+      ],
+      "publicClient": true,
+      "bearerOnly": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect",
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "profile",
+        "email",
+        "roles",
+        "web-origins"
+      ],
+      "optionalClientScopes": [
+        "tenant:read",
+        "product:read",
+        "inventory:read",
+        "order:read",
+        "user:read"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/*",
+        "access.token.lifespan": "300"
+      }
+    }
+  ],
+
+  "identityProviders": [],
+
+  "authenticationFlows": [],
+
+  "browserSecurityHeaders": {
+    "contentSecurityPolicyReportOnly": "",
+    "xContentTypeOptions": "nosniff",
+    "xRobotsTag": "none",
+    "xFrameOptions": "SAMEORIGIN",
+    "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self'; object-src 'none';",
+    "xXSSProtection": "1; mode=block",
+    "strictTransportSecurity": "max-age=31536000; includeSubDomains"
+  },
+
+  "smtpServer": {
+    "replyToDisplayName": "",
+    "starttls": "false",
+    "auth": "false",
+    "envelopeFrom": "",
+    "ssl": "false",
+    "password": "",
+    "port": "",
+    "host": "",
+    "replyTo": "",
+    "from": "no-reply@saas-inventory.local",
+    "fromDisplayName": "SaaS Inventory",
+    "user": ""
+  },
+
+  "eventsEnabled": true,
+  "eventsListeners": ["jboss-logging"],
+  "enabledEventTypes": [
+    "LOGIN",
+    "LOGIN_ERROR",
+    "LOGOUT",
+    "LOGOUT_ERROR",
+    "REGISTER",
+    "REGISTER_ERROR",
+    "TOKEN_EXCHANGE",
+    "CLIENT_LOGIN",
+    "CLIENT_LOGIN_ERROR",
+    "CODE_TO_TOKEN",
+    "CODE_TO_TOKEN_ERROR",
+    "REFRESH_TOKEN",
+    "REFRESH_TOKEN_ERROR",
+    "CLIENT_INITIATED_ACCOUNT_LINKING",
+    "UPDATE_PASSWORD",
+    "UPDATE_PASSWORD_ERROR",
+    "RESET_PASSWORD",
+    "RESET_PASSWORD_ERROR"
+  ],
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": true,
+
+  "userManagedAccessAllowed": false,
+
+  "attributes": {
+    "frontendUrl": "http://localhost:8080",
+    "adminEventsExpiration": "604800",
+    "eventsExpiration": "604800"
+  }
+}

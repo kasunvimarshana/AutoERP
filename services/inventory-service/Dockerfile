@@ -1,63 +1,65 @@
 FROM php:8.2-fpm-alpine
 
+LABEL maintainer="SaaS Platform Team"
+
 # Install system dependencies
 RUN apk add --no-cache \
-    git \
-    curl \
-    libpng-dev \
-    libjpeg-turbo-dev \
-    freetype-dev \
+    postgresql-dev \
     libzip-dev \
     zip \
     unzip \
+    git \
+    curl \
     oniguruma-dev \
     rabbitmq-c-dev \
-    nginx \
-    supervisor
+    $PHPIZE_DEPS
 
 # Install PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) \
-        pdo \
-        pdo_mysql \
-        mbstring \
-        exif \
-        pcntl \
-        bcmath \
-        gd \
-        zip \
-        opcache \
-        sockets
+RUN docker-php-ext-install \
+    pdo \
+    pdo_pgsql \
+    zip \
+    mbstring \
+    opcache \
+    bcmath \
+    pcntl
 
 # Install PECL extensions
-RUN pecl install redis amqp \
-    && docker-php-ext-enable redis amqp
+RUN pecl install redis && docker-php-ext-enable redis
+
+# Configure OPcache
+RUN echo "opcache.enable=1" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini \
+ && echo "opcache.memory_consumption=256" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini \
+ && echo "opcache.interned_strings_buffer=16" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini \
+ && echo "opcache.max_accelerated_files=20000" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini \
+ && echo "opcache.revalidate_freq=0" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini \
+ && echo "opcache.validate_timestamps=0" >> /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini
 
 # Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Set working directory
 WORKDIR /var/www/html
 
-# Copy application
+# Copy composer files first for layer caching
+COPY composer.json composer.lock* ./
+
+RUN composer install \
+    --no-dev \
+    --no-interaction \
+    --prefer-dist \
+    --optimize-autoloader \
+    --no-scripts
+
+# Copy application code
 COPY . .
 
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+# Run post-install scripts
+RUN composer run-script post-autoload-dump
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+ && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Copy Nginx config
-COPY docker/nginx.conf /etc/nginx/http.d/default.conf
+EXPOSE 9000
 
-# Copy Supervisor config
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-
-# Copy PHP-FPM config
-COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
-
-EXPOSE 8000
-
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["php-fpm"]

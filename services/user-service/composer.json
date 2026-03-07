@@ -1,24 +1,31 @@
 {
-    "name": "iam/user-service",
-    "description": "User microservice for Laravel IAM Inventory Management System",
-    "keywords": ["laravel", "microservice", "user", "keycloak", "rbac", "abac"],
-    "license": "MIT",
+    "name": "saas/user-service",
+    "description": "Multi-tenant SaaS User Service Microservice",
     "type": "project",
+    "keywords": ["laravel", "microservice", "saas", "multi-tenant"],
+    "license": "MIT",
     "require": {
         "php": "^8.2",
-        "guzzlehttp/guzzle": "^7.2",
-        "laravel/framework": "^11.0",
+        "ext-pdo": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "firebase/php-jwt": "^6.10",
+        "fruitcake/laravel-cors": "^3.0",
+        "guzzlehttp/guzzle": "^7.8",
+        "laravel/framework": "^10.48",
+        "laravel/sanctum": "^3.3",
         "laravel/tinker": "^2.9",
-        "php-amqplib/php-amqplib": "^3.6",
-        "stevenmaguire/oauth2-keycloak": "^5.1",
-        "tymon/jwt-auth": "^2.1"
+        "league/fractal": "^0.20",
+        "php-amqplib/php-amqplib": "^3.7",
+        "spatie/laravel-query-builder": "^5.8"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
-        "laravel/pint": "^1.13",
+        "laravel/pint": "^1.15",
         "mockery/mockery": "^1.6",
-        "nunomaduro/collision": "^8.0",
-        "phpunit/phpunit": "^11.0"
+        "nunomaduro/collision": "^7.10",
+        "phpunit/phpunit": "^10.5",
+        "spatie/laravel-ignition": "^2.4"
     },
     "autoload": {
         "psr-4": {
@@ -30,6 +37,26 @@
     "autoload-dev": {
         "psr-4": {
             "Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "post-autoload-dump": [
+            "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
+            "@php artisan package:discover --ansi"
+        ],
+        "post-update-cmd": [
+            "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
+        ],
+        "post-root-package-install": [
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
+        ],
+        "post-create-project-cmd": [
+            "@php artisan key:generate --ansi"
+        ]
+    },
+    "extra": {
+        "laravel": {
+            "dont-discover": []
         }
     },
     "config": {

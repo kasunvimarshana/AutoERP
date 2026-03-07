@@ -1,26 +1,24 @@
 {
-    "name": "iam/product-service",
-    "description": "Product microservice for Laravel IAM Inventory Management System",
-    "keywords": ["laravel", "microservice", "product", "inventory"],
-    "license": "MIT",
+    "name": "saas/product-service",
+    "description": "Multi-tenant SaaS Product Service",
     "type": "project",
+    "keywords": ["laravel", "saas", "microservice", "product"],
+    "license": "MIT",
     "require": {
-        "php": "^8.2",
-        "guzzlehttp/guzzle": "^7.2",
-        "laravel/framework": "^11.0",
+        "php": "^8.1",
+        "firebase/php-jwt": "^6.10",
+        "guzzlehttp/guzzle": "^7.8",
+        "laravel/framework": "^10.48",
         "laravel/tinker": "^2.9",
-        "php-amqplib/php-amqplib": "^3.6",
-        "stevenmaguire/oauth2-keycloak": "^5.1",
-        "tymon/jwt-auth": "^2.1",
-        "vlucas/phpdotenv": "^5.6"
+        "php-amqplib/php-amqplib": "^3.7",
+        "spatie/laravel-query-builder": "^5.8"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
-        "laravel/pint": "^1.13",
-        "laravel/sail": "^1.26",
+        "laravel/pint": "^1.15",
         "mockery/mockery": "^1.6",
-        "nunomaduro/collision": "^8.0",
-        "phpunit/phpunit": "^11.0"
+        "nunomaduro/collision": "^7.10",
+        "phpunit/phpunit": "^10.5"
     },
     "autoload": {
         "psr-4": {
@@ -46,9 +44,7 @@
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
         ],
         "post-create-project-cmd": [
-            "@php artisan key:generate --ansi",
-            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
-            "@php artisan migrate --graceful --ansi"
+            "@php artisan key:generate --ansi"
         ]
     },
     "extra": {

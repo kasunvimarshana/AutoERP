@@ -1,63 +1,51 @@
-FROM php:8.2-fpm-alpine
+FROM php:8.3-fpm-alpine
 
-# Install system dependencies
+LABEL maintainer="SaaS Platform Team"
+
+# System dependencies
 RUN apk add --no-cache \
-    git \
+    bash \
     curl \
+    git \
     libpng-dev \
-    libjpeg-turbo-dev \
-    freetype-dev \
     libzip-dev \
-    zip \
-    unzip \
     oniguruma-dev \
+    postgresql-dev \
     rabbitmq-c-dev \
-    nginx \
-    supervisor
+    unzip \
+    zip
 
-# Install PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) \
-        pdo \
-        pdo_mysql \
-        mbstring \
-        exif \
-        pcntl \
+# PHP extensions
+RUN pecl install amqp redis && \
+    docker-php-ext-enable amqp redis && \
+    docker-php-ext-install \
         bcmath \
         gd \
-        zip \
-        opcache \
-        sockets
+        mbstring \
+        pdo \
+        pdo_pgsql \
+        pcntl \
+        zip
 
-# Install PECL extensions
-RUN pecl install redis amqp \
-    && docker-php-ext-enable redis amqp
+# Composer
+COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer
 
-# Install Composer
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
-
-# Set working directory
 WORKDIR /var/www/html
 
-# Copy application
+# Copy composer files first for layer caching
+COPY composer.json composer.lock* ./
+RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist
+
+# Copy application code
 COPY . .
 
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+# Finalise composer autoloader
+RUN composer dump-autoload --optimize
 
-# Set permissions
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+# Permissions
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache && \
+    chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Copy Nginx config
-COPY docker/nginx.conf /etc/nginx/http.d/default.conf
+EXPOSE 9000
 
-# Copy Supervisor config
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-
-# Copy PHP-FPM config
-COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
-
-EXPOSE 8000
-
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["php-fpm"]

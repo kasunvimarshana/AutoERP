@@ -1,63 +1,61 @@
-FROM php:8.2-fpm-alpine
+# ---- Build Stage ----
+FROM php:8.2-fpm AS builder
 
-# Install system dependencies
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y \
     git \
     curl \
     libpng-dev \
-    libjpeg-turbo-dev \
-    freetype-dev \
+    libonig-dev \
+    libxml2-dev \
     libzip-dev \
     zip \
     unzip \
-    oniguruma-dev \
-    rabbitmq-c-dev \
-    nginx \
-    supervisor
+    && docker-php-ext-install pdo_mysql mbstring zip bcmath opcache \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) \
-        pdo \
-        pdo_mysql \
-        mbstring \
-        exif \
-        pcntl \
-        bcmath \
-        gd \
-        zip \
-        opcache \
-        sockets
-
-# Install PECL extensions
-RUN pecl install redis amqp \
-    && docker-php-ext-enable redis amqp
-
-# Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Set working directory
 WORKDIR /var/www/html
 
-# Copy application
+COPY composer.json composer.lock* ./
+
+RUN composer install --no-dev --optimize-autoloader --no-scripts --no-interaction
+
 COPY . .
 
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+RUN composer run-script post-autoload-dump --no-interaction 2>/dev/null || true \
+    && chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Set permissions
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+# ---- Production Stage ----
+FROM php:8.2-fpm
 
-# Copy Nginx config
-COPY docker/nginx.conf /etc/nginx/http.d/default.conf
+RUN apt-get update && apt-get install -y \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    libzip-dev \
+    zip \
+    unzip \
+    && docker-php-ext-install pdo_mysql mbstring zip bcmath opcache \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy Supervisor config
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+WORKDIR /var/www/html
 
-# Copy PHP-FPM config
-COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
+COPY --from=builder /var/www/html /var/www/html
 
-EXPOSE 8000
+RUN echo "opcache.enable=1\n\
+opcache.memory_consumption=128\n\
+opcache.interned_strings_buffer=8\n\
+opcache.max_accelerated_files=10000\n\
+opcache.revalidate_freq=60\n\
+opcache.fast_shutdown=1" > /usr/local/etc/php/conf.d/opcache.ini
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+EXPOSE 8004
+
+CMD ["php-fpm"]

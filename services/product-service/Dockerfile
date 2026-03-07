@@ -1,63 +1,65 @@
 FROM php:8.2-fpm-alpine
 
+LABEL maintainer="SaaS Platform Team"
+
 # Install system dependencies
 RUN apk add --no-cache \
     git \
     curl \
     libpng-dev \
-    libjpeg-turbo-dev \
-    freetype-dev \
-    libzip-dev \
+    libxml2-dev \
     zip \
     unzip \
     oniguruma-dev \
+    icu-dev \
     rabbitmq-c-dev \
-    nginx \
-    supervisor
+    $PHPIZE_DEPS
 
 # Install PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) \
-        pdo \
-        pdo_mysql \
-        mbstring \
-        exif \
-        pcntl \
-        bcmath \
-        gd \
-        zip \
-        opcache \
-        sockets
+RUN docker-php-ext-install \
+    pdo_mysql \
+    mbstring \
+    exif \
+    pcntl \
+    bcmath \
+    sockets \
+    intl
 
-# Install PECL extensions
-RUN pecl install redis amqp \
-    && docker-php-ext-enable redis amqp
+# Install Redis extension
+RUN pecl install redis && docker-php-ext-enable redis
+
+# Install AMQP extension
+RUN pecl install amqp && docker-php-ext-enable amqp
 
 # Install Composer
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer
 
-# Set working directory
 WORKDIR /var/www/html
 
-# Copy application
+# Copy composer files first for layer caching
+COPY composer.json composer.lock* ./
+
+RUN composer install \
+    --no-interaction \
+    --no-plugins \
+    --no-scripts \
+    --no-dev \
+    --prefer-dist \
+    --optimize-autoloader
+
+# Copy application code
 COPY . .
 
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader --no-interaction
-
-# Set permissions
+# Set permissions (do NOT run artisan cache commands here — environment
+# variables are only available at runtime, not build time)
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Copy Nginx config
-COPY docker/nginx.conf /etc/nginx/http.d/default.conf
+# Copy and enable the runtime entrypoint
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Copy Supervisor config
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+EXPOSE 9000
 
-# Copy PHP-FPM config
-COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
-
-EXPOSE 8000
-
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["php-fpm"]

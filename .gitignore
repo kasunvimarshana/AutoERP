@@ -1,35 +1,269 @@
-# Dependencies
-node_modules/
-vendor/
+# =============================================================================
+# Laravel Multi-Tenant SaaS — Comprehensive .gitignore
+# Covers: Laravel (PHP), React (Node/JS), Docker, and general tooling
+# =============================================================================
 
-# Build artifacts
-frontend/dist/
-frontend/build/
-
-# Environment files
+# -----------------------------------------------------------------------------
+# Environment & Secrets  (NEVER commit these)
+# -----------------------------------------------------------------------------
 .env
-*.env.local
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+**/secrets/
 
-# Laravel
-services/*/storage/app/
-services/*/storage/framework/
-services/*/storage/logs/
-services/*/bootstrap/cache/
+# -----------------------------------------------------------------------------
+# Laravel / PHP
+# -----------------------------------------------------------------------------
+/vendor/
+**/vendor/
+/node_modules/
+**/node_modules/
 
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
+# Laravel generated/cache files
+/bootstrap/cache/*.php
+!/bootstrap/cache/.gitkeep
+/storage/*.key
+**/storage/app/public/*
+!**/storage/app/public/.gitkeep
+**/storage/framework/cache/data/*
+!**/storage/framework/cache/data/.gitkeep
+**/storage/framework/sessions/*
+!**/storage/framework/sessions/.gitkeep
+**/storage/framework/testing/*
+!**/storage/framework/testing/.gitkeep
+**/storage/framework/views/*
+!**/storage/framework/views/.gitkeep
+**/storage/logs/*
+!**/storage/logs/.gitkeep
 
-# OS
-.DS_Store
-Thumbs.db
+# PHP composer
+composer.phar
+**/composer.lock
+# Uncomment the above line to also ignore composer.lock (not recommended for apps)
+# composer.lock
+
+# PHP Unit
+phpunit.xml
+!phpunit.xml.dist
+.phpunit.result.cache
+.phpunit.cache/
+/coverage/
+**/.phpunit.result.cache
+
+# PHPStan / Psalm / Pint
+.phpstan-cache/
+.psalm/cache/
+**/.pint.cache
+
+# Telescope / Horizon / Debugbar
+**/storage/telescope/
+**/storage/clockwork/
+
+# Sail
+**/vendor/bin/sail
+
+# IDE helpers
+_ide_helper.php
+_ide_helper_models.php
+.phpstorm.meta.php
+
+# Laravel Octane
+**/rr
+
+# -----------------------------------------------------------------------------
+# React / Node / JavaScript / TypeScript
+# -----------------------------------------------------------------------------
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Build output
+/dist/
+/build/
+**/dist/
+**/build/
+.next/
+**/.next/
+out/
+**/out/
+
+# Caches
+.npm/
+.yarn/
+**/.yarn/cache
+**/.yarn/unplugged
+**/.yarn/build-state.yml
+**/.yarn/install-state.gz
+.pnp.*
+.cache/
+**/.cache/
+
+# TypeScript
+*.tsbuildinfo
+
+# Vite
+.vite/
+**/.vite/
+
+# Storybook
+storybook-static/
 
 # Test coverage
-coverage/
-.phpunit.result.cache
-*.clover
+/coverage/
+**/coverage/
+lcov.info
+*.lcov
 
+# -----------------------------------------------------------------------------
 # Docker
+# -----------------------------------------------------------------------------
+# Ignore local override files (keep the base docker-compose.yml)
+docker-compose.override.yml
+docker-compose.local.yml
+
+# Docker data volumes (if mounted locally)
 .docker/
+**/data/postgres/
+**/data/redis/
+**/data/rabbitmq/
+**/data/keycloak/
+
+# -----------------------------------------------------------------------------
+# Logs & Temporary Files
+# -----------------------------------------------------------------------------
+*.log
+*.logs
+logs/
+tmp/
+temp/
+.tmp/
+
+# Swap files
+*.swp
+*.swo
+*~
+
+# -----------------------------------------------------------------------------
+# OS-generated files
+# -----------------------------------------------------------------------------
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V8
+.Trashes
+ehthumbs.db
+Thumbs.db
+.AppleDouble
+.LSOverride
+Icon
+
+# Windows
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# -----------------------------------------------------------------------------
+# IDEs & Editors
+# -----------------------------------------------------------------------------
+# VS Code
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json.example
+
+# JetBrains (PHPStorm, WebStorm, IntelliJ)
+.idea/
+*.iml
+*.iws
+*.ipr
+.idea_modules/
+
+# Sublime Text
+*.sublime-workspace
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+Session.vim
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Atom
+.atom/
+
+# -----------------------------------------------------------------------------
+# Testing & Quality Tools
+# -----------------------------------------------------------------------------
+.jest-cache/
+.eslintcache
+.stylelintcache
+*.snap
+/e2e/screenshots/
+/e2e/videos/
+/cypress/videos/
+/cypress/screenshots/
+/playwright-report/
+/test-results/
+
+# -----------------------------------------------------------------------------
+# CI / CD
+# -----------------------------------------------------------------------------
+.github/workflows/secrets/
+
+# -----------------------------------------------------------------------------
+# Package Managers
+# -----------------------------------------------------------------------------
+# Keep package-lock.json and yarn.lock for reproducible builds
+# but ignore shrinkwrap
+npm-shrinkwrap.json
+
+# -----------------------------------------------------------------------------
+# Miscellaneous
+# -----------------------------------------------------------------------------
+*.bak
+*.orig
+*.patch
+*.diff
+.history/
+.local/
+*.gz
+*.zip
+*.tar
+*.tar.gz
+
+# Terraform (if used for infra)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraformrc
+terraform.rc
