@@ -1,540 +1,233 @@
-# Laravel Multi-Tenant SAAS — Saga Pattern for Distributed Transactions
+# SaaS Multi-Tenant Inventory Management System with Saga Pattern
 
-A production-ready microservice system implementing the **Saga Orchestration Pattern** for distributed transactions across heterogeneous services.
+A production-grade microservices architecture demonstrating distributed transactions using the **Saga Orchestration Pattern**, multi-tenant isolation, RBAC/ABAC authorization, and polyglot persistence.
 
 ---
 
-## Architecture Diagram
+## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              CLIENT / BROWSER                               │
-└─────────────────────────────────────┬───────────────────────────────────────┘
-                                      │ HTTP
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         API GATEWAY  (Nginx :80)                            │
-│  /api/orders* → Order Svc  │  /api/products* → Inventory Svc               │
-│  /api/payments* → Pay Svc  │  /api/notifications* → Notification Svc       │
-└──────────┬────────────────┬──────────────────┬───────────────┬──────────────┘
-           │                │                  │               │
-           ▼                ▼                  ▼               ▼
-  ┌────────────────┐  ┌─────────────┐  ┌────────────┐  ┌──────────────────┐
-  │  Order Service │  │  Inventory  │  │  Payment   │  │  Notification    │
-  │  Laravel 10    │  │  Service    │  │  Service   │  │  Service         │
-  │  PHP 8.2       │  │  Laravel 10 │  │  Go 1.21   │  │  Node.js 20      │
-  │  MySQL  :8000  │  │  PHP 8.2    │  │  :8002     │  │  Express :8003   │
-  │  [ORCHESTRATOR]│  │  PgSQL:8001 │  │            │  │  MongoDB         │
-  └───────┬────────┘  └──────┬──────┘  └─────┬──────┘  └────────┬─────────┘
-          │                  │               │                   │
-          │      ┌───────────┴───────────────┴───────────────────┘
-          │      │           RABBITMQ  (AMQP :5672)
-          │      │   Exchange: saga.commands (direct)
-          │      │   Exchange: saga.replies  (direct)
-          │      │
-          │  Queues:
-          │  ├── reserve-inventory  ──► Inventory Service
-          │  ├── release-inventory  ──► Inventory Service (compensation)
-          │  ├── process-payment    ──► Payment Service
-          │  ├── refund-payment     ──► Payment Service (compensation)
-          │  ├── send-notification  ──► Notification Service
-          │  └── saga-replies       ──► Order Service (orchestrator)
-          │
-          ▼
-  ┌───────────────┐
-  │     REDIS     │  ← Saga state fast-access store
-  │    :6379      │    Key: saga:{sagaId} → JSON state
-  └───────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        Client (React + TypeScript)               │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │ HTTP
+┌─────────────────────────────▼───────────────────────────────────┐
+│                    API Gateway (Laravel 10)                       │
+│          Rate limiting · Request routing · Tracing               │
+└────┬──────────────┬──────────────┬──────────────┬───────────────┘
+     │              │              │              │
+┌────▼────┐  ┌──────▼──────┐ ┌────▼────┐  ┌────▼─────────────┐
+│  Auth   │  │  Inventory  │ │  Order  │  │  Notification    │
+│ Service │  │  Service    │ │ Service │  │  Service         │
+│Laravel  │  │  Laravel    │ │Laravel  │  │  Node.js         │
+│MySQL    │  │  PostgreSQL │ │MySQL    │  │  MongoDB         │
+│Passport │  │             │ │  SAGA   │  │  RabbitMQ        │
+└────┬────┘  └──────┬──────┘ └────┬────┘  └──────────────────┘
+     │              │              │
+     └──────────────┴──────────────┘
+                    │
+          ┌─────────▼─────────┐
+          │     RabbitMQ      │
+          │   (Message Bus)   │
+          └───────────────────┘
 ```
+
+---
+
+## Saga Orchestration Pattern
+
+The **Order Service** contains the Saga orchestrator. When an order is created, it executes 4 steps in sequence. If any step fails, compensating transactions run in **LIFO order** to roll back the distributed transaction.
+
+```
+CREATE ORDER
+     │
+     ▼
+┌─────────────────────────────────────────────┐
+│             Saga Orchestrator               │
+│                                             │
+│  Step 1: ReserveInventory  ──────────────►  │  Inventory Service
+│          ↳ compensate: ReleaseInventory     │  (PostgreSQL)
+│                                             │
+│  Step 2: ProcessPayment    ──────────────►  │  Payment Gateway
+│          ↳ compensate: RefundPayment        │  (local simulation)
+│                                             │
+│  Step 3: ConfirmOrder      ──────────────►  │  Order DB
+│          ↳ compensate: CancelOrder          │  (MySQL)
+│                                             │
+│  Step 4: SendNotification  ──────────────►  │  Notification Service
+│          ↳ compensate: SendCancellation     │  (Node.js / MongoDB)
+│                                             │
+└─────────────────────────────────────────────┘
+```
+
+All step state transitions are persisted to the `saga_logs` table for **observability** and **crash recovery**.
 
 ---
 
 ## Services
 
-| Service | Language | DB | Port | Role |
+| Service | Language | Framework | Database | Port |
 |---|---|---|---|---|
-| **Order Service** | Laravel 10 / PHP 8.2 | MySQL 8.0 | 8000 | Saga Orchestrator |
-| **Inventory Service** | Laravel 10 / PHP 8.2 | PostgreSQL 16 | 8001 | Stock reservation |
-| **Payment Service** | Go 1.21 | Redis 7 | 8002 | Payment processing |
-| **Notification Service** | Node.js 20 / Express | MongoDB 7 | 8003 | Email notifications |
-| **API Gateway** | Nginx 1.25 | — | 80 | Routing, CORS, rate-limiting |
-| **RabbitMQ** | AMQP | — | 5672/15672 | Message broker |
-| **Redis** | — | — | 6379 | Saga state store |
+| **api-gateway** | PHP 8.2 | Laravel 10 | Redis (cache) | 8000 |
+| **auth-service** | PHP 8.2 | Laravel 10 + Passport | MySQL 8 | 8001 |
+| **inventory-service** | PHP 8.2 | Laravel 10 | PostgreSQL 15 | 8002 |
+| **order-service** | PHP 8.2 | Laravel 10 | MySQL 8 | 8003 |
+| **notification-service** | Node.js 20 | Express 4 | MongoDB 7 | 8004 |
+| **frontend** | TypeScript | React 18 + Vite | – | 3000 |
 
 ---
 
-## Technology Stack
+## Key Design Principles
 
-| Layer | Technology |
-|---|---|
-| Orchestration Pattern | Saga (Orchestrator-based) |
-| Message Broker | RabbitMQ 3.12 |
-| State Store | Redis 7.2 |
-| HTTP Framework (PHP) | Laravel 10 |
-| HTTP Framework (Go) | Gin 1.9 |
-| HTTP Framework (Node) | Express 4.18 |
-| Container Runtime | Docker + Docker Compose |
-| Reverse Proxy | Nginx 1.25 |
-| CI/CD Ready | Yes (Dockerfiles + health checks) |
+### 1. Interface-Driven Design
+Every service layer is backed by an interface:
+- `AuthServiceInterface` / `TenantServiceInterface` / `AuthorizationServiceInterface`
+- `InventoryRepositoryInterface` / `ProductServiceInterface`
+- `OrderServiceInterface` / `SagaOrchestratorInterface` / `SagaStepInterface`
+- `GatewayProxyInterface`
+- `NotificationServiceContract` (Node.js)
 
----
+This allows any implementation to be swapped without breaking consuming code.
 
-## Saga Flow
+### 2. Multi-Tenant Isolation
+- Every database record carries a `tenant_id`
+- `TenantMiddleware` resolves the current tenant from `X-Tenant-ID` header
+- ABAC policies enforce cross-tenant access prevention
 
-### Happy Path (Order Created Successfully)
+### 3. RBAC + ABAC Authorization
+- **RBAC**: Spatie Permission with tenant-scoped roles (`admin:{tenantId}`, `warehouse_manager:{tenantId}`)
+- **ABAC**: User attributes (department, clearance) evaluated against resource attributes
 
-```
-Client              Order Service        Inventory           Payment          Notification
-  │                  (Orchestrator)        Service            Service           Service
-  │
-  │─── POST /api/orders ──────────────►│
-  │                                    │
-  │                                    │─ Create Order (DB) ─►
-  │                                    │─ Create SagaState ──►
-  │                                    │─ Store in Redis ────►
-  │                                    │
-  │                                    │──── [1] RESERVE_INVENTORY ──────────►│
-  │◄── 201 Created (saga started) ─────│                                      │
-  │                                                                            │
-  │                                               (DB transaction, lock rows) │
-  │                                    │◄─── [2] INVENTORY_RESERVED ──────────│
-  │                                    │
-  │                                    │──── [3] PROCESS_PAYMENT ───────────────────────►│
-  │                                    │                                                  │
-  │                                    │◄─── [4] PAYMENT_PROCESSED ─────────────────────│
-  │                                    │
-  │                                    │──── [5] SEND_NOTIFICATION ──────────────────────────────►│
-  │                                    │                                                           │
-  │                                    │◄─── [6] NOTIFICATION_SENT ──────────────────────────────│
-  │                                    │
-  │                                    │─ Update Order → confirmed ─►
-  │                                    │─ Update SagaState → COMPLETED ►
-```
-
-### Compensation Flow (Payment Fails)
-
-```
-  │──── [1] RESERVE_INVENTORY ──────────►│
-  │◄─── [2] INVENTORY_RESERVED ──────────│
-  │──── [3] PROCESS_PAYMENT ───────────────────────►│
-  │◄─── [4] PAYMENT_FAILED ────────────────────────│  ← triggers compensation
-  │
-  │──── [C1] RELEASE_INVENTORY ─────────►│          ← compensating transaction
-  │◄─── [C2] INVENTORY_RELEASED ─────────│
-  │
-  │─ Update Order → failed ─────────────►
-```
-
-### Saga States
-
-```
-STARTED → INVENTORY_RESERVED → PAYMENT_PROCESSED → COMPLETED
-                │                      │
-                ▼                      ▼
-             FAILED          COMPENSATION_STARTED → COMPENSATION_COMPLETED
-```
+### 4. Saga Compensating Transactions
+- Each `SagaStep` has `execute()` + `compensate()` methods
+- Compensations are **idempotent** (safe to call multiple times)
+- `SagaOrchestrator` runs compensations in **LIFO order** on failure
+- Every state transition is logged to `saga_logs` table
 
 ---
 
 ## Quick Start
 
 ### Prerequisites
+- Docker 24+
+- Docker Compose v2+
+- Make
 
-- Docker ≥ 24.0
-- Docker Compose v2
-
-### 1. Clone & Configure
-
+### 1. Clone and setup
 ```bash
-git clone https://github.com/your-org/Laravel_MultiTenent_SAAS_SAGA.git
-cd Laravel_MultiTenent_SAAS_SAGA
-cp .env.example .env
-# Edit .env with your settings (generate APP_KEY values)
+git clone <repository-url>
+cd SAAS_MultiTenent_SAGA
+make setup
 ```
 
-### 2. Start All Services
-
+### 2. Start all services
 ```bash
-docker compose up --build -d
+make up
 ```
 
-### 3. Run Database Migrations
-
+### 3. Run migrations and seeders
 ```bash
-# Order Service
-docker compose exec order-service php artisan migrate --force
-
-# Inventory Service (with seed data)
-docker compose exec inventory-service php artisan migrate --force
-docker compose exec inventory-service php artisan db:seed --force
+make migrate
+make seed
 ```
 
-### 4. Generate App Keys
+### 4. Access the application
+- **Frontend**: http://localhost:3000
+- **API Gateway**: http://localhost:8000
+- **RabbitMQ Management**: http://localhost:15672 (admin/secret)
+- **Auth Service**: http://localhost:8001
+- **Inventory Service**: http://localhost:8002
+- **Order Service**: http://localhost:8003
+- **Notification Service**: http://localhost:8004
 
-```bash
-docker compose exec order-service     php artisan key:generate
-docker compose exec inventory-service php artisan key:generate
-```
-
-### 5. Verify All Services
-
-```bash
-curl http://localhost/api/orders       # → order service health through gateway
-curl http://localhost/api/products     # → inventory service
-curl http://localhost:8002/health      # → payment service (direct)
-curl http://localhost:8003/health      # → notification service (direct)
-curl http://localhost:15672            # → RabbitMQ management UI (guest/guest)
-```
-
----
-
-## API Documentation
-
-### Order Service — `http://localhost/api/orders`
-
-#### Create Order (Start Saga)
-
-```http
-POST /api/orders
-Content-Type: application/json
-
-{
-  "customer_id": "550e8400-e29b-41d4-a716-446655440000",
-  "customer_email": "customer@example.com",
-  "items": [
-    {
-      "product_id": "660e8400-e29b-41d4-a716-446655440001",
-      "product_name": "Pro Laptop 15\"",
-      "quantity": 1,
-      "price": 1299.99
-    }
-  ]
-}
-```
-
-**Response 201:**
-```json
-{
-  "message": "Order created and saga started",
-  "data": {
-    "order_id": "uuid",
-    "saga_id":  "uuid",
-    "status":   "processing"
-  }
-}
-```
-
-#### List Orders
-
-```http
-GET /api/orders?per_page=10
-```
-
-#### Get Order with Saga State
-
-```http
-GET /api/orders/{order_id}
-```
-
-**Response 200:**
-```json
-{
-  "data": {
-    "id": "uuid",
-    "customer_id": "uuid",
-    "status": "confirmed",
-    "total_amount": "1299.99",
-    "items": [...],
-    "saga": {
-      "id": "uuid",
-      "current_step": "COMPLETED",
-      "status": "COMPLETED",
-      "error": null
-    }
-  }
-}
-```
-
-#### Cancel Order
-
-```http
-PUT /api/orders/{order_id}/cancel
-```
-
----
-
-### Inventory Service — `http://localhost/api/products`
-
-#### List Products with Stock
-
-```http
-GET /api/products?per_page=10
-```
-
-#### Create Product
-
-```http
-POST /api/products
-Content-Type: application/json
-
-{
-  "sku": "WIDGET-001",
-  "name": "Premium Widget",
-  "description": "A high-quality widget",
-  "price": 49.99,
-  "stock_quantity": 100
-}
-```
-
-#### Adjust Stock
-
-```http
-PUT /api/products/{id}/stock
-Content-Type: application/json
-
-{
-  "adjustment": 50,
-  "reason": "Restocked from supplier"
-}
-```
-
-#### List Reservations
-
-```http
-GET /api/inventory/reservations?order_id={uuid}
-```
-
----
-
-### Payment Service — `http://localhost:8002`
-
-#### Create Payment (manual trigger)
-
-```http
-POST /payments
-Content-Type: application/json
-
-{
-  "saga_id":     "uuid",
-  "order_id":    "uuid",
-  "customer_id": "uuid",
-  "amount":      1299.99
-}
-```
-
-#### Get Payment
-
-```http
-GET /payments/{payment_id}
-```
-
-#### Refund Payment
-
-```http
-POST /payments/{saga_id}/refund
-Content-Type: application/json
-
-{ "order_id": "uuid" }
-```
-
----
-
-### Notification Service — `http://localhost:8003`
-
-#### Get Notification
-
-```http
-GET /notifications/{notification_id}
-```
-
-#### Get Notifications by Order
-
-```http
-GET /notifications/order/{order_id}
-```
-
----
-
-## Message Format Reference
-
-### Command Message (Orchestrator → Services)
-
-```json
-{
-  "saga_id":   "550e8400-e29b-41d4-a716-446655440000",
-  "order_id":  "660e8400-e29b-41d4-a716-446655440001",
-  "type":      "RESERVE_INVENTORY",
-  "payload":   { "items": [...] },
-  "timestamp": "2024-01-15T10:30:00Z"
-}
-```
-
-### Reply Message (Services → Orchestrator)
-
-```json
-{
-  "saga_id":   "550e8400-e29b-41d4-a716-446655440000",
-  "order_id":  "660e8400-e29b-41d4-a716-446655440001",
-  "type":      "INVENTORY_RESERVED",
-  "success":   true,
-  "data":      { "items_count": 2 },
-  "error":     "",
-  "timestamp": "2024-01-15T10:30:01Z"
-}
-```
-
-### Message Types
-
-| Type | Direction | Queue |
+### Default credentials
+| Email | Password | Role |
 |---|---|---|
-| `RESERVE_INVENTORY` | Orchestrator → Inventory | `reserve-inventory` |
-| `INVENTORY_RESERVED` | Inventory → Orchestrator | `saga-replies` |
-| `INVENTORY_RESERVATION_FAILED` | Inventory → Orchestrator | `saga-replies` |
-| `RELEASE_INVENTORY` | Orchestrator → Inventory | `release-inventory` |
-| `INVENTORY_RELEASED` | Inventory → Orchestrator | `saga-replies` |
-| `PROCESS_PAYMENT` | Orchestrator → Payment | `process-payment` |
-| `PAYMENT_PROCESSED` | Payment → Orchestrator | `saga-replies` |
-| `PAYMENT_FAILED` | Payment → Orchestrator | `saga-replies` |
-| `REFUND_PAYMENT` | Orchestrator → Payment | `refund-payment` |
-| `PAYMENT_REFUNDED` | Payment → Orchestrator | `saga-replies` |
-| `SEND_NOTIFICATION` | Orchestrator → Notification | `send-notification` |
-| `NOTIFICATION_SENT` | Notification → Orchestrator | `saga-replies` |
-| `NOTIFICATION_FAILED` | Notification → Orchestrator | `saga-replies` |
+| `superadmin@saas.local` | `password` | Super Admin |
+| `admin@default.local` | `password` | Tenant Admin |
 
 ---
 
-## Environment Variables
+## API Examples
 
-| Variable | Service | Default | Description |
-|---|---|---|---|
-| `APP_KEY` | Order, Inventory | — | Laravel encryption key (generate with `artisan key:generate`) |
-| `DB_HOST` | Order | `mysql` | MySQL hostname |
-| `DB_HOST` | Inventory | `postgres` | PostgreSQL hostname |
-| `REDIS_HOST` | Order, Payment | `redis` | Redis hostname |
-| `RABBITMQ_HOST` | Order, Inventory | `rabbitmq` | RabbitMQ hostname |
-| `RABBITMQ_URL` | Payment, Notification | `amqp://guest:guest@rabbitmq:5672/` | RabbitMQ AMQP URL |
-| `MONGODB_URI` | Notification | `mongodb://mongo:27017/notifications_db` | MongoDB URI |
-| `SAGA_TIMEOUT` | Order | `300` | Saga state TTL in Redis (seconds) |
-| `GIN_MODE` | Payment | `debug` | Gin mode (`debug`/`release`) |
-| `EMAIL_HOST` | Notification | `smtp.ethereal.email` | SMTP hostname |
-| `EMAIL_USER` | Notification | — | SMTP username |
-| `EMAIL_PASS` | Notification | — | SMTP password |
+### Authentication
+```bash
+# Login
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: <tenant-uuid>" \
+  -d '{"email":"admin@default.local","password":"password"}'
+
+# Get current user
+curl http://localhost:8000/api/v1/auth/me \
+  -H "Authorization: Bearer <token>"
+```
+
+### Create Order (triggers Saga)
+```bash
+curl -X POST http://localhost:8000/api/v1/orders/orders \
+  -H "Authorization: Bearer <token>" \
+  -H "X-Tenant-ID: <tenant-uuid>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "items": [
+      {"product_id": "<product-uuid>", "quantity": 2, "unit_price": 29.99}
+    ],
+    "total_amount": 59.98,
+    "currency": "USD",
+    "payment_method": "credit_card",
+    "user_email": "customer@example.com"
+  }'
+```
+
+### Reserve Inventory (Saga step)
+```bash
+curl -X POST http://localhost:8000/api/v1/inventory/inventory/reserve \
+  -H "Authorization: Bearer <token>" \
+  -H "X-Tenant-ID: <tenant-uuid>" \
+  -H "Content-Type: application/json" \
+  -d '{"product_id": "<uuid>", "quantity": 2, "order_id": "<order-uuid>"}'
+```
+
+---
+
+## Development Commands
+
+```bash
+make up           # Start all services
+make down         # Stop all services
+make logs         # Tail all service logs
+make migrate      # Run all database migrations
+make seed         # Run all database seeders
+make test         # Run all tests
+make shell-auth   # Shell into auth-service container
+make shell-order  # Shell into order-service container
+```
 
 ---
 
 ## Testing
 
-### Order Service (PHPUnit)
-
+### Laravel services (PHPUnit)
 ```bash
-cd order-service
+# Auth service
+docker compose exec auth_service php artisan test
 
-# Install dependencies
-composer install
+# Inventory service
+docker compose exec inventory_service php artisan test
 
-# Run all tests
-./vendor/bin/phpunit
-
-# Run specific suite
-./vendor/bin/phpunit --testsuite Unit
-./vendor/bin/phpunit --testsuite Feature
-
-# With coverage
-./vendor/bin/phpunit --coverage-text
+# Order service (Saga tests)
+docker compose exec order_service php artisan test
 ```
 
-### Inventory Service (PHPUnit)
-
+### Notification service (Jest)
 ```bash
-cd inventory-service
-composer install
-./vendor/bin/phpunit
+docker compose exec notification_service npm test
 ```
 
-### Payment Service (Go)
-
+### Frontend (Vitest)
 ```bash
-cd payment-service
-
-# Download dependencies
-go mod tidy
-
-# Run all tests
-go test ./... -v
-
-# Run with race detector
-go test -race ./... -v
-
-# Run specific test
-go test -run TestRefundPayment -v
-```
-
-### Notification Service (Jest)
-
-```bash
-cd notification-service
-npm install
-npm test
-```
-
----
-
-## Troubleshooting
-
-### Services fail to start
-
-**Symptom:** Order/Inventory service exits immediately.
-**Cause:** RabbitMQ or database not ready.
-**Fix:** Services have healthcheck dependencies; wait for `docker compose up` to complete. Check logs:
-```bash
-docker compose logs order-service
-docker compose logs rabbitmq
-```
-
-### RabbitMQ connection refused
-
-```bash
-# Check RabbitMQ is healthy
-docker compose exec rabbitmq rabbitmq-diagnostics check_port_connectivity
-
-# View management UI
-open http://localhost:15672  # guest / guest
-```
-
-### Database migration errors
-
-```bash
-# Reset and re-migrate Order Service
-docker compose exec order-service php artisan migrate:fresh --force
-
-# Reset and re-migrate Inventory Service  
-docker compose exec inventory-service php artisan migrate:fresh --seed --force
-```
-
-### Saga stuck in STARTED state
-
-This can happen if the consumer crashes after publishing a command. Check:
-```bash
-docker compose logs order-service | grep saga:consume
-docker compose logs inventory-service | grep inventory:consume
-```
-
-Redis state (for debugging):
-```bash
-docker compose exec redis redis-cli KEYS "saga:*"
-docker compose exec redis redis-cli GET "saga:{saga_id}"
-```
-
-### Payment always failing
-
-The payment service has a simulated 10% failure rate. This is intentional to demonstrate compensating transactions. If you want 100% success for testing, modify `internal/service/payment_service.go` and change `0.90` to `1.0`.
-
-### Viewing all container logs
-
-```bash
-docker compose logs -f                    # all services
-docker compose logs -f order-service      # single service
-docker compose logs --tail=100 rabbitmq   # last 100 lines
+cd frontend && npm test
 ```
 
 ---
@@ -542,65 +235,73 @@ docker compose logs --tail=100 rabbitmq   # last 100 lines
 ## Project Structure
 
 ```
-├── docker-compose.yml
-├── .env.example
-├── .gitignore
+SAAS_MultiTenent_SAGA/
+├── docker-compose.yml          # Full stack orchestration
+├── Makefile                    # Developer convenience commands
+├── .env.example                # Root environment template
 │
-├── order-service/                  # Laravel 10 - Saga Orchestrator
+├── auth-service/               # PHP 8.2 + Laravel 10 + MySQL
 │   ├── app/
-│   │   ├── Http/Controllers/       # OrderController
-│   │   ├── Http/Requests/          # CreateOrderRequest
-│   │   ├── Models/                 # Order, SagaState
+│   │   ├── Contracts/          # AuthService, TenantService, AuthorizationService interfaces
+│   │   ├── Models/             # User (HasApiTokens, HasRoles), Tenant
+│   │   ├── Services/           # AuthService (Passport), TenantService, AuthorizationService (RBAC+ABAC)
+│   │   └── Http/               # Controllers, Middleware, Requests
+│   └── database/migrations/
+│
+├── inventory-service/          # PHP 8.2 + Laravel 10 + PostgreSQL
+│   ├── app/
+│   │   ├── Contracts/          # InventoryRepository, ProductService interfaces
+│   │   ├── Models/             # Product, InventoryItem
+│   │   ├── Repositories/       # InventoryRepository (SELECT FOR UPDATE)
+│   │   └── Services/           # ProductService
+│   └── database/migrations/
+│
+├── order-service/              # PHP 8.2 + Laravel 10 + MySQL + SAGA
+│   ├── app/
+│   │   ├── Contracts/          # SagaStep, SagaOrchestrator, OrderService interfaces
 │   │   ├── Saga/
-│   │   │   ├── SagaOrchestrator.php
-│   │   │   └── Steps/              # ReserveInventory, ProcessPayment, etc.
-│   │   ├── Messaging/              # RabbitMQPublisher, RabbitMQConsumer
-│   │   └── Console/Commands/       # SagaEventConsumer (saga:consume)
-│   ├── database/migrations/
-│   ├── tests/
-│   └── Dockerfile
+│   │   │   ├── SagaContext.php         # Shared data bag
+│   │   │   ├── SagaOrchestrator.php    # LIFO compensation engine
+│   │   │   └── Steps/
+│   │   │       ├── ReserveInventoryStep.php
+│   │   │       ├── ProcessPaymentStep.php
+│   │   │       ├── ConfirmOrderStep.php
+│   │   │       └── SendNotificationStep.php
+│   │   └── Models/             # Order, OrderItem, Payment, SagaLog
+│   └── database/migrations/
 │
-├── inventory-service/              # Laravel 10 - Inventory Management
-│   ├── app/
-│   │   ├── Http/Controllers/       # ProductController, InventoryController
-│   │   ├── Models/                 # Product, InventoryReservation
-│   │   ├── Services/               # InventoryService
-│   │   ├── Messaging/              # RabbitMQPublisher, RabbitMQConsumer
-│   │   └── Console/Commands/       # InventoryEventConsumer
-│   ├── database/
-│   │   ├── migrations/
-│   │   └── seeders/                # ProductSeeder (10 sample products)
-│   ├── tests/
-│   └── Dockerfile
-│
-├── payment-service/                # Go 1.21 - Payment Processing
-│   ├── main.go
-│   ├── internal/
-│   │   ├── model/                  # Payment struct
-│   │   ├── store/                  # RedisStore
-│   │   ├── service/                # PaymentService
-│   │   ├── handler/                # Gin HTTP handlers
-│   │   └── messaging/              # RabbitMQ consumer + publisher
-│   ├── payment_service_test.go
-│   └── Dockerfile
-│
-├── notification-service/           # Node.js 20 - Email Notifications
+├── notification-service/       # Node.js 20 + Express + MongoDB (polyglot)
 │   ├── src/
-│   │   ├── index.js                # Express app entry point
-│   │   ├── config/                 # Environment configuration
-│   │   ├── models/                 # Mongoose Notification model
-│   │   ├── services/               # NotificationService
-│   │   ├── messaging/              # RabbitMQ consumer + publisher
-│   │   ├── routes/                 # Express routes
-│   │   └── __tests__/             # Jest tests
-│   └── Dockerfile
+│   │   ├── contracts/          # NotificationServiceContract (abstract base)
+│   │   ├── services/           # EmailNotificationService, NotificationProcessor
+│   │   └── messaging/          # RabbitMQ consumer (choreography complement)
+│   └── tests/
 │
-└── api-gateway/
-    └── nginx.conf                  # Nginx reverse proxy configuration
+├── api-gateway/                # PHP 8.2 + Laravel 10
+│   └── app/
+│       ├── Contracts/          # GatewayProxyInterface
+│       └── Services/           # GatewayProxy (Guzzle + X-Request-ID tracing)
+│
+└── frontend/                   # React 18 + TypeScript + Vite
+    └── src/
+        ├── services/           # apiClient, authService, inventoryService, orderService
+        ├── store/              # Zustand authStore
+        └── pages/              # Login, Dashboard, Products, Inventory, Orders (Saga log viewer)
 ```
+
+---
+
+## Security Considerations
+
+- All database passwords and secrets must be changed for production deployments
+- Laravel Passport keys should be generated fresh per environment
+- The API Gateway enforces rate limiting (60 req/min per IP by default)
+- Multi-tenant isolation is enforced at both middleware and ABAC policy levels
+- Saga compensations are idempotent to handle duplicate execution safely
+- Stock reservation uses `SELECT FOR UPDATE` to prevent race conditions
 
 ---
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT

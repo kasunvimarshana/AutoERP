@@ -1,65 +1,52 @@
 'use strict';
 
-const express  = require('express');
-const mongoose = require('mongoose');
-const config   = require('./config');
-const logger   = require('./logger');
-const { startConsumer } = require('./messaging/consumer');
-const notificationsRouter = require('./routes/notifications');
+require('dotenv').config();
 
-const app = express();
+const app      = require('./app');
+const logger   = require('./utils/logger');
+const database = require('./config/database');
+const consumer = require('./messaging/consumer');
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+const PORT = process.env.PORT || 3000;
 
-// ── Health check ──────────────────────────────────────────────────────────────
-app.get('/health', (_req, res) => {
-  res.json({
-    status:  'ok',
-    service: 'notification-service',
-    version: '1.0.0',
-    db:      mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    time:    new Date().toISOString(),
-  });
-});
-
-// ── Routes ────────────────────────────────────────────────────────────────────
-app.use('/notifications', notificationsRouter);
-
-// ── 404 handler ───────────────────────────────────────────────────────────────
-app.use((_req, res) => {
-  res.status(404).json({ message: 'Route not found' });
-});
-
-// ── Error handler ─────────────────────────────────────────────────────────────
-app.use((err, _req, res, _next) => {
-  logger.error('[App] Unhandled error', { error: err.message, stack: err.stack });
-  res.status(500).json({ message: 'Internal server error' });
-});
-
-// ── Bootstrap ─────────────────────────────────────────────────────────────────
+/**
+ * Bootstrap the notification service.
+ * Connects to MongoDB, starts the Express HTTP server,
+ * and starts the RabbitMQ consumer for async notifications.
+ */
 async function bootstrap() {
   try {
-    await mongoose.connect(config.mongodb.uri);
-    logger.info('[App] MongoDB connected', { uri: config.mongodb.uri });
+    // 1. Connect to MongoDB
+    await database.connect();
+    logger.info('Connected to MongoDB');
+
+    // 2. Start HTTP server
+    const server = app.listen(PORT, () => {
+      logger.info(`Notification service listening on port ${PORT}`);
+    });
+
+    // 3. Start RabbitMQ consumer (async, non-blocking)
+    consumer.start().catch(err => {
+      logger.error('RabbitMQ consumer error', { error: err.message });
+    });
+
+    // Graceful shutdown
+    const shutdown = async (signal) => {
+      logger.info(`${signal} received – shutting down`);
+      server.close(async () => {
+        await consumer.stop();
+        await database.disconnect();
+        process.exit(0);
+      });
+    };
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT',  () => shutdown('SIGINT'));
+
   } catch (err) {
-    logger.error('[App] MongoDB connection failed', { error: err.message });
-    // Continue without MongoDB in dev/test — notifications will fail gracefully
+    logger.error('Failed to start notification service', { error: err.message });
+    process.exit(1);
   }
-
-  // Start RabbitMQ consumer (non-blocking)
-  startConsumer().catch(err => {
-    logger.error('[App] RabbitMQ consumer failed to start', { error: err.message });
-  });
-
-  app.listen(config.port, () => {
-    logger.info(`[App] Notification service listening on port ${config.port}`);
-  });
 }
 
-// Only bootstrap when running directly (not in tests)
-if (require.main === module) {
-  bootstrap();
-}
-
-module.exports = app;
+bootstrap();

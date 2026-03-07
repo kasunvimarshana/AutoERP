@@ -1,59 +1,57 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Ramsey\Uuid\Uuid;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * Product model – represents a catalogue entry for a tenant.
+ *
+ * @property string      $id
+ * @property string      $tenant_id
+ * @property string      $name
+ * @property string|null $description
+ * @property string      $sku
+ * @property float       $price
+ * @property string      $currency
+ * @property string      $status
+ * @property array|null  $metadata
+ */
 class Product extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUuids, SoftDeletes;
 
-    protected $keyType    = 'string';
-    public    $incrementing = false;
-
+    /** @var array<string> */
     protected $fillable = [
-        'id',
-        'sku',
+        'tenant_id',
         'name',
         'description',
+        'sku',
         'price',
-        'stock_quantity',
-        'reserved_quantity',
+        'currency',
+        'status',
+        'metadata',
     ];
 
+    /** @var array<string, string> */
     protected $casts = [
-        'price'             => 'decimal:2',
-        'stock_quantity'    => 'integer',
-        'reserved_quantity' => 'integer',
+        'price'    => 'float',
+        'metadata' => 'array',
     ];
-
-    protected static function boot(): void
-    {
-        parent::boot();
-
-        static::creating(function (Product $product): void {
-            if (empty($product->id)) {
-                $product->id = Uuid::uuid4()->toString();
-            }
-            if (! isset($product->reserved_quantity)) {
-                $product->reserved_quantity = 0;
-            }
-        });
-    }
 
     /**
-     * Get the number of units available for reservation.
+     * The inventory item tracking stock for this product.
+     *
+     * @return HasOne<InventoryItem>
      */
-    public function getAvailableStock(): int
+    public function inventoryItem(): HasOne
     {
-        return max(0, $this->stock_quantity - $this->reserved_quantity);
-    }
-
-    public function reservations(): HasMany
-    {
-        return $this->hasMany(InventoryReservation::class, 'product_id', 'id');
+        return $this->hasOne(InventoryItem::class);
     }
 }

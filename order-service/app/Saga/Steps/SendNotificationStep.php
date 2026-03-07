@@ -1,46 +1,104 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Saga\Steps;
 
-use App\Messaging\RabbitMQPublisher;
+use App\Contracts\SagaStepInterface;
+use App\Saga\SagaContext;
+use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Log;
 
-class SendNotificationStep
+/**
+ * Saga Step 4: Send order confirmation notification.
+ *
+ * Forward:    POST /api/v1/notifications  → Notification Service (Node.js)
+ * Compensate: POST /api/v1/notifications/cancel  → send cancellation notice
+ *
+ * Note: Notification sending is best-effort. A failure here does NOT
+ * roll back the payment or inventory reservation.  In a real system
+ * this would be a separate outbox/event pattern.
+ *
+ * Context reads:
+ *   - order_id, tenant_id, user_email, order_confirmed
+ */
+final class SendNotificationStep implements SagaStepInterface
 {
-    public function __construct(
-        private readonly RabbitMQPublisher $publisher
-    ) {}
+    private readonly Client $httpClient;
 
-    public function execute(
-        string $sagaId,
-        string $orderId,
-        string $customerEmail,
-        array  $items,
-        float  $totalAmount
-    ): void {
-        $message = [
-            'saga_id'   => $sagaId,
-            'order_id'  => $orderId,
-            'type'      => 'SEND_NOTIFICATION',
-            'payload'   => [
-                'customer_email' => $customerEmail,
-                'order_id'       => $orderId,
-                'items'          => $items,
-                'total_amount'   => $totalAmount,
-                'saga_id'        => $sagaId,
-            ],
-            'timestamp' => now()->toIso8601String(),
-        ];
-
-        $this->publisher->publish(
-            config('rabbitmq.exchanges.commands'),
-            config('rabbitmq.queues.send_notification'),
-            $message
-        );
-
-        Log::info('[Step] SendNotification published', [
-            'saga_id'  => $sagaId,
-            'order_id' => $orderId,
+    public function __construct()
+    {
+        $this->httpClient = new Client([
+            'base_uri' => config('services.notification.url'),
+            'timeout'  => 5.0,
         ]);
+    }
+
+    public function getName(): string
+    {
+        return 'SendNotification';
+    }
+
+    public function execute(SagaContext $context): void
+    {
+        $orderId    = $context->get('order_id');
+        $tenantId   = $context->get('tenant_id');
+        $userEmail  = $context->get('user_email');
+
+        try {
+            $this->httpClient->post('/api/v1/notifications', [
+                'json' => [
+                    'type'       => 'order_confirmed',
+                    'order_id'   => $orderId,
+                    'tenant_id'  => $tenantId,
+                    'recipient'  => $userEmail,
+                    'payload'    => [
+                        'order_id'     => $orderId,
+                        'confirmed_at' => now()->toIso8601String(),
+                    ],
+                ],
+                'headers' => [
+                    'Accept'             => 'application/json',
+                    'X-Internal-Service' => 'order-service',
+                ],
+            ]);
+
+            Log::info("[SendNotificationStep] Notification sent", ['order_id' => $orderId]);
+        } catch (\Throwable $e) {
+            // Non-fatal: log but don't fail the Saga
+            Log::warning("[SendNotificationStep] Failed to send notification (non-fatal)", [
+                'order_id' => $orderId,
+                'error'    => $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function compensate(SagaContext $context): void
+    {
+        $orderId   = $context->get('order_id');
+        $userEmail = $context->get('user_email');
+
+        try {
+            $this->httpClient->post('/api/v1/notifications', [
+                'json' => [
+                    'type'      => 'order_cancelled',
+                    'order_id'  => $orderId,
+                    'recipient' => $userEmail,
+                    'payload'   => [
+                        'order_id'     => $orderId,
+                        'cancelled_at' => now()->toIso8601String(),
+                    ],
+                ],
+                'headers' => [
+                    'Accept'             => 'application/json',
+                    'X-Internal-Service' => 'order-service',
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning("[SendNotificationStep] Compensation notification failed (non-fatal)", [
+                'order_id' => $orderId,
+                'error'    => $e->getMessage(),
+            ]);
+        }
     }
 }

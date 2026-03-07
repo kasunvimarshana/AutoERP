@@ -1,64 +1,81 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Ramsey\Uuid\Uuid;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * Order model.
+ *
+ * @property string      $id
+ * @property string      $tenant_id
+ * @property string      $user_id
+ * @property string      $status   pending|confirmed|cancelled|failed
+ * @property float       $total_amount
+ * @property string      $currency
+ * @property string|null $payment_method
+ * @property string|null $notes
+ * @property \Carbon\Carbon|null $confirmed_at
+ * @property \Carbon\Carbon|null $cancelled_at
+ */
 class Order extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUuids, SoftDeletes;
 
-    public const STATUS_PENDING    = 'pending';
-    public const STATUS_PROCESSING = 'processing';
-    public const STATUS_CONFIRMED  = 'confirmed';
-    public const STATUS_FAILED     = 'failed';
-    public const STATUS_CANCELLED  = 'cancelled';
-
-    protected $keyType    = 'string';
-    public    $incrementing = false;
-
+    /** @var array<string> */
     protected $fillable = [
-        'id',
-        'customer_id',
-        'customer_email',
-        'items',
-        'total_amount',
+        'tenant_id',
+        'user_id',
         'status',
-        'saga_id',
-        'saga_state',
+        'total_amount',
+        'currency',
+        'payment_method',
+        'notes',
+        'confirmed_at',
+        'cancelled_at',
     ];
 
+    /** @var array<string, string> */
     protected $casts = [
-        'items'        => 'array',
-        'total_amount' => 'decimal:2',
+        'total_amount' => 'float',
+        'confirmed_at' => 'datetime',
+        'cancelled_at' => 'datetime',
     ];
 
-    protected static function boot(): void
+    /**
+     * Line items for this order.
+     *
+     * @return HasMany<OrderItem>
+     */
+    public function items(): HasMany
     {
-        parent::boot();
-
-        static::creating(function (Order $order): void {
-            if (empty($order->id)) {
-                $order->id = Uuid::uuid4()->toString();
-            }
-        });
+        return $this->hasMany(OrderItem::class);
     }
 
-    public function sagaStates(): HasMany
+    /**
+     * Payment record for this order.
+     *
+     * @return HasOne<Payment>
+     */
+    public function payment(): HasOne
     {
-        return $this->hasMany(SagaState::class, 'order_id', 'id');
+        return $this->hasOne(Payment::class);
     }
 
-    public function isCompletable(): bool
+    /**
+     * Saga log entries for this order's distributed transaction.
+     *
+     * @return HasMany<SagaLog>
+     */
+    public function sagaLogs(): HasMany
     {
-        return $this->status === self::STATUS_PROCESSING;
-    }
-
-    public function isCancellable(): bool
-    {
-        return in_array($this->status, [self::STATUS_PENDING, self::STATUS_PROCESSING], true);
+        return $this->hasMany(SagaLog::class);
     }
 }

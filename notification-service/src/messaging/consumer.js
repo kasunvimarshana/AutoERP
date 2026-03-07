@@ -1,134 +1,83 @@
 'use strict';
 
-const amqp               = require('amqplib');
-const config             = require('../config');
-const logger             = require('../logger');
-const { publishReply }   = require('./publisher');
-const notificationService = require('../services/notificationService');
-
-const MAX_RETRIES    = 5;
-const RETRY_DELAY_MS = 3000;
+const amqp     = require('amqplib');
+const logger   = require('../utils/logger');
+const NotificationProcessor = require('../services/NotificationProcessor');
 
 /**
- * Connect to RabbitMQ with retry logic.
+ * RabbitMQ consumer for async notification processing.
+ *
+ * Listens on the 'notifications' queue for events published
+ * by other microservices (e.g., Order Service after order confirmation).
+ *
+ * This is the Choreography-style complement to the HTTP-based
+ * Orchestration pattern used by the Order Service Saga.
  */
-async function connectWithRetry(url, attempt = 1) {
-  try {
-    const conn = await amqp.connect(url);
-    logger.info('[Consumer] Connected to RabbitMQ', { attempt });
-    return conn;
-  } catch (err) {
-    if (attempt > MAX_RETRIES) {
-      throw new Error(`[Consumer] Failed to connect after ${MAX_RETRIES} attempts: ${err.message}`);
-    }
-    const delay = RETRY_DELAY_MS * attempt;
-    logger.warn('[Consumer] RabbitMQ connection failed, retrying...', { attempt, delay, error: err.message });
-    await new Promise(resolve => setTimeout(resolve, delay));
-    return connectWithRetry(url, attempt + 1);
-  }
-}
+const QUEUE_NAME = 'notifications';
 
-/**
- * Start consuming messages from the send-notification queue.
- */
-async function startConsumer() {
-  const conn    = await connectWithRetry(config.rabbitmq.url);
-  const channel = await conn.createChannel();
+let connection = null;
+let channel    = null;
+const processor = new NotificationProcessor();
 
-  await channel.assertExchange(config.rabbitmq.exchanges.commands, 'direct', { durable: true });
-  await channel.assertExchange(config.rabbitmq.exchanges.replies,  'direct', { durable: true });
+const consumer = {
+  /**
+   * Connect to RabbitMQ and start consuming messages.
+   */
+  async start() {
+    const url = process.env.RABBITMQ_URL || 'amqp://localhost';
 
-  const queueName = config.rabbitmq.queues.sendNotification;
-
-  await channel.assertQueue(queueName, { durable: true });
-  await channel.bindQueue(queueName, config.rabbitmq.exchanges.commands, queueName);
-
-  // Also ensure the replies queue is declared
-  await channel.assertQueue(config.rabbitmq.queues.sagaReplies, { durable: true });
-  await channel.bindQueue(
-    config.rabbitmq.queues.sagaReplies,
-    config.rabbitmq.exchanges.replies,
-    config.rabbitmq.queues.sagaReplies
-  );
-
-  await channel.prefetch(1);
-
-  logger.info('[Consumer] Waiting for messages', { queue: queueName });
-
-  channel.consume(queueName, async (msg) => {
-    if (!msg) return;
-
-    let parsed = null;
     try {
-      parsed = JSON.parse(msg.content.toString());
-      await handleMessage(parsed);
-      channel.ack(msg);
-    } catch (err) {
-      logger.error('[Consumer] Failed to process message', {
-        error:  err.message,
-        sagaId: parsed?.saga_id || 'unknown',
+      connection = await amqp.connect(url);
+      channel    = await connection.createChannel();
+
+      // Durable queue – survives broker restart
+      await channel.assertQueue(QUEUE_NAME, { durable: true });
+
+      // Process one message at a time
+      channel.prefetch(1);
+
+      logger.info(`RabbitMQ consumer started – listening on queue: ${QUEUE_NAME}`);
+
+      channel.consume(QUEUE_NAME, async (msg) => {
+        if (!msg) return;
+
+        try {
+          const content = JSON.parse(msg.content.toString());
+          logger.info('Received notification event', { type: content.type });
+
+          await processor.process(content);
+
+          // Acknowledge the message after successful processing
+          channel.ack(msg);
+
+        } catch (err) {
+          logger.error('Failed to process notification message', { error: err.message });
+
+          // Reject and requeue on processing failure (retry once only –
+          // redelivered messages are dead-lettered to prevent infinite loops)
+          channel.nack(msg, false, !msg.fields.redelivered);
+        }
       });
-      channel.nack(msg, false, false); // discard — do not requeue to avoid infinite loop
+
+    } catch (err) {
+      logger.error('Failed to connect to RabbitMQ', { error: err.message });
+      // Retry after 5 seconds
+      setTimeout(() => consumer.start(), 5000);
     }
-  });
+  },
 
-  conn.on('error',  err => logger.error('[Consumer] Connection error', { error: err.message }));
-  conn.on('close',  ()  => logger.warn('[Consumer] Connection closed — service restart required'));
-}
+  /**
+   * Gracefully close the consumer connection.
+   */
+  async stop() {
+    try {
+      if (channel)    await channel.close();
+      if (connection) await connection.close();
+      logger.info('RabbitMQ consumer stopped');
+    } catch (err) {
+      logger.error('Error stopping RabbitMQ consumer', { error: err.message });
+    }
+  },
+};
 
-/**
- * Handle an incoming send-notification command message.
- */
-async function handleMessage(message) {
-  const { saga_id: sagaId, order_id: orderId, payload } = message;
-
-  logger.info('[Consumer] Processing notification command', { sagaId, orderId });
-
-  const customerEmail = payload?.customer_email;
-  const items         = payload?.items         || [];
-  const totalAmount   = payload?.total_amount  || 0;
-
-  try {
-    await notificationService.sendOrderConfirmation(
-      sagaId,
-      orderId,
-      customerEmail,
-      items,
-      totalAmount
-    );
-
-    await publishReply(
-      config.rabbitmq.exchanges.replies,
-      config.rabbitmq.queues.sagaReplies,
-      {
-        saga_id:   sagaId,
-        order_id:  orderId,
-        type:      'NOTIFICATION_SENT',
-        success:   true,
-        data:      { recipient: customerEmail },
-        error:     '',
-        timestamp: new Date().toISOString(),
-      }
-    );
-
-    logger.info('[Consumer] Notification sent, reply published', { sagaId, orderId });
-  } catch (err) {
-    logger.error('[Consumer] Notification failed', { sagaId, orderId, error: err.message });
-
-    await publishReply(
-      config.rabbitmq.exchanges.replies,
-      config.rabbitmq.queues.sagaReplies,
-      {
-        saga_id:   sagaId,
-        order_id:  orderId,
-        type:      'NOTIFICATION_FAILED',
-        success:   false,
-        data:      {},
-        error:     err.message,
-        timestamp: new Date().toISOString(),
-      }
-    );
-  }
-}
-
-module.exports = { startConsumer };
+module.exports = consumer;

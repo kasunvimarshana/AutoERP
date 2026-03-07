@@ -1,18 +1,23 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ProductController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/health', fn () => response()->json([
-    'status'  => 'ok',
-    'service' => 'inventory-service',
-    'version' => '1.0.0',
-    'time'    => now()->toIso8601String(),
-]));
+Route::prefix('v1')->group(function () {
 
-Route::apiResource('products', ProductController::class);
-Route::put('products/{id}/stock', [ProductController::class, 'stockUpdate']);
+    Route::get('/health', fn () => response()->json(['status' => 'ok', 'service' => 'inventory-service']));
 
-Route::get('inventory/reservations', [InventoryController::class, 'reservations']);
-Route::get('inventory/reservations/{id}', [InventoryController::class, 'reservation']);
+    Route::middleware('tenant')->group(function () {
+
+        // Product catalogue CRUD
+        Route::apiResource('products', ProductController::class);
+
+        // Inventory management
+        Route::get('inventory', [InventoryController::class, 'index']);
+        Route::post('inventory/reserve', [InventoryController::class, 'reserve']);
+        Route::post('inventory/release', [InventoryController::class, 'release']);
+    });
+});

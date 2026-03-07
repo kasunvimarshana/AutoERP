@@ -1,37 +1,118 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Saga\Steps;
 
-use App\Messaging\RabbitMQPublisher;
+use App\Contracts\SagaStepInterface;
+use App\Exceptions\SagaStepException;
+use App\Saga\SagaContext;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\Log;
 
-class ReserveInventoryStep
+/**
+ * Saga Step 1: Reserve inventory for each order item.
+ *
+ * Forward:     POST /api/v1/inventory/reserve  → Inventory Service
+ * Compensate:  POST /api/v1/inventory/release  → Inventory Service (undo)
+ *
+ * Context reads:
+ *   - order_id, tenant_id, items (array of {product_id, quantity})
+ *
+ * Context writes:
+ *   - inventory_reserved (bool)
+ */
+final class ReserveInventoryStep implements SagaStepInterface
 {
-    public function __construct(
-        private readonly RabbitMQPublisher $publisher
-    ) {}
+    private readonly Client $httpClient;
 
-    public function execute(string $sagaId, string $orderId, array $items): void
+    public function __construct()
     {
-        $message = [
-            'saga_id'   => $sagaId,
-            'order_id'  => $orderId,
-            'type'      => 'RESERVE_INVENTORY',
-            'payload'   => [
-                'items' => $items,
-            ],
-            'timestamp' => now()->toIso8601String(),
-        ];
-
-        $this->publisher->publish(
-            config('rabbitmq.exchanges.commands'),
-            config('rabbitmq.queues.reserve_inventory'),
-            $message
-        );
-
-        Log::info('[Step] ReserveInventory published', [
-            'saga_id'  => $sagaId,
-            'order_id' => $orderId,
+        $this->httpClient = new Client([
+            'base_uri' => config('services.inventory.url'),
+            'timeout'  => 10.0,
         ]);
+    }
+
+    public function getName(): string
+    {
+        return 'ReserveInventory';
+    }
+
+    public function execute(SagaContext $context): void
+    {
+        $items    = $context->get('items', []);
+        $tenantId = $context->get('tenant_id');
+        $orderId  = $context->get('order_id');
+
+        foreach ($items as $item) {
+            try {
+                $response = $this->httpClient->post('/api/v1/inventory/reserve', [
+                    'json'    => [
+                        'product_id' => $item['product_id'],
+                        'quantity'   => $item['quantity'],
+                        'order_id'   => $orderId,
+                    ],
+                    'headers' => [
+                        'X-Tenant-ID'   => $tenantId,
+                        'Accept'        => 'application/json',
+                        'X-Internal-Service' => 'order-service',
+                    ],
+                ]);
+
+                $body = json_decode($response->getBody()->getContents(), true);
+
+                if (!($body['success'] ?? false)) {
+                    throw new SagaStepException(
+                        "Inventory reservation failed for product {$item['product_id']}: " .
+                        ($body['message'] ?? 'Unknown error')
+                    );
+                }
+            } catch (GuzzleException $e) {
+                throw new SagaStepException(
+                    "Failed to contact inventory service: {$e->getMessage()}",
+                    previous: $e
+                );
+            }
+        }
+
+        $context->set('inventory_reserved', true);
+        Log::info("[ReserveInventoryStep] All items reserved", ['order_id' => $orderId]);
+    }
+
+    public function compensate(SagaContext $context): void
+    {
+        // Only release if we actually reserved
+        if (!$context->get('inventory_reserved')) {
+            return;
+        }
+
+        $items    = $context->get('items', []);
+        $tenantId = $context->get('tenant_id');
+        $orderId  = $context->get('order_id');
+
+        foreach ($items as $item) {
+            try {
+                $this->httpClient->post('/api/v1/inventory/release', [
+                    'json'    => [
+                        'product_id' => $item['product_id'],
+                        'quantity'   => $item['quantity'],
+                        'order_id'   => $orderId,
+                    ],
+                    'headers' => [
+                        'X-Tenant-ID'        => $tenantId,
+                        'Accept'             => 'application/json',
+                        'X-Internal-Service' => 'order-service',
+                    ],
+                ]);
+            } catch (\Throwable $e) {
+                Log::error("[ReserveInventoryStep] Compensation failed for product {$item['product_id']}", [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        Log::info("[ReserveInventoryStep] Compensation completed (stock released)", ['order_id' => $orderId]);
     }
 }

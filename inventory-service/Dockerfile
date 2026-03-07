@@ -1,45 +1,26 @@
-FROM php:8.2-fpm AS base
+FROM php:8.2-fpm-alpine
 
-RUN apt-get update && apt-get install -y \
-    curl \
-    git \
-    libpq-dev \
-    libonig-dev \
-    libxml2-dev \
-    libzip-dev \
-    supervisor \
-    unzip \
-    zip \
-    && docker-php-ext-install \
-        pdo \
-        pdo_pgsql \
-        pgsql \
-        mbstring \
-        xml \
-        zip \
-        pcntl \
-    && pecl install redis \
-    && docker-php-ext-enable redis \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache curl libpng-dev libxml2-dev zip unzip git oniguruma-dev postgresql-dev nginx supervisor
+
+RUN docker-php-ext-install pdo_pgsql pdo mbstring exif pcntl bcmath gd opcache sockets
+
+RUN pecl install redis && docker-php-ext-enable redis
 
 COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-COPY composer.json composer.lock* ./
-RUN composer install --no-dev --no-interaction --optimize-autoloader --no-scripts
-
 COPY . .
-RUN composer dump-autoload --optimize
 
-RUN mkdir -p storage/logs storage/framework/cache storage/framework/sessions storage/framework/views \
-    bootstrap/cache \
-    && chown -R www-data:www-data storage bootstrap/cache \
-    && chmod -R 755 storage bootstrap/cache
+RUN composer install --optimize-autoloader --no-dev --no-interaction
 
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+RUN chown -R www-data:www-data /var/www/html \
+    && chmod -R 755 /var/www/html/storage \
+    && chmod -R 755 /var/www/html/bootstrap/cache
 
-EXPOSE 8001
+COPY docker/nginx.conf /etc/nginx/http.d/default.conf
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+EXPOSE 8000
+
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

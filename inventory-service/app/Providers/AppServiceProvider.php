@@ -1,19 +1,21 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Providers;
 
-use App\Messaging\RabbitMQConsumer;
-use App\Messaging\RabbitMQPublisher;
-use App\Services\InventoryService;
+use App\Contracts\InventoryRepositoryInterface;
+use App\Contracts\ProductServiceInterface;
+use App\Repositories\InventoryRepository;
+use App\Services\ProductService;
 use Illuminate\Support\ServiceProvider;
 
-class AppServiceProvider extends ServiceProvider
+final class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->singleton(RabbitMQPublisher::class, fn () => new RabbitMQPublisher());
-        $this->app->singleton(RabbitMQConsumer::class,  fn () => new RabbitMQConsumer());
-        $this->app->singleton(InventoryService::class,  fn () => new InventoryService());
+        $this->app->bind(InventoryRepositoryInterface::class, InventoryRepository::class);
+        $this->app->bind(ProductServiceInterface::class, ProductService::class);
     }
 
     public function boot(): void {}

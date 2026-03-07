@@ -1,0 +1,42 @@
+{
+  "name": "saas-inventory-frontend",
+  "version": "1.0.0",
+  "description": "Multi-tenant SaaS Inventory Management Frontend (React + TypeScript)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:ui": "vitest --ui",
+    "lint": "eslint src --ext ts,tsx"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.22.3",
+    "axios": "^1.6.8",
+    "@tanstack/react-query": "^5.28.6",
+    "react-hook-form": "^7.51.2",
+    "zod": "^3.22.4",
+    "@hookform/resolvers": "^3.3.4",
+    "lucide-react": "^0.368.0",
+    "clsx": "^2.1.0",
+    "zustand": "^4.5.2"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^7.5.0",
+    "@typescript-eslint/parser": "^7.5.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "typescript": "^5.4.3",
+    "vite": "^5.2.6",
+    "vitest": "^1.4.0",
+    "@testing-library/react": "^15.0.2",
+    "@testing-library/jest-dom": "^6.4.2",
+    "jsdom": "^24.0.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react-hooks": "^4.6.0"
+  }
+}

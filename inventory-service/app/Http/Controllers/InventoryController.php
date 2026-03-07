@@ -1,51 +1,95 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
-use App\Models\InventoryReservation;
+use App\Contracts\InventoryRepositoryInterface;
+use App\Http\Requests\ReserveStockRequest;
+use App\Http\Requests\ReleaseStockRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
-class InventoryController extends Controller
+/**
+ * Manages inventory-level operations: listing, reserving, and releasing stock.
+ *
+ * The reserve and release endpoints are called internally by the
+ * Order Service Saga orchestrator during distributed transactions.
+ */
+final class InventoryController extends Controller
 {
-    public function reservations(Request $request): JsonResponse
+    public function __construct(
+        private readonly InventoryRepositoryInterface $inventoryRepository,
+    ) {}
+
+    /**
+     * GET /api/v1/inventory
+     */
+    public function index(Request $request): JsonResponse
     {
-        $perPage = (int) $request->query('per_page', 15);
-        $perPage = max(1, min(100, $perPage));
+        $tenantId = $request->attributes->get('tenant_id');
+        $items = $this->inventoryRepository->listForTenant(
+            $tenantId,
+            (int) $request->query('per_page', '15')
+        );
 
-        $query = InventoryReservation::query()
-            ->with('product:id,sku,name')
-            ->orderByDesc('created_at');
+        return response()->json(['data' => $items]);
+    }
 
-        if ($request->query('order_id')) {
-            $query->where('order_id', $request->query('order_id'));
+    /**
+     * POST /api/v1/inventory/reserve
+     *
+     * Saga Step: Reserve stock for an order.
+     * Called by the Order Service Saga orchestrator.
+     */
+    public function reserve(ReserveStockRequest $request): JsonResponse
+    {
+        $data      = $request->validated();
+        $tenantId  = $request->attributes->get('tenant_id');
+        $reserved  = $this->inventoryRepository->reserveStock(
+            $data['product_id'],
+            $tenantId,
+            $data['quantity']
+        );
+
+        if (!$reserved) {
+            return response()->json([
+                'message' => 'Insufficient stock.',
+                'success' => false,
+            ], 422);
         }
-
-        if ($request->query('status')) {
-            $query->where('status', $request->query('status'));
-        }
-
-        $reservations = $query->paginate($perPage);
 
         return response()->json([
-            'data' => $reservations->items(),
-            'meta' => [
-                'current_page' => $reservations->currentPage(),
-                'last_page'    => $reservations->lastPage(),
-                'per_page'     => $reservations->perPage(),
-                'total'        => $reservations->total(),
-            ],
+            'message' => 'Stock reserved successfully.',
+            'success' => true,
         ]);
     }
 
-    public function reservation(string $id): JsonResponse
+    /**
+     * POST /api/v1/inventory/release
+     *
+     * Saga Compensation: Release reserved stock on order failure.
+     */
+    public function release(ReleaseStockRequest $request): JsonResponse
     {
-        $reservation = InventoryReservation::with('product:id,sku,name')->find($id);
+        $data     = $request->validated();
+        $tenantId = $request->attributes->get('tenant_id');
+        $released = $this->inventoryRepository->releaseStock(
+            $data['product_id'],
+            $tenantId,
+            $data['quantity']
+        );
 
-        if (! $reservation) {
-            return response()->json(['message' => 'Reservation not found'], 404);
+        if (!$released) {
+            return response()->json([
+                'message' => 'Failed to release stock.',
+                'success' => false,
+            ], 422);
         }
 
-        return response()->json(['data' => $reservation]);
+        return response()->json([
+            'message' => 'Stock released successfully.',
+            'success' => true,
+        ]);
     }
 }

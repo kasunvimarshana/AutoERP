@@ -1,283 +1,280 @@
-version: '3.9'
+version: '3.8'
+
+# Multi-tenant SaaS Inventory Management System
+# Implements distributed transactions using the Saga pattern
+# Services use different technology stacks as required
 
 networks:
-  saga-network:
+  saas_network:
     driver: bridge
 
 volumes:
-  mysql-data:
-  postgres-data:
-  redis-data:
-  rabbitmq-data:
-  mongo-data:
+  auth_mysql_data:
+  inventory_postgres_data:
+  order_mysql_data:
+  notification_mongo_data:
+  redis_data:
+  rabbitmq_data:
 
 services:
-  # ─── Message Broker ──────────────────────────────────────────────────────────
+
+  # ──────────────────────────────────────────────
+  # Infrastructure Services
+  # ──────────────────────────────────────────────
+
   rabbitmq:
     image: rabbitmq:3.12-management-alpine
-    container_name: saga-rabbitmq
+    container_name: saas_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-secret}
     ports:
       - "5672:5672"
       - "15672:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-      RABBITMQ_DEFAULT_VHOST: /
     volumes:
-      - rabbitmq-data:/var/lib/rabbitmq
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+      - rabbitmq_data:/var/lib/rabbitmq
     networks:
-      - saga-network
+      - saas_network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
-  # ─── Saga State Store ────────────────────────────────────────────────────────
   redis:
     image: redis:7.2-alpine
-    container_name: saga-redis
+    container_name: saas_redis
     ports:
       - "6379:6379"
     volumes:
-      - redis-data:/data
-    command: redis-server --appendonly yes
+      - redis_data:/data
+    networks:
+      - saas_network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    networks:
-      - saga-network
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # ─── Order Service DB ────────────────────────────────────────────────────────
-  mysql:
+  # Auth Service Database (MySQL 8)
+  auth_db:
     image: mysql:8.0
-    container_name: saga-mysql
-    ports:
-      - "3306:3306"
+    container_name: saas_auth_db
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: orders_db
-      MYSQL_USER: orders_user
-      MYSQL_PASSWORD: orders_password
+      MYSQL_ROOT_PASSWORD: ${AUTH_DB_ROOT_PASSWORD:-rootsecret}
+      MYSQL_DATABASE: ${AUTH_DB_DATABASE:-auth_db}
+      MYSQL_USER: ${AUTH_DB_USERNAME:-auth_user}
+      MYSQL_PASSWORD: ${AUTH_DB_PASSWORD:-auth_pass}
+    ports:
+      - "3307:3306"
     volumes:
-      - mysql-data:/var/lib/mysql
+      - auth_mysql_data:/var/lib/mysql
+    networks:
+      - saas_network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
       retries: 10
-    networks:
-      - saga-network
 
-  # ─── Inventory Service DB ────────────────────────────────────────────────────
-  postgres:
-    image: postgres:16-alpine
-    container_name: saga-postgres
-    ports:
-      - "5432:5432"
+  # Inventory Service Database (PostgreSQL 15 - different DB from auth)
+  inventory_db:
+    image: postgres:15-alpine
+    container_name: saas_inventory_db
     environment:
-      POSTGRES_DB: inventory_db
-      POSTGRES_USER: inventory_user
-      POSTGRES_PASSWORD: inventory_password
+      POSTGRES_DB: ${INVENTORY_DB_DATABASE:-inventory_db}
+      POSTGRES_USER: ${INVENTORY_DB_USERNAME:-inventory_user}
+      POSTGRES_PASSWORD: ${INVENTORY_DB_PASSWORD:-inventory_pass}
+    ports:
+      - "5433:5432"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - inventory_postgres_data:/var/lib/postgresql/data
+    networks:
+      - saas_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U inventory_user -d inventory_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${INVENTORY_DB_USERNAME:-inventory_user}"]
       interval: 10s
       timeout: 5s
       retries: 10
-    networks:
-      - saga-network
 
-  # ─── Order Service (Saga Orchestrator) ───────────────────────────────────────
-  order-service:
-    build:
-      context: ./order-service
-      dockerfile: Dockerfile
-    container_name: saga-order-service
-    ports:
-      - "8000:8000"
+  # Order Service Database (MySQL 8)
+  order_db:
+    image: mysql:8.0
+    container_name: saas_order_db
     environment:
-      APP_NAME: OrderService
-      APP_ENV: production
-      APP_KEY: ${APP_KEY:-}
-      APP_DEBUG: "false"
-      APP_URL: http://localhost:8000
-      DB_CONNECTION: mysql
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_DATABASE: orders_db
-      DB_USERNAME: orders_user
-      DB_PASSWORD: orders_password
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: guest
-      RABBITMQ_PASSWORD: guest
-      RABBITMQ_VHOST: /
-      SAGA_TIMEOUT: 300
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    networks:
-      - saga-network
-    restart: unless-stopped
-
-  # ─── Inventory Service ───────────────────────────────────────────────────────
-  inventory-service:
-    build:
-      context: ./inventory-service
-      dockerfile: Dockerfile
-    container_name: saga-inventory-service
+      MYSQL_ROOT_PASSWORD: ${ORDER_DB_ROOT_PASSWORD:-rootsecret}
+      MYSQL_DATABASE: ${ORDER_DB_DATABASE:-order_db}
+      MYSQL_USER: ${ORDER_DB_USERNAME:-order_user}
+      MYSQL_PASSWORD: ${ORDER_DB_PASSWORD:-order_pass}
     ports:
-      - "8001:8001"
-    environment:
-      APP_NAME: InventoryService
-      APP_ENV: production
-      APP_KEY: ${APP_KEY:-}
-      APP_DEBUG: "false"
-      APP_URL: http://localhost:8001
-      DB_CONNECTION: pgsql
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_DATABASE: inventory_db
-      DB_USERNAME: inventory_user
-      DB_PASSWORD: inventory_password
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USER: guest
-      RABBITMQ_PASSWORD: guest
-      RABBITMQ_VHOST: /
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/api/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      - "3308:3306"
+    volumes:
+      - order_mysql_data:/var/lib/mysql
     networks:
-      - saga-network
-    restart: unless-stopped
-
-  # ─── Payment Service (Go) ────────────────────────────────────────────────────
-  payment-service:
-    build:
-      context: ./payment-service
-      dockerfile: Dockerfile
-    container_name: saga-payment-service
-    ports:
-      - "8002:8002"
-    environment:
-      PORT: 8002
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      GIN_MODE: release
-    depends_on:
-      redis:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+      - saas_network
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8002/health"]
-      interval: 15s
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 20s
-    networks:
-      - saga-network
-    restart: unless-stopped
+      retries: 10
 
-  # ─── Notification Service (Node.js) ─────────────────────────────────────────
-  notification-service:
-    build:
-      context: ./notification-service
-      dockerfile: Dockerfile
-    container_name: saga-notification-service
-    ports:
-      - "8003:8003"
-    environment:
-      PORT: 8003
-      MONGODB_URI: mongodb://mongo:27017/notifications_db
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-      EMAIL_HOST: smtp.ethereal.email
-      EMAIL_PORT: 587
-      EMAIL_USER: ""
-      EMAIL_PASS: ""
-      NODE_ENV: production
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-      mongo:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8003/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-    networks:
-      - saga-network
-    restart: unless-stopped
-
-  # ─── MongoDB (Notification Service) ─────────────────────────────────────────
-  mongo:
+  # Notification Service Database (MongoDB - different tech stack)
+  notification_db:
     image: mongo:7.0
-    container_name: saga-mongo
-    ports:
-      - "27017:27017"
+    container_name: saas_notification_db
     environment:
-      MONGO_INITDB_DATABASE: notifications_db
+      MONGO_INITDB_ROOT_USERNAME: ${NOTIFICATION_DB_USERNAME:-notification_user}
+      MONGO_INITDB_ROOT_PASSWORD: ${NOTIFICATION_DB_PASSWORD:-notification_pass}
+      MONGO_INITDB_DATABASE: ${NOTIFICATION_DB_DATABASE:-notification_db}
+    ports:
+      - "27018:27017"
     volumes:
-      - mongo-data:/data/db
+      - notification_mongo_data:/data/db
+    networks:
+      - saas_network
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 10
-    networks:
-      - saga-network
 
-  # ─── API Gateway (Nginx) ─────────────────────────────────────────────────────
-  nginx:
-    image: nginx:1.25-alpine
-    container_name: saga-nginx
+  # ──────────────────────────────────────────────
+  # Application Services
+  # ──────────────────────────────────────────────
+
+  # Auth Service (Laravel 10 + MySQL)
+  auth_service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: saas_auth_service
+    env_file:
+      - ./auth-service/.env
     ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./api-gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+      - "8001:8000"
     depends_on:
-      - order-service
-      - inventory-service
-      - payment-service
-      - notification-service
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
+      auth_db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
-      - saga-network
-    restart: unless-stopped
+      - saas_network
+    volumes:
+      - ./auth-service:/var/www/html
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Inventory Service (Laravel 10 + PostgreSQL)
+  inventory_service:
+    build:
+      context: ./inventory-service
+      dockerfile: Dockerfile
+    container_name: saas_inventory_service
+    env_file:
+      - ./inventory-service/.env
+    ports:
+      - "8002:8000"
+    depends_on:
+      inventory_db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - saas_network
+    volumes:
+      - ./inventory-service:/var/www/html
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Order Service (Laravel 10 + MySQL + Saga Orchestrator)
+  order_service:
+    build:
+      context: ./order-service
+      dockerfile: Dockerfile
+    container_name: saas_order_service
+    env_file:
+      - ./order-service/.env
+    ports:
+      - "8003:8000"
+    depends_on:
+      order_db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - saas_network
+    volumes:
+      - ./order-service:/var/www/html
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Notification Service (Node.js + Express + MongoDB - different tech stack)
+  notification_service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: saas_notification_service
+    env_file:
+      - ./notification-service/.env
+    ports:
+      - "8004:3000"
+    depends_on:
+      notification_db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - saas_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # API Gateway (Nginx + Laravel)
+  api_gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: saas_api_gateway
+    env_file:
+      - ./api-gateway/.env
+    ports:
+      - "8000:8000"
+    depends_on:
+      auth_service:
+        condition: service_healthy
+      inventory_service:
+        condition: service_healthy
+      order_service:
+        condition: service_healthy
+    networks:
+      - saas_network
+
+  # Frontend (React + TypeScript)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: saas_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api_gateway
+    networks:
+      - saas_network

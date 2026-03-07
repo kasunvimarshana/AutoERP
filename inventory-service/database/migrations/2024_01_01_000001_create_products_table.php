@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -10,13 +12,19 @@ return new class extends Migration
     {
         Schema::create('products', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->string('sku', 100)->unique();
+            $table->string('tenant_id');
             $table->string('name');
             $table->text('description')->nullable();
-            $table->decimal('price', 10, 2);
-            $table->integer('stock_quantity')->default(0);
-            $table->integer('reserved_quantity')->default(0);
+            $table->string('sku')->unique();
+            $table->decimal('price', 10, 2)->default(0);
+            $table->char('currency', 3)->default('USD');
+            $table->string('status')->default('active');
+            $table->jsonb('metadata')->nullable();
             $table->timestamps();
+            $table->softDeletes();
+
+            $table->index('tenant_id');
+            $table->index(['tenant_id', 'status']);
         });
     }
 

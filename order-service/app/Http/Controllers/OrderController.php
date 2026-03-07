@@ -1,152 +1,98 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
+use App\Contracts\OrderServiceInterface;
+use App\Exceptions\SagaException;
 use App\Http\Requests\CreateOrderRequest;
 use App\Models\Order;
-use App\Saga\SagaOrchestrator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
-class OrderController extends Controller
+/**
+ * RESTful Order endpoints backed by the Saga orchestrator.
+ */
+final class OrderController extends Controller
 {
     public function __construct(
-        private readonly SagaOrchestrator $orchestrator
+        private readonly OrderServiceInterface $orderService,
     ) {}
 
+    /**
+     * GET /api/v1/orders
+     */
     public function index(Request $request): JsonResponse
     {
-        $perPage = (int) $request->query('per_page', 15);
-        $perPage = max(1, min(100, $perPage));
+        $tenantId = $request->attributes->get('tenant_id');
+        $orders   = $this->orderService->listForTenant(
+            $tenantId,
+            (int) $request->query('per_page', '15')
+        );
 
-        $orders = Order::query()
-            ->orderByDesc('created_at')
-            ->paginate($perPage);
-
-        return response()->json([
-            'data'  => $orders->items(),
-            'meta'  => [
-                'current_page' => $orders->currentPage(),
-                'last_page'    => $orders->lastPage(),
-                'per_page'     => $orders->perPage(),
-                'total'        => $orders->total(),
-            ],
-            'links' => [
-                'first' => $orders->url(1),
-                'last'  => $orders->url($orders->lastPage()),
-                'prev'  => $orders->previousPageUrl(),
-                'next'  => $orders->nextPageUrl(),
-            ],
-        ]);
+        return response()->json(['data' => $orders]);
     }
 
-    public function show(string $id): JsonResponse
-    {
-        $order = Order::with('sagaStates')->find($id);
-
-        if (! $order) {
-            return response()->json(['message' => 'Order not found'], 404);
-        }
-
-        $sagaState = $order->sagaStates()->latest()->first();
-
-        return response()->json([
-            'data' => array_merge($order->toArray(), [
-                'saga' => $sagaState ? [
-                    'id'           => $sagaState->saga_id,
-                    'current_step' => $sagaState->current_step,
-                    'status'       => $sagaState->status,
-                    'error'        => $sagaState->error_message,
-                ] : null,
-            ]),
-        ]);
-    }
-
+    /**
+     * POST /api/v1/orders
+     *
+     * Initiates a Saga distributed transaction:
+     *   Reserve Inventory → Process Payment → Confirm Order → Send Notification
+     */
     public function store(CreateOrderRequest $request): JsonResponse
     {
-        $validated = $request->validated();
-
-        $totalAmount = collect($validated['items'])
-            ->sum(fn ($item) => $item['price'] * $item['quantity']);
-
-        $order = Order::create([
-            'customer_id'    => $validated['customer_id'],
-            'customer_email' => $validated['customer_email'],
-            'items'          => $validated['items'],
-            'total_amount'   => $totalAmount,
-            'status'         => Order::STATUS_PENDING,
-        ]);
-
-        Log::info('Order created', ['order_id' => $order->id, 'total' => $totalAmount]);
+        $tenantId = $request->attributes->get('tenant_id');
+        $userId   = $request->attributes->get('user_id');
 
         try {
-            $sagaId = $this->orchestrator->startSaga($order);
-
-            $order->update([
-                'status'     => Order::STATUS_PROCESSING,
-                'saga_id'    => $sagaId,
-                'saga_state' => 'STARTED',
-            ]);
-
-            Log::info('Saga started', ['saga_id' => $sagaId, 'order_id' => $order->id]);
+            $order = $this->orderService->createOrder(
+                $tenantId,
+                $userId,
+                $request->validated()
+            );
 
             return response()->json([
-                'message' => 'Order created and saga started',
-                'data'    => [
-                    'order_id' => $order->id,
-                    'saga_id'  => $sagaId,
-                    'status'   => $order->status,
-                ],
+                'message' => 'Order created and confirmed via Saga transaction.',
+                'data'    => $order,
             ], 201);
-        } catch (\Throwable $e) {
-            Log::error('Failed to start saga', [
-                'order_id' => $order->id,
-                'error'    => $e->getMessage(),
-            ]);
 
-            $order->update(['status' => Order::STATUS_FAILED]);
-
+        } catch (SagaException $e) {
             return response()->json([
-                'message' => 'Order created but saga failed to start. Please retry.',
-                'data'    => ['order_id' => $order->id, 'status' => Order::STATUS_FAILED],
-            ], 500);
+                'message' => 'Order creation failed. All changes have been rolled back.',
+                'error'   => $e->getMessage(),
+            ], 422);
         }
     }
 
-    public function cancel(string $id): JsonResponse
+    /**
+     * GET /api/v1/orders/{id}
+     */
+    public function show(Request $request, string $id): JsonResponse
     {
-        $order = Order::find($id);
+        $tenantId = $request->attributes->get('tenant_id');
+        $order    = $this->orderService->find($id, $tenantId);
 
-        if (! $order) {
-            return response()->json(['message' => 'Order not found'], 404);
+        if (!$order) {
+            return response()->json(['message' => 'Order not found.'], 404);
         }
 
-        $cancellableStatuses = [Order::STATUS_PENDING, Order::STATUS_PROCESSING];
-        if (! in_array($order->status, $cancellableStatuses, true)) {
+        return response()->json(['data' => $order]);
+    }
+
+    /**
+     * POST /api/v1/orders/{order}/cancel
+     */
+    public function cancel(Request $request, Order $order): JsonResponse
+    {
+        try {
+            $cancelled = $this->orderService->cancelOrder($order);
             return response()->json([
-                'message' => 'Order cannot be cancelled in its current status',
-                'status'  => $order->status,
-            ], 422);
+                'message' => 'Order cancelled.',
+                'data'    => $cancelled,
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
         }
-
-        if ($order->saga_id) {
-            try {
-                $this->orchestrator->compensate($order->saga_id);
-                Log::info('Compensation triggered for cancellation', ['order_id' => $id]);
-            } catch (\Throwable $e) {
-                Log::error('Failed to trigger compensation', [
-                    'order_id' => $id,
-                    'error'    => $e->getMessage(),
-                ]);
-            }
-        }
-
-        $order->update(['status' => Order::STATUS_CANCELLED]);
-
-        return response()->json([
-            'message' => 'Order cancellation initiated',
-            'data'    => ['order_id' => $order->id, 'status' => $order->status],
-        ]);
     }
 }

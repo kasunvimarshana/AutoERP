@@ -1,27 +1,34 @@
 {
-  "name": "notification-service",
+  "name": "saas-notification-service",
   "version": "1.0.0",
-  "description": "Notification Service for Saga pattern - sends email notifications",
+  "description": "Multi-tenant SaaS Notification Service - Node.js + Express + MongoDB + RabbitMQ",
   "main": "src/index.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "jest --testEnvironment=node --forceExit"
+    "test": "jest --forceExit",
+    "test:coverage": "jest --coverage --forceExit"
   },
+  "keywords": ["microservice", "notification", "saga", "rabbitmq", "mongodb"],
+  "license": "MIT",
   "dependencies": {
-    "amqplib": "^0.10.3",
+    "amqplib": "^0.10.4",
     "express": "^4.18.2",
-    "mongoose": "^8.0.0",
+    "mongoose": "^8.3.1",
     "nodemailer": "^7.0.11",
-    "uuid": "^9.0.0",
-    "winston": "^3.11.0"
+    "winston": "^3.13.0",
+    "dotenv": "^16.4.5",
+    "express-validator": "^7.1.0",
+    "helmet": "^7.1.0",
+    "cors": "^2.8.5",
+    "morgan": "^1.10.0"
   },
   "devDependencies": {
     "jest": "^29.7.0",
-    "nodemon": "^3.0.2"
-  },
-  "jest": {
-    "testEnvironment": "node",
-    "testMatch": ["**/__tests__/**/*.test.js"]
+    "supertest": "^7.0.0",
+    "nodemon": "^3.1.0"
   }
 }
