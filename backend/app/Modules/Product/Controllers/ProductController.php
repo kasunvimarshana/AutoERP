@@ -3,7 +3,6 @@
 namespace App\Modules\Product\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Product\DTOs\ProductDTO;
 use App\Modules\Product\Requests\CreateProductRequest;
 use App\Modules\Product\Requests\UpdateProductRequest;
 use App\Modules\Product\Resources\ProductResource;
@@ -14,39 +13,66 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class ProductController extends Controller
 {
-    public function __construct(private readonly ProductService $productService) {}
+    public function __construct(
+        private readonly ProductService $productService,
+    ) {}
 
     public function index(Request $request): AnonymousResourceCollection
     {
-        $filters = $request->only(['search', 'category', 'is_active', 'min_price', 'max_price', 'sort_by', 'sort_dir', 'tenant_id']);
-        $perPage = $request->input('per_page', 15);
-        $products = $this->productService->list($filters, $perPage);
+        $perPage = (int) $request->query('per_page', 15);
+        $search  = $request->query('search');
+        $sortBy  = $request->query('sort_by', 'created_at');
+        $sortDir = $request->query('sort_dir', 'desc');
+        $filters = $request->query('filter', []);
+
+        $products = $this->productService->listProducts($perPage, $filters, $search, $sortBy, $sortDir);
+
         return ProductResource::collection($products);
     }
 
-    public function show(int $id): ProductResource
+    public function show(int $id): JsonResponse
     {
-        $product = $this->productService->get($id);
-        return new ProductResource($product);
+        $product = $this->productService->getProduct($id);
+
+        if (!$product) {
+            return response()->json(['error' => 'Product not found'], 404);
+        }
+
+        return response()->json(new ProductResource($product));
     }
 
     public function store(CreateProductRequest $request): JsonResponse
     {
-        $dto = ProductDTO::fromArray($request->validated());
-        $product = $this->productService->create($dto);
-        return (new ProductResource($product))->response()->setStatusCode(201);
+        try {
+            $product = $this->productService->createProduct($request->validated());
+            return response()->json(new ProductResource($product), 201);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
-    public function update(UpdateProductRequest $request, int $id): ProductResource
+    public function update(UpdateProductRequest $request, int $id): JsonResponse
     {
-        $dto = ProductDTO::fromArray($request->validated());
-        $product = $this->productService->update($id, $dto);
-        return new ProductResource($product);
+        try {
+            $product = $this->productService->updateProduct($id, $request->validated());
+            return response()->json(new ProductResource($product));
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     public function destroy(int $id): JsonResponse
     {
-        $this->productService->delete($id);
-        return response()->json(['message' => 'Product deleted successfully']);
+        try {
+            $deleted = $this->productService->deleteProduct($id);
+
+            if (!$deleted) {
+                return response()->json(['error' => 'Product not found'], 404);
+            }
+
+            return response()->json(null, 204);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 }

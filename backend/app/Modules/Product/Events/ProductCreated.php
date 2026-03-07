@@ -11,5 +11,7 @@ class ProductCreated
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public function __construct(public readonly Product $product) {}
+    public function __construct(
+        public readonly Product $product,
+    ) {}
 }

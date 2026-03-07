@@ -14,13 +14,13 @@ class UpdateUserRequest extends FormRequest
 
     public function rules(): array
     {
+        $userId = $this->route('id');
+
         return [
-            'name' => 'sometimes|string|max:255',
-            'email' => ['sometimes', 'string', 'email', 'max:255', Rule::unique('users')->ignore($this->route('user'))],
-            'password' => 'sometimes|string|min:8|confirmed',
-            'role' => 'sometimes|string|exists:roles,name',
-            'attributes' => 'sometimes|array',
-            'is_active' => 'sometimes|boolean',
+            'name'     => ['sometimes', 'string', 'max:255'],
+            'email'    => ['sometimes', 'email', Rule::unique('users', 'email')->ignore($userId)],
+            'password' => ['sometimes', 'min:8', 'confirmed'],
+            'role'     => ['sometimes', 'in:admin,manager,staff'],
         ];
     }
 }

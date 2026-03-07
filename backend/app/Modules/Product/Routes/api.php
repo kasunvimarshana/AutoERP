@@ -1,12 +1,12 @@
 <?php
 
-use App\Modules\Product\Controllers\ProductController;
 use Illuminate\Support\Facades\Route;
+use App\Modules\Product\Controllers\ProductController;
 
 Route::middleware(['auth:api', 'tenant'])->prefix('products')->group(function () {
     Route::get('/', [ProductController::class, 'index']);
-    Route::post('/', [ProductController::class, 'store'])->middleware('permission:create-products');
-    Route::get('/{product}', [ProductController::class, 'show']);
-    Route::put('/{product}', [ProductController::class, 'update'])->middleware('permission:edit-products');
-    Route::delete('/{product}', [ProductController::class, 'destroy'])->middleware('permission:delete-products');
+    Route::post('/', [ProductController::class, 'store']);
+    Route::get('/{id}', [ProductController::class, 'show']);
+    Route::put('/{id}', [ProductController::class, 'update']);
+    Route::delete('/{id}', [ProductController::class, 'destroy']);
 });

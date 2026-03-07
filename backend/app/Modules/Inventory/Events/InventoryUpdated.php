@@ -11,5 +11,9 @@ class InventoryUpdated
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public function __construct(public readonly Inventory $inventory) {}
+    public function __construct(
+        public readonly Inventory $inventory,
+        public readonly int $delta,
+        public readonly string $reason,
+    ) {}
 }

@@ -15,20 +15,22 @@ class OrderItem extends Model
         'quantity',
         'unit_price',
         'total_price',
+        'metadata',
     ];
 
     protected $casts = [
-        'unit_price' => 'decimal:2',
+        'quantity'    => 'integer',
+        'unit_price'  => 'decimal:2',
         'total_price' => 'decimal:2',
-        'quantity' => 'integer',
+        'metadata'    => 'array',
     ];
 
-    public function order()
+    public function order(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Order::class);
     }
 
-    public function product()
+    public function product(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(\App\Modules\Product\Models\Product::class);
     }

@@ -2,24 +2,26 @@
 
 namespace App\Modules\User\Models;
 
+use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Passport\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable, HasRoles, SoftDeletes;
+    use HasApiTokens, HasFactory, HasRoles, Notifiable, SoftDeletes, BelongsToTenant;
 
     protected $fillable = [
+        'tenant_id',
         'name',
         'email',
         'password',
-        'tenant_id',
-        'attributes',
-        'is_active',
+        'role',
+        'abac_attributes',
+        'email_verified_at',
     ];
 
     protected $hidden = [
@@ -29,13 +31,7 @@ class User extends Authenticatable
 
     protected $casts = [
         'email_verified_at' => 'datetime',
-        'password' => 'hashed',
-        'attributes' => 'array',
-        'is_active' => 'boolean',
+        'password'          => 'hashed',
+        'abac_attributes'   => 'array',
     ];
-
-    public function tenant()
-    {
-        return $this->belongsTo(\App\Modules\Tenant\Models\Tenant::class);
-    }
 }

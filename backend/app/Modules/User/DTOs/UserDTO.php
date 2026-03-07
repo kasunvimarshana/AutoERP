@@ -2,28 +2,40 @@
 
 namespace App\Modules\User\DTOs;
 
-class UserDTO
+use App\Modules\User\Models\User;
+
+readonly class UserDTO
 {
     public function __construct(
-        public readonly ?string $name = null,
-        public readonly ?string $email = null,
-        public readonly ?string $password = null,
-        public readonly ?int $tenantId = null,
-        public readonly ?array $attributes = null,
-        public readonly ?bool $isActive = null,
-        public readonly ?string $role = null,
+        public ?int $id,
+        public string $name,
+        public string $email,
+        public string $role,
+        public ?int $tenantId,
+        public array $abacAttributes,
     ) {}
 
     public static function fromArray(array $data): self
     {
         return new self(
-            name: $data['name'] ?? null,
-            email: $data['email'] ?? null,
-            password: $data['password'] ?? null,
+            id: $data['id'] ?? null,
+            name: $data['name'],
+            email: $data['email'],
+            role: $data['role'] ?? 'staff',
             tenantId: $data['tenant_id'] ?? null,
-            attributes: $data['attributes'] ?? null,
-            isActive: $data['is_active'] ?? null,
-            role: $data['role'] ?? null,
+            abacAttributes: $data['abac_attributes'] ?? [],
+        );
+    }
+
+    public static function fromModel(User $user): self
+    {
+        return new self(
+            id: $user->id,
+            name: $user->name,
+            email: $user->email,
+            role: $user->role ?? 'staff',
+            tenantId: $user->tenant_id,
+            abacAttributes: $user->abac_attributes ?? [],
         );
     }
 }

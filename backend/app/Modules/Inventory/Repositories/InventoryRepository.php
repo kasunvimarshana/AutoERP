@@ -4,69 +4,97 @@ namespace App\Modules\Inventory\Repositories;
 
 use App\Modules\Inventory\Models\Inventory;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 class InventoryRepository implements InventoryRepositoryInterface
 {
-    public function __construct(private readonly Inventory $model) {}
-
-    public function all(array $filters = [], int $perPage = 15): LengthAwarePaginator
+    public function all(array $filters = []): Collection
     {
-        $query = $this->model->newQuery()->with('product');
+        $query = Inventory::with('product');
 
-        if (!empty($filters['tenant_id'])) {
-            $query->where('tenant_id', $filters['tenant_id']);
+        foreach ($filters as $column => $value) {
+            $query->where($column, $value);
         }
 
-        if (!empty($filters['product_id'])) {
-            $query->where('product_id', $filters['product_id']);
-        }
-
-        if (isset($filters['low_stock'])) {
-            $query->whereColumn('quantity', '<=', 'min_quantity');
-        }
-
-        $sortBy = $filters['sort_by'] ?? 'created_at';
-        $sortDir = $filters['sort_dir'] ?? 'desc';
-        $query->orderBy($sortBy, $sortDir);
-
-        return $query->paginate($perPage);
+        return $query->get();
     }
 
-    public function find(int $id): Inventory
+    public function find(int $id): ?Inventory
     {
-        return $this->model->with('product')->findOrFail($id);
+        return Inventory::with('product')->find($id);
     }
 
     public function findByProduct(int $productId): ?Inventory
     {
-        return $this->model->where('product_id', $productId)->first();
+        return Inventory::where('product_id', $productId)->first();
     }
 
     public function create(array $data): Inventory
     {
-        return $this->model->create($data);
+        return Inventory::create($data);
     }
 
     public function update(int $id, array $data): Inventory
     {
-        $inventory = $this->find($id);
+        $inventory = Inventory::findOrFail($id);
         $inventory->update($data);
         return $inventory->fresh('product');
     }
 
     public function delete(int $id): bool
     {
-        $inventory = $this->find($id);
+        $inventory = Inventory::findOrFail($id);
         return $inventory->delete();
     }
 
-    public function adjustQuantity(int $id, int $adjustment): Inventory
+    public function paginate(
+        int $perPage,
+        array $filters,
+        ?string $search,
+        string $sortBy,
+        string $sortDir
+    ): LengthAwarePaginator {
+        $query = Inventory::with('product');
+
+        foreach ($filters as $column => $value) {
+            if (!empty($value)) {
+                $query->where($column, $value);
+            }
+        }
+
+        if ($search) {
+            $query->whereHas('product', function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('sku', 'like', "%{$search}%");
+            })->orWhere('warehouse_location', 'like', "%{$search}%");
+        }
+
+        $allowedSorts = ['quantity', 'warehouse_location', 'created_at', 'last_restocked_at'];
+        $sortBy  = in_array($sortBy, $allowedSorts) ? $sortBy : 'created_at';
+        $sortDir = strtolower($sortDir) === 'asc' ? 'asc' : 'desc';
+
+        return $query->orderBy($sortBy, $sortDir)->paginate($perPage);
+    }
+
+    public function adjustQuantity(int $id, int $delta, string $reason): Inventory
     {
-        return DB::transaction(function () use ($id, $adjustment) {
-            $inventory = $this->model->lockForUpdate()->findOrFail($id);
-            $newQuantity = max(0, $inventory->quantity + $adjustment);
-            $inventory->update(['quantity' => $newQuantity]);
+        return DB::transaction(function () use ($id, $delta, $reason) {
+            $inventory = Inventory::lockForUpdate()->findOrFail($id);
+            $newQty    = $inventory->quantity + $delta;
+
+            if ($newQty < 0) {
+                throw new \RuntimeException("Insufficient inventory. Current: {$inventory->quantity}, Delta: {$delta}");
+            }
+
+            $updateData = ['quantity' => $newQty];
+
+            if ($delta > 0) {
+                $updateData['last_restocked_at'] = now();
+            }
+
+            $inventory->update($updateData);
+
             return $inventory->fresh('product');
         });
     }

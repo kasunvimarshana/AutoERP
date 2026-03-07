@@ -1,13 +1,13 @@
 <?php
 
-use App\Modules\Inventory\Controllers\InventoryController;
 use Illuminate\Support\Facades\Route;
+use App\Modules\Inventory\Controllers\InventoryController;
 
 Route::middleware(['auth:api', 'tenant'])->prefix('inventory')->group(function () {
     Route::get('/', [InventoryController::class, 'index']);
-    Route::post('/', [InventoryController::class, 'store'])->middleware('permission:create-inventory');
-    Route::get('/{inventory}', [InventoryController::class, 'show']);
-    Route::put('/{inventory}', [InventoryController::class, 'update'])->middleware('permission:edit-inventory');
-    Route::delete('/{inventory}', [InventoryController::class, 'destroy'])->middleware('permission:delete-inventory');
-    Route::post('/{inventory}/adjust', [InventoryController::class, 'adjust'])->middleware('permission:edit-inventory');
+    Route::post('/', [InventoryController::class, 'store']);
+    Route::get('/{id}', [InventoryController::class, 'show']);
+    Route::put('/{id}', [InventoryController::class, 'update']);
+    Route::delete('/{id}', [InventoryController::class, 'destroy']);
+    Route::post('/{id}/adjust', [InventoryController::class, 'adjust']);
 });

@@ -2,42 +2,37 @@
 
 namespace App\Modules\Inventory\Models;
 
+use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Inventory extends Model
 {
-    use HasFactory, SoftDeletes;
-
-    protected $table = 'inventories';
+    use HasFactory, SoftDeletes, BelongsToTenant;
 
     protected $fillable = [
-        'product_id',
         'tenant_id',
+        'product_id',
+        'warehouse_location',
         'quantity',
         'reserved_quantity',
-        'min_quantity',
-        'max_quantity',
-        'location',
-        'notes',
+        'reorder_point',
+        'reorder_quantity',
+        'last_restocked_at',
     ];
 
     protected $casts = [
-        'quantity' => 'integer',
+        'quantity'          => 'integer',
         'reserved_quantity' => 'integer',
-        'min_quantity' => 'integer',
-        'max_quantity' => 'integer',
+        'reorder_point'     => 'integer',
+        'reorder_quantity'  => 'integer',
+        'last_restocked_at' => 'datetime',
     ];
 
-    public function product()
+    public function product(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(\App\Modules\Product\Models\Product::class);
-    }
-
-    public function tenant()
-    {
-        return $this->belongsTo(\App\Modules\Tenant\Models\Tenant::class);
     }
 
     public function getAvailableQuantityAttribute(): int

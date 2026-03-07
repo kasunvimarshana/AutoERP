@@ -1,12 +1,13 @@
 <?php
 
-use App\Modules\Order\Controllers\OrderController;
 use Illuminate\Support\Facades\Route;
+use App\Modules\Order\Controllers\OrderController;
 
 Route::middleware(['auth:api', 'tenant'])->prefix('orders')->group(function () {
     Route::get('/', [OrderController::class, 'index']);
-    Route::post('/', [OrderController::class, 'store'])->middleware('permission:create-orders');
-    Route::get('/{order}', [OrderController::class, 'show']);
-    Route::patch('/{order}/status', [OrderController::class, 'updateStatus'])->middleware('permission:edit-orders');
-    Route::delete('/{order}', [OrderController::class, 'destroy'])->middleware('permission:delete-orders');
+    Route::post('/', [OrderController::class, 'store']);
+    Route::get('/{id}', [OrderController::class, 'show']);
+    Route::put('/{id}', [OrderController::class, 'update']);
+    Route::delete('/{id}', [OrderController::class, 'destroy']);
+    Route::post('/{id}/cancel', [OrderController::class, 'cancel']);
 });

@@ -8,80 +8,73 @@ use App\Modules\User\Events\UserDeleted;
 use App\Modules\User\Events\UserUpdated;
 use App\Modules\User\Models\User;
 use App\Modules\User\Repositories\UserRepositoryInterface;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Event;
 
 class UserService
 {
     public function __construct(
-        private readonly UserRepositoryInterface $userRepository
+        private readonly UserRepositoryInterface $userRepository,
     ) {}
 
-    public function list(array $filters = [], int $perPage = 15)
-    {
-        return $this->userRepository->all($filters, $perPage);
+    public function listUsers(
+        int $perPage = 15,
+        array $filters = [],
+        ?string $search = null,
+        string $sortBy = 'created_at',
+        string $sortDir = 'desc'
+    ): LengthAwarePaginator {
+        return $this->userRepository->paginate($perPage, $filters, $search, $sortBy, $sortDir);
     }
 
-    public function get(int $id): User
+    public function getUser(int $id): ?User
     {
         return $this->userRepository->find($id);
     }
 
-    public function create(UserDTO $dto): User
+    public function createUser(array $data): User
     {
-        return DB::transaction(function () use ($dto) {
-            $user = $this->userRepository->create([
-                'name' => $dto->name,
-                'email' => $dto->email,
-                'password' => Hash::make($dto->password),
-                'tenant_id' => $dto->tenantId,
-                'attributes' => $dto->attributes,
-                'is_active' => $dto->isActive ?? true,
-            ]);
+        $role = $data['role'] ?? 'staff';
+        unset($data['password_confirmation']);
 
-            if ($dto->role) {
-                $user->assignRole($dto->role);
-            }
+        $user = $this->userRepository->create($data);
+        $user->assignRole($role);
 
-            event(new UserCreated($user));
+        Event::dispatch(new UserCreated($user));
 
-            return $user;
-        });
+        return $user;
     }
 
-    public function update(int $id, UserDTO $dto): User
+    public function updateUser(int $id, array $data): User
     {
-        return DB::transaction(function () use ($id, $dto) {
-            $data = array_filter([
-                'name' => $dto->name,
-                'email' => $dto->email,
-                'attributes' => $dto->attributes,
-                'is_active' => $dto->isActive,
-            ], fn($v) => $v !== null);
+        unset($data['password_confirmation']);
 
-            if ($dto->password) {
-                $data['password'] = Hash::make($dto->password);
-            }
-
-            $user = $this->userRepository->update($id, $data);
-
-            if ($dto->role) {
-                $user->syncRoles([$dto->role]);
-            }
-
-            event(new UserUpdated($user));
-
-            return $user;
-        });
-    }
-
-    public function delete(int $id): bool
-    {
-        return DB::transaction(function () use ($id) {
+        if (isset($data['role'])) {
             $user = $this->userRepository->find($id);
-            $result = $this->userRepository->delete($id);
-            event(new UserDeleted($user));
-            return $result;
-        });
+            $user->syncRoles([$data['role']]);
+        }
+
+        $user = $this->userRepository->update($id, $data);
+        Event::dispatch(new UserUpdated($user));
+
+        return $user;
+    }
+
+    public function deleteUser(int $id): bool
+    {
+        $user = $this->userRepository->find($id);
+
+        if (!$user) {
+            return false;
+        }
+
+        $tenantId = $user->tenant_id;
+        $result = $this->userRepository->delete($id);
+
+        if ($result) {
+            Event::dispatch(new UserDeleted($id, $tenantId));
+        }
+
+        return $result;
     }
 }

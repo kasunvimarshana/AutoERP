@@ -4,32 +4,28 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
+use App\Modules\Tenant\Models\Tenant;
+use Illuminate\Support\Facades\App;
 
 class TenantMiddleware
 {
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next): mixed
     {
-        $user = $request->user();
+        $tenantId = $request->header('X-Tenant-ID')
+            ?? $request->query('tenant_id')
+            ?? ($request->user() ? $request->user()->tenant_id : null);
 
-        if (!$user) {
-            return response()->json(['message' => 'Unauthenticated'], 401);
+        if (!$tenantId) {
+            return response()->json(['error' => 'Tenant not specified'], 400);
         }
 
-        if (!$user->tenant_id) {
-            return response()->json(['message' => 'No tenant associated with this user'], 403);
+        $tenant = Tenant::find($tenantId);
+
+        if (!$tenant || !$tenant->is_active) {
+            return response()->json(['error' => 'Invalid or inactive tenant'], 403);
         }
 
-        // Set tenant context on request
-        $request->merge(['current_tenant_id' => $user->tenant_id]);
-        app()->instance('current_tenant_id', $user->tenant_id);
-
-        // Check tenant_id in request matches user's tenant (for non-admin users)
-        if (!$user->hasRole('super-admin') && $request->has('tenant_id')) {
-            if ((int) $request->input('tenant_id') !== (int) $user->tenant_id) {
-                return response()->json(['message' => 'Access denied to this tenant'], 403);
-            }
-        }
+        App::instance('tenant', $tenant);
 
         return $next($request);
     }

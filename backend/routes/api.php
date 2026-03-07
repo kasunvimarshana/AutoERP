@@ -1,20 +1,9 @@
 <?php
 
-use App\Http\Controllers\HealthController;
-use App\Http\Controllers\WebhookController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\HealthCheckController;
 
-// Health check
-Route::get('/health', [HealthController::class, 'check']);
+Route::get('/health', [HealthCheckController::class, 'index']);
+Route::get('/ping', [HealthCheckController::class, 'ping']);
 
-// Webhooks
-Route::prefix('webhooks')->group(function () {
-    Route::post('/users', [WebhookController::class, 'handleUserWebhook']);
-    Route::post('/products', [WebhookController::class, 'handleProductWebhook']);
-});
-
-// Module routes
-require __DIR__ . '/../app/Modules/User/Routes/api.php';
-require __DIR__ . '/../app/Modules/Product/Routes/api.php';
-require __DIR__ . '/../app/Modules/Inventory/Routes/api.php';
-require __DIR__ . '/../app/Modules/Order/Routes/api.php';
+// Module routes are loaded by ModuleServiceProvider

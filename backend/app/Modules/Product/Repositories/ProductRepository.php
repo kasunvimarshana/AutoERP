@@ -4,33 +4,64 @@ namespace App\Modules\Product\Repositories;
 
 use App\Modules\Product\Models\Product;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Collection;
 
 class ProductRepository implements ProductRepositoryInterface
 {
-    public function __construct(private readonly Product $model) {}
-
-    public function all(array $filters = [], int $perPage = 15): LengthAwarePaginator
+    public function all(array $filters = []): Collection
     {
-        $query = $this->model->newQuery()->with('inventory');
+        $query = Product::query();
 
-        if (!empty($filters['search'])) {
-            $query->where(function ($q) use ($filters) {
-                $q->where('name', 'like', "%{$filters['search']}%")
-                  ->orWhere('sku', 'like', "%{$filters['search']}%")
-                  ->orWhere('description', 'like', "%{$filters['search']}%");
-            });
+        foreach ($filters as $column => $value) {
+            $query->where($column, $value);
         }
 
-        if (!empty($filters['tenant_id'])) {
-            $query->where('tenant_id', $filters['tenant_id']);
-        }
+        return $query->get();
+    }
+
+    public function find(int $id): ?Product
+    {
+        return Product::find($id);
+    }
+
+    public function findBySku(string $sku): ?Product
+    {
+        return Product::where('sku', $sku)->first();
+    }
+
+    public function create(array $data): Product
+    {
+        return Product::create($data);
+    }
+
+    public function update(int $id, array $data): Product
+    {
+        $product = Product::findOrFail($id);
+        $product->update($data);
+        return $product->fresh();
+    }
+
+    public function delete(int $id): bool
+    {
+        $product = Product::findOrFail($id);
+        return $product->delete();
+    }
+
+    public function paginate(
+        int $perPage,
+        array $filters,
+        ?string $search,
+        string $sortBy,
+        string $sortDir
+    ): LengthAwarePaginator {
+        $query = Product::query();
 
         if (!empty($filters['category'])) {
             $query->where('category', $filters['category']);
         }
 
         if (isset($filters['is_active'])) {
-            $query->where('is_active', $filters['is_active']);
+            $query->where('is_active', (bool) $filters['is_active']);
         }
 
         if (!empty($filters['min_price'])) {
@@ -41,44 +72,18 @@ class ProductRepository implements ProductRepositoryInterface
             $query->where('price', '<=', $filters['max_price']);
         }
 
-        $sortBy = $filters['sort_by'] ?? 'created_at';
-        $sortDir = $filters['sort_dir'] ?? 'desc';
-        $query->orderBy($sortBy, $sortDir);
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('sku', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
 
-        return $query->paginate($perPage);
-    }
+        $allowedSorts = ['name', 'price', 'cost_price', 'created_at', 'sku'];
+        $sortBy = in_array($sortBy, $allowedSorts) ? $sortBy : 'created_at';
+        $sortDir = strtolower($sortDir) === 'asc' ? 'asc' : 'desc';
 
-    public function find(int $id): Product
-    {
-        return $this->model->with('inventory')->findOrFail($id);
-    }
-
-    public function create(array $data): Product
-    {
-        return $this->model->create($data);
-    }
-
-    public function update(int $id, array $data): Product
-    {
-        $product = $this->find($id);
-        $product->update($data);
-        return $product->fresh('inventory');
-    }
-
-    public function delete(int $id): bool
-    {
-        $product = $this->find($id);
-        return $product->delete();
-    }
-
-    public function findBySku(string $sku, int $tenantId): ?Product
-    {
-        return $this->model->where('sku', $sku)->where('tenant_id', $tenantId)->first();
-    }
-
-    public function findByTenant(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
-    {
-        $filters['tenant_id'] = $tenantId;
-        return $this->all($filters, $perPage);
+        return $query->orderBy($sortBy, $sortDir)->paginate($perPage);
     }
 }
