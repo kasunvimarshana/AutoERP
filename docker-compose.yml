@@ -1,0 +1,372 @@
+version: "3.9"
+
+# ============================================================
+#  LaravelSAGA – Inventory Management System
+#  Distributed transactions via the Saga Orchestration pattern
+# ============================================================
+
+networks:
+  saga-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  postgres_data:
+  mongodb_data:
+  redis_data:
+  rabbitmq_data:
+
+# ------------------------------------------------------------------
+# Re-usable fragments
+# ------------------------------------------------------------------
+x-laravel-env: &laravel-env
+  # APP_KEY is intentionally omitted here – set it in each service's .env file
+  # via `php artisan key:generate` and never commit real keys to version control.
+  # Use the provided .env.example as a template.
+  APP_ENV: local
+  APP_DEBUG: "true"
+  LOG_CHANNEL: stack
+  LOG_LEVEL: debug
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_USER: saga_user
+  RABBITMQ_PASSWORD: saga_password
+  RABBITMQ_VHOST: /
+
+x-healthcheck-defaults: &hc-defaults
+  interval: 15s
+  timeout: 10s
+  retries: 5
+  start_period: 30s
+
+services:
+  # ================================================================
+  # INFRASTRUCTURE
+  # ================================================================
+
+  # ----------------------------------------------------------------
+  # MySQL – Order Service database
+  # ----------------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: saga-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: orders_db
+      MYSQL_USER: orders_user
+      MYSQL_PASSWORD: orders_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./infrastructure/mysql/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - saga-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password"]
+      <<: *hc-defaults
+
+  # ----------------------------------------------------------------
+  # PostgreSQL – Inventory Service database
+  # ----------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: saga-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: inventory_db
+      POSTGRES_USER: inventory_user
+      POSTGRES_PASSWORD: inventory_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - saga-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inventory_user -d inventory_db"]
+      <<: *hc-defaults
+
+  # ----------------------------------------------------------------
+  # MongoDB – Payment Service database
+  # ----------------------------------------------------------------
+  mongodb:
+    image: mongo:6.0
+    container_name: saga-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: payments_user
+      MONGO_INITDB_ROOT_PASSWORD: payments_password
+      MONGO_INITDB_DATABASE: payments_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./infrastructure/mongodb/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - saga-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      <<: *hc-defaults
+
+  # ----------------------------------------------------------------
+  # Redis – Notification Service cache / queue driver
+  # ----------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: saga-redis
+    restart: unless-stopped
+    command: redis-server --requirepass redis_password --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - saga-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_password", "ping"]
+      <<: *hc-defaults
+
+  # ----------------------------------------------------------------
+  # RabbitMQ – Message Bus (AMQP + Management UI)
+  # ----------------------------------------------------------------
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: saga-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: saga_user
+      RABBITMQ_DEFAULT_PASS: saga_password
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./infrastructure/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+      - ./infrastructure/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    networks:
+      - saga-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      <<: *hc-defaults
+
+  # ================================================================
+  # APPLICATION SERVICES
+  # ================================================================
+
+  # ----------------------------------------------------------------
+  # API Gateway – Laravel 10  (port 8000)
+  # ----------------------------------------------------------------
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+      target: development
+    container_name: saga-api-gateway
+    restart: unless-stopped
+    env_file:
+      - ./services/api-gateway/.env
+    environment:
+      <<: *laravel-env
+      APP_NAME: "SAGA API Gateway"
+      APP_URL: http://localhost:8000
+      ORDER_SERVICE_URL: http://order-service:8001
+      INVENTORY_SERVICE_URL: http://inventory-service:8002
+      PAYMENT_SERVICE_URL: http://payment-service:8003
+      NOTIFICATION_SERVICE_URL: http://notification-service:8004
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./services/api-gateway:/var/www/html
+      - /var/www/html/vendor
+    networks:
+      - saga-network
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      <<: *hc-defaults
+
+  # ----------------------------------------------------------------
+  # Order Service – Laravel 10 + MySQL + Saga Orchestrator (port 8001)
+  # ----------------------------------------------------------------
+  order-service:
+    build:
+      context: ./services/order-service
+      dockerfile: Dockerfile
+      target: development
+    container_name: saga-order-service
+    restart: unless-stopped
+    env_file:
+      - ./services/order-service/.env
+    environment:
+      <<: *laravel-env
+      APP_NAME: "SAGA Order Service"
+      APP_URL: http://localhost:8001
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_DATABASE: orders_db
+      DB_USERNAME: orders_user
+      DB_PASSWORD: orders_password
+      INVENTORY_SERVICE_URL: http://inventory-service:8002
+      PAYMENT_SERVICE_URL: http://payment-service:8003
+      NOTIFICATION_SERVICE_URL: http://notification-service:8004
+      SAGA_ORCHESTRATOR_ENABLED: "true"
+      SAGA_TIMEOUT_SECONDS: "30"
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./services/order-service:/var/www/html
+      - /var/www/html/vendor
+    networks:
+      - saga-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/health"]
+      <<: *hc-defaults
+
+  # ----------------------------------------------------------------
+  # Inventory Service – Laravel 10 + PostgreSQL (port 8002)
+  # ----------------------------------------------------------------
+  inventory-service:
+    build:
+      context: ./services/inventory-service
+      dockerfile: Dockerfile
+      target: development
+    container_name: saga-inventory-service
+    restart: unless-stopped
+    env_file:
+      - ./services/inventory-service/.env
+    environment:
+      <<: *laravel-env
+      APP_NAME: "SAGA Inventory Service"
+      APP_URL: http://localhost:8002
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_DATABASE: inventory_db
+      DB_USERNAME: inventory_user
+      DB_PASSWORD: inventory_password
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./services/inventory-service:/var/www/html
+      - /var/www/html/vendor
+    networks:
+      - saga-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/api/health"]
+      <<: *hc-defaults
+
+  # ----------------------------------------------------------------
+  # Payment Service – Node.js + MongoDB (port 8003)
+  # ----------------------------------------------------------------
+  payment-service:
+    build:
+      context: ./services/payment-service
+      dockerfile: Dockerfile
+      target: development
+    container_name: saga-payment-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: "8003"
+      MONGODB_URI: mongodb://payments_user:payments_password@mongodb:27017/payments_db?authSource=admin
+      RABBITMQ_URL: amqp://saga_user:saga_password@rabbitmq:5672/
+      RABBITMQ_PREFETCH: "10"
+      PAYMENT_GATEWAY_MOCK: "true"
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./services/payment-service:/app
+      - /app/node_modules
+    networks:
+      - saga-network
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      <<: *hc-defaults
+
+  # ----------------------------------------------------------------
+  # Notification Service – Laravel 10 + Redis (port 8004)
+  # ----------------------------------------------------------------
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+      target: development
+    container_name: saga-notification-service
+    restart: unless-stopped
+    env_file:
+      - ./services/notification-service/.env
+    environment:
+      <<: *laravel-env
+      APP_NAME: "SAGA Notification Service"
+      APP_URL: http://localhost:8004
+      QUEUE_CONNECTION: redis
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: redis_password
+      CACHE_DRIVER: redis
+      SESSION_DRIVER: redis
+      MAIL_MAILER: log
+    ports:
+      - "8004:8004"
+    volumes:
+      - ./services/notification-service:/var/www/html
+      - /var/www/html/vendor
+    networks:
+      - saga-network
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/api/health"]
+      <<: *hc-defaults
+
+  # ----------------------------------------------------------------
+  # React Frontend (port 3000)
+  # ----------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: saga-frontend
+    restart: unless-stopped
+    environment:
+      REACT_APP_API_URL: http://localhost:8000
+      REACT_APP_WS_URL: ws://localhost:8000
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - saga-network
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    stdin_open: true
+    tty: true

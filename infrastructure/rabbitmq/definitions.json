@@ -1,0 +1,501 @@
+{
+  "_comment": "RabbitMQ broker definitions for LaravelSAGA – imported at startup via load_definitions",
+
+  "rabbit_version": "3.12.0",
+  "rabbitmq_version": "3.12.0",
+  "product_name": "RabbitMQ",
+  "product_version": "3.12.0",
+
+  "_note_users": "Users are NOT defined here to avoid embedding credentials in source control. RABBITMQ_DEFAULT_USER / RABBITMQ_DEFAULT_PASS env vars in docker-compose.yml bootstrap the broker user at first start.",
+
+  "users": [],
+
+  "vhosts": [
+    { "name": "/" }
+  ],
+
+  "permissions": [],
+
+  "topic_permissions": [],
+
+  "parameters": [],
+
+  "global_parameters": [
+    {
+      "name": "cluster_name",
+      "value": "saga-cluster"
+    }
+  ],
+
+  "policies": [
+    {
+      "vhost": "/",
+      "name": "ha-all-queues",
+      "pattern": "^(order|inventory|payment|notification)\\.",
+      "definition": {
+        "ha-mode": "all",
+        "ha-sync-mode": "automatic",
+        "message-ttl": 86400000,
+        "dead-letter-exchange": "saga.dead-letter"
+      },
+      "priority": 0,
+      "apply-to": "queues"
+    },
+    {
+      "vhost": "/",
+      "name": "dlq-message-ttl",
+      "pattern": "^.*\\.dlq$",
+      "definition": {
+        "message-ttl": 604800000,
+        "max-length": 10000
+      },
+      "priority": 0,
+      "apply-to": "queues"
+    }
+  ],
+
+  "exchanges": [
+    {
+      "name": "saga.events",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {
+        "alternate-exchange": "saga.dead-letter"
+      }
+    },
+    {
+      "name": "saga.commands",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "saga.dead-letter",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "saga.retry",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+
+  "queues": [
+    {
+      "name": "order.commands",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "saga.dead-letter",
+        "x-dead-letter-routing-key": "order.commands.dlq",
+        "x-message-ttl": 86400000,
+        "x-max-length": 100000,
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "order.commands.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 604800000,
+        "x-max-length": 10000,
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "order.events",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "saga.dead-letter",
+        "x-dead-letter-routing-key": "order.events.dlq",
+        "x-message-ttl": 86400000,
+        "x-max-length": 100000,
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "order.events.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 604800000,
+        "x-max-length": 10000,
+        "x-queue-type": "classic"
+      }
+    },
+
+    {
+      "name": "inventory.commands",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "saga.dead-letter",
+        "x-dead-letter-routing-key": "inventory.commands.dlq",
+        "x-message-ttl": 86400000,
+        "x-max-length": 100000,
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "inventory.commands.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 604800000,
+        "x-max-length": 10000,
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "inventory.events",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "saga.dead-letter",
+        "x-dead-letter-routing-key": "inventory.events.dlq",
+        "x-message-ttl": 86400000,
+        "x-max-length": 100000,
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "inventory.events.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 604800000,
+        "x-max-length": 10000,
+        "x-queue-type": "classic"
+      }
+    },
+
+    {
+      "name": "payment.commands",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "saga.dead-letter",
+        "x-dead-letter-routing-key": "payment.commands.dlq",
+        "x-message-ttl": 86400000,
+        "x-max-length": 100000,
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "payment.commands.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 604800000,
+        "x-max-length": 10000,
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "payment.events",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "saga.dead-letter",
+        "x-dead-letter-routing-key": "payment.events.dlq",
+        "x-message-ttl": 86400000,
+        "x-max-length": 100000,
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "payment.events.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 604800000,
+        "x-max-length": 10000,
+        "x-queue-type": "classic"
+      }
+    },
+
+    {
+      "name": "notification.commands",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "saga.dead-letter",
+        "x-dead-letter-routing-key": "notification.commands.dlq",
+        "x-message-ttl": 86400000,
+        "x-max-length": 100000,
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "notification.commands.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 604800000,
+        "x-max-length": 10000,
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "notification.events",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "saga.dead-letter",
+        "x-dead-letter-routing-key": "notification.events.dlq",
+        "x-message-ttl": 86400000,
+        "x-max-length": 100000,
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "notification.events.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 604800000,
+        "x-max-length": 10000,
+        "x-queue-type": "classic"
+      }
+    },
+
+    {
+      "name": "saga.orchestrator.replies",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "saga.dead-letter",
+        "x-dead-letter-routing-key": "saga.orchestrator.replies.dlq",
+        "x-message-ttl": 3600000,
+        "x-max-length": 50000,
+        "x-queue-type": "classic"
+      }
+    },
+    {
+      "name": "saga.orchestrator.replies.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 604800000,
+        "x-max-length": 10000,
+        "x-queue-type": "classic"
+      }
+    }
+  ],
+
+  "bindings": [
+    {
+      "source": "saga.commands",
+      "vhost": "/",
+      "destination": "order.commands",
+      "destination_type": "queue",
+      "routing_key": "order.commands",
+      "arguments": {}
+    },
+    {
+      "source": "saga.commands",
+      "vhost": "/",
+      "destination": "inventory.commands",
+      "destination_type": "queue",
+      "routing_key": "inventory.commands",
+      "arguments": {}
+    },
+    {
+      "source": "saga.commands",
+      "vhost": "/",
+      "destination": "payment.commands",
+      "destination_type": "queue",
+      "routing_key": "payment.commands",
+      "arguments": {}
+    },
+    {
+      "source": "saga.commands",
+      "vhost": "/",
+      "destination": "notification.commands",
+      "destination_type": "queue",
+      "routing_key": "notification.commands",
+      "arguments": {}
+    },
+    {
+      "source": "saga.commands",
+      "vhost": "/",
+      "destination": "saga.orchestrator.replies",
+      "destination_type": "queue",
+      "routing_key": "saga.orchestrator.replies",
+      "arguments": {}
+    },
+
+    {
+      "source": "saga.events",
+      "vhost": "/",
+      "destination": "order.events",
+      "destination_type": "queue",
+      "routing_key": "order.#",
+      "arguments": {}
+    },
+    {
+      "source": "saga.events",
+      "vhost": "/",
+      "destination": "inventory.events",
+      "destination_type": "queue",
+      "routing_key": "inventory.#",
+      "arguments": {}
+    },
+    {
+      "source": "saga.events",
+      "vhost": "/",
+      "destination": "payment.events",
+      "destination_type": "queue",
+      "routing_key": "payment.#",
+      "arguments": {}
+    },
+    {
+      "source": "saga.events",
+      "vhost": "/",
+      "destination": "notification.events",
+      "destination_type": "queue",
+      "routing_key": "notification.#",
+      "arguments": {}
+    },
+    {
+      "source": "saga.events",
+      "vhost": "/",
+      "destination": "order.events",
+      "destination_type": "queue",
+      "routing_key": "saga.order.#",
+      "arguments": {}
+    },
+    {
+      "source": "saga.events",
+      "vhost": "/",
+      "destination": "inventory.events",
+      "destination_type": "queue",
+      "routing_key": "saga.inventory.#",
+      "arguments": {}
+    },
+    {
+      "source": "saga.events",
+      "vhost": "/",
+      "destination": "payment.events",
+      "destination_type": "queue",
+      "routing_key": "saga.payment.#",
+      "arguments": {}
+    },
+    {
+      "source": "saga.events",
+      "vhost": "/",
+      "destination": "notification.events",
+      "destination_type": "queue",
+      "routing_key": "saga.notification.#",
+      "arguments": {}
+    },
+
+    {
+      "source": "saga.dead-letter",
+      "vhost": "/",
+      "destination": "order.commands.dlq",
+      "destination_type": "queue",
+      "routing_key": "order.commands.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "saga.dead-letter",
+      "vhost": "/",
+      "destination": "order.events.dlq",
+      "destination_type": "queue",
+      "routing_key": "order.events.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "saga.dead-letter",
+      "vhost": "/",
+      "destination": "inventory.commands.dlq",
+      "destination_type": "queue",
+      "routing_key": "inventory.commands.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "saga.dead-letter",
+      "vhost": "/",
+      "destination": "inventory.events.dlq",
+      "destination_type": "queue",
+      "routing_key": "inventory.events.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "saga.dead-letter",
+      "vhost": "/",
+      "destination": "payment.commands.dlq",
+      "destination_type": "queue",
+      "routing_key": "payment.commands.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "saga.dead-letter",
+      "vhost": "/",
+      "destination": "payment.events.dlq",
+      "destination_type": "queue",
+      "routing_key": "payment.events.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "saga.dead-letter",
+      "vhost": "/",
+      "destination": "notification.commands.dlq",
+      "destination_type": "queue",
+      "routing_key": "notification.commands.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "saga.dead-letter",
+      "vhost": "/",
+      "destination": "notification.events.dlq",
+      "destination_type": "queue",
+      "routing_key": "notification.events.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "saga.dead-letter",
+      "vhost": "/",
+      "destination": "saga.orchestrator.replies.dlq",
+      "destination_type": "queue",
+      "routing_key": "saga.orchestrator.replies.dlq",
+      "arguments": {}
+    }
+  ]
+}
