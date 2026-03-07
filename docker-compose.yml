@@ -1,0 +1,200 @@
+version: "3.9"
+
+# =============================================================================
+# Enterprise Inventory Management System — Docker Compose
+# Multi-tenant SaaS platform with Laravel backend + React frontend
+# =============================================================================
+
+networks:
+  inventory_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:
+  rabbitmq_data:
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # MySQL — Primary relational database (tenant-aware schemas)
+  # ---------------------------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: inventory_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD:-rootsecret}"
+      MYSQL_DATABASE: "${DB_DATABASE:-inventory}"
+      MYSQL_USER: "${DB_USERNAME:-inventory_user}"
+      MYSQL_PASSWORD: "${DB_PASSWORD:-inventory_pass}"
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d
+    networks:
+      - inventory_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Redis — Cache, session store, and queue backend
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: inventory_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - inventory_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # RabbitMQ — Message broker for event-driven microservice communication
+  # ---------------------------------------------------------------------------
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: inventory_rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: "${RABBITMQ_USER:-admin}"
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASS:-rabbitsecret}"
+      RABBITMQ_DEFAULT_VHOST: "${RABBITMQ_VHOST:-inventory}"
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - inventory_network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Laravel Backend — API server
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend/Dockerfile
+    container_name: inventory_backend
+    restart: unless-stopped
+    working_dir: /var/www/html
+    environment:
+      APP_ENV: "${APP_ENV:-production}"
+      APP_KEY: "${APP_KEY}"
+      APP_DEBUG: "${APP_DEBUG:-false}"
+      APP_URL: "${APP_URL:-http://localhost:8000}"
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: "${DB_DATABASE:-inventory}"
+      DB_USERNAME: "${DB_USERNAME:-inventory_user}"
+      DB_PASSWORD: "${DB_PASSWORD:-inventory_pass}"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CACHE_DRIVER: redis
+      SESSION_DRIVER: redis
+      QUEUE_CONNECTION: redis
+      MESSAGE_BROKER_DRIVER: "${MESSAGE_BROKER_DRIVER:-rabbitmq}"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: "${RABBITMQ_USER:-admin}"
+      RABBITMQ_PASS: "${RABBITMQ_PASS:-rabbitsecret}"
+      RABBITMQ_VHOST: "${RABBITMQ_VHOST:-inventory}"
+      PASSPORT_PRIVATE_KEY: "${PASSPORT_PRIVATE_KEY}"
+      PASSPORT_PUBLIC_KEY: "${PASSPORT_PUBLIC_KEY}"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/var/www/html
+      - ./backend/storage:/var/www/html/storage
+    networks:
+      - inventory_network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # Laravel Queue Worker — Processes async jobs (sagas, webhooks, broker events)
+  # ---------------------------------------------------------------------------
+  queue_worker:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend/Dockerfile
+    container_name: inventory_queue_worker
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--timeout=90"]
+    environment:
+      APP_ENV: "${APP_ENV:-production}"
+      APP_KEY: "${APP_KEY}"
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: "${DB_DATABASE:-inventory}"
+      DB_USERNAME: "${DB_USERNAME:-inventory_user}"
+      DB_PASSWORD: "${DB_PASSWORD:-inventory_pass}"
+      REDIS_HOST: redis
+      QUEUE_CONNECTION: redis
+      MESSAGE_BROKER_DRIVER: "${MESSAGE_BROKER_DRIVER:-rabbitmq}"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: "${RABBITMQ_USER:-admin}"
+      RABBITMQ_PASS: "${RABBITMQ_PASS:-rabbitsecret}"
+      RABBITMQ_VHOST: "${RABBITMQ_VHOST:-inventory}"
+    volumes:
+      - ./backend:/var/www/html
+    networks:
+      - inventory_network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # React Frontend — Vite SPA served via Nginx
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: "${VITE_API_BASE_URL:-http://localhost:8000/api/v1}"
+    container_name: inventory_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    networks:
+      - inventory_network
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
