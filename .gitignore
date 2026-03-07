@@ -1,0 +1,31 @@
+# Ignore vendor directories and build artifacts in both services
+order-service/vendor/
+inventory-service/vendor/
+
+# Ignore SQLite database files
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Ignore environment files
+order-service/.env
+inventory-service/.env
+
+# Ignore Laravel storage generated files
+order-service/storage/logs/
+inventory-service/storage/logs/
+order-service/storage/framework/cache/
+inventory-service/storage/framework/cache/
+order-service/storage/framework/sessions/
+inventory-service/storage/framework/sessions/
+order-service/storage/framework/views/
+inventory-service/storage/framework/views/
+
+# Ignore PHPUnit result cache
+.phpunit.result.cache
+order-service/.phpunit.result.cache
+inventory-service/.phpunit.result.cache
+
+# OS files
+.DS_Store
+Thumbs.db
