@@ -1,211 +1,412 @@
-# LaravelMSCRUD
+# Microservices CRUD Example
 
-A Laravel reference implementation of a **microservices CRUD** pattern using **Events and Listeners** for cross-service communication, database transactions for consistency, and rollback logic for error handling.
+A reference implementation of a **multi-language, multi-database, event-driven microservices architecture** with full CRUD operations, transactional consistency, and cross-service data relationships.
+
+---
 
 ## Architecture Overview
 
-The application models two logical microservices within a single Laravel project:
-
-| Service | Responsibility |
-|---------|---------------|
-| **Service A — Product Service** | Full CRUD for `products`. Dispatches domain events on every mutation. |
-| **Service B — Inventory Service** | Manages `inventories`. Reacts to Service A events to keep inventory in sync. |
-
-Cross-service communication uses **Laravel Events & Listeners**:
-
 ```
-Service A                          Service B
-──────────────────────             ─────────────────────────────
-ProductController                  HandleProductCreated  (creates inventory)
-  │─ ProductCreated ──────────────►
-  │─ ProductUpdated ──────────────► HandleProductUpdated (syncs product_name)
-  └─ ProductDeleted ──────────────► HandleProductDeleted (removes inventory)
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Client / API Consumer                        │
+└────────────────────┬───────────────────────┬────────────────────────┘
+                     │ HTTP                  │ HTTP
+                     ▼                       ▼
+┌────────────────────────────┐   ┌──────────────────────────────────┐
+│   Product Service (A)      │   │   Inventory Service (B)          │
+│   Laravel / PHP            │   │   Node.js / Express              │
+│   MySQL (Relational DB)    │   │   MongoDB (Document DB)          │
+│   Port: 8001               │   │   Port: 8002                     │
+│                            │   │                                  │
+│  - GET    /api/v1/products │   │  - GET    /api/v1/inventory      │
+│  - POST   /api/v1/products │   │  - POST   /api/v1/inventory      │
+│  - GET    /api/v1/products/│   │  - GET    /api/v1/inventory/:id  │
+│            :id (+ inventory│   │  - PUT    /api/v1/inventory/:id  │
+│            enrichment)     │   │  - DELETE /api/v1/inventory/:id  │
+│  - PUT    /api/v1/products/│   │                                  │
+│            :id             │   │  Subscribes to RabbitMQ:         │
+│  - DELETE /api/v1/products/│   │  - product.created → init stock  │
+│            :id             │   │  - product.updated → sync name   │
+└────────────┬───────────────┘   │  - product.deleted → cascade del │
+             │ Publish Events    └────────────┬─────────────────────┘
+             │ (via Listeners)                │ Consume Events
+             ▼                               ▲
+┌───────────────────────────────────────────────────────────────────┐
+│              RabbitMQ Message Broker (Topic Exchange)             │
+│                                                                   │
+│  Exchange: product_events (topic, durable)                        │
+│  Routing Keys:                                                    │
+│    product.created  ──► inventory_product_events queue            │
+│    product.updated  ──► inventory_product_events queue            │
+│    product.deleted  ──► inventory_product_events queue            │
+└───────────────────────────────────────────────────────────────────┘
 ```
-
-Each mutating operation in Service A is wrapped in a **database transaction**. Because listeners run synchronously by default (`QUEUE_CONNECTION=sync`), any failure in Service B propagates back and **rolls back** the Service A change — maintaining data consistency across services.
 
 ---
 
-## Requirements
+## Services
 
-- PHP 8.2+
-- Composer 2.x
+### Service A — Product Service (Laravel / PHP + MySQL)
+
+- **Language**: PHP 8.2
+- **Framework**: Laravel 10
+- **Database**: MySQL 8.0 (relational, ACID-compliant)
+- **Port**: `8001`
+
+**Key Features:**
+- Full CRUD with database transactions and automatic rollback on failure
+- Domain Events (`ProductCreated`, `ProductUpdated`, `ProductDeleted`)
+- Queued Listeners publish events to RabbitMQ after commit (async)
+- Response enrichment: product endpoints return related inventory data fetched from Service B
+- Soft-deletes for audit trail
+- Request validation with form requests
 
 ---
 
-## Setup
+### Service B — Inventory Service (Node.js / Express + MongoDB)
+
+- **Language**: JavaScript (Node.js 20)
+- **Framework**: Express 4
+- **Database**: MongoDB 7 (document, schema-flexible)
+- **Port**: `8002`
+
+**Key Features:**
+- Full CRUD for inventory records
+- RabbitMQ consumer with exponential backoff reconnection
+- Event handlers maintain cross-service data consistency:
+  - `product.created` → creates initial inventory record
+  - `product.updated` → syncs `product_name` / `product_sku` across all inventory records
+  - `product.deleted` → cascade-deletes all related inventory records
+- Idempotent event handling (safe to replay)
+- Filtering by `product_name`, `product_id`, `warehouse_location`
+
+---
+
+## Cross-Service Relationship Handling
+
+| Operation | Product Service | Inventory Service |
+|-----------|----------------|-------------------|
+| **Create Product** | `POST /api/v1/products` → DB transaction → `ProductCreated` event | Consumes `product.created` → creates inventory record |
+| **Get Product with Inventory** | `GET /api/v1/products/:id` → HTTP call to Inventory Service | `GET /api/v1/inventory?product_name=X` returns related records |
+| **Update Product Name** | `PUT /api/v1/products/:id` → DB transaction → `ProductUpdated` event (includes `previous_name`) | Consumes `product.updated` → `updateMany({product_id})` with new name |
+| **Delete Product** | `DELETE /api/v1/products/:id` → soft-delete → `ProductDeleted` event | Consumes `product.deleted` → `deleteMany({product_id})` cascade |
+
+### Data Consistency Strategy
+
+1. **Within a service**: Full ACID database transactions (MySQL for Product Service).
+2. **Across services**: Events are published to RabbitMQ **only after** the local transaction commits — ensuring other services only react to confirmed, consistent state.
+3. **Failure handling**: If RabbitMQ publish fails, the queued listener retries. If the Inventory Service fails to process an event, it nacks the message (sends to Dead Letter Exchange for manual inspection).
+4. **Idempotency**: Event handlers check for existing records before creating, preventing duplicates on message replay.
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/)
+
+### Start All Services
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/kasunvimarshana/LaravelMSCRUD.git
-cd LaravelMSCRUD
+git clone https://github.com/kasunvimarshana/LaravelCRUDExample.git
+cd LaravelCRUDExample
 
-# 2. Install dependencies
-composer install
+docker compose up --build
+```
 
-# 3. Configure environment (SQLite is used by default)
-cp .env.example .env
-php artisan key:generate
+This starts:
+- **MySQL** on port `3306`
+- **MongoDB** on port `27017`
+- **RabbitMQ** on port `5672` (Management UI: `http://localhost:15672`)
+- **Product Service** on port `8001`
+- **Inventory Service** on port `8002`
 
-# 4. Run migrations
-php artisan migrate
+The Product Service will automatically run database migrations on startup.
 
-# 5. (Optional) Seed with sample data
-php artisan db:seed
+---
 
-# 6. Start the development server
-php artisan serve
+## API Reference
+
+### Product Service (`http://localhost:8001`)
+
+#### List Products (with Inventory)
+```http
+GET /api/v1/products
+```
+Query params: `category`, `is_active`, `search`, `per_page`, `page`
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "Wireless Keyboard",
+      "description": "Bluetooth wireless keyboard",
+      "price": "49.99",
+      "stock": 150,
+      "sku": "WK-001",
+      "category": "Electronics",
+      "is_active": true,
+      "inventory": [
+        {
+          "id": "...",
+          "product_id": 1,
+          "product_name": "Wireless Keyboard",
+          "quantity": 150,
+          "warehouse_location": "Main Warehouse",
+          "available_quantity": 150,
+          "needs_reorder": false
+        }
+      ]
+    }
+  ],
+  "meta": { "current_page": 1, "per_page": 15, "total": 1, "last_page": 1 }
+}
+```
+
+#### Create Product
+```http
+POST /api/v1/products
+Content-Type: application/json
+
+{
+  "name": "USB-C Hub",
+  "description": "7-in-1 USB-C hub",
+  "price": 35.99,
+  "stock": 200,
+  "sku": "UCH-001",
+  "category": "Electronics"
+}
+```
+
+#### Get Product with Inventory
+```http
+GET /api/v1/products/1
+```
+
+#### Update Product
+```http
+PUT /api/v1/products/1
+Content-Type: application/json
+
+{
+  "name": "USB-C Hub Pro",
+  "price": 39.99
+}
+```
+> This fires `ProductUpdated` → Inventory Service updates `product_name` in all inventory records.
+
+#### Delete Product
+```http
+DELETE /api/v1/products/1
+```
+> This fires `ProductDeleted` → Inventory Service deletes all related inventory records.
+
+---
+
+### Inventory Service (`http://localhost:8002`)
+
+#### List Inventory (Filter by Product Name)
+```http
+GET /api/v1/inventory?product_name=USB-C Hub
+GET /api/v1/inventory?product_id=1
+```
+
+#### Create Inventory Record
+```http
+POST /api/v1/inventory
+Content-Type: application/json
+
+{
+  "product_id": 1,
+  "product_name": "USB-C Hub",
+  "product_sku": "UCH-001",
+  "quantity": 200,
+  "warehouse_location": "Warehouse B",
+  "reorder_threshold": 20
+}
+```
+
+#### Update Inventory
+```http
+PUT /api/v1/inventory/:id
+Content-Type: application/json
+
+{
+  "quantity": 150,
+  "notes": "Partial stock used"
+}
+```
+
+#### Delete Inventory Record
+```http
+DELETE /api/v1/inventory/:id
 ```
 
 ---
 
-## API Endpoints
+## RabbitMQ Event Payloads
 
-### Service A — Product Service (`/api/products`)
-
-| Method | URI | Description |
-|--------|-----|-------------|
-| `GET` | `/api/products` | List all products with their inventory |
-| `POST` | `/api/products` | Create a product (dispatches `ProductCreated`) |
-| `GET` | `/api/products/{id}` | Show a product with its inventory |
-| `PUT` | `/api/products/{id}` | Update a product (dispatches `ProductUpdated`) |
-| `DELETE` | `/api/products/{id}` | Delete a product (dispatches `ProductDeleted`) |
-
-**Create / Update payload:**
-
+### product.created
 ```json
 {
-  "name": "Widget Pro",
-  "description": "A high-quality widget",
-  "price": 29.99,
-  "sku": "WP-0001"
+  "event": "product.created",
+  "product_id": 1,
+  "name": "USB-C Hub",
+  "sku": "UCH-001",
+  "price": 35.99,
+  "stock": 200,
+  "category": "Electronics",
+  "is_active": true,
+  "timestamp": "2024-01-01T00:00:00+00:00"
 }
 ```
 
-### Service B — Inventory Service (`/api/inventories`)
-
-| Method | URI | Description |
-|--------|-----|-------------|
-| `GET` | `/api/inventories` | List all inventories (supports `?product_name=` filter) |
-| `GET` | `/api/inventories/{id}` | Show an inventory record with its product |
-| `PUT` | `/api/inventories/{id}` | Update an inventory record by ID |
-| `PATCH` | `/api/inventories/by-product-name` | Update inventory record(s) by product name |
-| `DELETE` | `/api/inventories/{id}` | Delete an inventory record |
-
-**Update inventory payload:**
-
+### product.updated
 ```json
 {
-  "quantity": 100,
-  "warehouse_location": "Main Warehouse",
-  "status": "in_stock"
+  "event": "product.updated",
+  "product_id": 1,
+  "name": "USB-C Hub Pro",
+  "sku": "UCH-001",
+  "price": 39.99,
+  "previous_name": "USB-C Hub",
+  "previous_sku": "UCH-001",
+  "timestamp": "2024-01-01T00:00:00+00:00"
 }
 ```
 
-**Update by product name payload:**
-
+### product.deleted
 ```json
 {
-  "product_name": "Widget Pro",
-  "status": "low_stock"
+  "event": "product.deleted",
+  "product_id": 1,
+  "name": "USB-C Hub Pro",
+  "sku": "UCH-001",
+  "timestamp": "2024-01-01T00:00:00+00:00"
 }
 ```
 
 ---
 
-## Event-Driven Flow
+## Adding a New Service in Any Language
 
-### Product Created
-1. `ProductController::store()` opens a DB transaction.
-2. `Product::create()` inserts the product record.
-3. `event(new ProductCreated($product))` is dispatched.
-4. `HandleProductCreated::handle()` creates an `Inventory` record with `status = out_of_stock`.
-5. Transaction commits. Both records are saved atomically.
+To add a third service (e.g., Python Analytics Service), simply:
 
-### Product Updated
-1. `ProductController::update()` opens a DB transaction.
-2. `$product->update($validated)` updates the product.
-3. `event(new ProductUpdated($product))` is dispatched.
-4. `HandleProductUpdated::handle()` updates `product_name` in all related inventory records.
-5. Transaction commits.
+1. Connect to RabbitMQ using any AMQP client library
+2. Declare the same exchange: `product_events` (topic, durable)
+3. Create a queue and bind with desired routing keys (e.g., `product.*`)
+4. Process incoming events
 
-### Product Deleted
-1. `ProductController::destroy()` captures `$productId` and `$productName`.
-2. Opens a DB transaction, deletes the product.
-3. `event(new ProductDeleted($productId, $productName))` is dispatched.
-4. `HandleProductDeleted::handle()` deletes all inventory records for `product_id`.
-5. Transaction commits. Both deletions are atomic.
+**Python example (pika):**
+```python
+import pika, json
 
-### Rollback on Failure
-If any listener throws an exception, the enclosing `DB::transaction()` in the controller is rolled back. The product change is **undone**, and an error response is returned to the caller.
+connection = pika.BlockingConnection(pika.URLParameters('amqp://guest:guest@localhost:5672/'))
+channel = connection.channel()
+channel.exchange_declare(exchange='product_events', exchange_type='topic', durable=True)
+result = channel.queue_declare(queue='analytics_queue', durable=True)
+channel.queue_bind(exchange='product_events', queue='analytics_queue', routing_key='product.*')
 
----
+def callback(ch, method, properties, body):
+    event = json.loads(body)
+    print(f"Analytics: received {event['event']} for product {event['product_id']}")
+    ch.basic_ack(delivery_tag=method.delivery_tag)
 
-## Key Source Files
-
-```
-app/
-├── Events/
-│   ├── ProductCreated.php          # Dispatched after product creation (Service A)
-│   ├── ProductUpdated.php          # Dispatched after product update (Service A)
-│   └── ProductDeleted.php          # Dispatched after product deletion (Service A)
-├── Listeners/
-│   ├── HandleProductCreated.php    # Creates inventory record (Service B)
-│   ├── HandleProductUpdated.php    # Updates inventory product_name (Service B)
-│   └── HandleProductDeleted.php    # Removes inventory records (Service B)
-├── Http/
-│   ├── Controllers/
-│   │   ├── ProductController.php   # Service A endpoints
-│   │   └── InventoryController.php # Service B endpoints
-│   └── Resources/
-│       ├── ProductResource.php     # JSON response with embedded inventory
-│       └── InventoryResource.php   # JSON response with embedded product
-├── Models/
-│   ├── Product.php                 # Service A model
-│   └── Inventory.php              # Service B model
-└── Providers/
-    └── AppServiceProvider.php      # Event ↔ Listener bindings
-database/
-├── migrations/
-│   ├── 2024_01_01_000001_create_products_table.php
-│   └── 2024_01_01_000002_create_inventories_table.php
-├── factories/
-│   ├── ProductFactory.php
-│   └── InventoryFactory.php
-└── seeders/
-    └── DatabaseSeeder.php
-routes/
-└── api.php
-tests/
-└── Feature/
-    ├── ProductServiceTest.php      # 13 tests for Service A
-    └── InventoryServiceTest.php    # 11 tests for Service B
+channel.basic_consume(queue='analytics_queue', on_message_callback=callback)
+channel.start_consuming()
 ```
 
 ---
 
 ## Running Tests
 
+### Product Service (PHP/PHPUnit)
+
 ```bash
+cd product-service
+composer install
 php artisan test
 ```
 
-Expected output: **24 tests, 111 assertions** — all passing.
+### Inventory Service (Node.js/Jest)
+
+```bash
+cd inventory-service
+npm install
+npm test
+```
 
 ---
 
-## Queue Configuration
+## Project Structure
 
-By default `QUEUE_CONNECTION=sync` (see `.env.example`), so listeners run synchronously inside the controller's transaction. To use asynchronous processing (e.g., Redis):
-
-```env
-QUEUE_CONNECTION=redis
+```
+.
+├── docker-compose.yml                 # Orchestrates all services
+│
+├── product-service/                   # Laravel / PHP / MySQL
+│   ├── app/
+│   │   ├── Events/
+│   │   │   ├── ProductCreated.php
+│   │   │   ├── ProductUpdated.php
+│   │   │   └── ProductDeleted.php
+│   │   ├── Listeners/
+│   │   │   ├── PublishProductCreatedEvent.php
+│   │   │   ├── PublishProductUpdatedEvent.php
+│   │   │   └── PublishProductDeletedEvent.php
+│   │   ├── Http/Controllers/
+│   │   │   └── ProductController.php
+│   │   ├── Http/Requests/
+│   │   │   ├── StoreProductRequest.php
+│   │   │   └── UpdateProductRequest.php
+│   │   ├── Models/
+│   │   │   └── Product.php
+│   │   ├── Services/
+│   │   │   ├── ProductService.php     # Business logic + DB transactions
+│   │   │   └── RabbitMQService.php    # Message broker integration
+│   │   └── Providers/
+│   │       ├── AppServiceProvider.php
+│   │       └── EventServiceProvider.php  # Event → Listener mapping
+│   ├── database/
+│   │   ├── migrations/
+│   │   │   └── *_create_products_table.php
+│   │   ├── factories/ProductFactory.php
+│   │   └── seeders/DatabaseSeeder.php
+│   ├── routes/api.php
+│   ├── tests/Feature/ProductControllerTest.php
+│   └── Dockerfile
+│
+└── inventory-service/                 # Node.js / Express / MongoDB
+    ├── src/
+    │   ├── app.js                     # Express application entry point
+    │   ├── controllers/
+    │   │   └── inventoryController.js  # CRUD handlers
+    │   ├── models/
+    │   │   └── Inventory.js           # Mongoose schema
+    │   ├── routes/
+    │   │   └── inventoryRoutes.js
+    │   ├── events/
+    │   │   └── productEventConsumer.js # RabbitMQ consumer
+    │   └── middleware/
+    │       └── logger.js
+    ├── tests/
+    │   ├── inventory.test.js           # API integration tests
+    │   └── productEventConsumer.test.js # Event handler unit tests
+    ├── package.json
+    └── Dockerfile
 ```
 
-Then start a worker:
+---
 
-```bash
-php artisan queue:work --queue=inventory
-```
+## Design Principles
 
-> **Note:** With an async queue driver the transaction rollback across services is no longer automatic. Production systems should implement compensating transactions or a saga pattern for distributed consistency.
+1. **Single Responsibility**: Each service owns its domain (products vs. inventory).
+2. **Database per Service**: MySQL for relational product data; MongoDB for flexible inventory records.
+3. **Event-Driven Communication**: Services communicate via RabbitMQ events, not direct calls.
+4. **Eventual Consistency**: Inventory data is updated asynchronously after product events.
+5. **Fault Tolerance**: Queued listeners with retries; consumer reconnects with backoff; graceful fallback in API responses when Inventory Service is unavailable.
+6. **Idempotency**: Event handlers are safe to replay without creating duplicates.

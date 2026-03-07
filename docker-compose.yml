@@ -1,0 +1,181 @@
+version: '3.9'
+
+#
+# Microservices CRUD Example
+# ─────────────────────────────────────────────────────────────────
+# Service A (Product Service)  - Laravel/PHP  + MySQL
+# Service B (Inventory Service) - Node.js/Express + MongoDB
+# Message Broker                - RabbitMQ
+# ─────────────────────────────────────────────────────────────────
+#
+# Cross-service event flow:
+#   Product CRUD → Laravel Events → Listeners → RabbitMQ
+#                  ↓
+#   Inventory Service Consumer → MongoDB updates
+#
+# Usage:
+#   docker compose up --build
+#   Product Service:  http://localhost:8001/api/v1/products
+#   Inventory Service: http://localhost:8002/api/v1/inventory
+#   RabbitMQ UI:       http://localhost:15672 (guest/guest)
+
+services:
+
+  # ─── Infrastructure ───────────────────────────────────────────
+
+  mysql:
+    image: mysql:8.0
+    container_name: microservices_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: product_service
+      MYSQL_USER: product_user
+      MYSQL_PASSWORD: product_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - microservices_network
+
+  mongodb:
+    image: mongo:7.0
+    container_name: microservices_mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: inventory_service
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - microservices_network
+
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: microservices_rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"    # AMQP protocol
+      - "15672:15672"  # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - microservices_network
+
+  # ─── Product Service (Laravel/PHP + MySQL) ─────────────────────
+
+  product-service:
+    build:
+      context: ./product-service
+      dockerfile: Dockerfile
+    container_name: microservices_product_service
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      APP_NAME: "Product Service"
+      APP_ENV: production
+      APP_KEY: ""           # Will be generated on startup
+      APP_DEBUG: "false"
+      APP_URL: http://localhost:8001
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: product_service
+      DB_USERNAME: product_user
+      DB_PASSWORD: product_password
+      QUEUE_CONNECTION: database
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: guest
+      RABBITMQ_PASSWORD: guest
+      RABBITMQ_VHOST: /
+      RABBITMQ_EXCHANGE: product_events
+      INVENTORY_SERVICE_URL: http://inventory-service:8002
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - microservices_network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8001/up"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ─── Inventory Service (Node.js/Express + MongoDB) ────────────
+
+  inventory-service:
+    build:
+      context: ./inventory-service
+      dockerfile: Dockerfile
+    container_name: microservices_inventory_service
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    environment:
+      NODE_ENV: production
+      PORT: 8002
+      MONGO_URI: mongodb://mongodb:27017/inventory_service
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      RABBITMQ_EXCHANGE: product_events
+      RABBITMQ_QUEUE: inventory_product_events
+      RABBITMQ_ROUTING_KEYS: "product.created,product.updated,product.deleted"
+      PRODUCT_SERVICE_URL: http://product-service:8001
+      RABBITMQ_RECONNECT_DELAY_MS: 5000
+      RABBITMQ_MAX_RETRIES: 10
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - microservices_network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8002/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+# ─── Volumes ──────────────────────────────────────────────────────
+
+volumes:
+  mysql_data:
+    driver: local
+  mongodb_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+
+# ─── Networks ─────────────────────────────────────────────────────
+
+networks:
+  microservices_network:
+    driver: bridge

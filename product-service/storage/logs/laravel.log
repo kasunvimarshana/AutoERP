@@ -1,0 +1,22 @@
+[2026-03-05 17:56:47] laravel.EMERGENCY: Unable to create configured logger. Using emergency logger. {"exception":"[object] (InvalidArgumentException(code: 0): Log [] is not defined. at /home/runner/work/LaravelCRUDExample/LaravelCRUDExample/product-service/vendor/laravel/framework/src/Illuminate/Log/LogManager.php:212)
+[stacktrace]
+#0 /home/runner/work/LaravelCRUDExample/LaravelCRUDExample/product-service/vendor/laravel/framework/src/Illuminate/Log/LogManager.php(137): Illuminate\\Log\\LogManager->resolve()
+#1 /home/runner/work/LaravelCRUDExample/LaravelCRUDExample/product-service/vendor/laravel/framework/src/Illuminate/Log/LogManager.php(124): Illuminate\\Log\\LogManager->get()
+#2 /home/runner/work/LaravelCRUDExample/LaravelCRUDExample/product-service/vendor/laravel/framework/src/Illuminate/Log/LogManager.php(681): Illuminate\\Log\\LogManager->driver()
+#3 /home/runner/work/LaravelCRUDExample/LaravelCRUDExample/product-service/vendor/laravel/framework/src/Illuminate/Foundation/Exceptions/Handler.php(317): Illuminate\\Log\\LogManager->error()
+#4 /home/runner/work/LaravelCRUDExample/LaravelCRUDExample/product-service/vendor/laravel/framework/src/Illuminate/Foundation/Exceptions/Handler.php(278): Illuminate\\Foundation\\Exceptions\\Handler->reportThrowable()
+#5 /home/runner/work/LaravelCRUDExample/LaravelCRUDExample/product-service/vendor/nunomaduro/collision/src/Adapters/Laravel/ExceptionHandler.php(46): Illuminate\\Foundation\\Exceptions\\Handler->report()
+#6 /home/runner/work/LaravelCRUDExample/LaravelCRUDExample/product-service/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(523): NunoMaduro\\Collision\\Adapters\\Laravel\\ExceptionHandler->report()
+#7 /home/runner/work/LaravelCRUDExample/LaravelCRUDExample/product-service/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(203): Illuminate\\Foundation\\Console\\Kernel->reportException()
+#8 /home/runner/work/LaravelCRUDExample/LaravelCRUDExample/product-service/artisan(24): Illuminate\\Foundation\\Console\\Kernel->handle()
+#9 {main}
+"} 
+[2026-03-05 17:56:47] laravel.ERROR: Method Illuminate\Foundation\Console\ClosureCommand::hourly does not exist. {"exception":"[object] (BadMethodCallException(code: 0): Method Illuminate\\Foundation\\Console\\ClosureCommand::hourly does not exist. at /home/runner/work/LaravelCRUDExample/LaravelCRUDExample/product-service/vendor/laravel/framework/src/Illuminate/Macroable/Traits/Macroable.php:112)
+[stacktrace]
+#0 /home/runner/work/LaravelCRUDExample/LaravelCRUDExample/product-service/routes/console.php(8): Illuminate\\Console\\Command->__call()
+#1 /home/runner/work/LaravelCRUDExample/LaravelCRUDExample/product-service/app/Console/Kernel.php(25): require('...')
+#2 /home/runner/work/LaravelCRUDExample/LaravelCRUDExample/product-service/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(453): App\\Console\\Kernel->commands()
+#3 /home/runner/work/LaravelCRUDExample/LaravelCRUDExample/product-service/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(199): Illuminate\\Foundation\\Console\\Kernel->bootstrap()
+#4 /home/runner/work/LaravelCRUDExample/LaravelCRUDExample/product-service/artisan(24): Illuminate\\Foundation\\Console\\Kernel->handle()
+#5 {main}
+"} 
