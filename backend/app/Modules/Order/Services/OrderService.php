@@ -1,113 +1,77 @@
 <?php
-
 namespace App\Modules\Order\Services;
 
-use App\Core\MessageBroker\MessageBrokerInterface;
-use App\Core\Pagination\PaginationHelper;
-use App\Core\Saga\SagaOrchestrator;
-use App\Core\Service\BaseService;
-use App\Core\Tenant\TenantManager;
+use App\Helpers\PaginationHelper;
+use App\Interfaces\MessageBrokerInterface;
 use App\Models\Inventory;
 use App\Models\Order;
 use App\Modules\Order\Repositories\OrderRepository;
-use App\Modules\Order\Saga\Steps\ConfirmOrderStep;
-use App\Modules\Order\Saga\Steps\CreateOrderStep;
-use App\Modules\Order\Saga\Steps\ReserveInventoryStep;
-use App\Modules\Order\Saga\Steps\ValidateOrderStep;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Str;
+use App\Sagas\OrderSaga;
 
-class OrderService extends BaseService
+class OrderService
 {
     public function __construct(
-        OrderRepository $repository,
-        private MessageBrokerInterface $broker,
-        private TenantManager $tenantManager
-    ) {
-        parent::__construct($repository);
+        private OrderRepository $orderRepository,
+        private OrderSaga $orderSaga,
+        private MessageBrokerInterface $messageBroker,
+    ) {}
+
+    public function listOrders(array $filters, int $tenantId): mixed
+    {
+        $filters['tenant_id'] = $tenantId;
+        ['per_page' => $perPage, 'page' => $page] = PaginationHelper::fromRequest(request());
+
+        $query = $this->orderRepository->all($filters, ['items', 'items.product', 'user']);
+        return PaginationHelper::paginate($query, $perPage, $page);
     }
 
-    public function index(array $params = []): array
+    public function getOrder(int $id): mixed
     {
-        $query = $this->repository->query()->with(['items.product', 'user']);
-        $this->applyFilters($query, $params);
-
-        return PaginationHelper::paginate($query, $params);
+        return $this->orderRepository->find($id, ['items', 'items.product', 'user', 'tenant']);
     }
 
-    /**
-     * Place an order via the Saga pattern:
-     *   Validate → Reserve Inventory → Create Order → Confirm Order
-     *
-     * On any failure all executed steps are compensated (rolled back).
-     */
-    public function placeOrder(array $data): array
+    public function createOrder(array $data, int $tenantId, int $userId): mixed
     {
-        $sagaId = Str::uuid()->toString();
+        $data['tenant_id'] = $tenantId;
+        $data['user_id'] = $userId;
 
-        $saga = (new SagaOrchestrator())
-            ->addStep(new ValidateOrderStep())
-            ->addStep(new ReserveInventoryStep())
-            ->addStep(new CreateOrderStep())
-            ->addStep(new ConfirmOrderStep());
-
-        $context = array_merge($data, [
-            'saga_id'   => $sagaId,
-            'tenant_id' => $this->tenantManager->getTenantId(),
-        ]);
-
-        $result = $saga->execute($context);
-
-        $order = Order::findOrFail($result['order_id']);
-
-        $this->broker->publish('order.placed', [
-            'order_id'     => $order->id,
-            'order_number' => $order->order_number,
-            'tenant_id'    => $order->tenant_id,
-            'total_amount' => $order->total_amount,
-            'saga_id'      => $sagaId,
-        ]);
-
-        return [
-            'order'   => $order->load('items.product', 'user'),
-            'saga_id' => $sagaId,
-        ];
+        return $this->orderSaga->execute($data);
     }
 
-    public function cancelOrder(int $orderId): Order
+    public function updateOrderStatus(int $id, string $status): mixed
     {
-        $order = $this->repository->findByIdOrFail($orderId);
+        $order = $this->orderRepository->update($id, ['status' => $status]);
 
-        if (!in_array($order->status, ['pending', 'confirmed'], true)) {
-            throw new \InvalidArgumentException(
-                "Cannot cancel order in status '{$order->status}'."
-            );
-        }
-
-        $order->update(['status' => 'cancelled']);
-
-        // Restore stock for each item
-        foreach ($order->items as $item) {
-            $inventory = Inventory::where('product_id', $item->product_id)->first();
-            $inventory?->increment('quantity', $item->quantity);
-        }
-
-        $this->broker->publish('order.cancelled', [
-            'order_id'     => $order->id,
-            'order_number' => $order->order_number,
+        $this->messageBroker->publish('order.status_changed', [
+            'order_id' => $id,
+            'status' => $status,
+            'tenant_id' => $order->tenant_id,
         ]);
 
         return $order;
     }
 
-    protected function applyFilters(Builder $query, array $params): void
+    public function cancelOrder(int $id, string $reason = ''): mixed
     {
-        if (!empty($params['status'])) {
-            $query->where('status', $params['status']);
+        $order = $this->orderRepository->find($id, ['items']);
+
+        foreach ($order->items as $item) {
+            if ($item->inventory_id) {
+                $inventory = Inventory::find($item->inventory_id);
+                if ($inventory) {
+                    $inventory->decrement('reserved_quantity', min($item->quantity, $inventory->reserved_quantity));
+                }
+            }
         }
 
-        if (!empty($params['user_id'])) {
-            $query->where('user_id', $params['user_id']);
-        }
+        $order->update(['status' => Order::STATUS_CANCELLED, 'notes' => $reason]);
+
+        $this->messageBroker->publish('order.cancelled', [
+            'order_id' => $id,
+            'reason' => $reason,
+            'tenant_id' => $order->tenant_id,
+        ]);
+
+        return $order->fresh();
     }
 }

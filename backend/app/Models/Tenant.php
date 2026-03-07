@@ -1,26 +1,18 @@
 <?php
-
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Tenant extends Model
 {
-    use HasFactory, SoftDeletes;
+    use SoftDeletes;
 
-    protected $fillable = [
-        'name',
-        'key',
-        'domain',
-        'is_active',
-        'settings',
-    ];
+    protected $fillable = ['name', 'domain', 'database', 'settings', 'is_active'];
 
     protected $casts = [
+        'settings' => 'array',
         'is_active' => 'boolean',
-        'settings'  => 'array',
     ];
 
     public function users()
@@ -28,8 +20,14 @@ class Tenant extends Model
         return $this->hasMany(User::class);
     }
 
-    public function configurations()
+    public function configs()
     {
-        return $this->hasMany(TenantConfiguration::class);
+        return $this->hasMany(TenantConfig::class);
+    }
+
+    public function getConfig(string $key, $default = null)
+    {
+        $config = $this->configs()->where('key', $key)->first();
+        return $config ? $config->value : $default;
     }
 }

@@ -1,40 +1,42 @@
 export interface Tenant {
   id: number;
   name: string;
-  key: string;
-  domain?: string;
+  domain: string;
   is_active: boolean;
+  settings?: Record<string, unknown>;
+}
+
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+  tenant_id: number;
+  is_active: boolean;
+  attributes?: Record<string, unknown>;
+  roles?: Role[];
+  permissions?: Permission[];
+  tenant?: Tenant;
 }
 
 export interface Role {
   id: number;
   name: string;
+  guard_name: string;
 }
 
 export interface Permission {
   id: number;
   name: string;
-}
-
-export interface User {
-  id: number;
-  tenant_id: number;
-  name: string;
-  email: string;
-  is_active: boolean;
-  attributes?: Record<string, unknown>;
-  roles: Role[];
-  permissions: Permission[];
-  tenant?: Tenant;
+  guard_name: string;
 }
 
 export interface Product {
   id: number;
   tenant_id: number;
-  sku: string;
   name: string;
   description?: string;
-  price: string;
+  sku: string;
+  price: number;
   category?: string;
   attributes?: Record<string, unknown>;
   is_active: boolean;
@@ -44,23 +46,23 @@ export interface Inventory {
   id: number;
   tenant_id: number;
   product_id: number;
-  warehouse: string;
+  warehouse_location: string;
   quantity: number;
   reserved_quantity: number;
-  min_quantity: number;
-  max_quantity?: number;
-  location?: string;
-  available_quantity: number;
+  reorder_level: number;
+  unit_cost?: number;
   product?: Product;
+  available_quantity?: number;
 }
 
 export interface OrderItem {
   id: number;
   order_id: number;
   product_id: number;
+  inventory_id?: number;
   quantity: number;
-  unit_price: string;
-  total_price: string;
+  unit_price: number;
+  subtotal: number;
   product?: Product;
 }
 
@@ -69,38 +71,44 @@ export interface Order {
   tenant_id: number;
   user_id: number;
   order_number: string;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'failed';
-  total_amount: string;
-  currency: string;
+  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+  total_amount: number;
+  shipping_address?: Record<string, string>;
   notes?: string;
-  saga_id?: string;
-  items: OrderItem[];
+  items?: OrderItem[];
   user?: User;
-}
-
-export interface PaginatedResponse<T> {
-  data: T[];
-  meta: {
-    current_page?: number;
-    last_page?: number;
-    per_page?: number;
-    total: number;
-    from?: number;
-    to?: number;
-  };
-  links?: {
-    first?: string;
-    last?: string;
-    prev?: string | null;
-    next?: string | null;
-  };
 }
 
 export interface TenantConfig {
   id: number;
+  tenant_id: number;
   key: string;
+  value: string;
+  group: string;
   type: string;
-  is_encrypted: boolean;
-  updated_at?: string;
-  created_at?: string;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+}
+
+export interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  message?: string;
+}
+
+export interface AuthState {
+  user: User | null;
+  token: string | null;
+  isAuthenticated: boolean;
+}
+
+export interface LoginCredentials {
+  email: string;
+  password: string;
 }

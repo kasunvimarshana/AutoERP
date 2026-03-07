@@ -1,124 +1,90 @@
 <?php
-
 namespace App\Modules\Inventory\Services;
 
-use App\Core\MessageBroker\MessageBrokerInterface;
-use App\Core\Pagination\PaginationHelper;
-use App\Core\Service\BaseService;
+use App\Helpers\PaginationHelper;
+use App\Interfaces\MessageBrokerInterface;
 use App\Modules\Inventory\Repositories\InventoryRepository;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
-class InventoryService extends BaseService
+class InventoryService
 {
     public function __construct(
-        InventoryRepository $repository,
-        private MessageBrokerInterface $broker
-    ) {
-        parent::__construct($repository);
+        private InventoryRepository $inventoryRepository,
+        private MessageBrokerInterface $messageBroker,
+    ) {}
+
+    public function listInventory(array $filters, int $tenantId): mixed
+    {
+        $filters['tenant_id'] = $tenantId;
+        ['per_page' => $perPage, 'page' => $page] = PaginationHelper::fromRequest(request());
+
+        $query = $this->inventoryRepository->all($filters, ['product']);
+        return PaginationHelper::paginate($query, $perPage, $page);
     }
 
-    public function index(array $params = []): array
+    public function getInventory(int $id): mixed
     {
-        $query = $this->repository->query()->with('product');
-        $this->applyFilters($query, $params);
-
-        return PaginationHelper::paginate($query, $params);
+        return $this->inventoryRepository->find($id, ['product', 'product.tenant']);
     }
 
-    public function store(array $data): Model
+    public function createInventory(array $data, int $tenantId): mixed
     {
-        $inventory = $this->repository->create($data);
+        return DB::transaction(function () use ($data, $tenantId) {
+            $data['tenant_id'] = $tenantId;
+            $inventory = $this->inventoryRepository->create($data);
 
-        $this->broker->publish('inventory.created', [
-            'inventory_id' => $inventory->id,
-            'product_id'   => $inventory->product_id,
-            'quantity'     => $inventory->quantity,
-        ]);
+            $this->messageBroker->publish('inventory.created', [
+                'inventory_id' => $inventory->id,
+                'product_id' => $inventory->product_id,
+                'tenant_id' => $tenantId,
+            ]);
 
-        return $inventory->load('product');
+            return $inventory->load('product');
+        });
     }
 
-    /**
-     * Add / subtract stock.  Pass a positive $delta to add, negative to deduct.
-     */
-    public function adjustQuantity(int $id, int $delta, string $reason = ''): Model
+    public function updateInventory(int $id, array $data): mixed
     {
-        $inventory   = $this->repository->findByIdOrFail($id);
-        $newQuantity = $inventory->quantity + $delta;
+        return DB::transaction(function () use ($id, $data) {
+            $inventory = $this->inventoryRepository->update($id, $data);
 
-        if ($newQuantity < 0) {
-            throw new \InvalidArgumentException('Insufficient stock; adjustment would result in negative quantity.');
-        }
+            $this->messageBroker->publish('inventory.updated', [
+                'inventory_id' => $inventory->id,
+                'tenant_id' => $inventory->tenant_id,
+            ]);
 
-        $inventory->update(['quantity' => $newQuantity]);
-
-        $this->broker->publish('inventory.adjusted', [
-            'inventory_id' => $id,
-            'product_id'   => $inventory->product_id,
-            'delta'        => $delta,
-            'new_quantity' => $newQuantity,
-            'reason'       => $reason,
-        ]);
-
-        return $inventory->fresh()->load('product');
+            return $inventory->load('product');
+        });
     }
 
-    public function reserveQuantity(int $id, int $quantity): Model
+    public function deleteInventory(int $id): bool
     {
-        $inventory = $this->repository->findByIdOrFail($id);
-        $available = $inventory->quantity - $inventory->reserved_quantity;
+        $inventory = $this->inventoryRepository->find($id);
+        $result = $this->inventoryRepository->delete($id);
 
-        if ($available < $quantity) {
-            throw new \InvalidArgumentException(
-                "Insufficient available stock. Available: {$available}, requested: {$quantity}."
-            );
+        if ($result) {
+            $this->messageBroker->publish('inventory.deleted', [
+                'inventory_id' => $id,
+                'tenant_id' => $inventory->tenant_id,
+            ]);
         }
 
-        $inventory->update(['reserved_quantity' => $inventory->reserved_quantity + $quantity]);
-
-        $this->broker->publish('inventory.reserved', [
-            'inventory_id'      => $id,
-            'product_id'        => $inventory->product_id,
-            'reserved_quantity' => $quantity,
-        ]);
-
-        return $inventory->fresh()->load('product');
+        return $result;
     }
 
-    public function releaseReservation(int $id, int $quantity): Model
+    public function adjustStock(int $id, int $delta, string $reason = ''): mixed
     {
-        $inventory   = $this->repository->findByIdOrFail($id);
-        $newReserved = max(0, $inventory->reserved_quantity - $quantity);
-        $inventory->update(['reserved_quantity' => $newReserved]);
+        return DB::transaction(function () use ($id, $delta, $reason) {
+            $inventory = $this->inventoryRepository->adjustQuantity($id, $delta);
 
-        $this->broker->publish('inventory.reservation_released', [
-            'inventory_id'     => $id,
-            'released_quantity' => $quantity,
-        ]);
+            $this->messageBroker->publish('inventory.stock_adjusted', [
+                'inventory_id' => $id,
+                'delta' => $delta,
+                'reason' => $reason,
+                'new_quantity' => $inventory->quantity,
+            ]);
 
-        return $inventory->fresh()->load('product');
-    }
-
-    /** Cross-service filter: search by product name or other product attributes. */
-    protected function applyFilters(Builder $query, array $params): void
-    {
-        if (!empty($params['product_name'])) {
-            $query->whereHas('product', function ($q) use ($params) {
-                $q->where('name', 'like', "%{$params['product_name']}%");
-            });
-        }
-
-        if (!empty($params['product_id'])) {
-            $query->where('product_id', $params['product_id']);
-        }
-
-        if (!empty($params['warehouse'])) {
-            $query->where('warehouse', $params['warehouse']);
-        }
-
-        if (array_key_exists('low_stock', $params)) {
-            $query->whereRaw('quantity <= min_quantity');
-        }
+            return $inventory;
+        });
     }
 }

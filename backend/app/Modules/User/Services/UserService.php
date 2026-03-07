@@ -1,123 +1,82 @@
 <?php
-
 namespace App\Modules\User\Services;
 
-use App\Core\MessageBroker\MessageBrokerInterface;
-use App\Core\Pagination\PaginationHelper;
-use App\Core\Service\BaseService;
-use App\Core\Tenant\TenantManager;
+use App\Helpers\PaginationHelper;
+use App\Interfaces\MessageBrokerInterface;
 use App\Modules\User\Repositories\UserRepository;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 
-class UserService extends BaseService
+class UserService
 {
     public function __construct(
-        UserRepository $repository,
-        private MessageBrokerInterface $broker,
-        private TenantManager $tenantManager
-    ) {
-        parent::__construct($repository);
+        private UserRepository $userRepository,
+        private MessageBrokerInterface $messageBroker,
+    ) {}
+
+    public function listUsers(array $filters, int $tenantId): mixed
+    {
+        $filters['tenant_id'] = $tenantId;
+        ['per_page' => $perPage, 'page' => $page] = PaginationHelper::fromRequest(request());
+
+        $query = $this->userRepository->all($filters, ['roles', 'tenant']);
+        return PaginationHelper::paginate($query, $perPage, $page);
     }
 
-    public function index(array $params = []): array
+    public function getUser(int $id): mixed
     {
-        $query = $this->repository->query()->with(['roles', 'permissions', 'tenant']);
-        $this->applyFilters($query, $params);
-
-        return PaginationHelper::paginate($query, $params);
+        return $this->userRepository->find($id, ['roles', 'permissions', 'tenant']);
     }
 
-    public function store(array $data): Model
+    public function createUser(array $data, int $tenantId): mixed
     {
-        if ($this->tenantManager->hasTenant()) {
-            $data['tenant_id'] = $this->tenantManager->getTenantId();
-        }
+        return DB::transaction(function () use ($data, $tenantId) {
+            $data['tenant_id'] = $tenantId;
+            $user = $this->userRepository->create($data);
 
-        $user = $this->repository->create($data);
+            if (isset($data['roles'])) {
+                $user->syncRoles($data['roles']);
+            }
 
-        if (!empty($data['roles'])) {
-            $user->syncRoles($data['roles']);
-        } else {
-            $user->assignRole('user');
-        }
+            $this->messageBroker->publish('user.created', [
+                'user_id' => $user->id,
+                'tenant_id' => $tenantId,
+                'email' => $user->email,
+            ]);
 
-        $this->broker->publish('user.created', [
-            'user_id'   => $user->id,
-            'tenant_id' => $user->tenant_id,
-            'email'     => $user->email,
-        ]);
-
-        return $user->load('roles');
+            return $user->load(['roles', 'permissions', 'tenant']);
+        });
     }
 
-    public function update(int $id, array $data): Model
+    public function updateUser(int $id, array $data): mixed
     {
-        if (isset($data['password'])) {
-            $data['password'] = Hash::make($data['password']);
-        }
+        return DB::transaction(function () use ($id, $data) {
+            $user = $this->userRepository->update($id, $data);
 
-        $user = $this->repository->update($id, $data);
+            if (isset($data['roles'])) {
+                $user->syncRoles($data['roles']);
+            }
 
-        if (isset($data['roles'])) {
-            $user->syncRoles($data['roles']);
-        }
+            $this->messageBroker->publish('user.updated', [
+                'user_id' => $user->id,
+                'tenant_id' => $user->tenant_id,
+            ]);
 
-        $this->broker->publish('user.updated', [
-            'user_id'   => $user->id,
-            'tenant_id' => $user->tenant_id,
-        ]);
-
-        return $user->load('roles');
+            return $user->load(['roles', 'permissions', 'tenant']);
+        });
     }
 
-    public function destroy(int $id): bool
+    public function deleteUser(int $id): bool
     {
-        $user     = $this->repository->findByIdOrFail($id);
-        $userId   = $user->id;
-        $tenantId = $user->tenant_id;
-        $result   = $this->repository->delete($id);
+        $user = $this->userRepository->find($id);
+        $result = $this->userRepository->delete($id);
 
-        $this->broker->publish('user.deleted', [
-            'user_id'   => $userId,
-            'tenant_id' => $tenantId,
-        ]);
+        if ($result) {
+            $this->messageBroker->publish('user.deleted', [
+                'user_id' => $id,
+                'tenant_id' => $user->tenant_id,
+            ]);
+        }
 
         return $result;
-    }
-
-    public function assignRole(int $userId, string $role): Model
-    {
-        $user = $this->repository->findByIdOrFail($userId);
-        $user->assignRole($role);
-
-        return $user->load('roles');
-    }
-
-    public function revokeRole(int $userId, string $role): Model
-    {
-        $user = $this->repository->findByIdOrFail($userId);
-        $user->removeRole($role);
-
-        return $user->load('roles');
-    }
-
-    protected function applyFilters(Builder $query, array $params): void
-    {
-        if (!empty($params['search'])) {
-            $query->where(function ($q) use ($params) {
-                $q->where('name', 'like', "%{$params['search']}%")
-                  ->orWhere('email', 'like', "%{$params['search']}%");
-            });
-        }
-
-        if (isset($params['is_active'])) {
-            $query->where('is_active', filter_var($params['is_active'], FILTER_VALIDATE_BOOLEAN));
-        }
-
-        if (!empty($params['role'])) {
-            $query->role($params['role']);
-        }
     }
 }

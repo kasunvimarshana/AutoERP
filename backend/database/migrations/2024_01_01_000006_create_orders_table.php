@@ -1,5 +1,4 @@
 <?php
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -12,14 +11,14 @@ return new class extends Migration {
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->string('order_number')->unique();
-            $table->string('status')->default('pending');
-            $table->decimal('total_amount', 12, 2);
-            $table->string('currency', 3)->default('USD');
+            $table->enum('status', ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'])->default('pending');
+            $table->decimal('total_amount', 12, 2)->default(0);
+            $table->json('shipping_address')->nullable();
             $table->text('notes')->nullable();
-            $table->uuid('saga_id')->nullable();
+            $table->json('saga_state')->nullable();
             $table->json('metadata')->nullable();
-            $table->softDeletes();
             $table->timestamps();
+            $table->softDeletes();
             $table->index(['tenant_id', 'status']);
             $table->index(['tenant_id', 'user_id']);
         });

@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Modules\Order\Controllers;
 
 use App\Http\Controllers\Controller;
@@ -13,36 +12,56 @@ class OrderController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        return response()->json($this->orderService->index($request->query()));
-    }
+        $tenant = app('tenant');
+        $filters = $request->only(['status', 'user_id', 'order_number']);
+        $orders = $this->orderService->listOrders($filters, $tenant->id);
 
-    public function store(Request $request): JsonResponse
-    {
-        $request->validate([
-            'items'               => 'required|array|min:1',
-            'items.*.product_id'  => 'required|exists:products,id',
-            'items.*.quantity'    => 'required|integer|min:1',
-            'currency'            => 'sometimes|string|size:3',
-            'notes'               => 'nullable|string',
-        ]);
-
-        $result = $this->orderService->placeOrder(array_merge(
-            $request->all(),
-            ['user_id' => $request->user()->id]
-        ));
-
-        return response()->json($result, 201);
+        return response()->json(['success' => true, 'data' => $orders]);
     }
 
     public function show(int $id): JsonResponse
     {
-        return response()->json(
-            $this->orderService->show($id)->load('items.product', 'user')
-        );
+        return response()->json(['success' => true, 'data' => $this->orderService->getOrder($id)]);
     }
 
-    public function cancel(int $id): JsonResponse
+    public function store(Request $request): JsonResponse
     {
-        return response()->json($this->orderService->cancelOrder($id));
+        $validated = $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|integer|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'shipping_address' => 'nullable|array',
+            'notes' => 'nullable|string|max:1000',
+            'payment_method' => 'nullable|string',
+        ]);
+
+        $tenant = app('tenant');
+        $user = $request->user();
+
+        $result = $this->orderService->createOrder($validated, $tenant->id, $user->id);
+
+        return response()->json(['success' => true, 'data' => $result, 'message' => 'Order created successfully'], 201);
+    }
+
+    public function updateStatus(Request $request, int $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'status' => 'required|string|in:pending,confirmed,processing,shipped,delivered,cancelled,refunded',
+        ]);
+
+        $order = $this->orderService->updateOrderStatus($id, $validated['status']);
+
+        return response()->json(['success' => true, 'data' => $order, 'message' => 'Order status updated']);
+    }
+
+    public function cancel(Request $request, int $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        $order = $this->orderService->cancelOrder($id, $validated['reason'] ?? '');
+
+        return response()->json(['success' => true, 'data' => $order, 'message' => 'Order cancelled']);
     }
 }

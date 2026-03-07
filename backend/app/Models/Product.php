@@ -1,32 +1,27 @@
 <?php
-
 namespace App\Models;
 
-use App\Core\Tenant\HasTenant;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Product extends Model
 {
-    use HasFactory, HasTenant, SoftDeletes;
+    use SoftDeletes;
 
     protected $fillable = [
-        'tenant_id',
-        'sku',
-        'name',
-        'description',
-        'price',
-        'category',
-        'attributes',
-        'is_active',
+        'tenant_id', 'name', 'description', 'sku', 'price', 'category', 'attributes', 'is_active',
     ];
 
     protected $casts = [
-        'price'      => 'decimal:2',
+        'price' => 'decimal:2',
         'attributes' => 'array',
-        'is_active'  => 'boolean',
+        'is_active' => 'boolean',
     ];
+
+    public function tenant()
+    {
+        return $this->belongsTo(Tenant::class);
+    }
 
     public function inventories()
     {

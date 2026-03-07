@@ -1,81 +1,74 @@
 <?php
-
 namespace App\Modules\Product\Services;
 
-use App\Core\MessageBroker\MessageBrokerInterface;
-use App\Core\Pagination\PaginationHelper;
-use App\Core\Service\BaseService;
+use App\Helpers\PaginationHelper;
+use App\Interfaces\MessageBrokerInterface;
 use App\Modules\Product\Repositories\ProductRepository;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
-class ProductService extends BaseService
+class ProductService
 {
     public function __construct(
-        ProductRepository $repository,
-        private MessageBrokerInterface $broker
-    ) {
-        parent::__construct($repository);
+        private ProductRepository $productRepository,
+        private MessageBrokerInterface $messageBroker,
+    ) {}
+
+    public function listProducts(array $filters, int $tenantId): mixed
+    {
+        $filters['tenant_id'] = $tenantId;
+        ['per_page' => $perPage, 'page' => $page] = PaginationHelper::fromRequest(request());
+
+        $query = $this->productRepository->all($filters);
+        return PaginationHelper::paginate($query, $perPage, $page);
     }
 
-    public function index(array $params = []): array
+    public function getProduct(int $id): mixed
     {
-        $query = $this->repository->query();
-        $this->applyFilters($query, $params);
-
-        return PaginationHelper::paginate($query, $params);
+        return $this->productRepository->find($id, ['inventories']);
     }
 
-    public function store(array $data): Model
+    public function createProduct(array $data, int $tenantId): mixed
     {
-        $product = $this->repository->create($data);
+        return DB::transaction(function () use ($data, $tenantId) {
+            $data['tenant_id'] = $tenantId;
+            $product = $this->productRepository->create($data);
 
-        $this->broker->publish('product.created', [
-            'product_id' => $product->id,
-            'tenant_id'  => $product->tenant_id,
-            'sku'        => $product->sku,
-        ]);
+            $this->messageBroker->publish('product.created', [
+                'product_id' => $product->id,
+                'tenant_id' => $tenantId,
+                'name' => $product->name,
+            ]);
 
-        return $product;
+            return $product;
+        });
     }
 
-    public function destroy(int $id): bool
+    public function updateProduct(int $id, array $data): mixed
     {
-        $product = $this->repository->findByIdOrFail($id);
-        $result  = $this->repository->delete($id);
+        return DB::transaction(function () use ($id, $data) {
+            $product = $this->productRepository->update($id, $data);
 
-        $this->broker->publish('product.deleted', [
-            'product_id' => $product->id,
-            'tenant_id'  => $product->tenant_id,
-        ]);
+            $this->messageBroker->publish('product.updated', [
+                'product_id' => $product->id,
+                'tenant_id' => $product->tenant_id,
+            ]);
+
+            return $product;
+        });
+    }
+
+    public function deleteProduct(int $id): bool
+    {
+        $product = $this->productRepository->find($id);
+        $result = $this->productRepository->delete($id);
+
+        if ($result) {
+            $this->messageBroker->publish('product.deleted', [
+                'product_id' => $id,
+                'tenant_id' => $product->tenant_id,
+            ]);
+        }
 
         return $result;
-    }
-
-    protected function applyFilters(Builder $query, array $params): void
-    {
-        if (!empty($params['search'])) {
-            $query->where(function ($q) use ($params) {
-                $q->where('name', 'like', "%{$params['search']}%")
-                  ->orWhere('sku', 'like', "%{$params['search']}%")
-                  ->orWhere('description', 'like', "%{$params['search']}%");
-            });
-        }
-
-        if (!empty($params['category'])) {
-            $query->where('category', $params['category']);
-        }
-
-        if (isset($params['is_active'])) {
-            $query->where('is_active', filter_var($params['is_active'], FILTER_VALIDATE_BOOLEAN));
-        }
-
-        if (!empty($params['min_price'])) {
-            $query->where('price', '>=', $params['min_price']);
-        }
-
-        if (!empty($params['max_price'])) {
-            $query->where('price', '<=', $params['max_price']);
-        }
     }
 }

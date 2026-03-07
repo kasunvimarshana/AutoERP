@@ -1,65 +1,63 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
-export default function DashboardPage() {
-  const { user, tenantKey } = useAuth();
+const StatCard: React.FC<{ label: string; value: string; color: string; emoji: string }> = ({ label, value, color, emoji }) => (
+  <div style={{
+    background: 'white',
+    padding: '1.5rem',
+    borderRadius: '0.75rem',
+    border: `2px solid ${color}22`,
+    flex: '1',
+    minWidth: '180px',
+  }}>
+    <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>{emoji}</div>
+    <div style={{ fontSize: '2rem', fontWeight: 700, color }}>{value}</div>
+    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>{label}</div>
+  </div>
+);
 
-  const cards = [
-    { title: 'Users',     emoji: '👥', path: '/users',      desc: 'Manage users, roles & permissions' },
-    { title: 'Products',  emoji: '📦', path: '/products',   desc: 'Catalog management with RBAC filters' },
-    { title: 'Inventory', emoji: '🏭', path: '/inventory',  desc: 'Stock levels, reservations & adjustments' },
-    { title: 'Orders',    emoji: '🛒', path: '/orders',     desc: 'Place orders via distributed Saga pattern' },
-    { title: 'Config',    emoji: '⚙️', path: '/tenant-config', desc: 'Per-tenant runtime settings' },
-  ];
+const DashboardPage: React.FC = () => {
+  const { user } = useAuth();
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-gray-800">
-          Welcome, {user?.name}!
+    <div>
+      <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.5rem' }}>
+        Welcome back, {user?.name}!
+      </h1>
+      <p style={{ color: '#64748b', marginBottom: '2rem' }}>
+        Tenant: <strong>{user?.tenant?.name}</strong> · Roles: {user?.roles?.map(r => r.name).join(', ')}
+      </p>
+
+      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '2rem' }}>
+        <StatCard label="Total Products" value="—" color="#3b82f6" emoji="📦" />
+        <StatCard label="Inventory Items" value="—" color="#10b981" emoji="🏭" />
+        <StatCard label="Active Orders" value="—" color="#f59e0b" emoji="🛒" />
+        <StatCard label="Total Users" value="—" color="#8b5cf6" emoji="👥" />
+      </div>
+
+      <div style={{ background: 'white', padding: '1.5rem', borderRadius: '0.75rem', border: '1px solid #e2e8f0' }}>
+        <h2 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#1e293b', marginBottom: '1rem' }}>
+          System Overview
         </h2>
-        <p className="text-sm text-gray-500 mt-1">
-          Tenant: <span className="font-semibold text-indigo-600">{tenantKey}</span>
-          {' · '}
-          Role: <span className="font-semibold capitalize">{user?.roles?.[0]?.name ?? '—'}</span>
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {cards.map((c) => (
-          <a
-            key={c.title}
-            href={c.path}
-            className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow"
-          >
-            <div className="text-4xl mb-3">{c.emoji}</div>
-            <h3 className="text-lg font-semibold text-gray-800">{c.title}</h3>
-            <p className="text-sm text-gray-500 mt-1">{c.desc}</p>
-          </a>
-        ))}
-      </div>
-
-      <div className="mt-10 bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">Architecture Overview</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
           {[
-            'Controller → Service → Repository',
-            'Laravel Passport SSO',
-            'RBAC + ABAC Authorization',
-            'Multi-tenant TenantScope',
-            'Saga Distributed Transactions',
-            'MessageBroker (Null/RabbitMQ/Kafka)',
-            'Conditional Pagination',
-            'Tenant Runtime Config',
-            'Cross-service Inventory Filters',
-          ].map((f) => (
-            <div key={f} className="flex items-center gap-2 bg-indigo-50 rounded-lg px-3 py-2">
-              <span className="text-indigo-500">✓</span>
-              <span className="text-gray-700">{f}</span>
+            { title: 'Multi-Tenancy', desc: 'Each tenant has isolated data with runtime-configurable settings', icon: '🏢' },
+            { title: 'SSO & Auth', desc: 'Laravel Passport-based authentication with Single Sign-On', icon: '🔐' },
+            { title: 'RBAC + ABAC', desc: 'Role and attribute-based fine-grained authorization', icon: '🛡️' },
+            { title: 'Saga Pattern', desc: 'Distributed transactions with compensating rollbacks for Orders', icon: '🔄' },
+            { title: 'Message Broker', desc: 'Event-driven architecture with RabbitMQ/Kafka support', icon: '📨' },
+            { title: 'Microservices', desc: 'Controller → Service → Repository modular architecture', icon: '⚙️' },
+          ].map(({ title, desc, icon }) => (
+            <div key={title} style={{ padding: '1rem', background: '#f8fafc', borderRadius: '0.5rem' }}>
+              <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>{icon}</div>
+              <div style={{ fontWeight: 600, color: '#1e293b', marginBottom: '0.25rem', fontSize: '0.9rem' }}>{title}</div>
+              <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>{desc}</div>
             </div>
           ))}
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default DashboardPage;

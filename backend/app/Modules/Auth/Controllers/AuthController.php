@@ -1,66 +1,98 @@
 <?php
-
 namespace App\Modules\Auth\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Auth\Services\AuthService;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
-    public function __construct(private AuthService $authService) {}
-
     public function login(Request $request): JsonResponse
     {
         $request->validate([
-            'email'    => 'required|email',
+            'email' => 'required|email',
             'password' => 'required|string',
         ]);
 
-        $result = $this->authService->login($request->only('email', 'password'));
-
-        if (!$result) {
-            return response()->json(['message' => 'Invalid credentials.'], 401);
+        if (!Auth::attempt($request->only('email', 'password'))) {
+            return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
-        return response()->json($result);
-    }
+        $user = Auth::user();
 
-    public function register(Request $request): JsonResponse
-    {
-        $request->validate([
-            'tenant_id' => 'required|exists:tenants,id',
-            'name'      => 'required|string|max:255',
-            'email'     => 'required|email|unique:users',
-            'password'  => 'required|string|min:8|confirmed',
+        if (!$user->is_active) {
+            return response()->json(['message' => 'Account is inactive'], 403);
+        }
+
+        $token = $user->createToken('auth_token', $this->getScopes($user))->accessToken;
+
+        return response()->json([
+            'success' => true,
+            'access_token' => $token,
+            'token_type' => 'Bearer',
+            'user' => $user->load(['roles', 'permissions', 'tenant']),
         ]);
-
-        return response()->json($this->authService->register($request->all()), 201);
     }
 
     public function logout(Request $request): JsonResponse
     {
-        $this->authService->logout($request->user());
-
-        return response()->json(['message' => 'Successfully logged out.']);
-    }
-
-    public function refresh(Request $request): JsonResponse
-    {
-        return response()->json($this->authService->refresh($request->user()));
+        $request->user()->token()->revoke();
+        return response()->json(['success' => true, 'message' => 'Logged out successfully']);
     }
 
     public function me(Request $request): JsonResponse
     {
-        return response()->json($request->user()->load('tenant', 'roles', 'permissions'));
+        return response()->json([
+            'success' => true,
+            'data' => $request->user()->load(['roles', 'permissions', 'tenant']),
+        ]);
     }
 
-    /** SSO: provide a cross-service token to the authenticated user. */
-    public function ssoToken(Request $request): JsonResponse
+    public function refresh(Request $request): JsonResponse
     {
+        $user = $request->user();
+        $user->token()->revoke();
+        $token = $user->createToken('auth_token', $this->getScopes($user))->accessToken;
+
         return response()->json([
-            'sso_token' => $this->authService->generateSsoToken($request->user()),
+            'success' => true,
+            'access_token' => $token,
+            'token_type' => 'Bearer',
+        ]);
+    }
+
+    private function getScopes(User $user): array
+    {
+        $scopes = [];
+        foreach ($user->getAllPermissions() as $permission) {
+            $scopes[] = $permission->name;
+        }
+        return $scopes;
+    }
+
+    public function ssoCallback(Request $request): JsonResponse
+    {
+        $token = $request->input('sso_token');
+
+        if (!$token) {
+            return response()->json(['message' => 'SSO token required'], 400);
+        }
+
+        $user = User::where('email', $request->input('email'))->first();
+
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+        $accessToken = $user->createToken('sso_token', $this->getScopes($user))->accessToken;
+
+        return response()->json([
+            'success' => true,
+            'access_token' => $accessToken,
+            'token_type' => 'Bearer',
+            'user' => $user->load(['roles', 'permissions', 'tenant']),
         ]);
     }
 }

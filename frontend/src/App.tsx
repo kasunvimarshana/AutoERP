@@ -1,39 +1,36 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
-import ProtectedRoute from './components/layout/ProtectedRoute';
-import Layout from './components/layout/Layout';
-import LoginPage from './pages/auth/LoginPage';
+import { TenantProvider } from './contexts/TenantContext';
+import Layout from './components/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
+import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
-import UsersPage from './pages/users/UsersPage';
-import ProductsPage from './pages/products/ProductsPage';
-import InventoryPage from './pages/inventory/InventoryPage';
-import OrdersPage from './pages/orders/OrdersPage';
-import TenantConfigPage from './pages/tenant/TenantConfigPage';
+import UsersPage from './pages/UsersPage';
+import ProductsPage from './pages/ProductsPage';
+import InventoryPage from './pages/InventoryPage';
+import OrdersPage from './pages/OrdersPage';
+import TenantConfigPage from './pages/TenantConfigPage';
 
-export default function App() {
-  return (
+const App: React.FC = () => (
+  <BrowserRouter>
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-
-          <Route element={<ProtectedRoute />}>
-            <Route element={<Layout />}>
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard"    element={<DashboardPage />} />
-              <Route path="/users"        element={<UsersPage />} />
-              <Route path="/products"     element={<ProductsPage />} />
-              <Route path="/inventory"    element={<InventoryPage />} />
-              <Route path="/orders"       element={<OrdersPage />} />
-              <Route path="/tenant-config" element={<TenantConfigPage />} />
-            </Route>
-          </Route>
-
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </BrowserRouter>
+      <TenantProvider>
+        <Layout>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+            <Route path="/users" element={<ProtectedRoute requiredPermission="user.view"><UsersPage /></ProtectedRoute>} />
+            <Route path="/products" element={<ProtectedRoute requiredPermission="product.view"><ProductsPage /></ProtectedRoute>} />
+            <Route path="/inventory" element={<ProtectedRoute requiredPermission="inventory.view"><InventoryPage /></ProtectedRoute>} />
+            <Route path="/orders" element={<ProtectedRoute requiredPermission="order.view"><OrdersPage /></ProtectedRoute>} />
+            <Route path="/tenant-config" element={<ProtectedRoute><TenantConfigPage /></ProtectedRoute>} />
+          </Routes>
+        </Layout>
+      </TenantProvider>
     </AuthProvider>
-  );
-}
+  </BrowserRouter>
+);
 
+export default App;

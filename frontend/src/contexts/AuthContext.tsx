@@ -1,67 +1,79 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { authApi } from '../api/endpoints';
-import type { User } from '../types';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
+import type { User, AuthState, LoginCredentials } from '../types';
+import { authApi } from '../api/auth';
 
-interface AuthContextValue {
-  user: User | null;
-  token: string | null;
-  tenantKey: string | null;
-  login: (email: string, password: string, tenant: string) => Promise<void>;
+interface AuthContextType extends AuthState {
+  login: (credentials: LoginCredentials) => Promise<void>;
   logout: () => Promise<void>;
-  isAuthenticated: boolean;
-  isLoading: boolean;
+  hasRole: (role: string) => boolean;
+  hasPermission: (permission: string) => boolean;
 }
 
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser]         = useState<User | null>(null);
-  const [token, setToken]       = useState<string | null>(() => localStorage.getItem('access_token'));
-  const [tenantKey, setTenantKey] = useState<string | null>(() => localStorage.getItem('tenant_key'));
-  const [isLoading, setIsLoading] = useState(true);
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(localStorage.getItem('auth_token'));
 
   useEffect(() => {
     if (token) {
       authApi.me()
-        .then((res) => setUser(res.data))
+        .then((res) => setUser(res.data.data))
         .catch(() => {
-          localStorage.removeItem('access_token');
           setToken(null);
-        })
-        .finally(() => setIsLoading(false));
-    } else {
-      setIsLoading(false);
+          localStorage.removeItem('auth_token');
+        });
     }
   }, [token]);
 
-  const login = async (email: string, password: string, tenant: string) => {
-    localStorage.setItem('tenant_key', tenant);
-    setTenantKey(tenant);
-    const res = await authApi.login({ email, password });
-    const { access_token, user: loggedUser } = res.data;
-    localStorage.setItem('access_token', access_token);
+  const login = async (credentials: LoginCredentials) => {
+    const res = await authApi.login(credentials);
+    const { access_token, user: loggedInUser } = res.data;
     setToken(access_token);
-    setUser(loggedUser);
+    setUser(loggedInUser);
+    localStorage.setItem('auth_token', access_token);
+    if (loggedInUser.tenant_id) {
+      localStorage.setItem('tenant_id', String(loggedInUser.tenant_id));
+    }
   };
 
   const logout = async () => {
-    try { await authApi.logout(); } catch (_) { /* ignore */ }
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('tenant_key');
-    setToken(null);
-    setTenantKey(null);
-    setUser(null);
+    try {
+      await authApi.logout();
+    } finally {
+      setToken(null);
+      setUser(null);
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('tenant_id');
+    }
   };
 
+  const hasRole = (role: string) =>
+    user?.roles?.some((r) => r.name === role) ?? false;
+
+  const hasPermission = (permission: string) =>
+    user?.permissions?.some((p) => p.name === permission) ?? false;
+
   return (
-    <AuthContext.Provider value={{ user, token, tenantKey, login, logout, isAuthenticated: !!token, isLoading }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        isAuthenticated: !!token && !!user,
+        login,
+        logout,
+        hasRole,
+        hasPermission,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
-}
+};
 
-export function useAuth() {
+export const useAuth = () => {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
-}
+};

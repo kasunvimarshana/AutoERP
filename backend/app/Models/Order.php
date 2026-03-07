@@ -1,40 +1,45 @@
 <?php
-
 namespace App\Models;
 
-use App\Core\Tenant\HasTenant;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Order extends Model
 {
-    use HasFactory, HasTenant, SoftDeletes;
+    use SoftDeletes;
 
     protected $fillable = [
-        'tenant_id',
-        'user_id',
-        'order_number',
-        'status',
-        'total_amount',
-        'currency',
-        'notes',
-        'saga_id',
-        'metadata',
+        'tenant_id', 'user_id', 'order_number', 'status', 'total_amount',
+        'shipping_address', 'notes', 'saga_state', 'metadata',
     ];
 
     protected $casts = [
         'total_amount' => 'decimal:2',
-        'metadata'     => 'array',
+        'shipping_address' => 'array',
+        'metadata' => 'array',
+        'saga_state' => 'array',
     ];
 
-    public function items()
+    const STATUS_PENDING = 'pending';
+    const STATUS_CONFIRMED = 'confirmed';
+    const STATUS_PROCESSING = 'processing';
+    const STATUS_SHIPPED = 'shipped';
+    const STATUS_DELIVERED = 'delivered';
+    const STATUS_CANCELLED = 'cancelled';
+    const STATUS_REFUNDED = 'refunded';
+
+    public function tenant()
     {
-        return $this->hasMany(OrderItem::class);
+        return $this->belongsTo(Tenant::class);
     }
 
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function items()
+    {
+        return $this->hasMany(OrderItem::class);
     }
 }
