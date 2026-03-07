@@ -1,76 +1,4 @@
-# ============================================================
-#  LaravelSAGA – .gitignore
-# ============================================================
-
-# ----------------------------------------------------------------
-# PHP / Laravel
-# ----------------------------------------------------------------
-vendor/
-composer.lock
-bootstrap/cache/*.php
-bootstrap/cache/*.json
-
-# Laravel storage (logs, cache, compiled views, sessions)
-storage/logs/*.log
-storage/framework/cache/*
-storage/framework/sessions/*
-storage/framework/views/*
-storage/framework/testing/*
-storage/app/public/*
-!storage/app/public/.gitkeep
-!storage/framework/cache/.gitkeep
-!storage/framework/sessions/.gitkeep
-!storage/framework/views/.gitkeep
-!storage/logs/.gitkeep
-!storage/app/.gitkeep
-
-# ----------------------------------------------------------------
-# Node.js / JavaScript (payment-service + frontend)
-# ----------------------------------------------------------------
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-package-lock.json
-yarn.lock
-.pnp
-.pnp.js
-
-# Build output
-/frontend/build/
-/frontend/dist/
-/services/payment-service/dist/
-
-# ----------------------------------------------------------------
-# Environment files
-# Keep .env.example; never commit actual secrets
-# ----------------------------------------------------------------
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env.staging
-!.env.example
-
-# ----------------------------------------------------------------
-# Docker volumes (local bind-mount artefacts)
-# ----------------------------------------------------------------
-.docker/
-docker/volumes/
-mysql_data/
-postgres_data/
-mongodb_data/
-redis_data/
-rabbitmq_data/
-infrastructure/mysql/data/
-infrastructure/postgres/data/
-infrastructure/mongodb/data/
-
-# ----------------------------------------------------------------
-# OS artefacts
-# ----------------------------------------------------------------
+# ─── Operating System ────────────────────────────────────────────────────────
 .DS_Store
 .DS_Store?
 ._*
@@ -78,64 +6,75 @@ infrastructure/mongodb/data/
 .Trashes
 ehthumbs.db
 Thumbs.db
-desktop.ini
-
-# ----------------------------------------------------------------
-# IDE / Editor
-# ----------------------------------------------------------------
-.idea/
-.idea/**
-*.iml
-.vscode/
-.vscode/**
-!.vscode/extensions.json
 *.swp
 *.swo
 *~
-.project
-.classpath
-.settings/
+
+# ─── PHP / Laravel ───────────────────────────────────────────────────────────
+/order-service/vendor/
+/inventory-service/vendor/
+/order-service/.env
+/inventory-service/.env
+/order-service/bootstrap/cache/*.php
+/inventory-service/bootstrap/cache/*.php
+/order-service/storage/logs/*.log
+/inventory-service/storage/logs/*.log
+/order-service/storage/app/public
+/inventory-service/storage/app/public
+*.cache
+.phpunit.cache
+.phpunit.result.cache
+
+# ─── Go ──────────────────────────────────────────────────────────────────────
+/payment-service/payment-service
+/payment-service/*.exe
+*.test
+*.out
+go.sum
+
+# ─── Node.js ─────────────────────────────────────────────────────────────────
+/notification-service/node_modules/
+/notification-service/.env
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.eslintcache
+
+# ─── Docker ──────────────────────────────────────────────────────────────────
+.docker/
+docker-compose.override.yml
+
+# ─── Environment files ───────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─── IDE / Editors ───────────────────────────────────────────────────────────
+.idea/
+.vscode/
 *.sublime-project
 *.sublime-workspace
-nbproject/
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.tmproj
+.ionide
 
-# ----------------------------------------------------------------
-# Test artefacts
-# ----------------------------------------------------------------
+# ─── Build artifacts ─────────────────────────────────────────────────────────
+/dist/
+/build/
+/out/
+
+# ─── Logs ────────────────────────────────────────────────────────────────────
+logs/
+*.log
+
+# ─── Misc ────────────────────────────────────────────────────────────────────
+*.bak
+*.tmp
+.cache/
 coverage/
-.phpunit.result.cache
-.phpunit.cache/
-phpunit.xml
-!phpunit.xml.dist
-/reports/
-/test-results/
-
-# ----------------------------------------------------------------
-# Build & CI artefacts
-# ----------------------------------------------------------------
-*.phar
-public/hot
-public/storage
-public/mix-manifest.json
-public/build/
-/mix-manifest.json
-/_ide_helper.php
-/_ide_helper_models.php
-/.phpstorm.meta.php
-
-# ----------------------------------------------------------------
-# Dependency scanning & lock files (keep .lock in version control
-# for PHP services; ignore generated IDE helpers)
-# ----------------------------------------------------------------
-# Uncomment if you prefer to ignore Composer lock files:
-# composer.lock
-
-# ----------------------------------------------------------------
-# Certificates & secrets
-# ----------------------------------------------------------------
-*.pem
-*.key
-*.crt
-*.pfx
-*.p12
-secrets/
+.nyc_output/
