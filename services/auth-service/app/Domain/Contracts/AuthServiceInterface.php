@@ -1,48 +1,65 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Domain\Contracts;
 
-/**
- * Auth Service Interface
- *
- * Defines the contract for authentication operations.
- */
+use App\Domain\Models\User;
+
 interface AuthServiceInterface
 {
     /**
-     * Register a new user.
+     * Authenticate user within a tenant context.
+     *
+     * @return array{user: User, access_token: string, refresh_token: string|null, expires_in: int}
+     * @throws \App\Exceptions\AuthenticationException
+     * @throws \App\Exceptions\TenantNotFoundException
+     */
+    public function login(
+        string $email,
+        string $password,
+        ?string $tenantId = null,
+        ?string $deviceId = null,
+        ?string $deviceName = null,
+        bool $rememberMe = false
+    ): array;
+
+    /**
+     * Register a new user within a tenant.
+     *
+     * @return array{user: User, access_token: string, refresh_token: string|null, expires_in: int}
+     * @throws \App\Exceptions\TenantNotFoundException
      */
     public function register(array $data): array;
 
     /**
-     * Authenticate a user and return access token.
+     * Logout the authenticated user.
      */
-    public function login(array $credentials): array;
+    public function logout(User $user, ?string $deviceId = null, bool $revokeAll = false): void;
 
     /**
-     * Revoke user tokens (logout).
+     * Refresh an access token using a refresh token.
+     *
+     * @return array{access_token: string, refresh_token: string, expires_in: int}
+     * @throws \App\Exceptions\InvalidTokenException
      */
-    public function logout(int|string $userId): bool;
+    public function refreshToken(string $refreshToken): array;
 
     /**
-     * Refresh access token.
+     * Send password reset link.
      */
-    public function refreshToken(string $token): array;
+    public function sendPasswordResetLink(string $email, ?string $tenantId = null): void;
 
     /**
-     * Validate a token and return user data.
+     * Reset password using token.
      */
-    public function validateToken(string $token): ?array;
+    public function resetPassword(
+        string $token,
+        string $email,
+        string $password,
+        ?string $tenantId = null
+    ): void;
 
     /**
-     * Assign a role to a user.
+     * Get authenticated user by token.
      */
-    public function assignRole(int|string $userId, string $role): bool;
-
-    /**
-     * Check if user has permission.
-     */
-    public function hasPermission(int|string $userId, string $permission): bool;
+    public function getUserFromToken(string $token): ?User;
 }

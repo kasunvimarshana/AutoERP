@@ -1,19 +1,20 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Domain\Events;
 
-use App\Domain\Entities\User;
+use App\Domain\Models\User;
+use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Foundation\Events\Dispatchable;
+use Illuminate\Queue\SerializesModels;
 
-/**
- * User Logged In Domain Event
- */
 class UserLoggedIn
 {
+    use Dispatchable, InteractsWithSockets, SerializesModels;
+
     public function __construct(
         public readonly User $user,
         public readonly string $ipAddress,
-        public readonly string $userAgent
+        public readonly ?string $deviceId = null,
+        public readonly ?string $tenantId = null,
     ) {}
 }

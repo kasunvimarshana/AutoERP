@@ -1,36 +1,17 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Domain\Contracts;
 
-use App\Domain\Entities\Product;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Collection;
-
-/**
- * Product Repository Interface
- */
-interface ProductRepositoryInterface extends BaseRepositoryInterface
+interface ProductRepositoryInterface
 {
-    /**
-     * Find product by SKU within a tenant.
-     */
-    public function findBySku(string $sku, int|string $tenantId): ?Product;
-
-    /**
-     * Get all products for a tenant with optional filters.
-     * Returns paginated when per_page is set, all results otherwise.
-     */
-    public function findByTenant(int|string $tenantId, array $filters = []): Collection|LengthAwarePaginator;
-
-    /**
-     * Get products that need reordering.
-     */
-    public function findLowStock(int|string $tenantId): Collection;
-
-    /**
-     * Update product stock quantity atomically.
-     */
-    public function adjustStock(int|string $productId, int $delta): Product;
+    public function findById(string $tenantId, string $id): ?object;
+    public function findBySku(string $tenantId, string $sku): ?object;
+    public function findByCategory(string $tenantId, string $categoryId, array $params = []): mixed;
+    public function findLowStock(string $tenantId, ?int $threshold = null): mixed;
+    public function searchByNameOrSku(string $tenantId, string $query, array $params = []): mixed;
+    public function list(string $tenantId, array $params = []): mixed;
+    public function create(array $data): object;
+    public function update(string $id, array $data): object;
+    public function delete(string $id): bool;
+    public function existsBySku(string $tenantId, string $sku, ?string $excludeId = null): bool;
 }

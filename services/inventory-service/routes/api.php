@@ -1,34 +1,33 @@
 <?php
-
-declare(strict_types=1);
-
-use App\Http\Controllers\HealthController;
-use App\Http\Controllers\ProductController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\V1\{ProductController,CategoryController,WarehouseController,StockController,StockMovementController,HealthController};
 
-/*
-|--------------------------------------------------------------------------
-| Inventory Service API Routes
-|--------------------------------------------------------------------------
-*/
+Route::get('/health', HealthController::class);
 
-// Health check endpoints (no auth required)
-Route::prefix('health')->group(function () {
-    Route::get('/', [HealthController::class, 'check']);
-    Route::get('/live', [HealthController::class, 'live']);
-    Route::get('/ready', [HealthController::class, 'ready']);
-});
+Route::middleware(['tenant', 'auth'])->prefix('v1')->group(function () {
+    // Products
+    Route::get('/products/low-stock', [ProductController::class, 'getLowStock']);
+    Route::get('/products/search',    [ProductController::class, 'search']);
+    Route::apiResource('/products',   ProductController::class);
 
-// Product endpoints (tenant-aware)
-Route::prefix('products')->middleware(['auth.service', 'tenant'])->group(function () {
-    Route::get('/', [ProductController::class, 'index']);
-    Route::post('/', [ProductController::class, 'store']);
-    Route::get('/low-stock', [ProductController::class, 'lowStock']);
-    Route::get('/{id}', [ProductController::class, 'show']);
-    Route::put('/{id}', [ProductController::class, 'update']);
-    Route::delete('/{id}', [ProductController::class, 'destroy']);
+    // Categories
+    Route::get('/categories/tree', [CategoryController::class, 'tree']);
+    Route::apiResource('/categories', CategoryController::class);
 
-    // Saga endpoints (used by Order Service)
-    Route::post('/{id}/reserve-stock', [ProductController::class, 'reserveStock']);
-    Route::delete('/reservations/{reservationId}', [ProductController::class, 'releaseReservation']);
+    // Warehouses
+    Route::get('/warehouses/{id}/stock', [WarehouseController::class, 'stockSummary']);
+    Route::apiResource('/warehouses', WarehouseController::class);
+
+    // Stock
+    Route::get('/stock/{productId}/{warehouseId}',       [StockController::class, 'getStockLevel']);
+    Route::post('/stock/adjust',                          [StockController::class, 'adjustStock']);
+    Route::post('/stock/transfer',                        [StockController::class, 'transferStock']);
+    Route::post('/stock/reserve',                         [StockController::class, 'reserveStock']);
+    Route::post('/stock/reservations/{id}/commit',        [StockController::class, 'commitReservation']);
+    Route::post('/stock/reservations/{id}/release',       [StockController::class, 'releaseReservation']);
+
+    // Stock Movements
+    Route::get('/stock-movements',     [StockMovementController::class, 'index']);
+    Route::post('/stock-movements',    [StockMovementController::class, 'store']);
+    Route::get('/stock-movements/{id}',[StockMovementController::class, 'show']);
 });

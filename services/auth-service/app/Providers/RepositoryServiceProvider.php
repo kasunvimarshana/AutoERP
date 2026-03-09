@@ -1,35 +1,30 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Providers;
 
-use App\Domain\Contracts\AuthServiceInterface;
+use App\Domain\Contracts\TenantRepositoryInterface;
+use App\Domain\Contracts\TokenRepositoryInterface;
 use App\Domain\Contracts\UserRepositoryInterface;
-use App\Infrastructure\Database\Repositories\UserRepository;
-use App\Infrastructure\Services\AuthService;
+use App\Repositories\TenantRepository;
+use App\Repositories\TokenRepository;
+use App\Repositories\UserRepository;
 use Illuminate\Support\ServiceProvider;
 
-/**
- * Repository Service Provider
- *
- * Binds interfaces to concrete implementations.
- * Use this provider to swap implementations without modifying consuming code.
- */
 class RepositoryServiceProvider extends ServiceProvider
 {
+    /**
+     * All repository interface-to-implementation bindings.
+     */
+    public array $bindings = [
+        UserRepositoryInterface::class   => UserRepository::class,
+        TenantRepositoryInterface::class => TenantRepository::class,
+        TokenRepositoryInterface::class  => TokenRepository::class,
+    ];
+
     public function register(): void
     {
-        // Repository bindings
-        $this->app->bind(
-            UserRepositoryInterface::class,
-            UserRepository::class
-        );
-
-        // Service bindings
-        $this->app->bind(
-            AuthServiceInterface::class,
-            AuthService::class
-        );
+        foreach ($this->bindings as $interface => $implementation) {
+            $this->app->bind($interface, $implementation);
+        }
     }
 }

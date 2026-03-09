@@ -1,38 +1,246 @@
-# Dependencies
-vendor/
-node_modules/
+# =============================================================================
+# Enterprise Inventory Management System — Root .gitignore
+# =============================================================================
 
-# Environment files
+# -----------------------------------------------------------------------------
+# Environment & Secrets
+# -----------------------------------------------------------------------------
 .env
+.env.*
 !.env.example
+!.env.*.example
+*.pem
+*.key
+*.crt
+*.csr
+*.p12
+*.pfx
+secrets/
+.vault-token
 
-# Laravel storage
-storage/logs/
-storage/framework/
-
-# Bootstrap cache
+# -----------------------------------------------------------------------------
+# PHP / Laravel
+# -----------------------------------------------------------------------------
+vendor/
+composer.lock
+*.cache
 bootstrap/cache/*.php
-!bootstrap/cache/.gitkeep
+storage/app/public/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/testing/*
+storage/framework/views/*
+storage/logs/*
+!storage/logs/.gitkeep
+!storage/framework/.gitkeep
+!storage/framework/cache/.gitkeep
+!storage/framework/sessions/.gitkeep
+!storage/framework/testing/.gitkeep
+!storage/framework/views/.gitkeep
+!storage/app/.gitkeep
+!storage/app/public/.gitkeep
+public/hot
+public/storage
+public/mix-manifest.json
+public/build/
+_ide_helper.php
+_ide_helper_models.php
+.phpstorm.meta.php
+*.phpunit.result.cache
+.phpunit.cache/
+phpunit.xml
+!phpunit.xml.dist
 
-# Build artifacts
+# Passport / OAuth keys generated at runtime
+storage/oauth-private.key
+storage/oauth-public.key
+
+# -----------------------------------------------------------------------------
+# Node.js / NPM / Yarn
+# -----------------------------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn/cache
+.yarn/unplugged
+.yarn/install-state.gz
+.pnp.js
+package-lock.json
+yarn.lock
 dist/
+build/
+.next/
+.nuxt/
+.output/
+.cache/
 
-# Lock files (keep package-lock.json)
-*.lock
-!package-lock.json
+# -----------------------------------------------------------------------------
+# Docker
+# -----------------------------------------------------------------------------
+docker-compose.override.yml
+.docker/
+docker/volumes/
+volumes/
+data/postgres-auth/
+data/postgres-inventory/
+data/postgres-orders/
+data/redis/
+data/rabbitmq/
+data/kafka/
+data/zookeeper/
 
-# OS files
+# -----------------------------------------------------------------------------
+# Logs & Runtime
+# -----------------------------------------------------------------------------
+*.log
+logs/
+*.pid
+*.seed
+*.pid.lock
+*.sock
+pids/
+
+# -----------------------------------------------------------------------------
+# Database & Backups
+# -----------------------------------------------------------------------------
+*.sql
+*.dump
+*.db
+*.sqlite
+*.sqlite3
+backups/
+dumps/
+
+# -----------------------------------------------------------------------------
+# IDE & Editor Files
+# -----------------------------------------------------------------------------
+# JetBrains (PhpStorm, WebStorm, IntelliJ)
+.idea/
+*.iml
+*.iws
+*.ipr
+.fleet/
+
+# VS Code
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json.example
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+.netrwhist
+
+# Emacs
+*#
+.#*
+\#*#
+
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
 Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
 
-# Temp directory
-/tmp
+# Linux
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
 
-# Test coverage
+# -----------------------------------------------------------------------------
+# Build Artifacts & Coverage
+# -----------------------------------------------------------------------------
 coverage/
+.coverage
+htmlcov/
+.tox/
+.nox/
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist-info/
+.eggs/
+target/
+out/
+*.class
+*.jar
+*.war
+*.nar
+*.ear
 
-# PHPUnit cache
-.phpunit.result.cache
+# -----------------------------------------------------------------------------
+# Terraform / Infrastructure-as-Code
+# -----------------------------------------------------------------------------
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform/
+.terraform.lock.hcl
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
 
-# Jest coverage
-jest-coverage/
+# -----------------------------------------------------------------------------
+# Kubernetes / Helm
+# -----------------------------------------------------------------------------
+kubeconfig
+*.kubeconfig
+charts/*.tgz
+
+# -----------------------------------------------------------------------------
+# Monitoring & APM
+# -----------------------------------------------------------------------------
+.newrelic/
+newrelic.ini
+
+# -----------------------------------------------------------------------------
+# Temporary / Misc
+# -----------------------------------------------------------------------------
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+*.patch
+.cache

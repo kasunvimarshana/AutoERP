@@ -1,0 +1,732 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://saas-inventory.internal/schemas/event-types/v1.0.0",
+  "title": "EventTypes",
+  "description": "Authoritative catalog of all domain events produced and consumed across the microservices platform. Each entry defines the event type identifier, owning service, Kafka topic, RabbitMQ exchange/routing-key, and payload schema reference.",
+  "version": "1.0.0",
+  "updatedAt": "2024-01-15T00:00:00Z",
+  "domains": {
+    "auth": {
+      "description": "Authentication and multi-tenant identity events",
+      "service": "auth-service",
+      "events": [
+        {
+          "type": "auth.user.registered",
+          "description": "Fired when a new user successfully completes registration.",
+          "version": 1,
+          "kafkaTopic": "auth.user.registered",
+          "rabbitExchange": "auth.events",
+          "rabbitRoutingKey": "auth.user.registered",
+          "producer": "auth-service",
+          "consumers": ["notification-service", "api-gateway"],
+          "sagaRole": null,
+          "schema": {
+            "type": "object",
+            "required": ["userId", "tenantId", "email", "registeredAt"],
+            "properties": {
+              "userId":       { "type": "string", "format": "uuid" },
+              "tenantId":     { "type": "string", "format": "uuid" },
+              "email":        { "type": "string", "format": "email" },
+              "name":         { "type": "string" },
+              "role":         { "type": "string", "enum": ["admin", "manager", "operator", "viewer"] },
+              "registeredAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "type": "auth.user.login",
+          "description": "Fired when a user successfully authenticates and receives a token.",
+          "version": 1,
+          "kafkaTopic": "auth.user.login",
+          "rabbitExchange": "auth.events",
+          "rabbitRoutingKey": "auth.user.login",
+          "producer": "auth-service",
+          "consumers": ["api-gateway"],
+          "sagaRole": null,
+          "schema": {
+            "type": "object",
+            "required": ["userId", "tenantId", "sessionId", "loginAt", "ipAddress"],
+            "properties": {
+              "userId":    { "type": "string", "format": "uuid" },
+              "tenantId":  { "type": "string", "format": "uuid" },
+              "sessionId": { "type": "string", "format": "uuid" },
+              "loginAt":   { "type": "string", "format": "date-time" },
+              "ipAddress": { "type": "string" },
+              "userAgent": { "type": "string" },
+              "mfaUsed":   { "type": "boolean" }
+            }
+          }
+        },
+        {
+          "type": "auth.user.logout",
+          "description": "Fired when a user explicitly revokes their session.",
+          "version": 1,
+          "kafkaTopic": "auth.user.logout",
+          "rabbitExchange": "auth.events",
+          "rabbitRoutingKey": "auth.user.logout",
+          "producer": "auth-service",
+          "consumers": ["api-gateway"],
+          "sagaRole": null,
+          "schema": {
+            "type": "object",
+            "required": ["userId", "sessionId", "logoutAt"],
+            "properties": {
+              "userId":    { "type": "string", "format": "uuid" },
+              "sessionId": { "type": "string", "format": "uuid" },
+              "logoutAt":  { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "type": "auth.user.password_reset_requested",
+          "description": "Fired when a password reset email is requested.",
+          "version": 1,
+          "kafkaTopic": "auth.user.password-reset-requested",
+          "rabbitExchange": "auth.events",
+          "rabbitRoutingKey": "auth.user.password_reset_requested",
+          "producer": "auth-service",
+          "consumers": ["notification-service"],
+          "sagaRole": null,
+          "schema": {
+            "type": "object",
+            "required": ["userId", "email", "resetToken", "expiresAt"],
+            "properties": {
+              "userId":     { "type": "string", "format": "uuid" },
+              "email":      { "type": "string", "format": "email" },
+              "resetToken": { "type": "string" },
+              "expiresAt":  { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "type": "auth.tenant.created",
+          "description": "Fired when a new tenant is provisioned on the platform.",
+          "version": 1,
+          "kafkaTopic": "auth.tenant.created",
+          "rabbitExchange": "auth.events",
+          "rabbitRoutingKey": "auth.tenant.created",
+          "producer": "auth-service",
+          "consumers": ["inventory-service", "order-service", "notification-service"],
+          "sagaRole": "SAGA_START",
+          "schema": {
+            "type": "object",
+            "required": ["tenantId", "slug", "name", "plan", "createdAt"],
+            "properties": {
+              "tenantId":   { "type": "string", "format": "uuid" },
+              "slug":       { "type": "string" },
+              "name":       { "type": "string" },
+              "plan":       { "type": "string", "enum": ["starter", "growth", "enterprise"] },
+              "ownerId":    { "type": "string", "format": "uuid" },
+              "createdAt":  { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "type": "auth.tenant.suspended",
+          "description": "Fired when a tenant account is suspended.",
+          "version": 1,
+          "kafkaTopic": "auth.tenant.suspended",
+          "rabbitExchange": "auth.events",
+          "rabbitRoutingKey": "auth.tenant.suspended",
+          "producer": "auth-service",
+          "consumers": ["api-gateway", "inventory-service", "order-service"],
+          "sagaRole": null,
+          "schema": {
+            "type": "object",
+            "required": ["tenantId", "reason", "suspendedAt"],
+            "properties": {
+              "tenantId":    { "type": "string", "format": "uuid" },
+              "reason":      { "type": "string" },
+              "suspendedAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "type": "auth.token.refreshed",
+          "description": "Fired when an access token is refreshed via refresh token.",
+          "version": 1,
+          "kafkaTopic": "auth.token.refreshed",
+          "rabbitExchange": "auth.events",
+          "rabbitRoutingKey": "auth.token.refreshed",
+          "producer": "auth-service",
+          "consumers": [],
+          "sagaRole": null,
+          "schema": {
+            "type": "object",
+            "required": ["userId", "sessionId", "refreshedAt"],
+            "properties": {
+              "userId":      { "type": "string", "format": "uuid" },
+              "sessionId":   { "type": "string", "format": "uuid" },
+              "refreshedAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      ]
+    },
+    "inventory": {
+      "description": "Inventory and warehouse management events",
+      "service": "inventory-service",
+      "events": [
+        {
+          "type": "inventory.item.created",
+          "description": "Fired when a new inventory item (SKU) is added to a tenant's catalog.",
+          "version": 1,
+          "kafkaTopic": "inventory.item.created",
+          "rabbitExchange": "inventory.events",
+          "rabbitRoutingKey": "inventory.item.created",
+          "producer": "inventory-service",
+          "consumers": ["order-service", "notification-service"],
+          "sagaRole": null,
+          "schema": {
+            "type": "object",
+            "required": ["itemId", "tenantId", "sku", "name", "quantity", "createdAt"],
+            "properties": {
+              "itemId":       { "type": "string", "format": "uuid" },
+              "tenantId":     { "type": "string", "format": "uuid" },
+              "sku":          { "type": "string" },
+              "name":         { "type": "string" },
+              "description":  { "type": "string" },
+              "quantity":     { "type": "integer", "minimum": 0 },
+              "reorderPoint": { "type": "integer", "minimum": 0 },
+              "warehouseId":  { "type": "string", "format": "uuid" },
+              "categoryId":   { "type": "string", "format": "uuid" },
+              "unitCost":     { "type": "number", "minimum": 0 },
+              "unitPrice":    { "type": "number", "minimum": 0 },
+              "createdAt":    { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "type": "inventory.item.updated",
+          "description": "Fired when an inventory item's attributes are modified.",
+          "version": 1,
+          "kafkaTopic": "inventory.item.updated",
+          "rabbitExchange": "inventory.events",
+          "rabbitRoutingKey": "inventory.item.updated",
+          "producer": "inventory-service",
+          "consumers": ["order-service"],
+          "sagaRole": null,
+          "schema": {
+            "type": "object",
+            "required": ["itemId", "tenantId", "changedFields", "updatedAt"],
+            "properties": {
+              "itemId":        { "type": "string", "format": "uuid" },
+              "tenantId":      { "type": "string", "format": "uuid" },
+              "changedFields": { "type": "object" },
+              "updatedAt":     { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "type": "inventory.item.deleted",
+          "description": "Fired when an inventory item is soft-deleted.",
+          "version": 1,
+          "kafkaTopic": "inventory.item.deleted",
+          "rabbitExchange": "inventory.events",
+          "rabbitRoutingKey": "inventory.item.deleted",
+          "producer": "inventory-service",
+          "consumers": ["order-service"],
+          "sagaRole": null,
+          "schema": {
+            "type": "object",
+            "required": ["itemId", "tenantId", "deletedAt"],
+            "properties": {
+              "itemId":    { "type": "string", "format": "uuid" },
+              "tenantId":  { "type": "string", "format": "uuid" },
+              "deletedAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "type": "inventory.stock.reserved",
+          "description": "Fired when stock is tentatively reserved for an order (Saga compensation step).",
+          "version": 1,
+          "kafkaTopic": "inventory.stock.reserved",
+          "rabbitExchange": "inventory.events",
+          "rabbitRoutingKey": "inventory.stock.reserved",
+          "producer": "inventory-service",
+          "consumers": ["order-service"],
+          "sagaRole": "SAGA_REPLY",
+          "schema": {
+            "type": "object",
+            "required": ["reservationId", "orderId", "tenantId", "items", "reservedAt"],
+            "properties": {
+              "reservationId": { "type": "string", "format": "uuid" },
+              "orderId":       { "type": "string", "format": "uuid" },
+              "sagaId":        { "type": "string", "format": "uuid" },
+              "tenantId":      { "type": "string", "format": "uuid" },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["itemId", "quantity"],
+                  "properties": {
+                    "itemId":   { "type": "string", "format": "uuid" },
+                    "quantity": { "type": "integer", "minimum": 1 }
+                  }
+                }
+              },
+              "reservedAt": { "type": "string", "format": "date-time" },
+              "expiresAt":  { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "type": "inventory.stock.reservation_failed",
+          "description": "Fired when stock cannot be reserved (insufficient quantity). Triggers Saga compensation.",
+          "version": 1,
+          "kafkaTopic": "inventory.stock.reservation-failed",
+          "rabbitExchange": "inventory.events",
+          "rabbitRoutingKey": "inventory.stock.reservation_failed",
+          "producer": "inventory-service",
+          "consumers": ["order-service"],
+          "sagaRole": "SAGA_COMPENSATE",
+          "schema": {
+            "type": "object",
+            "required": ["orderId", "sagaId", "tenantId", "failedItems", "reason", "failedAt"],
+            "properties": {
+              "orderId":     { "type": "string", "format": "uuid" },
+              "sagaId":      { "type": "string", "format": "uuid" },
+              "tenantId":    { "type": "string", "format": "uuid" },
+              "failedItems": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "itemId":    { "type": "string", "format": "uuid" },
+                    "requested": { "type": "integer" },
+                    "available": { "type": "integer" }
+                  }
+                }
+              },
+              "reason":    { "type": "string" },
+              "failedAt":  { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "type": "inventory.stock.released",
+          "description": "Fired when a stock reservation is released (e.g., order cancelled).",
+          "version": 1,
+          "kafkaTopic": "inventory.stock.released",
+          "rabbitExchange": "inventory.events",
+          "rabbitRoutingKey": "inventory.stock.released",
+          "producer": "inventory-service",
+          "consumers": ["order-service", "notification-service"],
+          "sagaRole": "SAGA_COMPENSATE",
+          "schema": {
+            "type": "object",
+            "required": ["reservationId", "orderId", "tenantId", "releasedAt"],
+            "properties": {
+              "reservationId": { "type": "string", "format": "uuid" },
+              "orderId":       { "type": "string", "format": "uuid" },
+              "sagaId":        { "type": "string", "format": "uuid" },
+              "tenantId":      { "type": "string", "format": "uuid" },
+              "releasedAt":    { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "type": "inventory.stock.depleted",
+          "description": "Fired when an item's quantity falls to or below its reorder point.",
+          "version": 1,
+          "kafkaTopic": "inventory.stock.depleted",
+          "rabbitExchange": "inventory.events",
+          "rabbitRoutingKey": "inventory.stock.depleted",
+          "producer": "inventory-service",
+          "consumers": ["notification-service"],
+          "sagaRole": null,
+          "schema": {
+            "type": "object",
+            "required": ["itemId", "tenantId", "sku", "currentQuantity", "reorderPoint", "depletedAt"],
+            "properties": {
+              "itemId":          { "type": "string", "format": "uuid" },
+              "tenantId":        { "type": "string", "format": "uuid" },
+              "sku":             { "type": "string" },
+              "currentQuantity": { "type": "integer" },
+              "reorderPoint":    { "type": "integer" },
+              "depletedAt":      { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "type": "inventory.stock.replenished",
+          "description": "Fired when stock is restocked or a purchase order is received.",
+          "version": 1,
+          "kafkaTopic": "inventory.stock.replenished",
+          "rabbitExchange": "inventory.events",
+          "rabbitRoutingKey": "inventory.stock.replenished",
+          "producer": "inventory-service",
+          "consumers": ["notification-service", "order-service"],
+          "sagaRole": null,
+          "schema": {
+            "type": "object",
+            "required": ["itemId", "tenantId", "addedQuantity", "newQuantity", "replenishedAt"],
+            "properties": {
+              "itemId":          { "type": "string", "format": "uuid" },
+              "tenantId":        { "type": "string", "format": "uuid" },
+              "sku":             { "type": "string" },
+              "addedQuantity":   { "type": "integer", "minimum": 1 },
+              "newQuantity":     { "type": "integer", "minimum": 0 },
+              "purchaseOrderId": { "type": "string", "format": "uuid" },
+              "replenishedAt":   { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      ]
+    },
+    "order": {
+      "description": "Order lifecycle and Saga orchestration events",
+      "service": "order-service",
+      "events": [
+        {
+          "type": "order.placed",
+          "description": "Fired when a customer submits a new order. Initiates the Order Saga.",
+          "version": 1,
+          "kafkaTopic": "order.placed",
+          "rabbitExchange": "order.events",
+          "rabbitRoutingKey": "order.placed",
+          "producer": "order-service",
+          "consumers": ["inventory-service", "notification-service"],
+          "sagaRole": "SAGA_START",
+          "schema": {
+            "type": "object",
+            "required": ["orderId", "tenantId", "customerId", "items", "totalAmount", "currency", "placedAt"],
+            "properties": {
+              "orderId":     { "type": "string", "format": "uuid" },
+              "tenantId":    { "type": "string", "format": "uuid" },
+              "customerId":  { "type": "string", "format": "uuid" },
+              "sagaId":      { "type": "string", "format": "uuid" },
+              "items": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": ["itemId", "sku", "quantity", "unitPrice"],
+                  "properties": {
+                    "itemId":    { "type": "string", "format": "uuid" },
+                    "sku":       { "type": "string" },
+                    "quantity":  { "type": "integer", "minimum": 1 },
+                    "unitPrice": { "type": "number", "minimum": 0 }
+                  }
+                }
+              },
+              "totalAmount":     { "type": "number", "minimum": 0 },
+              "currency":        { "type": "string", "pattern": "^[A-Z]{3}$" },
+              "shippingAddress": { "type": "object" },
+              "notes":           { "type": "string" },
+              "placedAt":        { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "type": "order.confirmed",
+          "description": "Fired when all saga steps succeed and the order is confirmed.",
+          "version": 1,
+          "kafkaTopic": "order.confirmed",
+          "rabbitExchange": "order.events",
+          "rabbitRoutingKey": "order.confirmed",
+          "producer": "order-service",
+          "consumers": ["notification-service", "inventory-service"],
+          "sagaRole": "SAGA_SUCCESS",
+          "schema": {
+            "type": "object",
+            "required": ["orderId", "tenantId", "customerId", "confirmedAt"],
+            "properties": {
+              "orderId":      { "type": "string", "format": "uuid" },
+              "tenantId":     { "type": "string", "format": "uuid" },
+              "customerId":   { "type": "string", "format": "uuid" },
+              "sagaId":       { "type": "string", "format": "uuid" },
+              "confirmedAt":  { "type": "string", "format": "date-time" },
+              "estimatedDelivery": { "type": "string", "format": "date" }
+            }
+          }
+        },
+        {
+          "type": "order.cancelled",
+          "description": "Fired when an order is cancelled by customer or system.",
+          "version": 1,
+          "kafkaTopic": "order.cancelled",
+          "rabbitExchange": "order.events",
+          "rabbitRoutingKey": "order.cancelled",
+          "producer": "order-service",
+          "consumers": ["inventory-service", "notification-service"],
+          "sagaRole": "SAGA_COMPENSATE",
+          "schema": {
+            "type": "object",
+            "required": ["orderId", "tenantId", "reason", "cancelledAt"],
+            "properties": {
+              "orderId":     { "type": "string", "format": "uuid" },
+              "tenantId":    { "type": "string", "format": "uuid" },
+              "customerId":  { "type": "string", "format": "uuid" },
+              "sagaId":      { "type": "string", "format": "uuid" },
+              "reason":      { "type": "string" },
+              "cancelledBy": { "type": "string", "enum": ["customer", "system", "admin"] },
+              "cancelledAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "type": "order.shipped",
+          "description": "Fired when the order has been dispatched by the warehouse.",
+          "version": 1,
+          "kafkaTopic": "order.shipped",
+          "rabbitExchange": "order.events",
+          "rabbitRoutingKey": "order.shipped",
+          "producer": "order-service",
+          "consumers": ["notification-service"],
+          "sagaRole": null,
+          "schema": {
+            "type": "object",
+            "required": ["orderId", "tenantId", "trackingNumber", "carrier", "shippedAt"],
+            "properties": {
+              "orderId":        { "type": "string", "format": "uuid" },
+              "tenantId":       { "type": "string", "format": "uuid" },
+              "customerId":     { "type": "string", "format": "uuid" },
+              "trackingNumber": { "type": "string" },
+              "carrier":        { "type": "string" },
+              "trackingUrl":    { "type": "string", "format": "uri" },
+              "shippedAt":      { "type": "string", "format": "date-time" },
+              "estimatedDelivery": { "type": "string", "format": "date" }
+            }
+          }
+        },
+        {
+          "type": "order.delivered",
+          "description": "Fired when the order is confirmed as delivered to the customer.",
+          "version": 1,
+          "kafkaTopic": "order.delivered",
+          "rabbitExchange": "order.events",
+          "rabbitRoutingKey": "order.delivered",
+          "producer": "order-service",
+          "consumers": ["notification-service"],
+          "sagaRole": null,
+          "schema": {
+            "type": "object",
+            "required": ["orderId", "tenantId", "deliveredAt"],
+            "properties": {
+              "orderId":     { "type": "string", "format": "uuid" },
+              "tenantId":    { "type": "string", "format": "uuid" },
+              "customerId":  { "type": "string", "format": "uuid" },
+              "deliveredAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "type": "order.saga.started",
+          "description": "Fired internally by the Saga orchestrator when an order saga is initiated.",
+          "version": 1,
+          "kafkaTopic": "order.saga.started",
+          "rabbitExchange": "order.saga",
+          "rabbitRoutingKey": "order.saga.started",
+          "producer": "order-service",
+          "consumers": ["inventory-service"],
+          "sagaRole": "SAGA_START",
+          "schema": {
+            "type": "object",
+            "required": ["sagaId", "orderId", "tenantId", "step", "startedAt"],
+            "properties": {
+              "sagaId":    { "type": "string", "format": "uuid" },
+              "orderId":   { "type": "string", "format": "uuid" },
+              "tenantId":  { "type": "string", "format": "uuid" },
+              "step":      { "type": "string" },
+              "startedAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "type": "order.saga.completed",
+          "description": "Fired when all saga steps have been executed successfully.",
+          "version": 1,
+          "kafkaTopic": "order.saga.completed",
+          "rabbitExchange": "order.saga",
+          "rabbitRoutingKey": "order.saga.completed",
+          "producer": "order-service",
+          "consumers": ["notification-service"],
+          "sagaRole": "SAGA_SUCCESS",
+          "schema": {
+            "type": "object",
+            "required": ["sagaId", "orderId", "tenantId", "completedAt"],
+            "properties": {
+              "sagaId":       { "type": "string", "format": "uuid" },
+              "orderId":      { "type": "string", "format": "uuid" },
+              "tenantId":     { "type": "string", "format": "uuid" },
+              "completedAt":  { "type": "string", "format": "date-time" },
+              "duration_ms":  { "type": "integer" }
+            }
+          }
+        },
+        {
+          "type": "order.saga.failed",
+          "description": "Fired when a saga step fails and compensation is required.",
+          "version": 1,
+          "kafkaTopic": "order.saga.failed",
+          "rabbitExchange": "order.saga",
+          "rabbitRoutingKey": "order.saga.failed",
+          "producer": "order-service",
+          "consumers": ["notification-service", "inventory-service"],
+          "sagaRole": "SAGA_FAILURE",
+          "schema": {
+            "type": "object",
+            "required": ["sagaId", "orderId", "tenantId", "failedStep", "reason", "failedAt"],
+            "properties": {
+              "sagaId":      { "type": "string", "format": "uuid" },
+              "orderId":     { "type": "string", "format": "uuid" },
+              "tenantId":    { "type": "string", "format": "uuid" },
+              "failedStep":  { "type": "string" },
+              "reason":      { "type": "string" },
+              "errorCode":   { "type": "string" },
+              "failedAt":    { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "type": "order.saga.compensated",
+          "description": "Fired when all compensation transactions for a failed saga have executed.",
+          "version": 1,
+          "kafkaTopic": "order.saga.compensated",
+          "rabbitExchange": "order.saga",
+          "rabbitRoutingKey": "order.saga.compensated",
+          "producer": "order-service",
+          "consumers": ["notification-service"],
+          "sagaRole": "SAGA_COMPENSATE",
+          "schema": {
+            "type": "object",
+            "required": ["sagaId", "orderId", "tenantId", "compensatedAt"],
+            "properties": {
+              "sagaId":         { "type": "string", "format": "uuid" },
+              "orderId":        { "type": "string", "format": "uuid" },
+              "tenantId":       { "type": "string", "format": "uuid" },
+              "compensatedAt":  { "type": "string", "format": "date-time" },
+              "compensatedSteps": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "notification": {
+      "description": "Notification dispatch events",
+      "service": "notification-service",
+      "events": [
+        {
+          "type": "notification.email.queued",
+          "description": "Fired when an outbound email is queued for delivery.",
+          "version": 1,
+          "kafkaTopic": "notification.email.queued",
+          "rabbitExchange": "notification.events",
+          "rabbitRoutingKey": "notification.email.queued",
+          "producer": "notification-service",
+          "consumers": [],
+          "sagaRole": null,
+          "schema": {
+            "type": "object",
+            "required": ["notificationId", "tenantId", "recipient", "templateId", "queuedAt"],
+            "properties": {
+              "notificationId": { "type": "string", "format": "uuid" },
+              "tenantId":       { "type": "string", "format": "uuid" },
+              "recipient":      { "type": "string", "format": "email" },
+              "templateId":     { "type": "string" },
+              "subject":        { "type": "string" },
+              "variables":      { "type": "object" },
+              "priority":       { "type": "integer", "minimum": 0, "maximum": 9 },
+              "queuedAt":       { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "type": "notification.email.sent",
+          "description": "Fired when an email is successfully delivered by the SMTP provider.",
+          "version": 1,
+          "kafkaTopic": "notification.email.sent",
+          "rabbitExchange": "notification.events",
+          "rabbitRoutingKey": "notification.email.sent",
+          "producer": "notification-service",
+          "consumers": [],
+          "sagaRole": null,
+          "schema": {
+            "type": "object",
+            "required": ["notificationId", "recipient", "messageId", "sentAt"],
+            "properties": {
+              "notificationId": { "type": "string", "format": "uuid" },
+              "recipient":      { "type": "string", "format": "email" },
+              "messageId":      { "type": "string" },
+              "sentAt":         { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "type": "notification.email.failed",
+          "description": "Fired when an email delivery permanently fails.",
+          "version": 1,
+          "kafkaTopic": "notification.email.failed",
+          "rabbitExchange": "notification.events",
+          "rabbitRoutingKey": "notification.email.failed",
+          "producer": "notification-service",
+          "consumers": [],
+          "sagaRole": null,
+          "schema": {
+            "type": "object",
+            "required": ["notificationId", "recipient", "reason", "failedAt"],
+            "properties": {
+              "notificationId": { "type": "string", "format": "uuid" },
+              "recipient":      { "type": "string", "format": "email" },
+              "reason":         { "type": "string" },
+              "retryCount":     { "type": "integer" },
+              "failedAt":       { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "type": "notification.sms.queued",
+          "description": "Fired when an outbound SMS is queued for delivery.",
+          "version": 1,
+          "kafkaTopic": "notification.sms.queued",
+          "rabbitExchange": "notification.events",
+          "rabbitRoutingKey": "notification.sms.queued",
+          "producer": "notification-service",
+          "consumers": [],
+          "sagaRole": null,
+          "schema": {
+            "type": "object",
+            "required": ["notificationId", "tenantId", "phoneNumber", "body", "queuedAt"],
+            "properties": {
+              "notificationId": { "type": "string", "format": "uuid" },
+              "tenantId":       { "type": "string", "format": "uuid" },
+              "phoneNumber":    { "type": "string" },
+              "body":           { "type": "string", "maxLength": 1600 },
+              "queuedAt":       { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        {
+          "type": "notification.push.queued",
+          "description": "Fired when a mobile push notification is queued for delivery.",
+          "version": 1,
+          "kafkaTopic": "notification.push.queued",
+          "rabbitExchange": "notification.events",
+          "rabbitRoutingKey": "notification.push.queued",
+          "producer": "notification-service",
+          "consumers": [],
+          "sagaRole": null,
+          "schema": {
+            "type": "object",
+            "required": ["notificationId", "tenantId", "deviceToken", "title", "body", "queuedAt"],
+            "properties": {
+              "notificationId": { "type": "string", "format": "uuid" },
+              "tenantId":       { "type": "string", "format": "uuid" },
+              "deviceToken":    { "type": "string" },
+              "title":          { "type": "string" },
+              "body":           { "type": "string" },
+              "data":           { "type": "object" },
+              "platform":       { "type": "string", "enum": ["ios", "android", "web"] },
+              "queuedAt":       { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

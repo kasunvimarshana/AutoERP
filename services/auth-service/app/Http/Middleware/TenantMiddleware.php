@@ -1,80 +1,69 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Http\Middleware;
 
-use App\Domain\Entities\Tenant;
+use App\Domain\Models\Tenant;
+use App\Infrastructure\Tenant\TenantDatabaseManager;
+use App\Infrastructure\Tenant\TenantResolver;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
-/**
- * Tenant Middleware
- *
- * Resolves the current tenant from the request (header, subdomain, or route).
- * Binds tenant context to the request lifecycle.
- */
 class TenantMiddleware
 {
-    /**
-     * Handle an incoming request.
-     */
+    public function __construct(
+        private readonly TenantResolver $resolver,
+        private readonly TenantDatabaseManager $dbManager,
+    ) {}
+
     public function handle(Request $request, Closure $next): Response
     {
-        // Resolve tenant from X-Tenant-ID header or subdomain
-        $tenantId = $request->header('X-Tenant-ID')
-            ?? $this->resolveFromSubdomain($request);
+        $tenant = $this->resolveTenant($request);
 
-        if (!$tenantId) {
+        if ($tenant === null) {
             return response()->json([
                 'success' => false,
-                'message' => 'Tenant context required. Provide X-Tenant-ID header.',
-            ], 400);
+                'message' => 'Tenant not found or could not be resolved.',
+                'error'   => 'TENANT_NOT_RESOLVED',
+            ], Response::HTTP_NOT_FOUND);
         }
 
-        $tenant = Tenant::where('id', $tenantId)
-            ->where('is_active', true)
-            ->first();
-
-        if (!$tenant) {
+        if ($tenant->status !== 'active') {
             return response()->json([
                 'success' => false,
-                'message' => 'Tenant not found or inactive.',
-            ], 404);
+                'message' => 'Tenant account is suspended or inactive.',
+                'error'   => 'TENANT_INACTIVE',
+            ], Response::HTTP_FORBIDDEN);
         }
 
-        // Bind tenant to the request
+        // Set tenant on the request for downstream use
         $request->attributes->set('tenant', $tenant);
         $request->attributes->set('tenant_id', $tenant->id);
 
-        // Apply tenant-specific runtime config if provided
-        if ($tenant->settings) {
-            $this->applyTenantSettings($tenant->settings);
-        }
+        // Switch database connection to this tenant's schema/database
+        $this->dbManager->connectForTenant($tenant);
+
+        // Bind the tenant into the IoC container
+        app()->instance(Tenant::class, $tenant);
+        app()->instance('current_tenant', $tenant);
+
+        Log::withContext(['tenant_id' => $tenant->id, 'tenant_slug' => $tenant->subdomain]);
 
         return $next($request);
     }
 
-    private function resolveFromSubdomain(Request $request): ?string
+    private function resolveTenant(Request $request): ?Tenant
     {
-        $host = $request->getHost();
-        $parts = explode('.', $host);
+        $identifier = $this->resolver->extractIdentifier($request);
 
-        if (count($parts) > 2) {
-            $slug = $parts[0];
-            $tenant = Tenant::where('slug', $slug)->first();
-            return $tenant ? (string) $tenant->id : null;
+        if ($identifier === null) {
+            return null;
         }
 
-        return null;
-    }
-
-    private function applyTenantSettings(array $settings): void
-    {
-        // Apply runtime tenant-specific configurations
-        foreach ($settings as $key => $value) {
-            config([$key => $value]);
-        }
+        return Cache::remember($identifier, config('tenant.cache_ttl', 3600), function () use ($request) {
+            return $this->resolver->resolve($request);
+        });
     }
 }

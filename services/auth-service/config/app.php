@@ -1,20 +1,36 @@
 <?php
 
+use Illuminate\Support\Facades\Facade;
+use Illuminate\Support\ServiceProvider;
+
 return [
-    'name' => env('APP_NAME', 'KV Auth Service'),
+
+    'name' => env('APP_NAME', 'Auth Service'),
     'env' => env('APP_ENV', 'production'),
     'debug' => (bool) env('APP_DEBUG', false),
     'url' => env('APP_URL', 'http://localhost'),
+    'asset_url' => env('ASSET_URL'),
     'timezone' => 'UTC',
     'locale' => 'en',
     'fallback_locale' => 'en',
     'faker_locale' => 'en_US',
-    'cipher' => 'AES-256-CBC',
     'key' => env('APP_KEY'),
-    'previous_keys' => array_filter(
-        explode(',', env('APP_PREVIOUS_KEYS', ''))
-    ),
+    'cipher' => 'AES-256-CBC',
     'maintenance' => ['driver' => 'file'],
-    'providers' => [],
-    'aliases' => [],
+
+    'providers' => ServiceProvider::defaultProviders()->merge([
+        App\Providers\AppServiceProvider::class,
+        App\Providers\AuthServiceProvider::class,
+        App\Providers\EventServiceProvider::class,
+        App\Providers\RouteServiceProvider::class,
+        App\Providers\RepositoryServiceProvider::class,
+        App\Providers\TenantServiceProvider::class,
+        Laravel\Passport\PassportServiceProvider::class,
+        Spatie\Permission\PermissionServiceProvider::class,
+    ])->toArray(),
+
+    'aliases' => Facade::defaultAliases()->merge([
+        'Redis' => Illuminate\Support\Facades\Redis::class,
+    ])->toArray(),
+
 ];

@@ -1,18 +1,19 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Domain\Events;
 
-use App\Domain\Entities\User;
+use App\Domain\Models\User;
+use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Foundation\Events\Dispatchable;
+use Illuminate\Queue\SerializesModels;
 
-/**
- * User Registered Domain Event
- */
 class UserRegistered
 {
+    use Dispatchable, InteractsWithSockets, SerializesModels;
+
     public function __construct(
         public readonly User $user,
-        public readonly int|string $tenantId
+        public readonly string $tenantId,
+        public readonly ?string $ipAddress = null,
     ) {}
 }

@@ -1,36 +1,17 @@
 <?php
-
-declare(strict_types=1);
-
 namespace App\Providers;
-
-use App\Infrastructure\Messaging\Brokers\KafkaBroker;
-use App\Infrastructure\Messaging\Brokers\LogBroker;
-use App\Infrastructure\Messaging\Brokers\RabbitMQBroker;
 use Illuminate\Support\ServiceProvider;
+use App\Domain\Contracts\ProductServiceInterface;
+use App\Domain\Contracts\StockServiceInterface;
+use App\Services\ProductService;
+use App\Services\StockService;
 
 class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        // Register broker implementations for DI
-        $this->app->bind(RabbitMQBroker::class, function ($app) {
-            $config = config('messaging.rabbitmq');
-            return new RabbitMQBroker(
-                $config['host'],
-                $config['port'],
-                $config['user'],
-                $config['password'],
-                $config['vhost']
-            );
-        });
-
-        $this->app->bind(KafkaBroker::class, function ($app) {
-            return new KafkaBroker(config('messaging.kafka.brokers'));
-        });
-
-        $this->app->bind(LogBroker::class, fn () => new LogBroker());
+        $this->app->bind(ProductServiceInterface::class, ProductService::class);
+        $this->app->bind(StockServiceInterface::class, StockService::class);
     }
-
     public function boot(): void {}
 }

@@ -1,165 +1,472 @@
-version: '3.8'
+# =============================================================================
+# Enterprise Inventory Management System
+# Docker Compose — Full Stack Orchestration
+# =============================================================================
 
+version: "3.9"
+
+# ---------------------------------------------------------------------------
+# Named Volumes
+# ---------------------------------------------------------------------------
+volumes:
+  postgres_auth_data:
+    driver: local
+  postgres_inventory_data:
+    driver: local
+  postgres_orders_data:
+    driver: local
+  redis_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  kafka_data:
+    driver: local
+  zookeeper_data:
+    driver: local
+  zookeeper_log:
+    driver: local
+
+# ---------------------------------------------------------------------------
+# Networks
+# ---------------------------------------------------------------------------
+networks:
+  saas_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# ---------------------------------------------------------------------------
+# Services
+# ---------------------------------------------------------------------------
 services:
-  mysql-auth:
-    image: mysql:8.0
-    environment:
-      MYSQL_DATABASE: auth_db
-      MYSQL_USER: auth_user
-      MYSQL_PASSWORD: auth_pass
-      MYSQL_ROOT_PASSWORD: root_pass
-    ports:
-      - "3307:3306"
-    volumes:
-      - mysql-auth-data:/var/lib/mysql
-    networks:
-      - kv-network
 
-  mysql-inventory:
-    image: mysql:8.0
-    environment:
-      MYSQL_DATABASE: inventory_db
-      MYSQL_USER: inv_user
-      MYSQL_PASSWORD: inv_pass
-      MYSQL_ROOT_PASSWORD: root_pass
-    ports:
-      - "3308:3306"
-    volumes:
-      - mysql-inventory-data:/var/lib/mysql
-    networks:
-      - kv-network
+  # =========================================================================
+  # Infrastructure — Databases
+  # =========================================================================
 
-  mysql-order:
-    image: mysql:8.0
+  postgres-auth:
+    image: postgres:15-alpine
+    container_name: saas_postgres_auth
+    restart: unless-stopped
     environment:
-      MYSQL_DATABASE: order_db
-      MYSQL_USER: order_user
-      MYSQL_PASSWORD: order_pass
-      MYSQL_ROOT_PASSWORD: root_pass
-    ports:
-      - "3309:3306"
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: ${AUTH_DB_USER:-auth_user}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD:-auth_secret}
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
-      - mysql-order-data:/var/lib/mysql
+      - postgres_auth_data:/var/lib/postgresql/data
+      - ./infrastructure/scripts/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
+    ports:
+      - "5432:5432"
     networks:
-      - kv-network
+      - saas_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AUTH_DB_USER:-auth_user} -d auth_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  postgres-inventory:
+    image: postgres:15-alpine
+    container_name: saas_postgres_inventory
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: inventory_db
+      POSTGRES_USER: ${INVENTORY_DB_USER:-inventory_user}
+      POSTGRES_PASSWORD: ${INVENTORY_DB_PASSWORD:-inventory_secret}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_inventory_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - saas_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${INVENTORY_DB_USER:-inventory_user} -d inventory_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  postgres-orders:
+    image: postgres:15-alpine
+    container_name: saas_postgres_orders
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: orders_db
+      POSTGRES_USER: ${ORDERS_DB_USER:-orders_user}
+      POSTGRES_PASSWORD: ${ORDERS_DB_PASSWORD:-orders_secret}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_orders_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    networks:
+      - saas_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ORDERS_DB_USER:-orders_user} -d orders_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # =========================================================================
+  # Infrastructure — Cache & Queue
+  # =========================================================================
 
   redis:
-    image: redis:alpine
+    image: redis:7-alpine
+    container_name: saas_redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-redis_secret}
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 60 1
+      --loglevel notice
+    volumes:
+      - redis_data:/data
     ports:
       - "6379:6379"
-    volumes:
-      - redis-data:/data
     networks:
-      - kv-network
+      - saas_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_secret}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   rabbitmq:
-    image: rabbitmq:3-management
+    image: rabbitmq:3.12-management-alpine
+    container_name: saas_rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-rabbit_user}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-rabbit_secret}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-saas_vhost}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./infrastructure/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
     ports:
       - "5672:5672"
       - "15672:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    volumes:
-      - rabbitmq-data:/var/lib/rabbitmq
     networks:
-      - kv-network
+      - saas_network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # =========================================================================
+  # Infrastructure — Kafka / Zookeeper
+  # =========================================================================
 
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.3.0
+    image: bitnami/zookeeper:3.8
+    container_name: saas_zookeeper
+    restart: unless-stopped
     environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
+      ALLOW_ANONYMOUS_LOGIN: "yes"
+      ZOO_SERVER_ID: 1
+      ZOO_PORT_NUMBER: 2181
+      ZOO_TICK_TIME: 2000
+      ZOO_INIT_LIMIT: 10
+      ZOO_SYNC_LIMIT: 5
+      ZOO_MAX_CLIENT_CNXNS: 60
+    volumes:
+      - zookeeper_data:/bitnami/zookeeper/data
+      - zookeeper_log:/bitnami/zookeeper/log
     networks:
-      - kv-network
+      - saas_network
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   kafka:
-    image: confluentinc/cp-kafka:7.3.0
-    ports:
-      - "9092:9092"
-    environment:
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    image: bitnami/kafka:3.5
+    container_name: saas_kafka
+    restart: unless-stopped
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CFG_NUM_PARTITIONS: 3
+      KAFKA_CFG_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_CFG_LOG_RETENTION_HOURS: 168
+      KAFKA_CFG_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_CFG_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    volumes:
+      - kafka_data:/bitnami/kafka
+      - ./infrastructure/kafka/kafka-config.properties:/opt/bitnami/kafka/config/server-extra.properties:ro
     networks:
-      - kv-network
+      - saas_network
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # =========================================================================
+  # Application Services
+  # =========================================================================
+
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+      target: production
+    container_name: saas_api_gateway
+    restart: unless-stopped
+    env_file:
+      - ./services/api-gateway/.env
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_PORT: 9000
+      AUTH_SERVICE_URL: http://auth-service:9000
+      INVENTORY_SERVICE_URL: http://inventory-service:9000
+      ORDER_SERVICE_URL: http://order-service:9000
+      NOTIFICATION_SERVICE_URL: http://notification-service:3000
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+    volumes:
+      - ./services/api-gateway/storage/logs:/var/www/html/storage/logs
+    ports:
+      - "8000:9000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - saas_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   auth-service:
-    build: ./services/auth-service
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: saas_auth_service
+    restart: unless-stopped
+    env_file:
+      - ./services/auth-service/.env
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_PORT: 9000
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres-auth
+      DB_PORT: 5432
+      DB_DATABASE: auth_db
+      DB_USERNAME: ${AUTH_DB_USER:-auth_user}
+      DB_PASSWORD: ${AUTH_DB_PASSWORD:-auth_secret}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-rabbit_user}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-rabbit_secret}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-saas_vhost}
+    volumes:
+      - ./services/auth-service/storage/logs:/var/www/html/storage/logs
     ports:
       - "8001:9000"
     depends_on:
-      - mysql-auth
-      - redis
-      - rabbitmq
+      postgres-auth:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
-      - kv-network
+      - saas_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   inventory-service:
-    build: ./services/inventory-service
+    build:
+      context: ./services/inventory-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: saas_inventory_service
+    restart: unless-stopped
+    env_file:
+      - ./services/inventory-service/.env
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_PORT: 9000
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres-inventory
+      DB_PORT: 5432
+      DB_DATABASE: inventory_db
+      DB_USERNAME: ${INVENTORY_DB_USER:-inventory_user}
+      DB_PASSWORD: ${INVENTORY_DB_PASSWORD:-inventory_secret}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      KAFKA_BROKERS: kafka:9092
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-rabbit_user}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-rabbit_secret}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-saas_vhost}
+    volumes:
+      - ./services/inventory-service/storage/logs:/var/www/html/storage/logs
     ports:
       - "8002:9000"
     depends_on:
-      - mysql-inventory
-      - redis
-      - rabbitmq
-      - kafka
+      postgres-inventory:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
     networks:
-      - kv-network
+      - saas_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   order-service:
-    build: ./services/order-service
+    build:
+      context: ./services/order-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: saas_order_service
+    restart: unless-stopped
+    env_file:
+      - ./services/order-service/.env
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_PORT: 9000
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres-orders
+      DB_PORT: 5432
+      DB_DATABASE: orders_db
+      DB_USERNAME: ${ORDERS_DB_USER:-orders_user}
+      DB_PASSWORD: ${ORDERS_DB_PASSWORD:-orders_secret}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      KAFKA_BROKERS: kafka:9092
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-rabbit_user}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-rabbit_secret}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-saas_vhost}
+      INVENTORY_SERVICE_URL: http://inventory-service:9000
+    volumes:
+      - ./services/order-service/storage/logs:/var/www/html/storage/logs
     ports:
       - "8003:9000"
     depends_on:
-      - mysql-order
-      - redis
-      - rabbitmq
-      - kafka
+      postgres-orders:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
     networks:
-      - kv-network
+      - saas_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   notification-service:
-    build: ./services/notification-service
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: saas_notification_service
+    restart: unless-stopped
+    env_file:
+      - ./services/notification-service/.env
+    environment:
+      NODE_ENV: ${APP_ENV:-production}
+      PORT: 3000
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-rabbit_user}:${RABBITMQ_PASSWORD:-rabbit_secret}@rabbitmq:5672/${RABBITMQ_VHOST:-saas_vhost}
+      KAFKA_BROKERS: kafka:9092
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+    volumes:
+      - ./services/notification-service/logs:/app/logs
     ports:
-      - "8004:9000"
+      - "8004:3000"
     depends_on:
-      - redis
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
     networks:
-      - kv-network
+      - saas_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
-  saga-orchestrator:
-    build: ./services/saga-orchestrator
+  # =========================================================================
+  # Infrastructure — Reverse Proxy
+  # =========================================================================
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: saas_nginx
+    restart: unless-stopped
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infrastructure/nginx/conf.d:/etc/nginx/conf.d:ro
     ports:
-      - "8005:9000"
+      - "80:80"
+      - "443:443"
     depends_on:
-      - redis
-      - rabbitmq
-      - kafka
+      api-gateway:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
     networks:
-      - kv-network
-
-  api-gateway:
-    build: ./services/api-gateway
-    ports:
-      - "8000:3000"
-    depends_on:
-      - auth-service
-      - inventory-service
-      - order-service
-    networks:
-      - kv-network
-
-networks:
-  kv-network:
-    driver: bridge
-
-volumes:
-  mysql-auth-data:
-  mysql-inventory-data:
-  mysql-order-data:
-  redis-data:
-  rabbitmq-data:
+      - saas_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3

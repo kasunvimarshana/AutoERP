@@ -1,45 +1,40 @@
 <?php
 
-declare(strict_types=1);
+/*
+|--------------------------------------------------------------------------
+| Create The Application
+|--------------------------------------------------------------------------
+*/
 
-use App\Http\Middleware\AuthServiceMiddleware;
-use App\Http\Middleware\TenantMiddleware;
-use Illuminate\Foundation\Application;
-use Illuminate\Foundation\Configuration\Exceptions;
-use Illuminate\Foundation\Configuration\Middleware;
+$app = new Illuminate\Foundation\Application(
+    $_ENV['APP_BASE_PATH'] ?? dirname(__DIR__)
+);
 
-return Application::configure(basePath: dirname(__DIR__))
-    ->withRouting(
-        api: __DIR__ . '/../routes/api.php',
-        apiPrefix: 'api',
-    )
-    ->withMiddleware(function (Middleware $middleware) {
-        $middleware->alias([
-            'auth.service' => AuthServiceMiddleware::class,
-            'tenant'       => TenantMiddleware::class,
-        ]);
-    })
-    ->withExceptions(function (Exceptions $exceptions) {
-        $exceptions->render(function (\Illuminate\Validation\ValidationException $e, $request) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed.',
-                'errors'  => $e->errors(),
-            ], 422);
-        });
+/*
+|--------------------------------------------------------------------------
+| Bind Important Interfaces
+|--------------------------------------------------------------------------
+*/
 
-        $exceptions->render(function (\DomainException $e, $request) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 422);
-        });
+$app->singleton(
+    Illuminate\Contracts\Http\Kernel::class,
+    App\Http\Kernel::class
+);
 
-        $exceptions->render(function (\Illuminate\Database\Eloquent\ModelNotFoundException $e, $request) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Resource not found.',
-            ], 404);
-        });
-    })
-    ->create();
+$app->singleton(
+    Illuminate\Contracts\Console\Kernel::class,
+    App\Console\Kernel::class
+);
+
+$app->singleton(
+    Illuminate\Contracts\Debug\ExceptionHandler::class,
+    App\Exceptions\Handler::class
+);
+
+/*
+|--------------------------------------------------------------------------
+| Return The Application
+|--------------------------------------------------------------------------
+*/
+
+return $app;
