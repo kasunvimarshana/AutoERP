@@ -1,19 +1,38 @@
-/node_modules
-/public/build
-/public/hot
-/public/storage
-/storage/*.key
-/vendor
-.env
-.env.backup
-.env.production
-.phpactor.json
-auth.json
-Homestead.json
-Homestead.yaml
-npm-debug.log
-yarn-error.log
+# Dependencies
+vendor/
+node_modules/
 
-# Passport keys (generated on first install)
-/storage/oauth-private.key
-/storage/oauth-public.key
+# Environment files
+.env
+!.env.example
+
+# Laravel storage
+storage/logs/
+storage/framework/
+
+# Bootstrap cache
+bootstrap/cache/*.php
+!bootstrap/cache/.gitkeep
+
+# Build artifacts
+dist/
+
+# Lock files (keep package-lock.json)
+*.lock
+!package-lock.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temp directory
+/tmp
+
+# Test coverage
+coverage/
+
+# PHPUnit cache
+.phpunit.result.cache
+
+# Jest coverage
+jest-coverage/
