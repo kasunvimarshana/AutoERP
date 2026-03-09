@@ -1,0 +1,158 @@
+{
+  "vhosts": [
+    { "name": "saas_vhost" }
+  ],
+  "exchanges": [
+    {
+      "name": "saga.dlx",
+      "vhost": "saas_vhost",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "inventory.dlx",
+      "vhost": "saas_vhost",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "order.dlx",
+      "vhost": "saas_vhost",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "payment.dlx",
+      "vhost": "saas_vhost",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "saga.events",
+      "vhost": "saas_vhost",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "inventory.events",
+      "vhost": "saas_vhost",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "order.events",
+      "vhost": "saas_vhost",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "payment.events",
+      "vhost": "saas_vhost",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "notification.events",
+      "vhost": "saas_vhost",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "saga.commands",
+      "vhost": "saas_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": { "x-dead-letter-exchange": "saga.dlx" }
+    },
+    {
+      "name": "inventory.commands",
+      "vhost": "saas_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": { "x-dead-letter-exchange": "inventory.dlx" }
+    },
+    {
+      "name": "order.commands",
+      "vhost": "saas_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": { "x-dead-letter-exchange": "order.dlx" }
+    },
+    {
+      "name": "payment.commands",
+      "vhost": "saas_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": { "x-dead-letter-exchange": "payment.dlx" }
+    },
+    {
+      "name": "notification.commands",
+      "vhost": "saas_vhost",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    }
+  ],
+  "bindings": [
+    {
+      "source": "saga.events",
+      "vhost": "saas_vhost",
+      "destination": "saga.commands",
+      "destination_type": "queue",
+      "routing_key": "saga.#",
+      "arguments": {}
+    },
+    {
+      "source": "inventory.events",
+      "vhost": "saas_vhost",
+      "destination": "inventory.commands",
+      "destination_type": "queue",
+      "routing_key": "inventory.#",
+      "arguments": {}
+    },
+    {
+      "source": "order.events",
+      "vhost": "saas_vhost",
+      "destination": "order.commands",
+      "destination_type": "queue",
+      "routing_key": "order.#",
+      "arguments": {}
+    },
+    {
+      "source": "payment.events",
+      "vhost": "saas_vhost",
+      "destination": "payment.commands",
+      "destination_type": "queue",
+      "routing_key": "payment.#",
+      "arguments": {}
+    },
+    {
+      "source": "notification.events",
+      "vhost": "saas_vhost",
+      "destination": "notification.commands",
+      "destination_type": "queue",
+      "routing_key": "notification.#",
+      "arguments": {}
+    }
+  ]
+}

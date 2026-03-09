@@ -1,0 +1,20 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Requests\Order;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class CancelOrderSagaRequest extends FormRequest
+{
+    public function authorize(): bool { return true; }
+
+    public function rules(): array
+    {
+        return [
+            'saga_id' => ['required', 'uuid'],
+            'reason' => ['nullable', 'string'],
+        ];
+    }
+}

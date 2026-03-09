@@ -1,0 +1,528 @@
+version: '3.9'
+
+# ==============================================================================
+# Enterprise Multi-Tenant SaaS Inventory Management System
+# Microservices Architecture with Saga Pattern Distributed Transactions
+# ==============================================================================
+
+networks:
+  saas_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  mysql_gateway_data:
+  mysql_inventory_data:
+  mysql_order_data:
+  mysql_payment_data:
+  mysql_notification_data:
+  mysql_saga_data:
+  redis_data:
+  rabbitmq_data:
+  kafka_data:
+  zookeeper_data:
+
+services:
+  # ============================================================================
+  # Message Broker - RabbitMQ
+  # ============================================================================
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: saas_rabbitmq
+    hostname: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-secret}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-saas_vhost}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./infrastructure/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./infrastructure/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+    networks:
+      saas_network:
+        ipv4_address: 172.20.0.10
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================================================
+  # Message Broker - Zookeeper (for Kafka)
+  # ============================================================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: saas_zookeeper
+    hostname: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+    networks:
+      saas_network:
+        ipv4_address: 172.20.0.11
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================================================
+  # Message Broker - Apache Kafka
+  # ============================================================================
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: saas_kafka
+    hostname: kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      saas_network:
+        ipv4_address: 172.20.0.12
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================================================
+  # Cache - Redis
+  # ============================================================================
+  redis:
+    image: redis:7.2-alpine
+    container_name: saas_redis
+    hostname: redis
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD:-secret} --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      saas_network:
+        ipv4_address: 172.20.0.20
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-secret}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================================================
+  # Database - MySQL for API Gateway
+  # ============================================================================
+  mysql_gateway:
+    image: mysql:8.0
+    container_name: saas_mysql_gateway
+    hostname: mysql_gateway
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootsecret}
+      MYSQL_DATABASE: ${GATEWAY_DB_NAME:-saas_gateway}
+      MYSQL_USER: ${GATEWAY_DB_USER:-gateway_user}
+      MYSQL_PASSWORD: ${GATEWAY_DB_PASSWORD:-gateway_secret}
+    volumes:
+      - mysql_gateway_data:/var/lib/mysql
+      - ./infrastructure/mysql/init/gateway.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      saas_network:
+        ipv4_address: 172.20.0.30
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootsecret}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================================================
+  # Database - MySQL for Inventory Service
+  # ============================================================================
+  mysql_inventory:
+    image: mysql:8.0
+    container_name: saas_mysql_inventory
+    hostname: mysql_inventory
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootsecret}
+      MYSQL_DATABASE: ${INVENTORY_DB_NAME:-saas_inventory}
+      MYSQL_USER: ${INVENTORY_DB_USER:-inventory_user}
+      MYSQL_PASSWORD: ${INVENTORY_DB_PASSWORD:-inventory_secret}
+    volumes:
+      - mysql_inventory_data:/var/lib/mysql
+    networks:
+      saas_network:
+        ipv4_address: 172.20.0.31
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================================================
+  # Database - MySQL for Order Service
+  # ============================================================================
+  mysql_order:
+    image: mysql:8.0
+    container_name: saas_mysql_order
+    hostname: mysql_order
+    ports:
+      - "3308:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootsecret}
+      MYSQL_DATABASE: ${ORDER_DB_NAME:-saas_orders}
+      MYSQL_USER: ${ORDER_DB_USER:-order_user}
+      MYSQL_PASSWORD: ${ORDER_DB_PASSWORD:-order_secret}
+    volumes:
+      - mysql_order_data:/var/lib/mysql
+    networks:
+      saas_network:
+        ipv4_address: 172.20.0.32
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================================================
+  # Database - MySQL for Payment Service
+  # ============================================================================
+  mysql_payment:
+    image: mysql:8.0
+    container_name: saas_mysql_payment
+    hostname: mysql_payment
+    ports:
+      - "3309:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootsecret}
+      MYSQL_DATABASE: ${PAYMENT_DB_NAME:-saas_payments}
+      MYSQL_USER: ${PAYMENT_DB_USER:-payment_user}
+      MYSQL_PASSWORD: ${PAYMENT_DB_PASSWORD:-payment_secret}
+    volumes:
+      - mysql_payment_data:/var/lib/mysql
+    networks:
+      saas_network:
+        ipv4_address: 172.20.0.33
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================================================
+  # Database - MySQL for Notification Service
+  # ============================================================================
+  mysql_notification:
+    image: mysql:8.0
+    container_name: saas_mysql_notification
+    hostname: mysql_notification
+    ports:
+      - "3310:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootsecret}
+      MYSQL_DATABASE: ${NOTIFICATION_DB_NAME:-saas_notifications}
+      MYSQL_USER: ${NOTIFICATION_DB_USER:-notification_user}
+      MYSQL_PASSWORD: ${NOTIFICATION_DB_PASSWORD:-notification_secret}
+    volumes:
+      - mysql_notification_data:/var/lib/mysql
+    networks:
+      saas_network:
+        ipv4_address: 172.20.0.34
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================================================
+  # Database - MySQL for Saga Orchestrator
+  # ============================================================================
+  mysql_saga:
+    image: mysql:8.0
+    container_name: saas_mysql_saga
+    hostname: mysql_saga
+    ports:
+      - "3311:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootsecret}
+      MYSQL_DATABASE: ${SAGA_DB_NAME:-saas_saga}
+      MYSQL_USER: ${SAGA_DB_USER:-saga_user}
+      MYSQL_PASSWORD: ${SAGA_DB_PASSWORD:-saga_secret}
+    volumes:
+      - mysql_saga_data:/var/lib/mysql
+    networks:
+      saas_network:
+        ipv4_address: 172.20.0.35
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================================================
+  # API Gateway Service (Laravel)
+  # ============================================================================
+  api_gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+      args:
+        APP_ENV: ${APP_ENV:-local}
+    container_name: saas_api_gateway
+    hostname: api_gateway
+    ports:
+      - "8000:80"
+    environment:
+      APP_ENV: ${APP_ENV:-local}
+      APP_KEY: ${GATEWAY_APP_KEY}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      DB_HOST: mysql_gateway
+      DB_DATABASE: ${GATEWAY_DB_NAME:-saas_gateway}
+      DB_USERNAME: ${GATEWAY_DB_USER:-gateway_user}
+      DB_PASSWORD: ${GATEWAY_DB_PASSWORD:-gateway_secret}
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-secret}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-secret}
+      KAFKA_BROKERS: kafka:29092
+    volumes:
+      - ./services/api-gateway:/var/www/html
+    networks:
+      saas_network:
+        ipv4_address: 172.20.0.100
+    depends_on:
+      mysql_gateway:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================================================
+  # Inventory Service (Laravel)
+  # ============================================================================
+  inventory_service:
+    build:
+      context: ./services/inventory-service
+      dockerfile: Dockerfile
+    container_name: saas_inventory_service
+    hostname: inventory_service
+    ports:
+      - "8001:80"
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_KEY: ${INVENTORY_APP_KEY}
+      DB_HOST: mysql_inventory
+      DB_DATABASE: ${INVENTORY_DB_NAME:-saas_inventory}
+      DB_USERNAME: ${INVENTORY_DB_USER:-inventory_user}
+      DB_PASSWORD: ${INVENTORY_DB_PASSWORD:-inventory_secret}
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-secret}
+      RABBITMQ_HOST: rabbitmq
+      KAFKA_BROKERS: kafka:29092
+    volumes:
+      - ./services/inventory-service:/var/www/html
+    networks:
+      saas_network:
+        ipv4_address: 172.20.0.101
+    depends_on:
+      mysql_inventory:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ============================================================================
+  # Order Service (Laravel)
+  # ============================================================================
+  order_service:
+    build:
+      context: ./services/order-service
+      dockerfile: Dockerfile
+    container_name: saas_order_service
+    hostname: order_service
+    ports:
+      - "8002:80"
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_KEY: ${ORDER_APP_KEY}
+      DB_HOST: mysql_order
+      DB_DATABASE: ${ORDER_DB_NAME:-saas_orders}
+      DB_USERNAME: ${ORDER_DB_USER:-order_user}
+      DB_PASSWORD: ${ORDER_DB_PASSWORD:-order_secret}
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-secret}
+      RABBITMQ_HOST: rabbitmq
+      KAFKA_BROKERS: kafka:29092
+    volumes:
+      - ./services/order-service:/var/www/html
+    networks:
+      saas_network:
+        ipv4_address: 172.20.0.102
+    depends_on:
+      mysql_order:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ============================================================================
+  # Payment Service (Node.js - demonstrates polyglot microservices)
+  # ============================================================================
+  payment_service:
+    build:
+      context: ./services/payment-service
+      dockerfile: Dockerfile
+    container_name: saas_payment_service
+    hostname: payment_service
+    ports:
+      - "8003:3000"
+    environment:
+      NODE_ENV: ${APP_ENV:-production}
+      DB_HOST: mysql_payment
+      DB_DATABASE: ${PAYMENT_DB_NAME:-saas_payments}
+      DB_USER: ${PAYMENT_DB_USER:-payment_user}
+      DB_PASSWORD: ${PAYMENT_DB_PASSWORD:-payment_secret}
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-secret}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-admin}:${RABBITMQ_PASS:-secret}@rabbitmq/${RABBITMQ_VHOST:-saas_vhost}
+      KAFKA_BROKERS: kafka:29092
+    volumes:
+      - ./services/payment-service:/app
+      - /app/node_modules
+    networks:
+      saas_network:
+        ipv4_address: 172.20.0.103
+    depends_on:
+      mysql_payment:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ============================================================================
+  # Notification Service (Laravel)
+  # ============================================================================
+  notification_service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: saas_notification_service
+    hostname: notification_service
+    ports:
+      - "8004:80"
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_KEY: ${NOTIFICATION_APP_KEY}
+      DB_HOST: mysql_notification
+      DB_DATABASE: ${NOTIFICATION_DB_NAME:-saas_notifications}
+      DB_USERNAME: ${NOTIFICATION_DB_USER:-notification_user}
+      DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:-notification_secret}
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-secret}
+      RABBITMQ_HOST: rabbitmq
+      KAFKA_BROKERS: kafka:29092
+    volumes:
+      - ./services/notification-service:/var/www/html
+    networks:
+      saas_network:
+        ipv4_address: 172.20.0.104
+    depends_on:
+      mysql_notification:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ============================================================================
+  # Saga Orchestrator Service (Laravel)
+  # ============================================================================
+  saga_orchestrator:
+    build:
+      context: ./services/saga-orchestrator
+      dockerfile: Dockerfile
+    container_name: saas_saga_orchestrator
+    hostname: saga_orchestrator
+    ports:
+      - "8005:80"
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_KEY: ${SAGA_APP_KEY}
+      DB_HOST: mysql_saga
+      DB_DATABASE: ${SAGA_DB_NAME:-saas_saga}
+      DB_USERNAME: ${SAGA_DB_USER:-saga_user}
+      DB_PASSWORD: ${SAGA_DB_PASSWORD:-saga_secret}
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-secret}
+      RABBITMQ_HOST: rabbitmq
+      KAFKA_BROKERS: kafka:29092
+      INVENTORY_SERVICE_URL: http://inventory_service
+      ORDER_SERVICE_URL: http://order_service
+      PAYMENT_SERVICE_URL: http://payment_service:3000
+      NOTIFICATION_SERVICE_URL: http://notification_service
+    volumes:
+      - ./services/saga-orchestrator:/var/www/html
+    networks:
+      saas_network:
+        ipv4_address: 172.20.0.105
+    depends_on:
+      mysql_saga:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ============================================================================
+  # Nginx Reverse Proxy / Load Balancer
+  # ============================================================================
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: saas_nginx
+    hostname: nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infrastructure/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./infrastructure/nginx/ssl:/etc/nginx/ssl:ro
+    networks:
+      saas_network:
+        ipv4_address: 172.20.0.200
+    depends_on:
+      - api_gateway
+      - inventory_service
+      - order_service
+      - payment_service
+      - notification_service
+      - saga_orchestrator
+    restart: unless-stopped

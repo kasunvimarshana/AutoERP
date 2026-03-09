@@ -1,0 +1,36 @@
+# Environment files
+.env
+*.env.local
+
+# Dependencies
+node_modules/
+vendor/
+
+# Build artifacts
+*.log
+*.cache
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.docker/
+
+# Laravel storage
+services/*/storage/logs/*.log
+services/*/storage/framework/cache/*
+services/*/storage/framework/sessions/*
+services/*/storage/framework/views/*
+services/*/bootstrap/cache/*
+
+# SSL certificates (generated locally)
+infrastructure/nginx/ssl/*.pem
+infrastructure/nginx/ssl/*.key
+infrastructure/nginx/ssl/*.crt
