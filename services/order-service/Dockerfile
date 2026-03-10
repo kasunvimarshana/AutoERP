@@ -1,31 +1,13 @@
-FROM php:8.2-fpm-alpine
+FROM node:18-alpine
 
-# Install system dependencies
-RUN apk add --no-cache \
-    nginx \
-    supervisor \
-    curl \
-    libpng-dev \
-    libzip-dev \
-    oniguruma-dev \
-    && docker-php-ext-install pdo pdo_mysql mbstring zip gd bcmath opcache
+WORKDIR /app
 
-# Install Composer
-COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
+COPY package*.json ./
 
-WORKDIR /var/www/html
+RUN npm install --production
 
 COPY . .
 
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+EXPOSE 3005
 
-RUN mkdir -p storage/logs storage/framework/{sessions,views,cache} bootstrap/cache \
-    && chown -R www-data:www-data storage bootstrap/cache \
-    && chmod -R 775 storage bootstrap/cache
-
-COPY docker/nginx.conf /etc/nginx/nginx.conf
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-
-EXPOSE 8000
-
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["node", "src/server.js"]
