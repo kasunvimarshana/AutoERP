@@ -1,28 +1,17 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ProductController;
-use App\Http\Controllers\CategoryController;
-use App\Http\Controllers\HealthController;
+use Illuminate\Support\Facades\Route;
 
-Route::get('/health', [HealthController::class, 'check']);
+// Public routes
+Route::get('/products', [ProductController::class, 'index']);
+Route::get('/products/code/{code}', [ProductController::class, 'showByCode']);
+Route::get('/products/{id}', [ProductController::class, 'show']);
+Route::post('/products/bulk', [ProductController::class, 'bulkGet']);
 
-// Categories
-Route::prefix('categories')->group(function () {
-    Route::get('/',        [CategoryController::class, 'index']);
-    Route::post('/',       [CategoryController::class, 'store']);
-    Route::get('/{id}',    [CategoryController::class, 'show']);
-    Route::put('/{id}',    [CategoryController::class, 'update']);
-    Route::delete('/{id}', [CategoryController::class, 'destroy']);
-});
-
-// Products
-Route::prefix('products')->group(function () {
-    Route::get('/',        [ProductController::class, 'index']);
-    Route::post('/',       [ProductController::class, 'store']);
-    // Cross-service lookup: GET /api/products/lookup?ids[]=uuid&codes[]=CODE
-    Route::get('/lookup',  [ProductController::class, 'lookup']);
-    Route::get('/{id}',    [ProductController::class, 'show']);
-    Route::put('/{id}',    [ProductController::class, 'update']);
-    Route::delete('/{id}', [ProductController::class, 'destroy']);
+// Admin-protected routes
+Route::middleware('auth.jwt')->group(function () {
+    Route::post('/products', [ProductController::class, 'store']);
+    Route::put('/products/{id}', [ProductController::class, 'update']);
+    Route::delete('/products/{id}', [ProductController::class, 'destroy']);
 });

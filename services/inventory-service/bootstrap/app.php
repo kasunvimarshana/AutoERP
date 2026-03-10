@@ -1,4 +1,5 @@
 <?php
+
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -10,22 +11,11 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-    ->withMiddleware(function (Middleware $middleware) {
-        $middleware->api(prepend: [
-            \App\Http\Middleware\TenantMiddleware::class,
-            \App\Http\Middleware\ServiceAuthMiddleware::class,
+    ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->alias([
+            'auth.jwt' => \App\Http\Middleware\JwtMiddleware::class,
         ]);
     })
-    ->withExceptions(function (Exceptions $exceptions) {
-        $exceptions->render(function (\Illuminate\Validation\ValidationException $e, $request) {
-            return response()->json(['success' => false, 'message' => 'Validation failed.', 'errors' => $e->errors()], 422);
-        });
-        $exceptions->render(function (\Illuminate\Database\Eloquent\ModelNotFoundException $e, $request) {
-            return response()->json(['success' => false, 'message' => 'Not found.'], 404);
-        });
-        $exceptions->render(function (\Throwable $e, $request) {
-            if ($request->expectsJson()) {
-                return response()->json(['success' => false, 'message' => config('app.debug') ? $e->getMessage() : 'Server error.'], 500);
-            }
-        });
+    ->withExceptions(function (Exceptions $exceptions): void {
+        //
     })->create();

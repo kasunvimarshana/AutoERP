@@ -1,42 +1,33 @@
 <?php
+
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Inventory extends Model
 {
-    use HasFactory, HasUuids, SoftDeletes;
-
-    protected $table = 'inventories';
-
     protected $fillable = [
-        'tenant_id', 'product_id', 'product_code', 'product_name', 'category_id',
-        'quantity_on_hand', 'quantity_reserved', 'quantity_available',
-        'reorder_point', 'reorder_quantity', 'location', 'status', 'metadata',
+        'product_id',
+        'product_name',
+        'product_code',
+        'product_category',
+        'quantity',
+        'reserved_quantity',
+        'warehouse_location',
+        'reorder_level',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'quantity_on_hand'   => 'integer',
-            'quantity_reserved'  => 'integer',
-            'quantity_available' => 'integer',
-            'reorder_point'      => 'integer',
-            'reorder_quantity'   => 'integer',
-            'metadata'           => 'array',
-        ];
-    }
+    protected $casts = [
+        'product_id'        => 'integer',
+        'quantity'          => 'integer',
+        'reserved_quantity' => 'integer',
+        'reorder_level'     => 'integer',
+    ];
 
-    public function transactions(): \Illuminate\Database\Eloquent\Relations\HasMany
-    {
-        return $this->hasMany(InventoryTransaction::class, 'inventory_id');
-    }
+    protected $appends = ['available_quantity'];
 
-    public function isLowStock(): bool
+    public function getAvailableQuantityAttribute(): int
     {
-        return $this->quantity_available <= ($this->reorder_point ?? 0);
+        return $this->quantity - $this->reserved_quantity;
     }
 }

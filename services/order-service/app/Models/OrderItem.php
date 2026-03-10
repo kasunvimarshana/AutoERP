@@ -1,12 +1,34 @@
 <?php
+
 namespace App\Models;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+
 use Illuminate\Database\Eloquent\Model;
-class OrderItem extends Model {
-    use HasFactory, HasUuids;
-    protected $table = 'order_items';
-    protected $fillable = ['order_id','product_id','product_code','product_name','quantity','unit_price','discount','total'];
-    protected function casts(): array { return ['quantity'=>'integer','unit_price'=>'decimal:4','discount'=>'decimal:4','total'=>'decimal:4']; }
-    public function order(): \Illuminate\Database\Eloquent\Relations\BelongsTo { return $this->belongsTo(Order::class, 'order_id'); }
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class OrderItem extends Model
+{
+    protected $fillable = [
+        'order_id',
+        'product_id',
+        'product_name',
+        'product_code',
+        'product_category',
+        'quantity',
+        'unit_price',
+        'subtotal',
+        'inventory_id',
+    ];
+
+    protected $casts = [
+        'unit_price' => 'decimal:2',
+        'subtotal' => 'decimal:2',
+        'quantity' => 'integer',
+        'product_id' => 'integer',
+        'inventory_id' => 'integer',
+    ];
+
+    public function order(): BelongsTo
+    {
+        return $this->belongsTo(Order::class);
+    }
 }
