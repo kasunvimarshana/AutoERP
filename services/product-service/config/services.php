@@ -1,38 +1,32 @@
 <?php
 
-return [
+declare(strict_types=1);
 
+return [
     /*
     |--------------------------------------------------------------------------
-    | Third Party Services
+    | Cross-Service URLs
     |--------------------------------------------------------------------------
-    |
-    | This file is for storing the credentials for third party services such
-    | as Mailgun, Postmark, AWS and more. This file provides the de facto
-    | location for this type of information, allowing packages to have
-    | a conventional file to locate the various service credentials.
-    |
+    | Internal service discovery configuration.  All values are read from
+    | environment variables so they can be overridden per environment.
     */
-
-    'postmark' => [
-        'key' => env('POSTMARK_API_KEY'),
+    'auth_service' => [
+        'url' => env('AUTH_SERVICE_URL', 'http://auth-service:8001'),
     ],
 
-    'resend' => [
-        'key' => env('RESEND_API_KEY'),
+    'user_service' => [
+        'url' => env('USER_SERVICE_URL', 'http://user-service:8002'),
     ],
 
-    'ses' => [
-        'key' => env('AWS_ACCESS_KEY_ID'),
-        'secret' => env('AWS_SECRET_ACCESS_KEY'),
-        'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+    'product_service' => [
+        'url' => env('PRODUCT_SERVICE_URL', 'http://product-service:8003'),
     ],
 
-    'slack' => [
-        'notifications' => [
-            'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
-            'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
-        ],
+    'inventory_service' => [
+        'url' => env('INVENTORY_SERVICE_URL', 'http://inventory-service:8004'),
     ],
 
+    'order_service' => [
+        'url' => env('ORDER_SERVICE_URL', 'http://order-service:8005'),
+    ],
 ];

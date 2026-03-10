@@ -1,328 +1,114 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
-use App\Models\Inventory;
-use App\Services\ProductServiceClient;
+use App\Application\Inventory\Services\InventoryService;
+use App\Domain\Inventory\Exceptions\InsufficientStockException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Routing\Controller;
 
+/**
+ * InventoryController
+ *
+ * Thin controller — delegates all logic to InventoryService.
+ */
 class InventoryController extends Controller
 {
-    public function __construct(private readonly ProductServiceClient $productClient) {}
+    public function __construct(
+        private readonly InventoryService $inventoryService,
+    ) {}
 
+    // GET /api/inventory
     public function index(Request $request): JsonResponse
     {
-        $query = Inventory::query();
+        $tenantId = $request->attributes->get('tenant_id');
+        $filters  = $request->only(['product_id', 'warehouse_id', 'quantity_available:lte', 'quantity_available:gte']);
+        $perPage  = (int) $request->get('per_page', 15);
 
-        // Direct filters
-        if ($request->filled('warehouse_location')) {
-            $query->where('warehouse_location', 'like', '%' . $request->warehouse_location . '%');
+        $items = $this->inventoryService->list($tenantId, $filters, $perPage);
+
+        return response()->json($items);
+    }
+
+    // GET /api/inventory/product/{productId}
+    public function showByProduct(Request $request, string $productId): JsonResponse
+    {
+        $tenantId = $request->attributes->get('tenant_id');
+        $item     = $this->inventoryService->getByProduct($productId, $tenantId);
+
+        if ($item === null) {
+            return response()->json(['message' => 'Inventory item not found.', 'error' => true], 404);
         }
 
-        if ($request->filled('min_quantity')) {
-            $query->where('quantity', '>=', (int) $request->min_quantity);
-        }
+        return response()->json(['data' => $item]);
+    }
 
-        if ($request->filled('max_quantity')) {
-            $query->where('quantity', '<=', (int) $request->max_quantity);
-        }
+    // POST /api/inventory/reserve
+    public function reserve(Request $request): JsonResponse
+    {
+        $request->validate([
+            'order_id'  => ['required', 'string', 'uuid'],
+            'tenant_id' => ['required', 'string', 'uuid'],
+            'items'     => ['required', 'array', 'min:1'],
+            'items.*.product_id' => ['required', 'string', 'uuid'],
+            'items.*.quantity'   => ['required', 'integer', 'min:1'],
+        ]);
 
-        // Cross-service filters: call Product Service to get matching product IDs
-        $crossServiceFilters = [];
+        try {
+            $reservation = $this->inventoryService->reserve(
+                $request->input('order_id'),
+                $request->input('tenant_id'),
+                $request->input('items'),
+                $request->input('saga_id')
+            );
 
-        if ($request->filled('product_name')) {
-            $crossServiceFilters['name'] = $request->product_name;
-        }
-
-        if ($request->filled('product_code')) {
-            $crossServiceFilters['code'] = $request->product_code;
-        }
-
-        if ($request->filled('product_category')) {
-            $crossServiceFilters['category'] = $request->product_category;
-        }
-
-        if ($request->filled('product_search')) {
-            $crossServiceFilters['search'] = $request->product_search;
-        }
-
-        if (!empty($crossServiceFilters)) {
-            $products   = $this->productClient->getProductsByFilters($crossServiceFilters);
-            $productIds = array_column($products, 'id');
-
-            if (empty($productIds)) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Inventory retrieved successfully',
-                    'data'    => ['inventory' => []],
-                ]);
-            }
-
-            $query->whereIn('product_id', $productIds);
-        }
-
-        $perPage   = (int) $request->input('per_page', 15);
-        $paginator = $query->paginate($perPage);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Inventory retrieved successfully',
-            'data'    => [
-                'inventory'  => $paginator->items(),
-                'pagination' => [
-                    'current_page' => $paginator->currentPage(),
-                    'per_page'     => $paginator->perPage(),
-                    'total'        => $paginator->total(),
-                    'last_page'    => $paginator->lastPage(),
+            return response()->json([
+                'data' => [
+                    'reservation_id' => $reservation->id,
+                    'status'         => $reservation->status,
+                    'expires_at'     => $reservation->expires_at?->toIso8601String(),
                 ],
-            ],
-        ]);
+            ], 201);
+
+        } catch (InsufficientStockException $e) {
+            return response()->json(['message' => $e->getMessage(), 'error' => true], 422);
+        }
     }
 
-    public function store(Request $request): JsonResponse
+    // DELETE /api/inventory/reserve/{reservationId}
+    public function releaseReservation(string $reservationId): JsonResponse
     {
-        $user = $request->attributes->get('auth_user');
+        try {
+            $this->inventoryService->releaseReservation($reservationId);
 
-        if (($user['role'] ?? '') !== 'admin') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Forbidden: admin access required',
-            ], 403);
+            return response()->json(['message' => 'Reservation released successfully.']);
+
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage(), 'error' => true], 422);
         }
-
-        $validator = Validator::make($request->all(), [
-            'product_id'         => 'required|integer|min:1',
-            'product_name'       => 'required|string|max:255',
-            'product_code'       => 'required|string|max:100',
-            'product_category'   => 'required|string|max:100',
-            'quantity'           => 'required|integer|min:0',
-            'reserved_quantity'  => 'nullable|integer|min:0',
-            'warehouse_location' => 'nullable|string|max:255',
-            'reorder_level'      => 'nullable|integer|min:0',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors'  => $validator->errors(),
-            ], 422);
-        }
-
-        $inventory = Inventory::create($validator->validated());
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Inventory created successfully',
-            'data'    => ['inventory' => $inventory],
-        ], 201);
     }
 
-    public function show(Request $request, $id): JsonResponse
+    // POST /api/inventory/adjust
+    public function adjustStock(Request $request): JsonResponse
     {
-        $inventory = Inventory::find($id);
-
-        if (!$inventory) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Inventory not found',
-            ], 404);
-        }
-
-        // Enrich with live product data if Product Service is reachable
-        $product = $this->productClient->getProduct((int) $inventory->product_id);
-
-        $data = $inventory->toArray();
-
-        if ($product) {
-            $data['product'] = $product;
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Inventory retrieved successfully',
-            'data'    => ['inventory' => $data],
-        ]);
-    }
-
-    public function update(Request $request, $id): JsonResponse
-    {
-        $user = $request->attributes->get('auth_user');
-
-        if (($user['role'] ?? '') !== 'admin') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Forbidden: admin access required',
-            ], 403);
-        }
-
-        $inventory = Inventory::find($id);
-
-        if (!$inventory) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Inventory not found',
-            ], 404);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'product_id'         => 'sometimes|integer|min:1',
-            'product_name'       => 'sometimes|string|max:255',
-            'product_code'       => 'sometimes|string|max:100',
-            'product_category'   => 'sometimes|string|max:100',
-            'quantity'           => 'sometimes|integer|min:0',
-            'reserved_quantity'  => 'sometimes|integer|min:0',
-            'warehouse_location' => 'nullable|string|max:255',
-            'reorder_level'      => 'sometimes|integer|min:0',
+        $request->validate([
+            'product_id' => ['required', 'string', 'uuid'],
+            'delta'      => ['required', 'integer'],
+            'reason'     => ['sometimes', 'string', 'max:255'],
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors'  => $validator->errors(),
-            ], 422);
-        }
+        $tenantId = $request->attributes->get('tenant_id');
 
-        $inventory->update($validator->validated());
+        $item = $this->inventoryService->adjustStock(
+            $request->input('product_id'),
+            $tenantId,
+            $request->integer('delta'),
+            $request->input('reason', 'manual_adjustment')
+        );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Inventory updated successfully',
-            'data'    => ['inventory' => $inventory],
-        ]);
-    }
-
-    public function destroy(Request $request, $id): JsonResponse
-    {
-        $user = $request->attributes->get('auth_user');
-
-        if (($user['role'] ?? '') !== 'admin') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Forbidden: admin access required',
-            ], 403);
-        }
-
-        $inventory = Inventory::find($id);
-
-        if (!$inventory) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Inventory not found',
-            ], 404);
-        }
-
-        $inventory->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Inventory deleted successfully',
-        ]);
-    }
-
-    public function reserve(Request $request, $id): JsonResponse
-    {
-        $inventory = Inventory::find($id);
-
-        if (!$inventory) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Inventory not found',
-            ], 404);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'quantity' => 'required|integer|min:1',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors'  => $validator->errors(),
-            ], 422);
-        }
-
-        $qty = (int) $request->quantity;
-
-        if ($inventory->available_quantity < $qty) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Insufficient available quantity',
-                'data'    => [
-                    'available_quantity' => $inventory->available_quantity,
-                    'requested_quantity' => $qty,
-                ],
-            ], 422);
-        }
-
-        $inventory->reserved_quantity += $qty;
-        $inventory->save();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Quantity reserved successfully',
-            'data'    => ['inventory' => $inventory],
-        ]);
-    }
-
-    public function release(Request $request, $id): JsonResponse
-    {
-        $inventory = Inventory::find($id);
-
-        if (!$inventory) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Inventory not found',
-            ], 404);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'quantity' => 'required|integer|min:1',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors'  => $validator->errors(),
-            ], 422);
-        }
-
-        $qty = (int) $request->quantity;
-
-        if ($inventory->reserved_quantity < $qty) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Cannot release more than reserved quantity',
-                'data'    => [
-                    'reserved_quantity'  => $inventory->reserved_quantity,
-                    'requested_quantity' => $qty,
-                ],
-            ], 422);
-        }
-
-        $inventory->reserved_quantity -= $qty;
-        $inventory->save();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Quantity released successfully',
-            'data'    => ['inventory' => $inventory],
-        ]);
-    }
-
-    public function getByProductId(Request $request, $productId): JsonResponse
-    {
-        $inventory = Inventory::where('product_id', (int) $productId)->get();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Inventory retrieved successfully',
-            'data'    => ['inventory' => $inventory],
-        ]);
+        return response()->json(['data' => $item]);
     }
 }

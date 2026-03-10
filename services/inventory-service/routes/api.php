@@ -1,15 +1,30 @@
 <?php
 
+declare(strict_types=1);
+
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\InventoryController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware('auth.jwt')->group(function () {
-    Route::get('/inventory', [InventoryController::class, 'index']);
-    Route::post('/inventory', [InventoryController::class, 'store']);
-    Route::get('/inventory/product/{productId}', [InventoryController::class, 'getByProductId']);
-    Route::get('/inventory/{id}', [InventoryController::class, 'show']);
-    Route::put('/inventory/{id}', [InventoryController::class, 'update']);
-    Route::delete('/inventory/{id}', [InventoryController::class, 'destroy']);
-    Route::post('/inventory/{id}/reserve', [InventoryController::class, 'reserve']);
-    Route::post('/inventory/{id}/release', [InventoryController::class, 'release']);
+/*
+|--------------------------------------------------------------------------
+| API Routes — Inventory Service
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/health', HealthController::class)->name('health');
+
+Route::middleware(['resolve.tenant'])->group(function (): void {
+
+    // Authenticated routes
+    Route::middleware('auth:api')->group(function (): void {
+
+        Route::prefix('inventory')->name('inventory.')->group(function (): void {
+            Route::get('/',                           [InventoryController::class, 'index'])->name('index');
+            Route::get('/product/{productId}',        [InventoryController::class, 'showByProduct'])->name('showByProduct');
+            Route::post('/adjust',                    [InventoryController::class, 'adjustStock'])->name('adjustStock');
+            Route::post('/reserve',                   [InventoryController::class, 'reserve'])->name('reserve');
+            Route::delete('/reserve/{reservationId}', [InventoryController::class, 'releaseReservation'])->name('releaseReservation');
+        });
+    });
 });

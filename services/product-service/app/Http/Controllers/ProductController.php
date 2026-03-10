@@ -1,238 +1,143 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
-use App\Models\Product;
+use App\Application\Product\DTOs\CreateProductDTO;
+use App\Application\Product\DTOs\UpdateProductDTO;
+use App\Application\Product\Services\ProductService;
+use App\Domain\Product\Exceptions\ProductAlreadyExistsException;
+use App\Domain\Product\Exceptions\ProductNotFoundException;
+use App\Http\Requests\Product\CreateProductRequest;
+use App\Http\Requests\Product\UpdateProductRequest;
+use App\Http\Resources\Product\ProductCollection;
+use App\Http\Resources\Product\ProductResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Routing\Controller;
 
+/**
+ * ProductController
+ *
+ * Thin controller — delegates all logic to ProductService.
+ */
 class ProductController extends Controller
 {
+    public function __construct(
+        private readonly ProductService $productService,
+    ) {}
+
+    // GET /api/products
     public function index(Request $request): JsonResponse
     {
-        $query = Product::query();
-
-        if ($request->filled('name')) {
-            $query->where('name', 'like', '%' . $request->name . '%');
-        }
-
-        if ($request->filled('code')) {
-            $query->where('code', $request->code);
-        }
-
-        if ($request->filled('category')) {
-            $query->where('category', 'like', '%' . $request->category . '%');
-        }
-
-        if ($request->filled('min_price')) {
-            $query->where('price', '>=', (float) $request->min_price);
-        }
-
-        if ($request->filled('max_price')) {
-            $query->where('price', '<=', (float) $request->max_price);
-        }
-
-        if ($request->filled('search')) {
-            $term = $request->search;
-            $query->where(function ($q) use ($term) {
-                $q->where('name', 'like', '%' . $term . '%')
-                  ->orWhere('code', 'like', '%' . $term . '%')
-                  ->orWhere('description', 'like', '%' . $term . '%')
-                  ->orWhere('category', 'like', '%' . $term . '%');
-            });
-        }
-
-        $perPage   = (int) $request->input('per_page', 15);
-        $paginator = $query->paginate($perPage);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Products retrieved successfully',
-            'data'    => [
-                'products'   => $paginator->items(),
-                'pagination' => [
-                    'current_page' => $paginator->currentPage(),
-                    'per_page'     => $paginator->perPage(),
-                    'total'        => $paginator->total(),
-                    'last_page'    => $paginator->lastPage(),
-                ],
-            ],
+        $tenantId = $request->attributes->get('tenant_id');
+        $filters  = $request->only([
+            'category_id', 'status', 'price:gte', 'price:lte',
+            'name:like', 'code:like', 'sku:like',
         ]);
+        $perPage  = (int) $request->get('per_page', 15);
+        $orderBy  = $this->parseOrderBy($request);
+
+        $products = $this->productService->list($tenantId, $filters, $perPage, ['category'], $orderBy);
+
+        return (new ProductCollection($products))->response();
     }
 
-    public function store(Request $request): JsonResponse
+    // GET /api/products/search?q=term
+    public function search(Request $request): JsonResponse
     {
-        $user = $request->attributes->get('auth_user');
+        $tenantId = $request->attributes->get('tenant_id');
+        $term     = (string) $request->get('q', '');
+        $perPage  = (int) $request->get('per_page', 15);
 
-        if (($user['role'] ?? '') !== 'admin') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Forbidden: admin access required',
-            ], 403);
-        }
+        $products = $this->productService->search($term, $tenantId, $perPage);
 
-        $validator = Validator::make($request->all(), [
-            'name'           => 'required|string|max:255',
-            'code'           => 'required|string|max:100|unique:products,code',
-            'category'       => 'required|string|max:100',
-            'description'    => 'nullable|string',
-            'price'          => 'required|numeric|min:0',
-            'stock_quantity' => 'nullable|integer|min:0',
-            'image_url'      => 'nullable|string|max:500',
-            'is_active'      => 'nullable|boolean',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors'  => $validator->errors(),
-            ], 422);
-        }
-
-        $product = Product::create($validator->validated());
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Product created successfully',
-            'data'    => ['product' => $product],
-        ], 201);
+        return (new ProductCollection($products))->response();
     }
 
-    public function show(Request $request, $id): JsonResponse
+    // GET /api/products/{id}
+    public function show(Request $request, string $id): JsonResponse
     {
-        $product = Product::find($id);
+        try {
+            $tenantId = $request->attributes->get('tenant_id');
+            $product  = $this->productService->findById($id, $tenantId);
 
-        if (!$product) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Product not found',
-            ], 404);
+            return (new ProductResource($product))->response();
+
+        } catch (ProductNotFoundException $e) {
+            return $this->notFound($e->getMessage());
         }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Product retrieved successfully',
-            'data'    => ['product' => $product],
-        ]);
     }
 
-    public function showByCode(Request $request, $code): JsonResponse
+    // POST /api/products
+    public function store(CreateProductRequest $request): JsonResponse
     {
-        $product = Product::where('code', $code)->first();
+        try {
+            $data = array_merge($request->validated(), [
+                'tenant_id' => $request->attributes->get('tenant_id'),
+            ]);
 
-        if (!$product) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Product not found',
-            ], 404);
+            $product = $this->productService->create(CreateProductDTO::fromArray($data));
+
+            return (new ProductResource($product))->response()->setStatusCode(201);
+
+        } catch (ProductAlreadyExistsException $e) {
+            return response()->json(['message' => $e->getMessage(), 'error' => true], 409);
         }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Product retrieved successfully',
-            'data'    => ['product' => $product],
-        ]);
     }
 
-    public function update(Request $request, $id): JsonResponse
+    // PUT/PATCH /api/products/{id}
+    public function update(UpdateProductRequest $request, string $id): JsonResponse
     {
-        $user = $request->attributes->get('auth_user');
+        try {
+            $data = array_merge($request->validated(), [
+                'tenant_id' => $request->attributes->get('tenant_id'),
+            ]);
 
-        if (($user['role'] ?? '') !== 'admin') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Forbidden: admin access required',
-            ], 403);
+            $product = $this->productService->update($id, UpdateProductDTO::fromArray($data));
+
+            return (new ProductResource($product))->response();
+
+        } catch (ProductNotFoundException $e) {
+            return $this->notFound($e->getMessage());
         }
-
-        $product = Product::find($id);
-
-        if (!$product) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Product not found',
-            ], 404);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'name'           => 'sometimes|required|string|max:255',
-            'code'           => 'sometimes|required|string|max:100|unique:products,code,' . $id,
-            'category'       => 'sometimes|required|string|max:100',
-            'description'    => 'nullable|string',
-            'price'          => 'sometimes|required|numeric|min:0',
-            'stock_quantity' => 'nullable|integer|min:0',
-            'image_url'      => 'nullable|string|max:500',
-            'is_active'      => 'nullable|boolean',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors'  => $validator->errors(),
-            ], 422);
-        }
-
-        $product->update($validator->validated());
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Product updated successfully',
-            'data'    => ['product' => $product->fresh()],
-        ]);
     }
 
-    public function destroy(Request $request, $id): JsonResponse
+    // DELETE /api/products/{id}
+    public function destroy(Request $request, string $id): JsonResponse
     {
-        $user = $request->attributes->get('auth_user');
+        try {
+            $tenantId = $request->attributes->get('tenant_id');
+            $this->productService->delete($id, $tenantId);
 
-        if (($user['role'] ?? '') !== 'admin') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Forbidden: admin access required',
-            ], 403);
+            return response()->json(['message' => 'Product deleted successfully.']);
+
+        } catch (ProductNotFoundException $e) {
+            return $this->notFound($e->getMessage());
         }
-
-        $product = Product::find($id);
-
-        if (!$product) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Product not found',
-            ], 404);
-        }
-
-        $product->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Product deleted successfully',
-        ]);
     }
 
-    public function bulkGet(Request $request): JsonResponse
+    // ─────────────────────────────────────────────────────────────────────────
+    // Helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private function parseOrderBy(Request $request): array
     {
-        $validator = Validator::make($request->all(), [
-            'ids'   => 'required|array|min:1',
-            'ids.*' => 'integer|min:1',
-        ]);
+        $sort      = $request->get('sort',  'created_at');
+        $direction = $request->get('order', 'desc');
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors'  => $validator->errors(),
-            ], 422);
-        }
+        $allowed = ['name', 'code', 'price', 'created_at', 'updated_at', 'status'];
 
-        $products = Product::whereIn('id', $request->ids)->get();
+        $sort = in_array($sort, $allowed, true) ? $sort : 'created_at';
+        $direction = in_array(strtolower($direction), ['asc', 'desc'], true)
+                   ? strtolower($direction) : 'desc';
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Products retrieved successfully',
-            'data'    => ['products' => $products],
-        ]);
+        return [$sort => $direction];
+    }
+
+    private function notFound(string $message): JsonResponse
+    {
+        return response()->json(['message' => $message, 'error' => true], 404);
     }
 }

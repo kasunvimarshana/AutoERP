@@ -1,0 +1,176 @@
+{
+  "rabbit_version": "3.12.0",
+  "rabbitmq_version": "3.12.0",
+  "users": [
+    {
+      "name": "kvsaas_admin",
+      "password_hash": "CHANGE_ME_HASH",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": "administrator",
+      "limits": {}
+    }
+  ],
+  "vhosts": [
+    { "name": "kvsaas" }
+  ],
+  "permissions": [
+    {
+      "user": "kvsaas_admin",
+      "vhost": "kvsaas",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "kvsaas.events",
+      "vhost": "kvsaas",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "kvsaas.saga",
+      "vhost": "kvsaas",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "kvsaas.dlx",
+      "vhost": "kvsaas",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "order.created",
+      "vhost": "kvsaas",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "kvsaas.dlx",
+        "x-dead-letter-routing-key": "order.created.dead",
+        "x-message-ttl": 86400000
+      }
+    },
+    {
+      "name": "order.payment.process",
+      "vhost": "kvsaas",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "kvsaas.dlx",
+        "x-dead-letter-routing-key": "order.payment.process.dead"
+      }
+    },
+    {
+      "name": "order.inventory.reserve",
+      "vhost": "kvsaas",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "kvsaas.dlx",
+        "x-dead-letter-routing-key": "order.inventory.reserve.dead"
+      }
+    },
+    {
+      "name": "order.completed",
+      "vhost": "kvsaas",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "order.failed",
+      "vhost": "kvsaas",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "saga.orchestrator",
+      "vhost": "kvsaas",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-dead-letter-exchange": "kvsaas.dlx",
+        "x-dead-letter-routing-key": "saga.orchestrator.dead"
+      }
+    },
+    {
+      "name": "webhook.dispatch",
+      "vhost": "kvsaas",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    }
+  ],
+  "bindings": [
+    {
+      "source": "kvsaas.events",
+      "vhost": "kvsaas",
+      "destination": "order.created",
+      "destination_type": "queue",
+      "routing_key": "order.created",
+      "arguments": {}
+    },
+    {
+      "source": "kvsaas.events",
+      "vhost": "kvsaas",
+      "destination": "order.payment.process",
+      "destination_type": "queue",
+      "routing_key": "order.payment.process",
+      "arguments": {}
+    },
+    {
+      "source": "kvsaas.events",
+      "vhost": "kvsaas",
+      "destination": "order.inventory.reserve",
+      "destination_type": "queue",
+      "routing_key": "order.inventory.reserve",
+      "arguments": {}
+    },
+    {
+      "source": "kvsaas.events",
+      "vhost": "kvsaas",
+      "destination": "order.completed",
+      "destination_type": "queue",
+      "routing_key": "order.completed",
+      "arguments": {}
+    },
+    {
+      "source": "kvsaas.events",
+      "vhost": "kvsaas",
+      "destination": "order.failed",
+      "destination_type": "queue",
+      "routing_key": "order.failed",
+      "arguments": {}
+    },
+    {
+      "source": "kvsaas.saga",
+      "vhost": "kvsaas",
+      "destination": "saga.orchestrator",
+      "destination_type": "queue",
+      "routing_key": "saga.orchestrator",
+      "arguments": {}
+    },
+    {
+      "source": "kvsaas.events",
+      "vhost": "kvsaas",
+      "destination": "webhook.dispatch",
+      "destination_type": "queue",
+      "routing_key": "webhook.*",
+      "arguments": {}
+    }
+  ]
+}

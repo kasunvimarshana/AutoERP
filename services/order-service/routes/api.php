@@ -1,13 +1,28 @@
 <?php
 
+declare(strict_types=1);
+
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\OrderController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware('auth.jwt')->group(function () {
-    Route::get('/orders', [OrderController::class, 'index']);
-    Route::post('/orders', [OrderController::class, 'store']);
-    Route::get('/orders/{id}', [OrderController::class, 'show']);
-    Route::put('/orders/{id}', [OrderController::class, 'update']);
-    Route::delete('/orders/{id}', [OrderController::class, 'destroy']);
-    Route::post('/orders/{id}/cancel', [OrderController::class, 'cancel']);
+/*
+|--------------------------------------------------------------------------
+| API Routes — Order Service
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/health', HealthController::class)->name('health');
+
+Route::middleware(['resolve.tenant'])->group(function (): void {
+
+    Route::middleware('auth:api')->group(function (): void {
+
+        Route::prefix('orders')->name('orders.')->group(function (): void {
+            Route::get('/',                    [OrderController::class, 'index'])->name('index');
+            Route::post('/',                   [OrderController::class, 'store'])->name('store');
+            Route::get('/{id}',                [OrderController::class, 'show'])->name('show');
+            Route::get('/saga/{sagaId}/status',[OrderController::class, 'sagaStatus'])->name('sagaStatus');
+        });
+    });
 });
