@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+vendor/
+
+# Environment files
+.env
+*.env.local
+.env.production
+
+# Laravel
+storage/logs/*.log
+bootstrap/cache/*.php
+*.cache
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+dist/
+*.pyc
+
+# Docker
+.dockerignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+build/
+*.zip
+
+# Composer lock (optional – keep in version control for reproducible builds)
+# composer.lock
+
+# NPM lock (optional – keep for reproducibility)
+# package-lock.json
