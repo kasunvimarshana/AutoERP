@@ -1,3 +1,4 @@
 <?php
-
-use Illuminate\Support\Facades\Schedule;
+use Illuminate\Foundation\Inspiring;
+use Illuminate\Support\Facades\Artisan;
+Artisan::command('inspire', fn() => $this->comment(Inspiring::quote()))->purpose('Inspire');

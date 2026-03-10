@@ -1,538 +1,548 @@
-# Multi-Tenant Microservices System with Saga Pattern
+# KV SSO SaaS Microservice Platform
 
-[![Order Service Tests](https://img.shields.io/badge/Order%20Service-14%20tests%20passing-green)](#testing)
-[![Inventory Service Tests](https://img.shields.io/badge/Inventory%20Service-5%20tests%20passing-green)](#testing)
-[![Payment Service Tests](https://img.shields.io/badge/Payment%20Service-9%20tests%20passing-green)](#testing)
-[![Notification Service Tests](https://img.shields.io/badge/Notification%20Service-10%20tests%20passing-green)](#testing)
+A fully functional **microservices-based** SaaS application using **Laravel 10**, demonstrating:
 
----
-
-## Overview
-
-This repository implements a **production-quality microservices system** demonstrating:
-
-| Concept | Implementation |
-|---|---|
-| **Multiple independent services** | 4 domain services + API Gateway |
-| **Heterogeneous tech stacks** | Laravel (PHP), Node.js/Express, Python/Flask |
-| **Multiple databases** | MySQL, PostgreSQL, SQLite |
-| **Loose coupling** | HTTP REST APIs between services |
-| **Vertical scalability** | PostgreSQL indices, connection pooling |
-| **Horizontal scalability** | Nginx upstream groups, Docker Compose `--scale` |
-| **Cross-service CRUD** | Full CRUD across all services with relational queries |
-| **Distributed transactions** | Orchestration-based Saga pattern |
-| **Compensating rollback** | Automatic rollback with per-step compensation |
+- 🏗️ **5 independent, loosely coupled microservices** with different database backends
+- 🔐 **Secure multi-tenant JWT authentication** (SSO) with RBAC/ABAC
+- 🔄 **Saga Orchestration pattern** for distributed transactions with compensating rollbacks
+- 🔗 **Cross-service filtering** of inventory and orders by product attributes
+- 🐳 **Docker Compose** for local development orchestration
 
 ---
 
-## Architecture
+## 🏛️ Architecture
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│                      API GATEWAY (Nginx)                    │
-│                    http://localhost:8080                    │
-└───────┬────────────────┬────────────────┬──────────────────┘
-        │                │                │
-        ▼                ▼                ▼
-┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│ Order Service│  │  Inventory   │  │   Payment    │  │Notification  │
-│  (Laravel)   │  │  Service     │  │   Service    │  │  Service     │
-│  PHP 8.2     │  │  (Laravel)   │  │  (Node.js)   │  │  (Python)    │
-│  MySQL       │  │  PHP 8.2     │  │  Express 4   │  │  Flask 3     │
-│  port: 8001  │  │  PostgreSQL  │  │  PostgreSQL  │  │  SQLite      │
-└──────┬───────┘  │  port: 8002  │  │  port: 8003  │  │  port: 8004  │
-       │          └──────────────┘  └──────────────┘  └──────────────┘
-       │  Saga Orchestrator              ▲                    ▲
-       │  (calls in order) ─────────────┘────────────────────┘
-       │
-       ▼
-   ┌────────┐
-   │ Redis  │   (async queue for order-worker)
-   └────────┘
+                        ┌─────────────────────────────┐
+                        │       API Gateway (nginx)    │
+                        │         Port 8000            │
+                        └───────────┬─────────────────┘
+                                    │
+            ┌───────────────────────┼────────────────────────┐
+            │           │           │           │             │
+     ┌──────▼──────┐  ┌─▼──────┐  ┌▼────────┐ ┌▼──────────┐ ┌▼────────────┐
+     │Auth Service │  │  User  │  │ Product │ │Inventory  │ │   Order     │
+     │  Port 8001  │  │Service │  │ Service │ │ Service   │ │  Service    │
+     │  Laravel+   │  │8002    │  │  8003   │ │  8004     │ │   8005      │
+     │  MySQL      │  │MySQL   │  │PostgreSQL│ │  MySQL    │ │  MySQL      │
+     └─────────────┘  └────────┘  └─────────┘ └───────────┘ └─────────────┘
+            │                          │              │              │
+     ┌──────▼──────┐              ┌────▼──────────────▼──────────────▼────┐
+     │  MySQL DB   │              │                Redis                   │
+     │  auth_db    │              │    (Caching, Sessions, Queues)         │
+     └─────────────┘              └────────────────────────────────────────┘
 ```
 
-### Service Responsibilities
+### Services Overview
 
-| Service | Technology | Database | Port | Responsibilities |
-|---|---|---|---|---|
-| **API Gateway** | Nginx 1.25 | — | 8080 | Route, load-balance, rate-limit |
-| **Order Service** | Laravel 10 / PHP 8.2 | MySQL 8.0 | 8001 | Orders CRUD, **Saga Orchestrator** |
-| **Inventory Service** | Laravel 10 / PHP 8.2 | PostgreSQL 15 | 8002 | Products CRUD, stock reservations |
-| **Payment Service** | Node.js 20 / Express 4 | In-memory / PostgreSQL | 8003 | Payments, refunds |
-| **Notification Service** | Python 3.12 / Flask 3 | SQLite | 8004 | Email notifications |
+| Service | Port | Database | Responsibility |
+|---------|------|----------|----------------|
+| **Auth Service** | 8001 | MySQL | JWT SSO, multi-tenant auth, RBAC |
+| **User Service** | 8002 | MySQL | User profiles, tenant-scoped |
+| **Product Service** | 8003 | **PostgreSQL** | Product catalog, categories |
+| **Inventory Service** | 8004 | MySQL | Stock management, reservations |
+| **Order Service** | 8005 | MySQL | Orders + Saga orchestration |
+| **API Gateway** | 8000 | - | nginx reverse proxy |
 
 ---
 
-## Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
-- Docker ≥ 24 and Docker Compose ≥ 2.20
+- Docker & Docker Compose
+- Git
 
-### 1. Start all services
+### 1. Clone and Start
 
 ```bash
-docker compose up --build -d
+git clone https://github.com/kasunvimarshana/KV_SSO_SAAS_Microservice.git
+cd KV_SSO_SAAS_Microservice
+docker-compose up -d
 ```
 
-### 2. Run migrations (Order Service)
+### 2. Wait for services to be ready
 
 ```bash
-docker compose exec order-service php artisan migrate --seed
+docker-compose ps
+# Wait until all services are "healthy"
 ```
 
-### 3. Seed inventory products
+### 3. Verify all services are running
 
 ```bash
-docker compose exec inventory-service php artisan migrate
-docker compose exec inventory-service php artisan db:seed --class=ProductSeeder
-```
-
-### 4. Verify all services are up
-
-```bash
-curl http://localhost:8080/health
-# {"status":"api-gateway-ok"}
-
-curl http://localhost:8001/api/orders
-curl http://localhost:8002/api/products
-curl http://localhost:8003/health
-curl http://localhost:8004/health
-```
-
-### 5. Horizontal scaling
-
-```bash
-# Scale Order Service to 3 replicas
-docker compose up --scale order-service=3 -d
+curl http://localhost:8000/health          # API Gateway
+curl http://localhost:8001/api/health      # Auth Service
+curl http://localhost:8002/api/health      # User Service
+curl http://localhost:8003/api/health      # Product Service
+curl http://localhost:8004/api/health      # Inventory Service
+curl http://localhost:8005/api/health      # Order Service
 ```
 
 ---
 
-## API Reference
+## 🔐 Authentication & Multi-Tenancy
 
-### Order Service (via Gateway: `localhost:8080/api/orders`)
-
-#### List orders (with filtering)
-
-```http
-GET /api/orders?status=confirmed&customer_email=alice@example.com&min_amount=50&per_page=10
-```
-
-Query parameters:
-
-| Parameter | Description |
-|---|---|
-| `status` | `pending` / `confirmed` / `failed` / `cancelled` |
-| `customer_email` | Filter by customer |
-| `from_date` / `to_date` | Date range (Y-m-d) |
-| `min_amount` / `max_amount` | Amount range |
-| `search` | Search order_number or customer_name |
-| `per_page` | Items per page (default 15) |
-
-#### Create order (basic, no Saga)
-
-```http
-POST /api/orders
-Content-Type: application/json
-
-{
-  "customer_email": "alice@example.com",
-  "customer_name":  "Alice Smith",
-  "items": [
-    { "product_id": 1, "product_name": "Widget A", "quantity": 2, "unit_price": 29.99 },
-    { "product_id": 3, "product_name": "Gadget C", "quantity": 1, "unit_price": 99.00 }
-  ]
-}
-```
-
----
-
-### Inventory Service (`localhost:8080/api/products`)
-
-#### List products (with filtering)
-
-```http
-GET /api/products?category=widgets&in_stock=1&min_price=20&max_price=100
-```
-
-#### Create product
-
-```http
-POST /api/products
-Content-Type: application/json
-
-{
-  "sku": "WGT-X001",
-  "name": "Widget X",
-  "category": "widgets",
-  "description": "A premium widget",
-  "price": 49.99,
-  "stock_quantity": 100
-}
-```
-
-#### Restock a product
-
-```http
-POST /api/products/{id}/restock
-Content-Type: application/json
-
-{ "quantity": 50 }
-```
-
----
-
-### Payment Service (`localhost:8080/api/payments`)
-
-#### List payments
-
-```http
-GET /api/payments?order_id=42&status=completed
-```
-
-#### Refund a payment (compensating action)
-
-```http
-POST /api/payments/{payment_id}/refund
-Content-Type: application/json
-
-{ "reason": "customer_request", "order_id": 42 }
-```
-
-> **Demo tip**: To trigger a payment failure, set `unit_price` so that total > 9999.
-> The payment service simulates a card decline for amounts exceeding this threshold.
-
----
-
-### Notification Service (`localhost:8080/api/notifications`)
-
-#### List notifications
-
-```http
-GET /api/notifications?type=order_confirmed&recipient=alice@example.com
-```
-
----
-
-## Saga Pattern: Distributed Transaction Management
-
-The **Place Order** workflow is managed by the `SagaOrchestrator` in the Order Service.
-It uses the **Orchestration** pattern: a central coordinator drives all steps and
-compensates on failure.
-
-### Successful flow
-
-```
-Client           Order Service      Inventory Service  Payment Service  Notification
-  │                   │                    │                 │               │
-  │  POST /saga/      │                    │                 │               │
-  │  place-order      │                    │                 │               │
-  │──────────────────>│                    │                 │               │
-  │                   │ 1. create_order    │                 │               │
-  │                   │ (save to MySQL)    │                 │               │
-  │                   │                    │                 │               │
-  │                   │ 2. POST /reservations                │               │
-  │                   │───────────────────>│                 │               │
-  │                   │ {reservation_ids}  │                 │               │
-  │                   │<───────────────────│                 │               │
-  │                   │                    │                 │               │
-  │                   │ 3. POST /payments  │                 │               │
-  │                   │────────────────────────────────────>│               │
-  │                   │ {payment_id}       │                 │               │
-  │                   │<────────────────────────────────────│               │
-  │                   │                    │                 │               │
-  │                   │ 4. POST /notifications               │               │
-  │                   │────────────────────────────────────────────────────>│
-  │                   │                    │                 │               │
-  │  201 {order, log} │                    │                 │               │
-  │<──────────────────│                    │                 │               │
-```
-
-### API Example – Successful Saga
+### Register and Login
 
 ```bash
-curl -X POST http://localhost:8080/api/saga/place-order \
+# Register a new user
+curl -X POST http://localhost:8000/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{
-    "customer_email": "alice@example.com",
-    "customer_name":  "Alice Smith",
-    "items": [
-      { "product_id": 1, "product_name": "Widget A", "quantity": 2, "unit_price": 29.99 }
-    ]
+    "name": "John Doe",
+    "email": "john@example.com",
+    "password": "password123",
+    "password_confirmation": "password123",
+    "tenant_code": "default"
   }'
+
+# Response:
+# {
+#   "message": "User registered successfully",
+#   "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+#   "token_type": "Bearer",
+#   "user": {
+#     "id": 3,
+#     "name": "John Doe",
+#     "email": "john@example.com",
+#     "role": "staff",
+#     "tenant_id": 1,
+#     "tenant_code": "default"
+#   }
+# }
+
+# Login with seeded admin
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin@default.com", "password": "password"}'
 ```
 
-**Response (HTTP 201):**
+### JWT Token Structure
 
+The JWT contains tenant and role information used by all services:
 ```json
 {
-  "saga_id": "550e8400-e29b-41d4-a716-446655440000",
-  "status":  "completed",
-  "order": {
-    "id": 1,
-    "order_number":   "ORD-A1B2C3D4",
-    "customer_email": "alice@example.com",
-    "status":         "confirmed",
-    "total_amount":   59.98,
-    "items": [
-      {
-        "product_id":   1,
-        "product_name": "Widget A",
-        "quantity":     2,
-        "unit_price":   29.99,
-        "subtotal":     59.98
-      }
-    ]
-  },
-  "log": [
-    { "step": "create_order",       "result": "success", "timestamp": "2026-01-01T10:00:00Z" },
-    { "step": "reserve_inventory",  "result": "success", "timestamp": "2026-01-01T10:00:01Z",
-      "context": { "reservation_ids": [1] } },
-    { "step": "process_payment",    "result": "success", "timestamp": "2026-01-01T10:00:02Z",
-      "context": { "payment_id": "pay_000001", "amount": 59.98, "status": "completed" } },
-    { "step": "send_notification",  "result": "success", "timestamp": "2026-01-01T10:00:03Z",
-      "context": { "recipient": "alice@example.com" } },
-    { "step": "saga_completed",     "result": "success", "timestamp": "2026-01-01T10:00:03Z" }
-  ]
+  "sub": "1",
+  "tenant_id": "1",
+  "tenant_code": "default",
+  "role": "admin",
+  "permissions": ["*"],
+  "email": "admin@default.com",
+  "exp": 1234567890
 }
 ```
 
+**All subsequent requests require:** `Authorization: Bearer <token>`
+
 ---
 
-### Rollback flow (payment failure demo)
-
-When `amount > 9999`, the Payment Service simulates a card decline, triggering rollback:
-
-```
-Completed steps:    create_order → reserve_inventory → ✗ process_payment (FAILED)
-
-Compensating steps: compensate_inventory  ← releases stock reservation
-                    compensate_order       ← sets order status = "failed"
-                    (in reverse order of completed steps)
-```
+## 📦 Product Service (PostgreSQL)
 
 ```bash
-# Trigger payment failure: total amount > 9999
-curl -X POST http://localhost:8080/api/saga/place-order \
+export TOKEN="your_jwt_token_here"
+
+# Create a category
+curl -X POST http://localhost:8000/api/categories/ \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Electronics", "description": "Electronic gadgets"}'
+
+# Create a product
+curl -X POST http://localhost:8000/api/products/ \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "customer_email": "bob@example.com",
-    "customer_name":  "Bob Jones",
+    "name": "Laptop Pro X",
+    "code": "LAPTOP-001",
+    "category_id": 1,
+    "price": 1299.99,
+    "cost": 800.00,
+    "unit": "pcs",
+    "attributes": {"brand": "TechCo", "color": "silver", "warranty": "2 years"}
+  }'
+
+# Filter products by name
+curl "http://localhost:8000/api/products/?name=Laptop" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Filter products by category
+curl "http://localhost:8000/api/products/?category_id=1" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Search products (full text)
+curl "http://localhost:8000/api/products/search?q=laptop" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## 📊 Inventory Service
+
+```bash
+# Create inventory record
+curl -X POST http://localhost:8000/api/inventory/ \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "product_id": "1",
+    "warehouse": "main",
+    "quantity": 500,
+    "reorder_level": 50
+  }'
+
+# Filter inventory by product name (Cross-Service!)
+# This calls Product Service internally to find matching products
+curl "http://localhost:8000/api/inventory/filter-by-product-attributes?product_name=Laptop" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Filter inventory by product code
+curl "http://localhost:8000/api/inventory/filter-by-product-attributes?product_code=LAP" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Filter inventory by category
+curl "http://localhost:8000/api/inventory/filter-by-product-attributes?category_id=1" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Check low stock items
+curl "http://localhost:8000/api/inventory/low-stock" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## 🛒 Order Service with Saga Pattern
+
+### Create Order (Triggers Saga Orchestration)
+
+```bash
+curl -X POST http://localhost:8000/api/orders/ \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
     "items": [
-      { "product_id": 1, "product_name": "Widget A", "quantity": 2, "unit_price": 5000.00 }
-    ]
+      {"product_id": "1", "quantity": 2, "price": 1299.99},
+      {"product_id": "2", "quantity": 1, "price": 29.99}
+    ],
+    "shipping_address": "123 Main Street, City, Country",
+    "notes": "Please handle with care"
   }'
+
+# Successful Response (SAGA COMPLETED):
+# {
+#   "message": "Order created successfully",
+#   "saga_status": "COMPLETED",
+#   "saga_id": "550e8400-e29b-41d4-a716-446655440000",
+#   "order": {
+#     "id": 1,
+#     "status": "confirmed",
+#     "total_amount": "2629.97",
+#     "items": [...]
+#   }
+# }
 ```
 
-**Response (HTTP 402):**
+### Saga Steps Explained
 
-```json
-{
-  "saga_id": "660e9400-e29b-41d4-a716-446655440001",
-  "status":  "rolled_back",
-  "error":   "Payment processing failed: Payment declined: amount exceeds limit",
-  "order": {
-    "id":           2,
-    "status":       "failed",
-    "total_amount": 10000.00
-  },
-  "log": [
-    { "step": "create_order",         "result": "success" },
-    { "step": "reserve_inventory",    "result": "success",
-      "context": { "reservation_ids": [2] } },
-    { "step": "saga_failed",          "result": "error",
-      "context": { "message": "Payment declined...", "failed_at_step": "reserve_inventory" } },
-    { "step": "compensate_inventory", "result": "success",
-      "context": { "released": [2] } },
-    { "step": "compensate_order",     "result": "success",
-      "context": { "new_status": "failed" } }
-  ]
-}
+```
+Order Creation Saga:
+┌──────────────────────────────────────────────────────────┐
+│  STEP 1: Create Order (PENDING) - Order Service DB       │
+│  STEP 2: Validate Products - ──► Product Service         │
+│  STEP 3: Reserve Inventory - ──► Inventory Service       │
+│  STEP 4: Confirm Order (CONFIRMED) - Order Service DB    │
+└──────────────────────────────────────────────────────────┘
+
+Compensating Transactions (if failure):
+┌──────────────────────────────────────────────────────────┐
+│  COMPENSATE STEP 3: Release inventory reservations       │
+│  COMPENSATE STEP 1: Mark order as FAILED                 │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Saga Failure Example (Insufficient Stock)
+
+```bash
+# This will fail if inventory is insufficient
+curl -X POST http://localhost:8000/api/orders/ \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"items": [{"product_id": "1", "quantity": 99999, "price": 1299.99}]}'
+
+# Failure Response (SAGA COMPENSATED):
+# {
+#   "error": "Insufficient stock for product 1. Available: 500, Requested: 99999",
+#   "saga_status": "COMPENSATED",
+#   "saga_id": "660e8400-e29b-41d4-a716-446655440001",
+#   "compensations": [
+#     {"step": "COMPENSATE_FAIL_ORDER", "order_id": 2, "success": true}
+#   ],
+#   "failed_step": "STEP_3_RESERVE_INVENTORY"
+# }
+```
+
+### Cancel Order (Triggers Compensation)
+
+```bash
+# Cancel an order - releases inventory reservations
+curl -X POST http://localhost:8000/api/orders/1/cancel \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"reason": "Customer changed mind"}'
+
+# Response includes compensations applied
+```
+
+### View Saga Logs
+
+```bash
+# List all sagas
+curl "http://localhost:8000/api/sagas/" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Get specific saga details with all steps
+curl "http://localhost:8000/api/sagas/550e8400-e29b-41d4-a716-446655440000" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Response:
+# {
+#   "saga": {
+#     "saga_id": "550e8400...",
+#     "status": "COMPLETED",
+#     "started_at": "2024-01-15T10:30:00Z",
+#     "completed_at": "2024-01-15T10:30:01Z"
+#   },
+#   "steps": [
+#     {"step": "1_CREATE_ORDER", "status": "SUCCESS", "timestamp": "..."},
+#     {"step": "2_VALIDATE_PRODUCTS", "status": "SUCCESS", "timestamp": "..."},
+#     {"step": "3_RESERVE_INVENTORY", "status": "SUCCESS", "timestamp": "..."},
+#     {"step": "4_CONFIRM_ORDER", "status": "SUCCESS", "timestamp": "..."}
+#   ]
+# }
+```
+
+### Cross-Service Order Filtering
+
+```bash
+# Filter orders by product name (calls Product Service internally)
+curl "http://localhost:8000/api/orders/filter-by-product?product_name=Laptop" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Filter orders by product code
+curl "http://localhost:8000/api/orders/filter-by-product?product_code=LAP-001" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Filter orders by category
+curl "http://localhost:8000/api/orders/filter-by-product?category_id=1" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ---
 
-### Inventory failure rollback
+## 👤 User Service
 
 ```bash
-# Try to order more than available stock (product 1 has 100 units)
-curl -X POST http://localhost:8080/api/saga/place-order \
+# List users (tenant-scoped)
+curl "http://localhost:8000/api/users/" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Create user profile (linked to auth user)
+curl -X POST http://localhost:8000/api/users/ \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "customer_email": "carol@example.com",
-    "customer_name":  "Carol Davis",
-    "items": [
-      { "product_id": 1, "product_name": "Widget A", "quantity": 999, "unit_price": 29.99 }
-    ]
+    "name": "Jane Smith",
+    "email": "jane@company.com",
+    "external_id": "auth_user_id_from_auth_service",
+    "phone": "+1-555-0100",
+    "address": "456 Oak Street, City"
   }'
-```
-
-**Response (HTTP 422):**
-
-```json
-{
-  "saga_id": "770e0500-...",
-  "status":  "rolled_back",
-  "error":   "Inventory reservation failed: Insufficient stock for product 'Widget A' (requested 999, available 100)",
-  "order": {
-    "status": "failed"
-  },
-  "log": [
-    { "step": "create_order",    "result": "success" },
-    { "step": "saga_failed",     "result": "error" },
-    { "step": "compensate_order","result": "success" }
-  ]
-}
 ```
 
 ---
 
-### Check Saga status
+## 🏢 Multi-Tenant Architecture
+
+Each request is tenant-scoped via JWT:
+- Token contains `tenant_id` and `tenant_code`
+- All queries automatically filter by `tenant_id`
+- Cross-tenant data access is impossible by design
 
 ```bash
-curl http://localhost:8080/api/saga/{saga_id}/status
-```
+# Seeded tenants:
+# - "default" tenant: admin@default.com / password
+# - "acme" tenant: admin@acme.com / password
 
-### Manual rollback (admin / recovery tool)
-
-```bash
-curl -X POST http://localhost:8080/api/saga/{saga_id}/rollback \
+# Login as Acme tenant admin
+curl -X POST http://localhost:8000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{
-    "completed_steps": ["create_order", "reserve_inventory", "process_payment"],
-    "payment_id": "pay_000001",
-    "reservation_ids": [1, 2]
-  }'
+  -d '{"email": "admin@acme.com", "password": "password"}'
 ```
 
 ---
 
-## Cross-Service Relational Queries
+## 🧪 Running Tests
 
-Although each service owns its own database, cross-service joins are performed at the
-application layer via HTTP:
-
-```bash
-# 1. Get confirmed orders from Order Service (MySQL)
-curl "http://localhost:8080/api/orders?status=confirmed"
-
-# 2. For each order, fetch its payment details (Payment Service)
-curl "http://localhost:8080/api/payments?order_id=42"
-
-# 3. Check stock reservation status (Inventory Service / PostgreSQL)
-curl "http://localhost:8080/api/reservations?order_id=42&status=active"
-
-# 4. Verify notification was sent (Notification Service / SQLite)
-curl "http://localhost:8080/api/notifications?recipient=alice@example.com&type=order_confirmed"
-```
-
-The `order.saga_log` JSON column in the Order Service DB records every cross-service
-interaction, providing a complete audit trail for each distributed transaction.
-
----
-
-## Testing
-
-### Run all tests
+Tests use SQLite in-memory databases and mock external services.
 
 ```bash
-# Order Service (PHP/Laravel) – 14 tests
-cd order-service && ./vendor/bin/phpunit --testdox
+# Run all tests for a service
+cd auth-service && composer install && php artisan test
 
-# Inventory Service (PHP/Laravel) – 5 tests
-cd inventory-service && ./vendor/bin/phpunit --testdox
-
-# Payment Service (Node.js/Jest) – 9 tests
-cd payment-service && npm test
-
-# Notification Service (Python/pytest) – 10 tests
-cd notification-service && python -m pytest tests/ -v
+# Individual services
+cd user-service && composer install && php artisan test
+cd product-service && composer install && php artisan test
+cd inventory-service && composer install && php artisan test
+cd order-service && composer install && php artisan test
 ```
 
 ### Test Coverage
 
-| Service | Tests | Description |
-|---|---|---|
-| Order Service – Unit | 4 | SagaOrchestrator: happy path + 2 rollback scenarios + log completeness |
-| Order Service – Feature | 10 | Full CRUD API including filtering and pagination |
-| Inventory Service | 5 | Stock reservation, insufficient-stock 422, compensating release, product filtering |
-| Payment Service | 9 | Charge, decline, listing, filtering, refund, double-refund prevention |
-| Notification Service | 10 | CRUD, filtering, email validation, type filtering |
-| **Total** | **38** | — |
+| Service | Tests | Key Scenarios |
+|---------|-------|---------------|
+| Auth Service | 8 tests | Register, login, JWT validation, blacklisting |
+| User Service | 7 tests | CRUD, tenant isolation |
+| Product Service | 8 tests | CRUD, search, filtering, tenant isolation |
+| Inventory Service | 10 tests | Reserve/release, saga compensation, low-stock |
+| Order Service | 12 tests | Saga success/failure/compensation, filtering |
 
 ---
 
-## Scalability Design
+## 🔄 Saga Pattern Deep Dive
 
-### Vertical Scalability
+The **Saga Orchestration** pattern manages distributed transactions:
 
-- **PostgreSQL indices** on all frequently-queried columns (`status`, `category`, `price`, `created_at`)
-- **MySQL indices** on `orders.saga_id`, `orders.status`, `orders.customer_email`
-- **Row-level locking** (`lockForUpdate()`) in inventory reservation prevents race conditions under concurrent load
+### Why Saga?
+In microservices, a single business operation (creating an order) spans multiple services. Traditional ACID transactions don't work across service boundaries. The Saga pattern solves this by:
+1. Breaking the transaction into local steps
+2. Defining compensating transactions for each step
+3. Executing compensations in reverse order when failures occur
 
-### Horizontal Scalability
+### Saga Implementation
+
+```php
+// Order Service - SagaOrchestrator::createOrderSaga()
+// 
+// HAPPY PATH:
+// ─────────────────────────────────────────────────────────
+// Step 1: Order created (PENDING) ──── local DB
+// Step 2: Products validated ──────── Product Service
+// Step 3: Inventory reserved ──────── Inventory Service
+// Step 4: Order confirmed ─────────── local DB
+//
+// FAILURE PATH (e.g., insufficient stock at Step 3):
+// ─────────────────────────────────────────────────────────
+// Step 3 FAILS: "Insufficient stock"
+// COMPENSATE Step 3: Release any partial reservations
+// COMPENSATE Step 1: Mark order as FAILED
+// Return COMPENSATED status with compensation details
+```
+
+---
+
+## 🔒 RBAC Authorization
+
+Roles: `super_admin` → `admin` → `manager` → `staff` → `viewer`
+
+```
+super_admin: Can manage tenants, all permissions
+admin:       Can manage users, products, inventory, orders within tenant
+manager:     Can manage inventory and orders
+staff:       Can create orders, view products/inventory
+viewer:      Read-only access
+```
+
+---
+
+## 📁 Project Structure
+
+```
+KV_SSO_SAAS_Microservice/
+├── api-gateway/                # nginx reverse proxy
+│   ├── Dockerfile
+│   └── nginx.conf
+├── auth-service/               # Authentication & Authorization
+│   ├── app/Http/Controllers/   # AuthController, TenantController
+│   ├── app/Services/           # JwtService
+│   └── tests/                  # Unit + Feature tests
+├── user-service/               # User Profile Management
+├── product-service/            # Product Catalog (PostgreSQL)
+├── inventory-service/          # Inventory & Stock Management
+│   └── app/Services/           # ProductServiceClient (cross-service)
+├── order-service/              # Order Management + Saga
+│   ├── app/Services/           # SagaOrchestrator, ProductServiceClient
+│   │                           # InventoryServiceClient
+│   └── tests/Unit/             # SagaOrchestratorTest
+├── docker/
+│   ├── mysql/init.sql          # Creates all MySQL databases
+│   └── postgres/init.sql       # Creates PostgreSQL databases
+└── docker-compose.yml          # Full stack orchestration
+```
+
+---
+
+## 🌐 API Reference
+
+### Auth Service (via Gateway: /api/auth/)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | /api/auth/register | - | Register user |
+| POST | /api/auth/login | - | Login |
+| POST | /api/auth/logout | ✅ | Logout (blacklist token) |
+| POST | /api/auth/refresh | - | Refresh JWT token |
+| POST | /api/auth/validate-token | - | Validate JWT |
+| GET | /api/auth/me | ✅ | Get current user |
+| GET | /api/tenants/ | ✅ super_admin | List tenants |
+
+### Product Service (via Gateway: /api/products/, /api/categories/)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /api/products/?name=&code=&category_id= | List/filter products |
+| POST | /api/products/ | Create product |
+| GET | /api/products/search?q= | Full-text search |
+| GET | /api/products/by-ids?ids=1,2,3 | Bulk fetch by IDs |
+| GET | /api/categories/ | List categories |
+
+### Inventory Service (via Gateway: /api/inventory/)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /api/inventory/filter-by-product-attributes?product_name= | Cross-service filter |
+| POST | /api/inventory/{id}/reserve | Reserve stock (Saga step) |
+| POST | /api/inventory/{id}/release | Release stock (Saga compensation) |
+| POST | /api/inventory/{id}/adjust | Adjust stock level |
+| GET | /api/inventory/low-stock | Get low stock items |
+
+### Order Service (via Gateway: /api/orders/, /api/sagas/)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | /api/orders/ | Create order (triggers Saga) |
+| GET | /api/orders/filter-by-product?product_name= | Cross-service filter |
+| POST | /api/orders/{id}/cancel | Cancel + compensate |
+| POST | /api/orders/{id}/complete | Complete order |
+| GET | /api/sagas/{sagaId} | View saga details |
+
+---
+
+## ⚙️ Environment Variables
+
+Each service uses a shared `JWT_SECRET` for cross-service token validation. Set in each service's `.env`:
+
+```env
+JWT_SECRET=your_shared_secret_min_32_chars_here
+```
+
+---
+
+## 🐳 Docker Services
 
 ```yaml
-# docker-compose.yml – scale Order Service to N replicas
-docker compose up --scale order-service=3 -d
-
-# Nginx nginx.conf – add replica servers to upstream block
-upstream order_service {
-    server order-service:8000;
-    # server order-service-2:8000;
-    # server order-service-3:8000;
-}
-```
-
-- **Stateless HTTP services**: All state in databases/Redis
-- **Redis-backed queue**: `order-worker` can be scaled independently
-- **Shared-nothing architecture**: Services communicate only via APIs
-
----
-
-## Directory Structure
-
-```
-.
-├── docker-compose.yml              # Full system orchestration
-├── api-gateway/
-│   ├── Dockerfile
-│   └── nginx.conf                  # Reverse proxy + load balancing
-├── order-service/                  # Laravel 10 / PHP 8.2 / MySQL
-│   ├── app/
-│   │   ├── Http/Controllers/
-│   │   │   ├── OrderController.php # CRUD with filtering & pagination
-│   │   │   └── SagaController.php  # Saga orchestration endpoints
-│   │   ├── Models/
-│   │   │   ├── Order.php           # saga_log JSON column for audit trail
-│   │   │   └── OrderItem.php
-│   │   └── Services/
-│   │       ├── SagaOrchestrator.php # Distributed transaction + rollback
-│   │       ├── InventoryClient.php  # HTTP client for Inventory Service
-│   │       ├── PaymentClient.php    # HTTP client for Payment Service
-│   │       └── NotificationClient.php
-│   ├── database/migrations/
-│   ├── routes/api.php
-│   └── tests/
-│       ├── Feature/OrderApiTest.php         # 10 CRUD feature tests
-│       └── Unit/SagaOrchestratorTest.php    # 4 Saga unit tests
-├── inventory-service/              # Laravel 10 / PHP 8.2 / PostgreSQL
-│   ├── app/Http/Controllers/
-│   │   ├── ProductController.php   # CRUD with category/price/stock filtering
-│   │   └── ReservationController.php # Atomic reservations + compensating release
-│   ├── app/Models/
-│   │   ├── Product.php             # available_quantity virtual attribute
-│   │   └── StockReservation.php    # active|released|fulfilled lifecycle
-│   ├── database/seeders/ProductSeeder.php
-│   └── tests/Feature/ReservationApiTest.php
-├── payment-service/                # Node.js 20 / Express 4
-│   ├── src/
-│   │   ├── app.js                  # Express app entry point
-│   │   ├── routes/payments.js      # Charge + refund endpoints
-│   │   └── models/payment.js       # In-memory store (swap for PostgreSQL)
-│   └── tests/payment.test.js       # 9 Jest tests
-└── notification-service/           # Python 3.12 / Flask 3 / SQLite
-    ├── app.py                      # Full CRUD + type/recipient/status filtering
-    ├── requirements.txt
-    └── tests/test_notifications.py # 10 pytest tests
+Services:
+  mysql:3306       # auth_db, user_db, inventory_db, order_db
+  postgres:5432    # product_db
+  redis:6379       # Cache, sessions, queues
+  auth-service     # :8001
+  user-service     # :8002
+  product-service  # :8003
+  inventory-service # :8004
+  order-service    # :8005
+  api-gateway      # :8000 (nginx)
 ```

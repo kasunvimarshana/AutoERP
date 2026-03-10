@@ -2,59 +2,35 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
-/**
- * Order model.
- *
- * @property int    $id
- * @property string $order_number
- * @property string $customer_email
- * @property string $customer_name
- * @property string $status   pending|confirmed|failed|cancelled
- * @property float  $total_amount
- * @property string|null $saga_id
- * @property array|null  $saga_log
- */
 class Order extends Model
 {
-    use HasFactory;
+    use SoftDeletes;
 
     protected $fillable = [
-        'order_number',
-        'customer_email',
-        'customer_name',
-        'status',
-        'total_amount',
-        'saga_id',
-        'saga_log',
+        'tenant_id', 'user_id', 'status', 'total_amount',
+        'shipping_address', 'notes', 'saga_id',
+        'confirmed_at', 'completed_at', 'cancelled_at',
+        'cancellation_reason',
     ];
 
     protected $casts = [
-        'total_amount' => 'float',
-        'saga_log'     => 'array',
+        'total_amount'   => 'decimal:2',
+        'confirmed_at'   => 'datetime',
+        'completed_at'   => 'datetime',
+        'cancelled_at'   => 'datetime',
     ];
 
-    // ── Relationships ────────────────────────────────────────────────────
-
-    public function items()
+    public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class);
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────
-
-    public function appendSagaLog(string $step, string $result, array $context = []): void
+    public function sagaLog(): HasMany
     {
-        $log   = $this->saga_log ?? [];
-        $log[] = [
-            'step'      => $step,
-            'result'    => $result,
-            'timestamp' => now()->toIso8601String(),
-            'context'   => $context,
-        ];
-        $this->saga_log = $log;
-        $this->save();
+        return $this->hasMany(SagaLog::class);
     }
 }

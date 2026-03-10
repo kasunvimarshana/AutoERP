@@ -10,16 +10,19 @@ return new class extends Migration
     {
         Schema::create('order_items', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('order_id')->constrained('orders')->cascadeOnDelete();
-            $table->unsignedBigInteger('product_id');  // FK lives in Inventory Service
-            $table->string('product_name');
-            $table->unsignedInteger('quantity');
+            $table->string('tenant_id');
+            $table->foreignId('order_id')->constrained('orders')->onDelete('cascade');
+            $table->string('product_id');
+            $table->string('inventory_id')->nullable();
+            $table->string('product_name')->nullable();
+            $table->string('product_code')->nullable();
+            $table->integer('quantity');
             $table->decimal('unit_price', 12, 2);
-            $table->decimal('subtotal', 12, 2);
+            $table->decimal('total_price', 12, 2);
             $table->timestamps();
 
+            $table->index(['tenant_id', 'product_id']);
             $table->index('order_id');
-            $table->index('product_id');
         });
     }
 

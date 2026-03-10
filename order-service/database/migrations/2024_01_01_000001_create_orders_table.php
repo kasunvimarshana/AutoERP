@@ -10,19 +10,24 @@ return new class extends Migration
     {
         Schema::create('orders', function (Blueprint $table) {
             $table->id();
-            $table->string('order_number')->unique();
-            $table->string('customer_email');
-            $table->string('customer_name');
-            $table->enum('status', ['pending', 'confirmed', 'failed', 'cancelled'])
-                  ->default('pending');
+            $table->string('tenant_id');
+            $table->string('user_id');
+            $table->enum('status', ['pending', 'confirmed', 'processing', 'completed', 'cancelled', 'failed'])
+                ->default('pending');
             $table->decimal('total_amount', 12, 2)->default(0);
-            $table->uuid('saga_id')->nullable()->index();
-            $table->json('saga_log')->nullable();
+            $table->text('shipping_address')->nullable();
+            $table->text('notes')->nullable();
+            $table->string('saga_id')->nullable()->index();
+            $table->timestamp('confirmed_at')->nullable();
+            $table->timestamp('completed_at')->nullable();
+            $table->timestamp('cancelled_at')->nullable();
+            $table->text('cancellation_reason')->nullable();
             $table->timestamps();
+            $table->softDeletes();
 
-            $table->index('customer_email');
-            $table->index('status');
-            $table->index('created_at');
+            $table->index(['tenant_id', 'status']);
+            $table->index(['tenant_id', 'user_id']);
+            $table->index('tenant_id');
         });
     }
 

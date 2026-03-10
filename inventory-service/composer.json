@@ -1,19 +1,16 @@
 {
-    "name": "microservices/inventory-service",
-    "description": "Inventory Service – product catalogue and stock management (Laravel 10, PostgreSQL)",
+    "name": "kv/inventory-service",
+    "description": "KV Inventory Microservice",
     "type": "project",
     "require": {
         "php": "^8.2",
-        "laravel/framework": "^10.0",
-        "laravel/sanctum": "^3.3",
-        "predis/predis": "^2.2"
+        "laravel/framework": "^11.0",
+        "firebase/php-jwt": "^7.0",
+        "guzzlehttp/guzzle": "^7.8"
     },
     "require-dev": {
-        "fakerphp/faker": "^1.23",
-        "laravel/pint": "^1.13",
-        "mockery/mockery": "^1.6",
-        "nunomaduro/collision": "^7.10",
-        "phpunit/phpunit": "^10.5"
+        "phpunit/phpunit": "^10.0",
+        "mockery/mockery": "^1.6"
     },
     "autoload": {
         "psr-4": {
@@ -33,11 +30,19 @@
             "@php artisan package:discover --ansi"
         ]
     },
-    "extra": { "laravel": { "dont-discover": [] } },
+    "extra": {
+        "laravel": {
+            "dont-discover": []
+        }
+    },
     "config": {
         "optimize-autoloader": true,
         "preferred-install": "dist",
-        "sort-packages": true
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "php-http/discovery": true
+        }
     },
     "minimum-stability": "stable",
     "prefer-stable": true

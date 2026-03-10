@@ -4,168 +4,244 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\OrderItem;
-use Illuminate\Http\JsonResponse;
+use App\Services\SagaOrchestrator;
+use App\Services\ProductServiceClient;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Routing\Controller as BaseController;
 
-/**
- * Standard CRUD controller for Order resources.
- *
- * Supports filtering by status, customer_email, date range, and pagination.
- */
-class OrderController extends Controller
+class OrderController extends BaseController
 {
-    // ── List orders ───────────────────────────────────────────────────────
+    public function __construct(
+        private SagaOrchestrator $sagaOrchestrator,
+        private ProductServiceClient $productClient
+    ) {}
 
-    /**
-     * GET /api/orders
-     *
-     * Query params:
-     *   status         (pending|confirmed|failed|cancelled)
-     *   customer_email
-     *   from_date      (Y-m-d)
-     *   to_date        (Y-m-d)
-     *   min_amount
-     *   max_amount
-     *   search         (searches order_number and customer_name)
-     *   per_page       (default 15)
-     *   page           (default 1)
-     */
     public function index(Request $request): JsonResponse
     {
-        $query = Order::with('items');
+        $tenantId = $request->input('tenant_id');
 
-        if ($status = $request->query('status')) {
-            $query->where('status', $status);
-        }
-        if ($email = $request->query('customer_email')) {
-            $query->where('customer_email', $email);
-        }
-        if ($from = $request->query('from_date')) {
-            $query->whereDate('created_at', '>=', $from);
-        }
-        if ($to = $request->query('to_date')) {
-            $query->whereDate('created_at', '<=', $to);
-        }
-        if ($min = $request->query('min_amount')) {
-            $query->where('total_amount', '>=', (float) $min);
-        }
-        if ($max = $request->query('max_amount')) {
-            $query->where('total_amount', '<=', (float) $max);
-        }
-        if ($search = $request->query('search')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('order_number', 'like', "%{$search}%")
-                  ->orWhere('customer_name', 'like', "%{$search}%");
-            });
-        }
-
-        $perPage = (int) $request->query('per_page', 15);
-        $orders  = $query->orderByDesc('created_at')->paginate($perPage);
+        $orders = Order::where('tenant_id', $tenantId)
+            ->with('items')
+            ->when($request->status, fn($q, $s) => $q->where('status', $s))
+            ->when($request->user_id, fn($q, $u) => $q->where('user_id', $u))
+            ->when($request->from_date, fn($q, $d) => $q->whereDate('created_at', '>=', $d))
+            ->when($request->to_date, fn($q, $d) => $q->whereDate('created_at', '<=', $d))
+            ->orderBy('created_at', 'desc')
+            ->paginate($request->input('per_page', 15));
 
         return response()->json($orders);
     }
 
-    // ── Create order ──────────────────────────────────────────────────────
-
     /**
-     * POST /api/orders
+     * Create an order using the Saga Orchestration pattern.
      *
-     * Basic order creation (no Saga). Use /api/saga/place-order for the
-     * full distributed transaction workflow.
+     * Saga Steps:
+     * 1. Create order in PENDING state
+     * 2. Validate products exist (Product Service)
+     * 3. Reserve inventory for each item (Inventory Service)
+     * 4. Confirm order (mark as CONFIRMED)
+     *
+     * Compensating Transactions on failure:
+     * - Release any reserved inventory
+     * - Mark order as FAILED
      */
     public function store(Request $request): JsonResponse
     {
+        $tenantId = $request->input('tenant_id');
+        $userId   = $request->input('_user_id');
+        $token    = $request->bearerToken();
+
         $validator = Validator::make($request->all(), [
-            'customer_email'         => 'required|email',
-            'customer_name'          => 'required|string|max:255',
-            'items'                  => 'required|array|min:1',
-            'items.*.product_id'     => 'required|integer',
-            'items.*.product_name'   => 'required|string',
-            'items.*.quantity'       => 'required|integer|min:1',
-            'items.*.unit_price'     => 'required|numeric|min:0',
+            'items'               => 'required|array|min:1',
+            'items.*.product_id'  => 'required|string',
+            'items.*.quantity'    => 'required|integer|min:1',
+            'items.*.price'       => 'required|numeric|min:0',
+            'shipping_address'    => 'sometimes|string|max:500',
+            'notes'               => 'sometimes|string|max:1000',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $data = $validator->validated();
+        // Execute the Saga
+        $result = $this->sagaOrchestrator->createOrderSaga(
+            tenantId: $tenantId,
+            userId: $userId,
+            token: $token,
+            items: $request->items,
+            shippingAddress: $request->input('shipping_address'),
+            notes: $request->input('notes'),
+        );
 
-        $totalAmount = 0;
-        $order       = Order::create([
-            'order_number'   => 'ORD-' . strtoupper(substr(uniqid(), -8)),
-            'customer_email' => $data['customer_email'],
-            'customer_name'  => $data['customer_name'],
-            'status'         => 'pending',
-            'total_amount'   => 0,
+        if (!$result['success']) {
+            return response()->json([
+                'error'           => $result['error'],
+                'saga_id'         => $result['saga_id'] ?? null,
+                'saga_status'     => 'COMPENSATED',
+                'compensations'   => $result['compensations'] ?? [],
+                'failed_step'     => $result['failed_step'] ?? null,
+            ], 422);
+        }
+
+        return response()->json([
+            'message'     => 'Order created successfully',
+            'order'       => $result['order'],
+            'saga_id'     => $result['saga_id'],
+            'saga_status' => 'COMPLETED',
+        ], 201);
+    }
+
+    public function show(Request $request, string $id): JsonResponse
+    {
+        $tenantId = $request->input('tenant_id');
+        $order = Order::where('tenant_id', $tenantId)->with('items')->findOrFail($id);
+
+        return response()->json(['order' => $order]);
+    }
+
+    public function update(Request $request, string $id): JsonResponse
+    {
+        $tenantId = $request->input('tenant_id');
+        $order = Order::where('tenant_id', $tenantId)->findOrFail($id);
+
+        if (in_array($order->status, ['completed', 'cancelled'])) {
+            return response()->json(['error' => 'Cannot update a completed or cancelled order'], 409);
+        }
+
+        $order->update($request->only(['shipping_address', 'notes']));
+
+        return response()->json([
+            'message' => 'Order updated',
+            'order'   => $order->fresh()->load('items'),
+        ]);
+    }
+
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        $tenantId = $request->input('tenant_id');
+        $order = Order::where('tenant_id', $tenantId)->findOrFail($id);
+
+        if (!in_array($order->status, ['cancelled', 'failed'])) {
+            return response()->json(['error' => 'Only cancelled or failed orders can be deleted'], 409);
+        }
+
+        $order->delete();
+        return response()->json(['message' => 'Order deleted']);
+    }
+
+    /**
+     * Cancel an order and trigger compensating transactions (Saga rollback)
+     */
+    public function cancel(Request $request, string $id): JsonResponse
+    {
+        $tenantId = $request->input('tenant_id');
+        $token    = $request->bearerToken();
+        $order    = Order::where('tenant_id', $tenantId)->with('items')->findOrFail($id);
+
+        if (in_array($order->status, ['completed', 'cancelled'])) {
+            return response()->json(['error' => 'Order cannot be cancelled'], 409);
+        }
+
+        $result = $this->sagaOrchestrator->cancelOrderSaga(
+            order: $order,
+            token: $token,
+            reason: $request->input('reason', 'Cancelled by user'),
+        );
+
+        return response()->json([
+            'message'       => 'Order cancelled',
+            'order'         => $result['order'],
+            'compensations' => $result['compensations'],
+            'saga_status'   => 'COMPENSATED',
+        ]);
+    }
+
+    public function complete(Request $request, string $id): JsonResponse
+    {
+        $tenantId = $request->input('tenant_id');
+        $order    = Order::where('tenant_id', $tenantId)->with('items')->findOrFail($id);
+
+        if ($order->status !== 'confirmed') {
+            return response()->json(['error' => 'Only confirmed orders can be completed'], 409);
+        }
+
+        $result = $this->sagaOrchestrator->completeOrderSaga($order, $request->bearerToken());
+
+        return response()->json([
+            'message' => 'Order completed',
+            'order'   => $result['order'],
+        ]);
+    }
+
+    /**
+     * Cross-service: Filter orders by product attributes (name, code, category)
+     * Calls Product Service to find product IDs, then filters order items
+     */
+    public function filterByProduct(Request $request): JsonResponse
+    {
+        $tenantId = $request->input('tenant_id');
+        $token    = $request->bearerToken();
+
+        $searchParams = array_filter([
+            'name'        => $request->input('product_name'),
+            'code'        => $request->input('product_code'),
+            'category_id' => $request->input('category_id'),
+            'q'           => $request->input('q'),
         ]);
 
-        foreach ($data['items'] as $item) {
-            $subtotal = $item['quantity'] * $item['unit_price'];
-            $totalAmount += $subtotal;
+        if (empty($searchParams)) {
+            return response()->json(['error' => 'At least one product filter is required'], 422);
+        }
 
-            OrderItem::create([
-                'order_id'     => $order->id,
-                'product_id'   => $item['product_id'],
-                'product_name' => $item['product_name'],
-                'quantity'     => $item['quantity'],
-                'unit_price'   => $item['unit_price'],
-                'subtotal'     => $subtotal,
+        // Step 1: Get matching product IDs from Product Service
+        $productResult = $this->productClient->searchProducts($token, $tenantId, $searchParams);
+
+        if (!$productResult['success']) {
+            return response()->json([
+                'error'   => 'Failed to fetch products',
+                'details' => $productResult['error'] ?? 'Service unavailable',
+            ], 502);
+        }
+
+        $productIds = collect($productResult['products'])->pluck('id')->toArray();
+
+        if (empty($productIds)) {
+            return response()->json([
+                'orders'          => [],
+                'total'           => 0,
+                'products_found'  => 0,
+                'filters_applied' => $searchParams,
+                'message'         => 'No products matched the filter criteria',
             ]);
         }
 
-        $order->total_amount = $totalAmount;
-        $order->save();
+        // Step 2: Find orders containing those products
+        $orderIds = OrderItem::whereIn('product_id', $productIds)
+            ->where('tenant_id', $tenantId)
+            ->distinct()
+            ->pluck('order_id');
 
-        return response()->json($order->load('items'), 201);
-    }
+        $orders = Order::where('tenant_id', $tenantId)
+            ->whereIn('id', $orderIds)
+            ->with('items')
+            ->paginate($request->input('per_page', 15));
 
-    // ── Get single order ──────────────────────────────────────────────────
+        // Enrich order items with product info
+        $productMap = collect($productResult['products'])->keyBy('id');
+        $orders->getCollection()->each(function ($order) use ($productMap) {
+            $order->items->each(function ($item) use ($productMap) {
+                $item->product = $productMap->get($item->product_id);
+            });
+        });
 
-    public function show(int $id): JsonResponse
-    {
-        $order = Order::with('items')->findOrFail($id);
-        return response()->json($order);
-    }
-
-    // ── Update order ──────────────────────────────────────────────────────
-
-    public function update(Request $request, int $id): JsonResponse
-    {
-        $order = Order::findOrFail($id);
-
-        $validator = Validator::make($request->all(), [
-            'customer_email' => 'sometimes|email',
-            'customer_name'  => 'sometimes|string|max:255',
-            'status'         => 'sometimes|in:pending,confirmed,failed,cancelled',
+        return response()->json([
+            'orders'          => $orders,
+            'products_found'  => count($productIds),
+            'filters_applied' => $searchParams,
         ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
-        $order->update($validator->validated());
-
-        return response()->json($order->load('items'));
-    }
-
-    // ── Delete order ──────────────────────────────────────────────────────
-
-    public function destroy(int $id): JsonResponse
-    {
-        $order = Order::findOrFail($id);
-        $order->items()->delete();
-        $order->delete();
-
-        return response()->json(['message' => 'Order deleted.'], 200);
-    }
-
-    // ── List items for a specific order ───────────────────────────────────
-
-    public function items(int $id): JsonResponse
-    {
-        $order = Order::findOrFail($id);
-        return response()->json($order->items);
     }
 }

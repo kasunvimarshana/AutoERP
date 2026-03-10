@@ -1,45 +1,33 @@
-# Laravel / PHP
-vendor/
-*.phpunit.result.cache
-storage/framework/cache/
-storage/framework/sessions/
-storage/framework/views/
-storage/logs/
-bootstrap/cache/
+# Env files (keep examples, ignore actual)
 .env
-.env.*
-!.env.example
-*.log
+*.env
 
-# Node.js
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Vendor directories
+*/vendor/
+*/node_modules/
 
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-build/
-dist/
-*.egg-info/
-.pytest_cache/
-*.db
-*.sqlite3
-notifications.db
+# Laravel storage (keep directory, not contents)
+*/storage/logs/*.log
+*/storage/app/public
+*/storage/framework/cache/data
+*/storage/framework/sessions
+*/storage/framework/views
 
-# Docker
-.dockerignore
+# Bootstrap cache (runtime, not source)
+*/bootstrap/cache/*.php
+
+# PHPUnit caches
+*/.phpunit.result.cache
+*/.phpunit.cache/
+
+# Docker volumes
+.docker/
 
 # IDE
 .idea/
 .vscode/
 *.swp
-*.swo
-.DS_Store
 
 # OS
+.DS_Store
 Thumbs.db

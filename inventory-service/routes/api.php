@@ -1,32 +1,32 @@
 <?php
 
-use App\Http\Controllers\ProductController;
-use App\Http\Controllers\ReservationController;
+use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\InventoryMovementController;
 use Illuminate\Support\Facades\Route;
 
-/*
-|--------------------------------------------------------------------------
-| Inventory Service API Routes
-|--------------------------------------------------------------------------
-|
-| Products:
-|   GET    /api/products               List products (filter by category, price, search, in_stock)
-|   POST   /api/products               Create product
-|   GET    /api/products/{id}          Get product with stock level
-|   PUT    /api/products/{id}          Update product
-|   DELETE /api/products/{id}          Delete product
-|   POST   /api/products/{id}/restock  Restock a product
-|
-| Reservations (Saga compensating support):
-|   POST   /api/reservations           Reserve stock for an order
-|   DELETE /api/reservations/release   Release (rollback) reservations
-|   GET    /api/reservations           List reservations
-|
-*/
+Route::get('/health', fn() => response()->json(['status' => 'ok', 'service' => 'inventory-service']));
 
-Route::apiResource('products', ProductController::class);
-Route::post('products/{id}/restock', [ProductController::class, 'restock']);
+Route::middleware(['jwt.auth', 'tenant'])->group(function () {
+    // Inventory CRUD
+    Route::prefix('inventory')->group(function () {
+        Route::get('/', [InventoryController::class, 'index']);
+        Route::post('/', [InventoryController::class, 'store']);
+        Route::get('/low-stock', [InventoryController::class, 'lowStock']);
+        Route::get('/by-product/{productId}', [InventoryController::class, 'byProduct']);
+        Route::get('/filter-by-product-attributes', [InventoryController::class, 'filterByProductAttributes']);
+        Route::get('/{id}', [InventoryController::class, 'show']);
+        Route::put('/{id}', [InventoryController::class, 'update']);
+        Route::delete('/{id}', [InventoryController::class, 'destroy']);
 
-Route::post('reservations',          [ReservationController::class, 'store']);
-Route::delete('reservations/release',[ReservationController::class, 'release']);
-Route::get('reservations',           [ReservationController::class, 'index']);
+        // Stock operations
+        Route::post('/{id}/reserve', [InventoryController::class, 'reserve']);
+        Route::post('/{id}/release', [InventoryController::class, 'release']);
+        Route::post('/{id}/adjust', [InventoryController::class, 'adjust']);
+    });
+
+    // Inventory movements / audit trail
+    Route::prefix('inventory-movements')->group(function () {
+        Route::get('/', [InventoryMovementController::class, 'index']);
+        Route::get('/{id}', [InventoryMovementController::class, 'show']);
+    });
+});
