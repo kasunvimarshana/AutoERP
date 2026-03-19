@@ -1,0 +1,13 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    paths:
+        - app
+        - tests
+    level: 9
+    ignoreErrors:
+        - '#Call to an undefined method Illuminate\\Database\\Eloquent\\Builder#'
+        - '#Call to an undefined method Illuminate\\Database\\Eloquent\\Relations\\#'
+    checkMissingIterableValueType: false
+    checkGenericClassInNonGenericObjectType: false

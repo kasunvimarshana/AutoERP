@@ -1,0 +1,74 @@
+version: '3.9'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kv_sso_app
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html
+    environment:
+      - APP_ENV=local
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - kv_sso_network
+    ports:
+      - "8000:8000"
+    command: php artisan serve --host=0.0.0.0 --port=8000
+
+  mysql:
+    image: mysql:8.0
+    container_name: kv_sso_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_DATABASE: kv_sso
+      MYSQL_USER: kv_sso_user
+      MYSQL_PASSWORD: secret
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - kv_sso_network
+    ports:
+      - "3306:3306"
+
+  redis:
+    image: redis:7-alpine
+    container_name: kv_sso_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - kv_sso_network
+    ports:
+      - "6379:6379"
+
+  horizon:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kv_sso_horizon
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - kv_sso_network
+    command: php artisan horizon
+
+networks:
+  kv_sso_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:

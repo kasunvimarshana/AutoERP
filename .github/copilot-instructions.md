@@ -1,165 +1,224 @@
-# Copilot Coding Agent Instructions
+# Copilot Instructions for KV_SSO
 
 ## Project Overview
 
-This repository is an **enterprise-grade, production-ready ERP/CRM SaaS platform** composed entirely of independent microservices. Every domain capability runs as a loosely coupled microservice that is fully dynamic, customizable, reusable, extendable, vertically and horizontally scalable, and configurable at runtime without redeployment.
+**KV_SSO** is a production-ready, enterprise-grade **Single Sign-On (SSO)** and distributed authentication/authorization system designed for a multi-tenant ERP/CRM SaaS platform. It is the **Auth Service** microservice within a broader ecosystem of loosely coupled services (Product, Inventory, Warehouse, User, Order, Finance, CRM, Procurement, Workflow, Reporting, Configuration).
+
+The platform is primarily built with **Laravel (LTS)** and follows a microservices architecture where each service communicates only through **versioned REST APIs (`/api/v1`)**, **gRPC**, or **asynchronous messaging (Kafka / RabbitMQ)**. Direct database access between services is strictly prohibited.
 
 ---
 
-## Architecture Principles
+## Architecture & Engineering Principles
 
-### Microservices Design
-- **Strict service isolation**: no direct database access between services.
-- All inter-service communication must use **versioned REST APIs** (`/api/v1`), **gRPC**, or **asynchronous messaging** via Kafka or RabbitMQ.
-- Each service independently owns its technology stack, database, infrastructure, and deployment lifecycle.
-- Core microservices: **Auth, User, Product, Inventory, Warehouse, Order, Finance, CRM, Procurement, Workflow, Reporting, Configuration**.
-
-### Engineering Principles
-- **Domain-Driven Design (DDD)**, Clean Architecture, API-first, SOLID, DRY, KISS.
-- **Controller → Service → Repository pipeline** with thin controllers.
-- Use **Request classes** for input validation, **Resource/DTO classes** for API responses.
-- All abstractions must be backed by **interfaces/contracts** to enforce dependency inversion.
-- Enforce **meaningful naming conventions**, strict modular boundaries, and **zero circular dependencies**.
-- Use a **modular plugin-style architecture**; modules must be independently deployable and runtime-enable/disable-able per tenant.
+- **Domain-Driven Design (DDD)** with bounded contexts per microservice.
+- **Clean Architecture**: Controller → Service → Repository pipeline; thin controllers only.
+- **SOLID, DRY, KISS** principles enforced throughout.
+- **API-first design**: Every feature is exposed via a versioned REST endpoint with an OpenAPI 3.1 contract before implementation.
+- **Modular, plugin-style architecture**: Strict module boundaries, no circular dependencies.
+- Use **Request classes** for input validation, **Resource classes** for API response shaping, and **Interfaces/Contracts** for dependency inversion.
 
 ---
 
-## Multi-Tenant SaaS Model
+## Multi-Tenancy Model
 
-- Hierarchical tenant isolation: **Tenant → Organisation → Branch → Location → Department**.
-- Support multi-organization, multi-vendor, multi-branch, multi-currency, multi-language, multi-device, and multi-unit-of-measure (UOM) with conversion matrices.
-- Strict **tenant-scoped queries, caches, queues, storage, configurations**, and tenant-specific feature flags.
-- Runtime configuration for databases, caches, queues, message brokers, feature flags, API keys, email services, storage, workflow definitions, pricing rules, tax rules, and environment parameters — **without redeployment or restart**.
+The platform enforces a strict hierarchical tenant isolation model:
 
----
+```
+Tenant → Organisation → Branch → Location → Department
+```
 
-## Authentication & Authorization System
-
-### Centralized Auth Microservice
-- Issues **stateless JWT access tokens** signed with **asymmetric public/private keys**; support cryptographic agility across algorithms (RS256, RS384, RS512) with RS256 as the default, so the algorithm can be upgraded without architectural changes.
-- All other microservices perform **local token verification using the public key** — no Auth service call per request.
-- Token claims must include: `user_id`, `tenant_id`, `organization_id`, `branch_id`, `roles`, `permissions`, `device_id`, `token_version`, `issuer`, `expiration`.
-
-### Authorization Model
-- **RBAC + ABAC**: roles, permissions, attributes, and contextual policies enforced through middleware, policies, and gates across all microservices.
-- Support **multi-guard authentication** per user/device/organization.
-
-### Session & Token Management
-- Short-lived access tokens + revocable refresh tokens stored securely.
-- **Distributed revocation lists** via Redis for global logout and device-level logout.
-- Token refresh, rotation, and revocation flows must be fully implemented.
-- Multi-device session management, SSO, API authentication, and service-to-service authentication.
-
-### Security Requirements
-- Password hashing: **Argon2 or bcrypt**.
-- Protect against CSRF, XSS, SQL injection, rate limiting, token replay, and suspicious activity.
-- Use **signed URLs** where appropriate.
-- Maintain **immutable append-only audit logs** for all authentication events.
-- Propagate identity securely between services via JWT headers or event metadata.
+- All database queries, cache keys, queues, storage paths, and configurations **must be tenant-scoped**.
+- JWT tokens carry contextual claims: `user_id`, `tenant_id`, `organization_id`, `branch_id`, `roles`, `permissions`, `device_id`, `token_version`, `issuer`, `exp`.
+- **Never** allow cross-tenant data leakage.
 
 ---
 
-## Product Domain
+## Authentication & Authorization
 
-- Support product types: **physical, consumable, service, digital, bundle, composite, variant-based**.
-- SKU management, barcode/QR support, optional GS1 compatibility, multiple images/assets.
-- Cost and valuation methods: **FIFO, LIFO, Weighted Average**.
-- Serial/lot/batch traceability, multi-location and multi-currency pricing.
-- Rule-based pricing engines, tier pricing, base UOM / buying UOM / selling UOM with unit conversion matrices.
-- All financial values must use **arbitrary-precision decimal calculations** (BCMath or equivalent):
-  - Monetary amounts: minimum **4 decimal places** of storage and calculation precision.
-  - Exchange rates and unit conversion factors: minimum **6 decimal places**.
-  - Rounding must use **ROUND_HALF_UP** (banker's rounding is not acceptable for financial ledgers).
-  - Display precision may differ from storage precision; truncation must never occur silently.
+- **Auth Service** uses **Laravel Passport** to issue stateless **JWT tokens** (asymmetric RS256 signing).
+- All other microservices verify tokens **locally** using the Auth Service's **public key** — no round-trip to Auth Service per request.
+- Support **SSO**, **multi-guard authentication** (per user/device/organization), **token rotation**, **revocation via Redis distributed revocation lists**, and **multi-device session management**.
+- Authorization combines **RBAC + ABAC** enforced through **Laravel Policies and Gates**.
+- Tokens are **short-lived** (access tokens ≤15 min); refresh tokens are revocable and stored securely.
 
----
-
-## Inventory & Warehouse Management
-
-- **Ledger-driven, immutable, transactional**: all stock movements occur only through transactions, never direct edits.
-- Multi-warehouse and multi-bin storage, serial/lot/batch tracking, expiry tracking.
-- Valuation strategies: **FEFO, FIFO, LIFO**.
-- Features: reservations, adjustments, transfers, returns, cycle counting, reorder rules, procurement suggestions, backorders, drop-shipping, damage handling, stock history reconstruction.
-- Enforce **pessimistic locking** for stock deductions, **optimistic locking** for updates.
-- **Idempotent APIs**, atomic database transactions, versioning, and complete audit trails.
-- Industry-agnostic: suitable for pharmacy, manufacturing, ecommerce, retail, wholesale, logistics, hospitals, service centers, supermarkets.
-- Optional **pharmaceutical compliance mode**: mandatory lot tracking, expiry management, FEFO enforcement, quarantine workflows, regulatory audit logs.
+### Security Requirements (always enforce)
+- Password hashing: **Argon2id** (preferred) or bcrypt.
+- CSRF protection on all stateful endpoints.
+- Rate limiting on all authentication endpoints.
+- Immutable, append-only **audit logs** for all auth events.
+- Replay protection via `jti` (JWT ID) stored in Redis.
+- Suspicious activity detection (brute-force, anomalous IP/device).
 
 ---
 
-## ERP Domain Flows
+## Coding Conventions
 
-- **Sales/POS**: Quotation → Sales Order → Delivery → Invoice → Payment.
-- **CRM Pipeline**: Lead → Opportunity → Proposal → Closed Won/Lost.
-- **Procurement**: Purchase Request → RFQ → Vendor Selection → Purchase Order → Goods Receipt → Vendor Bill → Payment.
-- **Accounting**: Double-entry bookkeeping, chart of accounts, journal entries, trial balance, P&L, balance sheets, tax engines.
-- Financial reconciliation with inventory valuation must be maintained.
+### PHP / Laravel
+- **PHP 8.2+** with strict types (`declare(strict_types=1);`) in every file.
+- Follow **PSR-12** coding standard.
+- All classes must be **final** unless explicitly designed for extension.
+- Use **constructor property promotion** where applicable.
+- Use **readonly** properties for value objects and DTOs.
+- No raw SQL — use Eloquent ORM or Query Builder with parameterized bindings only.
+- All public methods on Service and Repository classes must have return types declared.
 
----
+### Naming Conventions
+| Layer | Convention | Example |
+|---|---|---|
+| Controllers | `{Entity}Controller` | `AuthController` |
+| Form Requests | `{Action}{Entity}Request` | `LoginUserRequest` |
+| Resources | `{Entity}Resource` | `UserResource` |
+| Services | `{Entity}Service` | `TokenService` |
+| Repositories | `{Entity}Repository` | `UserRepository` |
+| Interfaces | `{Entity}RepositoryInterface` | `UserRepositoryInterface` |
+| Events | `{Entity}{Action}Event` | `UserLoggedInEvent` |
+| Listeners | `{Action}{Entity}Listener` | `LogAuthEventListener` |
+| Jobs | `{Action}{Entity}Job` | `RevokeUserTokensJob` |
+| Policies | `{Entity}Policy` | `TokenPolicy` |
 
-## Distributed Transactions & Messaging
-
-- Implement the **Saga Pattern** with a reusable orchestrator for distributed workflows (e.g., Order → Inventory → Payment → Confirmation) with compensating rollback actions.
-- Ensure eventual consistency using **event-driven communication** and the **Outbox Pattern**.
-- Cross-service filtering (e.g., orders by product attributes) must use APIs or event-driven sync — never direct DB queries.
-
----
-
-## Runtime & Metadata-Driven Configuration
-
-- Forms, fields, workflows, approval chains, validation rules, conditional logic, computed fields, pricing engines, tax engines, commission engines, discount engines, notification templates, UI layouts, rule engines (IF condition THEN action), and workflow state machines (State → Event → Transition → Guard → Action) must all be **metadata-driven and editable at runtime without code changes**.
-- Administrators must be able to dynamically manage tenants, roles, permissions, feature flags, policies, token lifetimes, and service integrations without redeployment.
-
----
-
-## API Standards
-
-- All APIs follow **versioned REST** standards: `/api/v1/...`.
-- Standardized **response envelopes** with consistent structure (data, meta, errors).
-- Support pagination, filtering, and sorting on all list endpoints.
-- **OpenAPI 3.1** documentation for all services.
-- Include webhook integrations, event publishing, and third-party connectors.
-- Health-check endpoints on every service.
-
----
-
-## Infrastructure & DevOps
-
-- **Docker** containerization, **Kubernetes** orchestration with Helm charts.
-- Auto-scaling, service discovery, CI/CD pipelines, blue-green deployments.
-- Centralized logging, observability metrics (**Prometheus**, OpenTelemetry).
-- **Laravel Horizon / Telescope** monitoring for Laravel-based services.
-- Static analysis: **PHPStan level 9** for PHP services.
-- Micro-frontend-ready **React (LTS)** UI architecture.
-
----
-
-## Testing & Quality
-
-- Automated tests: unit, feature, tenant isolation, authorization, concurrency, financial precision.
-- Mutation testing.
-- Performance targets (p95, measured at the service boundary, excluding network transit):
-  - Simple reads (single record, no joins): **≤100 ms**.
-  - Complex reads (filtered lists, aggregations, cross-service lookups): **≤200 ms**.
-  - Write operations (create/update with validation and event publishing): **≤300 ms**.
-- No hardcoded values; all configuration must be externalised.
+### Directory Structure (per module)
+```
+app/
+  Http/
+    Controllers/Api/V1/
+    Requests/
+    Resources/
+    Middleware/
+  Domain/
+    Models/
+    Events/
+    ValueObjects/
+  Services/
+  Repositories/
+    Contracts/
+    Eloquent/
+  Policies/
+  Jobs/
+  Listeners/
+```
 
 ---
 
-## Security & Compliance
+## API Design Standards
 
-- CSRF protection, XSS prevention, SQL injection protection, rate limiting.
-- Token rotation and replay prevention.
-- Immutable, append-only audit logs with long-term regulatory retention.
-- Data integrity: transactions, foreign keys, unique constraints, idempotency keys, optimistic/pessimistic locking, version tracking.
+- All APIs are versioned under `/api/v1/`.
+- Every response uses a **standard envelope**:
+  ```json
+  {
+    "success": true,
+    "data": { ... },
+    "message": "Operation completed.",
+    "meta": { "pagination": { ... } }
+  }
+  ```
+- Error responses:
+  ```json
+  {
+    "success": false,
+    "error": { "code": "AUTH_001", "message": "Token expired." },
+    "trace_id": "uuid-v4"
+  }
+  ```
+- Use **idempotency keys** (`Idempotency-Key` header) on all mutating endpoints.
+- Pagination: use cursor-based pagination for large datasets.
+- All endpoints must be documented with **OpenAPI 3.1 annotations**.
 
 ---
 
-## Code Style & Conventions
+## Testing Requirements
 
-- Follow the **Controller → Service → Repository** pattern consistently.
-- Name classes and methods clearly and descriptively; avoid abbreviations.
-- All service interfaces must live in a dedicated `Contracts` or `Interfaces` namespace.
-- Event names: past tense (e.g., `OrderPlaced`, `StockReserved`).
-- Use dependency injection throughout; no `new ClassName()` outside of factories/providers.
-- Write PHPDoc blocks for all public methods on service and repository classes.
+Run tests with:
+```bash
+php artisan test
+# or
+./vendor/bin/phpunit
+```
+
+Test categories to maintain:
+- **Unit tests**: Service layer, value objects, domain logic.
+- **Feature tests**: Full HTTP request/response cycle per endpoint.
+- **Tenant isolation tests**: Verify no cross-tenant data leakage.
+- **Authorization tests**: RBAC/ABAC enforcement per role/permission.
+- **Concurrency tests**: Pessimistic/optimistic locking correctness.
+
+Test file naming: `{ClassName}Test.php` in `tests/Unit/` or `tests/Feature/`.
+
+---
+
+## Static Analysis
+
+Run PHPStan at level 9 before committing:
+```bash
+./vendor/bin/phpstan analyse --level=9
+```
+
+All code must pass PHPStan level 9 with zero errors.
+
+---
+
+## Infrastructure & Environment
+
+- **Docker** + **Kubernetes** (Helm charts) for deployment.
+- **Redis**: Cache, session, revocation lists, rate limiting, queues.
+- **MySQL / PostgreSQL**: Primary relational database (tenant-scoped).
+- **Kafka / RabbitMQ**: Async event messaging between microservices.
+- Use `.env` for all environment-specific values; **never hardcode secrets**.
+- Health check endpoint: `GET /health` (returns `200 OK` with service status).
+- Metrics endpoint: `GET /metrics` (Prometheus-compatible).
+- **Laravel Horizon** for queue monitoring; **Laravel Telescope** for local debugging (disabled in production).
+
+---
+
+## Distributed Systems Patterns
+
+- **Outbox Pattern**: All domain events are written to an outbox table within the same DB transaction before being published to the message broker.
+- **Saga Pattern**: For distributed transactions (e.g., Order → Inventory → Payment), use a reusable Saga orchestrator with compensating rollback actions.
+- **Idempotent APIs**: All endpoints must be safe to retry without side effects.
+- **Optimistic locking**: Use `version` column for concurrent update protection.
+- **Pessimistic locking**: Use `lockForUpdate()` for stock deduction and financial operations.
+
+---
+
+## Performance Targets
+
+- **p95 latency** for CRUD operations: ≤ 200 ms.
+- Authentication token verification: ≤ 10 ms (local JWT validation, no Auth Service round-trip).
+- Avoid N+1 queries — always eager-load relationships.
+
+---
+
+## Key Files & Entry Points
+
+| File | Purpose |
+|---|---|
+| `README.md` | High-level project description |
+| `AGENT.md` | Agent-specific instructions |
+| `COPILOT.md` | Extended Copilot context |
+| `CLAUDE.md` | Extended context for Claude agent |
+| `.github/copilot-instructions.md` | This file — Copilot coding agent instructions |
+| `app/Http/Controllers/Api/V1/` | All API controllers |
+| `app/Services/` | Business logic layer |
+| `app/Repositories/` | Data access layer |
+| `routes/api.php` | API route definitions |
+| `config/` | Application configuration |
+| `database/migrations/` | Database schema |
+
+---
+
+## Common Tasks
+
+### Adding a new API endpoint
+1. Create a Form Request in `app/Http/Requests/`.
+2. Create or update a Resource in `app/Http/Resources/`.
+3. Add the method to the Service interface and implementation.
+4. Add a thin controller method calling the service.
+5. Register the route in `routes/api.php` under the `v1` prefix.
+6. Write Feature test covering happy path and error cases.
+7. Add OpenAPI annotation to the controller method.
+
+### Adding a new domain event
+1. Create the Event class in `app/Domain/Events/`.
+2. Create a Listener in `app/Listeners/`.
+3. Write to the outbox table in the same DB transaction.
+4. Register in `EventServiceProvider`.
+5. Write a unit test for the event dispatch.
