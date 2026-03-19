@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  # API Gateway
+  gateway:
+    image: kong:latest
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /usr/local/kong/declarative/kong.yml
+    ports:
+      - "8000:8000"
+      - "8443:8443"
+    volumes:
+      - ./infrastructure/gateway/kong.yml:/usr/local/kong/declarative/kong.yml
+
+  # Core Services
+  inventory-service:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile
+      args:
+        SERVICE_NAME: inventory-service
+    environment:
+      DB_HOST: postgres-inventory
+      REDIS_HOST: redis
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      - postgres-inventory
+      - redis
+      - kafka
+
+  product-service:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile
+      args:
+        SERVICE_NAME: product-service
+    environment:
+      DB_HOST: postgres-product
+      REDIS_HOST: redis
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      - postgres-product
+      - redis
+      - kafka
+
+  # Databases
+  postgres-inventory:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: inventory_db
+      POSTGRES_PASSWORD: password
+
+  postgres-product:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: product_db
+      POSTGRES_PASSWORD: password
+
+  redis:
+    image: redis:7-alpine
+
+  # Message Broker
+  kafka:
+    image: bitnami/kafka:latest
+    environment:
+      KAFKA_CFG_NODE_ID: 0
+      KAFKA_CFG_PROCESS_ROLES: controller,broker
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT
