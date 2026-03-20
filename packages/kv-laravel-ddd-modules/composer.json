@@ -1,5 +1,6 @@
 {
     "name": "kasunvimarshana/kv-laravel-ddd-modules",
+    "version": "1.0.x-dev",
     "description": "A production-ready Laravel DDD modules package with CQRS support, dynamic configuration, and full Artisan command suite",
     "type": "library",
     "license": "MIT",

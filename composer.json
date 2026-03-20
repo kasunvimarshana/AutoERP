@@ -9,7 +9,7 @@
         "php": "^8.2",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
-        "kasunvimarshana/kv-laravel-ddd-modules": "@dev"
+        "kasunvimarshana/kv-laravel-ddd-modules": "1.0.x-dev"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

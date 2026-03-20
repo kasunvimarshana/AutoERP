@@ -1,5 +1,6 @@
 {
     "name": "kasunvimarshana/kv-laravel-ddd-modules",
+    "version": "1.0.x-dev",
     "description": "A fully dynamic, customizable Laravel package for creating DDD (Domain-Driven Design) modular structures via Artisan commands",
     "type": "library",
     "keywords": ["laravel", "ddd", "domain-driven-design", "modules", "artisan", "package"],
@@ -12,12 +13,12 @@
     ],
     "require": {
         "php": "^8.1",
-        "illuminate/support": "^10.0|^11.0",
-        "illuminate/console": "^10.0|^11.0",
-        "illuminate/filesystem": "^10.0|^11.0"
+        "illuminate/support": "^10.0|^11.0|^12.0",
+        "illuminate/console": "^10.0|^11.0|^12.0",
+        "illuminate/filesystem": "^10.0|^11.0|^12.0"
     },
     "require-dev": {
-        "orchestra/testbench": "^8.0|^9.0",
+        "orchestra/testbench": "^8.0|^9.0|^10.0",
         "phpunit/phpunit": "^10.0|^11.0"
     },
     "autoload": {
