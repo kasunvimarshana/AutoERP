@@ -7,9 +7,10 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "kasunvimarshana/laravel-ddd-modules": "1.0.x-dev",
         "laravel/framework": "^12.0",
-        "laravel/tinker": "^2.10.1",
-        "kasunvimarshana/laravel-ddd-modules": "1.0.x-dev"
+        "laravel/passport": "^13.6",
+        "laravel/tinker": "^2.10.1"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
