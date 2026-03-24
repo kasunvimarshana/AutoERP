@@ -8,9 +8,9 @@ use Modules\OrganizationUnit\Domain\Events\OrganizationUnitCreated;
 use Modules\OrganizationUnit\Domain\Events\OrganizationUnitUpdated;
 use Modules\OrganizationUnit\Domain\Events\OrganizationUnitDeleted;
 use Modules\OrganizationUnit\Domain\Events\OrganizationUnitMoved;
-use Modules\OrganizationUnit\Domain\ValueObjects\Name;
-use Modules\OrganizationUnit\Domain\ValueObjects\Code;
-use Modules\OrganizationUnit\Domain\ValueObjects\Metadata;
+use Modules\Core\Domain\ValueObjects\Name;
+use Modules\Core\Domain\ValueObjects\Code;
+use Modules\Core\Domain\ValueObjects\Metadata;
 
 class OrganizationUnitEntityTest extends TestCase
 {

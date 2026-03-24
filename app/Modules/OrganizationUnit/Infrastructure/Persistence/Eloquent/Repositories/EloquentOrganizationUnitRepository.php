@@ -5,9 +5,9 @@ namespace Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Repositor
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitRepositoryInterface;
 use Modules\OrganizationUnit\Domain\Entities\OrganizationUnit;
-use Modules\OrganizationUnit\Domain\ValueObjects\Name;
-use Modules\OrganizationUnit\Domain\ValueObjects\Code;
-use Modules\OrganizationUnit\Domain\ValueObjects\Metadata;
+use Modules\Core\Domain\ValueObjects\Name;
+use Modules\Core\Domain\ValueObjects\Code;
+use Modules\Core\Domain\ValueObjects\Metadata;
 use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
 use Modules\OrganizationUnit\Domain\Exceptions\OrganizationUnitNotFoundException;
 use Illuminate\Support\Collection;

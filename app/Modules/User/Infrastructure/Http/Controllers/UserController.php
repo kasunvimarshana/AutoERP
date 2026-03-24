@@ -10,6 +10,8 @@ use Modules\User\Application\Contracts\AssignRoleServiceInterface;
 use Modules\User\Application\Contracts\UpdatePreferencesServiceInterface;
 use Modules\User\Application\DTOs\UserData;
 use Modules\User\Application\DTOs\UserPreferencesData;
+use Modules\User\Infrastructure\Http\Requests\StoreUserRequest;
+use Modules\User\Infrastructure\Http\Requests\UpdateUserRequest;
 use Modules\User\Infrastructure\Http\Requests\UpdatePreferencesRequest;
 use Modules\User\Infrastructure\Http\Resources\UserResource;
 use Modules\User\Infrastructure\Http\Resources\UserCollection;
@@ -42,11 +44,10 @@ class UserController extends BaseController
         return new UserCollection($users);
     }
 
-    public function store(Request $request): UserResource
+    public function store(StoreUserRequest $request): UserResource
     {
         $this->authorize('create', User::class);
-        $validated = $request->validate((new UserData())->rules());
-        $dto = UserData::fromArray($validated);
+        $dto = UserData::fromArray($request->validated());
         $user = $this->service->execute($dto->toArray());
         return new UserResource($user);
     }
@@ -61,14 +62,14 @@ class UserController extends BaseController
         return new UserResource($user);
     }
 
-    public function update(Request $request, int $id): UserResource
+    public function update(UpdateUserRequest $request, int $id): UserResource
     {
         $user = $this->service->find($id);
         if (!$user) {
             abort(404);
         }
         $this->authorize('update', $user);
-        $validated = $request->validate((new UserData())->rules());
+        $validated = $request->validated();
         $validated['id'] = $id;
         $dto = UserData::fromArray($validated);
         $updated = $this->updateService->execute($dto->toArray());

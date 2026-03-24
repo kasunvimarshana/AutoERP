@@ -4,12 +4,12 @@ namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use Modules\Tenant\Domain\Entities\Tenant;
-use Modules\Tenant\Domain\ValueObjects\DatabaseConfig;
-use Modules\Tenant\Domain\ValueObjects\MailConfig;
-use Modules\Tenant\Domain\ValueObjects\CacheConfig;
-use Modules\Tenant\Domain\ValueObjects\QueueConfig;
-use Modules\Tenant\Domain\ValueObjects\FeatureFlags;
-use Modules\Tenant\Domain\ValueObjects\ApiKeys;
+use Modules\Core\Domain\ValueObjects\DatabaseConfig;
+use Modules\Core\Domain\ValueObjects\MailConfig;
+use Modules\Core\Domain\ValueObjects\CacheConfig;
+use Modules\Core\Domain\ValueObjects\QueueConfig;
+use Modules\Core\Domain\ValueObjects\FeatureFlags;
+use Modules\Core\Domain\ValueObjects\ApiKeys;
 
 class TenantEntityTest extends TestCase
 {
@@ -17,7 +17,7 @@ class TenantEntityTest extends TestCase
     {
         return new Tenant(
             name: $name,
-            databaseConfig: new DatabaseConfig([
+            databaseConfig: DatabaseConfig::fromArray([
                 'driver'   => 'mysql',
                 'host'     => 'localhost',
                 'port'     => 3306,
@@ -45,7 +45,7 @@ class TenantEntityTest extends TestCase
         $tenant->update(
             name: 'New Name',
             domain: 'newdomain.com',
-            databaseConfig: new DatabaseConfig(['database' => 'new_db', 'username' => 'user', 'password' => 'pass']),
+            databaseConfig: DatabaseConfig::fromArray(['database' => 'new_db', 'username' => 'user', 'password' => 'pass']),
             active: false,
         );
 
@@ -69,7 +69,7 @@ class TenantEntityTest extends TestCase
 
     public function test_database_config_has_safe_defaults(): void
     {
-        $config = new DatabaseConfig([]);
+        $config = DatabaseConfig::fromArray([]);
 
         $this->assertSame('mysql', $config->toArray()['driver']);
         $this->assertSame('127.0.0.1', $config->toArray()['host']);

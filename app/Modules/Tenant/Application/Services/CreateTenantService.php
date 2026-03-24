@@ -5,12 +5,12 @@ namespace Modules\Tenant\Application\Services;
 use Modules\Core\Application\Services\BaseService;
 use Modules\Tenant\Domain\RepositoryInterfaces\TenantRepositoryInterface;
 use Modules\Tenant\Domain\Entities\Tenant;
-use Modules\Tenant\Domain\ValueObjects\DatabaseConfig;
-use Modules\Tenant\Domain\ValueObjects\MailConfig;
-use Modules\Tenant\Domain\ValueObjects\CacheConfig;
-use Modules\Tenant\Domain\ValueObjects\QueueConfig;
-use Modules\Tenant\Domain\ValueObjects\FeatureFlags;
-use Modules\Tenant\Domain\ValueObjects\ApiKeys;
+use Modules\Core\Domain\ValueObjects\DatabaseConfig;
+use Modules\Core\Domain\ValueObjects\MailConfig;
+use Modules\Core\Domain\ValueObjects\CacheConfig;
+use Modules\Core\Domain\ValueObjects\QueueConfig;
+use Modules\Core\Domain\ValueObjects\FeatureFlags;
+use Modules\Core\Domain\ValueObjects\ApiKeys;
 use Modules\Tenant\Application\Contracts\CreateTenantServiceInterface;
 use Modules\Tenant\Application\DTOs\TenantData;
 use Modules\Tenant\Domain\Events\TenantCreated;
@@ -29,7 +29,7 @@ class CreateTenantService extends BaseService implements CreateTenantServiceInte
     {
         $dto = TenantData::fromArray($data);
 
-        $databaseConfig = new DatabaseConfig($dto->database_config ?? []);
+        $databaseConfig = DatabaseConfig::fromArray($dto->database_config ?? []);
         $mailConfig = !empty($dto->mail_config) ? MailConfig::fromArray($dto->mail_config) : null;
         $cacheConfig = !empty($dto->cache_config) ? CacheConfig::fromArray($dto->cache_config) : null;
         $queueConfig = !empty($dto->queue_config) ? QueueConfig::fromArray($dto->queue_config) : null;

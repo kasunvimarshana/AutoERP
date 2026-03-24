@@ -2,9 +2,9 @@
 
 namespace Modules\OrganizationUnit\Domain\Entities;
 
-use Modules\OrganizationUnit\Domain\ValueObjects\Name;
-use Modules\OrganizationUnit\Domain\ValueObjects\Code;
-use Modules\OrganizationUnit\Domain\ValueObjects\Metadata;
+use Modules\Core\Domain\ValueObjects\Name;
+use Modules\Core\Domain\ValueObjects\Code;
+use Modules\Core\Domain\ValueObjects\Metadata;
 use Illuminate\Support\Collection;
 
 class OrganizationUnit

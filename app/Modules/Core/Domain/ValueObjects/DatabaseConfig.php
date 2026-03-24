@@ -53,9 +53,9 @@ class DatabaseConfig extends ValueObject
             $data['driver'] ?? 'mysql',
             $data['host'] ?? '127.0.0.1',
             (int)($data['port'] ?? 3306),
-            $data['database'],
-            $data['username'],
-            $data['password']
+            $data['database'] ?? '',
+            $data['username'] ?? '',
+            $data['password'] ?? ''
         );
     }
 }

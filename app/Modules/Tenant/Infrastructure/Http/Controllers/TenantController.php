@@ -9,6 +9,9 @@ use Modules\Tenant\Application\Contracts\DeleteTenantServiceInterface;
 use Modules\Tenant\Application\Contracts\UpdateTenantConfigServiceInterface;
 use Modules\Tenant\Application\DTOs\TenantData;
 use Modules\Tenant\Application\DTOs\TenantConfigData;
+use Modules\Tenant\Infrastructure\Http\Requests\StoreTenantRequest;
+use Modules\Tenant\Infrastructure\Http\Requests\UpdateTenantRequest;
+use Modules\Tenant\Infrastructure\Http\Requests\UpdateTenantConfigRequest;
 use Modules\Tenant\Infrastructure\Http\Resources\TenantResource;
 use Modules\Tenant\Infrastructure\Http\Resources\TenantCollection;
 use Modules\Tenant\Infrastructure\Http\Resources\TenantConfigResource;
@@ -42,11 +45,10 @@ class TenantController extends BaseController
         return new TenantCollection($tenants);
     }
 
-    public function store(Request $request): TenantResource
+    public function store(StoreTenantRequest $request): TenantResource
     {
         $this->authorize('create', Tenant::class);
-        $validated = $request->validate((new TenantData())->rules());
-        $dto = TenantData::fromArray($validated);
+        $dto = TenantData::fromArray($request->validated());
         $tenant = $this->service->execute($dto->toArray());
         return new TenantResource($tenant);
     }
@@ -61,28 +63,28 @@ class TenantController extends BaseController
         return new TenantResource($tenant);
     }
 
-    public function update(Request $request, int $id): TenantResource
+    public function update(UpdateTenantRequest $request, int $id): TenantResource
     {
         $tenant = $this->service->find($id);
         if (!$tenant) {
             abort(404);
         }
         $this->authorize('update', $tenant);
-        $validated = $request->validate((new TenantData())->rules());
+        $validated = $request->validated();
         $validated['id'] = $id;
         $dto = TenantData::fromArray($validated);
         $updated = $this->updateService->execute($dto->toArray());
         return new TenantResource($updated);
     }
 
-    public function updateConfig(Request $request, int $id): TenantConfigResource
+    public function updateConfig(UpdateTenantConfigRequest $request, int $id): TenantConfigResource
     {
         $tenant = $this->service->find($id);
         if (!$tenant) {
             abort(404);
         }
         $this->authorize('updateConfig', $tenant);
-        $validated = $request->validate((new TenantConfigData())->rules());
+        $validated = $request->validated();
         $validated['id'] = $id;
         $dto = TenantConfigData::fromArray($validated);
         $updated = $this->configService->execute($dto->toArray());

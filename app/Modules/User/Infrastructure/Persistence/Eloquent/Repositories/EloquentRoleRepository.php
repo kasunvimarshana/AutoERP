@@ -23,6 +23,22 @@ class EloquentRoleRepository extends EloquentRepository implements RoleRepositor
         return $model ? $this->toDomainEntity($model) : null;
     }
 
+    public function save(Role $role): Role
+    {
+        if ($role->getId()) {
+            $model = $this->update($role->getId(), [
+                'tenant_id' => $role->getTenantId(),
+                'name'      => $role->getName(),
+            ]);
+        } else {
+            $model = $this->create([
+                'tenant_id' => $role->getTenantId(),
+                'name'      => $role->getName(),
+            ]);
+        }
+        return $this->toDomainEntity($model);
+    }
+
     public function syncPermissions(Role $role, array $permissionIds): void
     {
         $model = $this->model->find($role->getId());

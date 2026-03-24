@@ -9,6 +9,8 @@ use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitService
 use Modules\OrganizationUnit\Application\Contracts\MoveOrganizationUnitServiceInterface;
 use Modules\OrganizationUnit\Application\DTOs\OrganizationUnitData;
 use Modules\OrganizationUnit\Application\DTOs\MoveOrganizationUnitData;
+use Modules\OrganizationUnit\Infrastructure\Http\Requests\StoreOrganizationUnitRequest;
+use Modules\OrganizationUnit\Infrastructure\Http\Requests\UpdateOrganizationUnitRequest;
 use Modules\OrganizationUnit\Infrastructure\Http\Requests\MoveOrganizationUnitRequest;
 use Modules\OrganizationUnit\Infrastructure\Http\Resources\OrganizationUnitResource;
 use Modules\OrganizationUnit\Infrastructure\Http\Resources\OrganizationUnitCollection;
@@ -43,11 +45,10 @@ class OrganizationUnitController extends BaseController
         return new OrganizationUnitCollection($units);
     }
 
-    public function store(Request $request): OrganizationUnitResource
+    public function store(StoreOrganizationUnitRequest $request): OrganizationUnitResource
     {
         $this->authorize('create', OrganizationUnit::class);
-        $validated = $request->validate((new OrganizationUnitData())->rules());
-        $dto = OrganizationUnitData::fromArray($validated);
+        $dto = OrganizationUnitData::fromArray($request->validated());
         $unit = $this->service->execute($dto->toArray());
         return new OrganizationUnitResource($unit);
     }
@@ -62,14 +63,14 @@ class OrganizationUnitController extends BaseController
         return new OrganizationUnitResource($unit);
     }
 
-    public function update(Request $request, int $id): OrganizationUnitResource
+    public function update(UpdateOrganizationUnitRequest $request, int $id): OrganizationUnitResource
     {
         $unit = $this->service->find($id);
         if (!$unit) {
             abort(404);
         }
         $this->authorize('update', $unit);
-        $validated = $request->validate((new OrganizationUnitData())->rules());
+        $validated = $request->validated();
         $validated['id'] = $id;
         $dto = OrganizationUnitData::fromArray($validated);
         $updated = $this->updateService->execute($dto->toArray());

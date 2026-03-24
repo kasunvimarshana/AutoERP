@@ -5,12 +5,12 @@ namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Repositories;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Tenant\Domain\RepositoryInterfaces\TenantRepositoryInterface;
 use Modules\Tenant\Domain\Entities\Tenant;
-use Modules\Tenant\Domain\ValueObjects\DatabaseConfig;
-use Modules\Tenant\Domain\ValueObjects\MailConfig;
-use Modules\Tenant\Domain\ValueObjects\CacheConfig;
-use Modules\Tenant\Domain\ValueObjects\QueueConfig;
-use Modules\Tenant\Domain\ValueObjects\FeatureFlags;
-use Modules\Tenant\Domain\ValueObjects\ApiKeys;
+use Modules\Core\Domain\ValueObjects\DatabaseConfig;
+use Modules\Core\Domain\ValueObjects\MailConfig;
+use Modules\Core\Domain\ValueObjects\CacheConfig;
+use Modules\Core\Domain\ValueObjects\QueueConfig;
+use Modules\Core\Domain\ValueObjects\FeatureFlags;
+use Modules\Core\Domain\ValueObjects\ApiKeys;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantModel;
 
 class EloquentTenantRepository extends EloquentRepository implements TenantRepositoryInterface
@@ -62,7 +62,7 @@ class EloquentTenantRepository extends EloquentRepository implements TenantRepos
     {
         return new Tenant(
             name: $model->name,
-            databaseConfig: new DatabaseConfig($model->database_config ?? []),
+            databaseConfig: DatabaseConfig::fromArray($model->database_config ?? []),
             domain: $model->domain,
             logoPath: $model->logo_path,
             mailConfig: !empty($model->mail_config) ? MailConfig::fromArray($model->mail_config) : null,

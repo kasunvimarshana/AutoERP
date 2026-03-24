@@ -2,12 +2,12 @@
 
 namespace Modules\Tenant\Domain\Entities;
 
-use Modules\Tenant\Domain\ValueObjects\DatabaseConfig;
-use Modules\Tenant\Domain\ValueObjects\MailConfig;
-use Modules\Tenant\Domain\ValueObjects\CacheConfig;
-use Modules\Tenant\Domain\ValueObjects\QueueConfig;
-use Modules\Tenant\Domain\ValueObjects\FeatureFlags;
-use Modules\Tenant\Domain\ValueObjects\ApiKeys;
+use Modules\Core\Domain\ValueObjects\DatabaseConfig;
+use Modules\Core\Domain\ValueObjects\MailConfig;
+use Modules\Core\Domain\ValueObjects\CacheConfig;
+use Modules\Core\Domain\ValueObjects\QueueConfig;
+use Modules\Core\Domain\ValueObjects\FeatureFlags;
+use Modules\Core\Domain\ValueObjects\ApiKeys;
 
 class Tenant
 {
@@ -74,7 +74,7 @@ class Tenant
     public function updateConfig(array $data): void
     {
         if (isset($data['database_config'])) {
-            $this->databaseConfig = new DatabaseConfig($data['database_config']);
+            $this->databaseConfig = DatabaseConfig::fromArray($data['database_config']);
         }
         if (isset($data['mail_config'])) {
             $this->mailConfig = MailConfig::fromArray($data['mail_config']);

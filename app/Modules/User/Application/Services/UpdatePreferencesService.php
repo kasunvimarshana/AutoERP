@@ -5,7 +5,7 @@ namespace Modules\User\Application\Services;
 use Modules\Core\Application\Services\BaseService;
 use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 use Modules\User\Domain\Entities\User;
-use Modules\User\Domain\ValueObjects\UserPreferences;
+use Modules\Core\Domain\ValueObjects\UserPreferences;
 use Modules\User\Application\DTOs\UserPreferencesData;
 use Modules\User\Domain\Events\UserUpdated;
 use Modules\User\Domain\Exceptions\UserNotFoundException;

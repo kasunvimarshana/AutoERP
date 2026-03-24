@@ -22,6 +22,22 @@ class EloquentPermissionRepository extends EloquentRepository implements Permiss
         return $model ? $this->toDomainEntity($model) : null;
     }
 
+    public function save(Permission $permission): Permission
+    {
+        if ($permission->getId()) {
+            $model = $this->update($permission->getId(), [
+                'tenant_id' => $permission->getTenantId(),
+                'name'      => $permission->getName(),
+            ]);
+        } else {
+            $model = $this->create([
+                'tenant_id' => $permission->getTenantId(),
+                'name'      => $permission->getName(),
+            ]);
+        }
+        return $this->toDomainEntity($model);
+    }
+
     private function toDomainEntity(PermissionModel $model): Permission
     {
         return new Permission($model->tenant_id, $model->name, $model->id);

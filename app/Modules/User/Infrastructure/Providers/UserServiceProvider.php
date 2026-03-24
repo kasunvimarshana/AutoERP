@@ -22,6 +22,11 @@ use Modules\User\Application\Contracts\AssignRoleServiceInterface;
 use Modules\User\Application\Contracts\UpdatePreferencesServiceInterface;
 use Modules\User\Application\Contracts\UploadUserAttachmentServiceInterface;
 use Modules\User\Application\Contracts\DeleteUserAttachmentServiceInterface;
+use Modules\User\Application\Contracts\CreateRoleServiceInterface;
+use Modules\User\Application\Contracts\DeleteRoleServiceInterface;
+use Modules\User\Application\Contracts\SyncRolePermissionsServiceInterface;
+use Modules\User\Application\Contracts\CreatePermissionServiceInterface;
+use Modules\User\Application\Contracts\DeletePermissionServiceInterface;
 use Modules\User\Application\Services\CreateUserService;
 use Modules\User\Application\Services\UpdateUserService;
 use Modules\User\Application\Services\DeleteUserService;
@@ -29,6 +34,11 @@ use Modules\User\Application\Services\AssignRoleService;
 use Modules\User\Application\Services\UpdatePreferencesService;
 use Modules\User\Application\Services\UploadUserAttachmentService;
 use Modules\User\Application\Services\DeleteUserAttachmentService;
+use Modules\User\Application\Services\CreateRoleService;
+use Modules\User\Application\Services\DeleteRoleService;
+use Modules\User\Application\Services\SyncRolePermissionsService;
+use Modules\User\Application\Services\CreatePermissionService;
+use Modules\User\Application\Services\DeletePermissionService;
 
 class UserServiceProvider extends ServiceProvider
 {
@@ -81,10 +91,27 @@ class UserServiceProvider extends ServiceProvider
                 $app->make(\Modules\Core\Application\Contracts\FileStorageServiceInterface::class)
             );
         });
+
+        $this->app->bind(CreateRoleServiceInterface::class, function ($app) {
+            return new CreateRoleService($app->make(RoleRepositoryInterface::class));
+        });
+        $this->app->bind(DeleteRoleServiceInterface::class, function ($app) {
+            return new DeleteRoleService($app->make(RoleRepositoryInterface::class));
+        });
+        $this->app->bind(SyncRolePermissionsServiceInterface::class, function ($app) {
+            return new SyncRolePermissionsService($app->make(RoleRepositoryInterface::class));
+        });
+        $this->app->bind(CreatePermissionServiceInterface::class, function ($app) {
+            return new CreatePermissionService($app->make(PermissionRepositoryInterface::class));
+        });
+        $this->app->bind(DeletePermissionServiceInterface::class, function ($app) {
+            return new DeletePermissionService($app->make(PermissionRepositoryInterface::class));
+        });
     }
 
     public function boot()
     {
         $this->loadRoutesFrom(__DIR__ . '/../../routes/api.php');
+        $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
     }
 }
