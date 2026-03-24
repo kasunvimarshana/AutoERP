@@ -1,24 +1,26 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Tenant\Infrastructure\Http\Controllers;
 
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Modules\Core\Infrastructure\Http\Controllers\BaseController;
 use Modules\Tenant\Application\Contracts\CreateTenantServiceInterface;
-use Modules\Tenant\Application\Contracts\UpdateTenantServiceInterface;
 use Modules\Tenant\Application\Contracts\DeleteTenantServiceInterface;
 use Modules\Tenant\Application\Contracts\UpdateTenantConfigServiceInterface;
-use Modules\Tenant\Application\DTOs\TenantData;
+use Modules\Tenant\Application\Contracts\UpdateTenantServiceInterface;
 use Modules\Tenant\Application\DTOs\TenantConfigData;
-use Modules\Tenant\Infrastructure\Http\Requests\StoreTenantRequest;
-use Modules\Tenant\Infrastructure\Http\Requests\UpdateTenantRequest;
-use Modules\Tenant\Infrastructure\Http\Requests\UpdateTenantConfigRequest;
-use Modules\Tenant\Infrastructure\Http\Resources\TenantResource;
-use Modules\Tenant\Infrastructure\Http\Resources\TenantCollection;
-use Modules\Tenant\Infrastructure\Http\Resources\TenantConfigResource;
+use Modules\Tenant\Application\DTOs\TenantData;
 use Modules\Tenant\Domain\Entities\Tenant;
 use Modules\Tenant\Domain\RepositoryInterfaces\TenantRepositoryInterface;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
+use Modules\Tenant\Infrastructure\Http\Requests\StoreTenantRequest;
+use Modules\Tenant\Infrastructure\Http\Requests\UpdateTenantConfigRequest;
+use Modules\Tenant\Infrastructure\Http\Requests\UpdateTenantRequest;
+use Modules\Tenant\Infrastructure\Http\Resources\TenantCollection;
+use Modules\Tenant\Infrastructure\Http\Resources\TenantConfigResource;
+use Modules\Tenant\Infrastructure\Http\Resources\TenantResource;
 
 class TenantController extends BaseController
 {
@@ -42,6 +44,7 @@ class TenantController extends BaseController
         $include = $request->input('include');
 
         $tenants = $this->service->list($filters, $perPage, $page, $sort, $include);
+
         return new TenantCollection($tenants);
     }
 
@@ -50,23 +53,25 @@ class TenantController extends BaseController
         $this->authorize('create', Tenant::class);
         $dto = TenantData::fromArray($request->validated());
         $tenant = $this->service->execute($dto->toArray());
+
         return new TenantResource($tenant);
     }
 
     public function show(int $id): TenantResource
     {
         $tenant = $this->service->find($id);
-        if (!$tenant) {
+        if (! $tenant) {
             abort(404);
         }
         $this->authorize('view', $tenant);
+
         return new TenantResource($tenant);
     }
 
     public function update(UpdateTenantRequest $request, int $id): TenantResource
     {
         $tenant = $this->service->find($id);
-        if (!$tenant) {
+        if (! $tenant) {
             abort(404);
         }
         $this->authorize('update', $tenant);
@@ -74,13 +79,14 @@ class TenantController extends BaseController
         $validated['id'] = $id;
         $dto = TenantData::fromArray($validated);
         $updated = $this->updateService->execute($dto->toArray());
+
         return new TenantResource($updated);
     }
 
     public function updateConfig(UpdateTenantConfigRequest $request, int $id): TenantConfigResource
     {
         $tenant = $this->service->find($id);
-        if (!$tenant) {
+        if (! $tenant) {
             abort(404);
         }
         $this->authorize('updateConfig', $tenant);
@@ -88,26 +94,29 @@ class TenantController extends BaseController
         $validated['id'] = $id;
         $dto = TenantConfigData::fromArray($validated);
         $updated = $this->configService->execute($dto->toArray());
+
         return new TenantConfigResource($updated);
     }
 
     public function destroy(int $id): JsonResponse
     {
         $tenant = $this->service->find($id);
-        if (!$tenant) {
+        if (! $tenant) {
             abort(404);
         }
         $this->authorize('delete', $tenant);
         $this->deleteService->execute(['id' => $id]);
+
         return response()->json(['message' => 'Tenant deleted successfully']);
     }
 
     public function configByDomain(string $domain): TenantConfigResource
     {
         $tenant = $this->tenantRepository->findByDomain($domain);
-        if (!$tenant) {
+        if (! $tenant) {
             abort(404);
         }
+
         return new TenantConfigResource($tenant);
     }
 

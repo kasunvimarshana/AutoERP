@@ -1,9 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Tenant\Application\UseCases;
 
-use Modules\Tenant\Domain\RepositoryInterfaces\TenantRepositoryInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Modules\Tenant\Domain\RepositoryInterfaces\TenantRepositoryInterface;
 
 class ListTenants
 {
@@ -22,6 +24,7 @@ class ListTenants
                 $repo->where($field, $value);
             }
         }
+
         return $repo->paginate($perPage, ['*'], 'page', $page);
     }
 }

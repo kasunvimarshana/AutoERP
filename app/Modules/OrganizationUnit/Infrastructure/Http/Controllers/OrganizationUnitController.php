@@ -1,24 +1,26 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\OrganizationUnit\Infrastructure\Http\Controllers;
 
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Modules\Core\Infrastructure\Http\Controllers\BaseController;
 use Modules\OrganizationUnit\Application\Contracts\CreateOrganizationUnitServiceInterface;
-use Modules\OrganizationUnit\Application\Contracts\UpdateOrganizationUnitServiceInterface;
 use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitServiceInterface;
 use Modules\OrganizationUnit\Application\Contracts\MoveOrganizationUnitServiceInterface;
-use Modules\OrganizationUnit\Application\DTOs\OrganizationUnitData;
+use Modules\OrganizationUnit\Application\Contracts\UpdateOrganizationUnitServiceInterface;
 use Modules\OrganizationUnit\Application\DTOs\MoveOrganizationUnitData;
-use Modules\OrganizationUnit\Infrastructure\Http\Requests\StoreOrganizationUnitRequest;
-use Modules\OrganizationUnit\Infrastructure\Http\Requests\UpdateOrganizationUnitRequest;
-use Modules\OrganizationUnit\Infrastructure\Http\Requests\MoveOrganizationUnitRequest;
-use Modules\OrganizationUnit\Infrastructure\Http\Resources\OrganizationUnitResource;
-use Modules\OrganizationUnit\Infrastructure\Http\Resources\OrganizationUnitCollection;
-use Modules\OrganizationUnit\Infrastructure\Http\Resources\OrganizationUnitTreeResource;
+use Modules\OrganizationUnit\Application\DTOs\OrganizationUnitData;
 use Modules\OrganizationUnit\Domain\Entities\OrganizationUnit;
 use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitRepositoryInterface;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
+use Modules\OrganizationUnit\Infrastructure\Http\Requests\MoveOrganizationUnitRequest;
+use Modules\OrganizationUnit\Infrastructure\Http\Requests\StoreOrganizationUnitRequest;
+use Modules\OrganizationUnit\Infrastructure\Http\Requests\UpdateOrganizationUnitRequest;
+use Modules\OrganizationUnit\Infrastructure\Http\Resources\OrganizationUnitCollection;
+use Modules\OrganizationUnit\Infrastructure\Http\Resources\OrganizationUnitResource;
+use Modules\OrganizationUnit\Infrastructure\Http\Resources\OrganizationUnitTreeResource;
 
 class OrganizationUnitController extends BaseController
 {
@@ -42,6 +44,7 @@ class OrganizationUnitController extends BaseController
         $include = $request->input('include');
 
         $units = $this->service->list($filters, $perPage, $page, $sort, $include);
+
         return new OrganizationUnitCollection($units);
     }
 
@@ -50,23 +53,25 @@ class OrganizationUnitController extends BaseController
         $this->authorize('create', OrganizationUnit::class);
         $dto = OrganizationUnitData::fromArray($request->validated());
         $unit = $this->service->execute($dto->toArray());
+
         return new OrganizationUnitResource($unit);
     }
 
     public function show(int $id): OrganizationUnitResource
     {
         $unit = $this->service->find($id);
-        if (!$unit) {
+        if (! $unit) {
             abort(404);
         }
         $this->authorize('view', $unit);
+
         return new OrganizationUnitResource($unit);
     }
 
     public function update(UpdateOrganizationUnitRequest $request, int $id): OrganizationUnitResource
     {
         $unit = $this->service->find($id);
-        if (!$unit) {
+        if (! $unit) {
             abort(404);
         }
         $this->authorize('update', $unit);
@@ -74,17 +79,19 @@ class OrganizationUnitController extends BaseController
         $validated['id'] = $id;
         $dto = OrganizationUnitData::fromArray($validated);
         $updated = $this->updateService->execute($dto->toArray());
+
         return new OrganizationUnitResource($updated);
     }
 
     public function destroy(int $id): JsonResponse
     {
         $unit = $this->service->find($id);
-        if (!$unit) {
+        if (! $unit) {
             abort(404);
         }
         $this->authorize('delete', $unit);
         $this->deleteService->execute(['id' => $id]);
+
         return response()->json(['message' => 'Organization unit deleted successfully']);
     }
 
@@ -94,13 +101,14 @@ class OrganizationUnitController extends BaseController
         $tenantId = (int) tenant_id();
         $rootId = $request->input('root_id');
         $tree = $this->orgUnitRepository->getTree($tenantId, $rootId);
+
         return new OrganizationUnitTreeResource($tree);
     }
 
     public function move(MoveOrganizationUnitRequest $request, int $id): JsonResponse
     {
         $unit = $this->service->find($id);
-        if (!$unit) {
+        if (! $unit) {
             abort(404);
         }
         $this->authorize('move', $unit);
@@ -108,6 +116,7 @@ class OrganizationUnitController extends BaseController
         $validated['id'] = $id;
         $dto = MoveOrganizationUnitData::fromArray($validated);
         $this->moveService->execute($dto->toArray());
+
         return response()->json(['message' => 'Organization unit moved successfully']);
     }
 
@@ -116,4 +125,3 @@ class OrganizationUnitController extends BaseController
         return OrganizationUnit::class;
     }
 }
-

@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\User\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
-use Modules\User\Domain\RepositoryInterfaces\PermissionRepositoryInterface;
-use Modules\User\Domain\Entities\Permission;
 use Modules\User\Application\Contracts\CreatePermissionServiceInterface;
+use Modules\User\Domain\Entities\Permission;
+use Modules\User\Domain\RepositoryInterfaces\PermissionRepositoryInterface;
 
 class CreatePermissionService extends BaseService implements CreatePermissionServiceInterface
 {

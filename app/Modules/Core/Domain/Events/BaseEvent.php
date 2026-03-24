@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Domain\Events;
 
 use Illuminate\Broadcasting\Channel;
@@ -13,6 +15,7 @@ abstract class BaseEvent implements ShouldBroadcast
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public int $tenantId;
+
     public ?int $orgUnitId;
 
     public function __construct(int $tenantId, ?int $orgUnitId = null)
@@ -23,10 +26,11 @@ abstract class BaseEvent implements ShouldBroadcast
 
     public function broadcastOn()
     {
-        $channels = [new Channel('tenant.' . $this->tenantId)];
+        $channels = [new Channel('tenant.'.$this->tenantId)];
         if ($this->orgUnitId) {
-            $channels[] = new Channel('org.' . $this->orgUnitId);
+            $channels[] = new Channel('org.'.$this->orgUnitId);
         }
+
         return $channels;
     }
 }

@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Tenant\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
-use Modules\Tenant\Domain\RepositoryInterfaces\TenantAttachmentRepositoryInterface;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
-use Modules\Tenant\Domain\Exceptions\AttachmentNotFoundException;
+use Modules\Core\Application\Services\BaseService;
 use Modules\Tenant\Application\Contracts\DeleteTenantAttachmentServiceInterface;
+use Modules\Tenant\Domain\Exceptions\AttachmentNotFoundException;
+use Modules\Tenant\Domain\RepositoryInterfaces\TenantAttachmentRepositoryInterface;
 
 class DeleteTenantAttachmentService extends BaseService implements DeleteTenantAttachmentServiceInterface
 {
@@ -21,11 +23,12 @@ class DeleteTenantAttachmentService extends BaseService implements DeleteTenantA
     {
         $attachmentId = $data['attachment_id'];
         $attachment = $this->attachmentRepo->find($attachmentId);
-        if (!$attachment) {
+        if (! $attachment) {
             throw new AttachmentNotFoundException($attachmentId);
         }
 
         $this->storage->delete($attachment->getFilePath());
+
         return $this->attachmentRepo->delete($attachmentId);
     }
 }

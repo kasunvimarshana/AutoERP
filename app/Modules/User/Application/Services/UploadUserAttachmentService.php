@@ -1,15 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\User\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
-use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
-use Modules\User\Domain\RepositoryInterfaces\UserAttachmentRepositoryInterface;
-use Modules\User\Domain\Entities\UserAttachment;
-use Modules\Core\Application\Contracts\FileStorageServiceInterface;
-use Modules\User\Domain\Exceptions\UserNotFoundException;
-use Modules\User\Application\Contracts\UploadUserAttachmentServiceInterface;
 use Illuminate\Support\Str;
+use Modules\Core\Application\Contracts\FileStorageServiceInterface;
+use Modules\Core\Application\Services\BaseService;
+use Modules\User\Application\Contracts\UploadUserAttachmentServiceInterface;
+use Modules\User\Domain\Entities\UserAttachment;
+use Modules\User\Domain\Exceptions\UserNotFoundException;
+use Modules\User\Domain\RepositoryInterfaces\UserAttachmentRepositoryInterface;
+use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 
 class UploadUserAttachmentService extends BaseService implements UploadUserAttachmentServiceInterface
 {
@@ -32,7 +34,7 @@ class UploadUserAttachmentService extends BaseService implements UploadUserAttac
         $metadata = $data['metadata'] ?? [];
 
         $user = $this->userRepository->find($userId);
-        if (!$user) {
+        if (! $user) {
             throw new UserNotFoundException($userId);
         }
 

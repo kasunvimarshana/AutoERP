@@ -1,17 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\User\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
-use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
-use Modules\User\Domain\Entities\User;
-use Modules\Core\Domain\ValueObjects\PhoneNumber;
 use Modules\Core\Domain\ValueObjects\Address;
+use Modules\Core\Domain\ValueObjects\PhoneNumber;
 use Modules\Core\Domain\ValueObjects\UserPreferences;
+use Modules\User\Application\Contracts\UpdateUserServiceInterface;
 use Modules\User\Application\DTOs\UserData;
+use Modules\User\Domain\Entities\User;
 use Modules\User\Domain\Events\UserUpdated;
 use Modules\User\Domain\Exceptions\UserNotFoundException;
-use Modules\User\Application\Contracts\UpdateUserServiceInterface;
+use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 
 class UpdateUserService extends BaseService implements UpdateUserServiceInterface
 {
@@ -29,12 +31,12 @@ class UpdateUserService extends BaseService implements UpdateUserServiceInterfac
         $dto = UserData::fromArray($data);
 
         $user = $this->userRepository->find($id);
-        if (!$user) {
+        if (! $user) {
             throw new UserNotFoundException($id);
         }
 
-        $phone = !empty($dto->phone) ? new PhoneNumber($dto->phone) : null;
-        $address = !empty($dto->address) ? Address::fromArray($dto->address) : null;
+        $phone = ! empty($dto->phone) ? new PhoneNumber($dto->phone) : null;
+        $address = ! empty($dto->address) ? Address::fromArray($dto->address) : null;
         $user->updateProfile($dto->first_name ?? $user->getFirstName(), $dto->last_name ?? $user->getLastName(), $phone, $address);
 
         if ($dto->preferences !== null) {
@@ -57,6 +59,7 @@ class UpdateUserService extends BaseService implements UpdateUserServiceInterfac
         }
 
         $this->addEvent(new UserUpdated($saved));
+
         return $saved;
     }
 }

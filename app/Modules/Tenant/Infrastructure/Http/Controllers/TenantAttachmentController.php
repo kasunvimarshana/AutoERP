@@ -1,17 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Tenant\Infrastructure\Http\Controllers;
 
-use Modules\Tenant\Application\Contracts\UploadTenantAttachmentServiceInterface;
-use Modules\Tenant\Application\Contracts\DeleteTenantAttachmentServiceInterface;
-use Modules\Tenant\Infrastructure\Http\Requests\UploadTenantAttachmentRequest;
-use Modules\Tenant\Infrastructure\Http\Resources\TenantAttachmentResource;
-use Modules\Tenant\Domain\RepositoryInterfaces\TenantAttachmentRepositoryInterface;
-use Modules\Tenant\Domain\Entities\Tenant;
-use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Modules\Core\Application\Contracts\FileStorageServiceInterface;
+use Modules\Tenant\Application\Contracts\DeleteTenantAttachmentServiceInterface;
+use Modules\Tenant\Application\Contracts\UploadTenantAttachmentServiceInterface;
+use Modules\Tenant\Domain\Entities\Tenant;
+use Modules\Tenant\Domain\RepositoryInterfaces\TenantAttachmentRepositoryInterface;
+use Modules\Tenant\Infrastructure\Http\Requests\UploadTenantAttachmentRequest;
+use Modules\Tenant\Infrastructure\Http\Resources\TenantAttachmentResource;
 
 class TenantAttachmentController extends Controller
 {
@@ -27,6 +29,7 @@ class TenantAttachmentController extends Controller
         $this->authorize('viewAttachments', Tenant::class);
         $type = $request->query('type');
         $attachments = $this->attachmentRepo->getByTenant($tenantId, $type);
+
         return TenantAttachmentResource::collection($attachments);
     }
 
@@ -36,16 +39,17 @@ class TenantAttachmentController extends Controller
         $file = $request->file('file');
         $fileInfo = [
             'tmp_path' => $file->getPathname(),
-            'name'     => $file->getClientOriginalName(),
+            'name' => $file->getClientOriginalName(),
             'mime_type' => $file->getMimeType(),
-            'size'     => $file->getSize(),
+            'size' => $file->getSize(),
         ];
         $attachment = $this->uploadService->execute([
             'tenant_id' => $tenantId,
-            'file'      => $fileInfo,
-            'type'      => $request->input('type'),
-            'metadata'  => $request->input('metadata'),
+            'file' => $fileInfo,
+            'type' => $request->input('type'),
+            'metadata' => $request->input('metadata'),
         ]);
+
         return new TenantAttachmentResource($attachment);
     }
 
@@ -53,16 +57,18 @@ class TenantAttachmentController extends Controller
     {
         $this->authorize('deleteAttachment', Tenant::class);
         $this->deleteService->execute(['attachment_id' => $attachmentId]);
+
         return response()->json(['message' => 'Attachment deleted successfully']);
     }
 
     public function serve(string $uuid)
     {
         $attachment = $this->attachmentRepo->findByUuid($uuid);
-        if (!$attachment) {
+        if (! $attachment) {
             abort(404);
         }
         $this->authorize('view', $attachment);
+
         return $this->storage->stream($attachment->getFilePath());
     }
 }

@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
-use Modules\Tenant\Domain\RepositoryInterfaces\TenantAttachmentRepositoryInterface;
-use Modules\Tenant\Domain\Entities\TenantAttachment;
-use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantAttachmentModel;
 use Illuminate\Support\Collection;
+use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
+use Modules\Tenant\Domain\Entities\TenantAttachment;
+use Modules\Tenant\Domain\RepositoryInterfaces\TenantAttachmentRepositoryInterface;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantAttachmentModel;
 
 class EloquentTenantAttachmentRepository extends EloquentRepository implements TenantAttachmentRepositoryInterface
 {
@@ -18,6 +20,7 @@ class EloquentTenantAttachmentRepository extends EloquentRepository implements T
     public function findByUuid(string $uuid): ?TenantAttachment
     {
         $model = $this->model->where('uuid', $uuid)->first();
+
         return $model ? $this->toDomainEntity($model) : null;
     }
 
@@ -28,20 +31,21 @@ class EloquentTenantAttachmentRepository extends EloquentRepository implements T
             $query->where('type', $type);
         }
         $models = $query->get();
-        return $models->map(fn($m) => $this->toDomainEntity($m));
+
+        return $models->map(fn ($m) => $this->toDomainEntity($m));
     }
 
     public function save(TenantAttachment $attachment): TenantAttachment
     {
         $data = [
             'tenant_id' => $attachment->getTenantId(),
-            'uuid'      => $attachment->getUuid(),
-            'name'      => $attachment->getName(),
+            'uuid' => $attachment->getUuid(),
+            'name' => $attachment->getName(),
             'file_path' => $attachment->getFilePath(),
             'mime_type' => $attachment->getMimeType(),
-            'size'      => $attachment->getSize(),
-            'type'      => $attachment->getType(),
-            'metadata'  => $attachment->getMetadata(),
+            'size' => $attachment->getSize(),
+            'type' => $attachment->getType(),
+            'metadata' => $attachment->getMetadata(),
         ];
 
         if ($attachment->getId()) {
@@ -49,6 +53,7 @@ class EloquentTenantAttachmentRepository extends EloquentRepository implements T
         } else {
             $model = $this->create($data);
         }
+
         return $this->toDomainEntity($model);
     }
 

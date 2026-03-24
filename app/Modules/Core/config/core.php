@@ -18,5 +18,5 @@ return [
         |
         */
         'default_disk' => env('FILE_STORAGE_DISK', 'public'),
-    ]
+    ],
 ];

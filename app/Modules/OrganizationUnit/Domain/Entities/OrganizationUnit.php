@@ -1,25 +1,38 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\OrganizationUnit\Domain\Entities;
 
-use Modules\Core\Domain\ValueObjects\Name;
+use Illuminate\Support\Collection;
 use Modules\Core\Domain\ValueObjects\Code;
 use Modules\Core\Domain\ValueObjects\Metadata;
-use Illuminate\Support\Collection;
+use Modules\Core\Domain\ValueObjects\Name;
 
 class OrganizationUnit
 {
     private ?int $id;
+
     private int $tenantId;
+
     private Name $name;
+
     private ?Code $code;
+
     private ?string $description;
+
     private Metadata $metadata;
+
     private ?int $parentId;
+
     private Collection $children; // Collection of OrganizationUnit entities
+
     private int $lft;
+
     private int $rgt;
+
     private \DateTimeInterface $createdAt;
+
     private \DateTimeInterface $updatedAt;
 
     public function __construct(
@@ -42,32 +55,79 @@ class OrganizationUnit
         $this->description = $description;
         $this->metadata = $metadata ?? new Metadata([]);
         $this->parentId = $parentId;
-        $this->children = new Collection();
+        $this->children = new Collection;
         $this->lft = $lft;
         $this->rgt = $rgt;
-        $this->createdAt = $createdAt ?? new \DateTimeImmutable();
-        $this->updatedAt = $updatedAt ?? new \DateTimeImmutable();
+        $this->createdAt = $createdAt ?? new \DateTimeImmutable;
+        $this->updatedAt = $updatedAt ?? new \DateTimeImmutable;
     }
 
     // Getters...
-    public function getId(): ?int { return $this->id; }
-    public function getTenantId(): int { return $this->tenantId; }
-    public function getName(): Name { return $this->name; }
-    public function getCode(): ?Code { return $this->code; }
-    public function getDescription(): ?string { return $this->description; }
-    public function getMetadata(): Metadata { return $this->metadata; }
-    public function getParentId(): ?int { return $this->parentId; }
-    public function getChildren(): Collection { return $this->children; }
-    public function getLft(): int { return $this->lft; }
-    public function getRgt(): int { return $this->rgt; }
-    public function getCreatedAt(): \DateTimeInterface { return $this->createdAt; }
-    public function getUpdatedAt(): \DateTimeInterface { return $this->updatedAt; }
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
+
+    public function getTenantId(): int
+    {
+        return $this->tenantId;
+    }
+
+    public function getName(): Name
+    {
+        return $this->name;
+    }
+
+    public function getCode(): ?Code
+    {
+        return $this->code;
+    }
+
+    public function getDescription(): ?string
+    {
+        return $this->description;
+    }
+
+    public function getMetadata(): Metadata
+    {
+        return $this->metadata;
+    }
+
+    public function getParentId(): ?int
+    {
+        return $this->parentId;
+    }
+
+    public function getChildren(): Collection
+    {
+        return $this->children;
+    }
+
+    public function getLft(): int
+    {
+        return $this->lft;
+    }
+
+    public function getRgt(): int
+    {
+        return $this->rgt;
+    }
+
+    public function getCreatedAt(): \DateTimeInterface
+    {
+        return $this->createdAt;
+    }
+
+    public function getUpdatedAt(): \DateTimeInterface
+    {
+        return $this->updatedAt;
+    }
 
     // Domain behaviour
     public function setParentId(?int $parentId): void
     {
         $this->parentId = $parentId;
-        $this->updatedAt = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable;
     }
 
     public function updateDetails(Name $name, ?Code $code, ?string $description, ?Metadata $metadata): void
@@ -78,7 +138,7 @@ class OrganizationUnit
         if ($metadata) {
             $this->metadata = $metadata;
         }
-        $this->updatedAt = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable;
     }
 
     public function addChild(OrganizationUnit $child): void
@@ -94,12 +154,12 @@ class OrganizationUnit
     {
         $this->lft = $lft;
         $this->rgt = $rgt;
-        $this->updatedAt = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable;
     }
 
     public function removeChild(OrganizationUnit $child): void
     {
-        $this->children = $this->children->reject(fn($c) => $c->getId() === $child->getId());
+        $this->children = $this->children->reject(fn ($c) => $c->getId() === $child->getId());
         $child->setParentId(null);
     }
 }

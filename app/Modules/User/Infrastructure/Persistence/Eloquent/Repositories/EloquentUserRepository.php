@@ -1,18 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\User\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
-use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
-use Modules\User\Domain\Entities\User;
+use Modules\Core\Domain\ValueObjects\Address;
 use Modules\Core\Domain\ValueObjects\Email;
 use Modules\Core\Domain\ValueObjects\PhoneNumber;
-use Modules\Core\Domain\ValueObjects\Address;
 use Modules\Core\Domain\ValueObjects\UserPreferences;
-use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
-use Modules\User\Infrastructure\Persistence\Eloquent\Models\RoleModel;
-use Modules\User\Domain\Entities\Role;
+use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\User\Domain\Entities\Permission;
+use Modules\User\Domain\Entities\Role;
+use Modules\User\Domain\Entities\User;
+use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
+use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 
 class EloquentUserRepository extends EloquentRepository implements UserRepositoryInterface
 {
@@ -26,20 +27,21 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
         $model = $this->model->where('tenant_id', $tenantId)
             ->where('email', $email)
             ->first();
+
         return $model ? $this->toDomainEntity($model) : null;
     }
 
     public function save(User $user): User
     {
         $data = [
-            'tenant_id'   => $user->getTenantId(),
-            'email'       => $user->getEmail()->value(),
-            'first_name'  => $user->getFirstName(),
-            'last_name'   => $user->getLastName(),
-            'phone'       => $user->getPhone()?->value(),
-            'address'     => $user->getAddress()?->toArray(),
+            'tenant_id' => $user->getTenantId(),
+            'email' => $user->getEmail()->value(),
+            'first_name' => $user->getFirstName(),
+            'last_name' => $user->getLastName(),
+            'phone' => $user->getPhone()?->value(),
+            'address' => $user->getAddress()?->toArray(),
             'preferences' => $user->getPreferences()->toArray(),
-            'active'      => $user->isActive(),
+            'active' => $user->isActive(),
         ];
 
         if ($user->getId()) {
@@ -55,6 +57,7 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
         }
 
         $model->load('roles.permissions');
+
         return $this->toDomainEntity($model);
     }
 
@@ -100,6 +103,7 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
             }
             $user->assignRole($role);
         }
+
         return $user;
     }
 }

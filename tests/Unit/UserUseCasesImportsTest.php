@@ -2,27 +2,27 @@
 
 namespace Tests\Unit;
 
-use PHPUnit\Framework\TestCase;
-use Modules\User\Application\UseCases\CreateUser;
-use Modules\User\Application\UseCases\GetUser;
-use Modules\User\Application\UseCases\ListUsers;
-use Modules\User\Application\UseCases\UpdateUser;
-use Modules\User\Application\UseCases\DeleteUser;
-use Modules\User\Application\UseCases\AssignRole;
-use Modules\User\Application\UseCases\UpdatePreferences;
-use Modules\User\Domain\Events\UserCreated;
-use Modules\User\Domain\Events\UserUpdated;
-use Modules\User\Domain\Events\RoleAssigned;
+use Modules\User\Application\Contracts\CreatePermissionServiceInterface;
 use Modules\User\Application\Contracts\CreateRoleServiceInterface;
+use Modules\User\Application\Contracts\DeletePermissionServiceInterface;
 use Modules\User\Application\Contracts\DeleteRoleServiceInterface;
 use Modules\User\Application\Contracts\SyncRolePermissionsServiceInterface;
-use Modules\User\Application\Contracts\CreatePermissionServiceInterface;
-use Modules\User\Application\Contracts\DeletePermissionServiceInterface;
+use Modules\User\Application\Services\CreatePermissionService;
 use Modules\User\Application\Services\CreateRoleService;
+use Modules\User\Application\Services\DeletePermissionService;
 use Modules\User\Application\Services\DeleteRoleService;
 use Modules\User\Application\Services\SyncRolePermissionsService;
-use Modules\User\Application\Services\CreatePermissionService;
-use Modules\User\Application\Services\DeletePermissionService;
+use Modules\User\Application\UseCases\AssignRole;
+use Modules\User\Application\UseCases\CreateUser;
+use Modules\User\Application\UseCases\DeleteUser;
+use Modules\User\Application\UseCases\GetUser;
+use Modules\User\Application\UseCases\ListUsers;
+use Modules\User\Application\UseCases\UpdatePreferences;
+use Modules\User\Application\UseCases\UpdateUser;
+use Modules\User\Domain\Events\RoleAssigned;
+use Modules\User\Domain\Events\UserCreated;
+use Modules\User\Domain\Events\UserUpdated;
+use PHPUnit\Framework\TestCase;
 
 class UserUseCasesImportsTest extends TestCase
 {

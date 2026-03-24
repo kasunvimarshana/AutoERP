@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\OrganizationUnit\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
-use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitRepositoryInterface;
+use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitServiceInterface;
 use Modules\OrganizationUnit\Domain\Events\OrganizationUnitDeleted;
 use Modules\OrganizationUnit\Domain\Exceptions\OrganizationUnitNotFoundException;
-use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitServiceInterface;
+use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitRepositoryInterface;
 
 class DeleteOrganizationUnitService extends BaseService implements DeleteOrganizationUnitServiceInterface
 {
@@ -22,7 +24,7 @@ class DeleteOrganizationUnitService extends BaseService implements DeleteOrganiz
     {
         $id = $data['id'];
         $unit = $this->orgUnitRepository->find($id);
-        if (!$unit) {
+        if (! $unit) {
             throw new OrganizationUnitNotFoundException($id);
         }
         $tenantId = $unit->getTenantId();
@@ -30,6 +32,7 @@ class DeleteOrganizationUnitService extends BaseService implements DeleteOrganiz
         if ($deleted) {
             $this->addEvent(new OrganizationUnitDeleted($id, $tenantId));
         }
+
         return $deleted;
     }
 }

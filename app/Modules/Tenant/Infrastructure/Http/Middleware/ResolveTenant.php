@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Tenant\Infrastructure\Http\Middleware;
 
 use Closure;
+use Illuminate\Http\Request;
 use Modules\Tenant\Application\Contracts\TenantConfigClientInterface;
 use Modules\Tenant\Application\Contracts\TenantConfigManagerInterface;
-use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
 class ResolveTenant
@@ -19,7 +21,7 @@ class ResolveTenant
     {
         // Resolve tenant ID
         $tenantId = $request->header('X-Tenant-ID') ?? optional($request->user())->tenant_id;
-        if (!$tenantId) {
+        if (! $tenantId) {
             throw new BadRequestHttpException('Tenant ID is required.');
         }
 
@@ -35,7 +37,7 @@ class ResolveTenant
 
         // Fetch tenant configuration (cached)
         $config = $this->client->getConfig($tenantId);
-        if (!$config) {
+        if (! $config) {
             throw new BadRequestHttpException('Invalid tenant ID.');
         }
 

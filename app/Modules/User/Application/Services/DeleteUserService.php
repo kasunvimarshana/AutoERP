@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\User\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
-use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
-use Modules\User\Domain\Exceptions\UserNotFoundException;
 use Modules\User\Application\Contracts\DeleteUserServiceInterface;
+use Modules\User\Domain\Exceptions\UserNotFoundException;
+use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 
 class DeleteUserService extends BaseService implements DeleteUserServiceInterface
 {
@@ -21,9 +23,10 @@ class DeleteUserService extends BaseService implements DeleteUserServiceInterfac
     {
         $id = $data['id'];
         $user = $this->userRepository->find($id);
-        if (!$user) {
+        if (! $user) {
             throw new UserNotFoundException($id);
         }
+
         return $this->userRepository->delete($id);
     }
 }

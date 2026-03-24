@@ -1,8 +1,8 @@
 <?php
 
-namespace Modules\Core\Domain\ValueObjects;
+declare(strict_types=1);
 
-use Illuminate\Support\Str;
+namespace Modules\Core\Domain\ValueObjects;
 
 abstract class ValueObject
 {

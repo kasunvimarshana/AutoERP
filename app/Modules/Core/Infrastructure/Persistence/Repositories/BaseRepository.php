@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Infrastructure\Persistence\Repositories;
 
-use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Collection;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Collection;
+use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
 
 abstract class BaseRepository implements RepositoryInterface
 {
@@ -18,64 +20,46 @@ abstract class BaseRepository implements RepositoryInterface
 
     /**
      * The relationships to eager load.
-     *
-     * @var array
      */
     protected array $with = [];
 
     /**
      * Where clauses.
-     *
-     * @var array
      */
     protected array $wheres = [];
 
     /**
      * WhereIn clauses.
-     *
-     * @var array
      */
     protected array $whereIns = [];
 
     /**
      * WhereBetween clauses.
-     *
-     * @var array
      */
     protected array $whereBetweens = [];
 
     /**
      * WhereNull clauses.
-     *
-     * @var array
      */
     protected array $whereNulls = [];
 
     /**
      * Order by clauses.
-     *
-     * @var array
      */
     protected array $orders = [];
 
     /**
      * Raw order by clauses.
-     *
-     * @var array
      */
     protected array $orderByRaw = [];
 
     /**
      * The limit value.
-     *
-     * @var int|null
      */
     protected ?int $limit = null;
 
     /**
      * The offset value.
-     *
-     * @var int|null
      */
     protected ?int $offset = null;
 
@@ -85,6 +69,7 @@ abstract class BaseRepository implements RepositoryInterface
     public function with(array|string $relations): static
     {
         $this->with = array_merge($this->with, (array) $relations);
+
         return $this;
     }
 
@@ -99,6 +84,7 @@ abstract class BaseRepository implements RepositoryInterface
         }
 
         $this->wheres[] = compact('column', 'operator', 'value', 'boolean');
+
         return $this;
     }
 
@@ -108,6 +94,7 @@ abstract class BaseRepository implements RepositoryInterface
     public function whereIn(string $column, array $values, string $boolean = 'and', bool $not = false): static
     {
         $this->whereIns[] = compact('column', 'values', 'boolean', 'not');
+
         return $this;
     }
 
@@ -117,6 +104,7 @@ abstract class BaseRepository implements RepositoryInterface
     public function whereBetween(string $column, array $values, string $boolean = 'and', bool $not = false): static
     {
         $this->whereBetweens[] = compact('column', 'values', 'boolean', 'not');
+
         return $this;
     }
 
@@ -126,6 +114,7 @@ abstract class BaseRepository implements RepositoryInterface
     public function whereNull(string $column, string $boolean = 'and', bool $not = false): static
     {
         $this->whereNulls[] = compact('column', 'boolean', 'not');
+
         return $this;
     }
 
@@ -135,6 +124,7 @@ abstract class BaseRepository implements RepositoryInterface
     public function orderBy(string $column, string $direction = 'asc'): static
     {
         $this->orders[] = compact('column', 'direction');
+
         return $this;
     }
 
@@ -144,6 +134,7 @@ abstract class BaseRepository implements RepositoryInterface
     public function orderByRaw(string $sql, array $bindings = []): static
     {
         $this->orderByRaw[] = compact('sql', 'bindings');
+
         return $this;
     }
 
@@ -153,6 +144,7 @@ abstract class BaseRepository implements RepositoryInterface
     public function limit(int $limit): static
     {
         $this->limit = $limit;
+
         return $this;
     }
 
@@ -162,6 +154,7 @@ abstract class BaseRepository implements RepositoryInterface
     public function offset(int $offset): static
     {
         $this->offset = $offset;
+
         return $this;
     }
 
@@ -171,6 +164,7 @@ abstract class BaseRepository implements RepositoryInterface
     public function find($id, array $columns = ['*'])
     {
         $this->applyCriteria();
+
         return $this->provider->find($id, $columns);
     }
 
@@ -180,6 +174,7 @@ abstract class BaseRepository implements RepositoryInterface
     public function get(array $columns = ['*']): Collection
     {
         $this->applyCriteria();
+
         return $this->provider->get($columns);
     }
 
@@ -193,20 +188,17 @@ abstract class BaseRepository implements RepositoryInterface
 
         $page = $page ?: Paginator::resolveCurrentPage($pageName);
         $this->applyCriteria();
+
         return $this->provider->paginate($perPage, $columns, $pageName, $page);
     }
 
     /**
      * Apply all stored criteria to the provider.
-     *
-     * @return void
      */
     abstract protected function applyCriteria(): void;
 
     /**
      * Reset the provider to its initial state.
-     *
-     * @return void
      */
     abstract protected function resetProvider(): void;
 }

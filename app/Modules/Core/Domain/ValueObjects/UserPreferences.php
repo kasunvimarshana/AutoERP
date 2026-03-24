@@ -1,11 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Domain\ValueObjects;
 
 class UserPreferences extends ValueObject
 {
     private string $language;
+
     private string $timezone;
+
     private array $notifications;
 
     public function __construct(string $language = 'en', string $timezone = 'UTC', array $notifications = [])
@@ -16,15 +20,26 @@ class UserPreferences extends ValueObject
     }
 
     // Getters...
-    public function getLanguage(): string { return $this->language; }
-    public function getTimezone(): string { return $this->timezone; }
-    public function getNotifications(): array { return $this->notifications; }
+    public function getLanguage(): string
+    {
+        return $this->language;
+    }
+
+    public function getTimezone(): string
+    {
+        return $this->timezone;
+    }
+
+    public function getNotifications(): array
+    {
+        return $this->notifications;
+    }
 
     public function toArray(): array
     {
         return [
-            'language'     => $this->language,
-            'timezone'     => $this->timezone,
+            'language' => $this->language,
+            'timezone' => $this->timezone,
             'notifications' => $this->notifications,
         ];
     }

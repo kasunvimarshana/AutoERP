@@ -1,8 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Modules\Tenant\Infrastructure\Http\Controllers\TenantController;
 use Modules\Tenant\Infrastructure\Http\Controllers\TenantAttachmentController;
+use Modules\Tenant\Infrastructure\Http\Controllers\TenantController;
 
 Route::middleware(['auth:api', 'resolve.tenant'])->group(function () {
     Route::apiResource('tenants', TenantController::class);
@@ -18,4 +18,3 @@ Route::get('config/domain/{domain}', [TenantController::class, 'configByDomain']
 
 // File serving (authenticated)
 Route::get('storage/tenant-attachments/{uuid}', [TenantAttachmentController::class, 'serve'])->middleware('auth:api');
-

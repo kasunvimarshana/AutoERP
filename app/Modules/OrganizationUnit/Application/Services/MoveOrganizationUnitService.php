@@ -1,13 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\OrganizationUnit\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
-use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitRepositoryInterface;
+use Modules\OrganizationUnit\Application\Contracts\MoveOrganizationUnitServiceInterface;
 use Modules\OrganizationUnit\Application\DTOs\MoveOrganizationUnitData;
 use Modules\OrganizationUnit\Domain\Events\OrganizationUnitMoved;
 use Modules\OrganizationUnit\Domain\Exceptions\OrganizationUnitNotFoundException;
-use Modules\OrganizationUnit\Application\Contracts\MoveOrganizationUnitServiceInterface;
+use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitRepositoryInterface;
 
 class MoveOrganizationUnitService extends BaseService implements MoveOrganizationUnitServiceInterface
 {
@@ -25,7 +27,7 @@ class MoveOrganizationUnitService extends BaseService implements MoveOrganizatio
         $dto = MoveOrganizationUnitData::fromArray($data);
 
         $unit = $this->orgUnitRepository->find($id);
-        if (!$unit) {
+        if (! $unit) {
             throw new OrganizationUnitNotFoundException($id);
         }
 
@@ -37,6 +39,7 @@ class MoveOrganizationUnitService extends BaseService implements MoveOrganizatio
         $this->orgUnitRepository->moveNode($id, $dto->parent_id);
         $updated = $this->orgUnitRepository->find($id);
         $this->addEvent(new OrganizationUnitMoved($updated, $oldParentId));
+
         return null;
     }
 }

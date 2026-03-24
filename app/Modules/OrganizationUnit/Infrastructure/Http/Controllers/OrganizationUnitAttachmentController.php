@@ -1,17 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\OrganizationUnit\Infrastructure\Http\Controllers;
 
-use Modules\OrganizationUnit\Application\Contracts\UploadOrganizationUnitAttachmentServiceInterface;
-use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitAttachmentServiceInterface;
-use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitAttachmentRepositoryInterface;
-use Modules\OrganizationUnit\Domain\Entities\OrganizationUnit;
-use Modules\Core\Application\Contracts\FileStorageServiceInterface;
-use Modules\OrganizationUnit\Infrastructure\Http\Requests\UploadOrganizationUnitAttachmentRequest;
-use Modules\OrganizationUnit\Infrastructure\Http\Resources\OrganizationUnitAttachmentResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Modules\Core\Application\Contracts\FileStorageServiceInterface;
+use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitAttachmentServiceInterface;
+use Modules\OrganizationUnit\Application\Contracts\UploadOrganizationUnitAttachmentServiceInterface;
+use Modules\OrganizationUnit\Domain\Entities\OrganizationUnit;
+use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitAttachmentRepositoryInterface;
+use Modules\OrganizationUnit\Infrastructure\Http\Requests\UploadOrganizationUnitAttachmentRequest;
+use Modules\OrganizationUnit\Infrastructure\Http\Resources\OrganizationUnitAttachmentResource;
 
 class OrganizationUnitAttachmentController extends Controller
 {
@@ -27,6 +29,7 @@ class OrganizationUnitAttachmentController extends Controller
         $this->authorize('viewAttachments', OrganizationUnit::class);
         $type = $request->query('type');
         $attachments = $this->attachmentRepo->getByOrganizationUnit($orgUnitId, $type);
+
         return OrganizationUnitAttachmentResource::collection($attachments);
     }
 
@@ -36,16 +39,17 @@ class OrganizationUnitAttachmentController extends Controller
         $file = $request->file('file');
         $fileInfo = [
             'tmp_path' => $file->getPathname(),
-            'name'     => $file->getClientOriginalName(),
+            'name' => $file->getClientOriginalName(),
             'mime_type' => $file->getMimeType(),
-            'size'     => $file->getSize(),
+            'size' => $file->getSize(),
         ];
         $attachment = $this->uploadService->execute([
             'organization_unit_id' => $orgUnitId,
-            'file'                 => $fileInfo,
-            'type'                 => $request->input('type'),
-            'metadata'             => $request->input('metadata'),
+            'file' => $fileInfo,
+            'type' => $request->input('type'),
+            'metadata' => $request->input('metadata'),
         ]);
+
         return new OrganizationUnitAttachmentResource($attachment);
     }
 
@@ -53,16 +57,18 @@ class OrganizationUnitAttachmentController extends Controller
     {
         $this->authorize('deleteAttachment', OrganizationUnit::class);
         $this->deleteService->execute(['attachment_id' => $attachmentId]);
+
         return response()->json(['message' => 'Attachment deleted successfully']);
     }
 
     public function serve(string $uuid)
     {
         $attachment = $this->attachmentRepo->findByUuid($uuid);
-        if (!$attachment) {
+        if (! $attachment) {
             abort(404);
         }
         $this->authorize('view', $attachment);
+
         return $this->storage->stream($attachment->getFilePath());
     }
 }

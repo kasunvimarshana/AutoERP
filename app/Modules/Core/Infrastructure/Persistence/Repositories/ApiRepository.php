@@ -1,16 +1,20 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Infrastructure\Persistence\Repositories;
 
 use Illuminate\Http\Client\PendingRequest;
-use Illuminate\Support\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Collection;
 
 class ApiRepository extends BaseRepository
 {
     protected PendingRequest $http;
+
     protected string $endpoint;
+
     protected array $defaultParams;
 
     public function __construct(PendingRequest $http, string $endpoint, array $defaultParams = [])
@@ -28,6 +32,7 @@ class ApiRepository extends BaseRepository
     {
         $params = $this->buildQueryParams($columns);
         $response = $this->http->get("{$this->endpoint}/{$id}", $params);
+
         return $response->successful() ? $response->json('data') : null;
     }
 
@@ -38,7 +43,8 @@ class ApiRepository extends BaseRepository
     {
         $params = $this->buildQueryParams($columns);
         $response = $this->http->get($this->endpoint, $params);
-        return $response->successful() ? new Collection($response->json('data') ?? []) : new Collection();
+
+        return $response->successful() ? new Collection($response->json('data') ?? []) : new Collection;
     }
 
     /**
@@ -52,7 +58,7 @@ class ApiRepository extends BaseRepository
         $page = $page ?: Paginator::resolveCurrentPage($pageName);
         $params = array_merge($this->buildQueryParams($columns), [
             'per_page' => $perPage,
-            $pageName  => $page,
+            $pageName => $page,
         ]);
 
         $response = $this->http->get($this->endpoint, $params);
@@ -78,6 +84,7 @@ class ApiRepository extends BaseRepository
     public function create(array $data)
     {
         $response = $this->http->post($this->endpoint, $data);
+
         return $response->successful() ? $response->json('data') : null;
     }
 
@@ -87,6 +94,7 @@ class ApiRepository extends BaseRepository
     public function update($id, array $data)
     {
         $response = $this->http->put("{$this->endpoint}/{$id}", $data);
+
         return $response->successful() ? $response->json('data') : null;
     }
 
@@ -96,6 +104,7 @@ class ApiRepository extends BaseRepository
     public function delete($id): bool
     {
         $response = $this->http->delete("{$this->endpoint}/{$id}");
+
         return $response->successful();
     }
 
@@ -117,9 +126,6 @@ class ApiRepository extends BaseRepository
 
     /**
      * Build query parameters from stored criteria.
-     *
-     * @param array $columns
-     * @return array
      */
     protected function buildQueryParams(array $columns): array
     {
@@ -131,7 +137,7 @@ class ApiRepository extends BaseRepository
         }
 
         // Eager loading (include)
-        if (!empty($this->with)) {
+        if (! empty($this->with)) {
             $params['include'] = implode(',', $this->with);
         }
 
@@ -149,7 +155,7 @@ class ApiRepository extends BaseRepository
         // WhereBetween – send as from/to parameters
         foreach ($this->whereBetweens as $whereBetween) {
             $params["filter[{$whereBetween['column']}_from]"] = $whereBetween['values'][0] ?? null;
-            $params["filter[{$whereBetween['column']}_to]"]   = $whereBetween['values'][1] ?? null;
+            $params["filter[{$whereBetween['column']}_to]"] = $whereBetween['values'][1] ?? null;
         }
 
         // WhereNull – send flag
@@ -158,10 +164,10 @@ class ApiRepository extends BaseRepository
         }
 
         // Sorting
-        if (!empty($this->orders)) {
+        if (! empty($this->orders)) {
             $params['sort'] = [];
             foreach ($this->orders as $order) {
-                $params['sort'][] = ($order['direction'] === 'desc' ? '-' : '') . $order['column'];
+                $params['sort'][] = ($order['direction'] === 'desc' ? '-' : '').$order['column'];
             }
         }
 

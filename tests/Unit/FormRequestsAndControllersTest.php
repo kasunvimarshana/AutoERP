@@ -2,20 +2,27 @@
 
 namespace Tests\Unit;
 
-use PHPUnit\Framework\TestCase;
-use Modules\Tenant\Infrastructure\Http\Requests\StoreTenantRequest;
-use Modules\Tenant\Infrastructure\Http\Requests\UpdateTenantRequest;
-use Modules\Tenant\Infrastructure\Http\Requests\UpdateTenantConfigRequest;
-use Modules\User\Infrastructure\Http\Requests\StoreUserRequest;
-use Modules\User\Infrastructure\Http\Requests\UpdateUserRequest;
-use Modules\User\Infrastructure\Http\Requests\StoreRoleRequest;
-use Modules\User\Infrastructure\Http\Requests\SyncRolePermissionsRequest;
-use Modules\User\Infrastructure\Http\Requests\StorePermissionRequest;
+use Illuminate\Foundation\Http\FormRequest;
 use Modules\OrganizationUnit\Infrastructure\Http\Requests\StoreOrganizationUnitRequest;
 use Modules\OrganizationUnit\Infrastructure\Http\Requests\UpdateOrganizationUnitRequest;
-use Modules\User\Infrastructure\Http\Controllers\RoleController;
+use Modules\Tenant\Infrastructure\Http\Requests\StoreTenantRequest;
+use Modules\Tenant\Infrastructure\Http\Requests\UpdateTenantConfigRequest;
+use Modules\Tenant\Infrastructure\Http\Requests\UpdateTenantRequest;
+use Modules\User\Application\Contracts\CreatePermissionServiceInterface;
+use Modules\User\Application\Contracts\CreateRoleServiceInterface;
+use Modules\User\Application\Contracts\DeletePermissionServiceInterface;
+use Modules\User\Application\Contracts\DeleteRoleServiceInterface;
+use Modules\User\Application\Contracts\SyncRolePermissionsServiceInterface;
+use Modules\User\Domain\RepositoryInterfaces\PermissionRepositoryInterface;
+use Modules\User\Domain\RepositoryInterfaces\RoleRepositoryInterface;
 use Modules\User\Infrastructure\Http\Controllers\PermissionController;
-use Illuminate\Foundation\Http\FormRequest;
+use Modules\User\Infrastructure\Http\Controllers\RoleController;
+use Modules\User\Infrastructure\Http\Requests\StorePermissionRequest;
+use Modules\User\Infrastructure\Http\Requests\StoreRoleRequest;
+use Modules\User\Infrastructure\Http\Requests\StoreUserRequest;
+use Modules\User\Infrastructure\Http\Requests\SyncRolePermissionsRequest;
+use Modules\User\Infrastructure\Http\Requests\UpdateUserRequest;
+use PHPUnit\Framework\TestCase;
 
 class FormRequestsAndControllersTest extends TestCase
 {
@@ -28,9 +35,9 @@ class FormRequestsAndControllersTest extends TestCase
         $this->assertTrue(class_exists(UpdateTenantRequest::class));
         $this->assertTrue(class_exists(UpdateTenantConfigRequest::class));
 
-        $this->assertInstanceOf(FormRequest::class, new StoreTenantRequest());
-        $this->assertInstanceOf(FormRequest::class, new UpdateTenantRequest());
-        $this->assertInstanceOf(FormRequest::class, new UpdateTenantConfigRequest());
+        $this->assertInstanceOf(FormRequest::class, new StoreTenantRequest);
+        $this->assertInstanceOf(FormRequest::class, new UpdateTenantRequest);
+        $this->assertInstanceOf(FormRequest::class, new UpdateTenantConfigRequest);
     }
 
     /**
@@ -44,11 +51,11 @@ class FormRequestsAndControllersTest extends TestCase
         $this->assertTrue(class_exists(SyncRolePermissionsRequest::class));
         $this->assertTrue(class_exists(StorePermissionRequest::class));
 
-        $this->assertInstanceOf(FormRequest::class, new StoreUserRequest());
-        $this->assertInstanceOf(FormRequest::class, new UpdateUserRequest());
-        $this->assertInstanceOf(FormRequest::class, new StoreRoleRequest());
-        $this->assertInstanceOf(FormRequest::class, new SyncRolePermissionsRequest());
-        $this->assertInstanceOf(FormRequest::class, new StorePermissionRequest());
+        $this->assertInstanceOf(FormRequest::class, new StoreUserRequest);
+        $this->assertInstanceOf(FormRequest::class, new UpdateUserRequest);
+        $this->assertInstanceOf(FormRequest::class, new StoreRoleRequest);
+        $this->assertInstanceOf(FormRequest::class, new SyncRolePermissionsRequest);
+        $this->assertInstanceOf(FormRequest::class, new StorePermissionRequest);
     }
 
     /**
@@ -59,8 +66,8 @@ class FormRequestsAndControllersTest extends TestCase
         $this->assertTrue(class_exists(StoreOrganizationUnitRequest::class));
         $this->assertTrue(class_exists(UpdateOrganizationUnitRequest::class));
 
-        $this->assertInstanceOf(FormRequest::class, new StoreOrganizationUnitRequest());
-        $this->assertInstanceOf(FormRequest::class, new UpdateOrganizationUnitRequest());
+        $this->assertInstanceOf(FormRequest::class, new StoreOrganizationUnitRequest);
+        $this->assertInstanceOf(FormRequest::class, new UpdateOrganizationUnitRequest);
     }
 
     /**
@@ -82,12 +89,12 @@ class FormRequestsAndControllersTest extends TestCase
         $this->assertNotNull($constructor);
 
         $params = $constructor->getParameters();
-        $paramTypes = array_map(fn($p) => $p->getType()?->getName(), $params);
+        $paramTypes = array_map(fn ($p) => $p->getType()?->getName(), $params);
 
-        $this->assertContains(\Modules\User\Application\Contracts\CreateRoleServiceInterface::class, $paramTypes);
-        $this->assertContains(\Modules\User\Application\Contracts\DeleteRoleServiceInterface::class, $paramTypes);
-        $this->assertContains(\Modules\User\Application\Contracts\SyncRolePermissionsServiceInterface::class, $paramTypes);
-        $this->assertContains(\Modules\User\Domain\RepositoryInterfaces\RoleRepositoryInterface::class, $paramTypes);
+        $this->assertContains(CreateRoleServiceInterface::class, $paramTypes);
+        $this->assertContains(DeleteRoleServiceInterface::class, $paramTypes);
+        $this->assertContains(SyncRolePermissionsServiceInterface::class, $paramTypes);
+        $this->assertContains(RoleRepositoryInterface::class, $paramTypes);
     }
 
     /**
@@ -100,10 +107,10 @@ class FormRequestsAndControllersTest extends TestCase
         $this->assertNotNull($constructor);
 
         $params = $constructor->getParameters();
-        $paramTypes = array_map(fn($p) => $p->getType()?->getName(), $params);
+        $paramTypes = array_map(fn ($p) => $p->getType()?->getName(), $params);
 
-        $this->assertContains(\Modules\User\Application\Contracts\CreatePermissionServiceInterface::class, $paramTypes);
-        $this->assertContains(\Modules\User\Application\Contracts\DeletePermissionServiceInterface::class, $paramTypes);
-        $this->assertContains(\Modules\User\Domain\RepositoryInterfaces\PermissionRepositoryInterface::class, $paramTypes);
+        $this->assertContains(CreatePermissionServiceInterface::class, $paramTypes);
+        $this->assertContains(DeletePermissionServiceInterface::class, $paramTypes);
+        $this->assertContains(PermissionRepositoryInterface::class, $paramTypes);
     }
 }

@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\User\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
-use Modules\User\Domain\RepositoryInterfaces\UserAttachmentRepositoryInterface;
-use Modules\User\Domain\Entities\UserAttachment;
-use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserAttachmentModel;
 use Illuminate\Support\Collection;
+use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
+use Modules\User\Domain\Entities\UserAttachment;
+use Modules\User\Domain\RepositoryInterfaces\UserAttachmentRepositoryInterface;
+use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserAttachmentModel;
 
 class EloquentUserAttachmentRepository extends EloquentRepository implements UserAttachmentRepositoryInterface
 {
@@ -18,6 +20,7 @@ class EloquentUserAttachmentRepository extends EloquentRepository implements Use
     public function findByUuid(string $uuid): ?UserAttachment
     {
         $model = $this->model->where('uuid', $uuid)->first();
+
         return $model ? $this->toDomainEntity($model) : null;
     }
 
@@ -27,21 +30,22 @@ class EloquentUserAttachmentRepository extends EloquentRepository implements Use
         if ($type !== null) {
             $query->where('type', $type);
         }
-        return $query->get()->map(fn($m) => $this->toDomainEntity($m));
+
+        return $query->get()->map(fn ($m) => $this->toDomainEntity($m));
     }
 
     public function save(UserAttachment $attachment): UserAttachment
     {
         $data = [
             'tenant_id' => $attachment->getTenantId(),
-            'user_id'   => $attachment->getUserId(),
-            'uuid'      => $attachment->getUuid(),
-            'name'      => $attachment->getName(),
+            'user_id' => $attachment->getUserId(),
+            'uuid' => $attachment->getUuid(),
+            'name' => $attachment->getName(),
             'file_path' => $attachment->getFilePath(),
             'mime_type' => $attachment->getMimeType(),
-            'size'      => $attachment->getSize(),
-            'type'      => $attachment->getType(),
-            'metadata'  => $attachment->getMetadata(),
+            'size' => $attachment->getSize(),
+            'type' => $attachment->getType(),
+            'metadata' => $attachment->getMetadata(),
         ];
 
         if ($attachment->getId()) {

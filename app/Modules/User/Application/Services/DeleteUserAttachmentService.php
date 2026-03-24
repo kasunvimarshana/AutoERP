@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\User\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
-use Modules\User\Domain\RepositoryInterfaces\UserAttachmentRepositoryInterface;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
-use Modules\User\Domain\Exceptions\AttachmentNotFoundException;
+use Modules\Core\Application\Services\BaseService;
 use Modules\User\Application\Contracts\DeleteUserAttachmentServiceInterface;
+use Modules\User\Domain\Exceptions\AttachmentNotFoundException;
+use Modules\User\Domain\RepositoryInterfaces\UserAttachmentRepositoryInterface;
 
 class DeleteUserAttachmentService extends BaseService implements DeleteUserAttachmentServiceInterface
 {
@@ -21,11 +23,12 @@ class DeleteUserAttachmentService extends BaseService implements DeleteUserAttac
     {
         $attachmentId = $data['attachment_id'];
         $attachment = $this->attachmentRepo->find($attachmentId);
-        if (!$attachment) {
+        if (! $attachment) {
             throw new AttachmentNotFoundException($attachmentId);
         }
 
         $this->storage->delete($attachment->getFilePath());
+
         return $this->attachmentRepo->delete($attachmentId);
     }
 }

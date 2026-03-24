@@ -1,16 +1,20 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Application\Services;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Modules\Core\Application\Contracts\ServiceInterface;
 use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
 use Modules\Core\Domain\Exceptions\NotFoundException;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Event;
 
 abstract class BaseService implements ServiceInterface
 {
     protected RepositoryInterface $repository;
+
     protected array $events = [];
 
     public function __construct(RepositoryInterface $repository)
@@ -26,6 +30,7 @@ abstract class BaseService implements ServiceInterface
         return DB::transaction(function () use ($data) {
             $result = $this->handle($data);
             $this->dispatchEvents();
+
             return $result;
         });
     }
@@ -65,7 +70,7 @@ abstract class BaseService implements ServiceInterface
     /**
      * List records with filters and pagination.
      */
-    public function list(array $filters = [], ?int $perPage = null, int $page = 1, ?string $sort = null, ?string $include = null): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    public function list(array $filters = [], ?int $perPage = null, int $page = 1, ?string $sort = null, ?string $include = null): LengthAwarePaginator
     {
         $perPage = $perPage ?? config('core.pagination.per_page', 15);
         $pageName = config('core.pagination.page_name', 'page');
@@ -100,6 +105,7 @@ abstract class BaseService implements ServiceInterface
         return DB::transaction(function () use ($id, $data) {
             $result = $this->handleUpdate($id, $data);
             $this->dispatchEvents();
+
             return $result;
         });
     }
@@ -112,6 +118,7 @@ abstract class BaseService implements ServiceInterface
         return DB::transaction(function () use ($id) {
             $result = $this->handleDelete($id);
             $this->dispatchEvents();
+
             return $result;
         });
     }
@@ -119,10 +126,11 @@ abstract class BaseService implements ServiceInterface
     protected function handleUpdate(mixed $id, array $data): mixed
     {
         $model = $this->repository->find($id);
-        if (!$model) {
+        if (! $model) {
             throw new NotFoundException('Record', $id);
         }
         $this->repository->update($id, $data);
+
         return $this->repository->find($id);
     }
 

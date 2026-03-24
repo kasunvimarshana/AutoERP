@@ -1,15 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\OrganizationUnit\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
-use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitRepositoryInterface;
-use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitAttachmentRepositoryInterface;
-use Modules\OrganizationUnit\Domain\Entities\OrganizationUnitAttachment;
-use Modules\Core\Application\Contracts\FileStorageServiceInterface;
-use Modules\OrganizationUnit\Domain\Exceptions\OrganizationUnitNotFoundException;
-use Modules\OrganizationUnit\Application\Contracts\UploadOrganizationUnitAttachmentServiceInterface;
 use Illuminate\Support\Str;
+use Modules\Core\Application\Contracts\FileStorageServiceInterface;
+use Modules\Core\Application\Services\BaseService;
+use Modules\OrganizationUnit\Application\Contracts\UploadOrganizationUnitAttachmentServiceInterface;
+use Modules\OrganizationUnit\Domain\Entities\OrganizationUnitAttachment;
+use Modules\OrganizationUnit\Domain\Exceptions\OrganizationUnitNotFoundException;
+use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitAttachmentRepositoryInterface;
+use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitRepositoryInterface;
 
 class UploadOrganizationUnitAttachmentService extends BaseService implements UploadOrganizationUnitAttachmentServiceInterface
 {
@@ -32,7 +34,7 @@ class UploadOrganizationUnitAttachmentService extends BaseService implements Upl
         $metadata = $data['metadata'] ?? [];
 
         $unit = $this->orgUnitRepository->find($orgUnitId);
-        if (!$unit) {
+        if (! $unit) {
             throw new OrganizationUnitNotFoundException($orgUnitId);
         }
 

@@ -1,10 +1,10 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Modules\User\Infrastructure\Http\Controllers\UserController;
-use Modules\User\Infrastructure\Http\Controllers\UserAttachmentController;
-use Modules\User\Infrastructure\Http\Controllers\RoleController;
 use Modules\User\Infrastructure\Http\Controllers\PermissionController;
+use Modules\User\Infrastructure\Http\Controllers\RoleController;
+use Modules\User\Infrastructure\Http\Controllers\UserAttachmentController;
+use Modules\User\Infrastructure\Http\Controllers\UserController;
 
 Route::middleware(['auth:api', 'resolve.tenant'])->group(function () {
     Route::apiResource('users', UserController::class);

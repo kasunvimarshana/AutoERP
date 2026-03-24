@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Domain\ValueObjects;
 
 class Metadata extends ValueObject

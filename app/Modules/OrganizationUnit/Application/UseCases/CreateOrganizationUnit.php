@@ -1,14 +1,16 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\OrganizationUnit\Application\UseCases;
 
-use Modules\OrganizationUnit\Domain\Entities\OrganizationUnit;
-use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitRepositoryInterface;
-use Modules\OrganizationUnit\Application\DTOs\OrganizationUnitData;
-use Modules\OrganizationUnit\Domain\Events\OrganizationUnitCreated;
-use Modules\Core\Domain\ValueObjects\Name;
 use Modules\Core\Domain\ValueObjects\Code;
 use Modules\Core\Domain\ValueObjects\Metadata;
+use Modules\Core\Domain\ValueObjects\Name;
+use Modules\OrganizationUnit\Application\DTOs\OrganizationUnitData;
+use Modules\OrganizationUnit\Domain\Entities\OrganizationUnit;
+use Modules\OrganizationUnit\Domain\Events\OrganizationUnitCreated;
+use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitRepositoryInterface;
 
 class CreateOrganizationUnit
 {

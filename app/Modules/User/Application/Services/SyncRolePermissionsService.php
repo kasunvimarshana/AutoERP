@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\User\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
-use Modules\User\Domain\RepositoryInterfaces\RoleRepositoryInterface;
-use Modules\User\Domain\Exceptions\RoleNotFoundException;
 use Modules\User\Application\Contracts\SyncRolePermissionsServiceInterface;
+use Modules\User\Domain\Exceptions\RoleNotFoundException;
+use Modules\User\Domain\RepositoryInterfaces\RoleRepositoryInterface;
 
 class SyncRolePermissionsService extends BaseService implements SyncRolePermissionsServiceInterface
 {
@@ -23,7 +25,7 @@ class SyncRolePermissionsService extends BaseService implements SyncRolePermissi
         $permissionIds = $data['permission_ids'] ?? [];
 
         $role = $this->roleRepository->find($roleId);
-        if (!$role) {
+        if (! $role) {
             throw new RoleNotFoundException($roleId);
         }
 

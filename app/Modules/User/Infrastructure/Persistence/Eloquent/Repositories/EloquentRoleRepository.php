@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\User\Infrastructure\Persistence\Eloquent\Repositories;
 
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
-use Modules\User\Domain\RepositoryInterfaces\RoleRepositoryInterface;
-use Modules\User\Domain\Entities\Role;
 use Modules\User\Domain\Entities\Permission;
+use Modules\User\Domain\Entities\Role;
+use Modules\User\Domain\RepositoryInterfaces\RoleRepositoryInterface;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\RoleModel;
 
 class EloquentRoleRepository extends EloquentRepository implements RoleRepositoryInterface
@@ -20,6 +22,7 @@ class EloquentRoleRepository extends EloquentRepository implements RoleRepositor
         $model = $this->model->where('tenant_id', $tenantId)
             ->where('name', $name)
             ->first();
+
         return $model ? $this->toDomainEntity($model) : null;
     }
 
@@ -28,14 +31,15 @@ class EloquentRoleRepository extends EloquentRepository implements RoleRepositor
         if ($role->getId()) {
             $model = $this->update($role->getId(), [
                 'tenant_id' => $role->getTenantId(),
-                'name'      => $role->getName(),
+                'name' => $role->getName(),
             ]);
         } else {
             $model = $this->create([
                 'tenant_id' => $role->getTenantId(),
-                'name'      => $role->getName(),
+                'name' => $role->getName(),
             ]);
         }
+
         return $this->toDomainEntity($model);
     }
 
@@ -55,6 +59,7 @@ class EloquentRoleRepository extends EloquentRepository implements RoleRepositor
                 $role->grantPermission(new Permission($permModel->tenant_id, $permModel->name, $permModel->id));
             }
         }
+
         return $role;
     }
 }

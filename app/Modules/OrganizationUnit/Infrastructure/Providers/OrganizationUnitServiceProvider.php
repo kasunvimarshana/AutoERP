@@ -1,26 +1,29 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\OrganizationUnit\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitRepositoryInterface;
-use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitAttachmentRepositoryInterface;
-use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrganizationUnitRepository;
-use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrganizationUnitAttachmentRepository;
-use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
-use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitAttachmentModel;
+use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\OrganizationUnit\Application\Contracts\CreateOrganizationUnitServiceInterface;
-use Modules\OrganizationUnit\Application\Contracts\UpdateOrganizationUnitServiceInterface;
+use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitAttachmentServiceInterface;
 use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitServiceInterface;
 use Modules\OrganizationUnit\Application\Contracts\MoveOrganizationUnitServiceInterface;
+use Modules\OrganizationUnit\Application\Contracts\UpdateOrganizationUnitServiceInterface;
 use Modules\OrganizationUnit\Application\Contracts\UploadOrganizationUnitAttachmentServiceInterface;
-use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitAttachmentServiceInterface;
 use Modules\OrganizationUnit\Application\Services\CreateOrganizationUnitService;
-use Modules\OrganizationUnit\Application\Services\UpdateOrganizationUnitService;
+use Modules\OrganizationUnit\Application\Services\DeleteOrganizationUnitAttachmentService;
 use Modules\OrganizationUnit\Application\Services\DeleteOrganizationUnitService;
 use Modules\OrganizationUnit\Application\Services\MoveOrganizationUnitService;
+use Modules\OrganizationUnit\Application\Services\UpdateOrganizationUnitService;
 use Modules\OrganizationUnit\Application\Services\UploadOrganizationUnitAttachmentService;
-use Modules\OrganizationUnit\Application\Services\DeleteOrganizationUnitAttachmentService;
+use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitAttachmentRepositoryInterface;
+use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitRepositoryInterface;
+use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitAttachmentModel;
+use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
+use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrganizationUnitAttachmentRepository;
+use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrganizationUnitRepository;
 
 class OrganizationUnitServiceProvider extends ServiceProvider
 {
@@ -49,20 +52,20 @@ class OrganizationUnitServiceProvider extends ServiceProvider
             return new UploadOrganizationUnitAttachmentService(
                 $app->make(OrganizationUnitRepositoryInterface::class),
                 $app->make(OrganizationUnitAttachmentRepositoryInterface::class),
-                $app->make(\Modules\Core\Application\Contracts\FileStorageServiceInterface::class)
+                $app->make(FileStorageServiceInterface::class)
             );
         });
         $this->app->bind(DeleteOrganizationUnitAttachmentServiceInterface::class, function ($app) {
             return new DeleteOrganizationUnitAttachmentService(
                 $app->make(OrganizationUnitAttachmentRepositoryInterface::class),
-                $app->make(\Modules\Core\Application\Contracts\FileStorageServiceInterface::class)
+                $app->make(FileStorageServiceInterface::class)
             );
         });
     }
 
     public function boot()
     {
-        $this->loadRoutesFrom(__DIR__ . '/../../routes/api.php');
-        $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
+        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
+        $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
     }
 }

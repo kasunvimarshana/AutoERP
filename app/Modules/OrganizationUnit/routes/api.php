@@ -1,8 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Modules\OrganizationUnit\Infrastructure\Http\Controllers\OrganizationUnitController;
 use Modules\OrganizationUnit\Infrastructure\Http\Controllers\OrganizationUnitAttachmentController;
+use Modules\OrganizationUnit\Infrastructure\Http\Controllers\OrganizationUnitController;
 
 Route::middleware(['auth:api', 'resolve.tenant'])->group(function () {
     Route::apiResource('org-units', OrganizationUnitController::class);

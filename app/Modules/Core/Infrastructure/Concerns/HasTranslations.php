@@ -1,9 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Infrastructure\Concerns;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Arr;
 use InvalidArgumentException;
 
 /**
@@ -45,13 +47,13 @@ trait HasTranslations
     /**
      * Ensure that all translatable columns contain valid JSON.
      *
-     * @throws \InvalidArgumentException
+     * @throws InvalidArgumentException
      */
     protected function ensureTranslatableAttributesAreValidJson(): void
     {
         foreach ($this->getTopLevelTranslatableColumns() as $column) {
             $value = $this->attributes[$column] ?? null;
-            if ($value !== null && !$this->isValidJsonArray($value)) {
+            if ($value !== null && ! $this->isValidJsonArray($value)) {
                 throw new InvalidArgumentException(
                     "Translatable column [{$column}] must be a valid JSON array of translations."
                 );
@@ -80,14 +82,12 @@ trait HasTranslations
         foreach ($this->getTranslatableAttributes() as $path) {
             $columns[] = $this->getColumnName($path);
         }
+
         return array_unique($columns);
     }
 
     /**
      * Check if an attribute path is translatable.
-     *
-     * @param string $key
-     * @return bool
      */
     public function isTranslatableAttribute(string $key): bool
     {
@@ -97,12 +97,10 @@ trait HasTranslations
     /**
      * Get a translation for a given attribute path and locale.
      *
-     * @param string $key    The attribute path (e.g., 'name' or 'meta->seo_title')
-     * @param string $locale
-     * @param bool   $useFallbackLocale
+     * @param  string  $key  The attribute path (e.g., 'name' or 'meta->seo_title')
      * @return mixed
      *
-     * @throws \InvalidArgumentException
+     * @throws InvalidArgumentException
      */
     public function getTranslation(string $key, string $locale, bool $useFallbackLocale = true)
     {
@@ -121,12 +119,11 @@ trait HasTranslations
     /**
      * Set a translation for a given attribute path and locale.
      *
-     * @param string $key    The attribute path (e.g., 'name' or 'meta->seo_title')
-     * @param string $locale
-     * @param mixed  $value
+     * @param  string  $key  The attribute path (e.g., 'name' or 'meta->seo_title')
+     * @param  mixed  $value
      * @return $this
      *
-     * @throws \InvalidArgumentException
+     * @throws InvalidArgumentException
      */
     public function setTranslation(string $key, string $locale, $value): self
     {
@@ -139,7 +136,7 @@ trait HasTranslations
         $target = &$current;
 
         foreach ($path as $segment) {
-            if (!isset($target[$segment]) || !is_array($target[$segment])) {
+            if (! isset($target[$segment]) || ! is_array($target[$segment])) {
                 $target[$segment] = [];
             }
             $target = &$target[$segment];
@@ -155,10 +152,9 @@ trait HasTranslations
     /**
      * Get all translations for a given attribute path.
      *
-     * @param string $key    The attribute path (e.g., 'name' or 'meta->seo_title')
-     * @return array
+     * @param  string  $key  The attribute path (e.g., 'name' or 'meta->seo_title')
      *
-     * @throws \InvalidArgumentException
+     * @throws InvalidArgumentException
      */
     public function getTranslations(string $key): array
     {
@@ -176,7 +172,7 @@ trait HasTranslations
         $translations = is_array($value) ? $value : [];
 
         foreach ($path as $segment) {
-            if (!isset($translations[$segment]) || !is_array($translations[$segment])) {
+            if (! isset($translations[$segment]) || ! is_array($translations[$segment])) {
                 return [];
             }
             $translations = $translations[$segment];
@@ -188,8 +184,7 @@ trait HasTranslations
     /**
      * Set all translations for a given attribute path (overwrites existing).
      *
-     * @param string $key
-     * @param array  $translations  ['en' => 'value', 'fr' => 'value']
+     * @param  array  $translations  ['en' => 'value', 'fr' => 'value']
      * @return $this
      */
     public function setTranslations(string $key, array $translations): self
@@ -203,7 +198,7 @@ trait HasTranslations
         $target = &$current;
 
         foreach ($path as $segment) {
-            if (!isset($target[$segment]) || !is_array($target[$segment])) {
+            if (! isset($target[$segment]) || ! is_array($target[$segment])) {
                 $target[$segment] = [];
             }
             $target = &$target[$segment];
@@ -219,11 +214,10 @@ trait HasTranslations
     /**
      * Forget one or all translations for an attribute path.
      *
-     * @param string      $key
-     * @param string|null $locale  If null, all translations for this path are forgotten.
+     * @param  string|null  $locale  If null, all translations for this path are forgotten.
      * @return $this
      *
-     * @throws \InvalidArgumentException
+     * @throws InvalidArgumentException
      */
     public function forgetTranslation(string $key, ?string $locale = null): self
     {
@@ -237,7 +231,7 @@ trait HasTranslations
 
         $lastSegment = array_pop($path);
         foreach ($path as $segment) {
-            if (!isset($target[$segment]) || !is_array($target[$segment])) {
+            if (! isset($target[$segment]) || ! is_array($target[$segment])) {
                 return $this; // path doesn't exist
             }
             $target = &$target[$segment];
@@ -262,7 +256,7 @@ trait HasTranslations
     /**
      * Intercept attribute access to return the translation for the current locale.
      *
-     * @param string $key
+     * @param  string  $key
      * @return mixed
      */
     public function __get($key)
@@ -277,8 +271,8 @@ trait HasTranslations
     /**
      * Intercept attribute setting to allow direct assignment of translations.
      *
-     * @param string $key
-     * @param mixed  $value
+     * @param  string  $key
+     * @param  mixed  $value
      * @return void
      */
     public function setAttribute($key, $value)
@@ -286,6 +280,7 @@ trait HasTranslations
         if ($this->isTranslatableAttribute($key) && is_array($value)) {
             // If an array is passed, treat it as a set of translations for the whole path.
             $this->setTranslations($key, $value);
+
             return;
         }
 
@@ -297,32 +292,28 @@ trait HasTranslations
     /**
      * Scope a query to only include records where the translation for a given locale matches a value.
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param string $key
-     * @param string $locale
-     * @param mixed  $value
-     * @param string $operator
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @param  Builder  $query
+     * @param  mixed  $value
+     * @return Builder
      */
     public function scopeWhereLocale($query, string $key, string $locale, $value, string $operator = '=')
     {
         $this->ensureIsTranslatable($key);
+
         return $query->where($this->getJsonPath($key, $locale), $operator, $value);
     }
 
     /**
      * Scope a query to only include records where the translation for one of several locales matches a value.
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param string $key
-     * @param array  $locales
-     * @param mixed  $value
-     * @param string $operator
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @param  Builder  $query
+     * @param  mixed  $value
+     * @return Builder
      */
     public function scopeWhereLocales($query, string $key, array $locales, $value, string $operator = '=')
     {
         $this->ensureIsTranslatable($key);
+
         return $query->where(function ($q) use ($key, $locales, $value, $operator) {
             foreach ($locales as $locale) {
                 $q->orWhere($this->getJsonPath($key, $locale), $operator, $value);
@@ -333,32 +324,28 @@ trait HasTranslations
     /**
      * Scope a query to only include records where the JSON column for a locale contains a given value.
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param string $key
-     * @param string $locale
-     * @param mixed  $value
-     * @param string $operand
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @param  Builder  $query
+     * @param  mixed  $value
+     * @return Builder
      */
     public function scopeWhereJsonContainsLocale($query, string $key, string $locale, $value, string $operand = '=')
     {
         $this->ensureIsTranslatable($key);
+
         return $query->where($this->getJsonPath($key, $locale), $operand, $value);
     }
 
     /**
      * Scope a query to only include records where the JSON column for any of the locales contains a given value.
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param string $key
-     * @param array  $locales
-     * @param mixed  $value
-     * @param string $operand
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @param  Builder  $query
+     * @param  mixed  $value
+     * @return Builder
      */
     public function scopeWhereJsonContainsLocales($query, string $key, array $locales, $value, string $operand = '=')
     {
         $this->ensureIsTranslatable($key);
+
         return $query->where(function ($q) use ($key, $locales, $value, $operand) {
             foreach ($locales as $locale) {
                 $q->orWhere($this->getJsonPath($key, $locale), $operand, $value);
@@ -370,8 +357,6 @@ trait HasTranslations
 
     /**
      * Get the current application locale.
-     *
-     * @return string
      */
     protected function getLocale(): string
     {
@@ -380,8 +365,6 @@ trait HasTranslations
 
     /**
      * Get the fallback locale from configuration.
-     *
-     * @return string
      */
     protected function getFallbackLocale(): string
     {
@@ -390,9 +373,6 @@ trait HasTranslations
 
     /**
      * Encode an array of translations to JSON.
-     *
-     * @param array $translations
-     * @return string
      */
     protected function encodeTranslations(array $translations): string
     {
@@ -401,69 +381,61 @@ trait HasTranslations
 
     /**
      * Determine if a string is valid JSON.
-     *
-     * @param string $string
-     * @return bool
      */
     protected function isJson(string $string): bool
     {
         json_decode($string);
+
         return json_last_error() === JSON_ERROR_NONE;
     }
 
     /**
      * Determine if a value is a valid JSON array (object) of translations.
      *
-     * @param mixed $value
-     * @return bool
+     * @param  mixed  $value
      */
     protected function isValidJsonArray($value): bool
     {
-        if (!is_string($value) || !$this->isJson($value)) {
+        if (! is_string($value) || ! $this->isJson($value)) {
             return false;
         }
 
         $decoded = json_decode($value, true);
+
         return is_array($decoded);
     }
 
     /**
      * Ensure an attribute path is translatable.
      *
-     * @param string $key
-     * @return void
      *
-     * @throws \InvalidArgumentException
+     * @throws InvalidArgumentException
      */
     protected function ensureIsTranslatable(string $key): void
     {
-        if (!$this->isTranslatableAttribute($key)) {
+        if (! $this->isTranslatableAttribute($key)) {
             throw new InvalidArgumentException("Attribute path [{$key}] is not translatable.");
         }
     }
 
     /**
      * Extract the top‑level column name from a dotted path.
-     *
-     * @param string $key
-     * @return string
      */
     protected function getColumnName(string $key): string
     {
         $parts = explode('->', $key);
+
         return $parts[0];
     }
 
     /**
      * Extract the nested path (without the column) as an array of segments.
-     *
-     * @param string $key
-     * @return array
      */
     protected function getNestedPath(string $key): array
     {
         $parts = explode('->', $key);
         array_shift($parts); // remove the column name
+
         return $parts;
     }
 
@@ -471,16 +443,13 @@ trait HasTranslations
      * Build a JSON path for a given attribute and locale.
      *
      * Example: 'name->en' (for MySQL) – override for other databases.
-     *
-     * @param string $key
-     * @param string $locale
-     * @return string
      */
     protected function getJsonPath(string $key, string $locale): string
     {
         $column = $this->getColumnName($key);
         $path = $this->getNestedPath($key);
         $path[] = $locale; // add the locale as the final segment
-        return $column . '->' . implode('->', $path);
+
+        return $column.'->'.implode('->', $path);
     }
 }

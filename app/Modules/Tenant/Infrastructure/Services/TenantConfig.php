@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Tenant\Infrastructure\Services;
 
 use Modules\Tenant\Domain\Contracts\TenantConfigInterface;

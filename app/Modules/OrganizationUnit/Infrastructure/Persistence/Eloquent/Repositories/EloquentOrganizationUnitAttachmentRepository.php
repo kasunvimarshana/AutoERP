@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
-use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitAttachmentRepositoryInterface;
-use Modules\OrganizationUnit\Domain\Entities\OrganizationUnitAttachment;
-use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitAttachmentModel;
 use Illuminate\Support\Collection;
+use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
+use Modules\OrganizationUnit\Domain\Entities\OrganizationUnitAttachment;
+use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitAttachmentRepositoryInterface;
+use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitAttachmentModel;
 
 class EloquentOrganizationUnitAttachmentRepository extends EloquentRepository implements OrganizationUnitAttachmentRepositoryInterface
 {
@@ -18,6 +20,7 @@ class EloquentOrganizationUnitAttachmentRepository extends EloquentRepository im
     public function findByUuid(string $uuid): ?OrganizationUnitAttachment
     {
         $model = $this->model->where('uuid', $uuid)->first();
+
         return $model ? $this->toDomainEntity($model) : null;
     }
 
@@ -28,21 +31,22 @@ class EloquentOrganizationUnitAttachmentRepository extends EloquentRepository im
             $query->where('type', $type);
         }
         $models = $query->get();
-        return $models->map(fn($m) => $this->toDomainEntity($m));
+
+        return $models->map(fn ($m) => $this->toDomainEntity($m));
     }
 
     public function save(OrganizationUnitAttachment $attachment): OrganizationUnitAttachment
     {
         $data = [
-            'tenant_id'              => $attachment->getTenantId(),
-            'organization_unit_id'   => $attachment->getOrganizationUnitId(),
-            'uuid'                   => $attachment->getUuid(),
-            'name'                   => $attachment->getName(),
-            'file_path'              => $attachment->getFilePath(),
-            'mime_type'              => $attachment->getMimeType(),
-            'size'                   => $attachment->getSize(),
-            'type'                   => $attachment->getType(),
-            'metadata'               => $attachment->getMetadata(),
+            'tenant_id' => $attachment->getTenantId(),
+            'organization_unit_id' => $attachment->getOrganizationUnitId(),
+            'uuid' => $attachment->getUuid(),
+            'name' => $attachment->getName(),
+            'file_path' => $attachment->getFilePath(),
+            'mime_type' => $attachment->getMimeType(),
+            'size' => $attachment->getSize(),
+            'type' => $attachment->getType(),
+            'metadata' => $attachment->getMetadata(),
         ];
 
         if ($attachment->getId()) {
@@ -50,6 +54,7 @@ class EloquentOrganizationUnitAttachmentRepository extends EloquentRepository im
         } else {
             $model = $this->create($data);
         }
+
         return $this->toDomainEntity($model);
     }
 

@@ -2,15 +2,14 @@
 
 namespace Tests\Unit;
 
-use PHPUnit\Framework\TestCase;
+use Modules\Core\Domain\ValueObjects\Code;
+use Modules\Core\Domain\ValueObjects\Name;
 use Modules\OrganizationUnit\Domain\Entities\OrganizationUnit;
 use Modules\OrganizationUnit\Domain\Events\OrganizationUnitCreated;
-use Modules\OrganizationUnit\Domain\Events\OrganizationUnitUpdated;
 use Modules\OrganizationUnit\Domain\Events\OrganizationUnitDeleted;
 use Modules\OrganizationUnit\Domain\Events\OrganizationUnitMoved;
-use Modules\Core\Domain\ValueObjects\Name;
-use Modules\Core\Domain\ValueObjects\Code;
-use Modules\Core\Domain\ValueObjects\Metadata;
+use Modules\OrganizationUnit\Domain\Events\OrganizationUnitUpdated;
+use PHPUnit\Framework\TestCase;
 
 class OrganizationUnitEntityTest extends TestCase
 {

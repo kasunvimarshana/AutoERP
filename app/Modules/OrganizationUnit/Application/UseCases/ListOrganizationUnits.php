@@ -1,9 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\OrganizationUnit\Application\UseCases;
 
-use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitRepositoryInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitRepositoryInterface;
 
 class ListOrganizationUnits
 {
@@ -22,6 +24,7 @@ class ListOrganizationUnits
                 $repo->where($field, $value);
             }
         }
+
         return $repo->paginate($perPage, ['*'], 'page', $page);
     }
 }

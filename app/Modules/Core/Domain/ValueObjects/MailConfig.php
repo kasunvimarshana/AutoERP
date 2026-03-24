@@ -1,16 +1,25 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Core\Domain\ValueObjects;
 
 class MailConfig extends ValueObject
 {
     private string $driver;
+
     private string $host;
+
     private int $port;
+
     private string $username;
+
     private string $password;
+
     private ?string $encryption;
+
     private ?string $fromAddress;
+
     private ?string $fromName;
 
     public function __construct(
@@ -38,15 +47,15 @@ class MailConfig extends ValueObject
     public function toArray(): array
     {
         return [
-            'driver'      => $this->driver,
-            'host'        => $this->host,
-            'port'        => $this->port,
-            'username'    => $this->username,
-            'password'    => $this->password,
-            'encryption'  => $this->encryption,
+            'driver' => $this->driver,
+            'host' => $this->host,
+            'port' => $this->port,
+            'username' => $this->username,
+            'password' => $this->password,
+            'encryption' => $this->encryption,
             'from' => [
                 'address' => $this->fromAddress,
-                'name'    => $this->fromName,
+                'name' => $this->fromName,
             ],
         ];
     }
@@ -56,7 +65,7 @@ class MailConfig extends ValueObject
         return new static(
             $data['driver'] ?? 'smtp',
             $data['host'] ?? 'localhost',
-            (int)($data['port'] ?? 587),
+            (int) ($data['port'] ?? 587),
             $data['username'] ?? '',
             $data['password'] ?? '',
             $data['encryption'] ?? null,

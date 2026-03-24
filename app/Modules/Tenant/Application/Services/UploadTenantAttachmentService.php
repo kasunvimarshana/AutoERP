@@ -1,15 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Tenant\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
-use Modules\Tenant\Domain\RepositoryInterfaces\TenantRepositoryInterface;
-use Modules\Tenant\Domain\RepositoryInterfaces\TenantAttachmentRepositoryInterface;
-use Modules\Tenant\Domain\Entities\TenantAttachment;
-use Modules\Core\Application\Contracts\FileStorageServiceInterface;
-use Modules\Tenant\Domain\Exceptions\TenantNotFoundException;
-use Modules\Tenant\Application\Contracts\UploadTenantAttachmentServiceInterface;
 use Illuminate\Support\Str;
+use Modules\Core\Application\Contracts\FileStorageServiceInterface;
+use Modules\Core\Application\Services\BaseService;
+use Modules\Tenant\Application\Contracts\UploadTenantAttachmentServiceInterface;
+use Modules\Tenant\Domain\Entities\TenantAttachment;
+use Modules\Tenant\Domain\Exceptions\TenantNotFoundException;
+use Modules\Tenant\Domain\RepositoryInterfaces\TenantAttachmentRepositoryInterface;
+use Modules\Tenant\Domain\RepositoryInterfaces\TenantRepositoryInterface;
 
 class UploadTenantAttachmentService extends BaseService implements UploadTenantAttachmentServiceInterface
 {
@@ -32,7 +34,7 @@ class UploadTenantAttachmentService extends BaseService implements UploadTenantA
         $metadata = $data['metadata'] ?? [];
 
         $tenant = $this->tenantRepository->find($tenantId);
-        if (!$tenant) {
+        if (! $tenant) {
             throw new TenantNotFoundException($tenantId);
         }
 

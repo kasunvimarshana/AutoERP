@@ -2,14 +2,9 @@
 
 namespace Tests\Unit;
 
-use PHPUnit\Framework\TestCase;
-use Modules\Tenant\Domain\Entities\Tenant;
 use Modules\Core\Domain\ValueObjects\DatabaseConfig;
-use Modules\Core\Domain\ValueObjects\MailConfig;
-use Modules\Core\Domain\ValueObjects\CacheConfig;
-use Modules\Core\Domain\ValueObjects\QueueConfig;
-use Modules\Core\Domain\ValueObjects\FeatureFlags;
-use Modules\Core\Domain\ValueObjects\ApiKeys;
+use Modules\Tenant\Domain\Entities\Tenant;
+use PHPUnit\Framework\TestCase;
 
 class TenantEntityTest extends TestCase
 {
@@ -18,9 +13,9 @@ class TenantEntityTest extends TestCase
         return new Tenant(
             name: $name,
             databaseConfig: DatabaseConfig::fromArray([
-                'driver'   => 'mysql',
-                'host'     => 'localhost',
-                'port'     => 3306,
+                'driver' => 'mysql',
+                'host' => 'localhost',
+                'port' => 3306,
                 'database' => 'test_db',
                 'username' => 'root',
                 'password' => 'secret',
@@ -60,7 +55,7 @@ class TenantEntityTest extends TestCase
 
         $tenant->updateConfig([
             'feature_flags' => ['billing' => true],
-            'active'        => false,
+            'active' => false,
         ]);
 
         $this->assertTrue($tenant->getFeatureFlags()->isEnabled('billing'));

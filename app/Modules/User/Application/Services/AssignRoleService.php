@@ -1,15 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\User\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
-use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
-use Modules\User\Domain\RepositoryInterfaces\RoleRepositoryInterface;
-use Modules\User\Domain\Events\RoleAssigned;
-use Modules\User\Domain\Exceptions\UserNotFoundException;
-use Modules\User\Domain\Exceptions\RoleNotFoundException;
 use Modules\Core\Domain\Exceptions\DomainException;
 use Modules\User\Application\Contracts\AssignRoleServiceInterface;
+use Modules\User\Domain\Events\RoleAssigned;
+use Modules\User\Domain\Exceptions\RoleNotFoundException;
+use Modules\User\Domain\Exceptions\UserNotFoundException;
+use Modules\User\Domain\RepositoryInterfaces\RoleRepositoryInterface;
+use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 
 class AssignRoleService extends BaseService implements AssignRoleServiceInterface
 {
@@ -29,11 +31,11 @@ class AssignRoleService extends BaseService implements AssignRoleServiceInterfac
         $roleId = $data['role_id'];
 
         $user = $this->userRepository->find($userId);
-        if (!$user) {
+        if (! $user) {
             throw new UserNotFoundException($userId);
         }
         $role = $this->roleRepo->find($roleId);
-        if (!$role) {
+        if (! $role) {
             throw new RoleNotFoundException($roleId);
         }
         if ($role->getTenantId() !== $user->getTenantId()) {
@@ -43,6 +45,7 @@ class AssignRoleService extends BaseService implements AssignRoleServiceInterfac
         $user->assignRole($role);
         $this->userRepository->syncRoles($user, $user->getRoles()->pluck('id')->toArray());
         $this->addEvent(new RoleAssigned($user, $role));
+
         return null;
     }
 }

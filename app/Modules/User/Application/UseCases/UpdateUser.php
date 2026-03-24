@@ -1,15 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\User\Application\UseCases;
 
-use Modules\User\Domain\Entities\User;
-use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
+use Modules\Core\Domain\ValueObjects\Address;
+use Modules\Core\Domain\ValueObjects\PhoneNumber;
+use Modules\Core\Domain\ValueObjects\UserPreferences;
 use Modules\User\Application\DTOs\UserData;
+use Modules\User\Domain\Entities\User;
 use Modules\User\Domain\Events\UserUpdated;
 use Modules\User\Domain\Exceptions\UserNotFoundException;
-use Modules\Core\Domain\ValueObjects\PhoneNumber;
-use Modules\Core\Domain\ValueObjects\Address;
-use Modules\Core\Domain\ValueObjects\UserPreferences;
+use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 
 class UpdateUser
 {
@@ -20,7 +22,7 @@ class UpdateUser
     public function execute(int $id, UserData $data): User
     {
         $user = $this->userRepo->find($id);
-        if (!$user) {
+        if (! $user) {
             throw new UserNotFoundException($id);
         }
 

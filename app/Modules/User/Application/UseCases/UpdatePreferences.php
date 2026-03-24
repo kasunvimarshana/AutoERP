@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\User\Application\UseCases;
 
-use Modules\User\Domain\Entities\User;
-use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
-use Modules\User\Application\DTOs\UserPreferencesData;
-use Modules\User\Domain\Exceptions\UserNotFoundException;
 use Modules\Core\Domain\ValueObjects\UserPreferences;
+use Modules\User\Application\DTOs\UserPreferencesData;
+use Modules\User\Domain\Entities\User;
+use Modules\User\Domain\Exceptions\UserNotFoundException;
+use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 
 class UpdatePreferences
 {
@@ -17,7 +19,7 @@ class UpdatePreferences
     public function execute(int $userId, UserPreferencesData $data): User
     {
         $user = $this->userRepo->find($userId);
-        if (!$user) {
+        if (! $user) {
             throw new UserNotFoundException($userId);
         }
 

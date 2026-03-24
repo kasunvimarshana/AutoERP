@@ -1,15 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\User\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
-use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
-use Modules\User\Domain\Entities\User;
 use Modules\Core\Domain\ValueObjects\UserPreferences;
+use Modules\User\Application\Contracts\UpdatePreferencesServiceInterface;
 use Modules\User\Application\DTOs\UserPreferencesData;
+use Modules\User\Domain\Entities\User;
 use Modules\User\Domain\Events\UserUpdated;
 use Modules\User\Domain\Exceptions\UserNotFoundException;
-use Modules\User\Application\Contracts\UpdatePreferencesServiceInterface;
+use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 
 class UpdatePreferencesService extends BaseService implements UpdatePreferencesServiceInterface
 {
@@ -27,7 +29,7 @@ class UpdatePreferencesService extends BaseService implements UpdatePreferencesS
         $dto = UserPreferencesData::fromArray($data);
 
         $user = $this->userRepository->find($userId);
-        if (!$user) {
+        if (! $user) {
             throw new UserNotFoundException($userId);
         }
 
@@ -39,6 +41,7 @@ class UpdatePreferencesService extends BaseService implements UpdatePreferencesS
         $user->updatePreferences($preferences);
         $saved = $this->userRepository->save($user);
         $this->addEvent(new UserUpdated($saved));
+
         return $saved;
     }
 }

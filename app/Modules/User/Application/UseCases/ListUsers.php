@@ -1,9 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\User\Application\UseCases;
 
-use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 
 class ListUsers
 {
@@ -22,6 +24,7 @@ class ListUsers
                 $repo->where($field, $value);
             }
         }
+
         return $repo->paginate($perPage, ['*'], 'page', $page);
     }
 }

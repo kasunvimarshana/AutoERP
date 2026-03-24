@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -10,6 +12,7 @@ class TenantModel extends Model
     use SoftDeletes;
 
     protected $table = 'tenants';
+
     protected $fillable = [
         'name',
         'domain',
@@ -22,14 +25,15 @@ class TenantModel extends Model
         'api_keys',
         'active',
     ];
+
     protected $casts = [
         'database_config' => 'array',
-        'mail_config'     => 'array',
-        'cache_config'    => 'array',
-        'queue_config'    => 'array',
-        'feature_flags'   => 'array',
-        'api_keys'        => 'array',
-        'active'          => 'boolean',
+        'mail_config' => 'array',
+        'cache_config' => 'array',
+        'queue_config' => 'array',
+        'feature_flags' => 'array',
+        'api_keys' => 'array',
+        'active' => 'boolean',
     ];
 
     public function attachments()

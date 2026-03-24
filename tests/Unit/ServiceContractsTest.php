@@ -2,47 +2,42 @@
 
 namespace Tests\Unit;
 
-use PHPUnit\Framework\TestCase;
-
-// Tenant service interfaces
-use Modules\Tenant\Application\Contracts\CreateTenantServiceInterface;
-use Modules\Tenant\Application\Contracts\UpdateTenantServiceInterface;
-use Modules\Tenant\Application\Contracts\DeleteTenantServiceInterface;
-use Modules\Tenant\Application\Contracts\UpdateTenantConfigServiceInterface;
-use Modules\Tenant\Application\Contracts\UploadTenantAttachmentServiceInterface;
-use Modules\Tenant\Application\Contracts\DeleteTenantAttachmentServiceInterface;
-
-// User service interfaces
-use Modules\User\Application\Contracts\CreateUserServiceInterface;
-use Modules\User\Application\Contracts\UpdateUserServiceInterface;
-use Modules\User\Application\Contracts\DeleteUserServiceInterface;
-use Modules\User\Application\Contracts\AssignRoleServiceInterface;
-use Modules\User\Application\Contracts\UpdatePreferencesServiceInterface;
-use Modules\User\Application\Contracts\UploadUserAttachmentServiceInterface;
-use Modules\User\Application\Contracts\DeleteUserAttachmentServiceInterface;
-
-// OrganizationUnit service interfaces
-use Modules\OrganizationUnit\Application\Contracts\CreateOrganizationUnitServiceInterface;
-use Modules\OrganizationUnit\Application\Contracts\UpdateOrganizationUnitServiceInterface;
-use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitServiceInterface;
-use Modules\OrganizationUnit\Application\Contracts\MoveOrganizationUnitServiceInterface;
-use Modules\OrganizationUnit\Application\Contracts\UploadOrganizationUnitAttachmentServiceInterface;
-use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitAttachmentServiceInterface;
-
-// Core contracts
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
+// Tenant service interfaces
 use Modules\Core\Application\Contracts\ReadServiceInterface;
 use Modules\Core\Application\Contracts\ServiceInterface;
 use Modules\Core\Application\Contracts\WriteServiceInterface;
-
-// Tenant infrastructure
+use Modules\OrganizationUnit\Application\Contracts\CreateOrganizationUnitServiceInterface;
+use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitAttachmentServiceInterface;
+use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitServiceInterface;
+// User service interfaces
+use Modules\OrganizationUnit\Application\Contracts\MoveOrganizationUnitServiceInterface;
+use Modules\OrganizationUnit\Application\Contracts\UpdateOrganizationUnitServiceInterface;
+use Modules\OrganizationUnit\Application\Contracts\UploadOrganizationUnitAttachmentServiceInterface;
+use Modules\Tenant\Application\Contracts\CreateTenantServiceInterface;
+use Modules\Tenant\Application\Contracts\DeleteTenantAttachmentServiceInterface;
+use Modules\Tenant\Application\Contracts\DeleteTenantServiceInterface;
+use Modules\Tenant\Application\Contracts\TenantConfigClientInterface;
+// OrganizationUnit service interfaces
+use Modules\Tenant\Application\Contracts\TenantConfigManagerInterface;
+use Modules\Tenant\Application\Contracts\UpdateTenantConfigServiceInterface;
+use Modules\Tenant\Application\Contracts\UpdateTenantServiceInterface;
+use Modules\Tenant\Application\Contracts\UploadTenantAttachmentServiceInterface;
+use Modules\Tenant\Application\Services\TenantConfigManager;
+use Modules\Tenant\Domain\Contracts\TenantConfigInterface;
+// Core contracts
 use Modules\Tenant\Infrastructure\Http\Middleware\ResolveTenant;
 use Modules\Tenant\Infrastructure\Services\TenantConfig;
 use Modules\Tenant\Infrastructure\Services\TenantConfigClient;
-use Modules\Tenant\Application\Services\TenantConfigManager;
-use Modules\Tenant\Domain\Contracts\TenantConfigInterface;
-use Modules\Tenant\Application\Contracts\TenantConfigClientInterface;
-use Modules\Tenant\Application\Contracts\TenantConfigManagerInterface;
+use Modules\User\Application\Contracts\AssignRoleServiceInterface;
+// Tenant infrastructure
+use Modules\User\Application\Contracts\CreateUserServiceInterface;
+use Modules\User\Application\Contracts\DeleteUserAttachmentServiceInterface;
+use Modules\User\Application\Contracts\DeleteUserServiceInterface;
+use Modules\User\Application\Contracts\UpdatePreferencesServiceInterface;
+use Modules\User\Application\Contracts\UpdateUserServiceInterface;
+use Modules\User\Application\Contracts\UploadUserAttachmentServiceInterface;
+use PHPUnit\Framework\TestCase;
 
 class ServiceContractsTest extends TestCase
 {
@@ -100,7 +95,7 @@ class ServiceContractsTest extends TestCase
     public function test_core_resolve_tenant_middleware_removed(): void
     {
         $path = dirname(__DIR__, 2)
-            . '/app/Modules/Core/Infrastructure/Http/Middleware/ResolveTenant.php';
+            .'/app/Modules/Core/Infrastructure/Http/Middleware/ResolveTenant.php';
         $this->assertFalse(file_exists($path), 'Core ResolveTenant middleware should have been removed.');
     }
 
@@ -120,7 +115,7 @@ class ServiceContractsTest extends TestCase
     public function test_tenant_config_repository_interface_removed(): void
     {
         $path = dirname(__DIR__, 2)
-            . '/app/Modules/Tenant/Domain/Contracts/TenantConfigRepositoryInterface.php';
+            .'/app/Modules/Tenant/Domain/Contracts/TenantConfigRepositoryInterface.php';
         $this->assertFalse(file_exists($path), 'TenantConfigRepositoryInterface should have been removed.');
     }
 
@@ -132,11 +127,11 @@ class ServiceContractsTest extends TestCase
         $this->assertTrue(interface_exists(FileStorageServiceInterface::class));
 
         $path = dirname(__DIR__, 2)
-            . '/app/Modules/Core/Application/Contracts/FileStorageServiceInterface.php';
+            .'/app/Modules/Core/Application/Contracts/FileStorageServiceInterface.php';
         $this->assertTrue(file_exists($path), 'FileStorageServiceInterface must be in Application/Contracts/.');
 
         $wrongPath = dirname(__DIR__, 2)
-            . '/app/Modules/Core/Application/Services/FileStorageServiceInterface.php';
+            .'/app/Modules/Core/Application/Services/FileStorageServiceInterface.php';
         $this->assertFalse(file_exists($wrongPath), 'FileStorageServiceInterface must NOT remain in Application/Services/.');
     }
 

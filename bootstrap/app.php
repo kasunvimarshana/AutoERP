@@ -3,6 +3,9 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Modules\Auth\Infrastructure\Http\Middleware\CheckPermission;
+use Modules\Auth\Infrastructure\Http\Middleware\CheckRole;
+use Modules\Tenant\Infrastructure\Http\Middleware\ResolveTenant;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -13,7 +16,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'resolve.tenant' => \Modules\Tenant\Infrastructure\Http\Middleware\ResolveTenant::class,
+            'resolve.tenant' => ResolveTenant::class,
+            'role' => CheckRole::class,
+            'permission' => CheckPermission::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

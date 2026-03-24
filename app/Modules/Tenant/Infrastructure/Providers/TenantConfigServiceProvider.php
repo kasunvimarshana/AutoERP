@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Tenant\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Modules\Tenant\Application\Contracts\TenantConfigClientInterface;
 use Modules\Tenant\Application\Contracts\TenantConfigManagerInterface;
-use Modules\Tenant\Infrastructure\Services\TenantConfigClient;
 use Modules\Tenant\Application\Services\TenantConfigManager;
+use Modules\Tenant\Infrastructure\Services\TenantConfigClient;
 
 class TenantConfigServiceProvider extends ServiceProvider
 {
@@ -15,6 +17,7 @@ class TenantConfigServiceProvider extends ServiceProvider
         $this->app->singleton(TenantConfigClientInterface::class, function ($app) {
             $tenantServiceUrl = config('tenant.tenant_service.url');
             $cacheTtl = config('tenant.tenant_config_cache_ttl', 300);
+
             return new TenantConfigClient($tenantServiceUrl, $cacheTtl);
         });
 
@@ -25,7 +28,7 @@ class TenantConfigServiceProvider extends ServiceProvider
     {
         // Publish configuration
         $this->publishes([
-            __DIR__ . '/../../../config/tenant.php' => config_path('tenant.php'),
+            __DIR__.'/../../../config/tenant.php' => config_path('tenant.php'),
         ], 'tenant-config');
     }
 }

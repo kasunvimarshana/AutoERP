@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\OrganizationUnit\Application\UseCases;
 
 use Modules\OrganizationUnit\Domain\Entities\OrganizationUnit;

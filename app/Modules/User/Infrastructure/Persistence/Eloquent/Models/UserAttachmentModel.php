@@ -1,16 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\User\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class UserAttachmentModel extends Model
 {
     use SoftDeletes;
 
     protected $table = 'user_attachments';
+
     protected $fillable = [
         'user_id',
         'uuid',
@@ -21,9 +24,10 @@ class UserAttachmentModel extends Model
         'type',
         'metadata',
     ];
+
     protected $casts = [
         'metadata' => 'array',
-        'size'     => 'integer',
+        'size' => 'integer',
     ];
 
     public function user(): BelongsTo

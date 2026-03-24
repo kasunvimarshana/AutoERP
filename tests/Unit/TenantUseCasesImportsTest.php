@@ -2,17 +2,17 @@
 
 namespace Tests\Unit;
 
-use PHPUnit\Framework\TestCase;
 use Modules\Tenant\Application\UseCases\CreateTenant;
+use Modules\Tenant\Application\UseCases\DeleteTenant;
 use Modules\Tenant\Application\UseCases\GetTenant;
 use Modules\Tenant\Application\UseCases\ListTenants;
 use Modules\Tenant\Application\UseCases\UpdateTenant;
 use Modules\Tenant\Application\UseCases\UpdateTenantConfig;
-use Modules\Tenant\Application\UseCases\DeleteTenant;
-use Modules\Tenant\Domain\Events\TenantCreated;
-use Modules\Tenant\Domain\Events\TenantUpdated;
 use Modules\Tenant\Domain\Events\TenantConfigChanged;
+use Modules\Tenant\Domain\Events\TenantCreated;
 use Modules\Tenant\Domain\Events\TenantDeleted;
+use Modules\Tenant\Domain\Events\TenantUpdated;
+use PHPUnit\Framework\TestCase;
 
 class TenantUseCasesImportsTest extends TestCase
 {

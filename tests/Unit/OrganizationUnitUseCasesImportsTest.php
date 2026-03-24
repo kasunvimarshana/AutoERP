@@ -2,17 +2,17 @@
 
 namespace Tests\Unit;
 
-use PHPUnit\Framework\TestCase;
 use Modules\OrganizationUnit\Application\UseCases\CreateOrganizationUnit;
+use Modules\OrganizationUnit\Application\UseCases\DeleteOrganizationUnit;
 use Modules\OrganizationUnit\Application\UseCases\GetOrganizationUnit;
 use Modules\OrganizationUnit\Application\UseCases\ListOrganizationUnits;
-use Modules\OrganizationUnit\Application\UseCases\UpdateOrganizationUnit;
-use Modules\OrganizationUnit\Application\UseCases\DeleteOrganizationUnit;
 use Modules\OrganizationUnit\Application\UseCases\MoveOrganizationUnit;
+use Modules\OrganizationUnit\Application\UseCases\UpdateOrganizationUnit;
 use Modules\OrganizationUnit\Domain\Events\OrganizationUnitCreated;
-use Modules\OrganizationUnit\Domain\Events\OrganizationUnitUpdated;
 use Modules\OrganizationUnit\Domain\Events\OrganizationUnitDeleted;
 use Modules\OrganizationUnit\Domain\Events\OrganizationUnitMoved;
+use Modules\OrganizationUnit\Domain\Events\OrganizationUnitUpdated;
+use PHPUnit\Framework\TestCase;
 
 class OrganizationUnitUseCasesImportsTest extends TestCase
 {

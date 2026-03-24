@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Tenant\Application\Contracts;
 
 use Modules\Core\Application\Contracts\WriteServiceInterface;
@@ -7,6 +9,4 @@ use Modules\Core\Application\Contracts\WriteServiceInterface;
 /**
  * @method \Modules\Tenant\Domain\Entities\Tenant execute(array $data = [])
  */
-interface UpdateTenantConfigServiceInterface extends WriteServiceInterface
-{
-}
+interface UpdateTenantConfigServiceInterface extends WriteServiceInterface {}
