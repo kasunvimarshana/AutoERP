@@ -17,8 +17,6 @@ use Modules\Auth\Domain\Exceptions\InvalidCredentialsException;
  */
 class PassportTokenService implements TokenServiceInterface
 {
-    private static int $tokenTtlMinutes = 60;
-
     public function __construct(
         private readonly AuthUserRepositoryInterface $userRepository,
     ) {}
@@ -36,7 +34,7 @@ class PassportTokenService implements TokenServiceInterface
         return new AccessToken(
             accessToken: $result->accessToken,
             tokenType: 'Bearer',
-            expiresIn: self::$tokenTtlMinutes * 60,
+            expiresIn: (int) config('auth.passport.token_expiry_days', 15) * 24 * 3600,
             scopes: $scopes,
         );
     }

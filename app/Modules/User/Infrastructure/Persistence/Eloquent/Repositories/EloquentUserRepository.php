@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\User\Infrastructure\Persistence\Eloquent\Repositories;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Modules\Core\Domain\ValueObjects\Address;
 use Modules\Core\Domain\ValueObjects\Email;
 use Modules\Core\Domain\ValueObjects\PhoneNumber;
@@ -69,7 +70,31 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
         }
     }
 
-    // Paginate, delete, etc. from EloquentRepository
+    /**
+     * Find a user by ID and convert to domain entity.
+     *
+     * {@inheritdoc}
+     */
+    public function find($id, array $columns = ['*']): ?User
+    {
+        /** @var UserModel|null $model */
+        $model = $this->model->with('roles.permissions')->find($id);
+
+        return $model ? $this->toDomainEntity($model) : null;
+    }
+
+    /**
+     * Paginate users and convert each row to a domain entity.
+     *
+     * {@inheritdoc}
+     */
+    public function paginate(?int $perPage = null, array $columns = ['*'], ?string $pageName = null, ?int $page = null): LengthAwarePaginator
+    {
+        $this->with(['roles.permissions']);
+        $paginator = parent::paginate($perPage, $columns, $pageName, $page);
+
+        return $paginator->through(fn (UserModel $model) => $this->toDomainEntity($model));
+    }
 
     private function toDomainEntity(UserModel $model): User
     {

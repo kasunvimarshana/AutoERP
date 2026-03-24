@@ -13,10 +13,8 @@ abstract class BaseRepository implements RepositoryInterface
 {
     /**
      * The data provider (e.g., Builder, Collection, ApiClient).
-     *
-     * @var mixed
      */
-    protected $provider;
+    protected mixed $provider;
 
     /**
      * The relationships to eager load.

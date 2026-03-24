@@ -18,14 +18,11 @@ use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 
 class CreateUserService extends BaseService implements CreateUserServiceInterface
 {
-    private UserRepositoryInterface $userRepository;
-
     public function __construct(
-        UserRepositoryInterface $repository,
+        private readonly UserRepositoryInterface $userRepository,
         protected RoleRepositoryInterface $roleRepo
     ) {
-        parent::__construct($repository);
-        $this->userRepository = $repository;
+        parent::__construct($userRepository);
     }
 
     protected function handle(array $data): User

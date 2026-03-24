@@ -15,15 +15,12 @@ use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 
 class UploadUserAttachmentService extends BaseService implements UploadUserAttachmentServiceInterface
 {
-    private UserRepositoryInterface $userRepository;
-
     public function __construct(
-        UserRepositoryInterface $repository,
+        private readonly UserRepositoryInterface $userRepository,
         protected UserAttachmentRepositoryInterface $attachmentRepo,
         protected FileStorageServiceInterface $storage
     ) {
-        parent::__construct($repository);
-        $this->userRepository = $repository;
+        parent::__construct($userRepository);
     }
 
     protected function handle(array $data): UserAttachment

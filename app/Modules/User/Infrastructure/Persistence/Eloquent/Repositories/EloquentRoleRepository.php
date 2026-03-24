@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\User\Infrastructure\Persistence\Eloquent\Repositories;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\User\Domain\Entities\Permission;
 use Modules\User\Domain\Entities\Role;
@@ -49,6 +50,32 @@ class EloquentRoleRepository extends EloquentRepository implements RoleRepositor
         if ($model) {
             $model->permissions()->sync($permissionIds);
         }
+    }
+
+    /**
+     * Find a role by ID and convert to domain entity.
+     *
+     * {@inheritdoc}
+     */
+    public function find($id, array $columns = ['*']): ?Role
+    {
+        /** @var RoleModel|null $model */
+        $model = $this->model->with('permissions')->find($id);
+
+        return $model ? $this->toDomainEntity($model) : null;
+    }
+
+    /**
+     * Paginate roles and convert each row to a domain entity.
+     *
+     * {@inheritdoc}
+     */
+    public function paginate(?int $perPage = null, array $columns = ['*'], ?string $pageName = null, ?int $page = null): LengthAwarePaginator
+    {
+        $this->with(['permissions']);
+        $paginator = parent::paginate($perPage, $columns, $pageName, $page);
+
+        return $paginator->through(fn (RoleModel $model) => $this->toDomainEntity($model));
     }
 
     private function toDomainEntity(RoleModel $model): Role

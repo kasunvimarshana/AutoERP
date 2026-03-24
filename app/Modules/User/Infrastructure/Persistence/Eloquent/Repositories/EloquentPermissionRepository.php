@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\User\Infrastructure\Persistence\Eloquent\Repositories;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\User\Domain\Entities\Permission;
 use Modules\User\Domain\RepositoryInterfaces\PermissionRepositoryInterface;
@@ -45,5 +46,30 @@ class EloquentPermissionRepository extends EloquentRepository implements Permiss
     private function toDomainEntity(PermissionModel $model): Permission
     {
         return new Permission($model->tenant_id, $model->name, $model->id);
+    }
+
+    /**
+     * Find a permission by ID and convert to domain entity.
+     *
+     * {@inheritdoc}
+     */
+    public function find($id, array $columns = ['*']): ?Permission
+    {
+        /** @var PermissionModel|null $model */
+        $model = $this->model->find($id);
+
+        return $model ? $this->toDomainEntity($model) : null;
+    }
+
+    /**
+     * Paginate permissions and convert each row to a domain entity.
+     *
+     * {@inheritdoc}
+     */
+    public function paginate(?int $perPage = null, array $columns = ['*'], ?string $pageName = null, ?int $page = null): LengthAwarePaginator
+    {
+        $paginator = parent::paginate($perPage, $columns, $pageName, $page);
+
+        return $paginator->through(fn (PermissionModel $model) => $this->toDomainEntity($model));
     }
 }

@@ -99,7 +99,9 @@ class OrganizationUnitController extends BaseController
     {
         $this->authorize('viewAny', OrganizationUnit::class);
         $tenantId = (int) tenant_id();
-        $rootId = $request->input('root_id');
+        $rootId = $request->input('root_id') !== null
+            ? (int) $request->input('root_id')
+            : null;
         $tree = $this->orgUnitRepository->getTree($tenantId, $rootId);
 
         return new OrganizationUnitTreeResource($tree);

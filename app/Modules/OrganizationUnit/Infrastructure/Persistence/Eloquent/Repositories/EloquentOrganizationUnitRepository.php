@@ -139,13 +139,12 @@ class EloquentOrganizationUnitRepository extends EloquentRepository implements O
 
             $diff = (int) ($newLft - $node->_lft);
             if ($diff !== 0) {
-                $this->model->where('tenant_id', $node->tenant_id)
-                    ->where('_lft', '>=', $node->_lft)
-                    ->where('_rgt', '<=', $node->_rgt)
-                    ->update([
-                        '_lft' => DB::raw('_lft + '.$diff),
-                        '_rgt' => DB::raw('_rgt + '.$diff),
-                    ]);
+                // Use parameterized DB::update() to atomically shift both _lft and _rgt.
+                // The table name comes from the Eloquent model (not user input) and is safe.
+                DB::update(
+                    'UPDATE '.$this->model->getTable().' SET _lft = _lft + ?, _rgt = _rgt + ? WHERE tenant_id = ? AND _lft >= ? AND _rgt <= ?',
+                    [$diff, $diff, $node->tenant_id, $node->_lft, $node->_rgt]
+                );
             }
         });
     }

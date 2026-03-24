@@ -8,12 +8,12 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class MoveOrganizationUnitRequest extends FormRequest
 {
-    public function authorize()
+    public function authorize(): bool
     {
-        return $this->user()?->can('move', OrganizationUnit::class) ?? false;
+        return true;
     }
 
-    public function rules()
+    public function rules(): array
     {
         return [
             'parent_id' => 'nullable|integer|exists:organization_units,id',

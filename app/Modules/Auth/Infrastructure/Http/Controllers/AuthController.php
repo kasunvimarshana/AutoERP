@@ -22,6 +22,7 @@ use Modules\Auth\Infrastructure\Http\Requests\RegisterRequest;
 use Modules\Auth\Infrastructure\Http\Requests\ResetPasswordRequest;
 use Modules\Auth\Infrastructure\Http\Requests\SsoRequest;
 use Modules\Auth\Infrastructure\Http\Resources\AuthTokenResource;
+use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 use Modules\User\Infrastructure\Http\Resources\UserResource;
 
 class AuthController extends Controller
@@ -35,6 +36,7 @@ class AuthController extends Controller
         private readonly RefreshToken $refreshToken,
         private readonly ForgotPassword $forgotPassword,
         private readonly ResetPassword $resetPassword,
+        private readonly UserRepositoryInterface $userRepository,
     ) {}
 
     /**
@@ -89,10 +91,16 @@ class AuthController extends Controller
      */
     public function me(): JsonResponse
     {
-        $user = $this->getAuthenticatedUser->execute();
+        $authenticatable = $this->getAuthenticatedUser->execute();
+
+        if (! $authenticatable) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        $user = $this->userRepository->find($authenticatable->getAuthIdentifier());
 
         if (! $user) {
-            return response()->json(['message' => 'Unauthenticated'], 401);
+            return response()->json(['message' => 'User profile unavailable'], 404);
         }
 
         return response()->json(new UserResource($user));

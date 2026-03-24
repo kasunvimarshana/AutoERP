@@ -15,15 +15,12 @@ use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitReposit
 
 class UploadOrganizationUnitAttachmentService extends BaseService implements UploadOrganizationUnitAttachmentServiceInterface
 {
-    private OrganizationUnitRepositoryInterface $orgUnitRepository;
-
     public function __construct(
-        OrganizationUnitRepositoryInterface $repository,
+        private readonly OrganizationUnitRepositoryInterface $orgUnitRepository,
         protected OrganizationUnitAttachmentRepositoryInterface $attachmentRepo,
         protected FileStorageServiceInterface $storage
     ) {
-        parent::__construct($repository);
-        $this->orgUnitRepository = $repository;
+        parent::__construct($orgUnitRepository);
     }
 
     protected function handle(array $data): OrganizationUnitAttachment

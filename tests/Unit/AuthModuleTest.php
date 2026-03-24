@@ -908,4 +908,108 @@ class AuthModuleTest extends TestCase
         $this->assertStringContainsString('try {', $source, 'AbacAuthorizationStrategy must wrap Gate calls in try-catch.');
         $this->assertStringContainsString('catch (', $source, 'AbacAuthorizationStrategy must have a catch block.');
     }
+
+    // -------------------------------------------------------------------------
+    // AuthController: injects UserRepositoryInterface for me() endpoint
+    // -------------------------------------------------------------------------
+
+    public function test_auth_controller_injects_user_repository_interface(): void
+    {
+        $reflection = new \ReflectionClass(AuthController::class);
+        $constructor = $reflection->getConstructor();
+        $this->assertNotNull($constructor);
+
+        $types = array_map(fn ($p) => $p->getType()?->getName(), $constructor->getParameters());
+        $this->assertContains(
+            \Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface::class,
+            $types,
+            'AuthController must inject UserRepositoryInterface for the me() endpoint.'
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // PassportTokenService: no hardcoded TTL static field
+    // -------------------------------------------------------------------------
+
+    public function test_passport_token_service_uses_config_for_ttl(): void
+    {
+        $path = dirname(__DIR__, 2).'/app/Modules/Auth/Application/Services/PassportTokenService.php';
+        $this->assertFileExists($path);
+        $source = file_get_contents($path);
+
+        $this->assertStringNotContainsString(
+            'static int $tokenTtlMinutes',
+            $source,
+            'PassportTokenService must not have a hardcoded static TTL field.'
+        );
+        $this->assertStringContainsString(
+            "config('auth.passport.token_expiry_days'",
+            $source,
+            'PassportTokenService must read token TTL from config.'
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Repository find() overrides: return domain entities
+    // -------------------------------------------------------------------------
+
+    public function test_eloquent_user_repository_overrides_find(): void
+    {
+        $reflection = new \ReflectionClass(\Modules\User\Infrastructure\Persistence\Eloquent\Repositories\EloquentUserRepository::class);
+        $this->assertTrue(
+            $reflection->hasMethod('find'),
+            'EloquentUserRepository must override find() to return domain User entities.'
+        );
+        $method = $reflection->getMethod('find');
+        $this->assertSame(
+            \Modules\User\Infrastructure\Persistence\Eloquent\Repositories\EloquentUserRepository::class,
+            $method->getDeclaringClass()->getName(),
+            'find() must be declared in EloquentUserRepository itself, not inherited.'
+        );
+    }
+
+    public function test_eloquent_role_repository_overrides_find(): void
+    {
+        $reflection = new \ReflectionClass(\Modules\User\Infrastructure\Persistence\Eloquent\Repositories\EloquentRoleRepository::class);
+        $this->assertTrue(
+            $reflection->hasMethod('find'),
+            'EloquentRoleRepository must override find() to return domain Role entities.'
+        );
+        $method = $reflection->getMethod('find');
+        $this->assertSame(
+            \Modules\User\Infrastructure\Persistence\Eloquent\Repositories\EloquentRoleRepository::class,
+            $method->getDeclaringClass()->getName(),
+            'find() must be declared in EloquentRoleRepository itself, not inherited.'
+        );
+    }
+
+    public function test_eloquent_permission_repository_overrides_find(): void
+    {
+        $reflection = new \ReflectionClass(\Modules\User\Infrastructure\Persistence\Eloquent\Repositories\EloquentPermissionRepository::class);
+        $this->assertTrue(
+            $reflection->hasMethod('find'),
+            'EloquentPermissionRepository must override find() to return domain Permission entities.'
+        );
+        $method = $reflection->getMethod('find');
+        $this->assertSame(
+            \Modules\User\Infrastructure\Persistence\Eloquent\Repositories\EloquentPermissionRepository::class,
+            $method->getDeclaringClass()->getName(),
+            'find() must be declared in EloquentPermissionRepository itself, not inherited.'
+        );
+    }
+
+    public function test_eloquent_user_repository_overrides_paginate(): void
+    {
+        $reflection = new \ReflectionClass(\Modules\User\Infrastructure\Persistence\Eloquent\Repositories\EloquentUserRepository::class);
+        $this->assertTrue(
+            $reflection->hasMethod('paginate'),
+            'EloquentUserRepository must override paginate() to transform items to domain entities.'
+        );
+        $method = $reflection->getMethod('paginate');
+        $this->assertSame(
+            \Modules\User\Infrastructure\Persistence\Eloquent\Repositories\EloquentUserRepository::class,
+            $method->getDeclaringClass()->getName(),
+            'paginate() must be declared in EloquentUserRepository itself, not inherited.'
+        );
+    }
 }

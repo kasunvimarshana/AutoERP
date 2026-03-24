@@ -15,15 +15,12 @@ use Modules\Tenant\Domain\RepositoryInterfaces\TenantRepositoryInterface;
 
 class UploadTenantAttachmentService extends BaseService implements UploadTenantAttachmentServiceInterface
 {
-    private TenantRepositoryInterface $tenantRepository;
-
     public function __construct(
-        TenantRepositoryInterface $repository,
+        private readonly TenantRepositoryInterface $tenantRepository,
         protected TenantAttachmentRepositoryInterface $attachmentRepo,
         protected FileStorageServiceInterface $storage
     ) {
-        parent::__construct($repository);
-        $this->tenantRepository = $repository;
+        parent::__construct($tenantRepository);
     }
 
     protected function handle(array $data): TenantAttachment
