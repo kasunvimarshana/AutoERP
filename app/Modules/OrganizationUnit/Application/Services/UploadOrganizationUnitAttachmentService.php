@@ -6,17 +6,22 @@ use Modules\Core\Application\Services\BaseService;
 use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitRepositoryInterface;
 use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitAttachmentRepositoryInterface;
 use Modules\OrganizationUnit\Domain\Entities\OrganizationUnitAttachment;
-use Modules\Core\Application\Services\FileStorageServiceInterface;
-use Ramsey\Uuid\Uuid;
+use Modules\Core\Application\Contracts\FileStorageServiceInterface;
+use Modules\OrganizationUnit\Domain\Exceptions\OrganizationUnitNotFoundException;
+use Modules\OrganizationUnit\Application\Contracts\UploadOrganizationUnitAttachmentServiceInterface;
+use Illuminate\Support\Str;
 
-class UploadOrganizationUnitAttachmentService extends BaseService
+class UploadOrganizationUnitAttachmentService extends BaseService implements UploadOrganizationUnitAttachmentServiceInterface
 {
+    private OrganizationUnitRepositoryInterface $orgUnitRepository;
+
     public function __construct(
         OrganizationUnitRepositoryInterface $repository,
         protected OrganizationUnitAttachmentRepositoryInterface $attachmentRepo,
         protected FileStorageServiceInterface $storage
     ) {
         parent::__construct($repository);
+        $this->orgUnitRepository = $repository;
     }
 
     protected function handle(array $data): OrganizationUnitAttachment
@@ -26,13 +31,13 @@ class UploadOrganizationUnitAttachmentService extends BaseService
         $type = $data['type'] ?? null;
         $metadata = $data['metadata'] ?? [];
 
-        $unit = $this->repository->find($orgUnitId);
+        $unit = $this->orgUnitRepository->find($orgUnitId);
         if (!$unit) {
-            throw new \RuntimeException('Organization unit not found');
+            throw new OrganizationUnitNotFoundException($orgUnitId);
         }
 
         $tenantId = $unit->getTenantId();
-        $uuid = Uuid::uuid4()->toString();
+        $uuid = (string) Str::uuid();
         $path = $this->storage->store($fileInfo['tmp_path'], "org-units/{$orgUnitId}", $fileInfo['name']);
 
         $attachment = new OrganizationUnitAttachment(
@@ -47,8 +52,6 @@ class UploadOrganizationUnitAttachmentService extends BaseService
             metadata: $metadata
         );
 
-        $saved = $this->attachmentRepo->save($attachment);
-        // Optionally fire event
-        return $saved;
+        return $this->attachmentRepo->save($attachment);
     }
 }

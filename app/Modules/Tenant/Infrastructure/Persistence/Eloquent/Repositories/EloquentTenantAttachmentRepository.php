@@ -10,9 +10,9 @@ use Illuminate\Support\Collection;
 
 class EloquentTenantAttachmentRepository extends EloquentRepository implements TenantAttachmentRepositoryInterface
 {
-    public function __construct()
+    public function __construct(TenantAttachmentModel $model)
     {
-        parent::__construct(new TenantAttachmentModel());
+        parent::__construct($model);
     }
 
     public function findByUuid(string $uuid): ?TenantAttachment
@@ -50,11 +50,6 @@ class EloquentTenantAttachmentRepository extends EloquentRepository implements T
             $model = $this->create($data);
         }
         return $this->toDomainEntity($model);
-    }
-
-    public function delete(int $id): bool
-    {
-        return $this->destroy($id);
     }
 
     private function toDomainEntity(TenantAttachmentModel $model): TenantAttachment

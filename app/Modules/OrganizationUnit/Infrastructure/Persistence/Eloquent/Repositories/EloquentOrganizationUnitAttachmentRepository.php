@@ -10,9 +10,9 @@ use Illuminate\Support\Collection;
 
 class EloquentOrganizationUnitAttachmentRepository extends EloquentRepository implements OrganizationUnitAttachmentRepositoryInterface
 {
-    public function __construct()
+    public function __construct(OrganizationUnitAttachmentModel $model)
     {
-        parent::__construct(new OrganizationUnitAttachmentModel());
+        parent::__construct($model);
     }
 
     public function findByUuid(string $uuid): ?OrganizationUnitAttachment

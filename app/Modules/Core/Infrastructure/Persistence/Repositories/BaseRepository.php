@@ -82,7 +82,7 @@ abstract class BaseRepository implements RepositoryInterface
     /**
      * {@inheritdoc}
      */
-    public function with($relations)
+    public function with(array|string $relations): static
     {
         $this->with = array_merge($this->with, (array) $relations);
         return $this;
@@ -91,7 +91,7 @@ abstract class BaseRepository implements RepositoryInterface
     /**
      * {@inheritdoc}
      */
-    public function where($column, $operator = null, $value = null, string $boolean = 'and')
+    public function where(string $column, mixed $operator = null, mixed $value = null, string $boolean = 'and'): static
     {
         if (func_num_args() === 2) {
             $value = $operator;
@@ -105,7 +105,7 @@ abstract class BaseRepository implements RepositoryInterface
     /**
      * {@inheritdoc}
      */
-    public function whereIn(string $column, array $values, string $boolean = 'and', bool $not = false)
+    public function whereIn(string $column, array $values, string $boolean = 'and', bool $not = false): static
     {
         $this->whereIns[] = compact('column', 'values', 'boolean', 'not');
         return $this;
@@ -114,7 +114,7 @@ abstract class BaseRepository implements RepositoryInterface
     /**
      * {@inheritdoc}
      */
-    public function whereBetween(string $column, array $values, string $boolean = 'and', bool $not = false)
+    public function whereBetween(string $column, array $values, string $boolean = 'and', bool $not = false): static
     {
         $this->whereBetweens[] = compact('column', 'values', 'boolean', 'not');
         return $this;
@@ -123,7 +123,7 @@ abstract class BaseRepository implements RepositoryInterface
     /**
      * {@inheritdoc}
      */
-    public function whereNull(string $column, string $boolean = 'and', bool $not = false)
+    public function whereNull(string $column, string $boolean = 'and', bool $not = false): static
     {
         $this->whereNulls[] = compact('column', 'boolean', 'not');
         return $this;
@@ -132,7 +132,7 @@ abstract class BaseRepository implements RepositoryInterface
     /**
      * {@inheritdoc}
      */
-    public function orderBy(string $column, string $direction = 'asc')
+    public function orderBy(string $column, string $direction = 'asc'): static
     {
         $this->orders[] = compact('column', 'direction');
         return $this;
@@ -141,7 +141,7 @@ abstract class BaseRepository implements RepositoryInterface
     /**
      * {@inheritdoc}
      */
-    public function orderByRaw(string $sql, array $bindings = [])
+    public function orderByRaw(string $sql, array $bindings = []): static
     {
         $this->orderByRaw[] = compact('sql', 'bindings');
         return $this;
@@ -150,7 +150,7 @@ abstract class BaseRepository implements RepositoryInterface
     /**
      * {@inheritdoc}
      */
-    public function limit(int $limit)
+    public function limit(int $limit): static
     {
         $this->limit = $limit;
         return $this;
@@ -159,7 +159,7 @@ abstract class BaseRepository implements RepositoryInterface
     /**
      * {@inheritdoc}
      */
-    public function offset(int $offset)
+    public function offset(int $offset): static
     {
         $this->offset = $offset;
         return $this;
@@ -209,10 +209,4 @@ abstract class BaseRepository implements RepositoryInterface
      * @return void
      */
     abstract protected function resetProvider(): void;
-
-    // public function whereDate(string $column, string $operator, $value, string $boolean = 'and')
-    // {
-    //     $this->wheres[] = ['column' => $column, 'operator' => $operator, 'value' => $value, 'boolean' => $boolean, 'type' => 'date'];
-    //     return $this;
-    // }
 }

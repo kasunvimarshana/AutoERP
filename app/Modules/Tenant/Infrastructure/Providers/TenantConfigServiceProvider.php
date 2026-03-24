@@ -3,6 +3,8 @@
 namespace Modules\Tenant\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Tenant\Application\Contracts\TenantConfigClientInterface;
+use Modules\Tenant\Application\Contracts\TenantConfigManagerInterface;
 use Modules\Tenant\Infrastructure\Services\TenantConfigClient;
 use Modules\Tenant\Application\Services\TenantConfigManager;
 
@@ -10,13 +12,13 @@ class TenantConfigServiceProvider extends ServiceProvider
 {
     public function register()
     {
-        $this->app->singleton(TenantConfigClient::class, function ($app) {
-            $tenantServiceUrl = config('core.tenant_service.url');
-            $cacheTtl = config('core.tenant_config_cache_ttl', 300);
+        $this->app->singleton(TenantConfigClientInterface::class, function ($app) {
+            $tenantServiceUrl = config('tenant.tenant_service.url');
+            $cacheTtl = config('tenant.tenant_config_cache_ttl', 300);
             return new TenantConfigClient($tenantServiceUrl, $cacheTtl);
         });
 
-        $this->app->singleton(TenantConfigManager::class);
+        $this->app->singleton(TenantConfigManagerInterface::class, TenantConfigManager::class);
     }
 
     public function boot()

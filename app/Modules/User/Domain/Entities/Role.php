@@ -3,6 +3,7 @@
 namespace Modules\User\Domain\Entities;
 
 use Illuminate\Support\Collection;
+use Modules\Core\Domain\Exceptions\DomainException;
 
 class Role
 {
@@ -28,7 +29,7 @@ class Role
     public function grantPermission(Permission $permission): void
     {
         if ($permission->getTenantId() !== $this->tenantId) {
-            throw new \RuntimeException('Permission does not belong to the same tenant');
+            throw new DomainException('Permission does not belong to the same tenant');
         }
         if (!$this->permissions->contains('id', $permission->getId())) {
             $this->permissions->add($permission);

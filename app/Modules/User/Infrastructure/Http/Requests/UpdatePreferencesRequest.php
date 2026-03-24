@@ -6,12 +6,12 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class UpdatePreferencesRequest extends FormRequest
 {
-    public function authorize()
+    public function authorize(): bool
     {
-        return $this->user()?->can('updatePreferences', User::class) ?? false;
+        return true;
     }
 
-    public function rules()
+    public function rules(): array
     {
         return [
             'language'     => 'nullable|string|in:en,es,fr,de',

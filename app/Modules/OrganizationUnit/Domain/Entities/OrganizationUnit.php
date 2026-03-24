@@ -12,7 +12,7 @@ class OrganizationUnit
     private ?int $id;
     private int $tenantId;
     private Name $name;
-    private Code $code;
+    private ?Code $code;
     private ?string $description;
     private Metadata $metadata;
     private ?int $parentId;
@@ -25,7 +25,7 @@ class OrganizationUnit
     public function __construct(
         int $tenantId,
         Name $name,
-        Code $code,
+        ?Code $code = null,
         ?string $description = null,
         ?Metadata $metadata = null,
         ?int $parentId = null,
@@ -53,7 +53,7 @@ class OrganizationUnit
     public function getId(): ?int { return $this->id; }
     public function getTenantId(): int { return $this->tenantId; }
     public function getName(): Name { return $this->name; }
-    public function getCode(): Code { return $this->code; }
+    public function getCode(): ?Code { return $this->code; }
     public function getDescription(): ?string { return $this->description; }
     public function getMetadata(): Metadata { return $this->metadata; }
     public function getParentId(): ?int { return $this->parentId; }
@@ -70,7 +70,7 @@ class OrganizationUnit
         $this->updatedAt = new \DateTimeImmutable();
     }
 
-    public function updateDetails(Name $name, Code $code, ?string $description, ?Metadata $metadata): void
+    public function updateDetails(Name $name, ?Code $code, ?string $description, ?Metadata $metadata): void
     {
         $this->name = $name;
         $this->code = $code;

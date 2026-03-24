@@ -19,4 +19,10 @@ abstract class BaseModel extends Model
     ];
 
     protected $guarded = ['id', 'created_at', 'updated_at', 'deleted_at'];
+
+    /**
+     * Child classes should override $fillable with their explicit column list.
+     * Keeping $guarded here as a safety net for the abstract base; concrete
+     * Eloquent models that extend this class should define $fillable instead.
+     */
 }

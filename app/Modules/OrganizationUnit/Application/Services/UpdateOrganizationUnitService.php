@@ -10,12 +10,17 @@ use Modules\OrganizationUnit\Domain\ValueObjects\Code;
 use Modules\OrganizationUnit\Domain\ValueObjects\Metadata;
 use Modules\OrganizationUnit\Application\DTOs\OrganizationUnitData;
 use Modules\OrganizationUnit\Domain\Events\OrganizationUnitUpdated;
+use Modules\OrganizationUnit\Domain\Exceptions\OrganizationUnitNotFoundException;
+use Modules\OrganizationUnit\Application\Contracts\UpdateOrganizationUnitServiceInterface;
 
-class UpdateOrganizationUnitService extends BaseService
+class UpdateOrganizationUnitService extends BaseService implements UpdateOrganizationUnitServiceInterface
 {
+    private OrganizationUnitRepositoryInterface $orgUnitRepository;
+
     public function __construct(OrganizationUnitRepositoryInterface $repository)
     {
         parent::__construct($repository);
+        $this->orgUnitRepository = $repository;
     }
 
     protected function handle(array $data): OrganizationUnit
@@ -23,22 +28,21 @@ class UpdateOrganizationUnitService extends BaseService
         $id = $data['id'];
         $dto = OrganizationUnitData::fromArray($data);
 
-        $unit = $this->repository->find($id);
+        $unit = $this->orgUnitRepository->find($id);
         if (!$unit) {
-            throw new \RuntimeException('Organization unit not found');
+            throw new OrganizationUnitNotFoundException($id);
         }
 
         $name = new Name($dto->name);
-        $code = new Code($dto->code);
+        $code = $dto->code !== null ? new Code($dto->code) : null;
         $metadata = $dto->metadata ? new Metadata($dto->metadata) : null;
         $unit->updateDetails($name, $code, $dto->description, $metadata);
 
-        // If parent changed, move node
         if ($dto->parent_id !== $unit->getParentId()) {
-            $this->repository->moveNode($id, $dto->parent_id);
+            $this->orgUnitRepository->moveNode($id, $dto->parent_id);
         }
 
-        $saved = $this->repository->save($unit);
+        $saved = $this->orgUnitRepository->save($unit);
         $this->addEvent(new OrganizationUnitUpdated($saved));
         return $saved;
     }

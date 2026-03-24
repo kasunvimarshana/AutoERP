@@ -10,4 +10,5 @@ interface UserAttachmentRepositoryInterface extends RepositoryInterface
 {
     public function findByUuid(string $uuid): ?UserAttachment;
     public function getByUser(int $userId, ?string $type = null): Collection;
+    public function save(UserAttachment $attachment): UserAttachment;
 }

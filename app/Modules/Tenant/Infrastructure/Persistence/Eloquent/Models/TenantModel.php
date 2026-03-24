@@ -10,7 +10,18 @@ class TenantModel extends Model
     use SoftDeletes;
 
     protected $table = 'tenants';
-    protected $guarded = ['id'];
+    protected $fillable = [
+        'name',
+        'domain',
+        'logo_path',
+        'database_config',
+        'mail_config',
+        'cache_config',
+        'queue_config',
+        'feature_flags',
+        'api_keys',
+        'active',
+    ];
     protected $casts = [
         'database_config' => 'array',
         'mail_config'     => 'array',

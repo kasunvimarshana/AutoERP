@@ -16,8 +16,3 @@ Route::middleware(['auth:api', 'resolve.tenant'])->group(function () {
 
 // File serving (authenticated)
 Route::get('storage/org-unit-attachments/{uuid}', [OrganizationUnitAttachmentController::class, 'serve'])->middleware('auth:api');
-
-// Health check
-Route::get('/health', function () {
-    return response()->json(['status' => 'ok']);
-});

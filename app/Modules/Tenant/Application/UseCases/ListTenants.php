@@ -11,8 +11,17 @@ class ListTenants
         private TenantRepositoryInterface $tenantRepo
     ) {}
 
+    /** @var array<string> Allowed filter fields to prevent unauthorized data access */
+    private const ALLOWED_FILTERS = ['name', 'domain', 'active'];
+
     public function execute(array $filters, int $perPage, int $page): LengthAwarePaginator
     {
-        return $this->tenantRepo->paginate($filters, $perPage, $page);
+        $repo = clone $this->tenantRepo;
+        foreach ($filters as $field => $value) {
+            if (in_array($field, self::ALLOWED_FILTERS, true)) {
+                $repo->where($field, $value);
+            }
+        }
+        return $repo->paginate($perPage, ['*'], 'page', $page);
     }
 }

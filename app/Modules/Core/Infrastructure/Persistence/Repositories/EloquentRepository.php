@@ -29,12 +29,6 @@ class EloquentRepository extends BaseRepository
         // Apply where clauses
         foreach ($this->wheres as $where) {
             $this->provider->where($where['column'], $where['operator'], $where['value'], $where['boolean']);
-
-            // if (isset($where['type']) && $where['type'] === 'date') {
-            //     $this->provider->whereDate($where['column'], $where['operator'], $where['value'], $where['boolean']);
-            // } else {
-            //      $this->provider->where($where['column'], $where['operator'], $where['value'], $where['boolean']);
-            // }
         }
 
         // Apply whereIn

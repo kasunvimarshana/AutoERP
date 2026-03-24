@@ -10,4 +10,5 @@ interface OrganizationUnitAttachmentRepositoryInterface extends RepositoryInterf
 {
     public function findByUuid(string $uuid): ?OrganizationUnitAttachment;
     public function getByOrganizationUnit(int $orgUnitId, ?string $type = null): Collection;
+    public function save(OrganizationUnitAttachment $attachment): OrganizationUnitAttachment;
 }

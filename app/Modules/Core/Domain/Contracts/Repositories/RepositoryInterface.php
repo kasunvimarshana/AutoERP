@@ -33,7 +33,6 @@ interface RepositoryInterface
      * @param int|null $page
      * @return LengthAwarePaginator
      */
-    // public function paginate(?int $perPage = 15, array $columns = ['*'], ?string $pageName = 'page', ?int $page = null): LengthAwarePaginator;
     public function paginate(?int $perPage = null, array $columns = ['*'], ?string $pageName = null, ?int $page = null): LengthAwarePaginator;
 
     /**
@@ -65,9 +64,9 @@ interface RepositoryInterface
      * Set the relationships that should be eager loaded.
      *
      * @param array|string $relations
-     * @return $this
+     * @return static
      */
-    public function with($relations);
+    public function with(array|string $relations): static;
 
     /**
      * Add a basic where clause.
@@ -76,9 +75,9 @@ interface RepositoryInterface
      * @param mixed $operator
      * @param mixed $value
      * @param string $boolean
-     * @return $this
+     * @return static
      */
-    public function where($column, $operator = null, $value = null, string $boolean = 'and');
+    public function where(string $column, mixed $operator = null, mixed $value = null, string $boolean = 'and'): static;
 
     /**
      * Add a "where in" clause.
@@ -87,9 +86,9 @@ interface RepositoryInterface
      * @param array $values
      * @param string $boolean
      * @param bool $not
-     * @return $this
+     * @return static
      */
-    public function whereIn(string $column, array $values, string $boolean = 'and', bool $not = false);
+    public function whereIn(string $column, array $values, string $boolean = 'and', bool $not = false): static;
 
     /**
      * Add a "where between" clause.
@@ -98,9 +97,9 @@ interface RepositoryInterface
      * @param array $values
      * @param string $boolean
      * @param bool $not
-     * @return $this
+     * @return static
      */
-    public function whereBetween(string $column, array $values, string $boolean = 'and', bool $not = false);
+    public function whereBetween(string $column, array $values, string $boolean = 'and', bool $not = false): static;
 
     /**
      * Add a "where null" clause.
@@ -108,43 +107,41 @@ interface RepositoryInterface
      * @param string $column
      * @param string $boolean
      * @param bool $not
-     * @return $this
+     * @return static
      */
-    public function whereNull(string $column, string $boolean = 'and', bool $not = false);
+    public function whereNull(string $column, string $boolean = 'and', bool $not = false): static;
 
     /**
      * Add an order by clause.
      *
      * @param string $column
      * @param string $direction
-     * @return $this
+     * @return static
      */
-    public function orderBy(string $column, string $direction = 'asc');
+    public function orderBy(string $column, string $direction = 'asc'): static;
 
     /**
      * Add a raw order by clause.
      *
      * @param string $sql
      * @param array $bindings
-     * @return $this
+     * @return static
      */
-    public function orderByRaw(string $sql, array $bindings = []);
+    public function orderByRaw(string $sql, array $bindings = []): static;
 
     /**
      * Set the limit.
      *
      * @param int $limit
-     * @return $this
+     * @return static
      */
-    public function limit(int $limit);
+    public function limit(int $limit): static;
 
     /**
      * Set the offset.
      *
      * @param int $offset
-     * @return $this
+     * @return static
      */
-    public function offset(int $offset);
-
-    // public function whereDate(string $column, string $operator, $value, string $boolean = 'and');
+    public function offset(int $offset): static;
 }

@@ -11,7 +11,7 @@ use Modules\Tenant\Domain\ValueObjects\FeatureFlags;
 use Modules\Tenant\Domain\ValueObjects\ApiKeys;
 use Modules\Tenant\Domain\RepositoryInterfaces\TenantRepositoryInterface;
 use Modules\Tenant\Application\DTOs\TenantData;
-use Modules\Tenant\Domain\Tenant\TenantCreated;
+use Modules\Tenant\Domain\Events\TenantCreated;
 
 class CreateTenant
 {

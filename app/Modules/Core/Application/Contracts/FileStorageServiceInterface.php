@@ -1,6 +1,6 @@
 <?php
 
-namespace Modules\Core\Application\Services;
+namespace Modules\Core\Application\Contracts;
 
 use Illuminate\Http\UploadedFile;
 
@@ -71,7 +71,7 @@ interface FileStorageServiceInterface
      * @param string|null $disk
      * @return string|false
      */
-    public function mimeType(string $path, ?string $disk = null);
+    public function mimeType(string $path, ?string $disk = null): string|false;
 
     /**
      * Get the last modification timestamp.

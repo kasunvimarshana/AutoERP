@@ -19,7 +19,3 @@ Route::get('config/domain/{domain}', [TenantController::class, 'configByDomain']
 // File serving (authenticated)
 Route::get('storage/tenant-attachments/{uuid}', [TenantAttachmentController::class, 'serve'])->middleware('auth:api');
 
-// Health check
-Route::get('/health', function () {
-    return response()->json(['status' => 'ok']);
-});

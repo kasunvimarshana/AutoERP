@@ -7,6 +7,7 @@ use Modules\User\Domain\ValueObjects\PhoneNumber;
 use Modules\User\Domain\ValueObjects\Address;
 use Modules\User\Domain\ValueObjects\UserPreferences;
 use Illuminate\Support\Collection;
+use Modules\Core\Domain\Exceptions\DomainException;
 
 class User
 {
@@ -67,7 +68,7 @@ class User
     public function assignRole(Role $role): void
     {
         if ($role->getTenantId() !== $this->tenantId) {
-            throw new \RuntimeException('Role does not belong to the same tenant');
+            throw new DomainException('Role does not belong to the same tenant');
         }
         if (!$this->roles->contains('id', $role->getId())) {
             $this->roles->add($role);

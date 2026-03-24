@@ -10,7 +10,16 @@ class TenantAttachmentModel extends Model
     use SoftDeletes;
 
     protected $table = 'tenant_attachments';
-    protected $guarded = ['id'];
+    protected $fillable = [
+        'tenant_id',
+        'uuid',
+        'name',
+        'file_path',
+        'mime_type',
+        'size',
+        'type',
+        'metadata',
+    ];
     protected $casts = [
         'metadata' => 'array',
         'size'     => 'integer',

@@ -2,11 +2,13 @@
 
 namespace Modules\Core\Application\Services;
 
+use Modules\Core\Application\Contracts\ServiceInterface;
 use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
+use Modules\Core\Domain\Exceptions\NotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 
-abstract class BaseService
+abstract class BaseService implements ServiceInterface
 {
     protected RepositoryInterface $repository;
     protected array $events = [];
@@ -19,7 +21,7 @@ abstract class BaseService
     /**
      * Execute the service with automatic transaction wrapping.
      */
-    public function execute(array $data = [])
+    public function execute(array $data = []): mixed
     {
         return DB::transaction(function () use ($data) {
             $result = $this->handle($data);
@@ -31,7 +33,7 @@ abstract class BaseService
     /**
      * The actual business logic to be implemented by child classes.
      */
-    abstract protected function handle(array $data);
+    abstract protected function handle(array $data): mixed;
 
     /**
      * Register domain events to be dispatched after transaction.
@@ -47,7 +49,7 @@ abstract class BaseService
     /**
      * Add an event to be dispatched after transaction.
      */
-    protected function addEvent($event): void
+    protected function addEvent(object $event): void
     {
         $this->events[] = $event;
     }
@@ -55,7 +57,7 @@ abstract class BaseService
     /**
      * Find a record by ID.
      */
-    public function find($id)
+    public function find(mixed $id): mixed
     {
         return $this->repository->find($id);
     }
@@ -63,7 +65,7 @@ abstract class BaseService
     /**
      * List records with filters and pagination.
      */
-    public function list(array $filters = [], ?int $perPage = null, int $page = 1, ?string $sort = null, ?string $include = null)
+    public function list(array $filters = [], ?int $perPage = null, int $page = 1, ?string $sort = null, ?string $include = null): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
         $perPage = $perPage ?? config('core.pagination.per_page', 15);
         $pageName = config('core.pagination.page_name', 'page');
@@ -93,7 +95,7 @@ abstract class BaseService
     /**
      * Update a record.
      */
-    public function update($id, array $data)
+    public function update(mixed $id, array $data): mixed
     {
         return DB::transaction(function () use ($id, $data) {
             $result = $this->handleUpdate($id, $data);
@@ -105,7 +107,7 @@ abstract class BaseService
     /**
      * Delete a record.
      */
-    public function delete($id)
+    public function delete(mixed $id): mixed
     {
         return DB::transaction(function () use ($id) {
             $result = $this->handleDelete($id);
@@ -114,17 +116,17 @@ abstract class BaseService
         });
     }
 
-    protected function handleUpdate($id, array $data)
+    protected function handleUpdate(mixed $id, array $data): mixed
     {
         $model = $this->repository->find($id);
         if (!$model) {
-            throw new \RuntimeException('Record not found');
+            throw new NotFoundException('Record', $id);
         }
         $this->repository->update($id, $data);
         return $this->repository->find($id);
     }
 
-    protected function handleDelete($id)
+    protected function handleDelete(mixed $id): bool
     {
         return $this->repository->delete($id);
     }

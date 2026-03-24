@@ -2,12 +2,12 @@
 
 namespace Modules\Tenant\Infrastructure\Services;
 
-use Modules\Tenant\Application\Services\TenantConfigManager;
 use Modules\Tenant\Domain\Contracts\TenantConfigInterface;
+use Modules\Tenant\Application\Contracts\TenantConfigClientInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
-class TenantConfigClient
+class TenantConfigClient implements TenantConfigClientInterface
 {
     protected string $tenantServiceUrl;
     protected int $cacheTtl; // seconds

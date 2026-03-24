@@ -3,16 +3,16 @@
 namespace Modules\Tenant\Infrastructure\Http\Middleware;
 
 use Closure;
-use Modules\Tenant\Infrastructure\Services\TenantConfigClient;
-use Modules\Tenant\Application\Services\TenantConfigManager;
+use Modules\Tenant\Application\Contracts\TenantConfigClientInterface;
+use Modules\Tenant\Application\Contracts\TenantConfigManagerInterface;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
 class ResolveTenant
 {
     public function __construct(
-        protected TenantConfigClient $client,
-        protected TenantConfigManager $manager
+        protected TenantConfigClientInterface $client,
+        protected TenantConfigManagerInterface $manager
     ) {}
 
     public function handle(Request $request, Closure $next)
@@ -21,6 +21,12 @@ class ResolveTenant
         $tenantId = $request->header('X-Tenant-ID') ?? optional($request->user())->tenant_id;
         if (!$tenantId) {
             throw new BadRequestHttpException('Tenant ID is required.');
+        }
+
+        // Validate that the tenant ID is a positive integer to prevent injection attacks
+        $tenantId = filter_var($tenantId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($tenantId === false) {
+            throw new BadRequestHttpException('Tenant ID must be a valid positive integer.');
         }
 
         // Attach tenant ID to request for later use

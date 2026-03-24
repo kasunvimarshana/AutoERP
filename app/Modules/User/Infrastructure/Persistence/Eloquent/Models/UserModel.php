@@ -11,7 +11,16 @@ class UserModel extends Model
     use SoftDeletes;
 
     protected $table = 'users';
-    protected $guarded = ['id'];
+    protected $fillable = [
+        'tenant_id',
+        'email',
+        'first_name',
+        'last_name',
+        'phone',
+        'address',
+        'preferences',
+        'active',
+    ];
     protected $casts = [
         'address'     => 'array',
         'preferences' => 'array',

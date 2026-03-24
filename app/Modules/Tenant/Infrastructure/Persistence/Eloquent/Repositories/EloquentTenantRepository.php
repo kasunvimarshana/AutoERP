@@ -15,48 +15,15 @@ use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantModel;
 
 class EloquentTenantRepository extends EloquentRepository implements TenantRepositoryInterface
 {
-    public function __construct()
+    public function __construct(TenantModel $model)
     {
-        parent::__construct(new TenantModel());
+        parent::__construct($model);
     }
 
     public function findByDomain(string $domain): ?Tenant
     {
         $model = $this->model->where('domain', $domain)->first();
         return $model ? $this->toDomainEntity($model) : null;
-    }
-
-    public function get(array $filters = []): \Illuminate\Support\Collection
-    {
-        $query = $this->model->newQuery();
-        if (isset($filters['name'])) {
-            $query->where('name', 'like', '%' . $filters['name'] . '%');
-        }
-        if (isset($filters['domain'])) {
-            $query->where('domain', $filters['domain']);
-        }
-        if (isset($filters['active'])) {
-            $query->where('active', $filters['active']);
-        }
-        $models = $query->get();
-        return $models->map(fn($m) => $this->toDomainEntity($m));
-    }
-
-    public function paginate(array $filters, int $perPage, int $page): \Illuminate\Contracts\Pagination\LengthAwarePaginator
-    {
-        $query = $this->model->newQuery();
-        if (isset($filters['name'])) {
-            $query->where('name', 'like', '%' . $filters['name'] . '%');
-        }
-        if (isset($filters['domain'])) {
-            $query->where('domain', $filters['domain']);
-        }
-        if (isset($filters['active'])) {
-            $query->where('active', $filters['active']);
-        }
-        $paginator = $query->paginate($perPage, ['*'], 'page', $page);
-        $paginator->getCollection()->transform(fn($m) => $this->toDomainEntity($m));
-        return $paginator;
     }
 
     public function save(Tenant $tenant): Tenant
@@ -82,25 +49,29 @@ class EloquentTenantRepository extends EloquentRepository implements TenantRepos
         return $this->toDomainEntity($model);
     }
 
-    public function delete(int $id): bool
+    public function delete($id): bool
     {
-        return $this->destroy($id);
+        $record = $this->model->find($id);
+        if ($record) {
+            return (bool) $record->delete();
+        }
+        return false;
     }
 
     private function toDomainEntity(TenantModel $model): Tenant
     {
         return new Tenant(
-            id: $model->id,
             name: $model->name,
+            databaseConfig: new DatabaseConfig($model->database_config ?? []),
             domain: $model->domain,
             logoPath: $model->logo_path,
-            databaseConfig: new DatabaseConfig($model->database_config),
-            mailConfig: $model->mail_config ? new MailConfig($model->mail_config) : null,
-            cacheConfig: $model->cache_config ? new CacheConfig($model->cache_config) : null,
-            queueConfig: $model->queue_config ? new QueueConfig($model->queue_config) : null,
+            mailConfig: !empty($model->mail_config) ? MailConfig::fromArray($model->mail_config) : null,
+            cacheConfig: !empty($model->cache_config) ? CacheConfig::fromArray($model->cache_config) : null,
+            queueConfig: !empty($model->queue_config) ? QueueConfig::fromArray($model->queue_config) : null,
             featureFlags: new FeatureFlags($model->feature_flags ?? []),
             apiKeys: new ApiKeys($model->api_keys ?? []),
-            active: $model->active,
+            active: (bool) $model->active,
+            id: $model->id,
             createdAt: $model->created_at,
             updatedAt: $model->updated_at
         );

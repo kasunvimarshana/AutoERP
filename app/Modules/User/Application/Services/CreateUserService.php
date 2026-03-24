@@ -12,14 +12,18 @@ use Modules\User\Domain\ValueObjects\Address;
 use Modules\User\Domain\ValueObjects\UserPreferences;
 use Modules\User\Application\DTOs\UserData;
 use Modules\User\Domain\Events\UserCreated;
+use Modules\User\Application\Contracts\CreateUserServiceInterface;
 
-class CreateUserService extends BaseService
+class CreateUserService extends BaseService implements CreateUserServiceInterface
 {
+    private UserRepositoryInterface $userRepository;
+
     public function __construct(
         UserRepositoryInterface $repository,
         protected RoleRepositoryInterface $roleRepo
     ) {
         parent::__construct($repository);
+        $this->userRepository = $repository;
     }
 
     protected function handle(array $data): User
@@ -46,7 +50,7 @@ class CreateUserService extends BaseService
             active: $dto->active
         );
 
-        $saved = $this->repository->save($user);
+        $saved = $this->userRepository->save($user);
 
         if (!empty($dto->roles)) {
             $roleIds = [];
@@ -57,7 +61,7 @@ class CreateUserService extends BaseService
                     $roleIds[] = $role->getId();
                 }
             }
-            $this->repository->syncRoles($saved, $roleIds);
+            $this->userRepository->syncRoles($saved, $roleIds);
         }
 
         $this->addEvent(new UserCreated($saved));

@@ -3,6 +3,7 @@
 namespace Modules\Tenant\Application\UseCases;
 
 use Modules\Tenant\Domain\RepositoryInterfaces\TenantRepositoryInterface;
+use Modules\Tenant\Domain\Entities\Tenant;
 
 class GetTenant
 {

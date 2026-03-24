@@ -4,9 +4,11 @@ namespace Modules\OrganizationUnit\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
 use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitAttachmentRepositoryInterface;
-use Modules\Core\Application\Services\FileStorageServiceInterface;
+use Modules\Core\Application\Contracts\FileStorageServiceInterface;
+use Modules\OrganizationUnit\Domain\Exceptions\AttachmentNotFoundException;
+use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitAttachmentServiceInterface;
 
-class DeleteOrganizationUnitAttachmentService extends BaseService
+class DeleteOrganizationUnitAttachmentService extends BaseService implements DeleteOrganizationUnitAttachmentServiceInterface
 {
     public function __construct(
         protected OrganizationUnitAttachmentRepositoryInterface $attachmentRepo,
@@ -20,7 +22,7 @@ class DeleteOrganizationUnitAttachmentService extends BaseService
         $attachmentId = $data['attachment_id'];
         $attachment = $this->attachmentRepo->find($attachmentId);
         if (!$attachment) {
-            throw new \RuntimeException('Attachment not found');
+            throw new AttachmentNotFoundException($attachmentId);
         }
 
         $this->storage->delete($attachment->getFilePath());

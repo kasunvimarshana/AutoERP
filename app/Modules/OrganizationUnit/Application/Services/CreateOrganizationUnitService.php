@@ -10,12 +10,16 @@ use Modules\OrganizationUnit\Domain\ValueObjects\Code;
 use Modules\OrganizationUnit\Domain\ValueObjects\Metadata;
 use Modules\OrganizationUnit\Application\DTOs\OrganizationUnitData;
 use Modules\OrganizationUnit\Domain\Events\OrganizationUnitCreated;
+use Modules\OrganizationUnit\Application\Contracts\CreateOrganizationUnitServiceInterface;
 
-class CreateOrganizationUnitService extends BaseService
+class CreateOrganizationUnitService extends BaseService implements CreateOrganizationUnitServiceInterface
 {
+    private OrganizationUnitRepositoryInterface $orgUnitRepository;
+
     public function __construct(OrganizationUnitRepositoryInterface $repository)
     {
         parent::__construct($repository);
+        $this->orgUnitRepository = $repository;
     }
 
     protected function handle(array $data): OrganizationUnit
@@ -23,7 +27,7 @@ class CreateOrganizationUnitService extends BaseService
         $dto = OrganizationUnitData::fromArray($data);
 
         $name = new Name($dto->name);
-        $code = new Code($dto->code);
+        $code = $dto->code !== null ? new Code($dto->code) : null;
         $metadata = $dto->metadata ? new Metadata($dto->metadata) : null;
 
         $unit = new OrganizationUnit(
@@ -35,7 +39,7 @@ class CreateOrganizationUnitService extends BaseService
             parentId: $dto->parent_id
         );
 
-        $saved = $this->repository->save($unit);
+        $saved = $this->orgUnitRepository->save($unit);
         $this->addEvent(new OrganizationUnitCreated($saved));
         return $saved;
     }

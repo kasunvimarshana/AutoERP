@@ -2,20 +2,22 @@
 
 namespace Modules\OrganizationUnit\Infrastructure\Http\Controllers;
 
-use Modules\OrganizationUnit\Application\Services\UploadOrganizationUnitAttachmentService;
-use Modules\OrganizationUnit\Application\Services\DeleteOrganizationUnitAttachmentService;
+use Modules\OrganizationUnit\Application\Contracts\UploadOrganizationUnitAttachmentServiceInterface;
+use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitAttachmentServiceInterface;
 use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitAttachmentRepositoryInterface;
-use Modules\Core\Application\Services\FileStorageServiceInterface;
+use Modules\OrganizationUnit\Domain\Entities\OrganizationUnit;
+use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\OrganizationUnit\Infrastructure\Http\Requests\UploadOrganizationUnitAttachmentRequest;
 use Modules\OrganizationUnit\Infrastructure\Http\Resources\OrganizationUnitAttachmentResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
 
-class OrganizationUnitAttachmentController
+class OrganizationUnitAttachmentController extends Controller
 {
     public function __construct(
-        protected UploadOrganizationUnitAttachmentService $uploadService,
-        protected DeleteOrganizationUnitAttachmentService $deleteService,
+        protected UploadOrganizationUnitAttachmentServiceInterface $uploadService,
+        protected DeleteOrganizationUnitAttachmentServiceInterface $deleteService,
         protected OrganizationUnitAttachmentRepositoryInterface $attachmentRepo,
         protected FileStorageServiceInterface $storage
     ) {}
@@ -61,6 +63,6 @@ class OrganizationUnitAttachmentController
             abort(404);
         }
         $this->authorize('view', $attachment);
-        return response()->file(storage_path("app/public/{$attachment->getFilePath()}"));
+        return $this->storage->stream($attachment->getFilePath());
     }
 }

@@ -6,7 +6,7 @@ use Modules\Core\Application\DTOs\BaseDto;
 
 class TenantData extends BaseDto
 {
-    public int $tenant_id;
+    public ?int $tenant_id;
     public string $name;
     public ?string $domain;
     public array $database_config;
@@ -20,7 +20,6 @@ class TenantData extends BaseDto
     public function rules(): array
     {
         return [
-            'tenant_id'                => 'required|integer|exists:tenants,id',
             'name'                     => 'required|string|max:255',
             'domain'                   => 'nullable|string|unique:tenants,domain',
             'database_config'          => 'required|array',

@@ -5,22 +5,27 @@ namespace Modules\Tenant\Application\Services;
 use Modules\Core\Application\Services\BaseService;
 use Modules\Tenant\Domain\RepositoryInterfaces\TenantRepositoryInterface;
 use Modules\Tenant\Domain\Events\TenantDeleted;
+use Modules\Tenant\Domain\Exceptions\TenantNotFoundException;
+use Modules\Tenant\Application\Contracts\DeleteTenantServiceInterface;
 
-class DeleteTenantService extends BaseService
+class DeleteTenantService extends BaseService implements DeleteTenantServiceInterface
 {
+    private TenantRepositoryInterface $tenantRepository;
+
     public function __construct(TenantRepositoryInterface $repository)
     {
         parent::__construct($repository);
+        $this->tenantRepository = $repository;
     }
 
     protected function handle(array $data): bool
     {
         $id = $data['id'];
-        $tenant = $this->repository->find($id);
+        $tenant = $this->tenantRepository->find($id);
         if (!$tenant) {
-            throw new \RuntimeException('Tenant not found');
+            throw new TenantNotFoundException($id);
         }
-        $deleted = $this->repository->delete($id);
+        $deleted = $this->tenantRepository->delete($id);
         if ($deleted) {
             $this->addEvent(new TenantDeleted($id));
         }

@@ -3,7 +3,7 @@
 namespace Modules\Tenant\Infrastructure\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
-use Modules\Core\Infrastructure\Services\FileStorageServiceInterface;
+use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 
 class TenantAttachmentResource extends JsonResource
 {

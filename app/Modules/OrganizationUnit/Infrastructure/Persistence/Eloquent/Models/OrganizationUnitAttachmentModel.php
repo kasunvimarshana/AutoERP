@@ -10,7 +10,17 @@ class OrganizationUnitAttachmentModel extends Model
     use SoftDeletes;
 
     protected $table = 'organization_unit_attachments';
-    protected $guarded = ['id'];
+    protected $fillable = [
+        'tenant_id',
+        'organization_unit_id',
+        'uuid',
+        'name',
+        'file_path',
+        'mime_type',
+        'size',
+        'type',
+        'metadata',
+    ];
     protected $casts = [
         'metadata' => 'array',
         'size'     => 'integer',

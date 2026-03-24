@@ -7,8 +7,6 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
-        "darkaonline/l5-swagger": "^11.0",
-        "kasunvimarshana/laravel-ddd-modules": "1.0.x-dev",
         "laravel/framework": "^12.0",
         "laravel/passport": "^13.6",
         "laravel/tinker": "^2.10.1"
@@ -87,10 +85,5 @@
     },
     "minimum-stability": "stable",
     "prefer-stable": true,
-    "repositories": [
-        {
-            "type": "path",
-            "url": "./packages/laravel-ddd-modules"
-        }
-    ]
+    "repositories": []
 }

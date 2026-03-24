@@ -6,31 +6,37 @@ use Modules\Core\Application\Services\BaseService;
 use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitRepositoryInterface;
 use Modules\OrganizationUnit\Application\DTOs\MoveOrganizationUnitData;
 use Modules\OrganizationUnit\Domain\Events\OrganizationUnitMoved;
+use Modules\OrganizationUnit\Domain\Exceptions\OrganizationUnitNotFoundException;
+use Modules\OrganizationUnit\Application\Contracts\MoveOrganizationUnitServiceInterface;
 
-class MoveOrganizationUnitService extends BaseService
+class MoveOrganizationUnitService extends BaseService implements MoveOrganizationUnitServiceInterface
 {
+    private OrganizationUnitRepositoryInterface $orgUnitRepository;
+
     public function __construct(OrganizationUnitRepositoryInterface $repository)
     {
         parent::__construct($repository);
+        $this->orgUnitRepository = $repository;
     }
 
-    protected function handle(array $data): void
+    protected function handle(array $data): mixed
     {
         $id = $data['id'];
         $dto = MoveOrganizationUnitData::fromArray($data);
 
-        $unit = $this->repository->find($id);
+        $unit = $this->orgUnitRepository->find($id);
         if (!$unit) {
-            throw new \RuntimeException('Organization unit not found');
+            throw new OrganizationUnitNotFoundException($id);
         }
 
         $oldParentId = $unit->getParentId();
         if ($oldParentId === $dto->parent_id) {
-            return;
+            return null;
         }
 
-        $this->repository->moveNode($id, $dto->parent_id);
-        $updated = $this->repository->find($id);
+        $this->orgUnitRepository->moveNode($id, $dto->parent_id);
+        $updated = $this->orgUnitRepository->find($id);
         $this->addEvent(new OrganizationUnitMoved($updated, $oldParentId));
+        return null;
     }
 }

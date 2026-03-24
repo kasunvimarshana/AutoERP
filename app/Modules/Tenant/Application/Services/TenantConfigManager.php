@@ -3,11 +3,12 @@
 namespace Modules\Tenant\Application\Services;
 
 use Modules\Tenant\Domain\Contracts\TenantConfigInterface;
+use Modules\Tenant\Application\Contracts\TenantConfigManagerInterface;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 // use Laravel\Pennant\Feature;
 
-class TenantConfigManager
+class TenantConfigManager implements TenantConfigManagerInterface
 {
     /**
      * Apply tenant configuration to Laravel.

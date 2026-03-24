@@ -77,13 +77,13 @@ class Tenant
             $this->databaseConfig = new DatabaseConfig($data['database_config']);
         }
         if (isset($data['mail_config'])) {
-            $this->mailConfig = new MailConfig($data['mail_config']);
+            $this->mailConfig = MailConfig::fromArray($data['mail_config']);
         }
         if (isset($data['cache_config'])) {
-            $this->cacheConfig = new CacheConfig($data['cache_config']);
+            $this->cacheConfig = CacheConfig::fromArray($data['cache_config']);
         }
         if (isset($data['queue_config'])) {
-            $this->queueConfig = new QueueConfig($data['queue_config']);
+            $this->queueConfig = QueueConfig::fromArray($data['queue_config']);
         }
         if (isset($data['feature_flags'])) {
             $this->featureFlags = new FeatureFlags($data['feature_flags']);
@@ -94,6 +94,29 @@ class Tenant
         if (isset($data['active'])) {
             $this->active = (bool)$data['active'];
         }
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function update(
+        string $name,
+        ?string $domain,
+        DatabaseConfig $databaseConfig,
+        ?MailConfig $mailConfig = null,
+        ?CacheConfig $cacheConfig = null,
+        ?QueueConfig $queueConfig = null,
+        ?FeatureFlags $featureFlags = null,
+        ?ApiKeys $apiKeys = null,
+        bool $active = true
+    ): void {
+        $this->name = $name;
+        $this->domain = $domain;
+        $this->databaseConfig = $databaseConfig;
+        $this->mailConfig = $mailConfig;
+        $this->cacheConfig = $cacheConfig;
+        $this->queueConfig = $queueConfig;
+        $this->featureFlags = $featureFlags ?? $this->featureFlags;
+        $this->apiKeys = $apiKeys ?? $this->apiKeys;
+        $this->active = $active;
         $this->updatedAt = new \DateTimeImmutable();
     }
 

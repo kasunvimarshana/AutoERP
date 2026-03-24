@@ -2,6 +2,8 @@
 
 namespace Modules\Tenant\Domain\ValueObjects;
 
+use Modules\Core\Domain\ValueObjects\ValueObject;
+
 class FeatureFlags extends ValueObject
 {
     private array $flags;

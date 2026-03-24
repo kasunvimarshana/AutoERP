@@ -11,26 +11,30 @@ use Modules\Tenant\Domain\ValueObjects\CacheConfig;
 use Modules\Tenant\Domain\ValueObjects\QueueConfig;
 use Modules\Tenant\Domain\ValueObjects\FeatureFlags;
 use Modules\Tenant\Domain\ValueObjects\ApiKeys;
+use Modules\Tenant\Application\Contracts\CreateTenantServiceInterface;
 use Modules\Tenant\Application\DTOs\TenantData;
 use Modules\Tenant\Domain\Events\TenantCreated;
 
-class CreateTenantService extends BaseService
+class CreateTenantService extends BaseService implements CreateTenantServiceInterface
 {
+    private TenantRepositoryInterface $tenantRepository;
+
     public function __construct(TenantRepositoryInterface $repository)
     {
         parent::__construct($repository);
+        $this->tenantRepository = $repository;
     }
 
     protected function handle(array $data): Tenant
     {
         $dto = TenantData::fromArray($data);
 
-        $databaseConfig = new DatabaseConfig($dto->database_config);
-        $mailConfig = $dto->mail_config ? new MailConfig(...$dto->mail_config) : null;
-        $cacheConfig = $dto->cache_config ? new CacheConfig(...$dto->cache_config) : null;
-        $queueConfig = $dto->queue_config ? new QueueConfig(...$dto->queue_config) : null;
-        $featureFlags = new FeatureFlags($dto->feature_flags);
-        $apiKeys = new ApiKeys($dto->api_keys);
+        $databaseConfig = new DatabaseConfig($dto->database_config ?? []);
+        $mailConfig = !empty($dto->mail_config) ? MailConfig::fromArray($dto->mail_config) : null;
+        $cacheConfig = !empty($dto->cache_config) ? CacheConfig::fromArray($dto->cache_config) : null;
+        $queueConfig = !empty($dto->queue_config) ? QueueConfig::fromArray($dto->queue_config) : null;
+        $featureFlags = new FeatureFlags($dto->feature_flags ?? []);
+        $apiKeys = new ApiKeys($dto->api_keys ?? []);
 
         $tenant = new Tenant(
             name: $dto->name,
@@ -41,11 +45,12 @@ class CreateTenantService extends BaseService
             queueConfig: $queueConfig,
             featureFlags: $featureFlags,
             apiKeys: $apiKeys,
-            active: $dto->active
+            active: $dto->active ?? true
         );
 
-        $saved = $this->repository->create($tenant);
+        $saved = $this->tenantRepository->save($tenant);
         $this->addEvent(new TenantCreated($saved));
         return $saved;
     }
 }
+

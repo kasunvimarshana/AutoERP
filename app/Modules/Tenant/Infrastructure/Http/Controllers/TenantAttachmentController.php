@@ -2,20 +2,22 @@
 
 namespace Modules\Tenant\Infrastructure\Http\Controllers;
 
-use Modules\Tenant\Application\Services\UploadTenantAttachmentService;
-use Modules\Tenant\Application\Services\DeleteTenantAttachmentService;
+use Modules\Tenant\Application\Contracts\UploadTenantAttachmentServiceInterface;
+use Modules\Tenant\Application\Contracts\DeleteTenantAttachmentServiceInterface;
 use Modules\Tenant\Infrastructure\Http\Requests\UploadTenantAttachmentRequest;
 use Modules\Tenant\Infrastructure\Http\Resources\TenantAttachmentResource;
 use Modules\Tenant\Domain\RepositoryInterfaces\TenantAttachmentRepositoryInterface;
-use Modules\Core\Application\Services\FileStorageServiceInterface;
+use Modules\Tenant\Domain\Entities\Tenant;
+use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
 
-class TenantAttachmentController
+class TenantAttachmentController extends Controller
 {
     public function __construct(
-        protected UploadTenantAttachmentService $uploadService,
-        protected DeleteTenantAttachmentService $deleteService,
+        protected UploadTenantAttachmentServiceInterface $uploadService,
+        protected DeleteTenantAttachmentServiceInterface $deleteService,
         protected TenantAttachmentRepositoryInterface $attachmentRepo,
         protected FileStorageServiceInterface $storage
     ) {}
@@ -61,6 +63,6 @@ class TenantAttachmentController
             abort(404);
         }
         $this->authorize('view', $attachment);
-        return response()->file(storage_path("app/public/{$attachment->getFilePath()}"));
+        return $this->storage->stream($attachment->getFilePath());
     }
 }

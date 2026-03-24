@@ -10,7 +10,16 @@ class OrganizationUnitModel extends Model
     use SoftDeletes;
 
     protected $table = 'organization_units';
-    protected $guarded = ['id'];
+    protected $fillable = [
+        'tenant_id',
+        'name',
+        'code',
+        'description',
+        'metadata',
+        'parent_id',
+        '_lft',
+        '_rgt',
+    ];
     protected $casts = [
         'metadata' => 'array',
         'tenant_id' => 'integer',

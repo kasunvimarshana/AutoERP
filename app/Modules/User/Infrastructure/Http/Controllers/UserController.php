@@ -3,13 +3,14 @@
 namespace Modules\User\Infrastructure\Http\Controllers;
 
 use Modules\Core\Infrastructure\Http\Controllers\BaseController;
-use Modules\User\Application\Services\CreateUserService;
-use Modules\User\Application\Services\UpdateUserService;
-use Modules\User\Application\Services\DeleteUserService;
-use Modules\User\Application\Services\AssignRoleService;
-use Modules\User\Application\Services\UpdatePreferencesService;
+use Modules\User\Application\Contracts\CreateUserServiceInterface;
+use Modules\User\Application\Contracts\UpdateUserServiceInterface;
+use Modules\User\Application\Contracts\DeleteUserServiceInterface;
+use Modules\User\Application\Contracts\AssignRoleServiceInterface;
+use Modules\User\Application\Contracts\UpdatePreferencesServiceInterface;
 use Modules\User\Application\DTOs\UserData;
 use Modules\User\Application\DTOs\UserPreferencesData;
+use Modules\User\Infrastructure\Http\Requests\UpdatePreferencesRequest;
 use Modules\User\Infrastructure\Http\Resources\UserResource;
 use Modules\User\Infrastructure\Http\Resources\UserCollection;
 use Modules\User\Domain\Entities\User;
@@ -19,11 +20,11 @@ use Illuminate\Http\JsonResponse;
 class UserController extends BaseController
 {
     public function __construct(
-        CreateUserService $createService,
-        UpdateUserService $updateService,
-        DeleteUserService $deleteService,
-        protected AssignRoleService $assignRoleService,
-        protected UpdatePreferencesService $updatePreferencesService
+        CreateUserServiceInterface $createService,
+        protected UpdateUserServiceInterface $updateService,
+        protected DeleteUserServiceInterface $deleteService,
+        protected AssignRoleServiceInterface $assignRoleService,
+        protected UpdatePreferencesServiceInterface $updatePreferencesService
     ) {
         parent::__construct($createService, UserResource::class, UserData::class);
     }
@@ -50,7 +51,7 @@ class UserController extends BaseController
         return new UserResource($user);
     }
 
-    public function show($id): UserResource
+    public function show(int $id): UserResource
     {
         $user = $this->service->find($id);
         if (!$user) {
@@ -60,7 +61,7 @@ class UserController extends BaseController
         return new UserResource($user);
     }
 
-    public function update(Request $request, $id): UserResource
+    public function update(Request $request, int $id): UserResource
     {
         $user = $this->service->find($id);
         if (!$user) {
@@ -74,7 +75,7 @@ class UserController extends BaseController
         return new UserResource($updated);
     }
 
-    public function destroy($id): JsonResponse
+    public function destroy(int $id): JsonResponse
     {
         $user = $this->service->find($id);
         if (!$user) {
@@ -108,5 +109,10 @@ class UserController extends BaseController
         $dto = UserPreferencesData::fromArray($validated);
         $updated = $this->updatePreferencesService->execute(['user_id' => $id] + $dto->toArray());
         return new UserResource($updated);
+    }
+
+    protected function getModelClass(): string
+    {
+        return User::class;
     }
 }

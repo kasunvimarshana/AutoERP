@@ -5,7 +5,7 @@ namespace Modules\Core\Infrastructure\Services;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
-use Modules\Core\Application\Services\FileStorageServiceInterface;
+use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FileStorageService implements FileStorageServiceInterface
@@ -86,7 +86,7 @@ class FileStorageService implements FileStorageServiceInterface
     /**
      * {@inheritdoc}
      */
-    public function mimeType(string $path, ?string $disk = null)
+    public function mimeType(string $path, ?string $disk = null): string|false
     {
         $adapter = $this->getDisk($disk);
         return $adapter->mimeType($path);

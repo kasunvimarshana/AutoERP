@@ -2,6 +2,8 @@
 
 namespace Modules\Tenant\Domain\ValueObjects;
 
+use Modules\Core\Domain\ValueObjects\ValueObject;
+
 class QueueConfig extends ValueObject
 {
     private string $driver;

@@ -10,4 +10,5 @@ interface TenantAttachmentRepositoryInterface extends RepositoryInterface
 {
     public function findByUuid(string $uuid): ?TenantAttachment;
     public function getByTenant(int $tenantId, ?string $type = null): Collection;
+    public function save(TenantAttachment $attachment): TenantAttachment;
 }

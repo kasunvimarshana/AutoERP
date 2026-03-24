@@ -9,14 +9,15 @@ use Modules\OrganizationUnit\Domain\ValueObjects\Name;
 use Modules\OrganizationUnit\Domain\ValueObjects\Code;
 use Modules\OrganizationUnit\Domain\ValueObjects\Metadata;
 use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
+use Modules\OrganizationUnit\Domain\Exceptions\OrganizationUnitNotFoundException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class EloquentOrganizationUnitRepository extends EloquentRepository implements OrganizationUnitRepositoryInterface
 {
-    public function __construct()
+    public function __construct(OrganizationUnitModel $model)
     {
-        parent::__construct(new OrganizationUnitModel());
+        parent::__construct($model);
     }
 
     /**
@@ -24,53 +25,46 @@ class EloquentOrganizationUnitRepository extends EloquentRepository implements O
      */
     public function save(OrganizationUnit $unit): OrganizationUnit
     {
-        $data = [
-            'tenant_id'   => $unit->getTenantId(),
-            'name'        => $unit->getName()->value(),
-            'code'        => $unit->getCode()->value(),
-            'description' => $unit->getDescription(),
-            'metadata'    => $unit->getMetadata()->toArray(),
-            'parent_id'   => $unit->getParentId(),
-            '_lft'        => $unit->getLft(),
-            '_rgt'        => $unit->getRgt(),
-        ];
+        $savedModel = null;
 
-        DB::transaction(function () use ($unit, $data) {
+        DB::transaction(function () use ($unit, &$savedModel) {
             if ($unit->getId()) {
-                // Update existing
-                $model = $this->update($unit->getId(), $data);
+                $data = [
+                    'tenant_id'   => $unit->getTenantId(),
+                    'name'        => $unit->getName()->value(),
+                    'code'        => $unit->getCode()?->value(),
+                    'description' => $unit->getDescription(),
+                    'metadata'    => $unit->getMetadata()?->toArray(),
+                    'parent_id'   => $unit->getParentId(),
+                ];
+                $savedModel = $this->update($unit->getId(), $data);
             } else {
-                // Insert new – we need to calculate lft/rgt before insertion
-                $this->insertNode($unit);
-                $model = $this->model->where('id', $unit->getId())->first(); // after insertion
+                $savedModel = $this->insertNode($unit);
             }
         });
 
-        return $this->toDomainEntity($model);
+        return $this->toDomainEntity($savedModel);
     }
 
     /**
      * Insert a new node, calculating the correct lft/rgt values.
      */
-    protected function insertNode(OrganizationUnit $unit): void
+    protected function insertNode(OrganizationUnit $unit): OrganizationUnitModel
     {
         $parentId = $unit->getParentId();
         $tenantId = $unit->getTenantId();
 
         if ($parentId === null) {
-            // Insert as root – get the maximum rgt among roots
             $maxRgt = $this->model->where('tenant_id', $tenantId)
                 ->whereNull('parent_id')
                 ->max('_rgt');
             $lft = ($maxRgt ?? 0) + 1;
             $rgt = $lft + 1;
         } else {
-            // Get the parent node
             $parent = $this->model->find($parentId);
             if (!$parent) {
-                throw new \RuntimeException('Parent not found');
+                throw new OrganizationUnitNotFoundException('parent');
             }
-            // Shift all nodes to the right to make space for the new node
             $right = $parent->_rgt;
             $this->shiftLeftRight($tenantId, $right, 2);
             $lft = $right;
@@ -79,18 +73,16 @@ class EloquentOrganizationUnitRepository extends EloquentRepository implements O
 
         $unit->setLftRgt($lft, $rgt);
 
-        $model = $this->model->create([
+            return $this->model->create([
             'tenant_id'   => $unit->getTenantId(),
             'name'        => $unit->getName()->value(),
-            'code'        => $unit->getCode()->value(),
+            'code'        => $unit->getCode()?->value(),
             'description' => $unit->getDescription(),
-            'metadata'    => $unit->getMetadata()->toArray(),
+            'metadata'    => $unit->getMetadata()?->toArray(),
             'parent_id'   => $unit->getParentId(),
             '_lft'        => $lft,
             '_rgt'        => $rgt,
         ]);
-        $unit = new OrganizationUnit(/* ... */); // re‑hydrate with id
-        $this->model = $model; // store for later use
     }
 
     /**
@@ -113,23 +105,20 @@ class EloquentOrganizationUnitRepository extends EloquentRepository implements O
     {
         $node = $this->model->find($id);
         if (!$node) {
-            throw new \RuntimeException('Node not found');
+            throw new OrganizationUnitNotFoundException();
         }
 
-        $oldParentId = $node->parent_id;
-        if ($oldParentId === $newParentId) {
+        if ($node->parent_id === $newParentId) {
             return;
         }
 
         DB::transaction(function () use ($node, $newParentId) {
-            // Remove node and its descendants from the tree
             $width = $node->_rgt - $node->_lft + 1;
             $this->shiftLeftRight($node->tenant_id, $node->_rgt + 1, -$width);
-            // Update the node's parent and prepare to re‑insert
+
             $node->parent_id = $newParentId;
             $node->save();
 
-            // Re‑insert at the new position
             if ($newParentId === null) {
                 $maxRgt = $this->model->where('tenant_id', $node->tenant_id)
                     ->whereNull('parent_id')
@@ -137,20 +126,25 @@ class EloquentOrganizationUnitRepository extends EloquentRepository implements O
                 $newLft = ($maxRgt ?? 0) + 1;
             } else {
                 $newParent = $this->model->find($newParentId);
+                if (!$newParent) {
+                    throw new OrganizationUnitNotFoundException('parent');
+                }
                 $newLft = $newParent->_rgt;
                 $this->shiftLeftRight($node->tenant_id, $newLft, $width);
             }
             $newRgt = $newLft + $width - 1;
             $this->model->where('id', $node->id)->update(['_lft' => $newLft, '_rgt' => $newRgt]);
-            // Re‑adjust the descendants
-            $diff = $newLft - $node->_lft;
-            $this->model->where('tenant_id', $node->tenant_id)
-                ->where('_lft', '>=', $node->_lft)
-                ->where('_rgt', '<=', $node->_rgt)
-                ->update([
-                    '_lft' => DB::raw("_lft + $diff"),
-                    '_rgt' => DB::raw("_rgt + $diff"),
-                ]);
+
+            $diff = (int) ($newLft - $node->_lft);
+            if ($diff !== 0) {
+                $this->model->where('tenant_id', $node->tenant_id)
+                    ->where('_lft', '>=', $node->_lft)
+                    ->where('_rgt', '<=', $node->_rgt)
+                    ->update([
+                        '_lft' => DB::raw('_lft + ' . $diff),
+                        '_rgt' => DB::raw('_rgt + ' . $diff),
+                    ]);
+            }
         });
     }
 
@@ -159,16 +153,17 @@ class EloquentOrganizationUnitRepository extends EloquentRepository implements O
      */
     public function getTree(int $tenantId, ?int $rootId = null): array
     {
-        $query = $this->model->where('tenant_id', $tenantId)->orderBy('_lft');
         if ($rootId) {
-            $root = $this->model->find($rootId);
-            if ($root) {
-                $query = $root->getDescendants();
-            } else {
+            $root = $this->model->where('tenant_id', $tenantId)->find($rootId);
+            if (!$root) {
                 return [];
             }
+            $models = $root->getDescendants();
+            $models->prepend($root);
+        } else {
+            $models = $this->model->where('tenant_id', $tenantId)->orderBy('_lft')->get();
         }
-        $models = $query->get();
+
         return $this->buildTree($models);
     }
 
@@ -221,5 +216,41 @@ class EloquentOrganizationUnitRepository extends EloquentRepository implements O
         return $node->getAncestors()->map(fn($m) => $this->toDomainEntity($m))->all();
     }
 
-    // Other methods (find, paginate, delete) from EloquentRepository, with proper mapping to domain entities.
+    private function toDomainEntity(OrganizationUnitModel $model): OrganizationUnit
+    {
+        return new OrganizationUnit(
+            tenantId: $model->tenant_id,
+            name: new Name($model->name),
+            code: $model->code !== null ? new Code($model->code) : null,
+            description: $model->description,
+            metadata: isset($model->metadata) ? new Metadata((array) $model->metadata) : null,
+            parentId: $model->parent_id,
+            id: $model->id,
+            lft: $model->_lft ?? 0,
+            rgt: $model->_rgt ?? 0,
+            createdAt: $model->created_at,
+            updatedAt: $model->updated_at
+        );
+    }
+
+    public function rebuildTree(): void
+    {
+        // Rebuilds the nested set left/right values for all nodes.
+        // Typically needed after batch imports or corruption recovery.
+        $nodes = $this->model->orderBy('parent_id')->orderBy('id')->get();
+        $counter = 1;
+        $this->rebuildNodeTree($nodes, null, $counter);
+    }
+
+    protected function rebuildNodeTree($nodes, ?int $parentId, int &$counter): void
+    {
+        $children = $nodes->where('parent_id', $parentId);
+        foreach ($children as $node) {
+            $lft = $counter++;
+            $this->rebuildNodeTree($nodes, $node->id, $counter);
+            $rgt = $counter++;
+            $this->model->where('id', $node->id)->update(['_lft' => $lft, '_rgt' => $rgt]);
+        }
+    }
 }
+
