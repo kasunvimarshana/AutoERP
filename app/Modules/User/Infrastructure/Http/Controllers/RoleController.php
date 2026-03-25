@@ -15,6 +15,7 @@ use Modules\User\Domain\RepositoryInterfaces\RoleRepositoryInterface;
 use Modules\User\Infrastructure\Http\Requests\StoreRoleRequest;
 use Modules\User\Infrastructure\Http\Requests\SyncRolePermissionsRequest;
 use Modules\User\Infrastructure\Http\Resources\RoleResource;
+use OpenApi\Attributes as OA;
 
 class RoleController extends Controller
 {
@@ -25,6 +26,27 @@ class RoleController extends Controller
         protected RoleRepositoryInterface $roleRepository
     ) {}
 
+    #[OA\Get(
+        path: '/api/roles',
+        summary: 'List roles',
+        tags: ['Roles'],
+        security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(name: 'tenant_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'per_page',  in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 15)),
+            new OA\Parameter(name: 'page',      in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 1)),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Paginated list of roles',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: '#/components/schemas/RoleObject')),
+                    ],
+                )),
+            new OA\Response(response: 401, description: 'Unauthenticated',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+        ],
+    )]
     public function index(Request $request): JsonResponse
     {
         $this->authorize('viewAny', Role::class);
@@ -39,6 +61,25 @@ class RoleController extends Controller
         return response()->json(RoleResource::collection($roles));
     }
 
+    #[OA\Get(
+        path: '/api/roles/{id}',
+        summary: 'Get role',
+        tags: ['Roles'],
+        security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Role details',
+                content: new OA\JsonContent(ref: '#/components/schemas/RoleObject')),
+            new OA\Response(response: 401, description: 'Unauthenticated',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 403, description: 'Forbidden',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 404, description: 'Not found',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+        ],
+    )]
     public function show(int $id): RoleResource
     {
         $role = $this->roleRepository->find($id);
@@ -50,6 +91,32 @@ class RoleController extends Controller
         return new RoleResource($role);
     }
 
+    #[OA\Post(
+        path: '/api/roles',
+        summary: 'Create role',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['name'],
+                properties: [
+                    new OA\Property(property: 'name',      type: 'string',  example: 'manager'),
+                    new OA\Property(property: 'tenant_id', type: 'integer', nullable: true, example: 1),
+                ],
+            ),
+        ),
+        tags: ['Roles'],
+        security: [['bearerAuth' => []]],
+        responses: [
+            new OA\Response(response: 200, description: 'Role created',
+                content: new OA\JsonContent(ref: '#/components/schemas/RoleObject')),
+            new OA\Response(response: 401, description: 'Unauthenticated',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 403, description: 'Forbidden',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 422, description: 'Validation error',
+                content: new OA\JsonContent(ref: '#/components/schemas/ValidationErrorResponse')),
+        ],
+    )]
     public function store(StoreRoleRequest $request): RoleResource
     {
         $this->authorize('create', Role::class);
@@ -58,6 +125,25 @@ class RoleController extends Controller
         return new RoleResource($role);
     }
 
+    #[OA\Delete(
+        path: '/api/roles/{id}',
+        summary: 'Delete role',
+        tags: ['Roles'],
+        security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Deleted',
+                content: new OA\JsonContent(ref: '#/components/schemas/MessageResponse')),
+            new OA\Response(response: 401, description: 'Unauthenticated',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 403, description: 'Forbidden',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 404, description: 'Not found',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+        ],
+    )]
     public function destroy(int $id): JsonResponse
     {
         $role = $this->roleRepository->find($id);
@@ -70,6 +156,36 @@ class RoleController extends Controller
         return response()->json(['message' => 'Role deleted successfully']);
     }
 
+    #[OA\Put(
+        path: '/api/roles/{id}/permissions',
+        summary: 'Sync role permissions',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['permission_ids'],
+                properties: [
+                    new OA\Property(property: 'permission_ids', type: 'array', items: new OA\Items(type: 'integer'), example: [1, 2, 3]),
+                ],
+            ),
+        ),
+        tags: ['Roles'],
+        security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Role with synced permissions',
+                content: new OA\JsonContent(ref: '#/components/schemas/RoleObject')),
+            new OA\Response(response: 401, description: 'Unauthenticated',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 403, description: 'Forbidden',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 404, description: 'Not found',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 422, description: 'Validation error',
+                content: new OA\JsonContent(ref: '#/components/schemas/ValidationErrorResponse')),
+        ],
+    )]
     public function syncPermissions(SyncRolePermissionsRequest $request, int $id): RoleResource
     {
         $role = $this->roleRepository->find($id);

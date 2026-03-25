@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace Modules\Core\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use L5Swagger\Generator;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
+use Modules\Core\Infrastructure\ApiDoc\Contracts\ApiDocServiceInterface;
+use Modules\Core\Infrastructure\ApiDoc\Services\SwaggerApiDocService;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Core\Infrastructure\Services\FileStorageService;
 
@@ -19,6 +22,10 @@ class CoreServiceProvider extends ServiceProvider
             $defaultDisk = config('core.file_storage.default_disk', 'public');
 
             return new FileStorageService($defaultDisk);
+        });
+
+        $this->app->bind(ApiDocServiceInterface::class, function ($app) {
+            return new SwaggerApiDocService($app->make(Generator::class));
         });
 
         $this->mergeConfigFrom(__DIR__.'/../../config/core.php', 'core');
