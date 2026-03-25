@@ -4,7 +4,22 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Domain\Events;
 
-class TenantDeleted
+use Modules\Core\Domain\Events\BaseEvent;
+
+class TenantDeleted extends BaseEvent
 {
-    public function __construct(public int $tenantId) {}
+    public function __construct(int $tenantId)
+    {
+        parent::__construct($tenantId);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function broadcastWith(): array
+    {
+        return array_merge(parent::broadcastWith(), [
+            'id' => $this->tenantId,
+        ]);
+    }
 }

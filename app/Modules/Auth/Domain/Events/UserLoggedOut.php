@@ -4,15 +4,25 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Domain\Events;
 
-use Illuminate\Foundation\Events\Dispatchable;
-use Illuminate\Queue\SerializesModels;
+use Modules\Core\Domain\Events\UserScopedEvent;
 
-class UserLoggedOut
+class UserLoggedOut extends UserScopedEvent
 {
-    use Dispatchable, SerializesModels;
+    public readonly string $email;
 
-    public function __construct(
-        public readonly int $userId,
-        public readonly string $email,
-    ) {}
+    public function __construct(int $userId, string $email)
+    {
+        parent::__construct($userId);
+        $this->email = $email;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function broadcastWith(): array
+    {
+        return array_merge(parent::broadcastWith(), [
+            'email' => $this->email,
+        ]);
+    }
 }

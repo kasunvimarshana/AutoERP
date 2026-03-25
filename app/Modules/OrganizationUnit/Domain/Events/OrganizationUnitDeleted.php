@@ -4,7 +4,25 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Domain\Events;
 
-class OrganizationUnitDeleted
+use Modules\Core\Domain\Events\BaseEvent;
+
+class OrganizationUnitDeleted extends BaseEvent
 {
-    public function __construct(public int $unitId, public int $tenantId) {}
+    public readonly int $unitId;
+
+    public function __construct(int $unitId, int $tenantId)
+    {
+        $this->unitId = $unitId;
+        parent::__construct($tenantId, $unitId);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function broadcastWith(): array
+    {
+        return array_merge(parent::broadcastWith(), [
+            'id' => $this->unitId,
+        ]);
+    }
 }
