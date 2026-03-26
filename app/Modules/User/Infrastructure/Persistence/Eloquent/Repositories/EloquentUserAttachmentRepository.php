@@ -15,6 +15,7 @@ class EloquentUserAttachmentRepository extends EloquentRepository implements Use
     public function __construct(UserAttachmentModel $model)
     {
         parent::__construct($model);
+        $this->setDomainEntityMapper(fn (UserAttachmentModel $model): UserAttachment => $this->mapModelToDomainEntity($model));
     }
 
     public function findByUuid(string $uuid): ?UserAttachment
@@ -31,7 +32,7 @@ class EloquentUserAttachmentRepository extends EloquentRepository implements Use
             $query->where('type', $type);
         }
 
-        return $query->get()->map(fn ($m) => $this->toDomainEntity($m));
+        return $this->toDomainCollection($query->get());
     }
 
     public function save(UserAttachment $attachment): UserAttachment
@@ -54,10 +55,12 @@ class EloquentUserAttachmentRepository extends EloquentRepository implements Use
             $model = $this->create($data);
         }
 
-        return $this->toDomainEntity($model);
+        /** @var UserAttachmentModel $model */
+
+        return $this->mapModelToDomainEntity($model);
     }
 
-    private function toDomainEntity(UserAttachmentModel $model): UserAttachment
+    private function mapModelToDomainEntity(UserAttachmentModel $model): UserAttachment
     {
         return new UserAttachment(
             tenantId: $model->tenant_id,

@@ -33,7 +33,9 @@ class ApiRepository extends BaseRepository
         $params = $this->buildQueryParams($columns);
         $response = $this->http->get("{$this->endpoint}/{$id}", $params);
 
-        return $response->successful() ? $response->json('data') : null;
+        return $response->successful()
+            ? $this->mapToDomainEntity($response->json('data'))
+            : null;
     }
 
     /**
@@ -44,7 +46,9 @@ class ApiRepository extends BaseRepository
         $params = $this->buildQueryParams($columns);
         $response = $this->http->get($this->endpoint, $params);
 
-        return $response->successful() ? new Collection($response->json('data') ?? []) : new Collection;
+        $items = $response->successful() ? new Collection($response->json('data') ?? []) : new Collection;
+
+        return $this->mapCollectionToDomainEntities($items);
     }
 
     /**
@@ -69,13 +73,15 @@ class ApiRepository extends BaseRepository
         $perPage = $data['meta']['per_page'] ?? $perPage;
         $currentPage = $data['meta']['current_page'] ?? $page;
 
-        return new LengthAwarePaginator(
+        $paginator = new LengthAwarePaginator(
             $items,
             $total,
             $perPage,
             $currentPage,
             ['path' => Paginator::resolveCurrentPath(), 'pageName' => $pageName]
         );
+
+        return $this->mapPaginatorToDomainEntities($paginator);
     }
 
     /**
@@ -85,7 +91,9 @@ class ApiRepository extends BaseRepository
     {
         $response = $this->http->post($this->endpoint, $data);
 
-        return $response->successful() ? $response->json('data') : null;
+        return $response->successful()
+            ? $this->mapToDomainEntity($response->json('data'))
+            : null;
     }
 
     /**
@@ -95,7 +103,9 @@ class ApiRepository extends BaseRepository
     {
         $response = $this->http->put("{$this->endpoint}/{$id}", $data);
 
-        return $response->successful() ? $response->json('data') : null;
+        return $response->successful()
+            ? $this->mapToDomainEntity($response->json('data'))
+            : null;
     }
 
     /**

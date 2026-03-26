@@ -66,8 +66,13 @@ class UserController extends BaseController
     {
         $this->authorize('viewAny', User::class);
         $filters = $request->only(['name', 'email', 'active', 'role']);
-        $perPage = $request->input('per_page', 15);
-        $page = $request->input('page', 1);
+
+        if ($request->has('active')) {
+            $filters['active'] = $request->boolean('active');
+        }
+
+        $perPage = $request->integer('per_page', 15);
+        $page = $request->integer('page', 1);
         $sort = $request->input('sort');
         $include = $request->input('include');
 
@@ -82,23 +87,24 @@ class UserController extends BaseController
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ['tenant_id', 'email', 'first_name', 'last_name', 'password', 'password_confirmation'],
+                required: ['tenant_id', 'email', 'first_name', 'last_name'],
                 properties: [
-                    new OA\Property(property: 'tenant_id',             type: 'integer', example: 1),
-                    new OA\Property(property: 'email',                 type: 'string',  format: 'email', example: 'user@example.com'),
-                    new OA\Property(property: 'first_name',            type: 'string',  example: 'John'),
-                    new OA\Property(property: 'last_name',             type: 'string',  example: 'Doe'),
-                    new OA\Property(property: 'password',              type: 'string',  format: 'password', minLength: 8, example: 'secret12'),
-                    new OA\Property(property: 'password_confirmation', type: 'string',  format: 'password', example: 'secret12'),
-                    new OA\Property(property: 'phone',                 type: 'string',  nullable: true),
-                    new OA\Property(property: 'active',                type: 'boolean', default: true),
+                    new OA\Property(property: 'tenant_id',   type: 'integer', example: 1),
+                    new OA\Property(property: 'email',       type: 'string',  format: 'email', example: 'user@example.com'),
+                    new OA\Property(property: 'first_name',  type: 'string',  maxLength: 255, example: 'John'),
+                    new OA\Property(property: 'last_name',   type: 'string',  maxLength: 255, example: 'Doe'),
+                    new OA\Property(property: 'phone',       type: 'string',  nullable: true, maxLength: 20, example: '+1-555-0100'),
+                    new OA\Property(property: 'address',     type: 'object',  nullable: true),
+                    new OA\Property(property: 'preferences', type: 'object',  nullable: true),
+                    new OA\Property(property: 'active',      type: 'boolean', default: true),
+                    new OA\Property(property: 'roles',       type: 'array',   nullable: true, items: new OA\Items(type: 'integer'), example: [1, 2]),
                 ],
             ),
         ),
         tags: ['Users'],
         security: [['bearerAuth' => []]],
         responses: [
-            new OA\Response(response: 200, description: 'User created',
+            new OA\Response(response: 201, description: 'User created',
                 content: new OA\JsonContent(ref: '#/components/schemas/UserObject')),
             new OA\Response(response: 401, description: 'Unauthenticated',
                 content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
@@ -108,13 +114,13 @@ class UserController extends BaseController
                 content: new OA\JsonContent(ref: '#/components/schemas/ValidationErrorResponse')),
         ],
     )]
-    public function store(StoreUserRequest $request): UserResource
+    public function store(StoreUserRequest $request): \Illuminate\Http\JsonResponse
     {
         $this->authorize('create', User::class);
         $dto = UserData::fromArray($request->validated());
         $user = $this->service->execute($dto->toArray());
 
-        return new UserResource($user);
+        return (new UserResource($user))->response()->setStatusCode(201);
     }
 
     #[OA\Get(

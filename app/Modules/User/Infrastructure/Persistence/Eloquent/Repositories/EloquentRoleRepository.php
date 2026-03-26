@@ -16,6 +16,7 @@ class EloquentRoleRepository extends EloquentRepository implements RoleRepositor
     public function __construct(RoleModel $model)
     {
         parent::__construct($model);
+        $this->setDomainEntityMapper(fn (RoleModel $model): Role => $this->mapModelToDomainEntity($model));
     }
 
     public function findByName(int $tenantId, string $name): ?Role
@@ -41,11 +42,14 @@ class EloquentRoleRepository extends EloquentRepository implements RoleRepositor
             ]);
         }
 
-        return $this->toDomainEntity($model);
+        /** @var RoleModel $model */
+
+        return $this->mapModelToDomainEntity($model);
     }
 
     public function syncPermissions(Role $role, array $permissionIds): void
     {
+        /** @var RoleModel|null $model */
         $model = $this->model->find($role->getId());
         if ($model) {
             $model->permissions()->sync($permissionIds);
@@ -59,10 +63,9 @@ class EloquentRoleRepository extends EloquentRepository implements RoleRepositor
      */
     public function find($id, array $columns = ['*']): ?Role
     {
-        /** @var RoleModel|null $model */
-        $model = $this->model->with('permissions')->find($id);
+        $this->with(['permissions']);
 
-        return $model ? $this->toDomainEntity($model) : null;
+        return parent::find($id, $columns);
     }
 
     /**
@@ -73,12 +76,11 @@ class EloquentRoleRepository extends EloquentRepository implements RoleRepositor
     public function paginate(?int $perPage = null, array $columns = ['*'], ?string $pageName = null, ?int $page = null): LengthAwarePaginator
     {
         $this->with(['permissions']);
-        $paginator = parent::paginate($perPage, $columns, $pageName, $page);
 
-        return $paginator->through(fn (RoleModel $model) => $this->toDomainEntity($model));
+        return parent::paginate($perPage, $columns, $pageName, $page);
     }
 
-    private function toDomainEntity(RoleModel $model): Role
+    private function mapModelToDomainEntity(RoleModel $model): Role
     {
         $role = new Role($model->tenant_id, $model->name, $model->id);
         if ($model->relationLoaded('permissions')) {

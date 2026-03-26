@@ -62,6 +62,47 @@ abstract class BaseRepository implements RepositoryInterface
     protected ?int $offset = null;
 
     /**
+     * Optional mapper that converts provider items into Domain entities.
+     */
+    protected $domainEntityMapper = null;
+
+    /**
+     * Configure a mapper for converting provider items to Domain entities.
+     */
+    protected function setDomainEntityMapper(callable $mapper): void
+    {
+        $this->domainEntityMapper = $mapper;
+    }
+
+    /**
+     * Convert a single item to a Domain entity when a mapper is configured.
+     */
+    protected function mapToDomainEntity(mixed $item): mixed
+    {
+        if ($item === null || $this->domainEntityMapper === null) {
+            return $item;
+        }
+
+        return ($this->domainEntityMapper)($item);
+    }
+
+    /**
+     * Convert a collection of items to Domain entities.
+     */
+    protected function mapCollectionToDomainEntities(Collection $items): Collection
+    {
+        return $items->map(fn (mixed $item) => $this->mapToDomainEntity($item));
+    }
+
+    /**
+     * Convert paginated items to Domain entities.
+     */
+    protected function mapPaginatorToDomainEntities(LengthAwarePaginator $paginator): LengthAwarePaginator
+    {
+        return $paginator->through(fn (mixed $item) => $this->mapToDomainEntity($item));
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function with(array|string $relations): static
@@ -163,7 +204,7 @@ abstract class BaseRepository implements RepositoryInterface
     {
         $this->applyCriteria();
 
-        return $this->provider->find($id, $columns);
+        return $this->mapToDomainEntity($this->provider->find($id, $columns));
     }
 
     /**
@@ -173,7 +214,7 @@ abstract class BaseRepository implements RepositoryInterface
     {
         $this->applyCriteria();
 
-        return $this->provider->get($columns);
+        return $this->mapCollectionToDomainEntities($this->provider->get($columns));
     }
 
     /**
@@ -187,7 +228,9 @@ abstract class BaseRepository implements RepositoryInterface
         $page = $page ?: Paginator::resolveCurrentPage($pageName);
         $this->applyCriteria();
 
-        return $this->provider->paginate($perPage, $columns, $pageName, $page);
+        return $this->mapPaginatorToDomainEntities(
+            $this->provider->paginate($perPage, $columns, $pageName, $page)
+        );
     }
 
     /**

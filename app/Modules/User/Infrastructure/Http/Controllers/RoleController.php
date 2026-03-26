@@ -107,7 +107,7 @@ class RoleController extends Controller
         tags: ['Roles'],
         security: [['bearerAuth' => []]],
         responses: [
-            new OA\Response(response: 200, description: 'Role created',
+            new OA\Response(response: 201, description: 'Role created',
                 content: new OA\JsonContent(ref: '#/components/schemas/RoleObject')),
             new OA\Response(response: 401, description: 'Unauthenticated',
                 content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
@@ -117,12 +117,12 @@ class RoleController extends Controller
                 content: new OA\JsonContent(ref: '#/components/schemas/ValidationErrorResponse')),
         ],
     )]
-    public function store(StoreRoleRequest $request): RoleResource
+    public function store(StoreRoleRequest $request): \Illuminate\Http\JsonResponse
     {
         $this->authorize('create', Role::class);
         $role = $this->createService->execute($request->validated());
 
-        return new RoleResource($role);
+        return (new RoleResource($role))->response()->setStatusCode(201);
     }
 
     #[OA\Delete(

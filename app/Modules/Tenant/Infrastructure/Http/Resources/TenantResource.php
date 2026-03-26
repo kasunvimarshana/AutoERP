@@ -12,6 +12,7 @@ class TenantResource extends JsonResource
     public function toArray($request)
     {
         $storage = app(FileStorageServiceInterface::class);
+        // $resource = $this->resource;
 
         return [
             'id' => $this->getId(),
@@ -25,8 +26,8 @@ class TenantResource extends JsonResource
             'feature_flags' => $this->getFeatureFlags()->toArray(),
             'api_keys' => $this->getApiKeys()->toArray(),
             'active' => $this->isActive(),
-            'created_at' => $this->getCreatedAt()->format('c'),
-            'updated_at' => $this->getUpdatedAt()->format('c'),
+            'created_at' => $this->getCreatedAt()?->format('c'),
+            'updated_at' => $this->getUpdatedAt()?->format('c'),
         ];
     }
 }

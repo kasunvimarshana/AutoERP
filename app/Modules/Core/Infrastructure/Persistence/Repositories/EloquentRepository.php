@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Infrastructure\Persistence\Repositories;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 
 class EloquentRepository extends BaseRepository
 {
@@ -15,6 +16,32 @@ class EloquentRepository extends BaseRepository
         $this->model = $model;
         $this->provider = $model->newQuery();
     }
+
+    /**
+     * Convert a model to a Domain entity when a mapper is configured.
+     */
+    protected function toDomainEntity(Model $model): mixed
+    {
+        return $this->mapToDomainEntity($model);
+    }
+
+    /**
+     * Convert a model collection to Domain entities.
+     */
+    protected function toDomainCollection(Collection $models): Collection
+    {
+        return $models->map(fn (Model $model) => $this->toDomainEntity($model));
+    }
+
+    /**
+     * Retrieve a raw Eloquent model without applying Domain mapping.
+     */
+    protected function findModel($id, array $columns = ['*']): ?Model
+    {
+        return $this->model->newQuery()->find($id, $columns);
+    }
+
+
 
     /**
      * {@inheritdoc}
@@ -89,7 +116,7 @@ class EloquentRepository extends BaseRepository
      */
     public function update($id, array $data)
     {
-        $record = $this->find($id);
+        $record = $this->findModel($id);
         if ($record) {
             $record->update($data);
 
@@ -104,7 +131,7 @@ class EloquentRepository extends BaseRepository
      */
     public function delete($id): bool
     {
-        $record = $this->find($id);
+        $record = $this->findModel($id);
         if ($record) {
             return (bool) $record->delete();
         }

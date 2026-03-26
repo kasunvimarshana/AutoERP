@@ -104,7 +104,7 @@ class PermissionController extends Controller
         tags: ['Permissions'],
         security: [['bearerAuth' => []]],
         responses: [
-            new OA\Response(response: 200, description: 'Permission created',
+            new OA\Response(response: 201, description: 'Permission created',
                 content: new OA\JsonContent(ref: '#/components/schemas/PermissionObject')),
             new OA\Response(response: 401, description: 'Unauthenticated',
                 content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
@@ -114,12 +114,12 @@ class PermissionController extends Controller
                 content: new OA\JsonContent(ref: '#/components/schemas/ValidationErrorResponse')),
         ],
     )]
-    public function store(StorePermissionRequest $request): PermissionResource
+    public function store(StorePermissionRequest $request): \Illuminate\Http\JsonResponse
     {
         $this->authorize('create', Permission::class);
         $permission = $this->createService->execute($request->validated());
 
-        return new PermissionResource($permission);
+        return (new PermissionResource($permission))->response()->setStatusCode(201);
     }
 
     #[OA\Delete(

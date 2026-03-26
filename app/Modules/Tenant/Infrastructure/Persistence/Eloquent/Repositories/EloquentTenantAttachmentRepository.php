@@ -15,6 +15,7 @@ class EloquentTenantAttachmentRepository extends EloquentRepository implements T
     public function __construct(TenantAttachmentModel $model)
     {
         parent::__construct($model);
+        $this->setDomainEntityMapper(fn (TenantAttachmentModel $model): TenantAttachment => $this->mapModelToDomainEntity($model));
     }
 
     public function findByUuid(string $uuid): ?TenantAttachment
@@ -32,7 +33,7 @@ class EloquentTenantAttachmentRepository extends EloquentRepository implements T
         }
         $models = $query->get();
 
-        return $models->map(fn ($m) => $this->toDomainEntity($m));
+        return $this->toDomainCollection($models);
     }
 
     public function save(TenantAttachment $attachment): TenantAttachment
@@ -54,10 +55,12 @@ class EloquentTenantAttachmentRepository extends EloquentRepository implements T
             $model = $this->create($data);
         }
 
-        return $this->toDomainEntity($model);
+        /** @var TenantAttachmentModel $model */
+
+        return $this->mapModelToDomainEntity($model);
     }
 
-    private function toDomainEntity(TenantAttachmentModel $model): TenantAttachment
+    private function mapModelToDomainEntity(TenantAttachmentModel $model): TenantAttachment
     {
         return new TenantAttachment(
             tenantId: $model->tenant_id,

@@ -15,6 +15,7 @@ class EloquentPermissionRepository extends EloquentRepository implements Permiss
     public function __construct(PermissionModel $model)
     {
         parent::__construct($model);
+        $this->setDomainEntityMapper(fn (PermissionModel $model): Permission => $this->mapModelToDomainEntity($model));
     }
 
     public function findByName(int $tenantId, string $name): ?Permission
@@ -40,10 +41,12 @@ class EloquentPermissionRepository extends EloquentRepository implements Permiss
             ]);
         }
 
-        return $this->toDomainEntity($model);
+        /** @var PermissionModel $model */
+
+        return $this->mapModelToDomainEntity($model);
     }
 
-    private function toDomainEntity(PermissionModel $model): Permission
+    private function mapModelToDomainEntity(PermissionModel $model): Permission
     {
         return new Permission($model->tenant_id, $model->name, $model->id);
     }
@@ -55,10 +58,7 @@ class EloquentPermissionRepository extends EloquentRepository implements Permiss
      */
     public function find($id, array $columns = ['*']): ?Permission
     {
-        /** @var PermissionModel|null $model */
-        $model = $this->model->find($id);
-
-        return $model ? $this->toDomainEntity($model) : null;
+        return parent::find($id, $columns);
     }
 
     /**
@@ -68,8 +68,6 @@ class EloquentPermissionRepository extends EloquentRepository implements Permiss
      */
     public function paginate(?int $perPage = null, array $columns = ['*'], ?string $pageName = null, ?int $page = null): LengthAwarePaginator
     {
-        $paginator = parent::paginate($perPage, $columns, $pageName, $page);
-
-        return $paginator->through(fn (PermissionModel $model) => $this->toDomainEntity($model));
+        return parent::paginate($perPage, $columns, $pageName, $page);
     }
 }

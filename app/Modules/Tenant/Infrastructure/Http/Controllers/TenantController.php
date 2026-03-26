@@ -66,8 +66,13 @@ class TenantController extends BaseController
     {
         $this->authorize('viewAny', Tenant::class);
         $filters = $request->only(['name', 'domain', 'active']);
-        $perPage = $request->input('per_page', 15);
-        $page = $request->input('page', 1);
+
+        if ($request->has('active')) {
+            $filters['active'] = $request->boolean('active');
+        }
+
+        $perPage = $request->integer('per_page', 15);
+        $page = $request->integer('page', 1);
         $sort = $request->input('sort');
         $include = $request->input('include');
 
@@ -82,18 +87,36 @@ class TenantController extends BaseController
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ['name', 'domain'],
+                required: ['name', 'database_config'],
                 properties: [
-                    new OA\Property(property: 'name',   type: 'string',  example: 'Acme Corp'),
-                    new OA\Property(property: 'domain', type: 'string',  example: 'acme.example.com'),
-                    new OA\Property(property: 'active', type: 'boolean', default: true),
+                    new OA\Property(property: 'name',   type: 'string',  maxLength: 255, example: 'Acme Corp'),
+                    new OA\Property(property: 'domain', type: 'string',  nullable: true, example: 'acme.example.com'),
+                    new OA\Property(
+                        property: 'database_config',
+                        type: 'object',
+                        required: ['driver', 'host', 'port', 'database', 'username', 'password'],
+                        properties: [
+                            new OA\Property(property: 'driver',   type: 'string', enum: ['mysql', 'pgsql', 'sqlite'], example: 'mysql'),
+                            new OA\Property(property: 'host',     type: 'string', example: '127.0.0.1'),
+                            new OA\Property(property: 'port',     type: 'integer', example: 3306),
+                            new OA\Property(property: 'database', type: 'string', example: 'tenant_db'),
+                            new OA\Property(property: 'username', type: 'string', example: 'db_user'),
+                            new OA\Property(property: 'password', type: 'string', example: 'secret'),
+                        ],
+                    ),
+                    new OA\Property(property: 'mail_config',   type: 'object', nullable: true, example: ['host' => 'smtp.example.com']),
+                    new OA\Property(property: 'cache_config',  type: 'object', nullable: true, example: ['driver' => 'redis']),
+                    new OA\Property(property: 'queue_config',  type: 'object', nullable: true, example: ['driver' => 'database']),
+                    new OA\Property(property: 'feature_flags', type: 'object', nullable: true, example: ['billing' => true]),
+                    new OA\Property(property: 'api_keys',      type: 'object', nullable: true, example: []),
+                    new OA\Property(property: 'active',        type: 'boolean', default: true),
                 ],
             ),
         ),
         tags: ['Tenants'],
         security: [['bearerAuth' => []]],
         responses: [
-            new OA\Response(response: 200, description: 'Tenant created',
+            new OA\Response(response: 201, description: 'Tenant created',
                 content: new OA\JsonContent(ref: '#/components/schemas/TenantObject')),
             new OA\Response(response: 401, description: 'Unauthenticated',
                 content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
@@ -103,13 +126,13 @@ class TenantController extends BaseController
                 content: new OA\JsonContent(ref: '#/components/schemas/ValidationErrorResponse')),
         ],
     )]
-    public function store(StoreTenantRequest $request): TenantResource
+    public function store(StoreTenantRequest $request): \Illuminate\Http\JsonResponse
     {
         $this->authorize('create', Tenant::class);
         $dto = TenantData::fromArray($request->validated());
         $tenant = $this->service->execute($dto->toArray());
 
-        return new TenantResource($tenant);
+        return (new TenantResource($tenant))->response()->setStatusCode(201);
     }
 
     #[OA\Get(
@@ -208,7 +231,7 @@ class TenantController extends BaseController
         ],
         responses: [
             new OA\Response(response: 200, description: 'Updated tenant config',
-                content: new OA\JsonContent(ref: '#/components/schemas/TenantObject')),
+                content: new OA\JsonContent(ref: '#/components/schemas/TenantConfigObject')),
             new OA\Response(response: 401, description: 'Unauthenticated',
                 content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
             new OA\Response(response: 403, description: 'Forbidden',
@@ -273,7 +296,7 @@ class TenantController extends BaseController
         ],
         responses: [
             new OA\Response(response: 200, description: 'Tenant config',
-                content: new OA\JsonContent(ref: '#/components/schemas/TenantObject')),
+                content: new OA\JsonContent(ref: '#/components/schemas/TenantConfigObject')),
             new OA\Response(response: 404, description: 'Not found',
                 content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
         ],

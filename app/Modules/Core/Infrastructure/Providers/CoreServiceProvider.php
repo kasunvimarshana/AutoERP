@@ -7,6 +7,7 @@ namespace Modules\Core\Infrastructure\Providers;
 use Illuminate\Contracts\Broadcasting\Factory as BroadcastingFactory;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Route;
 use L5Swagger\Generator;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;

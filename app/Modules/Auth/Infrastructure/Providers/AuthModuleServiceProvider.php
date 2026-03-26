@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Auth\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Route;
 use Laravel\Passport\Passport;
 use Modules\Auth\Application\Contracts\AuthUserRepositoryInterface;
 use Modules\Auth\Application\Contracts\AuthenticationServiceInterface;
@@ -163,7 +164,13 @@ class AuthModuleServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
+        // $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
+        Route::middleware('api')
+             ->prefix('api')
+             ->group(function () {
+                 $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
+             });
+
         $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
 
         // Configure Passport token lifetime

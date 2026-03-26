@@ -66,8 +66,13 @@ class OrganizationUnitController extends BaseController
     {
         $this->authorize('viewAny', OrganizationUnit::class);
         $filters = $request->only(['name', 'code', 'parent_id']);
-        $perPage = $request->input('per_page', 15);
-        $page = $request->input('page', 1);
+
+        if ($request->has('parent_id')) {
+            $filters['parent_id'] = $request->integer('parent_id');
+        }
+
+        $perPage = $request->integer('per_page', 15);
+        $page = $request->integer('page', 1);
         $sort = $request->input('sort');
         $include = $request->input('include');
 
@@ -82,11 +87,11 @@ class OrganizationUnitController extends BaseController
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ['tenant_id', 'name', 'code'],
+                required: ['tenant_id', 'name'],
                 properties: [
                     new OA\Property(property: 'tenant_id',   type: 'integer', example: 1),
-                    new OA\Property(property: 'name',        type: 'string',  example: 'Engineering'),
-                    new OA\Property(property: 'code',        type: 'string',  example: 'ENG'),
+                    new OA\Property(property: 'name',        type: 'string',  maxLength: 255, example: 'Engineering'),
+                    new OA\Property(property: 'code',        type: 'string',  nullable: true, maxLength: 50, example: 'ENG'),
                     new OA\Property(property: 'description', type: 'string',  nullable: true),
                     new OA\Property(property: 'parent_id',   type: 'integer', nullable: true),
                     new OA\Property(property: 'metadata',    type: 'object',  nullable: true),
@@ -96,7 +101,7 @@ class OrganizationUnitController extends BaseController
         tags: ['Organization Units'],
         security: [['bearerAuth' => []]],
         responses: [
-            new OA\Response(response: 200, description: 'Organization unit created',
+            new OA\Response(response: 201, description: 'Organization unit created',
                 content: new OA\JsonContent(ref: '#/components/schemas/OrganizationUnitObject')),
             new OA\Response(response: 401, description: 'Unauthenticated',
                 content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
@@ -106,13 +111,13 @@ class OrganizationUnitController extends BaseController
                 content: new OA\JsonContent(ref: '#/components/schemas/ValidationErrorResponse')),
         ],
     )]
-    public function store(StoreOrganizationUnitRequest $request): OrganizationUnitResource
+    public function store(StoreOrganizationUnitRequest $request): \Illuminate\Http\JsonResponse
     {
         $this->authorize('create', OrganizationUnit::class);
         $dto = OrganizationUnitData::fromArray($request->validated());
         $unit = $this->service->execute($dto->toArray());
 
-        return new OrganizationUnitResource($unit);
+        return (new OrganizationUnitResource($unit))->response()->setStatusCode(201);
     }
 
     #[OA\Get(

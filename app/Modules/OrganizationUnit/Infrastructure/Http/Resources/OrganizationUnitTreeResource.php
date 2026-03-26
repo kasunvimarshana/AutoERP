@@ -10,6 +10,7 @@ class OrganizationUnitTreeResource extends JsonResource
 {
     public function toArray($request)
     {
+        // $resource = $this->resource;
         return $this->resource->map(fn ($unit) => [
             'id' => $unit->getId(),
             'name' => $unit->getName()->value(),

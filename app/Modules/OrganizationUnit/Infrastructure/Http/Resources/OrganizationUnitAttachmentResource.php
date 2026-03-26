@@ -11,6 +11,7 @@ class OrganizationUnitAttachmentResource extends JsonResource
 {
     public function toArray($request)
     {
+        // $resource = $this->resource;
         $storage = app(FileStorageServiceInterface::class);
 
         return [

@@ -30,6 +30,11 @@ abstract class BaseDto
      */
     protected array $casts = [];
 
+    public function __construct()
+    {
+        $this->initializeNullableProperties();
+    }
+
     /**
      * Create a new DTO instance from an array of data.
      */
@@ -39,6 +44,24 @@ abstract class BaseDto
         $dto->fill($data);
 
         return $dto;
+    }
+
+    protected function initializeNullableProperties(): void
+    {
+        $reflection = new \ReflectionClass($this);
+        $properties = $reflection->getProperties(\ReflectionProperty::IS_PUBLIC);
+
+        foreach ($properties as $property) {
+            if ($property->isInitialized($this)) {
+                continue;
+            }
+
+            $type = $property->getType();
+
+            if ($type !== null && $type->allowsNull()) {
+                $property->setValue($this, null);
+            }
+        }
     }
 
     /**
@@ -74,7 +97,12 @@ abstract class BaseDto
 
         foreach ($properties as $property) {
             $name = $property->getName();
-            $value = $this->$name;
+            // Skip uninitialized typed properties to avoid runtime errors.
+            if (! $property->isInitialized($this)) {
+                continue;
+            }
+
+            $value = $property->getValue($this);
 
             // Recursively convert nested DTOs
             if ($value instanceof self) {
@@ -147,7 +175,11 @@ abstract class BaseDto
     public function __get(string $name)
     {
         if (property_exists($this, $name)) {
-            return $this->$name;
+            $property = new \ReflectionProperty($this, $name);
+
+            return $property->isInitialized($this)
+                ? $property->getValue($this)
+                : null;
         }
 
         return null;

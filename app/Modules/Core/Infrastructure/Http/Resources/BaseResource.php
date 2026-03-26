@@ -10,6 +10,7 @@ class BaseResource extends JsonResource
 {
     public function toArray($request)
     {
+        // $resource = $this->resource;
         return parent::toArray($request);
     }
 

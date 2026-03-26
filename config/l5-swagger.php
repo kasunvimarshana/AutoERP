@@ -243,8 +243,9 @@ return [
         /*
          * Configs plugin allows to fetch external configs instead of passing them to SwaggerUIBundle.
          * See more at: https://github.com/swagger-api/swagger-ui#configs-plugin
+         * Set L5_SWAGGER_ADDITIONAL_CONFIG_URL in .env to provide an external config URL.
          */
-        'additional_config_url' => null,
+        'additional_config_url' => env('L5_SWAGGER_ADDITIONAL_CONFIG_URL', null),
 
         /*
          * Apply a sort to the operation list of each API. It can be 'alpha' (sort by paths alphanumerically),
@@ -256,8 +257,9 @@ return [
         /*
          * Pass the validatorUrl parameter to SwaggerUi init on the JS side.
          * A null value here disables validation.
+         * Set L5_SWAGGER_VALIDATOR_URL to a custom validator URL (e.g. https://validator.swagger.io/validator).
          */
-        'validator_url' => null,
+        'validator_url' => env('L5_SWAGGER_VALIDATOR_URL', null),
 
         /*
          * Swagger UI configuration parameters

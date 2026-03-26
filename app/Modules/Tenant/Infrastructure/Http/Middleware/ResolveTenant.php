@@ -37,12 +37,14 @@ class ResolveTenant
 
         // Fetch tenant configuration (cached)
         $config = $this->client->getConfig($tenantId);
-        if (! $config) {
-            throw new BadRequestHttpException('Invalid tenant ID.');
-        }
+        // if (! $config) {
+        //     throw new BadRequestHttpException('Invalid tenant ID.');
+        // }
 
-        // Apply configuration to Laravel
-        $this->manager->apply($config);
+        if ($config) {
+            // Apply configuration to Laravel
+            $this->manager->apply($config);
+        }
 
         // Bind tenant config to container for later access
         app()->instance('tenant.config', $config);

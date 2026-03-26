@@ -17,6 +17,7 @@ class AuthTokenResource extends JsonResource
 
     public function toArray($request): array
     {
+        // $resource = $this->resource;
         /** @var AccessToken $token */
         $token = $this->resource;
 

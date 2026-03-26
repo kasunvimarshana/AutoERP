@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Tenant\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Route;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Tenant\Application\Contracts\CreateTenantServiceInterface;
 use Modules\Tenant\Application\Contracts\DeleteTenantAttachmentServiceInterface;
@@ -65,7 +66,13 @@ class TenantServiceProvider extends ServiceProvider
 
     public function boot()
     {
-        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
+        // $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
+        Route::middleware('api')
+             ->prefix('api')
+             ->group(function () {
+                 $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
+             });
+
         $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
     }
 }

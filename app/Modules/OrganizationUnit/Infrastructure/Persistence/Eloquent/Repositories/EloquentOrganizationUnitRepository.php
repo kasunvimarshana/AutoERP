@@ -20,6 +20,7 @@ class EloquentOrganizationUnitRepository extends EloquentRepository implements O
     public function __construct(OrganizationUnitModel $model)
     {
         parent::__construct($model);
+        $this->setDomainEntityMapper(fn (OrganizationUnitModel $model): OrganizationUnit => $this->mapModelToDomainEntity($model));
     }
 
     /**
@@ -45,7 +46,11 @@ class EloquentOrganizationUnitRepository extends EloquentRepository implements O
             }
         });
 
-        return $this->toDomainEntity($savedModel);
+        if (! $savedModel instanceof OrganizationUnitModel) {
+            throw new \RuntimeException('Failed to save organization unit.');
+        }
+
+        return $this->mapModelToDomainEntity($savedModel);
     }
 
     /**
@@ -155,6 +160,7 @@ class EloquentOrganizationUnitRepository extends EloquentRepository implements O
     public function getTree(int $tenantId, ?int $rootId = null): array
     {
         if ($rootId) {
+            /** @var OrganizationUnitModel|null $root */
             $root = $this->model->where('tenant_id', $tenantId)->find($rootId);
             if (! $root) {
                 return [];
@@ -199,12 +205,13 @@ class EloquentOrganizationUnitRepository extends EloquentRepository implements O
      */
     public function getDescendants(int $id): array
     {
+        /** @var OrganizationUnitModel|null $node */
         $node = $this->model->find($id);
         if (! $node) {
             return [];
         }
 
-        return $node->getDescendants()->map(fn ($m) => $this->toDomainEntity($m))->all();
+        return $node->getDescendants()->map(fn ($m) => $this->mapModelToDomainEntity($m))->all();
     }
 
     /**
@@ -212,15 +219,16 @@ class EloquentOrganizationUnitRepository extends EloquentRepository implements O
      */
     public function getAncestors(int $id): array
     {
+        /** @var OrganizationUnitModel|null $node */
         $node = $this->model->find($id);
         if (! $node) {
             return [];
         }
 
-        return $node->getAncestors()->map(fn ($m) => $this->toDomainEntity($m))->all();
+        return $node->getAncestors()->map(fn ($m) => $this->mapModelToDomainEntity($m))->all();
     }
 
-    private function toDomainEntity(OrganizationUnitModel $model): OrganizationUnit
+    private function mapModelToDomainEntity(OrganizationUnitModel $model): OrganizationUnit
     {
         return new OrganizationUnit(
             tenantId: $model->tenant_id,

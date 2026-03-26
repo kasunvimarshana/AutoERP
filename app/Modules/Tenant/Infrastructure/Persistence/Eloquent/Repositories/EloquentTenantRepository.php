@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Repositories;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Modules\Core\Domain\ValueObjects\ApiKeys;
 use Modules\Core\Domain\ValueObjects\CacheConfig;
 use Modules\Core\Domain\ValueObjects\DatabaseConfig;
@@ -20,6 +21,7 @@ class EloquentTenantRepository extends EloquentRepository implements TenantRepos
     public function __construct(TenantModel $model)
     {
         parent::__construct($model);
+        $this->setDomainEntityMapper(fn (TenantModel $model): Tenant => $this->mapModelToDomainEntity($model));
     }
 
     public function findByDomain(string $domain): ?Tenant
@@ -50,20 +52,37 @@ class EloquentTenantRepository extends EloquentRepository implements TenantRepos
             $model = $this->create($data);
         }
 
-        return $this->toDomainEntity($model);
+        /** @var TenantModel $model */
+
+        return $this->mapModelToDomainEntity($model);
     }
 
     public function delete($id): bool
     {
-        $record = $this->model->find($id);
-        if ($record) {
-            return (bool) $record->delete();
-        }
-
-        return false;
+        return parent::delete($id);
     }
 
-    private function toDomainEntity(TenantModel $model): Tenant
+    /**
+     * Find a tenant by ID and convert to domain entity.
+     *
+     * {@inheritdoc}
+     */
+    public function find($id, array $columns = ['*']): ?Tenant
+    {
+        return parent::find($id, $columns);
+    }
+
+    /**
+     * Paginate tenants and convert each row to a domain entity.
+     *
+     * {@inheritdoc}
+     */
+    public function paginate(?int $perPage = null, array $columns = ['*'], ?string $pageName = null, ?int $page = null): LengthAwarePaginator
+    {
+        return parent::paginate($perPage, $columns, $pageName, $page);
+    }
+
+    private function mapModelToDomainEntity(TenantModel $model): Tenant
     {
         return new Tenant(
             name: $model->name,

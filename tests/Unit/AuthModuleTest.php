@@ -1012,4 +1012,54 @@ class AuthModuleTest extends TestCase
             'paginate() must be declared in EloquentUserRepository itself, not inherited.'
         );
     }
+
+    // -------------------------------------------------------------------------
+    // PassportSeeder: personal access client provisioning
+    // -------------------------------------------------------------------------
+
+    public function test_passport_seeder_class_exists(): void
+    {
+        $this->assertTrue(
+            class_exists(\Database\Seeders\PassportSeeder::class),
+            'PassportSeeder must exist to provision the Passport personal access client.'
+        );
+    }
+
+    public function test_passport_seeder_extends_seeder(): void
+    {
+        $this->assertTrue(
+            is_subclass_of(
+                \Database\Seeders\PassportSeeder::class,
+                \Illuminate\Database\Seeder::class
+            ),
+            'PassportSeeder must extend Illuminate\Database\Seeder.'
+        );
+    }
+
+    public function test_passport_seeder_run_accepts_client_repository(): void
+    {
+        $reflection = new \ReflectionClass(\Database\Seeders\PassportSeeder::class);
+        $method = $reflection->getMethod('run');
+
+        $params = $method->getParameters();
+        $this->assertCount(1, $params);
+        $this->assertSame(
+            \Laravel\Passport\ClientRepository::class,
+            $params[0]->getType()?->getName(),
+            'PassportSeeder::run() must accept ClientRepository for DI-based client creation.'
+        );
+    }
+
+    public function test_database_seeder_calls_passport_seeder(): void
+    {
+        $reflection = new \ReflectionClass(\Database\Seeders\DatabaseSeeder::class);
+        $method = $reflection->getMethod('run');
+        $source = file_get_contents($reflection->getFileName());
+
+        $this->assertStringContainsString(
+            'PassportSeeder::class',
+            $source,
+            'DatabaseSeeder must call PassportSeeder to provision the personal access client on db:seed.'
+        );
+    }
 }

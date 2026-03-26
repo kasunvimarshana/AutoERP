@@ -15,6 +15,7 @@ class EloquentOrganizationUnitAttachmentRepository extends EloquentRepository im
     public function __construct(OrganizationUnitAttachmentModel $model)
     {
         parent::__construct($model);
+        $this->setDomainEntityMapper(fn (OrganizationUnitAttachmentModel $model): OrganizationUnitAttachment => $this->mapModelToDomainEntity($model));
     }
 
     public function findByUuid(string $uuid): ?OrganizationUnitAttachment
@@ -32,7 +33,7 @@ class EloquentOrganizationUnitAttachmentRepository extends EloquentRepository im
         }
         $models = $query->get();
 
-        return $models->map(fn ($m) => $this->toDomainEntity($m));
+        return $this->toDomainCollection($models);
     }
 
     public function save(OrganizationUnitAttachment $attachment): OrganizationUnitAttachment
@@ -55,10 +56,12 @@ class EloquentOrganizationUnitAttachmentRepository extends EloquentRepository im
             $model = $this->create($data);
         }
 
-        return $this->toDomainEntity($model);
+        /** @var OrganizationUnitAttachmentModel $model */
+
+        return $this->mapModelToDomainEntity($model);
     }
 
-    private function toDomainEntity(OrganizationUnitAttachmentModel $model): OrganizationUnitAttachment
+    private function mapModelToDomainEntity(OrganizationUnitAttachmentModel $model): OrganizationUnitAttachment
     {
         return new OrganizationUnitAttachment(
             tenantId: $model->tenant_id,

@@ -26,10 +26,10 @@ class CollectionRepository extends BaseRepository
         $this->applyCriteria();
         $item = $this->provider->firstWhere('id', $id);
         if ($item && $columns !== ['*']) {
-            return collect($item)->only($columns)->all();
+            return $this->mapToDomainEntity(collect($item)->only($columns)->all());
         }
 
-        return $item;
+        return $this->mapToDomainEntity($item);
     }
 
     /**
@@ -39,10 +39,12 @@ class CollectionRepository extends BaseRepository
     {
         $this->applyCriteria();
         if ($columns === ['*']) {
-            return $this->provider;
+            return $this->mapCollectionToDomainEntities($this->provider);
         }
 
-        return $this->provider->map(fn ($item) => collect($item)->only($columns)->all());
+        return $this->mapCollectionToDomainEntities(
+            $this->provider->map(fn ($item) => collect($item)->only($columns)->all())
+        );
     }
 
     /**
@@ -61,13 +63,15 @@ class CollectionRepository extends BaseRepository
             $items = $items->map(fn ($item) => collect($item)->only($columns)->all());
         }
 
-        return new LengthAwarePaginator(
+        $paginator = new LengthAwarePaginator(
             $items,
             $total,
             $perPage,
             $page,
             ['path' => Paginator::resolveCurrentPath(), 'pageName' => $pageName]
         );
+
+        return $this->mapPaginatorToDomainEntities($paginator);
     }
 
     /**

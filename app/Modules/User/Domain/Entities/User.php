@@ -120,6 +120,16 @@ class User
         return $this->roles;
     }
 
+    public function getCreatedAt(): \DateTimeInterface
+    {
+        return $this->createdAt;
+    }
+
+    public function getUpdatedAt(): \DateTimeInterface
+    {
+        return $this->updatedAt;
+    }
+
     // Domain behaviour
     public function assignRole(Role $role): void
     {

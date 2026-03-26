@@ -10,6 +10,7 @@ class UserAttachmentResource extends JsonResource
 {
     public function toArray($request)
     {
+        // $resource = $this->resource;
         return [
             'id' => $this->getId(),
             'uuid' => $this->getUuid(),

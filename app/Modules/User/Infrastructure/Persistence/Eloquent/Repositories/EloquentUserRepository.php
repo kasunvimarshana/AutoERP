@@ -21,6 +21,7 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
     public function __construct(UserModel $model)
     {
         parent::__construct($model);
+        $this->setDomainEntityMapper(fn (UserModel $model): User => $this->mapModelToDomainEntity($model));
     }
 
     public function findByEmail(int $tenantId, string $email): ?User
@@ -51,6 +52,8 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
             $model = $this->create($data);
         }
 
+        /** @var UserModel $model */
+
         // Sync roles
         if ($user->getRoles()->isNotEmpty()) {
             $roleIds = $user->getRoles()->pluck('id')->toArray();
@@ -64,6 +67,7 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
 
     public function syncRoles(User $user, array $roleIds): void
     {
+        /** @var UserModel|null $model */
         $model = $this->model->find($user->getId());
         if ($model) {
             $model->roles()->sync($roleIds);
@@ -77,10 +81,9 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
      */
     public function find($id, array $columns = ['*']): ?User
     {
-        /** @var UserModel|null $model */
-        $model = $this->model->with('roles.permissions')->find($id);
+        $this->with(['roles.permissions']);
 
-        return $model ? $this->toDomainEntity($model) : null;
+        return parent::find($id, $columns);
     }
 
     /**
@@ -91,12 +94,11 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
     public function paginate(?int $perPage = null, array $columns = ['*'], ?string $pageName = null, ?int $page = null): LengthAwarePaginator
     {
         $this->with(['roles.permissions']);
-        $paginator = parent::paginate($perPage, $columns, $pageName, $page);
 
-        return $paginator->through(fn (UserModel $model) => $this->toDomainEntity($model));
+        return parent::paginate($perPage, $columns, $pageName, $page);
     }
 
-    private function toDomainEntity(UserModel $model): User
+    private function mapModelToDomainEntity(UserModel $model): User
     {
         $phone = $model->phone ? new PhoneNumber($model->phone) : null;
         $address = $model->address ? Address::fromArray($model->address) : null;

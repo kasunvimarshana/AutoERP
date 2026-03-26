@@ -17,14 +17,41 @@ use OpenApi\Attributes as OA;
 // ── Info ──────────────────────────────────────────────────────────────────────
 #[OA\Info(
     version: '1.0.0',
-    description: 'KVAutoERP – a modular, multi-tenant ERP REST API built on Laravel 12 with Passport OAuth2 authentication.',
+    description: <<<'DESC'
+KVAutoERP – a modular, multi-tenant ERP REST API built on Laravel 12 with Passport OAuth2 authentication.
+
+## Versioning Strategy
+This API uses **semantic versioning** (semver). The current stable release is `1.0.0`.
+
+- **Minor/patch releases** (e.g. `1.0.x`, `1.x.0`) are backward-compatible and do not break existing
+  integrations. New fields, optional parameters, and additional endpoints may be added.
+- **Major releases** (e.g. `2.0.0`) introduce breaking changes. When a new major version is published,
+  a new URL path prefix (e.g. `/api/v2/`) will be introduced so that both versions remain accessible
+  simultaneously during the migration window. The old version will be deprecated first and removed
+  after the announced sunset date.
+- **Deprecation notices** are communicated via an `X-API-Deprecated` response header and
+  documented in the changelog.
+
+## Authentication
+All protected endpoints require a Bearer token issued by `POST /api/auth/login` or
+`POST /api/auth/register`. Pass it in the `Authorization: Bearer <token>` request header.
+Use the **Authorize** button above to set your token once and apply it to all secured endpoints.
+
+## Cross-Origin Resource Sharing (CORS)
+The API is CORS-enabled. Allowed origins, methods, and headers are configured via environment
+variables (`CORS_ALLOWED_ORIGINS`, `CORS_ALLOWED_METHODS`, `CORS_ALLOWED_HEADERS`). See the
+`.env.example` file for all available CORS settings.
+DESC,
     title: 'KVAutoERP API',
     contact: new OA\Contact(name: 'KVAutoERP Support', email: 'support@kvautoerp.local'),
     license: new OA\License(name: 'MIT', url: 'https://opensource.org/licenses/MIT'),
 )]
 
 // ── Server ────────────────────────────────────────────────────────────────────
-#[OA\Server(url: 'http://localhost', description: 'API Server')]
+// L5_SWAGGER_CONST_HOST is defined by l5-swagger before scanning (see config/l5-swagger.php
+// → defaults.constants). It reads the L5_SWAGGER_CONST_HOST env variable and falls back to
+// APP_URL, so the generated spec always reflects the correct environment-specific base URL.
+#[OA\Server(url: L5_SWAGGER_CONST_HOST, description: 'API Server')]
 
 // ── Security Scheme ───────────────────────────────────────────────────────────
 #[OA\SecurityScheme(
@@ -36,6 +63,7 @@ use OpenApi\Attributes as OA;
 )]
 
 // ── Tags ─────────────────────────────────────────────────────────────────────
+#[OA\Tag(name: 'Health',             description: 'Application health check – liveness and readiness probes')]
 #[OA\Tag(name: 'Auth',               description: 'Authentication – register, login, logout, token refresh, SSO, and password reset')]
 #[OA\Tag(name: 'Users',              description: 'User management – CRUD, role assignment, preference updates')]
 #[OA\Tag(name: 'Roles',              description: 'Role management – create, list, view, delete, sync permissions')]
@@ -133,9 +161,9 @@ use OpenApi\Attributes as OA;
     schema: 'UserPreferencesObject',
     type: 'object',
     properties: [
-        new OA\Property(property: 'locale',   type: 'string', nullable: true, example: 'en'),
-        new OA\Property(property: 'timezone', type: 'string', nullable: true, example: 'UTC'),
-        new OA\Property(property: 'theme',    type: 'string', nullable: true, example: 'light'),
+        new OA\Property(property: 'language',      type: 'string', nullable: true, example: 'en', enum: ['en', 'es', 'fr', 'de']),
+        new OA\Property(property: 'timezone',      type: 'string', nullable: true, example: 'UTC'),
+        new OA\Property(property: 'notifications', type: 'array',  nullable: true, items: new OA\Items(type: 'string'), example: []),
     ],
 )]
 #[OA\Schema(
@@ -222,6 +250,24 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'api_keys',        type: 'object',  example: []),
         new OA\Property(property: 'active',          type: 'boolean', example: true),
         new OA\Property(property: 'created_at',      type: 'string',  format: 'date-time'),
+        new OA\Property(property: 'updated_at',      type: 'string',  format: 'date-time'),
+    ],
+)]
+
+// ── Tenant Config Schemas ─────────────────────────────────────────────────────
+#[OA\Schema(
+    schema: 'TenantConfigObject',
+    type: 'object',
+    required: ['id', 'database_config', 'feature_flags', 'api_keys', 'active', 'updated_at'],
+    properties: [
+        new OA\Property(property: 'id',              type: 'integer', example: 1),
+        new OA\Property(property: 'database_config', ref: '#/components/schemas/DatabaseConfigObject'),
+        new OA\Property(property: 'mail_config',     type: 'object',  nullable: true, example: ['host' => 'smtp.example.com']),
+        new OA\Property(property: 'cache_config',    type: 'object',  nullable: true, example: ['driver' => 'redis']),
+        new OA\Property(property: 'queue_config',    type: 'object',  nullable: true, example: ['driver' => 'database']),
+        new OA\Property(property: 'feature_flags',   type: 'object',  example: ['billing' => true, 'reports' => false]),
+        new OA\Property(property: 'api_keys',        type: 'object',  example: []),
+        new OA\Property(property: 'active',          type: 'boolean', example: true),
         new OA\Property(property: 'updated_at',      type: 'string',  format: 'date-time'),
     ],
 )]
