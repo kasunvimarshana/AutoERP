@@ -6,7 +6,7 @@ namespace Modules\User\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Controller;
+use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\User\Application\Contracts\CreatePermissionServiceInterface;
 use Modules\User\Application\Contracts\DeletePermissionServiceInterface;
 use Modules\User\Domain\Entities\Permission;
@@ -15,7 +15,7 @@ use Modules\User\Infrastructure\Http\Requests\StorePermissionRequest;
 use Modules\User\Infrastructure\Http\Resources\PermissionResource;
 use OpenApi\Attributes as OA;
 
-class PermissionController extends Controller
+class PermissionController extends AuthorizedController
 {
     public function __construct(
         protected CreatePermissionServiceInterface $createService,

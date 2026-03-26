@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Auth\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Routing\Controller;
+use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Auth\Application\Contracts\SsoServiceInterface;
 use Modules\Auth\Application\UseCases\ForgotPassword;
 use Modules\Auth\Application\UseCases\GetAuthenticatedUser;
@@ -26,7 +26,7 @@ use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 use Modules\User\Infrastructure\Http\Resources\UserResource;
 use OpenApi\Attributes as OA;
 
-class AuthController extends Controller
+class AuthController extends AuthorizedController
 {
     public function __construct(
         private readonly LoginUser $loginUser,

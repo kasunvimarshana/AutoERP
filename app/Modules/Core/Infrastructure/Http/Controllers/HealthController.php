@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace Modules\Core\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Routing\Controller;
 use OpenApi\Attributes as OA;
 
 /**
  * Health-check endpoint for liveness / readiness probes.
  */
-class HealthController extends Controller
+class HealthController extends AuthorizedController
 {
     /**
      * Return a simple liveness/readiness response.

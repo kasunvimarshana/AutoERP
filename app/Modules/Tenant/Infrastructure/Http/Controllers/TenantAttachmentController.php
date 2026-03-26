@@ -6,8 +6,8 @@ namespace Modules\Tenant\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Controller;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
+use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Tenant\Application\Contracts\DeleteTenantAttachmentServiceInterface;
 use Modules\Tenant\Application\Contracts\UploadTenantAttachmentServiceInterface;
 use Modules\Tenant\Domain\Entities\Tenant;
@@ -16,7 +16,7 @@ use Modules\Tenant\Infrastructure\Http\Requests\UploadTenantAttachmentRequest;
 use Modules\Tenant\Infrastructure\Http\Resources\TenantAttachmentResource;
 use OpenApi\Attributes as OA;
 
-class TenantAttachmentController extends Controller
+class TenantAttachmentController extends AuthorizedController
 {
     public function __construct(
         protected UploadTenantAttachmentServiceInterface $uploadService,

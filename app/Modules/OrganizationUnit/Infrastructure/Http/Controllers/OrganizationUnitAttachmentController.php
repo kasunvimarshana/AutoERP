@@ -6,8 +6,8 @@ namespace Modules\OrganizationUnit\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Controller;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
+use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitAttachmentServiceInterface;
 use Modules\OrganizationUnit\Application\Contracts\UploadOrganizationUnitAttachmentServiceInterface;
 use Modules\OrganizationUnit\Domain\Entities\OrganizationUnit;
@@ -16,7 +16,7 @@ use Modules\OrganizationUnit\Infrastructure\Http\Requests\UploadOrganizationUnit
 use Modules\OrganizationUnit\Infrastructure\Http\Resources\OrganizationUnitAttachmentResource;
 use OpenApi\Attributes as OA;
 
-class OrganizationUnitAttachmentController extends Controller
+class OrganizationUnitAttachmentController extends AuthorizedController
 {
     public function __construct(
         protected UploadOrganizationUnitAttachmentServiceInterface $uploadService,

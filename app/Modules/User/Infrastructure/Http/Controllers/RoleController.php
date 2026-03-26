@@ -6,7 +6,7 @@ namespace Modules\User\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Controller;
+use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\User\Application\Contracts\CreateRoleServiceInterface;
 use Modules\User\Application\Contracts\DeleteRoleServiceInterface;
 use Modules\User\Application\Contracts\SyncRolePermissionsServiceInterface;
@@ -17,7 +17,7 @@ use Modules\User\Infrastructure\Http\Requests\SyncRolePermissionsRequest;
 use Modules\User\Infrastructure\Http\Resources\RoleResource;
 use OpenApi\Attributes as OA;
 
-class RoleController extends Controller
+class RoleController extends AuthorizedController
 {
     public function __construct(
         protected CreateRoleServiceInterface $createService,
