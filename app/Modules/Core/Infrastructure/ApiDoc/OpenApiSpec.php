@@ -79,6 +79,7 @@ DESC,
 #[OA\Tag(name: 'Brand Logo',         description: 'Brand logo management – upload, delete, serve')]
 #[OA\Tag(name: 'Categories',         description: 'Category management – CRUD with hierarchical nesting, flexible attributes, and optional image handling')]
 #[OA\Tag(name: 'Category Images',    description: 'Category image management – upload, delete, serve')]
+#[OA\Tag(name: 'Accounts',           description: 'Account management – Chart of Accounts CRUD with hierarchical structure and flexible attributes')]
 
 // ── Reusable Error Schemas ────────────────────────────────────────────────────
 #[OA\Schema(
@@ -421,6 +422,31 @@ DESC,
         new OA\Property(property: 'metadata',    type: 'object',  nullable: true),
         new OA\Property(property: 'image',       ref: '#/components/schemas/CategoryImageObject', nullable: true),
         new OA\Property(property: 'children',    type: 'array',   items: new OA\Items(ref: '#/components/schemas/CategoryObject'), nullable: true),
+        new OA\Property(property: 'created_at',  type: 'string',  format: 'date-time'),
+        new OA\Property(property: 'updated_at',  type: 'string',  format: 'date-time'),
+    ],
+)]
+
+// ── Account Schemas ───────────────────────────────────────────────────────────
+#[OA\Schema(
+    schema: 'AccountObject',
+    type: 'object',
+    required: ['id', 'tenant_id', 'code', 'name', 'type', 'currency', 'balance', 'status'],
+    properties: [
+        new OA\Property(property: 'id',          type: 'integer', example: 1),
+        new OA\Property(property: 'tenant_id',   type: 'integer', example: 1),
+        new OA\Property(property: 'code',        type: 'string',  example: '1000'),
+        new OA\Property(property: 'name',        type: 'string',  example: 'Cash'),
+        new OA\Property(property: 'type',        type: 'string',  enum: ['asset', 'liability', 'equity', 'income', 'expense'], example: 'asset'),
+        new OA\Property(property: 'subtype',     type: 'string',  nullable: true, example: 'current_asset'),
+        new OA\Property(property: 'description', type: 'string',  nullable: true, example: 'Cash on hand and in bank'),
+        new OA\Property(property: 'currency',    type: 'string',  example: 'USD'),
+        new OA\Property(property: 'balance',     type: 'number',  format: 'float', example: 0.00),
+        new OA\Property(property: 'is_system',   type: 'boolean', example: false),
+        new OA\Property(property: 'parent_id',   type: 'integer', nullable: true, example: null),
+        new OA\Property(property: 'status',      type: 'string',  enum: ['active', 'inactive'], example: 'active'),
+        new OA\Property(property: 'attributes',  type: 'object',  nullable: true),
+        new OA\Property(property: 'metadata',    type: 'object',  nullable: true),
         new OA\Property(property: 'created_at',  type: 'string',  format: 'date-time'),
         new OA\Property(property: 'updated_at',  type: 'string',  format: 'date-time'),
     ],

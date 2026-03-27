@@ -140,6 +140,7 @@ class SwaggerApiDocTest extends TestCase
             'Brand Logo',
             'Categories',
             'Category Images',
+            'Accounts',
         ];
 
         foreach ($expectedTags as $tag) {
@@ -184,6 +185,7 @@ class SwaggerApiDocTest extends TestCase
             'BrandObject',
             'CategoryImageObject',
             'CategoryObject',
+            'AccountObject',
         ];
 
         foreach ($expectedSchemas as $schema) {
@@ -359,6 +361,20 @@ class SwaggerApiDocTest extends TestCase
         ]);
     }
 
+    /**
+     * Verify AccountController methods are annotated with OA operations.
+     */
+    public function test_account_controller_methods_have_oa_annotations(): void
+    {
+        $this->assertControllerMethodsHaveOaAnnotations(\Modules\Account\Infrastructure\Http\Controllers\AccountController::class, [
+            'index',
+            'store',
+            'show',
+            'update',
+            'destroy',
+        ]);
+    }
+
     // ── OA\Info attribute values ───────────────────────────────────────────────
 
     /**
@@ -458,6 +474,7 @@ class SwaggerApiDocTest extends TestCase
             'ProductController::store'          => [\Modules\Product\Infrastructure\Http\Controllers\ProductController::class, 'store'],
             'BrandController::store'            => [\Modules\Brand\Infrastructure\Http\Controllers\BrandController::class, 'store'],
             'CategoryController::store'         => [\Modules\Category\Infrastructure\Http\Controllers\CategoryController::class, 'store'],
+            'AccountController::store'          => [\Modules\Account\Infrastructure\Http\Controllers\AccountController::class, 'store'],
         ];
     }
 
