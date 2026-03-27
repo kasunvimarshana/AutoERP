@@ -136,6 +136,8 @@ class SwaggerApiDocTest extends TestCase
             'OrgUnit Attachments',
             'Products',
             'Product Images',
+            'Brands',
+            'Brand Logo',
         ];
 
         foreach ($expectedTags as $tag) {
@@ -176,6 +178,8 @@ class SwaggerApiDocTest extends TestCase
             'MoneyObject',
             'ProductImageObject',
             'ProductObject',
+            'BrandLogoObject',
+            'BrandObject',
         ];
 
         foreach ($expectedSchemas as $schema) {
