@@ -14,6 +14,12 @@ use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitService
 use Modules\OrganizationUnit\Application\Contracts\MoveOrganizationUnitServiceInterface;
 use Modules\OrganizationUnit\Application\Contracts\UpdateOrganizationUnitServiceInterface;
 use Modules\OrganizationUnit\Application\Contracts\UploadOrganizationUnitAttachmentServiceInterface;
+// Product service interfaces
+use Modules\Product\Application\Contracts\CreateProductServiceInterface;
+use Modules\Product\Application\Contracts\DeleteProductImageServiceInterface;
+use Modules\Product\Application\Contracts\DeleteProductServiceInterface;
+use Modules\Product\Application\Contracts\UpdateProductServiceInterface;
+use Modules\Product\Application\Contracts\UploadProductImageServiceInterface;
 use Modules\Tenant\Application\Contracts\CreateTenantServiceInterface;
 use Modules\Tenant\Application\Contracts\DeleteTenantAttachmentServiceInterface;
 use Modules\Tenant\Application\Contracts\DeleteTenantServiceInterface;
@@ -79,6 +85,18 @@ class ServiceContractsTest extends TestCase
         $this->assertTrue(interface_exists(MoveOrganizationUnitServiceInterface::class));
         $this->assertTrue(interface_exists(UploadOrganizationUnitAttachmentServiceInterface::class));
         $this->assertTrue(interface_exists(DeleteOrganizationUnitAttachmentServiceInterface::class));
+    }
+
+    /**
+     * Verify all Product service interface contracts exist.
+     */
+    public function test_all_product_service_interfaces_exist(): void
+    {
+        $this->assertTrue(interface_exists(CreateProductServiceInterface::class));
+        $this->assertTrue(interface_exists(UpdateProductServiceInterface::class));
+        $this->assertTrue(interface_exists(DeleteProductServiceInterface::class));
+        $this->assertTrue(interface_exists(UploadProductImageServiceInterface::class));
+        $this->assertTrue(interface_exists(DeleteProductImageServiceInterface::class));
     }
 
     /**
@@ -198,3 +216,5 @@ class ServiceContractsTest extends TestCase
             'ResolveTenant must inject TenantConfigManagerInterface, not a concrete class.');
     }
 }
+
+

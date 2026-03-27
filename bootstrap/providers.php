@@ -4,6 +4,7 @@ use App\Providers\AppServiceProvider;
 use Modules\Auth\Infrastructure\Providers\AuthModuleServiceProvider;
 use Modules\Core\Infrastructure\Providers\CoreServiceProvider;
 use Modules\OrganizationUnit\Infrastructure\Providers\OrganizationUnitServiceProvider;
+use Modules\Product\Infrastructure\Providers\ProductServiceProvider;
 use Modules\Tenant\Infrastructure\Providers\TenantConfigServiceProvider;
 use Modules\Tenant\Infrastructure\Providers\TenantServiceProvider;
 use Modules\User\Infrastructure\Providers\UserServiceProvider;
@@ -16,4 +17,5 @@ return [
     UserServiceProvider::class,
     OrganizationUnitServiceProvider::class,
     AuthModuleServiceProvider::class,
+    ProductServiceProvider::class,
 ];

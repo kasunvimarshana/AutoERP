@@ -73,6 +73,8 @@ DESC,
 #[OA\Tag(name: 'Tenant Attachments', description: 'Tenant file attachments – upload, list, delete, serve')]
 #[OA\Tag(name: 'Organization Units', description: 'Hierarchical organizational unit management – CRUD, tree view, move')]
 #[OA\Tag(name: 'OrgUnit Attachments',description: 'Organization-unit file attachments – upload, list, delete, serve')]
+#[OA\Tag(name: 'Products',           description: 'Product management – CRUD with flexible attributes and optional image handling')]
+#[OA\Tag(name: 'Product Images',     description: 'Product image management – upload, list, delete, serve')]
 
 // ── Reusable Error Schemas ────────────────────────────────────────────────────
 #[OA\Schema(
@@ -286,6 +288,56 @@ DESC,
         new OA\Property(property: 'metadata',    type: 'object',  example: []),
         new OA\Property(property: 'parent_id',   type: 'integer', nullable: true),
         new OA\Property(property: 'children',    type: 'array',   items: new OA\Items(ref: '#/components/schemas/OrganizationUnitObject')),
+        new OA\Property(property: 'created_at',  type: 'string',  format: 'date-time'),
+        new OA\Property(property: 'updated_at',  type: 'string',  format: 'date-time'),
+    ],
+)]
+
+// ── Product Schemas ───────────────────────────────────────────────────────────
+#[OA\Schema(
+    schema: 'MoneyObject',
+    type: 'object',
+    required: ['amount', 'currency'],
+    properties: [
+        new OA\Property(property: 'amount',   type: 'number',  format: 'float', example: 29.99),
+        new OA\Property(property: 'currency', type: 'string',  example: 'USD'),
+    ],
+)]
+#[OA\Schema(
+    schema: 'ProductImageObject',
+    type: 'object',
+    required: ['id', 'uuid', 'product_id', 'name', 'mime_type', 'size'],
+    properties: [
+        new OA\Property(property: 'id',         type: 'integer', example: 1),
+        new OA\Property(property: 'uuid',       type: 'string',  format: 'uuid', example: '550e8400-e29b-41d4-a716-446655440000'),
+        new OA\Property(property: 'product_id', type: 'integer', example: 1),
+        new OA\Property(property: 'name',       type: 'string',  example: 'product-front.jpg'),
+        new OA\Property(property: 'file_path',  type: 'string',  example: 'products/1/product-front.jpg'),
+        new OA\Property(property: 'mime_type',  type: 'string',  example: 'image/jpeg'),
+        new OA\Property(property: 'size',       type: 'integer', example: 204800),
+        new OA\Property(property: 'sort_order', type: 'integer', example: 0),
+        new OA\Property(property: 'is_primary', type: 'boolean', example: true),
+        new OA\Property(property: 'metadata',   type: 'object',  nullable: true),
+        new OA\Property(property: 'created_at', type: 'string',  format: 'date-time'),
+        new OA\Property(property: 'updated_at', type: 'string',  format: 'date-time'),
+    ],
+)]
+#[OA\Schema(
+    schema: 'ProductObject',
+    type: 'object',
+    required: ['id', 'tenant_id', 'sku', 'name', 'price', 'status'],
+    properties: [
+        new OA\Property(property: 'id',          type: 'integer', example: 1),
+        new OA\Property(property: 'tenant_id',   type: 'integer', example: 1),
+        new OA\Property(property: 'sku',         type: 'string',  example: 'PROD-001'),
+        new OA\Property(property: 'name',        type: 'string',  example: 'Widget Pro'),
+        new OA\Property(property: 'description', type: 'string',  nullable: true, example: 'A high quality widget'),
+        new OA\Property(property: 'price',       ref: '#/components/schemas/MoneyObject'),
+        new OA\Property(property: 'category',    type: 'string',  nullable: true, example: 'Widgets'),
+        new OA\Property(property: 'status',      type: 'string',  enum: ['active', 'inactive', 'draft'], example: 'active'),
+        new OA\Property(property: 'attributes',  type: 'object',  nullable: true, example: ['color' => 'red', 'weight' => '0.5kg']),
+        new OA\Property(property: 'metadata',    type: 'object',  nullable: true),
+        new OA\Property(property: 'images',      type: 'array',   items: new OA\Items(ref: '#/components/schemas/ProductImageObject')),
         new OA\Property(property: 'created_at',  type: 'string',  format: 'date-time'),
         new OA\Property(property: 'updated_at',  type: 'string',  format: 'date-time'),
     ],

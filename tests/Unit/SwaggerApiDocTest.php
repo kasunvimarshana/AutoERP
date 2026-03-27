@@ -134,6 +134,8 @@ class SwaggerApiDocTest extends TestCase
             'Tenant Attachments',
             'Organization Units',
             'OrgUnit Attachments',
+            'Products',
+            'Product Images',
         ];
 
         foreach ($expectedTags as $tag) {
@@ -171,6 +173,9 @@ class SwaggerApiDocTest extends TestCase
             'TenantObject',
             'TenantConfigObject',
             'OrganizationUnitObject',
+            'MoneyObject',
+            'ProductImageObject',
+            'ProductObject',
         ];
 
         foreach ($expectedSchemas as $schema) {
@@ -319,6 +324,33 @@ class SwaggerApiDocTest extends TestCase
         ]);
     }
 
+    /**
+     * Verify ProductController methods are annotated with OA operations.
+     */
+    public function test_product_controller_methods_have_oa_annotations(): void
+    {
+        $this->assertControllerMethodsHaveOaAnnotations(\Modules\Product\Infrastructure\Http\Controllers\ProductController::class, [
+            'index',
+            'store',
+            'show',
+            'update',
+            'destroy',
+        ]);
+    }
+
+    /**
+     * Verify ProductImageController methods are annotated with OA operations.
+     */
+    public function test_product_image_controller_methods_have_oa_annotations(): void
+    {
+        $this->assertControllerMethodsHaveOaAnnotations(\Modules\Product\Infrastructure\Http\Controllers\ProductImageController::class, [
+            'index',
+            'store',
+            'destroy',
+            'serve',
+        ]);
+    }
+
     // ── OA\Info attribute values ───────────────────────────────────────────────
 
     /**
@@ -415,6 +447,7 @@ class SwaggerApiDocTest extends TestCase
             'OrganizationUnitController::store' => [OrganizationUnitController::class, 'store'],
             'RoleController::store'             => [RoleController::class,             'store'],
             'PermissionController::store'       => [PermissionController::class,       'store'],
+            'ProductController::store'          => [\Modules\Product\Infrastructure\Http\Controllers\ProductController::class, 'store'],
         ];
     }
 
