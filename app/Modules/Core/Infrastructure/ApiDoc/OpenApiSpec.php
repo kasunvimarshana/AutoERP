@@ -77,6 +77,8 @@ DESC,
 #[OA\Tag(name: 'Product Images',     description: 'Product image management – upload, list, delete, serve')]
 #[OA\Tag(name: 'Brands',             description: 'Brand management – CRUD with flexible attributes and optional logo handling')]
 #[OA\Tag(name: 'Brand Logo',         description: 'Brand logo management – upload, delete, serve')]
+#[OA\Tag(name: 'Categories',         description: 'Category management – CRUD with hierarchical nesting, flexible attributes, and optional image handling')]
+#[OA\Tag(name: 'Category Images',    description: 'Category image management – upload, delete, serve')]
 
 // ── Reusable Error Schemas ────────────────────────────────────────────────────
 #[OA\Schema(
@@ -378,6 +380,47 @@ DESC,
         new OA\Property(property: 'attributes',  type: 'object',  nullable: true, example: ['country' => 'US']),
         new OA\Property(property: 'metadata',    type: 'object',  nullable: true),
         new OA\Property(property: 'logo',        ref: '#/components/schemas/BrandLogoObject', nullable: true),
+        new OA\Property(property: 'created_at',  type: 'string',  format: 'date-time'),
+        new OA\Property(property: 'updated_at',  type: 'string',  format: 'date-time'),
+    ],
+)]
+
+// ── Category Schemas ──────────────────────────────────────────────────────────
+#[OA\Schema(
+    schema: 'CategoryImageObject',
+    type: 'object',
+    required: ['id', 'uuid', 'category_id', 'name', 'mime_type', 'size'],
+    properties: [
+        new OA\Property(property: 'id',          type: 'integer', example: 1),
+        new OA\Property(property: 'uuid',        type: 'string',  format: 'uuid', example: '550e8400-e29b-41d4-a716-446655440000'),
+        new OA\Property(property: 'category_id', type: 'integer', example: 1),
+        new OA\Property(property: 'name',        type: 'string',  example: 'electronics.png'),
+        new OA\Property(property: 'file_path',   type: 'string',  example: 'categories/1/electronics.png'),
+        new OA\Property(property: 'mime_type',   type: 'string',  example: 'image/png'),
+        new OA\Property(property: 'size',        type: 'integer', example: 102400),
+        new OA\Property(property: 'metadata',    type: 'object',  nullable: true),
+        new OA\Property(property: 'created_at',  type: 'string',  format: 'date-time'),
+        new OA\Property(property: 'updated_at',  type: 'string',  format: 'date-time'),
+    ],
+)]
+#[OA\Schema(
+    schema: 'CategoryObject',
+    type: 'object',
+    required: ['id', 'tenant_id', 'name', 'slug', 'status'],
+    properties: [
+        new OA\Property(property: 'id',          type: 'integer', example: 1),
+        new OA\Property(property: 'tenant_id',   type: 'integer', example: 1),
+        new OA\Property(property: 'name',        type: 'string',  example: 'Electronics'),
+        new OA\Property(property: 'slug',        type: 'string',  example: 'electronics'),
+        new OA\Property(property: 'description', type: 'string',  nullable: true, example: 'Electronic products'),
+        new OA\Property(property: 'parent_id',   type: 'integer', nullable: true, example: null),
+        new OA\Property(property: 'depth',       type: 'integer', example: 0),
+        new OA\Property(property: 'path',        type: 'string',  example: 'electronics'),
+        new OA\Property(property: 'status',      type: 'string',  enum: ['active', 'inactive', 'draft'], example: 'active'),
+        new OA\Property(property: 'attributes',  type: 'object',  nullable: true),
+        new OA\Property(property: 'metadata',    type: 'object',  nullable: true),
+        new OA\Property(property: 'image',       ref: '#/components/schemas/CategoryImageObject', nullable: true),
+        new OA\Property(property: 'children',    type: 'array',   items: new OA\Items(ref: '#/components/schemas/CategoryObject'), nullable: true),
         new OA\Property(property: 'created_at',  type: 'string',  format: 'date-time'),
         new OA\Property(property: 'updated_at',  type: 'string',  format: 'date-time'),
     ],

@@ -138,6 +138,8 @@ class SwaggerApiDocTest extends TestCase
             'Product Images',
             'Brands',
             'Brand Logo',
+            'Categories',
+            'Category Images',
         ];
 
         foreach ($expectedTags as $tag) {
@@ -180,6 +182,8 @@ class SwaggerApiDocTest extends TestCase
             'ProductObject',
             'BrandLogoObject',
             'BrandObject',
+            'CategoryImageObject',
+            'CategoryObject',
         ];
 
         foreach ($expectedSchemas as $schema) {
@@ -452,6 +456,8 @@ class SwaggerApiDocTest extends TestCase
             'RoleController::store'             => [RoleController::class,             'store'],
             'PermissionController::store'       => [PermissionController::class,       'store'],
             'ProductController::store'          => [\Modules\Product\Infrastructure\Http\Controllers\ProductController::class, 'store'],
+            'BrandController::store'            => [\Modules\Brand\Infrastructure\Http\Controllers\BrandController::class, 'store'],
+            'CategoryController::store'         => [\Modules\Category\Infrastructure\Http\Controllers\CategoryController::class, 'store'],
         ];
     }
 

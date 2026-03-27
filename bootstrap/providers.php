@@ -3,6 +3,7 @@
 use App\Providers\AppServiceProvider;
 use Modules\Auth\Infrastructure\Providers\AuthModuleServiceProvider;
 use Modules\Brand\Infrastructure\Providers\BrandServiceProvider;
+use Modules\Category\Infrastructure\Providers\CategoryServiceProvider;
 use Modules\Core\Infrastructure\Providers\CoreServiceProvider;
 use Modules\OrganizationUnit\Infrastructure\Providers\OrganizationUnitServiceProvider;
 use Modules\Product\Infrastructure\Providers\ProductServiceProvider;
@@ -20,4 +21,5 @@ return [
     AuthModuleServiceProvider::class,
     ProductServiceProvider::class,
     BrandServiceProvider::class,
+    CategoryServiceProvider::class,
 ];
