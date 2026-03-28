@@ -80,6 +80,7 @@ DESC,
 #[OA\Tag(name: 'Categories',         description: 'Category management – CRUD with hierarchical nesting, flexible attributes, and optional image handling')]
 #[OA\Tag(name: 'Category Images',    description: 'Category image management – upload, delete, serve')]
 #[OA\Tag(name: 'Accounts',           description: 'Account management – Chart of Accounts CRUD with hierarchical structure and flexible attributes')]
+#[OA\Tag(name: 'Suppliers',          description: 'Supplier management – CRUD with optional user login access, flexible attributes and multi-tenant support')]
 
 // ── Reusable Error Schemas ────────────────────────────────────────────────────
 #[OA\Schema(
@@ -449,6 +450,63 @@ DESC,
         new OA\Property(property: 'metadata',    type: 'object',  nullable: true),
         new OA\Property(property: 'created_at',  type: 'string',  format: 'date-time'),
         new OA\Property(property: 'updated_at',  type: 'string',  format: 'date-time'),
+    ],
+)]
+
+// ── Supplier Schemas ──────────────────────────────────────────────────────────
+#[OA\Schema(
+    schema: 'SupplierObject',
+    type: 'object',
+    properties: [
+        new OA\Property(property: 'id',             type: 'integer', example: 1),
+        new OA\Property(property: 'tenant_id',      type: 'integer', example: 1),
+        new OA\Property(property: 'user_id',        type: 'integer', nullable: true, example: null),
+        new OA\Property(property: 'name',           type: 'string',  example: 'Acme Supplies Ltd'),
+        new OA\Property(property: 'code',           type: 'string',  example: 'SUP-001'),
+        new OA\Property(property: 'email',          type: 'string',  nullable: true, example: 'contact@acme.example.com'),
+        new OA\Property(property: 'phone',          type: 'string',  nullable: true, example: '+1-555-0100'),
+        new OA\Property(property: 'address',        type: 'object',  nullable: true),
+        new OA\Property(property: 'contact_person', type: 'object',  nullable: true),
+        new OA\Property(property: 'payment_terms',  type: 'string',  nullable: true, example: 'net30'),
+        new OA\Property(property: 'currency',       type: 'string',  example: 'USD'),
+        new OA\Property(property: 'tax_number',     type: 'string',  nullable: true, example: 'TAX-123456'),
+        new OA\Property(property: 'status',         type: 'string',  example: 'active'),
+        new OA\Property(property: 'type',           type: 'string',  example: 'manufacturer'),
+        new OA\Property(property: 'attributes',     type: 'object',  nullable: true),
+        new OA\Property(property: 'metadata',       type: 'object',  nullable: true),
+        new OA\Property(property: 'has_user_access',type: 'boolean', example: false),
+        new OA\Property(property: 'created_at',     type: 'string',  format: 'date-time'),
+        new OA\Property(property: 'updated_at',     type: 'string',  format: 'date-time'),
+    ],
+)]
+
+// ── Customer Schemas ──────────────────────────────────────────────────────────
+#[OA\Schema(
+    schema: 'CustomerObject',
+    type: 'object',
+    properties: [
+        new OA\Property(property: 'id',               type: 'integer', example: 1),
+        new OA\Property(property: 'tenant_id',        type: 'integer', example: 1),
+        new OA\Property(property: 'user_id',          type: 'integer', nullable: true, example: null),
+        new OA\Property(property: 'name',             type: 'string',  example: 'Jane Smith'),
+        new OA\Property(property: 'code',             type: 'string',  example: 'CUST-001'),
+        new OA\Property(property: 'email',            type: 'string',  nullable: true, example: 'jane@example.com'),
+        new OA\Property(property: 'phone',            type: 'string',  nullable: true, example: '+1-555-0100'),
+        new OA\Property(property: 'billing_address',  type: 'object',  nullable: true),
+        new OA\Property(property: 'shipping_address', type: 'object',  nullable: true),
+        new OA\Property(property: 'date_of_birth',    type: 'string',  nullable: true, example: '1990-01-15'),
+        new OA\Property(property: 'loyalty_tier',     type: 'string',  nullable: true, example: 'gold'),
+        new OA\Property(property: 'credit_limit',     type: 'number',  nullable: true, example: 5000.00),
+        new OA\Property(property: 'payment_terms',    type: 'string',  nullable: true, example: 'net30'),
+        new OA\Property(property: 'currency',         type: 'string',  example: 'USD'),
+        new OA\Property(property: 'tax_number',       type: 'string',  nullable: true, example: 'TAX-123456'),
+        new OA\Property(property: 'status',           type: 'string',  example: 'active'),
+        new OA\Property(property: 'type',             type: 'string',  example: 'retail'),
+        new OA\Property(property: 'attributes',       type: 'object',  nullable: true),
+        new OA\Property(property: 'metadata',         type: 'object',  nullable: true),
+        new OA\Property(property: 'has_user_access',  type: 'boolean', example: false),
+        new OA\Property(property: 'created_at',       type: 'string',  format: 'date-time'),
+        new OA\Property(property: 'updated_at',       type: 'string',  format: 'date-time'),
     ],
 )]
 
