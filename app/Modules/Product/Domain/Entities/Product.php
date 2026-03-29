@@ -303,4 +303,9 @@ class Product
     {
         return $this->status === 'active';
     }
+
+    public function isDraft(): bool
+    {
+        return $this->status === 'draft';
+    }
 }

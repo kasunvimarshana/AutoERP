@@ -37,6 +37,26 @@ class StoreProductRequest extends FormRequest
             'product_attributes.*.name'            => 'required_with:product_attributes|string|max:100',
             'product_attributes.*.allowed_values'  => 'nullable|array',
             'product_attributes.*.allowed_values.*' => 'string|max:100',
+            // Optional image uploads (multipart/form-data).
+            // Strict validation: JPEG, PNG, GIF, and WebP only; 10 MB max per file.
+            'images'                               => 'nullable|array|max:20',
+            'images.*'                             => 'file|image|max:10240|mimes:jpeg,png,gif,webp',
+            'primary_image'                        => 'nullable|integer|min:0',
         ];
+    }
+
+    public function withValidator(\Illuminate\Contracts\Validation\Validator $validator): void
+    {
+        $validator->after(function (\Illuminate\Contracts\Validation\Validator $v): void {
+            $images       = $this->file('images') ?? [];
+            $primaryIndex = $this->input('primary_image');
+
+            if ($primaryIndex !== null && count($images) > 0 && (int) $primaryIndex >= count($images)) {
+                $v->errors()->add(
+                    'primary_image',
+                    'The primary_image index must be less than the number of uploaded images ('.count($images).').'
+                );
+            }
+        });
     }
 }

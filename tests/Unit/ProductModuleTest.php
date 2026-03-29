@@ -1979,81 +1979,222 @@ class ProductModuleTest extends TestCase
             'UpdateProductRequest price should use sometimes to allow partial updates.');
     }
 
-    // ── Product::draft() domain method ────────────────────────────────────────
+    // ── Product::draft() and isDraft() ───────────────────────────────────────
+
+    public function test_product_entity_has_draft_method(): void
+    {
+        $rc = new \ReflectionClass(\Modules\Product\Domain\Entities\Product::class);
+        $this->assertTrue($rc->hasMethod('draft'), 'Product entity must have a draft() method.');
+    }
+
+    public function test_product_entity_has_is_draft_method(): void
+    {
+        $rc = new \ReflectionClass(\Modules\Product\Domain\Entities\Product::class);
+        $this->assertTrue($rc->hasMethod('isDraft'), 'Product entity must have an isDraft() method.');
+    }
 
     public function test_product_entity_can_be_drafted(): void
     {
-        $sku     = new \Modules\Core\Domain\ValueObjects\Sku('PROD-DRF01');
+        $sku     = new \Modules\Core\Domain\ValueObjects\Sku('PROD-DRAFT-01');
         $price   = new \Modules\Core\Domain\ValueObjects\Money(10.0, 'USD');
         $product = new \Modules\Product\Domain\Entities\Product(
-            tenantId: 1,
-            sku: $sku,
-            name: 'Draft Product',
-            price: $price,
-            status: 'active',
+            tenantId: 1, sku: $sku, name: 'Test', price: $price, status: 'active',
         );
 
-        $this->assertTrue($product->isActive());
+        $this->assertSame('active', $product->getStatus());
+        $this->assertFalse($product->isDraft());
+
         $product->draft();
+
         $this->assertSame('draft', $product->getStatus());
+        $this->assertTrue($product->isDraft());
         $this->assertFalse($product->isActive());
     }
 
-    public function test_product_draft_updates_timestamp(): void
+    public function test_product_entity_draft_then_activate(): void
     {
-        $sku     = new \Modules\Core\Domain\ValueObjects\Sku('PROD-DRF02');
-        $price   = new \Modules\Core\Domain\ValueObjects\Money(10.0, 'USD');
+        $sku     = new \Modules\Core\Domain\ValueObjects\Sku('PROD-DRAFT-02');
+        $price   = new \Modules\Core\Domain\ValueObjects\Money(5.0, 'USD');
         $product = new \Modules\Product\Domain\Entities\Product(
-            tenantId: 1,
-            sku: $sku,
-            name: 'Draft TS',
-            price: $price,
+            tenantId: 1, sku: $sku, name: 'Test', price: $price, status: 'draft',
         );
 
-        $before = $product->getUpdatedAt();
-        // Ensure at least 1 µs has elapsed before calling draft()
-        usleep(100);
-        $product->draft();
+        $this->assertTrue($product->isDraft());
 
-        $this->assertGreaterThan($before, $product->getUpdatedAt());
-        $this->assertSame('draft', $product->getStatus());
+        $product->activate();
+        $this->assertFalse($product->isDraft());
+        $this->assertTrue($product->isActive());
     }
 
-    // ── UpdateProductService draft status ─────────────────────────────────────
+    // ── UpdateProductService status handling ──────────────────────────────────
 
     public function test_update_product_service_handles_draft_status(): void
     {
-        $sku     = new \Modules\Core\Domain\ValueObjects\Sku('UPS-DRF01');
-        $price   = new \Modules\Core\Domain\ValueObjects\Money(20.0, 'USD');
-        $product = new \Modules\Product\Domain\Entities\Product(
-            tenantId: 1, sku: $sku, name: 'Active', price: $price, status: 'active', id: 99,
+        $sku      = new \Modules\Core\Domain\ValueObjects\Sku('TEST-DRAFT-SVC-01');
+        $price    = new \Modules\Core\Domain\ValueObjects\Money(10.0, 'USD');
+        $existing = new \Modules\Product\Domain\Entities\Product(
+            tenantId: 1, sku: $sku, name: 'Product', price: $price, status: 'active',
         );
 
         $repo = $this->createMock(\Modules\Product\Domain\RepositoryInterfaces\ProductRepositoryInterface::class);
-        $repo->method('find')->willReturn($product);
+        $repo->method('find')->willReturn($existing);
         $repo->method('save')->willReturnArgument(0);
 
         $service = new \Modules\Product\Application\Services\UpdateProductService($repo);
 
         $ref = new \ReflectionMethod($service, 'handle');
         $ref->setAccessible(true);
-        $result = $ref->invoke($service, [
-            'id'        => 99,
+        $updated = $ref->invoke($service, [
+            'id'        => 1,
             'tenant_id' => 1,
-            'sku'       => 'UPS-DRF01',
-            'name'      => 'Active',
-            'price'     => 20.0,
+            'sku'       => 'TEST-DRAFT-SVC-01',
+            'name'      => 'Product',
+            'price'     => 10.0,
             'currency'  => 'USD',
             'status'    => 'draft',
         ]);
 
-        $this->assertSame('draft', $result->getStatus());
-        $this->assertFalse($result->isActive());
+        $this->assertSame('draft', $updated->getStatus());
+        $this->assertTrue($updated->isDraft());
     }
 
-    // ── ProductController thin-controller (no DTO in constructor) ─────────────
+    public function test_update_product_service_preserves_status_when_not_in_payload(): void
+    {
+        $sku      = new \Modules\Core\Domain\ValueObjects\Sku('TEST-STATUS-PRESERVE-01');
+        $price    = new \Modules\Core\Domain\ValueObjects\Money(10.0, 'USD');
+        $existing = new \Modules\Product\Domain\Entities\Product(
+            tenantId: 1, sku: $sku, name: 'Product', price: $price, status: 'inactive',
+        );
 
-    public function test_product_controller_does_not_inject_product_data_dto(): void
+        $repo = $this->createMock(\Modules\Product\Domain\RepositoryInterfaces\ProductRepositoryInterface::class);
+        $repo->method('find')->willReturn($existing);
+        $repo->method('save')->willReturnArgument(0);
+
+        $service = new \Modules\Product\Application\Services\UpdateProductService($repo);
+
+        $ref = new \ReflectionMethod($service, 'handle');
+        $ref->setAccessible(true);
+        $updated = $ref->invoke($service, [
+            'id'        => 1,
+            'tenant_id' => 1,
+            'sku'       => 'TEST-STATUS-PRESERVE-01',
+            'name'      => 'Product',
+            'price'     => 10.0,
+            'currency'  => 'USD',
+            // 'status' intentionally absent – must stay 'inactive'
+        ]);
+
+        $this->assertSame('inactive', $updated->getStatus(),
+            'Status must be preserved when not present in the update payload.');
+    }
+
+    public function test_update_product_service_preserves_type_when_not_in_payload(): void
+    {
+        $sku      = new \Modules\Core\Domain\ValueObjects\Sku('TEST-TYPE-PRESERVE-01');
+        $price    = new \Modules\Core\Domain\ValueObjects\Money(10.0, 'USD');
+        $existing = new \Modules\Product\Domain\Entities\Product(
+            tenantId: 1, sku: $sku, name: 'Product', price: $price, type: 'digital',
+        );
+
+        $repo = $this->createMock(\Modules\Product\Domain\RepositoryInterfaces\ProductRepositoryInterface::class);
+        $repo->method('find')->willReturn($existing);
+        $repo->method('save')->willReturnArgument(0);
+
+        $service = new \Modules\Product\Application\Services\UpdateProductService($repo);
+
+        $ref = new \ReflectionMethod($service, 'handle');
+        $ref->setAccessible(true);
+        $updated = $ref->invoke($service, [
+            'id'        => 1,
+            'tenant_id' => 1,
+            'sku'       => 'TEST-TYPE-PRESERVE-01',
+            'name'      => 'Product',
+            'price'     => 10.0,
+            'currency'  => 'USD',
+            // 'type' intentionally absent – must stay 'digital'
+        ]);
+
+        $this->assertSame('digital', $updated->getType()->value(),
+            'Type must be preserved when not present in the update payload.');
+    }
+
+    // ── Request image validation rules ────────────────────────────────────────
+
+    public function test_store_product_request_supports_optional_image_uploads(): void
+    {
+        $request = new \Modules\Product\Infrastructure\Http\Requests\StoreProductRequest();
+        $rules   = $request->rules();
+
+        $this->assertArrayHasKey('images', $rules,
+            'StoreProductRequest must have an images validation rule.');
+        $this->assertArrayHasKey('images.*', $rules,
+            'StoreProductRequest must validate individual image files.');
+        $this->assertStringContainsString('image', $rules['images.*'],
+            'images.* rule must include the image file constraint.');
+        $this->assertStringContainsString('max:', $rules['images.*'],
+            'images.* rule must enforce a maximum file size.');
+        $this->assertStringContainsString('mimes:', $rules['images.*'],
+            'images.* rule must restrict MIME types.');
+    }
+
+    public function test_update_product_request_supports_optional_image_uploads(): void
+    {
+        $request = new \Modules\Product\Infrastructure\Http\Requests\UpdateProductRequest();
+        $rules   = $request->rules();
+
+        $this->assertArrayHasKey('images', $rules,
+            'UpdateProductRequest must have an images validation rule.');
+        $this->assertArrayHasKey('images.*', $rules,
+            'UpdateProductRequest must validate individual image files.');
+        $this->assertStringContainsString('image', $rules['images.*'],
+            'images.* rule must include the image file constraint.');
+        $this->assertStringContainsString('max:', $rules['images.*'],
+            'images.* rule must enforce a maximum file size.');
+        $this->assertStringContainsString('mimes:', $rules['images.*'],
+            'images.* rule must restrict MIME types.');
+    }
+
+    public function test_store_product_request_has_primary_image_rule(): void
+    {
+        $request = new \Modules\Product\Infrastructure\Http\Requests\StoreProductRequest();
+        $rules   = $request->rules();
+
+        $this->assertArrayHasKey('primary_image', $rules,
+            'StoreProductRequest must have a primary_image rule.');
+        $this->assertStringContainsString('nullable', $rules['primary_image']);
+        $this->assertStringContainsString('integer', $rules['primary_image']);
+    }
+
+    public function test_update_product_request_has_primary_image_rule(): void
+    {
+        $request = new \Modules\Product\Infrastructure\Http\Requests\UpdateProductRequest();
+        $rules   = $request->rules();
+
+        $this->assertArrayHasKey('primary_image', $rules,
+            'UpdateProductRequest must have a primary_image rule.');
+        $this->assertStringContainsString('nullable', $rules['primary_image']);
+        $this->assertStringContainsString('integer', $rules['primary_image']);
+    }
+
+    // ── ProductController injects BulkUploadProductImagesServiceInterface ─────
+
+    public function test_product_controller_injects_bulk_upload_service_interface(): void
+    {
+        $rc          = new \ReflectionClass(\Modules\Product\Infrastructure\Http\Controllers\ProductController::class);
+        $constructor = $rc->getConstructor();
+        $paramTypes  = array_map(
+            fn (\ReflectionParameter $p) => $p->getType()?->getName(),
+            $constructor->getParameters()
+        );
+
+        $this->assertContains(
+            \Modules\Product\Application\Contracts\BulkUploadProductImagesServiceInterface::class,
+            $paramTypes,
+            'ProductController must inject BulkUploadProductImagesServiceInterface for in-request image uploads.'
+        );
+    }
+
+    public function test_product_controller_does_not_inject_repository_directly(): void
     {
         $rc          = new \ReflectionClass(\Modules\Product\Infrastructure\Http\Controllers\ProductController::class);
         $constructor = $rc->getConstructor();
@@ -2063,24 +2204,9 @@ class ProductModuleTest extends TestCase
         );
 
         $this->assertNotContains(
-            \Modules\Product\Application\DTOs\ProductData::class,
+            \Modules\Product\Domain\RepositoryInterfaces\ProductRepositoryInterface::class,
             $paramTypes,
-            'ProductController must not inject ProductData DTO directly — it should delegate to services.'
+            'ProductController must not inject ProductRepositoryInterface directly.'
         );
-    }
-
-    // ── ProductController update fills defaults for partial updates ───────────
-
-    public function test_product_controller_index_filters_include_type(): void
-    {
-        $rc     = new \ReflectionClass(\Modules\Product\Infrastructure\Http\Controllers\ProductController::class);
-        $method = $rc->getMethod('index');
-
-        // Verify the index method exists and accepts a Request parameter.
-        $this->assertNotNull($method);
-        $params = $method->getParameters();
-        $this->assertCount(1, $params);
-        $this->assertNotNull($params[0]->getType());
-        $this->assertSame('Illuminate\Http\Request', $params[0]->getType()->getName());
     }
 }

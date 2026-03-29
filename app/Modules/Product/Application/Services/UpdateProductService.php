@@ -7,7 +7,6 @@ namespace Modules\Product\Application\Services;
 use Modules\Core\Application\Services\BaseService;
 use Modules\Core\Domain\ValueObjects\Money;
 use Modules\Product\Application\Contracts\UpdateProductServiceInterface;
-use Modules\Product\Application\DTOs\ProductData;
 use Modules\Product\Domain\Entities\Product;
 use Modules\Product\Domain\Events\ProductUpdated;
 use Modules\Product\Domain\Exceptions\ProductNotFoundException;
@@ -24,52 +23,61 @@ class UpdateProductService extends BaseService implements UpdateProductServiceIn
 
     protected function handle(array $data): Product
     {
-        $id = $data['id'];
+        $id = (int) $data['id'];
         $product = $this->productRepository->find($id);
 
         if (! $product) {
             throw new ProductNotFoundException($id);
         }
 
-        $dto   = ProductData::fromArray($data);
-        $price = new Money($dto->price, $dto->currency ?? 'USD');
+        $price = new Money(
+            (float) $data['price'],
+            (string) ($data['currency'] ?? 'USD')
+        );
 
+        // Only replace units of measure when the key is explicitly present in the payload.
         $unitsOfMeasure = null;
-        if (isset($dto->units_of_measure)) {
-            $unitsOfMeasure = [];
-            foreach ($dto->units_of_measure as $uomData) {
-                $unitsOfMeasure[] = UnitOfMeasure::fromArray($uomData);
-            }
+        if (array_key_exists('units_of_measure', $data) && is_array($data['units_of_measure'])) {
+            $unitsOfMeasure = array_map(
+                fn (array $uom) => UnitOfMeasure::fromArray($uom),
+                $data['units_of_measure']
+            );
         }
 
+        // Only replace product attributes when the key is explicitly present in the payload.
         $productAttributes = null;
-        if (isset($dto->product_attributes)) {
-            $productAttributes = [];
-            foreach ($dto->product_attributes as $attrData) {
-                $productAttributes[] = ProductAttribute::fromArray($attrData);
-            }
+        if (array_key_exists('product_attributes', $data) && is_array($data['product_attributes'])) {
+            $productAttributes = array_map(
+                fn (array $attr) => ProductAttribute::fromArray($attr),
+                $data['product_attributes']
+            );
         }
 
         $product->updateDetails(
-            name: $dto->name,
+            name: (string) $data['name'],
             price: $price,
-            description: $dto->description,
-            category: $dto->category,
-            attributes: $dto->attributes,
-            metadata: $dto->metadata,
-            type: $dto->type ?? null,
+            description: isset($data['description']) ? (string) $data['description'] : null,
+            category: isset($data['category']) ? (string) $data['category'] : null,
+            attributes: (isset($data['attributes']) && is_array($data['attributes']))
+                ? $data['attributes']
+                : null,
+            metadata: (isset($data['metadata']) && is_array($data['metadata']))
+                ? $data['metadata']
+                : null,
+            type: array_key_exists('type', $data) ? (string) $data['type'] : null,
             unitsOfMeasure: $unitsOfMeasure,
             productAttributes: $productAttributes,
         );
 
-        if (isset($dto->status)) {
-            if ($dto->status === 'active') {
-                $product->activate();
-            } elseif ($dto->status === 'inactive') {
-                $product->deactivate();
-            } elseif ($dto->status === 'draft') {
-                $product->draft();
-            }
+        // Only mutate status when it was explicitly provided in the input payload.
+        // Using array_key_exists avoids applying ProductData constructor defaults.
+        if (array_key_exists('status', $data)) {
+            match ((string) $data['status']) {
+                'active'   => $product->activate(),
+                'inactive' => $product->deactivate(),
+                'draft'    => $product->draft(),
+                default    => null,
+            };
         }
 
         $saved = $this->productRepository->save($product);
