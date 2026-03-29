@@ -11,7 +11,6 @@ use Modules\Product\Application\Contracts\CreateProductServiceInterface;
 use Modules\Product\Application\Contracts\DeleteProductServiceInterface;
 use Modules\Product\Application\Contracts\FindProductServiceInterface;
 use Modules\Product\Application\Contracts\UpdateProductServiceInterface;
-use Modules\Product\Application\DTOs\ProductData;
 use Modules\Product\Domain\Entities\Product;
 use Modules\Product\Infrastructure\Http\Requests\StoreProductRequest;
 use Modules\Product\Infrastructure\Http\Requests\UpdateProductRequest;
@@ -38,6 +37,7 @@ class ProductController extends AuthorizedController
             new OA\Parameter(name: 'sku',       in: 'query', required: false, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'category',  in: 'query', required: false, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'status',    in: 'query', required: false, schema: new OA\Schema(type: 'string', enum: ['active', 'inactive', 'draft'])),
+            new OA\Parameter(name: 'type',      in: 'query', required: false, schema: new OA\Schema(type: 'string', enum: ['physical', 'service', 'digital', 'combo', 'variable'])),
             new OA\Parameter(name: 'per_page',  in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 15)),
             new OA\Parameter(name: 'page',      in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 1)),
             new OA\Parameter(name: 'sort',      in: 'query', required: false, schema: new OA\Schema(type: 'string', example: 'name:asc')),
@@ -58,7 +58,7 @@ class ProductController extends AuthorizedController
     public function index(Request $request): ProductCollection
     {
         $this->authorize('viewAny', Product::class);
-        $filters = $request->only(['name', 'sku', 'category', 'status']);
+        $filters = $request->only(['name', 'sku', 'category', 'status', 'type']);
         $perPage = $request->integer('per_page', 15);
         $page = $request->integer('page', 1);
         $sort = $request->input('sort');
@@ -131,8 +131,7 @@ class ProductController extends AuthorizedController
     public function store(StoreProductRequest $request): JsonResponse
     {
         $this->authorize('create', Product::class);
-        $dto = ProductData::fromArray($request->validated());
-        $product = $this->createService->execute($dto->toArray());
+        $product = $this->createService->execute($request->validated());
 
         return (new ProductResource($product))->response()->setStatusCode(201);
     }
@@ -173,7 +172,6 @@ class ProductController extends AuthorizedController
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ['name', 'price'],
                 properties: [
                     new OA\Property(property: 'name',        type: 'string',  maxLength: 255),
                     new OA\Property(property: 'description', type: 'string',  nullable: true),
@@ -237,12 +235,21 @@ class ProductController extends AuthorizedController
             abort(404);
         }
         $this->authorize('update', $product);
-        $validated = $request->validated();
-        $validated['id'] = $id;
-        $validated['tenant_id'] = $product->getTenantId();
-        $validated['sku'] = $product->getSku()->value();
-        $dto = ProductData::fromArray($validated);
-        $updated = $this->updateService->execute($dto->toArray());
+
+        $data = $request->validated();
+
+        // Merge in identity fields from the resolved entity.
+        $data['id']        = $id;
+        $data['tenant_id'] = $product->getTenantId();
+        $data['sku']       = $product->getSku()->value();
+
+        // Fill defaults from the existing product for partial updates so that
+        // the service DTO's non-nullable typed properties are always initialised.
+        $data['name']     ??= $product->getName();
+        $data['price']    ??= $product->getPrice()->getAmount();
+        $data['currency'] ??= $product->getPrice()->getCurrency();
+
+        $updated = $this->updateService->execute($data);
 
         return new ProductResource($updated);
     }

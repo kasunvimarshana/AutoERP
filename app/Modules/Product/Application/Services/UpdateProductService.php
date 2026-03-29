@@ -67,6 +67,8 @@ class UpdateProductService extends BaseService implements UpdateProductServiceIn
                 $product->activate();
             } elseif ($dto->status === 'inactive') {
                 $product->deactivate();
+            } elseif ($dto->status === 'draft') {
+                $product->draft();
             }
         }
 

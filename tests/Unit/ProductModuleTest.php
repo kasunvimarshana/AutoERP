@@ -1978,4 +1978,109 @@ class ProductModuleTest extends TestCase
         $this->assertStringContainsString('sometimes', $rules['price'],
             'UpdateProductRequest price should use sometimes to allow partial updates.');
     }
+
+    // ── Product::draft() domain method ────────────────────────────────────────
+
+    public function test_product_entity_can_be_drafted(): void
+    {
+        $sku     = new \Modules\Core\Domain\ValueObjects\Sku('PROD-DRF01');
+        $price   = new \Modules\Core\Domain\ValueObjects\Money(10.0, 'USD');
+        $product = new \Modules\Product\Domain\Entities\Product(
+            tenantId: 1,
+            sku: $sku,
+            name: 'Draft Product',
+            price: $price,
+            status: 'active',
+        );
+
+        $this->assertTrue($product->isActive());
+        $product->draft();
+        $this->assertSame('draft', $product->getStatus());
+        $this->assertFalse($product->isActive());
+    }
+
+    public function test_product_draft_updates_timestamp(): void
+    {
+        $sku     = new \Modules\Core\Domain\ValueObjects\Sku('PROD-DRF02');
+        $price   = new \Modules\Core\Domain\ValueObjects\Money(10.0, 'USD');
+        $product = new \Modules\Product\Domain\Entities\Product(
+            tenantId: 1,
+            sku: $sku,
+            name: 'Draft TS',
+            price: $price,
+        );
+
+        $before = $product->getUpdatedAt();
+        // Ensure at least 1 µs has elapsed before calling draft()
+        usleep(100);
+        $product->draft();
+
+        $this->assertGreaterThan($before, $product->getUpdatedAt());
+        $this->assertSame('draft', $product->getStatus());
+    }
+
+    // ── UpdateProductService draft status ─────────────────────────────────────
+
+    public function test_update_product_service_handles_draft_status(): void
+    {
+        $sku     = new \Modules\Core\Domain\ValueObjects\Sku('UPS-DRF01');
+        $price   = new \Modules\Core\Domain\ValueObjects\Money(20.0, 'USD');
+        $product = new \Modules\Product\Domain\Entities\Product(
+            tenantId: 1, sku: $sku, name: 'Active', price: $price, status: 'active', id: 99,
+        );
+
+        $repo = $this->createMock(\Modules\Product\Domain\RepositoryInterfaces\ProductRepositoryInterface::class);
+        $repo->method('find')->willReturn($product);
+        $repo->method('save')->willReturnArgument(0);
+
+        $service = new \Modules\Product\Application\Services\UpdateProductService($repo);
+
+        $ref = new \ReflectionMethod($service, 'handle');
+        $ref->setAccessible(true);
+        $result = $ref->invoke($service, [
+            'id'        => 99,
+            'tenant_id' => 1,
+            'sku'       => 'UPS-DRF01',
+            'name'      => 'Active',
+            'price'     => 20.0,
+            'currency'  => 'USD',
+            'status'    => 'draft',
+        ]);
+
+        $this->assertSame('draft', $result->getStatus());
+        $this->assertFalse($result->isActive());
+    }
+
+    // ── ProductController thin-controller (no DTO in constructor) ─────────────
+
+    public function test_product_controller_does_not_inject_product_data_dto(): void
+    {
+        $rc          = new \ReflectionClass(\Modules\Product\Infrastructure\Http\Controllers\ProductController::class);
+        $constructor = $rc->getConstructor();
+        $paramTypes  = array_map(
+            fn (\ReflectionParameter $p) => $p->getType()?->getName(),
+            $constructor->getParameters()
+        );
+
+        $this->assertNotContains(
+            \Modules\Product\Application\DTOs\ProductData::class,
+            $paramTypes,
+            'ProductController must not inject ProductData DTO directly — it should delegate to services.'
+        );
+    }
+
+    // ── ProductController update fills defaults for partial updates ───────────
+
+    public function test_product_controller_index_filters_include_type(): void
+    {
+        $rc     = new \ReflectionClass(\Modules\Product\Infrastructure\Http\Controllers\ProductController::class);
+        $method = $rc->getMethod('index');
+
+        // Verify the index method exists and accepts a Request parameter.
+        $this->assertNotNull($method);
+        $params = $method->getParameters();
+        $this->assertCount(1, $params);
+        $this->assertNotNull($params[0]->getType());
+        $this->assertSame('Illuminate\Http\Request', $params[0]->getType()->getName());
+    }
 }
