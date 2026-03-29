@@ -23,18 +23,32 @@ class ProductModel extends Model
         'currency',
         'category',
         'status',
+        'type',
+        'units_of_measure',
         'attributes',
         'metadata',
     ];
 
     protected $casts = [
-        'price'      => 'float',
-        'attributes' => 'array',
-        'metadata'   => 'array',
+        'price'            => 'float',
+        'units_of_measure' => 'array',
+        'attributes'       => 'array',
+        'metadata'         => 'array',
     ];
 
     public function images(): HasMany
     {
         return $this->hasMany(ProductImageModel::class, 'product_id')->orderBy('sort_order');
     }
+
+    public function variations(): HasMany
+    {
+        return $this->hasMany(ProductVariationModel::class, 'product_id')->orderBy('sort_order');
+    }
+
+    public function comboItems(): HasMany
+    {
+        return $this->hasMany(ProductComboItemModel::class, 'product_id')->orderBy('sort_order');
+    }
 }
+

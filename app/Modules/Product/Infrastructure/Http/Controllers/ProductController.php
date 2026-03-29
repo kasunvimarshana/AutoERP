@@ -6,9 +6,10 @@ namespace Modules\Product\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Modules\Core\Infrastructure\Http\Controllers\BaseController;
+use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Product\Application\Contracts\CreateProductServiceInterface;
 use Modules\Product\Application\Contracts\DeleteProductServiceInterface;
+use Modules\Product\Application\Contracts\FindProductServiceInterface;
 use Modules\Product\Application\Contracts\UpdateProductServiceInterface;
 use Modules\Product\Application\DTOs\ProductData;
 use Modules\Product\Domain\Entities\Product;
@@ -18,15 +19,14 @@ use Modules\Product\Infrastructure\Http\Resources\ProductCollection;
 use Modules\Product\Infrastructure\Http\Resources\ProductResource;
 use OpenApi\Attributes as OA;
 
-class ProductController extends BaseController
+class ProductController extends AuthorizedController
 {
     public function __construct(
-        CreateProductServiceInterface $createService,
+        protected FindProductServiceInterface $findService,
+        protected CreateProductServiceInterface $createService,
         protected UpdateProductServiceInterface $updateService,
         protected DeleteProductServiceInterface $deleteService
-    ) {
-        parent::__construct($createService, ProductResource::class, ProductData::class);
-    }
+    ) {}
 
     #[OA\Get(
         path: '/api/products',
@@ -63,7 +63,7 @@ class ProductController extends BaseController
         $page = $request->integer('page', 1);
         $sort = $request->input('sort');
 
-        $products = $this->service->list($filters, $perPage, $page, $sort);
+        $products = $this->findService->list($filters, $perPage, $page, $sort);
 
         return new ProductCollection($products);
     }
@@ -83,9 +83,35 @@ class ProductController extends BaseController
                     new OA\Property(property: 'price',       type: 'number',   format: 'float', example: 29.99),
                     new OA\Property(property: 'currency',    type: 'string',   nullable: true, maxLength: 3, example: 'USD'),
                     new OA\Property(property: 'category',    type: 'string',   nullable: true, example: 'Widgets'),
-                    new OA\Property(property: 'status',      type: 'string',   nullable: true, enum: ['active', 'inactive', 'draft'], example: 'active'),
-                    new OA\Property(property: 'attributes',  type: 'object',   nullable: true),
-                    new OA\Property(property: 'metadata',    type: 'object',   nullable: true),
+                    new OA\Property(property: 'status',           type: 'string',   nullable: true, enum: ['active', 'inactive', 'draft'], example: 'active'),
+                    new OA\Property(property: 'type',             type: 'string',   nullable: true, enum: ['physical', 'service', 'digital', 'combo', 'variable'], example: 'physical'),
+                    new OA\Property(
+                        property: 'units_of_measure',
+                        type: 'array',
+                        nullable: true,
+                        items: new OA\Items(
+                            properties: [
+                                new OA\Property(property: 'unit',              type: 'string', example: 'kg'),
+                                new OA\Property(property: 'type',              type: 'string', enum: ['buying', 'selling', 'inventory'], example: 'buying'),
+                                new OA\Property(property: 'conversion_factor', type: 'number', format: 'float', example: 1.0),
+                            ],
+                        ),
+                    ),
+                    new OA\Property(property: 'attributes',       type: 'object',   nullable: true),
+                    new OA\Property(property: 'metadata',         type: 'object',   nullable: true),
+                    new OA\Property(
+                        property: 'product_attributes',
+                        type: 'array',
+                        nullable: true,
+                        items: new OA\Items(
+                            properties: [
+                                new OA\Property(property: 'code',           type: 'string', maxLength: 50,  example: 'color'),
+                                new OA\Property(property: 'name',           type: 'string', maxLength: 100, example: 'Color'),
+                                new OA\Property(property: 'allowed_values', type: 'array',  nullable: true,
+                                    items: new OA\Items(type: 'string', example: 'Red')),
+                            ],
+                        ),
+                    ),
                 ],
             ),
         ),
@@ -106,7 +132,7 @@ class ProductController extends BaseController
     {
         $this->authorize('create', Product::class);
         $dto = ProductData::fromArray($request->validated());
-        $product = $this->service->execute($dto->toArray());
+        $product = $this->createService->execute($dto->toArray());
 
         return (new ProductResource($product))->response()->setStatusCode(201);
     }
@@ -132,7 +158,7 @@ class ProductController extends BaseController
     )]
     public function show(int $id): ProductResource
     {
-        $product = $this->service->find($id);
+        $product = $this->findService->find($id);
         if (! $product) {
             abort(404);
         }
@@ -154,9 +180,35 @@ class ProductController extends BaseController
                     new OA\Property(property: 'price',       type: 'number',  format: 'float'),
                     new OA\Property(property: 'currency',    type: 'string',  nullable: true, maxLength: 3),
                     new OA\Property(property: 'category',    type: 'string',  nullable: true),
-                    new OA\Property(property: 'status',      type: 'string',  nullable: true, enum: ['active', 'inactive', 'draft']),
-                    new OA\Property(property: 'attributes',  type: 'object',  nullable: true),
-                    new OA\Property(property: 'metadata',    type: 'object',  nullable: true),
+                    new OA\Property(property: 'status',           type: 'string',  nullable: true, enum: ['active', 'inactive', 'draft']),
+                    new OA\Property(property: 'type',             type: 'string',  nullable: true, enum: ['physical', 'service', 'digital', 'combo', 'variable']),
+                    new OA\Property(
+                        property: 'units_of_measure',
+                        type: 'array',
+                        nullable: true,
+                        items: new OA\Items(
+                            properties: [
+                                new OA\Property(property: 'unit',              type: 'string'),
+                                new OA\Property(property: 'type',              type: 'string', enum: ['buying', 'selling', 'inventory']),
+                                new OA\Property(property: 'conversion_factor', type: 'number', format: 'float'),
+                            ],
+                        ),
+                    ),
+                    new OA\Property(property: 'attributes',       type: 'object',  nullable: true),
+                    new OA\Property(property: 'metadata',         type: 'object',  nullable: true),
+                    new OA\Property(
+                        property: 'product_attributes',
+                        type: 'array',
+                        nullable: true,
+                        items: new OA\Items(
+                            properties: [
+                                new OA\Property(property: 'code',           type: 'string', maxLength: 50),
+                                new OA\Property(property: 'name',           type: 'string', maxLength: 100),
+                                new OA\Property(property: 'allowed_values', type: 'array',  nullable: true,
+                                    items: new OA\Items(type: 'string')),
+                            ],
+                        ),
+                    ),
                 ],
             ),
         ),
@@ -180,7 +232,7 @@ class ProductController extends BaseController
     )]
     public function update(UpdateProductRequest $request, int $id): ProductResource
     {
-        $product = $this->service->find($id);
+        $product = $this->findService->find($id);
         if (! $product) {
             abort(404);
         }
@@ -216,7 +268,7 @@ class ProductController extends BaseController
     )]
     public function destroy(int $id): JsonResponse
     {
-        $product = $this->service->find($id);
+        $product = $this->findService->find($id);
         if (! $product) {
             abort(404);
         }
@@ -224,10 +276,5 @@ class ProductController extends BaseController
         $this->deleteService->execute(['id' => $id]);
 
         return response()->json(['message' => 'Product deleted successfully']);
-    }
-
-    protected function getModelClass(): string
-    {
-        return Product::class;
     }
 }

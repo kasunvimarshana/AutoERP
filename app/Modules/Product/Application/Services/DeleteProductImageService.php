@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Product\Application\Services;
 
-use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Application\Services\BaseService;
 use Modules\Product\Application\Contracts\DeleteProductImageServiceInterface;
+use Modules\Product\Application\Contracts\ImageStorageStrategyInterface;
 use Modules\Product\Domain\Exceptions\ProductImageNotFoundException;
 use Modules\Product\Domain\RepositoryInterfaces\ProductImageRepositoryInterface;
 
@@ -14,7 +14,7 @@ class DeleteProductImageService extends BaseService implements DeleteProductImag
 {
     public function __construct(
         protected ProductImageRepositoryInterface $imageRepository,
-        protected FileStorageServiceInterface $storage
+        protected ImageStorageStrategyInterface $storageStrategy
     ) {
         parent::__construct($imageRepository);
     }
@@ -28,7 +28,7 @@ class DeleteProductImageService extends BaseService implements DeleteProductImag
             throw new ProductImageNotFoundException($imageId);
         }
 
-        $this->storage->delete($image->getFilePath());
+        $this->storageStrategy->delete($image->getFilePath());
 
         return $this->imageRepository->delete($imageId);
     }

@@ -4,6 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Product\Application\Contracts;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
+use Modules\Core\Application\Contracts\ServiceInterface;
 
-interface UpdateProductServiceInterface extends WriteServiceInterface {}
+interface UpdateProductServiceInterface extends ServiceInterface {}
