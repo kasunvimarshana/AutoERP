@@ -6,15 +6,16 @@ namespace Modules\OrganizationUnit\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Modules\Core\Infrastructure\Http\Controllers\BaseController;
+use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\OrganizationUnit\Application\Contracts\CreateOrganizationUnitServiceInterface;
 use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitServiceInterface;
+use Modules\OrganizationUnit\Application\Contracts\FindOrganizationUnitServiceInterface;
 use Modules\OrganizationUnit\Application\Contracts\MoveOrganizationUnitServiceInterface;
 use Modules\OrganizationUnit\Application\Contracts\UpdateOrganizationUnitServiceInterface;
 use Modules\OrganizationUnit\Application\DTOs\MoveOrganizationUnitData;
 use Modules\OrganizationUnit\Application\DTOs\OrganizationUnitData;
+use Modules\OrganizationUnit\Application\DTOs\UpdateOrganizationUnitData;
 use Modules\OrganizationUnit\Domain\Entities\OrganizationUnit;
-use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitRepositoryInterface;
 use Modules\OrganizationUnit\Infrastructure\Http\Requests\MoveOrganizationUnitRequest;
 use Modules\OrganizationUnit\Infrastructure\Http\Requests\StoreOrganizationUnitRequest;
 use Modules\OrganizationUnit\Infrastructure\Http\Requests\UpdateOrganizationUnitRequest;
@@ -23,17 +24,15 @@ use Modules\OrganizationUnit\Infrastructure\Http\Resources\OrganizationUnitResou
 use Modules\OrganizationUnit\Infrastructure\Http\Resources\OrganizationUnitTreeResource;
 use OpenApi\Attributes as OA;
 
-class OrganizationUnitController extends BaseController
+class OrganizationUnitController extends AuthorizedController
 {
     public function __construct(
-        CreateOrganizationUnitServiceInterface $createService,
+        protected FindOrganizationUnitServiceInterface $findService,
+        protected CreateOrganizationUnitServiceInterface $createService,
         protected UpdateOrganizationUnitServiceInterface $updateService,
         protected DeleteOrganizationUnitServiceInterface $deleteService,
         protected MoveOrganizationUnitServiceInterface $moveService,
-        protected OrganizationUnitRepositoryInterface $orgUnitRepository
-    ) {
-        parent::__construct($createService, OrganizationUnitResource::class, OrganizationUnitData::class);
-    }
+    ) {}
 
     #[OA\Get(
         path: '/api/org-units',
@@ -76,7 +75,7 @@ class OrganizationUnitController extends BaseController
         $sort = $request->input('sort');
         $include = $request->input('include');
 
-        $units = $this->service->list($filters, $perPage, $page, $sort, $include);
+        $units = $this->findService->list($filters, $perPage, $page, $sort, $include);
 
         return new OrganizationUnitCollection($units);
     }
@@ -114,8 +113,8 @@ class OrganizationUnitController extends BaseController
     public function store(StoreOrganizationUnitRequest $request): \Illuminate\Http\JsonResponse
     {
         $this->authorize('create', OrganizationUnit::class);
-        $dto = OrganizationUnitData::fromArray($request->validated());
-        $unit = $this->service->execute($dto->toArray());
+        $dto  = OrganizationUnitData::fromArray($request->validated());
+        $unit = $this->createService->execute($dto->toArray());
 
         return (new OrganizationUnitResource($unit))->response()->setStatusCode(201);
     }
@@ -141,7 +140,7 @@ class OrganizationUnitController extends BaseController
     )]
     public function show(int $id): OrganizationUnitResource
     {
-        $unit = $this->service->find($id);
+        $unit = $this->findService->find($id);
         if (! $unit) {
             abort(404);
         }
@@ -184,15 +183,15 @@ class OrganizationUnitController extends BaseController
     )]
     public function update(UpdateOrganizationUnitRequest $request, int $id): OrganizationUnitResource
     {
-        $unit = $this->service->find($id);
+        $unit = $this->findService->find($id);
         if (! $unit) {
             abort(404);
         }
         $this->authorize('update', $unit);
-        $validated = $request->validated();
+        $validated       = $request->validated();
         $validated['id'] = $id;
-        $dto = OrganizationUnitData::fromArray($validated);
-        $updated = $this->updateService->execute($dto->toArray());
+        $dto             = UpdateOrganizationUnitData::fromArray($validated);
+        $updated         = $this->updateService->execute($dto->toArray());
 
         return new OrganizationUnitResource($updated);
     }
@@ -218,7 +217,7 @@ class OrganizationUnitController extends BaseController
     )]
     public function destroy(int $id): JsonResponse
     {
-        $unit = $this->service->find($id);
+        $unit = $this->findService->find($id);
         if (! $unit) {
             abort(404);
         }
@@ -255,7 +254,7 @@ class OrganizationUnitController extends BaseController
         $rootId = $request->input('root_id') !== null
             ? (int) $request->input('root_id')
             : null;
-        $tree = $this->orgUnitRepository->getTree($tenantId, $rootId);
+        $tree = $this->findService->getTree($tenantId, $rootId);
 
         return new OrganizationUnitTreeResource($tree);
     }
@@ -292,7 +291,7 @@ class OrganizationUnitController extends BaseController
     )]
     public function move(MoveOrganizationUnitRequest $request, int $id): JsonResponse
     {
-        $unit = $this->service->find($id);
+        $unit = $this->findService->find($id);
         if (! $unit) {
             abort(404);
         }
@@ -305,8 +304,79 @@ class OrganizationUnitController extends BaseController
         return response()->json(['message' => 'Organization unit moved successfully']);
     }
 
-    protected function getModelClass(): string
+    #[OA\Get(
+        path: '/api/org-units/{id}/descendants',
+        summary: 'Get descendants of an organization unit',
+        description: 'Returns all direct and indirect children of the given unit in nested-set order.',
+        tags: ['Organization Units'],
+        security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'List of descendant organization units',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: '#/components/schemas/OrganizationUnitObject')),
+                    ],
+                )),
+            new OA\Response(response: 401, description: 'Unauthenticated',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 403, description: 'Forbidden',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 404, description: 'Not found',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+        ],
+    )]
+    public function descendants(int $id): JsonResponse
     {
-        return OrganizationUnit::class;
+        $unit = $this->findService->find($id);
+        if (! $unit) {
+            abort(404);
+        }
+        $this->authorize('view', $unit);
+        $items = $this->findService->getDescendants($id);
+
+        return response()->json([
+            'data' => OrganizationUnitResource::collection(collect($items)),
+        ]);
+    }
+
+    #[OA\Get(
+        path: '/api/org-units/{id}/ancestors',
+        summary: 'Get ancestors of an organization unit',
+        description: 'Returns the parent chain (root → direct parent) of the given unit.',
+        tags: ['Organization Units'],
+        security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'List of ancestor organization units',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: '#/components/schemas/OrganizationUnitObject')),
+                    ],
+                )),
+            new OA\Response(response: 401, description: 'Unauthenticated',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 403, description: 'Forbidden',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+            new OA\Response(response: 404, description: 'Not found',
+                content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse')),
+        ],
+    )]
+    public function ancestors(int $id): JsonResponse
+    {
+        $unit = $this->findService->find($id);
+        if (! $unit) {
+            abort(404);
+        }
+        $this->authorize('view', $unit);
+        $items = $this->findService->getAncestors($id);
+
+        return response()->json([
+            'data' => OrganizationUnitResource::collection(collect($items)),
+        ]);
     }
 }

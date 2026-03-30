@@ -8,27 +8,25 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Category\Application\Contracts\CreateCategoryServiceInterface;
 use Modules\Category\Application\Contracts\DeleteCategoryServiceInterface;
+use Modules\Category\Application\Contracts\FindCategoryServiceInterface;
 use Modules\Category\Application\Contracts\UpdateCategoryServiceInterface;
 use Modules\Category\Application\DTOs\CategoryData;
 use Modules\Category\Domain\Entities\Category;
-use Modules\Category\Domain\RepositoryInterfaces\CategoryRepositoryInterface;
 use Modules\Category\Infrastructure\Http\Requests\StoreCategoryRequest;
 use Modules\Category\Infrastructure\Http\Requests\UpdateCategoryRequest;
 use Modules\Category\Infrastructure\Http\Resources\CategoryCollection;
 use Modules\Category\Infrastructure\Http\Resources\CategoryResource;
-use Modules\Core\Infrastructure\Http\Controllers\BaseController;
+use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use OpenApi\Attributes as OA;
 
-class CategoryController extends BaseController
+class CategoryController extends AuthorizedController
 {
     public function __construct(
-        CreateCategoryServiceInterface $createService,
+        protected CreateCategoryServiceInterface $createService,
         protected UpdateCategoryServiceInterface $updateService,
         protected DeleteCategoryServiceInterface $deleteService,
-        protected CategoryRepositoryInterface $categoryRepository
-    ) {
-        parent::__construct($createService, CategoryResource::class, CategoryData::class);
-    }
+        protected FindCategoryServiceInterface $findCategoryService
+    ) {}
 
     #[OA\Get(
         path: '/api/categories',
@@ -65,7 +63,7 @@ class CategoryController extends BaseController
         $page = $request->integer('page', 1);
         $sort = $request->input('sort');
 
-        $categories = $this->service->list($filters, $perPage, $page, $sort);
+        $categories = $this->findCategoryService->list($filters, $perPage, $page, $sort);
 
         return new CategoryCollection($categories);
     }
@@ -110,7 +108,7 @@ class CategoryController extends BaseController
             $validated['slug'] = \Illuminate\Support\Str::slug($validated['name']);
         }
         $dto = CategoryData::fromArray($validated);
-        $category = $this->service->execute($dto->toArray());
+        $category = $this->createService->execute($dto->toArray());
 
         return (new CategoryResource($category))->response()->setStatusCode(201);
     }
@@ -136,7 +134,7 @@ class CategoryController extends BaseController
     )]
     public function show(int $id): CategoryResource
     {
-        $category = $this->service->find($id);
+        $category = $this->findCategoryService->find($id);
         if (! $category) {
             abort(404);
         }
@@ -183,7 +181,7 @@ class CategoryController extends BaseController
     )]
     public function update(UpdateCategoryRequest $request, int $id): CategoryResource
     {
-        $category = $this->service->find($id);
+        $category = $this->findCategoryService->find($id);
         if (! $category) {
             abort(404);
         }
@@ -220,7 +218,7 @@ class CategoryController extends BaseController
     )]
     public function destroy(int $id): JsonResponse
     {
-        $category = $this->service->find($id);
+        $category = $this->findCategoryService->find($id);
         if (! $category) {
             abort(404);
         }
@@ -254,7 +252,7 @@ class CategoryController extends BaseController
     {
         $this->authorize('viewAny', Category::class);
         $tenantId = $request->integer('tenant_id', 1);
-        $tree = $this->categoryRepository->getTree($tenantId, $id);
+        $tree = $this->findCategoryService->getTree($tenantId, $id);
 
         return response()->json(['data' => CategoryResource::collection($tree)]);
     }
@@ -282,13 +280,10 @@ class CategoryController extends BaseController
     {
         $this->authorize('viewAny', Category::class);
         $tenantId = $request->integer('tenant_id', 1);
-        $roots = $this->categoryRepository->findRoots($tenantId);
+        $roots = $this->findCategoryService->findRoots($tenantId);
 
         return response()->json(['data' => CategoryResource::collection($roots)]);
     }
 
-    protected function getModelClass(): string
-    {
-        return Category::class;
-    }
+
 }

@@ -4,10 +4,12 @@ namespace Tests\Unit;
 
 use Modules\Customer\Application\Contracts\CreateCustomerServiceInterface;
 use Modules\Customer\Application\Contracts\DeleteCustomerServiceInterface;
+use Modules\Customer\Application\Contracts\FindCustomerServiceInterface;
 use Modules\Customer\Application\Contracts\UpdateCustomerServiceInterface;
 use Modules\Customer\Application\DTOs\CustomerData;
 use Modules\Customer\Application\Services\CreateCustomerService;
 use Modules\Customer\Application\Services\DeleteCustomerService;
+use Modules\Customer\Application\Services\FindCustomerService;
 use Modules\Customer\Application\Services\UpdateCustomerService;
 use Modules\Customer\Application\UseCases\CreateCustomer;
 use Modules\Customer\Application\UseCases\DeleteCustomer;
@@ -315,6 +317,7 @@ class CustomerModuleTest extends TestCase
     public function test_all_customer_service_interfaces_exist(): void
     {
         $this->assertTrue(interface_exists(CreateCustomerServiceInterface::class));
+        $this->assertTrue(interface_exists(FindCustomerServiceInterface::class));
         $this->assertTrue(interface_exists(UpdateCustomerServiceInterface::class));
         $this->assertTrue(interface_exists(DeleteCustomerServiceInterface::class));
     }
@@ -324,6 +327,7 @@ class CustomerModuleTest extends TestCase
     public function test_all_customer_service_implementations_exist(): void
     {
         $this->assertTrue(class_exists(CreateCustomerService::class));
+        $this->assertTrue(class_exists(FindCustomerService::class));
         $this->assertTrue(class_exists(UpdateCustomerService::class));
         $this->assertTrue(class_exists(DeleteCustomerService::class));
     }
@@ -335,6 +339,10 @@ class CustomerModuleTest extends TestCase
             'CreateCustomerService must implement CreateCustomerServiceInterface.'
         );
         $this->assertTrue(
+            is_subclass_of(FindCustomerService::class, FindCustomerServiceInterface::class),
+            'FindCustomerService must implement FindCustomerServiceInterface.'
+        );
+        $this->assertTrue(
             is_subclass_of(UpdateCustomerService::class, UpdateCustomerServiceInterface::class),
             'UpdateCustomerService must implement UpdateCustomerServiceInterface.'
         );
@@ -342,6 +350,40 @@ class CustomerModuleTest extends TestCase
             is_subclass_of(DeleteCustomerService::class, DeleteCustomerServiceInterface::class),
             'DeleteCustomerService must implement DeleteCustomerServiceInterface.'
         );
+    }
+
+    public function test_find_customer_service_does_not_support_write_execute(): void
+    {
+        $repo = $this->createMock(\Modules\Customer\Domain\RepositoryInterfaces\CustomerRepositoryInterface::class);
+        $service = new FindCustomerService($repo);
+
+        $this->expectException(\BadMethodCallException::class);
+
+        $ref = new \ReflectionMethod($service, 'handle');
+        $ref->setAccessible(true);
+        $ref->invoke($service, []);
+    }
+
+    public function test_customer_controller_extends_authorized_controller(): void
+    {
+        $this->assertTrue(
+            is_subclass_of(
+                \Modules\Customer\Infrastructure\Http\Controllers\CustomerController::class,
+                \Modules\Core\Infrastructure\Http\Controllers\AuthorizedController::class
+            ),
+            'CustomerController must extend AuthorizedController.'
+        );
+    }
+
+    public function test_customer_controller_injects_find_service(): void
+    {
+        $ref = new \ReflectionClass(\Modules\Customer\Infrastructure\Http\Controllers\CustomerController::class);
+        $constructor = $ref->getConstructor();
+        $params = $constructor->getParameters();
+        $paramTypes = array_map(fn ($p) => (string) $p->getType(), $params);
+
+        $this->assertContains(FindCustomerServiceInterface::class, $paramTypes,
+            'CustomerController constructor must inject FindCustomerServiceInterface.');
     }
 
     // ── Application Use Cases ─────────────────────────────────────────────────

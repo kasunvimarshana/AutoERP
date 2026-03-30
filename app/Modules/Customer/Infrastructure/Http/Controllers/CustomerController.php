@@ -6,9 +6,10 @@ namespace Modules\Customer\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Modules\Core\Infrastructure\Http\Controllers\BaseController;
+use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Customer\Application\Contracts\CreateCustomerServiceInterface;
 use Modules\Customer\Application\Contracts\DeleteCustomerServiceInterface;
+use Modules\Customer\Application\Contracts\FindCustomerServiceInterface;
 use Modules\Customer\Application\Contracts\UpdateCustomerServiceInterface;
 use Modules\Customer\Application\DTOs\CustomerData;
 use Modules\Customer\Domain\Entities\Customer;
@@ -18,15 +19,14 @@ use Modules\Customer\Infrastructure\Http\Resources\CustomerCollection;
 use Modules\Customer\Infrastructure\Http\Resources\CustomerResource;
 use OpenApi\Attributes as OA;
 
-class CustomerController extends BaseController
+class CustomerController extends AuthorizedController
 {
     public function __construct(
-        CreateCustomerServiceInterface $createService,
+        protected FindCustomerServiceInterface $findService,
+        protected CreateCustomerServiceInterface $createService,
         protected UpdateCustomerServiceInterface $updateService,
         protected DeleteCustomerServiceInterface $deleteService
-    ) {
-        parent::__construct($createService, CustomerResource::class, CustomerData::class);
-    }
+    ) {}
 
     #[OA\Get(
         path: '/api/customers',
@@ -64,7 +64,7 @@ class CustomerController extends BaseController
         $page    = $request->integer('page', 1);
         $sort    = $request->input('sort');
 
-        $customers = $this->service->list($filters, $perPage, $page, $sort);
+        $customers = $this->findService->list($filters, $perPage, $page, $sort);
 
         return new CustomerCollection($customers);
     }
@@ -115,7 +115,7 @@ class CustomerController extends BaseController
     {
         $this->authorize('create', Customer::class);
         $dto      = CustomerData::fromArray($request->validated());
-        $customer = $this->service->execute($dto->toArray());
+        $customer = $this->createService->execute($dto->toArray());
 
         return (new CustomerResource($customer))->response()->setStatusCode(201);
     }
@@ -141,7 +141,7 @@ class CustomerController extends BaseController
     )]
     public function show(int $id): CustomerResource
     {
-        $customer = $this->service->find($id);
+        $customer = $this->findService->find($id);
         if (! $customer) {
             abort(404);
         }
@@ -198,7 +198,7 @@ class CustomerController extends BaseController
     )]
     public function update(UpdateCustomerRequest $request, int $id): CustomerResource
     {
-        $customer = $this->service->find($id);
+        $customer = $this->findService->find($id);
         if (! $customer) {
             abort(404);
         }
@@ -233,7 +233,7 @@ class CustomerController extends BaseController
     )]
     public function destroy(int $id): JsonResponse
     {
-        $customer = $this->service->find($id);
+        $customer = $this->findService->find($id);
         if (! $customer) {
             abort(404);
         }
@@ -241,10 +241,5 @@ class CustomerController extends BaseController
         $this->deleteService->execute(['id' => $id]);
 
         return response()->json(['message' => 'Customer deleted successfully']);
-    }
-
-    protected function getModelClass(): string
-    {
-        return Customer::class;
     }
 }

@@ -12,9 +12,9 @@ use Modules\User\Application\Contracts\CreatePermissionServiceInterface;
 use Modules\User\Application\Contracts\CreateRoleServiceInterface;
 use Modules\User\Application\Contracts\DeletePermissionServiceInterface;
 use Modules\User\Application\Contracts\DeleteRoleServiceInterface;
+use Modules\User\Application\Contracts\FindPermissionServiceInterface;
+use Modules\User\Application\Contracts\FindRoleServiceInterface;
 use Modules\User\Application\Contracts\SyncRolePermissionsServiceInterface;
-use Modules\User\Domain\RepositoryInterfaces\PermissionRepositoryInterface;
-use Modules\User\Domain\RepositoryInterfaces\RoleRepositoryInterface;
 use Modules\User\Infrastructure\Http\Controllers\PermissionController;
 use Modules\User\Infrastructure\Http\Controllers\RoleController;
 use Modules\User\Infrastructure\Http\Requests\StorePermissionRequest;
@@ -94,7 +94,7 @@ class FormRequestsAndControllersTest extends TestCase
         $this->assertContains(CreateRoleServiceInterface::class, $paramTypes);
         $this->assertContains(DeleteRoleServiceInterface::class, $paramTypes);
         $this->assertContains(SyncRolePermissionsServiceInterface::class, $paramTypes);
-        $this->assertContains(RoleRepositoryInterface::class, $paramTypes);
+        $this->assertContains(FindRoleServiceInterface::class, $paramTypes);
     }
 
     /**
@@ -111,6 +111,6 @@ class FormRequestsAndControllersTest extends TestCase
 
         $this->assertContains(CreatePermissionServiceInterface::class, $paramTypes);
         $this->assertContains(DeletePermissionServiceInterface::class, $paramTypes);
-        $this->assertContains(PermissionRepositoryInterface::class, $paramTypes);
+        $this->assertContains(FindPermissionServiceInterface::class, $paramTypes);
     }
 }

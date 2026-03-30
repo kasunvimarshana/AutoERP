@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Application\Services;
 
-use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Application\Services\BaseService;
+use Modules\OrganizationUnit\Application\Contracts\AttachmentStorageStrategyInterface;
 use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitAttachmentServiceInterface;
 use Modules\OrganizationUnit\Domain\Exceptions\AttachmentNotFoundException;
 use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitAttachmentRepositoryInterface;
@@ -13,22 +13,22 @@ use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitAttachm
 class DeleteOrganizationUnitAttachmentService extends BaseService implements DeleteOrganizationUnitAttachmentServiceInterface
 {
     public function __construct(
-        protected OrganizationUnitAttachmentRepositoryInterface $attachmentRepo,
-        protected FileStorageServiceInterface $storage
+        private readonly OrganizationUnitAttachmentRepositoryInterface $attachmentRepository,
+        private readonly AttachmentStorageStrategyInterface $storageStrategy
     ) {
-        parent::__construct($attachmentRepo);
+        parent::__construct($attachmentRepository);
     }
 
     protected function handle(array $data): bool
     {
         $attachmentId = $data['attachment_id'];
-        $attachment = $this->attachmentRepo->find($attachmentId);
+        $attachment   = $this->attachmentRepository->find($attachmentId);
         if (! $attachment) {
             throw new AttachmentNotFoundException($attachmentId);
         }
 
-        $this->storage->delete($attachment->getFilePath());
+        $this->storageStrategy->delete($attachment->getFilePath());
 
-        return $this->attachmentRepo->delete($attachmentId);
+        return $this->attachmentRepository->delete($attachmentId);
     }
 }

@@ -6,9 +6,9 @@ namespace Modules\Brand\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Modules\Brand\Application\Contracts\DeleteBrandLogoServiceInterface;
+use Modules\Brand\Application\Contracts\FindBrandLogosServiceInterface;
 use Modules\Brand\Application\Contracts\UploadBrandLogoServiceInterface;
 use Modules\Brand\Domain\Entities\Brand;
-use Modules\Brand\Domain\RepositoryInterfaces\BrandLogoRepositoryInterface;
 use Modules\Brand\Infrastructure\Http\Requests\UploadBrandLogoRequest;
 use Modules\Brand\Infrastructure\Http\Resources\BrandLogoResource;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
@@ -20,7 +20,7 @@ class BrandLogoController extends AuthorizedController
     public function __construct(
         protected UploadBrandLogoServiceInterface $uploadService,
         protected DeleteBrandLogoServiceInterface $deleteService,
-        protected BrandLogoRepositoryInterface $logoRepo,
+        protected FindBrandLogosServiceInterface $findService,
         protected FileStorageServiceInterface $storage
     ) {}
 
@@ -125,7 +125,7 @@ class BrandLogoController extends AuthorizedController
     )]
     public function serve(string $uuid)
     {
-        $logo = $this->logoRepo->findByUuid($uuid);
+        $logo = $this->findService->findByUuid($uuid);
         if (! $logo) {
             abort(404);
         }

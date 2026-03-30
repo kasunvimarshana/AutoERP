@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Account\Application\Contracts\CreateAccountServiceInterface;
 use Modules\Account\Application\Contracts\DeleteAccountServiceInterface;
+use Modules\Account\Application\Contracts\FindAccountServiceInterface;
 use Modules\Account\Application\Contracts\UpdateAccountServiceInterface;
 use Modules\Account\Application\DTOs\AccountData;
 use Modules\Account\Domain\Entities\Account;
@@ -15,18 +16,17 @@ use Modules\Account\Infrastructure\Http\Requests\StoreAccountRequest;
 use Modules\Account\Infrastructure\Http\Requests\UpdateAccountRequest;
 use Modules\Account\Infrastructure\Http\Resources\AccountCollection;
 use Modules\Account\Infrastructure\Http\Resources\AccountResource;
-use Modules\Core\Infrastructure\Http\Controllers\BaseController;
+use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use OpenApi\Attributes as OA;
 
-class AccountController extends BaseController
+class AccountController extends AuthorizedController
 {
     public function __construct(
-        CreateAccountServiceInterface $createService,
+        protected FindAccountServiceInterface $findService,
+        protected CreateAccountServiceInterface $createService,
         protected UpdateAccountServiceInterface $updateService,
         protected DeleteAccountServiceInterface $deleteService
-    ) {
-        parent::__construct($createService, AccountResource::class, AccountData::class);
-    }
+    ) {}
 
     #[OA\Get(
         path: '/api/accounts',
@@ -64,7 +64,7 @@ class AccountController extends BaseController
         $page = $request->integer('page', 1);
         $sort = $request->input('sort');
 
-        $accounts = $this->service->list($filters, $perPage, $page, $sort);
+        $accounts = $this->findService->list($filters, $perPage, $page, $sort);
 
         return new AccountCollection($accounts);
     }
@@ -109,9 +109,8 @@ class AccountController extends BaseController
     public function store(StoreAccountRequest $request): JsonResponse
     {
         $this->authorize('create', Account::class);
-        $validated = $request->validated();
-        $dto = AccountData::fromArray($validated);
-        $account = $this->service->execute($dto->toArray());
+        $dto = AccountData::fromArray($request->validated());
+        $account = $this->createService->execute($dto->toArray());
 
         return (new AccountResource($account))->response()->setStatusCode(201);
     }
@@ -137,7 +136,7 @@ class AccountController extends BaseController
     )]
     public function show(int $id): AccountResource
     {
-        $account = $this->service->find($id);
+        $account = $this->findService->find($id);
         if (! $account) {
             abort(404);
         }
@@ -187,16 +186,16 @@ class AccountController extends BaseController
     )]
     public function update(UpdateAccountRequest $request, int $id): AccountResource
     {
-        $account = $this->service->find($id);
+        $account = $this->findService->find($id);
         if (! $account) {
             abort(404);
         }
         $this->authorize('update', $account);
-        $validated = $request->validated();
-        $validated['id'] = $id;
+        $validated              = $request->validated();
+        $validated['id']        = $id;
         $validated['tenant_id'] = $account->getTenantId();
-        $dto = AccountData::fromArray($validated);
-        $updated = $this->updateService->execute($dto->toArray());
+        $dto                    = AccountData::fromArray($validated);
+        $updated                = $this->updateService->execute($dto->toArray());
 
         return new AccountResource($updated);
     }
@@ -222,7 +221,7 @@ class AccountController extends BaseController
     )]
     public function destroy(int $id): JsonResponse
     {
-        $account = $this->service->find($id);
+        $account = $this->findService->find($id);
         if (! $account) {
             abort(404);
         }
@@ -230,10 +229,5 @@ class AccountController extends BaseController
         $this->deleteService->execute(['id' => $id]);
 
         return response()->json(['message' => 'Account deleted successfully']);
-    }
-
-    protected function getModelClass(): string
-    {
-        return Account::class;
     }
 }

@@ -15,7 +15,7 @@ class OrganizationUnitResource extends JsonResource
             'id' => $this->getId(),
             'tenant_id' => $this->getTenantId(),
             'name' => $this->getName()->value(),
-            'code' => $this->getCode()->value(),
+            'code' => $this->getCode()?->value(),
             'description' => $this->getDescription(),
             'metadata' => $this->getMetadata()->toArray(),
             'parent_id' => $this->getParentId(),

@@ -9,9 +9,9 @@ use Illuminate\Http\Request;
 use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\User\Application\Contracts\CreateRoleServiceInterface;
 use Modules\User\Application\Contracts\DeleteRoleServiceInterface;
+use Modules\User\Application\Contracts\FindRoleServiceInterface;
 use Modules\User\Application\Contracts\SyncRolePermissionsServiceInterface;
 use Modules\User\Domain\Entities\Role;
-use Modules\User\Domain\RepositoryInterfaces\RoleRepositoryInterface;
 use Modules\User\Infrastructure\Http\Requests\StoreRoleRequest;
 use Modules\User\Infrastructure\Http\Requests\SyncRolePermissionsRequest;
 use Modules\User\Infrastructure\Http\Resources\RoleResource;
@@ -20,10 +20,10 @@ use OpenApi\Attributes as OA;
 class RoleController extends AuthorizedController
 {
     public function __construct(
+        protected FindRoleServiceInterface $findService,
         protected CreateRoleServiceInterface $createService,
         protected DeleteRoleServiceInterface $deleteService,
-        protected SyncRolePermissionsServiceInterface $syncPermissionsService,
-        protected RoleRepositoryInterface $roleRepository
+        protected SyncRolePermissionsServiceInterface $syncPermissionsService
     ) {}
 
     #[OA\Get(
@@ -50,13 +50,13 @@ class RoleController extends AuthorizedController
     public function index(Request $request): JsonResponse
     {
         $this->authorize('viewAny', Role::class);
-        $repo = clone $this->roleRepository;
+        $filters = [];
         if ($tenantId = $request->query('tenant_id')) {
-            $repo->where('tenant_id', (int) $tenantId);
+            $filters['tenant_id'] = (int) $tenantId;
         }
         $perPage = (int) $request->input('per_page', 15);
-        $page = (int) $request->input('page', 1);
-        $roles = $repo->paginate($perPage, ['*'], 'page', $page);
+        $page    = (int) $request->input('page', 1);
+        $roles   = $this->findService->list($filters, $perPage, $page);
 
         return response()->json(RoleResource::collection($roles));
     }
@@ -82,7 +82,7 @@ class RoleController extends AuthorizedController
     )]
     public function show(int $id): RoleResource
     {
-        $role = $this->roleRepository->find($id);
+        $role = $this->findService->find($id);
         if (! $role) {
             abort(404);
         }
@@ -146,7 +146,7 @@ class RoleController extends AuthorizedController
     )]
     public function destroy(int $id): JsonResponse
     {
-        $role = $this->roleRepository->find($id);
+        $role = $this->findService->find($id);
         if (! $role) {
             abort(404);
         }
@@ -188,13 +188,13 @@ class RoleController extends AuthorizedController
     )]
     public function syncPermissions(SyncRolePermissionsRequest $request, int $id): RoleResource
     {
-        $role = $this->roleRepository->find($id);
+        $role = $this->findService->find($id);
         if (! $role) {
             abort(404);
         }
         $this->authorize('syncPermissions', $role);
         $updated = $this->syncPermissionsService->execute([
-            'role_id' => $id,
+            'role_id'        => $id,
             'permission_ids' => $request->validated()['permission_ids'],
         ]);
 

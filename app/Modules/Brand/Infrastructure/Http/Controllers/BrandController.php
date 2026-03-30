@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Brand\Application\Contracts\CreateBrandServiceInterface;
 use Modules\Brand\Application\Contracts\DeleteBrandServiceInterface;
+use Modules\Brand\Application\Contracts\FindBrandServiceInterface;
 use Modules\Brand\Application\Contracts\UpdateBrandServiceInterface;
 use Modules\Brand\Application\DTOs\BrandData;
 use Modules\Brand\Domain\Entities\Brand;
@@ -15,18 +16,17 @@ use Modules\Brand\Infrastructure\Http\Requests\StoreBrandRequest;
 use Modules\Brand\Infrastructure\Http\Requests\UpdateBrandRequest;
 use Modules\Brand\Infrastructure\Http\Resources\BrandCollection;
 use Modules\Brand\Infrastructure\Http\Resources\BrandResource;
-use Modules\Core\Infrastructure\Http\Controllers\BaseController;
+use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use OpenApi\Attributes as OA;
 
-class BrandController extends BaseController
+class BrandController extends AuthorizedController
 {
     public function __construct(
-        CreateBrandServiceInterface $createService,
+        protected FindBrandServiceInterface $findService,
+        protected CreateBrandServiceInterface $createService,
         protected UpdateBrandServiceInterface $updateService,
         protected DeleteBrandServiceInterface $deleteService
-    ) {
-        parent::__construct($createService, BrandResource::class, BrandData::class);
-    }
+    ) {}
 
     #[OA\Get(
         path: '/api/brands',
@@ -62,7 +62,7 @@ class BrandController extends BaseController
         $page = $request->integer('page', 1);
         $sort = $request->input('sort');
 
-        $brands = $this->service->list($filters, $perPage, $page, $sort);
+        $brands = $this->findService->list($filters, $perPage, $page, $sort);
 
         return new BrandCollection($brands);
     }
@@ -107,7 +107,7 @@ class BrandController extends BaseController
             $validated['slug'] = \Illuminate\Support\Str::slug($validated['name']);
         }
         $dto = BrandData::fromArray($validated);
-        $brand = $this->service->execute($dto->toArray());
+        $brand = $this->createService->execute($dto->toArray());
 
         return (new BrandResource($brand))->response()->setStatusCode(201);
     }
@@ -133,7 +133,7 @@ class BrandController extends BaseController
     )]
     public function show(int $id): BrandResource
     {
-        $brand = $this->service->find($id);
+        $brand = $this->findService->find($id);
         if (! $brand) {
             abort(404);
         }
@@ -180,7 +180,7 @@ class BrandController extends BaseController
     )]
     public function update(UpdateBrandRequest $request, int $id): BrandResource
     {
-        $brand = $this->service->find($id);
+        $brand = $this->findService->find($id);
         if (! $brand) {
             abort(404);
         }
@@ -218,7 +218,7 @@ class BrandController extends BaseController
     )]
     public function destroy(int $id): JsonResponse
     {
-        $brand = $this->service->find($id);
+        $brand = $this->findService->find($id);
         if (! $brand) {
             abort(404);
         }
@@ -228,8 +228,5 @@ class BrandController extends BaseController
         return response()->json(['message' => 'Brand deleted successfully']);
     }
 
-    protected function getModelClass(): string
-    {
-        return Brand::class;
-    }
+
 }

@@ -910,10 +910,10 @@ class AuthModuleTest extends TestCase
     }
 
     // -------------------------------------------------------------------------
-    // AuthController: injects UserRepositoryInterface for me() endpoint
+    // AuthController: injects FindUserServiceInterface for me() endpoint
     // -------------------------------------------------------------------------
 
-    public function test_auth_controller_injects_user_repository_interface(): void
+    public function test_auth_controller_injects_find_user_service_interface(): void
     {
         $reflection = new \ReflectionClass(AuthController::class);
         $constructor = $reflection->getConstructor();
@@ -921,9 +921,23 @@ class AuthModuleTest extends TestCase
 
         $types = array_map(fn ($p) => $p->getType()?->getName(), $constructor->getParameters());
         $this->assertContains(
+            \Modules\User\Application\Contracts\FindUserServiceInterface::class,
+            $types,
+            'AuthController must inject FindUserServiceInterface for the me() endpoint.'
+        );
+    }
+
+    public function test_auth_controller_does_not_inject_user_repository_interface(): void
+    {
+        $reflection = new \ReflectionClass(AuthController::class);
+        $constructor = $reflection->getConstructor();
+        $this->assertNotNull($constructor);
+
+        $types = array_map(fn ($p) => $p->getType()?->getName(), $constructor->getParameters());
+        $this->assertNotContains(
             \Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface::class,
             $types,
-            'AuthController must inject UserRepositoryInterface for the me() endpoint.'
+            'AuthController must not inject UserRepositoryInterface directly (DIP violation).'
         );
     }
 

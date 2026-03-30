@@ -6,9 +6,10 @@ namespace Modules\Supplier\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Modules\Core\Infrastructure\Http\Controllers\BaseController;
+use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Supplier\Application\Contracts\CreateSupplierServiceInterface;
 use Modules\Supplier\Application\Contracts\DeleteSupplierServiceInterface;
+use Modules\Supplier\Application\Contracts\FindSupplierServiceInterface;
 use Modules\Supplier\Application\Contracts\UpdateSupplierServiceInterface;
 use Modules\Supplier\Application\DTOs\SupplierData;
 use Modules\Supplier\Domain\Entities\Supplier;
@@ -18,15 +19,14 @@ use Modules\Supplier\Infrastructure\Http\Resources\SupplierCollection;
 use Modules\Supplier\Infrastructure\Http\Resources\SupplierResource;
 use OpenApi\Attributes as OA;
 
-class SupplierController extends BaseController
+class SupplierController extends AuthorizedController
 {
     public function __construct(
-        CreateSupplierServiceInterface $createService,
+        protected FindSupplierServiceInterface $findService,
+        protected CreateSupplierServiceInterface $createService,
         protected UpdateSupplierServiceInterface $updateService,
         protected DeleteSupplierServiceInterface $deleteService
-    ) {
-        parent::__construct($createService, SupplierResource::class, SupplierData::class);
-    }
+    ) {}
 
     #[OA\Get(
         path: '/api/suppliers',
@@ -63,7 +63,7 @@ class SupplierController extends BaseController
         $page    = $request->integer('page', 1);
         $sort    = $request->input('sort');
 
-        $suppliers = $this->service->list($filters, $perPage, $page, $sort);
+        $suppliers = $this->findService->list($filters, $perPage, $page, $sort);
 
         return new SupplierCollection($suppliers);
     }
@@ -110,8 +110,8 @@ class SupplierController extends BaseController
     public function store(StoreSupplierRequest $request): JsonResponse
     {
         $this->authorize('create', Supplier::class);
-        $dto = SupplierData::fromArray($request->validated());
-        $supplier = $this->service->execute($dto->toArray());
+        $dto      = SupplierData::fromArray($request->validated());
+        $supplier = $this->createService->execute($dto->toArray());
 
         return (new SupplierResource($supplier))->response()->setStatusCode(201);
     }
@@ -137,7 +137,7 @@ class SupplierController extends BaseController
     )]
     public function show(int $id): SupplierResource
     {
-        $supplier = $this->service->find($id);
+        $supplier = $this->findService->find($id);
         if (! $supplier) {
             abort(404);
         }
@@ -191,16 +191,16 @@ class SupplierController extends BaseController
     )]
     public function update(UpdateSupplierRequest $request, int $id): SupplierResource
     {
-        $supplier = $this->service->find($id);
+        $supplier = $this->findService->find($id);
         if (! $supplier) {
             abort(404);
         }
         $this->authorize('update', $supplier);
-        $validated = $request->validated();
+        $validated              = $request->validated();
         $validated['id']        = $id;
         $validated['tenant_id'] = $supplier->getTenantId();
-        $dto = SupplierData::fromArray($validated);
-        $updated = $this->updateService->execute($dto->toArray());
+        $dto                    = SupplierData::fromArray($validated);
+        $updated                = $this->updateService->execute($dto->toArray());
 
         return new SupplierResource($updated);
     }
@@ -226,7 +226,7 @@ class SupplierController extends BaseController
     )]
     public function destroy(int $id): JsonResponse
     {
-        $supplier = $this->service->find($id);
+        $supplier = $this->findService->find($id);
         if (! $supplier) {
             abort(404);
         }
@@ -234,10 +234,5 @@ class SupplierController extends BaseController
         $this->deleteService->execute(['id' => $id]);
 
         return response()->json(['message' => 'Supplier deleted successfully']);
-    }
-
-    protected function getModelClass(): string
-    {
-        return Supplier::class;
     }
 }

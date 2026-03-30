@@ -9,8 +9,8 @@ use Illuminate\Http\Request;
 use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\User\Application\Contracts\CreatePermissionServiceInterface;
 use Modules\User\Application\Contracts\DeletePermissionServiceInterface;
+use Modules\User\Application\Contracts\FindPermissionServiceInterface;
 use Modules\User\Domain\Entities\Permission;
-use Modules\User\Domain\RepositoryInterfaces\PermissionRepositoryInterface;
 use Modules\User\Infrastructure\Http\Requests\StorePermissionRequest;
 use Modules\User\Infrastructure\Http\Resources\PermissionResource;
 use OpenApi\Attributes as OA;
@@ -18,9 +18,9 @@ use OpenApi\Attributes as OA;
 class PermissionController extends AuthorizedController
 {
     public function __construct(
+        protected FindPermissionServiceInterface $findService,
         protected CreatePermissionServiceInterface $createService,
-        protected DeletePermissionServiceInterface $deleteService,
-        protected PermissionRepositoryInterface $permissionRepository
+        protected DeletePermissionServiceInterface $deleteService
     ) {}
 
     #[OA\Get(
@@ -47,13 +47,13 @@ class PermissionController extends AuthorizedController
     public function index(Request $request): JsonResponse
     {
         $this->authorize('viewAny', Permission::class);
-        $repo = clone $this->permissionRepository;
+        $filters = [];
         if ($tenantId = $request->query('tenant_id')) {
-            $repo->where('tenant_id', (int) $tenantId);
+            $filters['tenant_id'] = (int) $tenantId;
         }
-        $perPage = (int) $request->input('per_page', 15);
-        $page = (int) $request->input('page', 1);
-        $permissions = $repo->paginate($perPage, ['*'], 'page', $page);
+        $perPage     = (int) $request->input('per_page', 15);
+        $page        = (int) $request->input('page', 1);
+        $permissions = $this->findService->list($filters, $perPage, $page);
 
         return response()->json(PermissionResource::collection($permissions));
     }
@@ -79,7 +79,7 @@ class PermissionController extends AuthorizedController
     )]
     public function show(int $id): PermissionResource
     {
-        $permission = $this->permissionRepository->find($id);
+        $permission = $this->findService->find($id);
         if (! $permission) {
             abort(404);
         }
@@ -143,7 +143,7 @@ class PermissionController extends AuthorizedController
     )]
     public function destroy(int $id): JsonResponse
     {
-        $permission = $this->permissionRepository->find($id);
+        $permission = $this->findService->find($id);
         if (! $permission) {
             abort(404);
         }

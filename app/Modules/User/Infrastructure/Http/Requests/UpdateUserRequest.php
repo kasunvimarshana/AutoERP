@@ -18,16 +18,15 @@ class UpdateUserRequest extends FormRequest
         $userId = $this->route('user');
 
         return [
-            'tenant_id' => 'required|integer|exists:tenants,id',
-            'email' => 'required|email|unique:users,email,'.$userId,
-            'first_name' => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'phone' => 'nullable|string|max:20',
-            'address' => 'nullable|array',
+            'email'       => 'sometimes|required|email|unique:users,email,'.$userId,
+            'first_name'  => 'sometimes|required|string|max:255',
+            'last_name'   => 'sometimes|required|string|max:255',
+            'phone'       => 'nullable|string|max:20',
+            'address'     => 'nullable|array',
             'preferences' => 'nullable|array',
-            'active' => 'boolean',
-            'roles' => 'nullable|array',
-            'roles.*' => 'integer|exists:roles,id',
+            'active'      => 'boolean',
+            'roles'       => 'nullable|array',
+            'roles.*'     => 'integer|exists:roles,id',
         ];
     }
 }

@@ -9,11 +9,15 @@ use Illuminate\Support\ServiceProvider;
 use Modules\Category\Application\Contracts\CreateCategoryServiceInterface;
 use Modules\Category\Application\Contracts\DeleteCategoryImageServiceInterface;
 use Modules\Category\Application\Contracts\DeleteCategoryServiceInterface;
+use Modules\Category\Application\Contracts\FindCategoryImagesServiceInterface;
+use Modules\Category\Application\Contracts\FindCategoryServiceInterface;
 use Modules\Category\Application\Contracts\UpdateCategoryServiceInterface;
 use Modules\Category\Application\Contracts\UploadCategoryImageServiceInterface;
 use Modules\Category\Application\Services\CreateCategoryService;
 use Modules\Category\Application\Services\DeleteCategoryImageService;
 use Modules\Category\Application\Services\DeleteCategoryService;
+use Modules\Category\Application\Services\FindCategoryImagesService;
+use Modules\Category\Application\Services\FindCategoryService;
 use Modules\Category\Application\Services\UpdateCategoryService;
 use Modules\Category\Application\Services\UploadCategoryImageService;
 use Modules\Category\Domain\RepositoryInterfaces\CategoryImageRepositoryInterface;
@@ -60,6 +64,18 @@ class CategoryServiceProvider extends ServiceProvider
             return new DeleteCategoryImageService(
                 $app->make(CategoryImageRepositoryInterface::class),
                 $app->make(FileStorageServiceInterface::class)
+            );
+        });
+
+        $this->app->bind(FindCategoryServiceInterface::class, function ($app) {
+            return new FindCategoryService(
+                $app->make(CategoryRepositoryInterface::class)
+            );
+        });
+
+        $this->app->bind(FindCategoryImagesServiceInterface::class, function ($app) {
+            return new FindCategoryImagesService(
+                $app->make(CategoryImageRepositoryInterface::class)
             );
         });
     }

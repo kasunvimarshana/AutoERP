@@ -4,10 +4,12 @@ namespace Tests\Unit;
 
 use Modules\Supplier\Application\Contracts\CreateSupplierServiceInterface;
 use Modules\Supplier\Application\Contracts\DeleteSupplierServiceInterface;
+use Modules\Supplier\Application\Contracts\FindSupplierServiceInterface;
 use Modules\Supplier\Application\Contracts\UpdateSupplierServiceInterface;
 use Modules\Supplier\Application\DTOs\SupplierData;
 use Modules\Supplier\Application\Services\CreateSupplierService;
 use Modules\Supplier\Application\Services\DeleteSupplierService;
+use Modules\Supplier\Application\Services\FindSupplierService;
 use Modules\Supplier\Application\Services\UpdateSupplierService;
 use Modules\Supplier\Application\UseCases\CreateSupplier;
 use Modules\Supplier\Application\UseCases\DeleteSupplier;
@@ -296,6 +298,7 @@ class SupplierModuleTest extends TestCase
     public function test_all_supplier_service_interfaces_exist(): void
     {
         $this->assertTrue(interface_exists(CreateSupplierServiceInterface::class));
+        $this->assertTrue(interface_exists(FindSupplierServiceInterface::class));
         $this->assertTrue(interface_exists(UpdateSupplierServiceInterface::class));
         $this->assertTrue(interface_exists(DeleteSupplierServiceInterface::class));
     }
@@ -305,6 +308,7 @@ class SupplierModuleTest extends TestCase
     public function test_all_supplier_service_implementations_exist(): void
     {
         $this->assertTrue(class_exists(CreateSupplierService::class));
+        $this->assertTrue(class_exists(FindSupplierService::class));
         $this->assertTrue(class_exists(UpdateSupplierService::class));
         $this->assertTrue(class_exists(DeleteSupplierService::class));
     }
@@ -316,6 +320,10 @@ class SupplierModuleTest extends TestCase
             'CreateSupplierService must implement CreateSupplierServiceInterface.'
         );
         $this->assertTrue(
+            is_subclass_of(FindSupplierService::class, FindSupplierServiceInterface::class),
+            'FindSupplierService must implement FindSupplierServiceInterface.'
+        );
+        $this->assertTrue(
             is_subclass_of(UpdateSupplierService::class, UpdateSupplierServiceInterface::class),
             'UpdateSupplierService must implement UpdateSupplierServiceInterface.'
         );
@@ -323,6 +331,40 @@ class SupplierModuleTest extends TestCase
             is_subclass_of(DeleteSupplierService::class, DeleteSupplierServiceInterface::class),
             'DeleteSupplierService must implement DeleteSupplierServiceInterface.'
         );
+    }
+
+    public function test_find_supplier_service_does_not_support_write_execute(): void
+    {
+        $repo = $this->createMock(\Modules\Supplier\Domain\RepositoryInterfaces\SupplierRepositoryInterface::class);
+        $service = new FindSupplierService($repo);
+
+        $this->expectException(\BadMethodCallException::class);
+
+        $ref = new \ReflectionMethod($service, 'handle');
+        $ref->setAccessible(true);
+        $ref->invoke($service, []);
+    }
+
+    public function test_supplier_controller_extends_authorized_controller(): void
+    {
+        $this->assertTrue(
+            is_subclass_of(
+                \Modules\Supplier\Infrastructure\Http\Controllers\SupplierController::class,
+                \Modules\Core\Infrastructure\Http\Controllers\AuthorizedController::class
+            ),
+            'SupplierController must extend AuthorizedController.'
+        );
+    }
+
+    public function test_supplier_controller_injects_find_service(): void
+    {
+        $ref = new \ReflectionClass(\Modules\Supplier\Infrastructure\Http\Controllers\SupplierController::class);
+        $constructor = $ref->getConstructor();
+        $params = $constructor->getParameters();
+        $paramTypes = array_map(fn ($p) => (string) $p->getType(), $params);
+
+        $this->assertContains(FindSupplierServiceInterface::class, $paramTypes,
+            'SupplierController constructor must inject FindSupplierServiceInterface.');
     }
 
     // ── Application Use Cases ─────────────────────────────────────────────────

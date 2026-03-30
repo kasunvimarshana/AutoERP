@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Application\Services;
 
-use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Application\Services\BaseService;
+use Modules\Tenant\Application\Contracts\AttachmentStorageStrategyInterface;
 use Modules\Tenant\Application\Contracts\DeleteTenantAttachmentServiceInterface;
 use Modules\Tenant\Domain\Exceptions\AttachmentNotFoundException;
 use Modules\Tenant\Domain\RepositoryInterfaces\TenantAttachmentRepositoryInterface;
@@ -13,22 +13,22 @@ use Modules\Tenant\Domain\RepositoryInterfaces\TenantAttachmentRepositoryInterfa
 class DeleteTenantAttachmentService extends BaseService implements DeleteTenantAttachmentServiceInterface
 {
     public function __construct(
-        protected TenantAttachmentRepositoryInterface $attachmentRepo,
-        protected FileStorageServiceInterface $storage
+        private readonly TenantAttachmentRepositoryInterface $attachmentRepository,
+        private readonly AttachmentStorageStrategyInterface $storageStrategy
     ) {
-        parent::__construct($attachmentRepo); // use attachment repository as main
+        parent::__construct($attachmentRepository);
     }
 
     protected function handle(array $data): bool
     {
         $attachmentId = $data['attachment_id'];
-        $attachment = $this->attachmentRepo->find($attachmentId);
+        $attachment   = $this->attachmentRepository->find($attachmentId);
         if (! $attachment) {
             throw new AttachmentNotFoundException($attachmentId);
         }
 
-        $this->storage->delete($attachment->getFilePath());
+        $this->storageStrategy->delete($attachment->getFilePath());
 
-        return $this->attachmentRepo->delete($attachmentId);
+        return $this->attachmentRepository->delete($attachmentId);
     }
 }

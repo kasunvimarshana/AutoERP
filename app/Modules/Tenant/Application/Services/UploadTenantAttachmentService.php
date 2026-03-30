@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Application\Services;
 
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
-use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Application\Services\BaseService;
+use Modules\Tenant\Application\Contracts\AttachmentStorageStrategyInterface;
 use Modules\Tenant\Application\Contracts\UploadTenantAttachmentServiceInterface;
 use Modules\Tenant\Domain\Entities\TenantAttachment;
 use Modules\Tenant\Domain\Exceptions\TenantNotFoundException;
@@ -17,18 +18,26 @@ class UploadTenantAttachmentService extends BaseService implements UploadTenantA
 {
     public function __construct(
         private readonly TenantRepositoryInterface $tenantRepository,
-        protected TenantAttachmentRepositoryInterface $attachmentRepo,
-        protected FileStorageServiceInterface $storage
+        private readonly TenantAttachmentRepositoryInterface $attachmentRepository,
+        private readonly AttachmentStorageStrategyInterface $storageStrategy
     ) {
         parent::__construct($tenantRepository);
     }
 
+    /**
+     * Expected $data keys:
+     *   - tenant_id (int)
+     *   - file      (UploadedFile)
+     *   - type      (string|null)
+     *   - metadata  (array|null)
+     */
     protected function handle(array $data): TenantAttachment
     {
-        $tenantId = $data['tenant_id'];
-        $fileInfo = $data['file'];
-        $type = $data['type'] ?? null;
-        $metadata = $data['metadata'] ?? [];
+        $tenantId = (int) $data['tenant_id'];
+        /** @var UploadedFile $file */
+        $file     = $data['file'];
+        $type     = $data['type'] ?? null;
+        $metadata = isset($data['metadata']) && is_array($data['metadata']) ? $data['metadata'] : null;
 
         $tenant = $this->tenantRepository->find($tenantId);
         if (! $tenant) {
@@ -36,22 +45,22 @@ class UploadTenantAttachmentService extends BaseService implements UploadTenantA
         }
 
         $uuid = (string) Str::uuid();
-        $path = $this->storage->store($fileInfo['tmp_path'], "tenants/{$tenantId}", $fileInfo['name']);
+        $path = $this->storageStrategy->store($file, $tenantId);
 
         $attachment = new TenantAttachment(
             tenantId: $tenantId,
-            uuid: $uuid,
-            name: $fileInfo['name'],
+            uuid:     $uuid,
+            name:     $file->getClientOriginalName(),
             filePath: $path,
-            mimeType: $fileInfo['mime_type'],
-            size: $fileInfo['size'],
-            type: $type,
-            metadata: $metadata
+            mimeType: (string) $file->getMimeType(),
+            size:     (int) $file->getSize(),
+            type:     $type,
+            metadata: $metadata,
         );
 
-        $saved = $this->attachmentRepo->save($attachment);
+        $saved = $this->attachmentRepository->save($attachment);
 
-        // If this is a logo, update tenant's logo_path
+        // If this is a logo, update the tenant's logo_path
         if ($type === 'logo') {
             $tenant->setLogoPath($path);
             $this->tenantRepository->save($tenant);

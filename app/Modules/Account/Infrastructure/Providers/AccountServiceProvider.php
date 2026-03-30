@@ -8,9 +8,11 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Modules\Account\Application\Contracts\CreateAccountServiceInterface;
 use Modules\Account\Application\Contracts\DeleteAccountServiceInterface;
+use Modules\Account\Application\Contracts\FindAccountServiceInterface;
 use Modules\Account\Application\Contracts\UpdateAccountServiceInterface;
 use Modules\Account\Application\Services\CreateAccountService;
 use Modules\Account\Application\Services\DeleteAccountService;
+use Modules\Account\Application\Services\FindAccountService;
 use Modules\Account\Application\Services\UpdateAccountService;
 use Modules\Account\Domain\RepositoryInterfaces\AccountRepositoryInterface;
 use Modules\Account\Infrastructure\Persistence\Eloquent\Models\AccountModel;
@@ -26,6 +28,10 @@ class AccountServiceProvider extends ServiceProvider
 
         $this->app->bind(CreateAccountServiceInterface::class, function ($app) {
             return new CreateAccountService($app->make(AccountRepositoryInterface::class));
+        });
+
+        $this->app->bind(FindAccountServiceInterface::class, function ($app) {
+            return new FindAccountService($app->make(AccountRepositoryInterface::class));
         });
 
         $this->app->bind(UpdateAccountServiceInterface::class, function ($app) {

@@ -15,6 +15,10 @@ use Modules\User\Application\Contracts\DeletePermissionServiceInterface;
 use Modules\User\Application\Contracts\DeleteRoleServiceInterface;
 use Modules\User\Application\Contracts\DeleteUserAttachmentServiceInterface;
 use Modules\User\Application\Contracts\DeleteUserServiceInterface;
+use Modules\User\Application\Contracts\FindPermissionServiceInterface;
+use Modules\User\Application\Contracts\FindRoleServiceInterface;
+use Modules\User\Application\Contracts\FindUserAttachmentsServiceInterface;
+use Modules\User\Application\Contracts\FindUserServiceInterface;
 use Modules\User\Application\Contracts\SyncRolePermissionsServiceInterface;
 use Modules\User\Application\Contracts\UpdatePreferencesServiceInterface;
 use Modules\User\Application\Contracts\UpdateUserServiceInterface;
@@ -27,6 +31,10 @@ use Modules\User\Application\Services\DeletePermissionService;
 use Modules\User\Application\Services\DeleteRoleService;
 use Modules\User\Application\Services\DeleteUserAttachmentService;
 use Modules\User\Application\Services\DeleteUserService;
+use Modules\User\Application\Services\FindPermissionService;
+use Modules\User\Application\Services\FindRoleService;
+use Modules\User\Application\Services\FindUserAttachmentsService;
+use Modules\User\Application\Services\FindUserService;
 use Modules\User\Application\Services\SyncRolePermissionsService;
 use Modules\User\Application\Services\UpdatePreferencesService;
 use Modules\User\Application\Services\UpdateUserService;
@@ -67,6 +75,9 @@ class UserServiceProvider extends ServiceProvider
                 $app->make(RoleRepositoryInterface::class)
             );
         });
+        $this->app->bind(FindUserServiceInterface::class, function ($app) {
+            return new FindUserService($app->make(UserRepositoryInterface::class));
+        });
         $this->app->bind(UpdateUserServiceInterface::class, function ($app) {
             return new UpdateUserService($app->make(UserRepositoryInterface::class));
         });
@@ -96,8 +107,17 @@ class UserServiceProvider extends ServiceProvider
             );
         });
 
+        $this->app->bind(FindUserAttachmentsServiceInterface::class, function ($app) {
+            return new FindUserAttachmentsService(
+                $app->make(UserAttachmentRepositoryInterface::class)
+            );
+        });
+
         $this->app->bind(CreateRoleServiceInterface::class, function ($app) {
             return new CreateRoleService($app->make(RoleRepositoryInterface::class));
+        });
+        $this->app->bind(FindRoleServiceInterface::class, function ($app) {
+            return new FindRoleService($app->make(RoleRepositoryInterface::class));
         });
         $this->app->bind(DeleteRoleServiceInterface::class, function ($app) {
             return new DeleteRoleService($app->make(RoleRepositoryInterface::class));
@@ -107,6 +127,9 @@ class UserServiceProvider extends ServiceProvider
         });
         $this->app->bind(CreatePermissionServiceInterface::class, function ($app) {
             return new CreatePermissionService($app->make(PermissionRepositoryInterface::class));
+        });
+        $this->app->bind(FindPermissionServiceInterface::class, function ($app) {
+            return new FindPermissionService($app->make(PermissionRepositoryInterface::class));
         });
         $this->app->bind(DeletePermissionServiceInterface::class, function ($app) {
             return new DeletePermissionService($app->make(PermissionRepositoryInterface::class));

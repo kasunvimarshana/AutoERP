@@ -4,10 +4,12 @@ namespace Tests\Unit;
 
 use Modules\Account\Application\Contracts\CreateAccountServiceInterface;
 use Modules\Account\Application\Contracts\DeleteAccountServiceInterface;
+use Modules\Account\Application\Contracts\FindAccountServiceInterface;
 use Modules\Account\Application\Contracts\UpdateAccountServiceInterface;
 use Modules\Account\Application\DTOs\AccountData;
 use Modules\Account\Application\Services\CreateAccountService;
 use Modules\Account\Application\Services\DeleteAccountService;
+use Modules\Account\Application\Services\FindAccountService;
 use Modules\Account\Application\Services\UpdateAccountService;
 use Modules\Account\Application\UseCases\CreateAccount;
 use Modules\Account\Application\UseCases\DeleteAccount;
@@ -310,6 +312,7 @@ class AccountModuleTest extends TestCase
     public function test_all_account_service_interfaces_exist(): void
     {
         $this->assertTrue(interface_exists(CreateAccountServiceInterface::class));
+        $this->assertTrue(interface_exists(FindAccountServiceInterface::class));
         $this->assertTrue(interface_exists(UpdateAccountServiceInterface::class));
         $this->assertTrue(interface_exists(DeleteAccountServiceInterface::class));
     }
@@ -319,6 +322,7 @@ class AccountModuleTest extends TestCase
     public function test_all_account_service_implementations_exist(): void
     {
         $this->assertTrue(class_exists(CreateAccountService::class));
+        $this->assertTrue(class_exists(FindAccountService::class));
         $this->assertTrue(class_exists(UpdateAccountService::class));
         $this->assertTrue(class_exists(DeleteAccountService::class));
     }
@@ -330,6 +334,10 @@ class AccountModuleTest extends TestCase
             'CreateAccountService must implement CreateAccountServiceInterface.'
         );
         $this->assertTrue(
+            is_subclass_of(FindAccountService::class, FindAccountServiceInterface::class),
+            'FindAccountService must implement FindAccountServiceInterface.'
+        );
+        $this->assertTrue(
             is_subclass_of(UpdateAccountService::class, UpdateAccountServiceInterface::class),
             'UpdateAccountService must implement UpdateAccountServiceInterface.'
         );
@@ -337,6 +345,40 @@ class AccountModuleTest extends TestCase
             is_subclass_of(DeleteAccountService::class, DeleteAccountServiceInterface::class),
             'DeleteAccountService must implement DeleteAccountServiceInterface.'
         );
+    }
+
+    public function test_find_account_service_does_not_support_write_execute(): void
+    {
+        $repo = $this->createMock(\Modules\Account\Domain\RepositoryInterfaces\AccountRepositoryInterface::class);
+        $service = new FindAccountService($repo);
+
+        $this->expectException(\BadMethodCallException::class);
+
+        $ref = new \ReflectionMethod($service, 'handle');
+        $ref->setAccessible(true);
+        $ref->invoke($service, []);
+    }
+
+    public function test_account_controller_extends_authorized_controller(): void
+    {
+        $this->assertTrue(
+            is_subclass_of(
+                \Modules\Account\Infrastructure\Http\Controllers\AccountController::class,
+                \Modules\Core\Infrastructure\Http\Controllers\AuthorizedController::class
+            ),
+            'AccountController must extend AuthorizedController.'
+        );
+    }
+
+    public function test_account_controller_injects_find_service(): void
+    {
+        $ref = new \ReflectionClass(\Modules\Account\Infrastructure\Http\Controllers\AccountController::class);
+        $constructor = $ref->getConstructor();
+        $params = $constructor->getParameters();
+        $paramTypes = array_map(fn ($p) => (string) $p->getType(), $params);
+
+        $this->assertContains(FindAccountServiceInterface::class, $paramTypes,
+            'AccountController constructor must inject FindAccountServiceInterface.');
     }
 
     // ── Application Use Cases ─────────────────────────────────────────────────

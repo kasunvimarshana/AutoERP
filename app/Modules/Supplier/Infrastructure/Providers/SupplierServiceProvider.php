@@ -8,9 +8,11 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Modules\Supplier\Application\Contracts\CreateSupplierServiceInterface;
 use Modules\Supplier\Application\Contracts\DeleteSupplierServiceInterface;
+use Modules\Supplier\Application\Contracts\FindSupplierServiceInterface;
 use Modules\Supplier\Application\Contracts\UpdateSupplierServiceInterface;
 use Modules\Supplier\Application\Services\CreateSupplierService;
 use Modules\Supplier\Application\Services\DeleteSupplierService;
+use Modules\Supplier\Application\Services\FindSupplierService;
 use Modules\Supplier\Application\Services\UpdateSupplierService;
 use Modules\Supplier\Domain\RepositoryInterfaces\SupplierRepositoryInterface;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierModel;
@@ -26,6 +28,10 @@ class SupplierServiceProvider extends ServiceProvider
 
         $this->app->bind(CreateSupplierServiceInterface::class, function ($app) {
             return new CreateSupplierService($app->make(SupplierRepositoryInterface::class));
+        });
+
+        $this->app->bind(FindSupplierServiceInterface::class, function ($app) {
+            return new FindSupplierService($app->make(SupplierRepositoryInterface::class));
         });
 
         $this->app->bind(UpdateSupplierServiceInterface::class, function ($app) {

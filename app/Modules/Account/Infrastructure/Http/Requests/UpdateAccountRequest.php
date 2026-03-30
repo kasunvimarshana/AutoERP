@@ -16,9 +16,9 @@ class UpdateAccountRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'code'        => 'required|string|max:50',
-            'name'        => 'required|string|max:255',
-            'type'        => 'required|string|in:asset,liability,equity,income,expense',
+            'code'        => 'sometimes|required|string|max:50',
+            'name'        => 'sometimes|required|string|max:255',
+            'type'        => 'sometimes|required|string|in:asset,liability,equity,income,expense',
             'subtype'     => 'nullable|string|max:100',
             'description' => 'nullable|string',
             'currency'    => 'nullable|string|size:3',

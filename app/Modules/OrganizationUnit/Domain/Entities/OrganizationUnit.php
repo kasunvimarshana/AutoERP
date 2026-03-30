@@ -135,9 +135,9 @@ class OrganizationUnit
         $this->name = $name;
         $this->code = $code;
         $this->description = $description;
-        if ($metadata) {
-            $this->metadata = $metadata;
-        }
+        // When $metadata is explicitly null it means "clear to empty"; when it is
+        // an object the caller has already decided whether to keep or replace it.
+        $this->metadata = $metadata ?? new Metadata([]);
         $this->updatedAt = new \DateTimeImmutable;
     }
 

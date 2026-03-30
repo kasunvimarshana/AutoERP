@@ -6,9 +6,9 @@ namespace Modules\Category\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Modules\Category\Application\Contracts\DeleteCategoryImageServiceInterface;
+use Modules\Category\Application\Contracts\FindCategoryImagesServiceInterface;
 use Modules\Category\Application\Contracts\UploadCategoryImageServiceInterface;
 use Modules\Category\Domain\Entities\Category;
-use Modules\Category\Domain\RepositoryInterfaces\CategoryImageRepositoryInterface;
 use Modules\Category\Infrastructure\Http\Requests\UploadCategoryImageRequest;
 use Modules\Category\Infrastructure\Http\Resources\CategoryImageResource;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
@@ -20,7 +20,7 @@ class CategoryImageController extends AuthorizedController
     public function __construct(
         protected UploadCategoryImageServiceInterface $uploadService,
         protected DeleteCategoryImageServiceInterface $deleteService,
-        protected CategoryImageRepositoryInterface $imageRepo,
+        protected FindCategoryImagesServiceInterface $findService,
         protected FileStorageServiceInterface $storage
     ) {}
 
@@ -125,7 +125,7 @@ class CategoryImageController extends AuthorizedController
     )]
     public function serve(string $uuid)
     {
-        $image = $this->imageRepo->findByUuid($uuid);
+        $image = $this->findService->findByUuid($uuid);
         if (! $image) {
             abort(404);
         }

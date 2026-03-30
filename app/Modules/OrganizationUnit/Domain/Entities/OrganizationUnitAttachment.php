@@ -118,4 +118,22 @@ class OrganizationUnitAttachment
     {
         return $this->updatedAt;
     }
+
+    /**
+     * Update the mutable classification fields of an attachment.
+     *
+     * The stored file path, MIME type, name, size, and UUID are immutable
+     * after creation; only the human-assigned type label and the free-form
+     * metadata map may change without replacing the underlying file.
+     *
+     * Both parameters are assigned unconditionally. Callers are responsible
+     * for preserving existing values when a field was not present in the
+     * request payload (use UpdateOrganizationUnitAttachmentData::isProvided()
+     * to distinguish "absent" from "explicitly null" at the service layer).
+     */
+    public function updateDetails(?string $type, ?array $metadata): void
+    {
+        $this->type     = $type;
+        $this->metadata = $metadata;
+    }
 }

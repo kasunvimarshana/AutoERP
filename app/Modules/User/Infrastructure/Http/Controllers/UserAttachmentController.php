@@ -9,9 +9,9 @@ use Illuminate\Http\Request;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\User\Application\Contracts\DeleteUserAttachmentServiceInterface;
+use Modules\User\Application\Contracts\FindUserAttachmentsServiceInterface;
 use Modules\User\Application\Contracts\UploadUserAttachmentServiceInterface;
 use Modules\User\Domain\Entities\User;
-use Modules\User\Domain\RepositoryInterfaces\UserAttachmentRepositoryInterface;
 use Modules\User\Infrastructure\Http\Requests\UploadUserAttachmentRequest;
 use Modules\User\Infrastructure\Http\Resources\UserAttachmentResource;
 use OpenApi\Attributes as OA;
@@ -21,7 +21,7 @@ class UserAttachmentController extends AuthorizedController
     public function __construct(
         protected UploadUserAttachmentServiceInterface $uploadService,
         protected DeleteUserAttachmentServiceInterface $deleteService,
-        protected UserAttachmentRepositoryInterface $attachmentRepo,
+        protected FindUserAttachmentsServiceInterface $findService,
         protected FileStorageServiceInterface $storage
     ) {}
 
@@ -45,7 +45,7 @@ class UserAttachmentController extends AuthorizedController
     {
         $this->authorize('viewAttachments', User::class);
         $type = $request->query('type');
-        $attachments = $this->attachmentRepo->getByUser($userId, $type);
+        $attachments = $this->findService->getByUser($userId, $type);
 
         return UserAttachmentResource::collection($attachments);
     }
@@ -147,7 +147,7 @@ class UserAttachmentController extends AuthorizedController
     )]
     public function serve(string $uuid)
     {
-        $attachment = $this->attachmentRepo->findByUuid($uuid);
+        $attachment = $this->findService->findByUuid($uuid);
         if (! $attachment) {
             abort(404);
         }

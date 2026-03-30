@@ -22,7 +22,7 @@ use Modules\Auth\Infrastructure\Http\Requests\RegisterRequest;
 use Modules\Auth\Infrastructure\Http\Requests\ResetPasswordRequest;
 use Modules\Auth\Infrastructure\Http\Requests\SsoRequest;
 use Modules\Auth\Infrastructure\Http\Resources\AuthTokenResource;
-use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
+use Modules\User\Application\Contracts\FindUserServiceInterface;
 use Modules\User\Infrastructure\Http\Resources\UserResource;
 use OpenApi\Attributes as OA;
 
@@ -37,7 +37,7 @@ class AuthController extends AuthorizedController
         private readonly RefreshToken $refreshToken,
         private readonly ForgotPassword $forgotPassword,
         private readonly ResetPassword $resetPassword,
-        private readonly UserRepositoryInterface $userRepository,
+        private readonly FindUserServiceInterface $findUserService,
     ) {}
 
     #[OA\Post(
@@ -165,7 +165,7 @@ class AuthController extends AuthorizedController
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
-        $user = $this->userRepository->find($authenticatable->getAuthIdentifier());
+        $user = $this->findUserService->find($authenticatable->getAuthIdentifier());
 
         if (! $user) {
             return response()->json(['message' => 'User profile unavailable'], 404);
