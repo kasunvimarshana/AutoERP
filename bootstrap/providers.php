@@ -4,6 +4,7 @@ use App\Providers\AppServiceProvider;
 use Modules\Auth\Infrastructure\Providers\AuthModuleServiceProvider;
 use Modules\Account\Infrastructure\Providers\AccountServiceProvider;
 use Modules\Customer\Infrastructure\Providers\CustomerServiceProvider;
+use Modules\Location\Infrastructure\Providers\LocationServiceProvider;
 use Modules\Supplier\Infrastructure\Providers\SupplierServiceProvider;
 use Modules\Brand\Infrastructure\Providers\BrandServiceProvider;
 use Modules\Category\Infrastructure\Providers\CategoryServiceProvider;
@@ -28,4 +29,5 @@ return [
     AccountServiceProvider::class,
     SupplierServiceProvider::class,
     CustomerServiceProvider::class,
+    LocationServiceProvider::class,
 ];
