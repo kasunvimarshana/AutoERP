@@ -7,10 +7,11 @@ namespace Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 
 class WarehouseZoneModel extends Model
 {
-    use SoftDeletes;
+    use HasAudit, SoftDeletes;
 
     protected $table = 'warehouse_zones';
 

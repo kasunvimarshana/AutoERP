@@ -9,10 +9,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 
 class CategoryModel extends Model
 {
-    use SoftDeletes;
+    use HasAudit, SoftDeletes;
 
     protected $table = 'categories';
 

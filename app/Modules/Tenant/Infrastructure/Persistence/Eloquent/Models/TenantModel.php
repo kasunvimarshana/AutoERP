@@ -6,10 +6,11 @@ namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 
 class TenantModel extends Model
 {
-    use SoftDeletes;
+    use HasAudit, SoftDeletes;
 
     protected $table = 'tenants';
 

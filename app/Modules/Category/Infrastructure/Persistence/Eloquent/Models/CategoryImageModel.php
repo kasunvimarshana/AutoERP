@@ -7,10 +7,11 @@ namespace Modules\Category\Infrastructure\Persistence\Eloquent\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 
 class CategoryImageModel extends Model
 {
-    use SoftDeletes;
+    use HasAudit, SoftDeletes;
 
     protected $table = 'category_images';
 

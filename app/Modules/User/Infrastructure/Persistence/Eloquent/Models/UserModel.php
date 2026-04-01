@@ -10,10 +10,11 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Passport\Contracts\OAuthenticatable;
 use Laravel\Passport\HasApiTokens;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 
 class UserModel extends Authenticatable implements OAuthenticatable
 {
-    use HasApiTokens, Notifiable, SoftDeletes;
+    use HasAudit, HasApiTokens, Notifiable, SoftDeletes;
 
     protected $table = 'users';
 

@@ -7,10 +7,11 @@ namespace Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 
 class OrganizationUnitModel extends Model
 {
-    use SoftDeletes;
+    use HasAudit, SoftDeletes;
 
     protected $table = 'organization_units';
 

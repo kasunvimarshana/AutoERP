@@ -6,10 +6,11 @@ namespace Modules\Core\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 
 abstract class BaseModel extends Model
 {
-    use SoftDeletes;
+    use HasAudit, SoftDeletes;
 
     // protected $connection = 'tenant';
 
