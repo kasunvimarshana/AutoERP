@@ -81,6 +81,13 @@ DESC,
 #[OA\Tag(name: 'Category Images',    description: 'Category image management – upload, delete, serve')]
 #[OA\Tag(name: 'Accounts',           description: 'Account management – Chart of Accounts CRUD with hierarchical structure and flexible attributes')]
 #[OA\Tag(name: 'Suppliers',          description: 'Supplier management – CRUD with optional user login access, flexible attributes and multi-tenant support')]
+#[OA\Tag(name: 'HR - Employees',     description: 'Employee management – CRUD, department/position assignment, manager hierarchy, user account linking')]
+#[OA\Tag(name: 'HR - Departments',   description: 'Department management – CRUD with hierarchical nesting and manager assignment')]
+#[OA\Tag(name: 'HR - Positions',     description: 'Position/job-title management – CRUD with department assignment and grade levels')]
+#[OA\Tag(name: 'HR - Leave Requests', description: 'Leave request management – submit, approve, reject, cancel with full audit trail')]
+#[OA\Tag(name: 'HR - Attendance',    description: 'Attendance tracking – check-in/check-out records with status and hours worked')]
+#[OA\Tag(name: 'HR - Self Service',  description: 'Employee self-service – authenticated employee can view own profile and leave requests')]
+#[OA\Tag(name: 'HR - Biometric',     description: 'Biometric device integration – fingerprint / face / iris scanner check-in, check-out and employee enrollment')]
 
 // ── Reusable Error Schemas ────────────────────────────────────────────────────
 #[OA\Schema(
@@ -507,6 +514,107 @@ DESC,
         new OA\Property(property: 'has_user_access',  type: 'boolean', example: false),
         new OA\Property(property: 'created_at',       type: 'string',  format: 'date-time'),
         new OA\Property(property: 'updated_at',       type: 'string',  format: 'date-time'),
+    ],
+)]
+
+// ── HR Schemas ────────────────────────────────────────────────────────────────
+#[OA\Schema(
+    schema: 'DepartmentObject',
+    type: 'object',
+    properties: [
+        new OA\Property(property: 'id',          type: 'integer',  example: 1),
+        new OA\Property(property: 'tenant_id',   type: 'integer',  example: 1),
+        new OA\Property(property: 'name',        type: 'string',   example: 'Engineering'),
+        new OA\Property(property: 'code',        type: 'string',   nullable: true, example: 'ENG'),
+        new OA\Property(property: 'description', type: 'string',   nullable: true, example: 'Software engineering department'),
+        new OA\Property(property: 'manager_id',  type: 'integer',  nullable: true, example: null),
+        new OA\Property(property: 'parent_id',   type: 'integer',  nullable: true, example: null),
+        new OA\Property(property: 'metadata',    type: 'object',   nullable: true),
+        new OA\Property(property: 'is_active',   type: 'boolean',  example: true),
+        new OA\Property(property: 'created_at',  type: 'string',   format: 'date-time'),
+        new OA\Property(property: 'updated_at',  type: 'string',   format: 'date-time'),
+    ],
+)]
+#[OA\Schema(
+    schema: 'PositionObject',
+    type: 'object',
+    properties: [
+        new OA\Property(property: 'id',            type: 'integer', example: 1),
+        new OA\Property(property: 'tenant_id',     type: 'integer', example: 1),
+        new OA\Property(property: 'name',          type: 'string',  example: 'Senior Developer'),
+        new OA\Property(property: 'code',          type: 'string',  nullable: true, example: 'SWE-SR'),
+        new OA\Property(property: 'description',   type: 'string',  nullable: true, example: null),
+        new OA\Property(property: 'grade',         type: 'string',  nullable: true, example: 'L5'),
+        new OA\Property(property: 'department_id', type: 'integer', nullable: true, example: 1),
+        new OA\Property(property: 'metadata',      type: 'object',  nullable: true),
+        new OA\Property(property: 'is_active',     type: 'boolean', example: true),
+        new OA\Property(property: 'created_at',    type: 'string',  format: 'date-time'),
+        new OA\Property(property: 'updated_at',    type: 'string',  format: 'date-time'),
+    ],
+)]
+#[OA\Schema(
+    schema: 'EmployeeObject',
+    type: 'object',
+    properties: [
+        new OA\Property(property: 'id',              type: 'integer', example: 1),
+        new OA\Property(property: 'tenant_id',       type: 'integer', example: 1),
+        new OA\Property(property: 'first_name',      type: 'string',  example: 'John'),
+        new OA\Property(property: 'last_name',       type: 'string',  example: 'Doe'),
+        new OA\Property(property: 'email',           type: 'string',  format: 'email', example: 'john.doe@example.com'),
+        new OA\Property(property: 'phone',           type: 'string',  nullable: true, example: '+1-555-0100'),
+        new OA\Property(property: 'date_of_birth',   type: 'string',  nullable: true, example: '1990-06-15'),
+        new OA\Property(property: 'gender',          type: 'string',  nullable: true, example: 'male'),
+        new OA\Property(property: 'address',         type: 'string',  nullable: true, example: null),
+        new OA\Property(property: 'employee_number', type: 'string',  example: 'EMP-001'),
+        new OA\Property(property: 'hire_date',       type: 'string',  format: 'date', example: '2023-01-15'),
+        new OA\Property(property: 'employment_type', type: 'string',  example: 'full_time'),
+        new OA\Property(property: 'status',          type: 'string',  example: 'active'),
+        new OA\Property(property: 'department_id',   type: 'integer', nullable: true, example: 1),
+        new OA\Property(property: 'position_id',     type: 'integer', nullable: true, example: 1),
+        new OA\Property(property: 'manager_id',      type: 'integer', nullable: true, example: null),
+        new OA\Property(property: 'salary',          type: 'number',  nullable: true, example: 75000.00),
+        new OA\Property(property: 'currency',        type: 'string',  example: 'USD'),
+        new OA\Property(property: 'org_unit_id',     type: 'integer', nullable: true, example: null),
+        new OA\Property(property: 'metadata',        type: 'object',  nullable: true),
+        new OA\Property(property: 'is_active',       type: 'boolean', example: true),
+        new OA\Property(property: 'user_id',         type: 'integer', nullable: true, example: null),
+        new OA\Property(property: 'created_at',      type: 'string',  format: 'date-time'),
+        new OA\Property(property: 'updated_at',      type: 'string',  format: 'date-time'),
+    ],
+)]
+#[OA\Schema(
+    schema: 'LeaveRequestObject',
+    type: 'object',
+    properties: [
+        new OA\Property(property: 'id',          type: 'integer', example: 1),
+        new OA\Property(property: 'tenant_id',   type: 'integer', example: 1),
+        new OA\Property(property: 'employee_id', type: 'integer', example: 5),
+        new OA\Property(property: 'leave_type',  type: 'string',  example: 'annual'),
+        new OA\Property(property: 'start_date',  type: 'string',  format: 'date', example: '2024-07-01'),
+        new OA\Property(property: 'end_date',    type: 'string',  format: 'date', example: '2024-07-05'),
+        new OA\Property(property: 'reason',      type: 'string',  nullable: true, example: 'Family vacation'),
+        new OA\Property(property: 'status',      type: 'string',  example: 'pending'),
+        new OA\Property(property: 'approved_by', type: 'integer', nullable: true, example: null),
+        new OA\Property(property: 'notes',       type: 'string',  nullable: true, example: null),
+        new OA\Property(property: 'created_at',  type: 'string',  format: 'date-time'),
+        new OA\Property(property: 'updated_at',  type: 'string',  format: 'date-time'),
+    ],
+)]
+#[OA\Schema(
+    schema: 'AttendanceObject',
+    type: 'object',
+    properties: [
+        new OA\Property(property: 'id',             type: 'integer', example: 1),
+        new OA\Property(property: 'tenant_id',      type: 'integer', example: 1),
+        new OA\Property(property: 'employee_id',    type: 'integer', example: 5),
+        new OA\Property(property: 'date',           type: 'string',  format: 'date', example: '2024-06-01'),
+        new OA\Property(property: 'check_in_time',  type: 'string',  format: 'date-time', example: '2024-06-01T09:00:00Z'),
+        new OA\Property(property: 'check_out_time', type: 'string',  format: 'date-time', nullable: true, example: '2024-06-01T17:00:00Z'),
+        new OA\Property(property: 'status',         type: 'string',  example: 'present'),
+        new OA\Property(property: 'hours_worked',   type: 'number',  nullable: true, example: 8.0),
+        new OA\Property(property: 'notes',          type: 'string',  nullable: true, example: null),
+        new OA\Property(property: 'created_at',     type: 'string',  format: 'date-time'),
+        new OA\Property(property: 'updated_at',     type: 'string',  format: 'date-time'),
     ],
 )]
 

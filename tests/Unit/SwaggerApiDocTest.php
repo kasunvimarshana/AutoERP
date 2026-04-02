@@ -141,6 +141,13 @@ class SwaggerApiDocTest extends TestCase
             'Categories',
             'Category Images',
             'Accounts',
+            'HR - Employees',
+            'HR - Departments',
+            'HR - Positions',
+            'HR - Leave Requests',
+            'HR - Attendance',
+            'HR - Self Service',
+            'HR - Biometric',
         ];
 
         foreach ($expectedTags as $tag) {
@@ -186,6 +193,11 @@ class SwaggerApiDocTest extends TestCase
             'CategoryImageObject',
             'CategoryObject',
             'AccountObject',
+            'DepartmentObject',
+            'PositionObject',
+            'EmployeeObject',
+            'LeaveRequestObject',
+            'AttendanceObject',
         ];
 
         foreach ($expectedSchemas as $schema) {
@@ -375,6 +387,100 @@ class SwaggerApiDocTest extends TestCase
         ]);
     }
 
+    /**
+     * Verify HR EmployeeController methods are annotated with OA operations.
+     */
+    public function test_hr_employee_controller_methods_have_oa_annotations(): void
+    {
+        $this->assertControllerMethodsHaveOaAnnotations(\Modules\HR\Infrastructure\Http\Controllers\EmployeeController::class, [
+            'index',
+            'store',
+            'show',
+            'update',
+            'destroy',
+        ]);
+    }
+
+    /**
+     * Verify HR DepartmentController methods are annotated with OA operations.
+     */
+    public function test_hr_department_controller_methods_have_oa_annotations(): void
+    {
+        $this->assertControllerMethodsHaveOaAnnotations(\Modules\HR\Infrastructure\Http\Controllers\DepartmentController::class, [
+            'index',
+            'store',
+            'show',
+            'update',
+            'destroy',
+        ]);
+    }
+
+    /**
+     * Verify HR PositionController methods are annotated with OA operations.
+     */
+    public function test_hr_position_controller_methods_have_oa_annotations(): void
+    {
+        $this->assertControllerMethodsHaveOaAnnotations(\Modules\HR\Infrastructure\Http\Controllers\PositionController::class, [
+            'index',
+            'store',
+            'show',
+            'update',
+            'destroy',
+        ]);
+    }
+
+    /**
+     * Verify HR LeaveRequestController methods are annotated with OA operations.
+     */
+    public function test_hr_leave_request_controller_methods_have_oa_annotations(): void
+    {
+        $this->assertControllerMethodsHaveOaAnnotations(\Modules\HR\Infrastructure\Http\Controllers\LeaveRequestController::class, [
+            'index',
+            'store',
+            'show',
+            'update',
+            'destroy',
+        ]);
+    }
+
+    /**
+     * Verify HR AttendanceController methods are annotated with OA operations.
+     */
+    public function test_hr_attendance_controller_methods_have_oa_annotations(): void
+    {
+        $this->assertControllerMethodsHaveOaAnnotations(\Modules\HR\Infrastructure\Http\Controllers\AttendanceController::class, [
+            'index',
+            'store',
+            'show',
+            'update',
+            'destroy',
+        ]);
+    }
+
+    /**
+     * Verify HR EmployeeSelfServiceController methods are annotated with OA operations.
+     */
+    public function test_hr_self_service_controller_methods_have_oa_annotations(): void
+    {
+        $this->assertControllerMethodsHaveOaAnnotations(\Modules\HR\Infrastructure\Http\Controllers\EmployeeSelfServiceController::class, [
+            'profile',
+            'leaveRequests',
+        ]);
+    }
+
+    /**
+     * Verify HR BiometricAttendanceController methods are annotated with OA operations.
+     */
+    public function test_hr_biometric_attendance_controller_methods_have_oa_annotations(): void
+    {
+        $this->assertControllerMethodsHaveOaAnnotations(\Modules\HR\Infrastructure\Http\Controllers\BiometricAttendanceController::class, [
+            'checkIn',
+            'checkOut',
+            'enroll',
+            'devices',
+        ]);
+    }
+
     // ── OA\Info attribute values ───────────────────────────────────────────────
 
     /**
@@ -475,6 +581,11 @@ class SwaggerApiDocTest extends TestCase
             'BrandController::store'            => [\Modules\Brand\Infrastructure\Http\Controllers\BrandController::class, 'store'],
             'CategoryController::store'         => [\Modules\Category\Infrastructure\Http\Controllers\CategoryController::class, 'store'],
             'AccountController::store'          => [\Modules\Account\Infrastructure\Http\Controllers\AccountController::class, 'store'],
+            'HR\EmployeeController::store'      => [\Modules\HR\Infrastructure\Http\Controllers\EmployeeController::class,      'store'],
+            'HR\DepartmentController::store'    => [\Modules\HR\Infrastructure\Http\Controllers\DepartmentController::class,    'store'],
+            'HR\PositionController::store'      => [\Modules\HR\Infrastructure\Http\Controllers\PositionController::class,      'store'],
+            'HR\LeaveRequestController::store'  => [\Modules\HR\Infrastructure\Http\Controllers\LeaveRequestController::class,  'store'],
+            'HR\AttendanceController::store'    => [\Modules\HR\Infrastructure\Http\Controllers\AttendanceController::class,    'store'],
         ];
     }
 

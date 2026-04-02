@@ -7,6 +7,7 @@ use Modules\Customer\Infrastructure\Providers\CustomerServiceProvider;
 use Modules\Location\Infrastructure\Providers\LocationServiceProvider;
 use Modules\Warehouse\Infrastructure\Providers\WarehouseServiceProvider;
 use Modules\Supplier\Infrastructure\Providers\SupplierServiceProvider;
+use Modules\HR\Infrastructure\Providers\HRServiceProvider;
 use Modules\Brand\Infrastructure\Providers\BrandServiceProvider;
 use Modules\Category\Infrastructure\Providers\CategoryServiceProvider;
 use Modules\Core\Infrastructure\Providers\CoreServiceProvider;
@@ -32,4 +33,5 @@ return [
     CustomerServiceProvider::class,
     LocationServiceProvider::class,
     WarehouseServiceProvider::class,
+    HRServiceProvider::class,
 ];
