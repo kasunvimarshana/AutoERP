@@ -15,10 +15,10 @@ use Modules\Auth\Infrastructure\Http\Controllers\AuthController;
 
 // Public auth endpoints — rate-limited to protect against brute-force attacks
 Route::prefix('auth')->middleware('throttle:60,1')->group(function () {
-    Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/register', [AuthController::class, 'register'])->middleware('guest');
 
     // Stricter limit for login (5 attempts per minute)
-    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+    Route::post('/login', [AuthController::class, 'login'])->middleware(['throttle:5,1', 'guest']);
 
     // SSO token exchange
     Route::post('/sso/{provider}', [AuthController::class, 'ssoExchange']);

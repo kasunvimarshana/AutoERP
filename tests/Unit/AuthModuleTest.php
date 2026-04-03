@@ -46,6 +46,7 @@ use Modules\Auth\Domain\Exceptions\TokenExpiredException;
 use Modules\Auth\Infrastructure\Http\Controllers\AuthController;
 use Modules\Auth\Infrastructure\Http\Middleware\CheckPermission;
 use Modules\Auth\Infrastructure\Http\Middleware\CheckRole;
+use Modules\Auth\Infrastructure\Http\Middleware\RedirectIfAuthenticated;
 use Modules\Auth\Infrastructure\Http\Requests\LoginRequest;
 use Modules\Auth\Infrastructure\Http\Requests\RegisterRequest;
 use Modules\Auth\Infrastructure\Http\Requests\SsoRequest;
@@ -1075,5 +1076,82 @@ class AuthModuleTest extends TestCase
             $source,
             'DatabaseSeeder must call PassportSeeder to provision the personal access client on db:seed.'
         );
+    }
+
+    // -------------------------------------------------------------------------
+    // RedirectIfAuthenticated middleware
+    // -------------------------------------------------------------------------
+
+    public function test_redirect_if_authenticated_middleware_exists(): void
+    {
+        $this->assertTrue(class_exists(RedirectIfAuthenticated::class));
+    }
+
+    public function test_redirect_if_authenticated_middleware_has_handle_method(): void
+    {
+        $reflection = new \ReflectionClass(RedirectIfAuthenticated::class);
+        $this->assertTrue($reflection->hasMethod('handle'));
+    }
+
+    public function test_redirect_if_authenticated_middleware_handle_accepts_guard_variadic(): void
+    {
+        $reflection = new \ReflectionClass(RedirectIfAuthenticated::class);
+        $params = $reflection->getMethod('handle')->getParameters();
+
+        // Signature: handle(Request $request, Closure $next, string ...$guards)
+        $this->assertCount(3, $params);
+        $this->assertTrue($params[2]->isVariadic(), 'Third parameter must be variadic (guards).');
+        $this->assertSame('string', $params[2]->getType()?->getName());
+    }
+
+    public function test_redirect_if_authenticated_registered_in_bootstrap(): void
+    {
+        $source = file_get_contents(dirname(__DIR__, 2).'/bootstrap/app.php');
+
+        $this->assertStringContainsString(
+            'RedirectIfAuthenticated::class',
+            $source,
+            'RedirectIfAuthenticated must be registered in bootstrap/app.php.'
+        );
+    }
+
+    public function test_redirect_if_authenticated_registered_as_guest_alias(): void
+    {
+        $source = file_get_contents(dirname(__DIR__, 2).'/bootstrap/app.php');
+
+        $this->assertMatchesRegularExpression(
+            "/'guest'\s*=>\s*RedirectIfAuthenticated::class/",
+            $source,
+            "RedirectIfAuthenticated must be aliased as 'guest' in bootstrap/app.php."
+        );
+    }
+
+    public function test_login_route_applies_guest_middleware(): void
+    {
+        $source = file_get_contents(dirname(__DIR__, 2).'/app/Modules/Auth/routes/api.php');
+
+        $this->assertMatchesRegularExpression(
+            "/login.*middleware.*guest|guest.*login/s",
+            $source,
+            "The login route must apply the 'guest' middleware."
+        );
+    }
+
+    public function test_register_route_applies_guest_middleware(): void
+    {
+        $source = file_get_contents(dirname(__DIR__, 2).'/app/Modules/Auth/routes/api.php');
+
+        $this->assertMatchesRegularExpression(
+            "/register.*middleware.*guest|guest.*register/s",
+            $source,
+            "The register route must apply the 'guest' middleware."
+        );
+    }
+
+    public function test_auth_infrastructure_includes_redirect_if_authenticated(): void
+    {
+        $this->assertTrue(class_exists(CheckRole::class));
+        $this->assertTrue(class_exists(CheckPermission::class));
+        $this->assertTrue(class_exists(RedirectIfAuthenticated::class));
     }
 }

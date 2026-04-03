@@ -5,6 +5,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Modules\Auth\Infrastructure\Http\Middleware\CheckPermission;
 use Modules\Auth\Infrastructure\Http\Middleware\CheckRole;
+use Modules\Auth\Infrastructure\Http\Middleware\RedirectIfAuthenticated;
 use Modules\Tenant\Infrastructure\Http\Middleware\ResolveTenant;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -20,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'resolve.tenant' => ResolveTenant::class,
             'role' => CheckRole::class,
             'permission' => CheckPermission::class,
+            'guest' => RedirectIfAuthenticated::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
