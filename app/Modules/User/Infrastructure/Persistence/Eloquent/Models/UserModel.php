@@ -25,6 +25,7 @@ class UserModel extends Authenticatable implements OAuthenticatable
         'first_name',
         'last_name',
         'phone',
+        'avatar',
         'address',
         'preferences',
         'active',

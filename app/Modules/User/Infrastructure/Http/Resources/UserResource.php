@@ -19,6 +19,7 @@ class UserResource extends JsonResource
             'last_name' => $this->getLastName(),
             'full_name' => $this->getFullName(),
             'phone' => $this->getPhone()?->value(),
+            'avatar' => $this->getAvatar(),
             'address' => $this->getAddress()?->toArray(),
             'preferences' => $this->getPreferences()->toArray(),
             'active' => $this->isActive(),

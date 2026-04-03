@@ -30,6 +30,42 @@ use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantModel;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models\WarehouseModel;
 
+// WIMS module models — used to verify HasAudit for full audit compliance
+// Returns
+use Modules\Returns\Infrastructure\Persistence\Eloquent\Models\StockReturnModel;
+use Modules\Returns\Infrastructure\Persistence\Eloquent\Models\StockReturnLineModel;
+// Inbound flow
+use Modules\PurchaseOrder\Infrastructure\Persistence\Eloquent\Models\PurchaseOrderModel;
+use Modules\PurchaseOrder\Infrastructure\Persistence\Eloquent\Models\PurchaseOrderLineModel;
+use Modules\GoodsReceipt\Infrastructure\Persistence\Eloquent\Models\GoodsReceiptModel;
+use Modules\GoodsReceipt\Infrastructure\Persistence\Eloquent\Models\GoodsReceiptLineModel;
+// Outbound flow
+use Modules\SalesOrder\Infrastructure\Persistence\Eloquent\Models\SalesOrderModel;
+use Modules\SalesOrder\Infrastructure\Persistence\Eloquent\Models\SalesOrderLineModel;
+use Modules\Dispatch\Infrastructure\Persistence\Eloquent\Models\DispatchModel;
+use Modules\Dispatch\Infrastructure\Persistence\Eloquent\Models\DispatchLineModel;
+// Stock movement
+use Modules\StockMovement\Infrastructure\Persistence\Eloquent\Models\StockMovementModel;
+// Inventory
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\InventoryLevelModel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\InventoryValuationLayerModel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\InventoryBatchModel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\InventorySerialNumberModel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\InventoryCycleCountModel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\InventoryCycleCountLineModel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\InventoryLocationModel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\InventorySettingModel;
+// GS1 traceability
+use Modules\GS1\Infrastructure\Persistence\Eloquent\Models\Gs1IdentifierModel;
+use Modules\GS1\Infrastructure\Persistence\Eloquent\Models\Gs1BarcodeModel;
+// Warehouse zone
+use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models\WarehouseZoneModel;
+// UoM module
+use Modules\UoM\Infrastructure\Persistence\Eloquent\Models\UomCategoryModel;
+use Modules\UoM\Infrastructure\Persistence\Eloquent\Models\UnitOfMeasureModel;
+use Modules\UoM\Infrastructure\Persistence\Eloquent\Models\UomConversionModel;
+use Modules\UoM\Infrastructure\Persistence\Eloquent\Models\ProductUomSettingModel;
+
 class AuditTraitTest extends TestCase
 {
     // ── AuditAction Value Object ───────────────────────────────────────────────
@@ -429,6 +465,151 @@ class AuditTraitTest extends TestCase
     public function test_warehouse_model_uses_has_audit_trait(): void
     {
         $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(WarehouseModel::class));
+    }
+
+    // ── WIMS module models HasAudit (full audit compliance) ───────────────────
+    // ── WIMS — Returns module ─────────────────────────────────────────────────
+
+    public function test_stock_return_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(StockReturnModel::class));
+    }
+
+    public function test_stock_return_line_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(StockReturnLineModel::class));
+    }
+
+    public function test_stock_movement_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(StockMovementModel::class));
+    }
+
+    // ── WIMS — Inbound flow ───────────────────────────────────────────────────
+
+    public function test_purchase_order_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(PurchaseOrderModel::class));
+    }
+
+    public function test_purchase_order_line_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(PurchaseOrderLineModel::class));
+    }
+
+    public function test_goods_receipt_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(GoodsReceiptModel::class));
+    }
+
+    public function test_goods_receipt_line_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(GoodsReceiptLineModel::class));
+    }
+
+    // ── WIMS — Outbound flow ──────────────────────────────────────────────────
+
+    public function test_sales_order_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(SalesOrderModel::class));
+    }
+
+    public function test_sales_order_line_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(SalesOrderLineModel::class));
+    }
+
+    public function test_dispatch_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(DispatchModel::class));
+    }
+
+    public function test_dispatch_line_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(DispatchLineModel::class));
+    }
+
+    // ── WIMS — Inventory ──────────────────────────────────────────────────────
+
+    public function test_inventory_level_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(InventoryLevelModel::class));
+    }
+
+    public function test_inventory_valuation_layer_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(InventoryValuationLayerModel::class));
+    }
+
+    public function test_inventory_batch_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(InventoryBatchModel::class));
+    }
+
+    public function test_inventory_serial_number_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(InventorySerialNumberModel::class));
+    }
+
+    public function test_inventory_cycle_count_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(InventoryCycleCountModel::class));
+    }
+
+    public function test_inventory_cycle_count_line_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(InventoryCycleCountLineModel::class));
+    }
+
+    public function test_inventory_location_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(InventoryLocationModel::class));
+    }
+
+    public function test_inventory_setting_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(InventorySettingModel::class));
+    }
+
+    // ── WIMS — GS1 traceability ───────────────────────────────────────────────
+
+    public function test_gs1_identifier_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(Gs1IdentifierModel::class));
+    }
+
+    public function test_gs1_barcode_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(Gs1BarcodeModel::class));
+    }
+
+    // ── WIMS — Warehouse zone ─────────────────────────────────────────────────
+
+    public function test_warehouse_zone_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(WarehouseZoneModel::class));
+    }
+
+    // ── UoM module ────────────────────────────────────────────────────────────
+
+    public function test_uom_category_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(UomCategoryModel::class));
+    }
+
+    public function test_unit_of_measure_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(UnitOfMeasureModel::class));
+    }
+
+    public function test_uom_conversion_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(UomConversionModel::class));
+    }
+
+    public function test_product_uom_setting_model_uses_has_audit_trait(): void
+    {
+        $this->assertArrayHasKey(HasAudit::class, class_uses_recursive(ProductUomSettingModel::class));
     }
 
     // ── HasAudit filterAuditableAttributes ────────────────────────────────────

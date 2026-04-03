@@ -2,11 +2,19 @@
 
 use Illuminate\Support\Facades\Route;
 use Modules\User\Infrastructure\Http\Controllers\PermissionController;
+use Modules\User\Infrastructure\Http\Controllers\ProfileController;
 use Modules\User\Infrastructure\Http\Controllers\RoleController;
 use Modules\User\Infrastructure\Http\Controllers\UserAttachmentController;
 use Modules\User\Infrastructure\Http\Controllers\UserController;
 
 Route::middleware(['auth:api', 'resolve.tenant'])->group(function () {
+    // Profile endpoints (authenticated user managing their own profile)
+    Route::get('profile', [ProfileController::class, 'show']);
+    Route::patch('profile', [ProfileController::class, 'update']);
+    Route::post('profile/change-password', [ProfileController::class, 'changePassword']);
+    Route::patch('profile/preferences', [ProfileController::class, 'updatePreferences']);
+    Route::post('profile/avatar', [ProfileController::class, 'uploadAvatar']);
+
     Route::apiResource('users', UserController::class);
     Route::post('users/{user}/assign-role', [UserController::class, 'assignRole']);
     Route::patch('users/{user}/preferences', [UserController::class, 'updatePreferences']);

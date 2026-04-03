@@ -8,6 +8,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Route;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\User\Application\Contracts\AssignRoleServiceInterface;
+use Modules\User\Application\Contracts\ChangePasswordServiceInterface;
 use Modules\User\Application\Contracts\CreatePermissionServiceInterface;
 use Modules\User\Application\Contracts\CreateRoleServiceInterface;
 use Modules\User\Application\Contracts\CreateUserServiceInterface;
@@ -21,9 +22,12 @@ use Modules\User\Application\Contracts\FindUserAttachmentsServiceInterface;
 use Modules\User\Application\Contracts\FindUserServiceInterface;
 use Modules\User\Application\Contracts\SyncRolePermissionsServiceInterface;
 use Modules\User\Application\Contracts\UpdatePreferencesServiceInterface;
+use Modules\User\Application\Contracts\UpdateProfileServiceInterface;
 use Modules\User\Application\Contracts\UpdateUserServiceInterface;
+use Modules\User\Application\Contracts\UploadAvatarServiceInterface;
 use Modules\User\Application\Contracts\UploadUserAttachmentServiceInterface;
 use Modules\User\Application\Services\AssignRoleService;
+use Modules\User\Application\Services\ChangePasswordService;
 use Modules\User\Application\Services\CreatePermissionService;
 use Modules\User\Application\Services\CreateRoleService;
 use Modules\User\Application\Services\CreateUserService;
@@ -37,7 +41,9 @@ use Modules\User\Application\Services\FindUserAttachmentsService;
 use Modules\User\Application\Services\FindUserService;
 use Modules\User\Application\Services\SyncRolePermissionsService;
 use Modules\User\Application\Services\UpdatePreferencesService;
+use Modules\User\Application\Services\UpdateProfileService;
 use Modules\User\Application\Services\UpdateUserService;
+use Modules\User\Application\Services\UploadAvatarService;
 use Modules\User\Application\Services\UploadUserAttachmentService;
 use Modules\User\Domain\RepositoryInterfaces\PermissionRepositoryInterface;
 use Modules\User\Domain\RepositoryInterfaces\RoleRepositoryInterface;
@@ -92,6 +98,18 @@ class UserServiceProvider extends ServiceProvider
         });
         $this->app->bind(UpdatePreferencesServiceInterface::class, function ($app) {
             return new UpdatePreferencesService($app->make(UserRepositoryInterface::class));
+        });
+        $this->app->bind(UpdateProfileServiceInterface::class, function ($app) {
+            return new UpdateProfileService($app->make(UserRepositoryInterface::class));
+        });
+        $this->app->bind(ChangePasswordServiceInterface::class, function ($app) {
+            return new ChangePasswordService($app->make(UserRepositoryInterface::class));
+        });
+        $this->app->bind(UploadAvatarServiceInterface::class, function ($app) {
+            return new UploadAvatarService(
+                $app->make(UserRepositoryInterface::class),
+                $app->make(FileStorageServiceInterface::class)
+            );
         });
         $this->app->bind(UploadUserAttachmentServiceInterface::class, function ($app) {
             return new UploadUserAttachmentService(

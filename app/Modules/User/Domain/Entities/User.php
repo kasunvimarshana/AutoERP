@@ -31,6 +31,8 @@ class User
 
     private bool $active;
 
+    private ?string $avatar;
+
     private Collection $roles; // Collection of Role entities
 
     private \DateTimeInterface $createdAt;
@@ -48,7 +50,8 @@ class User
         bool $active = true,
         ?int $id = null,
         ?\DateTimeInterface $createdAt = null,
-        ?\DateTimeInterface $updatedAt = null
+        ?\DateTimeInterface $updatedAt = null,
+        ?string $avatar = null
     ) {
         $this->id = $id;
         $this->tenantId = $tenantId;
@@ -59,6 +62,7 @@ class User
         $this->address = $address;
         $this->preferences = $preferences ?? new UserPreferences;
         $this->active = $active;
+        $this->avatar = $avatar;
         $this->roles = new Collection;
         $this->createdAt = $createdAt ?? new \DateTimeImmutable;
         $this->updatedAt = $updatedAt ?? new \DateTimeImmutable;
@@ -108,6 +112,11 @@ class User
     public function getPreferences(): UserPreferences
     {
         return $this->preferences;
+    }
+
+    public function getAvatar(): ?string
+    {
+        return $this->avatar;
     }
 
     public function isActive(): bool
@@ -175,6 +184,12 @@ class User
     public function activate(): void
     {
         $this->active = true;
+        $this->updatedAt = new \DateTimeImmutable;
+    }
+
+    public function changeAvatar(?string $avatarPath): void
+    {
+        $this->avatar = $avatarPath;
         $this->updatedAt = new \DateTimeImmutable;
     }
 
