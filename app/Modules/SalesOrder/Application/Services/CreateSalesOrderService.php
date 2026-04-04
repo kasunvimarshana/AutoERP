@@ -1,50 +1,58 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\SalesOrder\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
-use Modules\Core\Domain\ValueObjects\Metadata;
+use Illuminate\Support\Facades\Event;
 use Modules\SalesOrder\Application\Contracts\CreateSalesOrderServiceInterface;
 use Modules\SalesOrder\Application\DTOs\SalesOrderData;
 use Modules\SalesOrder\Domain\Entities\SalesOrder;
 use Modules\SalesOrder\Domain\Events\SalesOrderCreated;
+use Modules\SalesOrder\Domain\RepositoryInterfaces\SalesOrderLineRepositoryInterface;
 use Modules\SalesOrder\Domain\RepositoryInterfaces\SalesOrderRepositoryInterface;
+use Modules\SalesOrder\Domain\ValueObjects\SalesOrderStatus;
 
-class CreateSalesOrderService extends BaseService implements CreateSalesOrderServiceInterface
+class CreateSalesOrderService implements CreateSalesOrderServiceInterface
 {
-    public function __construct(private readonly SalesOrderRepositoryInterface $orderRepository)
+    public function __construct(
+        private readonly SalesOrderRepositoryInterface $soRepository,
+        private readonly SalesOrderLineRepositoryInterface $lineRepository,
+    ) {}
+
+    public function execute(SalesOrderData $data): SalesOrder
     {
-        parent::__construct($orderRepository);
-    }
+        $totalAmount = 0.0;
+        foreach ($data->lines as $line) {
+            $totalAmount += (float) ($line['line_total'] ?? ($line['ordered_qty'] * $line['unit_price']));
+        }
 
-    protected function handle(array $data): SalesOrder
-    {
-        $dto = SalesOrderData::fromArray($data);
+        $so = $this->soRepository->create([
+            'tenant_id'              => $data->tenantId,
+            'warehouse_id'           => $data->warehouseId,
+            'customer_id'            => $data->customerId,
+            'so_number'              => $data->soNumber,
+            'status'                 => SalesOrderStatus::DRAFT,
+            'total_amount'           => $totalAmount,
+            'currency'               => $data->currency ?? 'USD',
+            'notes'                  => $data->notes,
+            'shipping_address'       => $data->shippingAddress,
+            'expected_delivery_date' => $data->expectedDeliveryDate,
+        ]);
 
-        $order = new SalesOrder(
-            tenantId:          $dto->tenantId,
-            referenceNumber:   $dto->referenceNumber,
-            customerId:        $dto->customerId,
-            orderDate:         $dto->orderDate,
-            customerReference: $dto->customerReference,
-            requiredDate:      $dto->requiredDate,
-            warehouseId:       $dto->warehouseId,
-            currency:          $dto->currency,
-            subtotal:          $dto->subtotal,
-            taxAmount:         $dto->taxAmount,
-            discountAmount:    $dto->discountAmount,
-            totalAmount:       $dto->totalAmount,
-            shippingAddress:   $dto->shippingAddress,
-            notes:             $dto->notes,
-            metadata:          $dto->metadata ? new Metadata($dto->metadata) : null,
-            status:            $dto->status,
-        );
+        foreach ($data->lines as $line) {
+            $this->lineRepository->create([
+                'sales_order_id'  => $so->id,
+                'product_id'      => $line['product_id'],
+                'variant_id'      => $line['variant_id'] ?? null,
+                'ordered_qty'     => $line['ordered_qty'],
+                'unit_price'      => $line['unit_price'],
+                'line_total'      => $line['line_total'] ?? ($line['ordered_qty'] * $line['unit_price']),
+                'discount_amount' => $line['discount_amount'] ?? null,
+                'notes'           => $line['notes'] ?? null,
+            ]);
+        }
 
-        $saved = $this->orderRepository->save($order);
-        $this->addEvent(new SalesOrderCreated($saved->getId(), $saved->getTenantId()));
+        Event::dispatch(new SalesOrderCreated($so->tenantId, $so->id));
 
-        return $saved;
+        return $so;
     }
 }

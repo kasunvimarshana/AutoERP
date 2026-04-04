@@ -1,25 +1,14 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Warehouse\Domain\RepositoryInterfaces;
 
-use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Modules\Warehouse\Domain\Entities\WarehouseZone;
 
-interface WarehouseZoneRepositoryInterface extends RepositoryInterface
+interface WarehouseZoneRepositoryInterface
 {
-    public function save(WarehouseZone $zone): WarehouseZone;
-
-    /**
-     * Return all zones belonging to a given warehouse.
-     *
-     * @return array<int, WarehouseZone>
-     */
-    public function getByWarehouse(int $warehouseId): array;
-
-    /**
-     * Move a zone node to a new parent within the nested-set tree.
-     */
-    public function moveNode(int $id, ?int $newParentZoneId): void;
+    public function findById(int $id): ?WarehouseZone;
+    public function findByWarehouse(int $warehouseId, array $filters = [], int $perPage = 15): LengthAwarePaginator;
+    public function create(array $data): WarehouseZone;
+    public function update(WarehouseZone $zone, array $data): WarehouseZone;
+    public function delete(WarehouseZone $zone): bool;
 }

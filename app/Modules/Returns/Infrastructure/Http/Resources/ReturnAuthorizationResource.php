@@ -1,32 +1,29 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Returns\Infrastructure\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Returns\Domain\Entities\ReturnAuthorization;
 
 class ReturnAuthorizationResource extends JsonResource
 {
+    public function __construct(private readonly ReturnAuthorization $rma)
+    {
+        parent::__construct($rma);
+    }
+
     public function toArray($request): array
     {
         return [
-            'id'             => $this->getId(),
-            'tenant_id'      => $this->getTenantId(),
-            'rma_number'     => $this->getRmaNumber(),
-            'return_type'    => $this->getReturnType(),
-            'party_id'       => $this->getPartyId(),
-            'party_type'     => $this->getPartyType(),
-            'reason'         => $this->getReason(),
-            'status'         => $this->getStatus(),
-            'authorized_by'  => $this->getAuthorizedBy(),
-            'authorized_at'  => $this->getAuthorizedAt()?->format('c'),
-            'expires_at'     => $this->getExpiresAt()?->format('c'),
-            'cancelled_at'   => $this->getCancelledAt()?->format('c'),
-            'stock_return_id'=> $this->getStockReturnId(),
-            'notes'          => $this->getNotes(),
-            'created_at'     => $this->getCreatedAt()->format('c'),
-            'updated_at'     => $this->getUpdatedAt()->format('c'),
+            'id'              => $this->rma->id,
+            'tenant_id'       => $this->rma->tenantId,
+            'rma_number'      => $this->rma->rmaNumber,
+            'stock_return_id' => $this->rma->stockReturnId,
+            'status'          => $this->rma->status,
+            'expires_at'      => $this->rma->expiresAt?->format('Y-m-d\TH:i:s\Z'),
+            'approved_by'     => $this->rma->approvedBy,
+            'approved_at'     => $this->rma->approvedAt?->format('Y-m-d\TH:i:s\Z'),
+            'notes'           => $this->rma->notes,
         ];
     }
 }

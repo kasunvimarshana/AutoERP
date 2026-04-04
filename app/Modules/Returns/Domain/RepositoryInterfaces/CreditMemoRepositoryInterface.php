@@ -1,17 +1,21 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Returns\Domain\RepositoryInterfaces;
 
-use Illuminate\Support\Collection;
-use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Modules\Returns\Domain\Entities\CreditMemo;
 
-interface CreditMemoRepositoryInterface extends RepositoryInterface
+interface CreditMemoRepositoryInterface
 {
+    public function findById(int $id): ?CreditMemo;
+
+    public function findByMemoNumber(int $tenantId, string $memoNumber): ?CreditMemo;
+
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator;
+
+    public function create(array $data): CreditMemo;
+
+    public function update(CreditMemo $memo, array $data): CreditMemo;
+
     public function save(CreditMemo $memo): CreditMemo;
-    public function findByStockReturn(int $tenantId, int $stockReturnId): Collection;
-    public function findByParty(int $tenantId, int $partyId, string $partyType): Collection;
-    public function findByStatus(int $tenantId, string $status): Collection;
 }

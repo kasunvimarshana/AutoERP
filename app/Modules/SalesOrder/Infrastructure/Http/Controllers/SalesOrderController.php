@@ -1,158 +1,155 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\SalesOrder\Infrastructure\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\SalesOrder\Application\Contracts\CancelSalesOrderServiceInterface;
 use Modules\SalesOrder\Application\Contracts\ConfirmSalesOrderServiceInterface;
 use Modules\SalesOrder\Application\Contracts\CreateSalesOrderServiceInterface;
-use Modules\SalesOrder\Application\Contracts\DeleteSalesOrderServiceInterface;
-use Modules\SalesOrder\Application\Contracts\DeliverSalesOrderServiceInterface;
-use Modules\SalesOrder\Application\Contracts\FindSalesOrderServiceInterface;
-use Modules\SalesOrder\Application\Contracts\ShipSalesOrderServiceInterface;
 use Modules\SalesOrder\Application\Contracts\StartPackingSalesOrderServiceInterface;
 use Modules\SalesOrder\Application\Contracts\StartPickingSalesOrderServiceInterface;
-use Modules\SalesOrder\Application\Contracts\UpdateSalesOrderServiceInterface;
 use Modules\SalesOrder\Application\DTOs\SalesOrderData;
-use Modules\SalesOrder\Application\DTOs\UpdateSalesOrderData;
-use Modules\SalesOrder\Infrastructure\Http\Requests\StoreSalesOrderRequest;
-use Modules\SalesOrder\Infrastructure\Http\Requests\UpdateSalesOrderRequest;
-use Modules\SalesOrder\Infrastructure\Http\Resources\SalesOrderCollection;
+use Modules\SalesOrder\Domain\RepositoryInterfaces\SalesOrderRepositoryInterface;
 use Modules\SalesOrder\Infrastructure\Http\Resources\SalesOrderResource;
+use Modules\SalesOrder\Infrastructure\Persistence\Eloquent\Models\SalesOrderModel;
 
-class SalesOrderController extends AuthorizedController
+class SalesOrderController extends Controller
 {
     public function __construct(
-        protected FindSalesOrderServiceInterface $findService,
-        protected CreateSalesOrderServiceInterface $createService,
-        protected UpdateSalesOrderServiceInterface $updateService,
-        protected DeleteSalesOrderServiceInterface $deleteService,
-        protected ConfirmSalesOrderServiceInterface $confirmService,
-        protected CancelSalesOrderServiceInterface $cancelService,
-        protected StartPickingSalesOrderServiceInterface $startPickingService,
-        protected StartPackingSalesOrderServiceInterface $startPackingService,
-        protected ShipSalesOrderServiceInterface $shipService,
-        protected DeliverSalesOrderServiceInterface $deliverService,
+        private readonly SalesOrderRepositoryInterface $repository,
+        private readonly CreateSalesOrderServiceInterface $createService,
+        private readonly ConfirmSalesOrderServiceInterface $confirmService,
+        private readonly CancelSalesOrderServiceInterface $cancelService,
+        private readonly StartPickingSalesOrderServiceInterface $startPickingService,
+        private readonly StartPackingSalesOrderServiceInterface $startPackingService,
     ) {}
 
-    public function index(Request $request): SalesOrderCollection
+    public function index(Request $request): JsonResponse
     {
-        $filters = $request->only(['tenant_id', 'status', 'customer_id', 'warehouse_id']);
-
-        return new SalesOrderCollection(
-            $this->findService->list($filters, $request->integer('per_page', 15), $request->integer('page', 1))
+        $tenantId = (int) $request->query('tenant_id', 0);
+        $sos = $this->repository->findAll(
+            $tenantId,
+            $request->only(['status', 'customer_id', 'warehouse_id'])
         );
+        return response()->json($sos);
     }
 
-    public function store(StoreSalesOrderRequest $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
-        $v   = $request->validated();
-        $dto = SalesOrderData::fromArray([
-            'tenantId'          => $v['tenant_id'],
-            'referenceNumber'   => $v['reference_number'],
-            'customerId'        => $v['customer_id'],
-            'orderDate'         => $v['order_date'],
-            'customerReference' => $v['customer_reference'] ?? null,
-            'requiredDate'      => $v['required_date'] ?? null,
-            'warehouseId'       => $v['warehouse_id'] ?? null,
-            'currency'          => $v['currency'] ?? 'USD',
-            'subtotal'          => $v['subtotal'] ?? 0.0,
-            'taxAmount'         => $v['tax_amount'] ?? 0.0,
-            'discountAmount'    => $v['discount_amount'] ?? 0.0,
-            'totalAmount'       => $v['total_amount'] ?? 0.0,
-            'shippingAddress'   => $v['shipping_address'] ?? null,
-            'notes'             => $v['notes'] ?? null,
-            'metadata'          => $v['metadata'] ?? null,
-            'status'            => $v['status'] ?? 'draft',
+        $validated = $request->validate([
+            'tenant_id'              => 'required|integer',
+            'warehouse_id'           => 'required|integer',
+            'customer_id'            => 'required|integer',
+            'so_number'              => 'required|string|max:100',
+            'lines'                  => 'required|array|min:1',
+            'lines.*.product_id'     => 'required|integer',
+            'lines.*.ordered_qty'    => 'required|numeric|min:0.0001',
+            'lines.*.unit_price'     => 'required|numeric|min:0',
+            'currency'               => 'nullable|string|size:3',
+            'notes'                  => 'nullable|string',
+            'shipping_address'       => 'nullable|string',
+            'expected_delivery_date' => 'nullable|date',
         ]);
 
-        $order = $this->createService->execute($dto->toArray());
-
-        return (new SalesOrderResource($order))->response()->setStatusCode(201);
-    }
-
-    public function show(int $id): SalesOrderResource|JsonResponse
-    {
-        $order = $this->findService->find($id);
-
-        if (! $order) {
-            return response()->json(['message' => 'Not found'], 404);
+        try {
+            $dto = new SalesOrderData(
+                tenantId: $validated['tenant_id'],
+                warehouseId: $validated['warehouse_id'],
+                customerId: $validated['customer_id'],
+                soNumber: $validated['so_number'],
+                lines: $validated['lines'],
+                currency: $validated['currency'] ?? 'USD',
+                notes: $validated['notes'] ?? null,
+                shippingAddress: $validated['shipping_address'] ?? null,
+                expectedDeliveryDate: $validated['expected_delivery_date'] ?? null,
+            );
+            $so = $this->createService->execute($dto);
+            return response()->json(new SalesOrderResource($so), 201);
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
         }
-
-        return new SalesOrderResource($order);
     }
 
-    public function update(UpdateSalesOrderRequest $request, int $id): SalesOrderResource
+    public function show(int $id): JsonResponse
     {
-        $v   = $request->validated();
-        $dto = UpdateSalesOrderData::fromArray(array_merge(['id' => $id], [
-            'customerReference' => $v['customer_reference'] ?? null,
-            'requiredDate'      => $v['required_date'] ?? null,
-            'warehouseId'       => $v['warehouse_id'] ?? null,
-            'shippingAddress'   => $v['shipping_address'] ?? null,
-            'notes'             => $v['notes'] ?? null,
-            'metadata'          => $v['metadata'] ?? null,
-        ]));
+        $so = $this->repository->findById($id);
+        if (!$so) return response()->json(['message' => 'Not found'], 404);
+        return response()->json(new SalesOrderResource($so));
+    }
 
-        return new SalesOrderResource($this->updateService->execute($dto->toArray()));
+    public function update(Request $request, int $id): JsonResponse
+    {
+        $so = $this->repository->findById($id);
+        if (!$so) return response()->json(['message' => 'Not found'], 404);
+
+        $validated = $request->validate([
+            'notes'                  => 'nullable|string',
+            'shipping_address'       => 'nullable|string',
+            'expected_delivery_date' => 'nullable|date',
+            'currency'               => 'nullable|string|size:3',
+        ]);
+
+        $updated = $this->repository->update($so, $validated);
+        return response()->json(new SalesOrderResource($updated));
     }
 
     public function destroy(int $id): JsonResponse
     {
-        $this->deleteService->execute(['id' => $id]);
-
-        return response()->json(['message' => 'Sales order deleted successfully']);
+        $so = $this->repository->findById($id);
+        if (!$so) return response()->json(['message' => 'Not found'], 404);
+        SalesOrderModel::findOrFail($id)->delete();
+        return response()->json(null, 204);
     }
 
-    public function confirm(Request $request, int $id): JsonResponse
+    public function confirm(int $id): JsonResponse
     {
-        $order = $this->confirmService->execute([
-            'id'           => $id,
-            'confirmed_by' => $request->integer('confirmed_by'),
-        ]);
-
-        return (new SalesOrderResource($order))->response();
+        $so = $this->repository->findById($id);
+        if (!$so) return response()->json(['message' => 'Not found'], 404);
+        try {
+            $so = $this->confirmService->execute($so);
+            return response()->json(new SalesOrderResource($so));
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     public function cancel(int $id): JsonResponse
     {
-        $order = $this->cancelService->execute(['id' => $id]);
-
-        return (new SalesOrderResource($order))->response();
+        $so = $this->repository->findById($id);
+        if (!$so) return response()->json(['message' => 'Not found'], 404);
+        try {
+            $so = $this->cancelService->execute($so);
+            return response()->json(new SalesOrderResource($so));
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
-    public function startPicking(int $id): JsonResponse
+    public function startPicking(Request $request, int $id): JsonResponse
     {
-        $order = $this->startPickingService->execute(['id' => $id]);
-
-        return (new SalesOrderResource($order))->response();
+        $so = $this->repository->findById($id);
+        if (!$so) return response()->json(['message' => 'Not found'], 404);
+        $request->validate(['picked_by' => 'required|integer']);
+        try {
+            $so = $this->startPickingService->execute($so, (int) $request->input('picked_by'));
+            return response()->json(new SalesOrderResource($so));
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
-    public function startPacking(int $id): JsonResponse
+    public function startPacking(Request $request, int $id): JsonResponse
     {
-        $order = $this->startPackingService->execute(['id' => $id]);
-
-        return (new SalesOrderResource($order))->response();
-    }
-
-    public function ship(Request $request, int $id): JsonResponse
-    {
-        $order = $this->shipService->execute([
-            'id'         => $id,
-            'shipped_by' => $request->integer('shipped_by'),
-        ]);
-
-        return (new SalesOrderResource($order))->response();
-    }
-
-    public function deliver(int $id): JsonResponse
-    {
-        $order = $this->deliverService->execute(['id' => $id]);
-
-        return (new SalesOrderResource($order))->response();
+        $so = $this->repository->findById($id);
+        if (!$so) return response()->json(['message' => 'Not found'], 404);
+        $request->validate(['packed_by' => 'required|integer']);
+        try {
+            $so = $this->startPackingService->execute($so, (int) $request->input('packed_by'));
+            return response()->json(new SalesOrderResource($so));
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 }

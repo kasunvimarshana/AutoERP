@@ -1,96 +1,54 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\StockMovement\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
-use Modules\Core\Domain\ValueObjects\Metadata;
+use Illuminate\Support\Facades\Event;
 use Modules\StockMovement\Application\Contracts\TransferStockServiceInterface;
 use Modules\StockMovement\Application\DTOs\TransferStockData;
-use Modules\StockMovement\Domain\Entities\StockMovement;
-use Modules\StockMovement\Domain\Events\StockMovementCreated;
+use Modules\StockMovement\Domain\Events\StockTransferred;
 use Modules\StockMovement\Domain\RepositoryInterfaces\StockMovementRepositoryInterface;
+use Modules\StockMovement\Domain\ValueObjects\MovementType;
 
-/**
- * TransferStockService
- *
- * Orchestrates a stock transfer between two locations by creating two
- * confirmed StockMovement records:
- *  1. An ISSUE movement from the source location (fromLocationId → null)
- *  2. A RECEIPT movement to the destination location (null → toLocationId)
- *
- * Both movements reference the same transfer reference number for full
- * audit traceability across inbound and outbound legs.
- *
- * Returns the RECEIPT movement as the primary result; callers may query
- * the paired ISSUE movement via the shared reference_number.
- */
-class TransferStockService extends BaseService implements TransferStockServiceInterface
+class TransferStockService implements TransferStockServiceInterface
 {
-    public function __construct(private readonly StockMovementRepositoryInterface $movementRepository)
+    public function __construct(private readonly StockMovementRepositoryInterface $repository) {}
+
+    public function execute(TransferStockData $data): array
     {
-        parent::__construct($movementRepository);
-    }
+        $issueRef   = $data->reference . '-OUT';
+        $receiptRef = $data->reference . '-IN';
 
-    protected function handle(array $data): StockMovement
-    {
-        $dto      = TransferStockData::fromArray($data);
-        $metadata = $dto->metadata ? new Metadata($dto->metadata) : null;
-        $now      = new \DateTimeImmutable;
+        $issue = $this->repository->create([
+            'tenant_id'        => $data->tenantId,
+            'product_id'       => $data->productId,
+            'warehouse_id'     => $data->fromWarehouseId,
+            'location_id'      => $data->fromLocationId,
+            'movement_type'    => MovementType::TRANSFER_OUT,
+            'quantity'         => $data->quantity,
+            'reference_number' => $issueRef,
+            'variant_id'       => $data->variantId,
+            'batch_id'         => $data->batchId,
+            'moved_at'         => now(),
+        ]);
 
-        // ── Issue movement (stock leaves source location) ────────────────
-        $issue = new StockMovement(
-            tenantId:        $dto->tenantId,
-            referenceNumber: $dto->referenceNumber . '-OUT',
-            movementType:    'issue',
-            productId:       $dto->productId,
-            quantity:        $dto->quantity,
-            variationId:     $dto->variationId,
-            fromLocationId:  $dto->fromLocationId,
-            toLocationId:    null,
-            batchId:         $dto->batchId,
-            serialNumberId:  $dto->serialNumberId,
-            uomId:           $dto->uomId,
-            unitCost:        $dto->unitCost,
-            currency:        $dto->currency,
-            referenceType:   'stock_transfer',
-            notes:           $dto->notes,
-            performedBy:     $dto->performedBy,
-            movementDate:    $now,
-            metadata:        $metadata,
-            status:          'confirmed',
-        );
-        $issue->confirm();
-        $savedIssue = $this->movementRepository->save($issue);
-        $this->addEvent(new StockMovementCreated($savedIssue));
+        $receipt = $this->repository->create([
+            'tenant_id'           => $data->tenantId,
+            'product_id'          => $data->productId,
+            'warehouse_id'        => $data->toWarehouseId,
+            'location_id'         => $data->toLocationId,
+            'movement_type'       => MovementType::TRANSFER_IN,
+            'quantity'            => $data->quantity,
+            'reference_number'    => $receiptRef,
+            'variant_id'          => $data->variantId,
+            'batch_id'            => $data->batchId,
+            'related_movement_id' => $issue->id,
+            'moved_at'            => now(),
+        ]);
 
-        // ── Receipt movement (stock arrives at destination location) ──────
-        $receipt = new StockMovement(
-            tenantId:        $dto->tenantId,
-            referenceNumber: $dto->referenceNumber . '-IN',
-            movementType:    'receipt',
-            productId:       $dto->productId,
-            quantity:        $dto->quantity,
-            variationId:     $dto->variationId,
-            fromLocationId:  null,
-            toLocationId:    $dto->toLocationId,
-            batchId:         $dto->batchId,
-            serialNumberId:  $dto->serialNumberId,
-            uomId:           $dto->uomId,
-            unitCost:        $dto->unitCost,
-            currency:        $dto->currency,
-            referenceType:   'stock_transfer',
-            notes:           $dto->notes,
-            performedBy:     $dto->performedBy,
-            movementDate:    $now,
-            metadata:        $metadata,
-            status:          'confirmed',
-        );
-        $receipt->confirm();
-        $savedReceipt = $this->movementRepository->save($receipt);
-        $this->addEvent(new StockMovementCreated($savedReceipt));
+        // Update the issue movement to reference the receipt
+        $this->repository->update($issue, ['related_movement_id' => $receipt->id]);
 
-        return $savedReceipt;
+        Event::dispatch(new StockTransferred($data->tenantId, $issue->id, $receipt->id));
+
+        return [$issue, $receipt];
     }
 }

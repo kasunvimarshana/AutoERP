@@ -1,9 +1,10 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Warehouse\Application\Contracts;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
+use Modules\Warehouse\Application\DTOs\WarehouseData;
+use Modules\Warehouse\Domain\Entities\Warehouse;
 
-interface UpdateWarehouseServiceInterface extends WriteServiceInterface {}
+interface UpdateWarehouseServiceInterface
+{
+    public function execute(Warehouse $warehouse, WarehouseData $data): Warehouse;
+}

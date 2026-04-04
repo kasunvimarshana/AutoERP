@@ -1,37 +1,32 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Returns\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
+use Illuminate\Support\Facades\Event;
 use Modules\Returns\Application\Contracts\VoidCreditMemoServiceInterface;
 use Modules\Returns\Domain\Entities\CreditMemo;
 use Modules\Returns\Domain\Events\CreditMemoVoided;
-use Modules\Returns\Domain\Exceptions\CreditMemoNotFoundException;
 use Modules\Returns\Domain\RepositoryInterfaces\CreditMemoRepositoryInterface;
+use Modules\Returns\Domain\ValueObjects\CreditMemoStatus;
 
-class VoidCreditMemoService extends BaseService implements VoidCreditMemoServiceInterface
+class VoidCreditMemoService implements VoidCreditMemoServiceInterface
 {
-    public function __construct(private readonly CreditMemoRepositoryInterface $creditMemoRepository)
-    {
-        parent::__construct($creditMemoRepository);
-    }
+    public function __construct(
+        private readonly CreditMemoRepositoryInterface $repository,
+    ) {}
 
-    protected function handle(array $data): CreditMemo
+    public function execute(CreditMemo $memo): CreditMemo
     {
-        $id   = $data['id'];
-        $memo = $this->creditMemoRepository->find($id);
-
-        if (! $memo) {
-            throw new CreditMemoNotFoundException($id);
+        if ($memo->status === CreditMemoStatus::APPLIED) {
+            throw new \DomainException('Cannot void an already applied credit memo.');
         }
 
-        $memo->void();
+        $updated = $this->repository->update($memo, [
+            'status' => CreditMemoStatus::VOIDED,
+        ]);
 
-        $saved = $this->creditMemoRepository->save($memo);
-        $this->addEvent(new CreditMemoVoided($saved));
+        Event::dispatch(new CreditMemoVoided($updated->tenantId, $updated->id));
 
-        return $saved;
+        return $updated;
     }
 }

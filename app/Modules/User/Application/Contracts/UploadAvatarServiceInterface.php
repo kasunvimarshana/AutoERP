@@ -1,12 +1,10 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\User\Application\Contracts;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
+use Illuminate\Http\UploadedFile;
+use Modules\User\Domain\Entities\User;
 
-/**
- * @method \Modules\User\Domain\Entities\User execute(array $data = [])
- */
-interface UploadAvatarServiceInterface extends WriteServiceInterface {}
+interface UploadAvatarServiceInterface
+{
+    public function execute(User $user, UploadedFile $file): User;
+}

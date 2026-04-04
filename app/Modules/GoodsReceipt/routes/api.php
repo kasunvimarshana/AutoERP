@@ -1,13 +1,14 @@
 <?php
-
 use Illuminate\Support\Facades\Route;
 use Modules\GoodsReceipt\Infrastructure\Http\Controllers\GoodsReceiptController;
-use Modules\GoodsReceipt\Infrastructure\Http\Controllers\GoodsReceiptLineController;
 
-Route::apiResource('goods-receipts', GoodsReceiptController::class);
-Route::post('goods-receipts/{id}/receive', [GoodsReceiptController::class, 'receive']);
-Route::post('goods-receipts/{id}/approve', [GoodsReceiptController::class, 'approve']);
-Route::post('goods-receipts/{id}/cancel', [GoodsReceiptController::class, 'cancel']);
-Route::post('goods-receipts/{id}/inspect', [GoodsReceiptController::class, 'inspect']);
-Route::post('goods-receipts/{id}/put-away', [GoodsReceiptController::class, 'putAway']);
-Route::apiResource('goods-receipt-lines', GoodsReceiptLineController::class);
+Route::prefix('goods-receipts')->group(function () {
+    Route::get('/',                  [GoodsReceiptController::class, 'index']);
+    Route::post('/',                 [GoodsReceiptController::class, 'store']);
+    Route::get('/{id}',              [GoodsReceiptController::class, 'show']);
+    Route::patch('/{id}',            [GoodsReceiptController::class, 'update']);
+    Route::delete('/{id}',           [GoodsReceiptController::class, 'destroy']);
+    Route::post('/{id}/inspect',     [GoodsReceiptController::class, 'inspect']);
+    Route::post('/{id}/put-away',    [GoodsReceiptController::class, 'putAway']);
+    Route::post('/{id}/complete',    [GoodsReceiptController::class, 'complete']);
+});

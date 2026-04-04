@@ -1,38 +1,27 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Inventory\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
+use Illuminate\Support\Facades\Event;
 use Modules\Inventory\Application\Contracts\ReserveStockServiceInterface;
 use Modules\Inventory\Domain\Entities\InventoryLevel;
 use Modules\Inventory\Domain\Events\StockReserved;
-use Modules\Inventory\Domain\Exceptions\InventoryLevelNotFoundException;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryLevelRepositoryInterface;
 
-class ReserveStockService extends BaseService implements ReserveStockServiceInterface
+class ReserveStockService implements ReserveStockServiceInterface
 {
-    public function __construct(private readonly InventoryLevelRepositoryInterface $levelRepository)
+    public function __construct(private readonly InventoryLevelRepositoryInterface $repository) {}
+
+    public function execute(int $levelId, float $qty): InventoryLevel
     {
-        parent::__construct($levelRepository);
-    }
-
-    protected function handle(array $data): InventoryLevel
-    {
-        $id  = (int) $data['id'];
-        $qty = (float) $data['qty'];
-
-        $level = $this->levelRepository->find($id);
-
-        if (! $level) {
-            throw new InventoryLevelNotFoundException($id);
+        $level = $this->repository->findById($levelId);
+        if (!$level) {
+            throw new \DomainException("Inventory level [{$levelId}] not found.");
         }
 
         $level->reserve($qty);
+        $saved = $this->repository->save($level);
 
-        $saved = $this->levelRepository->save($level);
-        $this->addEvent(new StockReserved($saved, $qty));
+        Event::dispatch(new StockReserved($saved->tenantId, $saved->id));
 
         return $saved;
     }

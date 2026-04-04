@@ -1,31 +1,31 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Returns\Infrastructure\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Returns\Domain\Entities\CreditMemo;
 
 class CreditMemoResource extends JsonResource
 {
+    public function __construct(private readonly CreditMemo $memo)
+    {
+        parent::__construct($memo);
+    }
+
     public function toArray($request): array
     {
         return [
-            'id'               => $this->getId(),
-            'tenant_id'        => $this->getTenantId(),
-            'reference_number' => $this->getReferenceNumber(),
-            'stock_return_id'  => $this->getStockReturnId(),
-            'party_id'         => $this->getPartyId(),
-            'party_type'       => $this->getPartyType(),
-            'status'           => $this->getStatus(),
-            'amount'           => $this->getAmount(),
-            'currency'         => $this->getCurrency(),
-            'issue_date'       => $this->getIssueDate()?->format('c'),
-            'applied_date'     => $this->getAppliedDate()?->format('c'),
-            'voided_date'      => $this->getVoidedDate()?->format('c'),
-            'notes'            => $this->getNotes(),
-            'created_at'       => $this->getCreatedAt()->format('c'),
-            'updated_at'       => $this->getUpdatedAt()->format('c'),
+            'id'              => $this->memo->id,
+            'tenant_id'       => $this->memo->tenantId,
+            'memo_number'     => $this->memo->memoNumber,
+            'stock_return_id' => $this->memo->stockReturnId,
+            'amount'          => $this->memo->amount,
+            'status'          => $this->memo->status,
+            'customer_id'     => $this->memo->customerId,
+            'currency'        => $this->memo->currency,
+            'notes'           => $this->memo->notes,
+            'issued_at'       => $this->memo->issuedAt?->format('Y-m-d\TH:i:s\Z'),
+            'issued_by'       => $this->memo->issuedBy,
         ];
     }
 }

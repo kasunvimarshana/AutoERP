@@ -1,27 +1,20 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\SalesOrder\Application\DTOs;
 
-use Modules\Core\Application\DTOs\BaseDto;
+use Modules\Core\Application\DTOs\BaseDTO;
 
-class SalesOrderData extends BaseDto
+class SalesOrderData extends BaseDTO
 {
-    public int $tenantId;
-    public string $referenceNumber;
-    public int $customerId;
-    public string $orderDate;
-    public ?string $customerReference = null;
-    public ?string $requiredDate = null;
-    public ?int $warehouseId = null;
-    public string $currency = 'USD';
-    public float $subtotal = 0.0;
-    public float $taxAmount = 0.0;
-    public float $discountAmount = 0.0;
-    public float $totalAmount = 0.0;
-    public ?array $shippingAddress = null;
-    public ?string $notes = null;
-    public ?array $metadata = null;
-    public string $status = 'draft';
+    public function __construct(
+        public readonly int $tenantId,
+        public readonly int $warehouseId,
+        public readonly int $customerId,
+        public readonly string $soNumber,
+        public readonly array $lines = [],
+        public readonly ?string $currency = 'USD',
+        public readonly ?string $notes = null,
+        public readonly ?string $shippingAddress = null,
+        public readonly ?string $expectedDeliveryDate = null,
+    ) {}
 }

@@ -1,20 +1,15 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Customer\Domain\RepositoryInterfaces;
 
-use Illuminate\Support\Collection;
-use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Modules\Customer\Domain\Entities\Customer;
 
-interface CustomerRepositoryInterface extends RepositoryInterface
+interface CustomerRepositoryInterface
 {
+    public function findById(int $id): ?Customer;
     public function findByCode(int $tenantId, string $code): ?Customer;
-
-    public function findByTenant(int $tenantId): Collection;
-
-    public function findByUserId(int $tenantId, int $userId): ?Customer;
-
-    public function save(Customer $customer): Customer;
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator;
+    public function create(array $data): Customer;
+    public function update(Customer $customer, array $data): Customer;
+    public function delete(Customer $customer): bool;
 }

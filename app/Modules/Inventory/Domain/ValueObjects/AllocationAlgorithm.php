@@ -1,95 +1,27 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Inventory\Domain\ValueObjects;
-
-use InvalidArgumentException;
 
 class AllocationAlgorithm
 {
-    /** First Expired, First Out — prioritises nearest expiry */
-    public const FEFO = 'fefo';
-
-    /** First In, First Out — prioritises oldest receipt */
-    public const FIFO = 'fifo';
-
-    /** Last In, First Out — prioritises newest receipt */
-    public const LIFO = 'lifo';
-
-    /** Zone-based — allocates from nearest or most efficient warehouse zone */
+    public const FIFO       = 'fifo';
+    public const LIFO       = 'lifo';
+    public const FEFO       = 'fefo';
+    public const NEAREST    = 'nearest';
     public const ZONE_BASED = 'zone_based';
 
-    /** Demand-based — allocates to fulfil highest-priority or time-sensitive demand first */
-    public const DEMAND_BASED = 'demand_based';
+    private static array $valid = [self::FIFO, self::LIFO, self::FEFO, self::NEAREST, self::ZONE_BASED];
 
-    public const VALID_ALGORITHMS = [
-        self::FEFO,
-        self::FIFO,
-        self::LIFO,
-        self::ZONE_BASED,
-        self::DEMAND_BASED,
-    ];
+    private function __construct(public readonly string $value) {}
 
-    private string $value;
-
-    public function __construct(string $value)
+    public static function from(string $v): self
     {
-        if (! in_array($value, self::VALID_ALGORITHMS, true)) {
-            throw new InvalidArgumentException("Invalid allocation algorithm: {$value}");
+        if (!in_array($v, self::$valid, true)) {
+            throw new \InvalidArgumentException("Invalid allocation algorithm: {$v}");
         }
-        $this->value = $value;
+        return new self($v);
     }
 
-    public function value(): string
-    {
-        return $this->value;
-    }
-
-    public function isFefo(): bool
-    {
-        return $this->value === self::FEFO;
-    }
-
-    public function isFifo(): bool
-    {
-        return $this->value === self::FIFO;
-    }
-
-    public function isLifo(): bool
-    {
-        return $this->value === self::LIFO;
-    }
-
-    public function isZoneBased(): bool
-    {
-        return $this->value === self::ZONE_BASED;
-    }
-
-    public function isDemandBased(): bool
-    {
-        return $this->value === self::DEMAND_BASED;
-    }
-
-    public function equals(self $other): bool
-    {
-        return $this->value === $other->value;
-    }
-
-    public function __toString(): string
-    {
-        return $this->value;
-    }
-
-    public static function assertValid(string $value): void
-    {
-        if (! in_array($value, self::VALID_ALGORITHMS, true)) {
-            throw new InvalidArgumentException("Invalid allocation algorithm: {$value}");
-        }
-    }
-
-    public static function values(): array
-    {
-        return self::VALID_ALGORITHMS;
-    }
+    public static function assertValid(string $v): void { self::from($v); }
+    public static function valid(): array { return self::$valid; }
+    public function __toString(): string { return $this->value; }
 }

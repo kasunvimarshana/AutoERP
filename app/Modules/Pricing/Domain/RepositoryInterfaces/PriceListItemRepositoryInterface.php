@@ -1,22 +1,13 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Pricing\Domain\RepositoryInterfaces;
-
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
 use Modules\Pricing\Domain\Entities\PriceListItem;
 
-interface PriceListItemRepositoryInterface extends RepositoryInterface
+interface PriceListItemRepositoryInterface
 {
-    public function save(PriceListItem $priceListItem): PriceListItem;
-
     public function findById(int $id): ?PriceListItem;
-
     public function findByPriceList(int $priceListId): array;
-
-    public function findByProduct(int $tenantId, int $productId): array;
-
-    public function list(array $filters, int $perPage, int $page): LengthAwarePaginator;
+    public function findByProduct(int $priceListId, int $productId): ?PriceListItem;
+    public function create(array $data): PriceListItem;
+    public function update(PriceListItem $item, array $data): PriceListItem;
+    public function delete(PriceListItem $item): bool;
 }

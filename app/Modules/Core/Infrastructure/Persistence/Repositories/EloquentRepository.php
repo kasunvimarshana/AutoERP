@@ -1,141 +1,51 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Core\Infrastructure\Persistence\Repositories;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
 
-class EloquentRepository extends BaseRepository
+abstract class EloquentRepository
 {
-    protected Model $model;
+    public function __construct(protected Model $model) {}
 
-    public function __construct(Model $model)
+    public function findById(int $id): ?Model
     {
-        $this->model = $model;
-        $this->provider = $model->newQuery();
+        return $this->model->find($id);
     }
 
-    /**
-     * Convert a model to a Domain entity when a mapper is configured.
-     */
-    protected function toDomainEntity(Model $model): mixed
+    public function findAll(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        return $this->mapToDomainEntity($model);
+        $query = $this->model->newQuery();
+        $this->applyFilters($query, $filters);
+
+        return $query->paginate($perPage);
     }
 
-    /**
-     * Convert a model collection to Domain entities.
-     */
-    protected function toDomainCollection(Collection $models): Collection
-    {
-        return $models->map(fn (Model $model) => $this->toDomainEntity($model));
-    }
-
-    /**
-     * Retrieve a raw Eloquent model without applying Domain mapping.
-     */
-    protected function findModel($id, array $columns = ['*']): ?Model
-    {
-        return $this->model->newQuery()->find($id, $columns);
-    }
-
-
-
-    /**
-     * {@inheritdoc}
-     */
-    protected function applyCriteria(): void
-    {
-        $this->resetProvider();
-
-        // Apply eager loading
-        if (! empty($this->with)) {
-            $this->provider->with($this->with);
-        }
-
-        // Apply where clauses
-        foreach ($this->wheres as $where) {
-            $this->provider->where($where['column'], $where['operator'], $where['value'], $where['boolean']);
-        }
-
-        // Apply whereIn
-        foreach ($this->whereIns as $whereIn) {
-            $this->provider->whereIn($whereIn['column'], $whereIn['values'], $whereIn['boolean'], $whereIn['not']);
-        }
-
-        // Apply whereBetween
-        foreach ($this->whereBetweens as $whereBetween) {
-            $this->provider->whereBetween($whereBetween['column'], $whereBetween['values'], $whereBetween['boolean'], $whereBetween['not']);
-        }
-
-        // Apply whereNull
-        foreach ($this->whereNulls as $whereNull) {
-            $method = $whereNull['not'] ? 'whereNotNull' : 'whereNull';
-            $this->provider->{$method}($whereNull['column'], $whereNull['boolean']);
-        }
-
-        // Apply orderBy
-        foreach ($this->orders as $order) {
-            $this->provider->orderBy($order['column'], $order['direction']);
-        }
-
-        // Apply orderByRaw
-        foreach ($this->orderByRaw as $rawOrder) {
-            $this->provider->orderByRaw($rawOrder['sql'], $rawOrder['bindings']);
-        }
-
-        // Apply limit and offset
-        if ($this->limit !== null) {
-            $this->provider->limit($this->limit);
-        }
-        if ($this->offset !== null) {
-            $this->provider->offset($this->offset);
-        }
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    protected function resetProvider(): void
-    {
-        $this->provider = $this->model->newQuery();
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function create(array $data)
+    public function create(array $data): Model
     {
         return $this->model->create($data);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function update($id, array $data)
+    public function update(Model $model, array $data): Model
     {
-        $record = $this->findModel($id);
-        if ($record) {
-            $record->update($data);
+        $model->fill($data);
+        $model->save();
 
-            return $record->fresh();
-        }
-
-        return null;
+        return $model;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function delete($id): bool
+    public function delete(Model $model): bool
     {
-        $record = $this->findModel($id);
-        if ($record) {
-            return (bool) $record->delete();
-        }
+        return (bool) $model->delete();
+    }
 
-        return false;
+    protected function applyFilters($query, array $filters): void
+    {
+        foreach ($filters as $field => $value) {
+            if ($value !== null) {
+                $query->where($field, $value);
+            }
+        }
     }
 }

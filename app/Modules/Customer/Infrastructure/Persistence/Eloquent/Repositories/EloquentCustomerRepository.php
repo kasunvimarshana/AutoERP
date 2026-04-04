@@ -1,10 +1,7 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Customer\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Support\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Customer\Domain\Entities\Customer;
 use Modules\Customer\Domain\RepositoryInterfaces\CustomerRepositoryInterface;
@@ -15,84 +12,62 @@ class EloquentCustomerRepository extends EloquentRepository implements CustomerR
     public function __construct(CustomerModel $model)
     {
         parent::__construct($model);
-        $this->setDomainEntityMapper(fn (CustomerModel $model): Customer => $this->mapModelToDomainEntity($model));
+    }
+
+    public function findById(int $id): ?Customer
+    {
+        $model = parent::findById($id);
+        return $model ? $this->toEntity($model) : null;
     }
 
     public function findByCode(int $tenantId, string $code): ?Customer
     {
         $model = $this->model->where('tenant_id', $tenantId)->where('code', $code)->first();
-
-        return $model ? $this->toDomainEntity($model) : null;
+        return $model ? $this->toEntity($model) : null;
     }
 
-    public function findByTenant(int $tenantId): Collection
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        return $this->toDomainCollection($this->model->where('tenant_id', $tenantId)->get());
-    }
-
-    public function findByUserId(int $tenantId, int $userId): ?Customer
-    {
-        $model = $this->model->where('tenant_id', $tenantId)->where('user_id', $userId)->first();
-
-        return $model ? $this->toDomainEntity($model) : null;
-    }
-
-    public function save(Customer $customer): Customer
-    {
-        $data = [
-            'tenant_id'        => $customer->getTenantId(),
-            'user_id'          => $customer->getUserId(),
-            'name'             => $customer->getName(),
-            'code'             => $customer->getCode(),
-            'email'            => $customer->getEmail(),
-            'phone'            => $customer->getPhone(),
-            'billing_address'  => $customer->getBillingAddress(),
-            'shipping_address' => $customer->getShippingAddress(),
-            'date_of_birth'    => $customer->getDateOfBirth(),
-            'loyalty_tier'     => $customer->getLoyaltyTier(),
-            'credit_limit'     => $customer->getCreditLimit(),
-            'payment_terms'    => $customer->getPaymentTerms(),
-            'currency'         => $customer->getCurrency(),
-            'tax_number'       => $customer->getTaxNumber(),
-            'status'           => $customer->getStatus(),
-            'type'             => $customer->getType(),
-            'attributes'       => $customer->getAttributes(),
-            'metadata'         => $customer->getMetadata(),
-        ];
-
-        if ($customer->getId()) {
-            $model = $this->update($customer->getId(), $data);
-        } else {
-            $model = $this->create($data);
+        $query = $this->model->where('tenant_id', $tenantId);
+        foreach ($filters as $key => $value) {
+            $query->where($key, $value);
         }
-
-        return $this->toDomainEntity($model);
+        return $query->paginate($perPage);
     }
 
-    private function mapModelToDomainEntity(CustomerModel $model): Customer
+    public function create(array $data): Customer
+    {
+        $model = parent::create($data);
+        return $this->toEntity($model);
+    }
+
+    public function update(Customer $customer, array $data): Customer
+    {
+        $model = $this->model->findOrFail($customer->id);
+        $updated = parent::update($model, $data);
+        return $this->toEntity($updated);
+    }
+
+    public function delete(Customer $customer): bool
+    {
+        $model = $this->model->findOrFail($customer->id);
+        return parent::delete($model);
+    }
+
+    private function toEntity(object $model): Customer
     {
         return new Customer(
+            id: $model->id,
             tenantId: $model->tenant_id,
             name: $model->name,
             code: $model->code,
-            userId: $model->user_id,
+            status: $model->status,
             email: $model->email,
             phone: $model->phone,
-            billingAddress: $model->billing_address,
-            shippingAddress: $model->shipping_address,
-            dateOfBirth: $model->date_of_birth,
-            loyaltyTier: $model->loyalty_tier,
-            creditLimit: $model->credit_limit,
-            paymentTerms: $model->payment_terms,
-            currency: $model->currency,
             taxNumber: $model->tax_number,
-            status: $model->status,
-            type: $model->type,
-            attributes: $model->attributes,
-            metadata: $model->metadata,
-            id: $model->id,
-            createdAt: $model->created_at,
-            updatedAt: $model->updated_at,
+            currency: $model->currency,
+            creditLimit: $model->credit_limit !== null ? (float) $model->credit_limit : null,
+            notes: $model->notes,
         );
     }
 }

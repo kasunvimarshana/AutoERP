@@ -1,100 +1,26 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Inventory\Domain\ValueObjects;
-
-use InvalidArgumentException;
 
 class LocationType
 {
-    public const BIN        = 'bin';
-    public const RACK       = 'rack';
-    public const SHELF      = 'shelf';
-    public const FLOOR      = 'floor';
-    public const RECEIVING  = 'receiving';
-    public const SHIPPING   = 'shipping';
-    public const STAGING    = 'staging';
-    public const QUARANTINE = 'quarantine';
+    public const INTERNAL = 'internal';
+    public const EXTERNAL = 'external';
+    public const VIRTUAL  = 'virtual';
+    public const TRANSIT  = 'transit';
 
-    public const VALID_TYPES = [
-        self::BIN,
-        self::RACK,
-        self::SHELF,
-        self::FLOOR,
-        self::RECEIVING,
-        self::SHIPPING,
-        self::STAGING,
-        self::QUARANTINE,
-    ];
+    private static array $valid = [self::INTERNAL, self::EXTERNAL, self::VIRTUAL, self::TRANSIT];
 
-    private string $value;
+    private function __construct(public readonly string $value) {}
 
-    public function __construct(string $value)
+    public static function from(string $v): self
     {
-        if (! in_array($value, self::VALID_TYPES, true)) {
-            throw new InvalidArgumentException("Invalid location type: {$value}");
+        if (!in_array($v, self::$valid, true)) {
+            throw new \InvalidArgumentException("Invalid location type: {$v}");
         }
-        $this->value = $value;
+        return new self($v);
     }
 
-    public function value(): string
-    {
-        return $this->value;
-    }
-
-    public function isBin(): bool
-    {
-        return $this->value === self::BIN;
-    }
-
-    public function isRack(): bool
-    {
-        return $this->value === self::RACK;
-    }
-
-    public function isShelf(): bool
-    {
-        return $this->value === self::SHELF;
-    }
-
-    public function isFloor(): bool
-    {
-        return $this->value === self::FLOOR;
-    }
-
-    public function isReceiving(): bool
-    {
-        return $this->value === self::RECEIVING;
-    }
-
-    public function isShipping(): bool
-    {
-        return $this->value === self::SHIPPING;
-    }
-
-    public function isStaging(): bool
-    {
-        return $this->value === self::STAGING;
-    }
-
-    public function isQuarantine(): bool
-    {
-        return $this->value === self::QUARANTINE;
-    }
-
-    public function equals(self $other): bool
-    {
-        return $this->value === $other->value;
-    }
-
-    public function __toString(): string
-    {
-        return $this->value;
-    }
-
-    public static function values(): array
-    {
-        return self::VALID_TYPES;
-    }
+    public static function assertValid(string $v): void { self::from($v); }
+    public static function valid(): array { return self::$valid; }
+    public function __toString(): string { return $this->value; }
 }

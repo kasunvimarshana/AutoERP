@@ -1,17 +1,16 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\SalesOrder\Domain\RepositoryInterfaces;
 
-use Illuminate\Support\Collection;
-use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Modules\SalesOrder\Domain\Entities\SalesOrder;
 
-interface SalesOrderRepositoryInterface extends RepositoryInterface
+interface SalesOrderRepositoryInterface
 {
-    public function save(SalesOrder $order): SalesOrder;
-    public function findByCustomer(int $tenantId, int $customerId): Collection;
-    public function findByStatus(int $tenantId, string $status): Collection;
-    public function findByReferenceNumber(int $tenantId, string $referenceNumber): ?SalesOrder;
+    public function findById(int $id): ?SalesOrder;
+    public function findBySoNumber(int $tenantId, string $soNumber): ?SalesOrder;
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator;
+    public function create(array $data): SalesOrder;
+    public function update(SalesOrder $so, array $data): SalesOrder;
+    public function save(SalesOrder $so): SalesOrder;
 }

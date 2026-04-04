@@ -1,45 +1,34 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Returns\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
+use Illuminate\Support\Facades\Event;
 use Modules\Returns\Application\Contracts\CompleteStockReturnServiceInterface;
 use Modules\Returns\Application\Contracts\ProcessReturnInventoryAdjustmentServiceInterface;
 use Modules\Returns\Domain\Entities\StockReturn;
 use Modules\Returns\Domain\Events\StockReturnCompleted;
-use Modules\Returns\Domain\Exceptions\StockReturnNotFoundException;
 use Modules\Returns\Domain\RepositoryInterfaces\StockReturnRepositoryInterface;
+use Modules\Returns\Domain\ValueObjects\ReturnStatus;
 
-class CompleteStockReturnService extends BaseService implements CompleteStockReturnServiceInterface
+class CompleteStockReturnService implements CompleteStockReturnServiceInterface
 {
     public function __construct(
-        private readonly StockReturnRepositoryInterface $returnRepository,
+        private readonly StockReturnRepositoryInterface $repository,
         private readonly ProcessReturnInventoryAdjustmentServiceInterface $inventoryAdjustmentService,
-    ) {
-        parent::__construct($returnRepository);
-    }
+    ) {}
 
-    protected function handle(array $data): StockReturn
+    public function execute(StockReturn $return, int $completedBy): StockReturn
     {
-        $id     = (int) $data['id'];
-        $return = $this->returnRepository->find($id);
+        $updated = $this->repository->update($return, [
+            'status'       => ReturnStatus::COMPLETED,
+            'completed_by' => $completedBy,
+            'completed_at' => now(),
+        ]);
 
-        if (! $return) {
-            throw new StockReturnNotFoundException($id);
-        }
+        $this->inventoryAdjustmentService->execute($updated);
 
-        $return->complete((int) $data['processed_by']);
+        Event::dispatch(new StockReturnCompleted($updated->tenantId, $updated->id));
 
-        $saved = $this->returnRepository->save($return);
-        $this->addEvent(new StockReturnCompleted($saved));
-
-        // Orchestrate inventory layer adjustments for all approved return lines.
-        // Creates StockMovement records, adjusts InventoryLevel quantities,
-        // and adds new InventoryValuationLayer entries per the tenant's valuation method.
-        $this->inventoryAdjustmentService->execute(['id' => $id]);
-
-        return $saved;
+        return $updated;
     }
 }

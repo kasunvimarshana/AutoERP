@@ -1,21 +1,46 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\SalesOrder\Domain\ValueObjects;
 
 class SalesOrderStatus
 {
-    const DRAFT     = 'draft';
-    const CONFIRMED = 'confirmed';
-    const PICKING   = 'picking';
-    const PACKING   = 'packing';
-    const SHIPPED   = 'shipped';
-    const DELIVERED = 'delivered';
-    const CANCELLED = 'cancelled';
+    public const DRAFT      = 'draft';
+    public const CONFIRMED  = 'confirmed';
+    public const PICKING    = 'picking';
+    public const PACKING    = 'packing';
+    public const SHIPPED    = 'shipped';
+    public const DELIVERED  = 'delivered';
+    public const CANCELLED  = 'cancelled';
+    public const CLOSED     = 'closed';
 
-    public static function values(): array
+    private static array $valid = [
+        self::DRAFT,
+        self::CONFIRMED,
+        self::PICKING,
+        self::PACKING,
+        self::SHIPPED,
+        self::DELIVERED,
+        self::CANCELLED,
+        self::CLOSED,
+    ];
+
+    private function __construct(public readonly string $value) {}
+
+    public static function from(string $v): self
     {
-        return ['draft', 'confirmed', 'picking', 'packing', 'shipped', 'delivered', 'cancelled'];
+        if (!in_array($v, self::$valid, true)) {
+            throw new \InvalidArgumentException("Invalid SO status: {$v}");
+        }
+        return new self($v);
+    }
+
+    public static function valid(): array
+    {
+        return self::$valid;
+    }
+
+    public function __toString(): string
+    {
+        return $this->value;
     }
 }

@@ -1,38 +1,30 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Customer\Infrastructure\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Customer\Domain\Entities\Customer;
 
 class CustomerResource extends JsonResource
 {
+    public function __construct(private readonly Customer $customer)
+    {
+        parent::__construct($customer);
+    }
+
     public function toArray($request): array
     {
         return [
-            'id'               => $this->getId(),
-            'tenant_id'        => $this->getTenantId(),
-            'user_id'          => $this->getUserId(),
-            'name'             => $this->getName(),
-            'code'             => $this->getCode(),
-            'email'            => $this->getEmail(),
-            'phone'            => $this->getPhone(),
-            'billing_address'  => $this->getBillingAddress(),
-            'shipping_address' => $this->getShippingAddress(),
-            'date_of_birth'    => $this->getDateOfBirth(),
-            'loyalty_tier'     => $this->getLoyaltyTier(),
-            'credit_limit'     => $this->getCreditLimit(),
-            'payment_terms'    => $this->getPaymentTerms(),
-            'currency'         => $this->getCurrency(),
-            'tax_number'       => $this->getTaxNumber(),
-            'status'           => $this->getStatus(),
-            'type'             => $this->getType(),
-            'attributes'       => $this->getAttributes(),
-            'metadata'         => $this->getMetadata(),
-            'has_user_access'  => $this->hasUserAccess(),
-            'created_at'       => $this->getCreatedAt()->format('c'),
-            'updated_at'       => $this->getUpdatedAt()->format('c'),
+            'id'           => $this->customer->id,
+            'tenant_id'    => $this->customer->tenantId,
+            'name'         => $this->customer->name,
+            'code'         => $this->customer->code,
+            'status'       => $this->customer->status,
+            'email'        => $this->customer->email,
+            'phone'        => $this->customer->phone,
+            'tax_number'   => $this->customer->taxNumber,
+            'currency'     => $this->customer->currency,
+            'credit_limit' => $this->customer->creditLimit,
+            'notes'        => $this->customer->notes,
         ];
     }
 }

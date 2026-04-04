@@ -1,44 +1,36 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Product\Infrastructure\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Product\Domain\Entities\Product;
 
 class ProductResource extends JsonResource
 {
+    public function __construct(private readonly Product $product)
+    {
+        parent::__construct($product);
+    }
+
     public function toArray($request): array
     {
         return [
-            'id'                => $this->getId(),
-            'tenant_id'         => $this->getTenantId(),
-            'sku'               => $this->getSku()->value(),
-            'name'              => $this->getName(),
-            'description'       => $this->getDescription(),
-            'price'             => [
-                'amount'   => $this->getPrice()->getAmount(),
-                'currency' => $this->getPrice()->getCurrency(),
-            ],
-            'category'          => $this->getCategory(),
-            'status'            => $this->getStatus(),
-            'type'              => $this->getType()->value(),
-            'units_of_measure'  => array_map(
-                fn ($uom) => $uom->toArray(),
-                $this->getUnitsOfMeasure()
-            ),
-            'attributes'        => $this->getAttributes(),
-            'metadata'          => $this->getMetadata(),
-            'product_attributes' => array_map(
-                fn ($attr) => $attr->toArray(),
-                $this->getProductAttributes()
-            ),
-            'images'            => ProductImageResource::collection($this->getImages()),
-            'variations'        => ProductVariationResource::collection($this->getVariations()),
-            'combo_items'       => ComboItemResource::collection($this->getComboItems()),
-            'created_at'        => $this->getCreatedAt()->format('c'),
-            'updated_at'        => $this->getUpdatedAt()->format('c'),
+            'id'             => $this->product->id,
+            'tenantId'       => $this->product->tenantId,
+            'sku'            => $this->product->sku,
+            'name'           => $this->product->name,
+            'type'           => $this->product->type,
+            'status'         => $this->product->status,
+            'categoryId'     => $this->product->categoryId,
+            'description'    => $this->product->description,
+            'barcode'        => $this->product->barcode,
+            'basePrice'      => $this->product->basePrice,
+            'costPrice'      => $this->product->costPrice,
+            'baseUomId'      => $this->product->baseUomId,
+            'trackInventory' => $this->product->trackInventory,
+            'trackBatch'     => $this->product->trackBatch,
+            'trackSerial'    => $this->product->trackSerial,
+            'trackLot'       => $this->product->trackLot,
+            'attributes'     => $this->product->attributes,
         ];
     }
 }
-

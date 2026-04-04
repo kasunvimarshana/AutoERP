@@ -1,38 +1,32 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\PurchaseOrder\Infrastructure\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\PurchaseOrder\Domain\Entities\PurchaseOrder;
 
 class PurchaseOrderResource extends JsonResource
 {
+    public function __construct(private readonly PurchaseOrder $po)
+    {
+        parent::__construct($po);
+    }
+
     public function toArray($request): array
     {
         return [
-            'id'                 => $this->getId(),
-            'tenant_id'          => $this->getTenantId(),
-            'reference_number'   => $this->getReferenceNumber(),
-            'status'             => $this->getStatus(),
-            'supplier_id'        => $this->getSupplierId(),
-            'supplier_reference' => $this->getSupplierReference(),
-            'order_date'         => $this->getOrderDate(),
-            'expected_date'      => $this->getExpectedDate(),
-            'warehouse_id'       => $this->getWarehouseId(),
-            'currency'           => $this->getCurrency(),
-            'subtotal'           => $this->getSubtotal(),
-            'tax_amount'         => $this->getTaxAmount(),
-            'discount_amount'    => $this->getDiscountAmount(),
-            'total_amount'       => $this->getTotalAmount(),
-            'notes'              => $this->getNotes(),
-            'metadata'           => $this->getMetadata()->toArray(),
-            'approved_by'        => $this->getApprovedBy(),
-            'approved_at'        => $this->getApprovedAt()?->format('c'),
-            'submitted_by'       => $this->getSubmittedBy(),
-            'submitted_at'       => $this->getSubmittedAt()?->format('c'),
-            'created_at'         => $this->getCreatedAt()->format('c'),
-            'updated_at'         => $this->getUpdatedAt()->format('c'),
+            'id'                     => $this->po->id,
+            'tenant_id'              => $this->po->tenantId,
+            'warehouse_id'           => $this->po->warehouseId,
+            'supplier_id'            => $this->po->supplierId,
+            'po_number'              => $this->po->poNumber,
+            'status'                 => $this->po->status,
+            'total_amount'           => $this->po->totalAmount,
+            'tax_amount'             => $this->po->taxAmount,
+            'currency'               => $this->po->currency,
+            'notes'                  => $this->po->notes,
+            'expected_delivery_date' => $this->po->expectedDeliveryDate?->format('Y-m-d'),
+            'approved_at'            => $this->po->approvedAt?->format('Y-m-d\TH:i:s\Z'),
+            'approved_by'            => $this->po->approvedBy,
         ];
     }
 }

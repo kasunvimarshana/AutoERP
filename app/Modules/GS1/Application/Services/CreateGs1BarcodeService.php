@@ -1,42 +1,49 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\GS1\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
-use Modules\Core\Domain\ValueObjects\Metadata;
-use Modules\GS1\Application\Contracts\CreateGs1BarcodeServiceInterface;
-use Modules\GS1\Application\DTOs\Gs1BarcodeData;
-use Modules\GS1\Domain\Entities\Gs1Barcode;
-use Modules\GS1\Domain\Events\Gs1BarcodeCreated;
-use Modules\GS1\Domain\RepositoryInterfaces\Gs1BarcodeRepositoryInterface;
+use Modules\GS1\Application\Contracts\CreateGS1BarcodeServiceInterface;
+use Modules\GS1\Application\DTOs\GS1BarcodeData;
+use Modules\GS1\Domain\Entities\GS1Barcode;
+use Modules\GS1\Domain\Events\GS1BarcodeCreated;
+use Modules\GS1\Domain\RepositoryInterfaces\GS1BarcodeRepositoryInterface;
 
-class CreateGs1BarcodeService extends BaseService implements CreateGs1BarcodeServiceInterface
+class CreateGS1BarcodeService implements CreateGS1BarcodeServiceInterface
 {
-    public function __construct(private readonly Gs1BarcodeRepositoryInterface $barcodeRepository)
+    public function __construct(
+        private readonly GS1BarcodeRepositoryInterface $repository,
+    ) {}
+
+    public function execute(GS1BarcodeData $data): GS1Barcode
     {
-        parent::__construct($barcodeRepository);
+        $digits     = $data->gs1CompanyPrefix . $data->itemReference;
+        $checkDigit = $this->calculateCheckDigit($digits);
+        $gtin       = $digits . $checkDigit;
+
+        $barcode = $this->repository->create([
+            'tenant_id'          => $data->tenantId,
+            'product_id'         => $data->productId,
+            'gs1_company_prefix' => $data->gs1CompanyPrefix,
+            'item_reference'     => $data->itemReference,
+            'check_digit'        => $checkDigit,
+            'gtin'               => $gtin,
+            'barcode_type'       => $data->barcodeType,
+            'variant_id'         => $data->variantId,
+            'is_active'          => true,
+        ]);
+
+        event(new GS1BarcodeCreated($data->tenantId, $barcode->id));
+
+        return $barcode;
     }
 
-    protected function handle(array $data): Gs1Barcode
+    private function calculateCheckDigit(string $digits): string
     {
-        $dto = Gs1BarcodeData::fromArray($data);
-
-        $barcode = new Gs1Barcode(
-            tenantId:               $dto->tenantId,
-            gs1IdentifierId:        $dto->gs1IdentifierId,
-            barcodeType:            $dto->barcodeType,
-            barcodeData:            $dto->barcodeData,
-            applicationIdentifiers: $dto->applicationIdentifiers,
-            isPrimary:              $dto->isPrimary,
-            isActive:               $dto->isActive,
-            metadata:               $dto->metadata ? new Metadata($dto->metadata) : null,
-        );
-
-        $saved = $this->barcodeRepository->save($barcode);
-        $this->addEvent(new Gs1BarcodeCreated($saved));
-
-        return $saved;
+        $sum        = 0;
+        $multiplier = 3;
+        for ($i = strlen($digits) - 1; $i >= 0; $i--) {
+            $sum       += (int) $digits[$i] * $multiplier;
+            $multiplier = ($multiplier === 3) ? 1 : 3;
+        }
+        return (string) ((10 - ($sum % 10)) % 10);
     }
 }

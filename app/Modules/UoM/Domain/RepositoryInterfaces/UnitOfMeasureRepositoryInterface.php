@@ -1,20 +1,14 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\UoM\Domain\RepositoryInterfaces;
-
-use Illuminate\Support\Collection;
-use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Modules\UoM\Domain\Entities\UnitOfMeasure;
 
-interface UnitOfMeasureRepositoryInterface extends RepositoryInterface
+interface UnitOfMeasureRepositoryInterface
 {
-    public function save(UnitOfMeasure $unit): UnitOfMeasure;
-
-    public function findByCode(int $tenantId, string $code): ?UnitOfMeasure;
-
-    public function findByCategory(int $tenantId, int $categoryId): Collection;
-
-    public function findBaseUnit(int $tenantId, int $categoryId): ?UnitOfMeasure;
+    public function findById(int $id): ?UnitOfMeasure;
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator;
+    public function findByCategory(int $categoryId): array;
+    public function create(array $data): UnitOfMeasure;
+    public function update(UnitOfMeasure $uom, array $data): UnitOfMeasure;
+    public function delete(UnitOfMeasure $uom): bool;
 }

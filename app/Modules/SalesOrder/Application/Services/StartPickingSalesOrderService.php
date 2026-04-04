@@ -1,37 +1,29 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\SalesOrder\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
+use Illuminate\Support\Facades\Event;
 use Modules\SalesOrder\Application\Contracts\StartPickingSalesOrderServiceInterface;
 use Modules\SalesOrder\Domain\Entities\SalesOrder;
 use Modules\SalesOrder\Domain\Events\SalesOrderPickingStarted;
-use Modules\SalesOrder\Domain\Exceptions\SalesOrderNotFoundException;
 use Modules\SalesOrder\Domain\RepositoryInterfaces\SalesOrderRepositoryInterface;
+use Modules\SalesOrder\Domain\ValueObjects\SalesOrderStatus;
 
-class StartPickingSalesOrderService extends BaseService implements StartPickingSalesOrderServiceInterface
+class StartPickingSalesOrderService implements StartPickingSalesOrderServiceInterface
 {
-    public function __construct(private readonly SalesOrderRepositoryInterface $orderRepository)
-    {
-        parent::__construct($orderRepository);
-    }
+    public function __construct(private readonly SalesOrderRepositoryInterface $repository) {}
 
-    protected function handle(array $data): SalesOrder
+    public function execute(SalesOrder $so, int $pickedBy): SalesOrder
     {
-        $id    = $data['id'];
-        $order = $this->orderRepository->find($id);
-
-        if (! $order) {
-            throw new SalesOrderNotFoundException($id);
+        if ($so->status !== SalesOrderStatus::CONFIRMED) {
+            throw new \DomainException("Sales order must be confirmed before picking can start.");
         }
-
-        $order->startPicking();
-
-        $saved = $this->orderRepository->save($order);
-        $this->addEvent(new SalesOrderPickingStarted($saved->getId(), $saved->getTenantId()));
-
-        return $saved;
+        $so = $this->repository->update($so, [
+            'status'    => SalesOrderStatus::PICKING,
+            'picked_by' => $pickedBy,
+            'picked_at' => now(),
+        ]);
+        Event::dispatch(new SalesOrderPickingStarted($so->tenantId, $so->id));
+        return $so;
     }
 }

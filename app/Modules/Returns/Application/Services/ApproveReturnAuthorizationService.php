@@ -1,39 +1,30 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Returns\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
+use Illuminate\Support\Facades\Event;
 use Modules\Returns\Application\Contracts\ApproveReturnAuthorizationServiceInterface;
 use Modules\Returns\Domain\Entities\ReturnAuthorization;
 use Modules\Returns\Domain\Events\ReturnAuthorizationApproved;
-use Modules\Returns\Domain\Exceptions\ReturnAuthorizationNotFoundException;
 use Modules\Returns\Domain\RepositoryInterfaces\ReturnAuthorizationRepositoryInterface;
+use Modules\Returns\Domain\ValueObjects\RmaStatus;
 
-class ApproveReturnAuthorizationService extends BaseService implements ApproveReturnAuthorizationServiceInterface
+class ApproveReturnAuthorizationService implements ApproveReturnAuthorizationServiceInterface
 {
-    public function __construct(private readonly ReturnAuthorizationRepositoryInterface $authorizationRepository)
+    public function __construct(
+        private readonly ReturnAuthorizationRepositoryInterface $repository,
+    ) {}
+
+    public function execute(ReturnAuthorization $rma, int $approvedBy): ReturnAuthorization
     {
-        parent::__construct($authorizationRepository);
-    }
+        $updated = $this->repository->update($rma, [
+            'status'      => RmaStatus::APPROVED,
+            'approved_by' => $approvedBy,
+            'approved_at' => now(),
+        ]);
 
-    protected function handle(array $data): ReturnAuthorization
-    {
-        $id            = $data['id'];
-        $authorization = $this->authorizationRepository->find($id);
+        Event::dispatch(new ReturnAuthorizationApproved($updated->tenantId, $updated->id));
 
-        if (! $authorization) {
-            throw new ReturnAuthorizationNotFoundException($id);
-        }
-
-        $expiresAt = isset($data['expires_at']) ? new \DateTimeImmutable($data['expires_at']) : null;
-
-        $authorization->approve((int) $data['authorized_by'], $expiresAt);
-
-        $saved = $this->authorizationRepository->save($authorization);
-        $this->addEvent(new ReturnAuthorizationApproved($saved));
-
-        return $saved;
+        return $updated;
     }
 }

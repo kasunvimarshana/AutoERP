@@ -1,9 +1,8 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\PurchaseOrder\Application\Contracts;
-
-use Modules\Core\Application\Contracts\WriteServiceInterface;
-
-interface CreatePurchaseOrderServiceInterface extends WriteServiceInterface {}
+use Modules\PurchaseOrder\Application\DTOs\PurchaseOrderData;
+use Modules\PurchaseOrder\Domain\Entities\PurchaseOrder;
+interface CreatePurchaseOrderServiceInterface
+{
+    public function execute(PurchaseOrderData $data): PurchaseOrder;
+}

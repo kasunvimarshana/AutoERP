@@ -1,28 +1,13 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\User\Application\DTOs;
 
-use Modules\Core\Application\DTOs\BaseDto;
+use Modules\Core\Application\DTOs\BaseDTO;
 
-class UpdateProfileData extends BaseDto
+class UpdateProfileData extends BaseDTO
 {
-    public string $first_name;
-
-    public string $last_name;
-
-    public ?string $phone;
-
-    public ?array $address;
-
-    public function rules(): array
-    {
-        return [
-            'first_name' => 'required|string|max:255',
-            'last_name'  => 'required|string|max:255',
-            'phone'      => 'nullable|string|max:20',
-            'address'    => 'nullable|array',
-        ];
-    }
+    public function __construct(
+        public readonly ?string $name = null,
+        public readonly ?string $email = null,
+        public readonly ?array $preferences = null,
+    ) {}
 }

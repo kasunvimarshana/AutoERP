@@ -1,45 +1,26 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\User\Application\Services;
 
-use Illuminate\Support\Facades\Hash;
-use Modules\Core\Application\Services\BaseService;
-use Modules\Core\Domain\Exceptions\DomainException;
+use Illuminate\Support\Facades\Event;
 use Modules\User\Application\Contracts\ChangePasswordServiceInterface;
+use Modules\User\Application\DTOs\ChangePasswordData;
+use Modules\User\Domain\Entities\User;
 use Modules\User\Domain\Events\UserPasswordChanged;
-use Modules\User\Domain\Exceptions\UserNotFoundException;
 use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 
-class ChangePasswordService extends BaseService implements ChangePasswordServiceInterface
+class ChangePasswordService implements ChangePasswordServiceInterface
 {
-    private UserRepositoryInterface $userRepository;
+    public function __construct(private readonly UserRepositoryInterface $repository) {}
 
-    public function __construct(UserRepositoryInterface $repository)
+    public function execute(User $user, ChangePasswordData $data): bool
     {
-        parent::__construct($repository);
-        $this->userRepository = $repository;
-    }
-
-    protected function handle(array $data): mixed
-    {
-        $userId = $data['user_id'];
-        $currentPassword = $data['current_password'];
-        $newPassword = $data['password'];
-
-        $user = $this->userRepository->find($userId);
-        if (! $user) {
-            throw new UserNotFoundException($userId);
+        if (!$this->repository->verifyPassword($user, $data->currentPassword)) {
+            throw new \InvalidArgumentException('Current password is incorrect.');
         }
-
-        if (! $this->userRepository->verifyPassword($userId, $currentPassword)) {
-            throw new DomainException('Current password is incorrect.');
+        $result = $this->repository->changePassword($user, $data->newPassword);
+        if ($result) {
+            Event::dispatch(new UserPasswordChanged($user->tenantId, $user->id));
         }
-
-        $this->userRepository->changePassword($userId, Hash::make($newPassword));
-        $this->addEvent(new UserPasswordChanged($user));
-
-        return null;
+        return $result;
     }
 }

@@ -1,20 +1,15 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Warehouse\Domain\RepositoryInterfaces;
 
-use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Modules\Warehouse\Domain\Entities\Warehouse;
 
-interface WarehouseRepositoryInterface extends RepositoryInterface
+interface WarehouseRepositoryInterface
 {
-    public function save(Warehouse $warehouse): Warehouse;
-
-    /**
-     * Return all warehouses belonging to a given location.
-     *
-     * @return array<int, Warehouse>
-     */
-    public function getByLocation(int $locationId): array;
+    public function findById(int $id): ?Warehouse;
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator;
+    public function findByCode(int $tenantId, string $code): ?Warehouse;
+    public function create(array $data): Warehouse;
+    public function update(Warehouse $warehouse, array $data): Warehouse;
+    public function delete(Warehouse $warehouse): bool;
 }

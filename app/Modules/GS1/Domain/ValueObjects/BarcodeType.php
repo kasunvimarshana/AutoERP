@@ -1,20 +1,28 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\GS1\Domain\ValueObjects;
 
-class BarcodeType
+final class BarcodeType
 {
-    public const GS1_128    = 'gs1_128';
-    public const EAN_13     = 'ean_13';
-    public const EAN_8      = 'ean_8';
-    public const UPC_A      = 'upc_a';
-    public const DATAMATRIX = 'datamatrix';
-    public const QR_CODE    = 'qr_code';
+    public const GTIN_8  = 'GTIN-8';
+    public const GTIN_12 = 'GTIN-12';
+    public const GTIN_13 = 'GTIN-13';
+    public const GTIN_14 = 'GTIN-14';
+    public const SSCC    = 'SSCC';
+    public const GS1_128 = 'GS1-128';
 
-    public static function values(): array
+    private static array $valid = [
+        self::GTIN_8, self::GTIN_12, self::GTIN_13, self::GTIN_14,
+        self::SSCC, self::GS1_128,
+    ];
+
+    public function __construct(private readonly string $value)
     {
-        return ['gs1_128', 'ean_13', 'ean_8', 'upc_a', 'datamatrix', 'qr_code'];
+        if (!self::valid($this->value)) {
+            throw new \InvalidArgumentException("Invalid BarcodeType: {$this->value}");
+        }
     }
+
+    public static function from(string $value): self { return new self($value); }
+    public static function valid(string $value): bool { return in_array($value, self::$valid, true); }
+    public function __toString(): string { return $this->value; }
 }

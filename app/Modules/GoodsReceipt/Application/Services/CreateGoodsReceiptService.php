@@ -1,45 +1,57 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\GoodsReceipt\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
-use Modules\Core\Domain\ValueObjects\Metadata;
+use Illuminate\Support\Facades\Event;
 use Modules\GoodsReceipt\Application\Contracts\CreateGoodsReceiptServiceInterface;
 use Modules\GoodsReceipt\Application\DTOs\GoodsReceiptData;
 use Modules\GoodsReceipt\Domain\Entities\GoodsReceipt;
 use Modules\GoodsReceipt\Domain\Events\GoodsReceiptCreated;
+use Modules\GoodsReceipt\Domain\RepositoryInterfaces\GoodsReceiptLineRepositoryInterface;
 use Modules\GoodsReceipt\Domain\RepositoryInterfaces\GoodsReceiptRepositoryInterface;
+use Modules\GoodsReceipt\Domain\ValueObjects\GoodsReceiptStatus;
 
-class CreateGoodsReceiptService extends BaseService implements CreateGoodsReceiptServiceInterface
+class CreateGoodsReceiptService implements CreateGoodsReceiptServiceInterface
 {
-    public function __construct(private readonly GoodsReceiptRepositoryInterface $receiptRepository)
+    public function __construct(
+        private readonly GoodsReceiptRepositoryInterface $grRepository,
+        private readonly GoodsReceiptLineRepositoryInterface $lineRepository,
+    ) {}
+
+    public function execute(GoodsReceiptData $data): GoodsReceipt
     {
-        parent::__construct($receiptRepository);
-    }
+        $gr = $this->grRepository->create([
+            'tenant_id'          => $data->tenantId,
+            'warehouse_id'       => $data->warehouseId,
+            'gr_number'          => $data->grNumber,
+            'status'             => GoodsReceiptStatus::PENDING,
+            'purchase_order_id'  => $data->purchaseOrderId,
+            'supplier_id'        => $data->supplierId,
+            'supplier_reference' => $data->supplierReference,
+            'notes'              => $data->notes,
+            'received_by'        => $data->receivedBy,
+            'received_at'        => $data->receivedBy ? now() : null,
+        ]);
 
-    protected function handle(array $data): GoodsReceipt
-    {
-        $dto = GoodsReceiptData::fromArray($data);
+        foreach ($data->lines as $line) {
+            $this->lineRepository->create([
+                'goods_receipt_id'       => $gr->id,
+                'product_id'             => $line['product_id'],
+                'variant_id'             => $line['variant_id'] ?? null,
+                'purchase_order_line_id' => $line['purchase_order_line_id'] ?? null,
+                'expected_qty'           => $line['expected_qty'],
+                'received_qty'           => $line['received_qty'] ?? $line['expected_qty'],
+                'location_id'            => $line['location_id'],
+                'batch_id'               => $line['batch_id'] ?? null,
+                'lot_number'             => $line['lot_number'] ?? null,
+                'serial_number'          => $line['serial_number'] ?? null,
+                'unit_cost'              => $line['unit_cost'] ?? null,
+                'condition'              => $line['condition'] ?? 'good',
+                'notes'                  => $line['notes'] ?? null,
+            ]);
+        }
 
-        $receipt = new GoodsReceipt(
-            tenantId:        $dto->tenantId,
-            referenceNumber: $dto->referenceNumber,
-            supplierId:      $dto->supplierId,
-            purchaseOrderId: $dto->purchaseOrderId,
-            warehouseId:     $dto->warehouseId,
-            receivedDate:    $dto->receivedDate ? new \DateTimeImmutable($dto->receivedDate) : null,
-            currency:        $dto->currency,
-            notes:           $dto->notes,
-            metadata:        $dto->metadata ? new Metadata($dto->metadata) : null,
-            status:          $dto->status,
-            receivedBy:      $dto->receivedBy,
-        );
+        Event::dispatch(new GoodsReceiptCreated($gr->tenantId, $gr->id));
 
-        $saved = $this->receiptRepository->save($receipt);
-        $this->addEvent(new GoodsReceiptCreated($saved->getId(), $saved->getTenantId()));
-
-        return $saved;
+        return $gr;
     }
 }

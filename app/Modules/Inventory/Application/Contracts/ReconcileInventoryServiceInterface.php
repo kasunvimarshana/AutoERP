@@ -1,9 +1,9 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Inventory\Application\Contracts;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
+use Modules\Inventory\Domain\Entities\InventoryCycleCount;
 
-interface ReconcileInventoryServiceInterface extends WriteServiceInterface {}
+interface ReconcileInventoryServiceInterface
+{
+    public function execute(int $cycleCountId, int $reconciledBy): InventoryCycleCount;
+}

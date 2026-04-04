@@ -1,115 +1,95 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\UoM\Infrastructure\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\UoM\Application\Contracts\CreateUomConversionServiceInterface;
 use Modules\UoM\Application\Contracts\DeleteUomConversionServiceInterface;
-use Modules\UoM\Application\Contracts\FindUomConversionServiceInterface;
 use Modules\UoM\Application\Contracts\UpdateUomConversionServiceInterface;
 use Modules\UoM\Application\DTOs\UomConversionData;
-use Modules\UoM\Application\DTOs\UpdateUomConversionData;
-use Modules\UoM\Domain\Entities\UomConversion;
-use Modules\UoM\Infrastructure\Http\Requests\StoreUomConversionRequest;
-use Modules\UoM\Infrastructure\Http\Requests\UpdateUomConversionRequest;
-use Modules\UoM\Infrastructure\Http\Resources\UomConversionCollection;
+use Modules\UoM\Domain\RepositoryInterfaces\UomConversionRepositoryInterface;
 use Modules\UoM\Infrastructure\Http\Resources\UomConversionResource;
 
-class UomConversionController extends AuthorizedController
+class UomConversionController extends Controller
 {
     public function __construct(
-        protected FindUomConversionServiceInterface $findService,
-        protected CreateUomConversionServiceInterface $createService,
-        protected UpdateUomConversionServiceInterface $updateService,
-        protected DeleteUomConversionServiceInterface $deleteService,
+        private readonly UomConversionRepositoryInterface $repository,
+        private readonly CreateUomConversionServiceInterface $createService,
+        private readonly UpdateUomConversionServiceInterface $updateService,
+        private readonly DeleteUomConversionServiceInterface $deleteService,
     ) {}
 
-    public function index(Request $request): UomConversionCollection
+    public function index(Request $request): JsonResponse
     {
-        $this->authorize('viewAny', UomConversion::class);
-        $filters = $request->only(['tenant_id', 'from_uom_id', 'to_uom_id', 'is_active']);
-        $perPage = $request->integer('per_page', 15);
-        $page    = $request->integer('page', 1);
-        $sort    = $request->input('sort');
-        $include = $request->input('include');
+        $fromId    = $request->query('from_uom_id');
+        $toId      = $request->query('to_uom_id');
+        $productId = $request->query('product_id');
 
-        $conversions = $this->findService->list($filters, $perPage, $page, $sort, $include);
+        if ($fromId && $toId) {
+            $conversion = $this->repository->findByFromTo(
+                (int) $fromId,
+                (int) $toId,
+                $productId !== null ? (int) $productId : null
+            );
+            return response()->json($conversion ? [new UomConversionResource($conversion)] : []);
+        }
 
-        return new UomConversionCollection($conversions);
+        return response()->json([]);
     }
 
-    public function store(StoreUomConversionRequest $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
-        $this->authorize('create', UomConversion::class);
-        $validated = $request->validated();
-
-        $dto = UomConversionData::fromArray([
-            'tenantId'  => $validated['tenant_id'],
-            'fromUomId' => $validated['from_uom_id'],
-            'toUomId'   => $validated['to_uom_id'],
-            'factor'    => $validated['factor'],
-            'isActive'  => $validated['is_active'] ?? true,
+        $validated = $request->validate([
+            'from_uom_id' => 'required|integer',
+            'to_uom_id'   => 'required|integer',
+            'factor'      => 'required|numeric',
+            'product_id'  => 'nullable|integer',
         ]);
 
-        $conversion = $this->createService->execute($dto->toArray());
+        $data = new UomConversionData(
+            fromUomId: $validated['from_uom_id'],
+            toUomId: $validated['to_uom_id'],
+            factor: $validated['factor'],
+            productId: $validated['product_id'] ?? null,
+        );
 
-        return (new UomConversionResource($conversion))->response()->setStatusCode(201);
+        $conversion = $this->createService->execute($data);
+        return response()->json(new UomConversionResource($conversion), 201);
     }
 
-    public function show(int $id): UomConversionResource
+    public function show(int $id): JsonResponse
     {
-        $conversion = $this->findService->find($id);
-        if (! $conversion) {
-            abort(404);
+        $conversion = $this->repository->findById($id);
+        if (!$conversion) {
+            return response()->json(['message' => 'Not found'], 404);
         }
-        $this->authorize('view', $conversion);
-
-        return new UomConversionResource($conversion);
+        return response()->json(new UomConversionResource($conversion));
     }
 
-    public function update(UpdateUomConversionRequest $request, int $id): UomConversionResource
+    public function update(Request $request, int $id): JsonResponse
     {
-        $conversion = $this->findService->find($id);
-        if (! $conversion) {
-            abort(404);
-        }
-        $this->authorize('update', $conversion);
+        $validated = $request->validate([
+            'from_uom_id' => 'required|integer',
+            'to_uom_id'   => 'required|integer',
+            'factor'      => 'required|numeric',
+            'product_id'  => 'nullable|integer',
+        ]);
 
-        $validated = $request->validated();
-        $payload   = ['id' => $id];
+        $data = new UomConversionData(
+            fromUomId: $validated['from_uom_id'],
+            toUomId: $validated['to_uom_id'],
+            factor: $validated['factor'],
+            productId: $validated['product_id'] ?? null,
+        );
 
-        if (array_key_exists('from_uom_id', $validated)) {
-            $payload['fromUomId'] = $validated['from_uom_id'];
-        }
-        if (array_key_exists('to_uom_id', $validated)) {
-            $payload['toUomId'] = $validated['to_uom_id'];
-        }
-        if (array_key_exists('factor', $validated)) {
-            $payload['factor'] = $validated['factor'];
-        }
-        if (array_key_exists('is_active', $validated)) {
-            $payload['isActive'] = $validated['is_active'];
-        }
-
-        $dto     = UpdateUomConversionData::fromArray($payload);
-        $updated = $this->updateService->execute($dto->toArray() + ['id' => $id]);
-
-        return new UomConversionResource($updated);
+        $conversion = $this->updateService->execute($id, $data);
+        return response()->json(new UomConversionResource($conversion));
     }
 
     public function destroy(int $id): JsonResponse
     {
-        $conversion = $this->findService->find($id);
-        if (! $conversion) {
-            abort(404);
-        }
-        $this->authorize('delete', $conversion);
-        $this->deleteService->execute(['id' => $id]);
-
-        return response()->json(['message' => 'UoM conversion deleted successfully']);
+        $this->deleteService->execute($id);
+        return response()->json(null, 204);
     }
 }

@@ -1,86 +1,26 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Inventory\Domain\ValueObjects;
-
-use InvalidArgumentException;
 
 class StockRotationStrategy
 {
-    /** First In, First Out */
     public const FIFO = 'fifo';
-
-    /** First Expired, First Out */
-    public const FEFO = 'fefo';
-
-    /** Last In, First Out */
     public const LIFO = 'lifo';
+    public const FEFO = 'fefo';
+    public const LEFO = 'lefo';
 
-    /** First Manufactured, First Out */
-    public const FMFO = 'fmfo';
+    private static array $valid = [self::FIFO, self::LIFO, self::FEFO, self::LEFO];
 
-    public const VALID_STRATEGIES = [
-        self::FIFO,
-        self::FEFO,
-        self::LIFO,
-        self::FMFO,
-    ];
+    private function __construct(public readonly string $value) {}
 
-    private string $value;
-
-    public function __construct(string $value)
+    public static function from(string $v): self
     {
-        if (! in_array($value, self::VALID_STRATEGIES, true)) {
-            throw new InvalidArgumentException("Invalid stock rotation strategy: {$value}");
+        if (!in_array($v, self::$valid, true)) {
+            throw new \InvalidArgumentException("Invalid stock rotation strategy: {$v}");
         }
-        $this->value = $value;
+        return new self($v);
     }
 
-    public function value(): string
-    {
-        return $this->value;
-    }
-
-    public function isFifo(): bool
-    {
-        return $this->value === self::FIFO;
-    }
-
-    public function isFefo(): bool
-    {
-        return $this->value === self::FEFO;
-    }
-
-    public function isLifo(): bool
-    {
-        return $this->value === self::LIFO;
-    }
-
-    public function isFmfo(): bool
-    {
-        return $this->value === self::FMFO;
-    }
-
-    public function equals(self $other): bool
-    {
-        return $this->value === $other->value;
-    }
-
-    public function __toString(): string
-    {
-        return $this->value;
-    }
-
-    public static function assertValid(string $value): void
-    {
-        if (! in_array($value, self::VALID_STRATEGIES, true)) {
-            throw new InvalidArgumentException("Invalid stock rotation strategy: {$value}");
-        }
-    }
-
-    public static function values(): array
-    {
-        return self::VALID_STRATEGIES;
-    }
+    public static function assertValid(string $v): void { self::from($v); }
+    public static function valid(): array { return self::$valid; }
+    public function __toString(): string { return $this->value; }
 }

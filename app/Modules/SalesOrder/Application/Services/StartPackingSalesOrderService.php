@@ -1,37 +1,29 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\SalesOrder\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
+use Illuminate\Support\Facades\Event;
 use Modules\SalesOrder\Application\Contracts\StartPackingSalesOrderServiceInterface;
 use Modules\SalesOrder\Domain\Entities\SalesOrder;
 use Modules\SalesOrder\Domain\Events\SalesOrderPackingStarted;
-use Modules\SalesOrder\Domain\Exceptions\SalesOrderNotFoundException;
 use Modules\SalesOrder\Domain\RepositoryInterfaces\SalesOrderRepositoryInterface;
+use Modules\SalesOrder\Domain\ValueObjects\SalesOrderStatus;
 
-class StartPackingSalesOrderService extends BaseService implements StartPackingSalesOrderServiceInterface
+class StartPackingSalesOrderService implements StartPackingSalesOrderServiceInterface
 {
-    public function __construct(private readonly SalesOrderRepositoryInterface $orderRepository)
-    {
-        parent::__construct($orderRepository);
-    }
+    public function __construct(private readonly SalesOrderRepositoryInterface $repository) {}
 
-    protected function handle(array $data): SalesOrder
+    public function execute(SalesOrder $so, int $packedBy): SalesOrder
     {
-        $id    = $data['id'];
-        $order = $this->orderRepository->find($id);
-
-        if (! $order) {
-            throw new SalesOrderNotFoundException($id);
+        if ($so->status !== SalesOrderStatus::PICKING) {
+            throw new \DomainException("Sales order must be in picking status before packing can start.");
         }
-
-        $order->startPacking();
-
-        $saved = $this->orderRepository->save($order);
-        $this->addEvent(new SalesOrderPackingStarted($saved->getId(), $saved->getTenantId()));
-
-        return $saved;
+        $so = $this->repository->update($so, [
+            'status'    => SalesOrderStatus::PACKING,
+            'packed_by' => $packedBy,
+            'packed_at' => now(),
+        ]);
+        Event::dispatch(new SalesOrderPackingStarted($so->tenantId, $so->id));
+        return $so;
     }
 }

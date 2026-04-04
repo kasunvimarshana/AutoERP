@@ -1,83 +1,50 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Inventory\Infrastructure\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
-use Modules\Inventory\Application\Contracts\CreateInventoryCycleCountServiceInterface;
-use Modules\Inventory\Application\Contracts\DeleteInventoryCycleCountServiceInterface;
-use Modules\Inventory\Application\Contracts\FindInventoryCycleCountServiceInterface;
+use Modules\Inventory\Application\Contracts\CreateCycleCountServiceInterface;
 use Modules\Inventory\Application\Contracts\ReconcileInventoryServiceInterface;
-use Modules\Inventory\Application\Contracts\UpdateInventoryCycleCountServiceInterface;
-use Modules\Inventory\Application\DTOs\InventoryCycleCountData;
-use Modules\Inventory\Application\DTOs\UpdateInventoryCycleCountData;
-use Modules\Inventory\Infrastructure\Http\Requests\StoreInventoryCycleCountRequest;
-use Modules\Inventory\Infrastructure\Http\Requests\UpdateInventoryCycleCountRequest;
-use Modules\Inventory\Infrastructure\Http\Resources\InventoryCycleCountCollection;
-use Modules\Inventory\Infrastructure\Http\Resources\InventoryCycleCountResource;
+use Modules\Inventory\Domain\RepositoryInterfaces\InventoryCycleCountRepositoryInterface;
 
-class InventoryCycleCountController extends AuthorizedController
+class InventoryCycleCountController extends Controller
 {
     public function __construct(
-        protected FindInventoryCycleCountServiceInterface $findService,
-        protected CreateInventoryCycleCountServiceInterface $createService,
-        protected UpdateInventoryCycleCountServiceInterface $updateService,
-        protected DeleteInventoryCycleCountServiceInterface $deleteService,
-        protected ReconcileInventoryServiceInterface $reconcileService,
+        private readonly InventoryCycleCountRepositoryInterface $repository,
+        private readonly CreateCycleCountServiceInterface $createService,
+        private readonly ReconcileInventoryServiceInterface $reconcileService,
     ) {}
 
-    public function index(Request $request): InventoryCycleCountCollection
+    public function index(Request $request): JsonResponse
     {
-        $filters = $request->only(['warehouse_id', 'status', 'tenant_id']);
-        return new InventoryCycleCountCollection($this->findService->list($filters, $request->integer('per_page', 15), $request->integer('page', 1)));
+        $tenantId = (int) $request->query('tenant_id', 0);
+        $counts = $this->repository->findAll($tenantId, $request->only(['warehouse_id', 'status', 'method']));
+        return response()->json($counts);
     }
 
-    public function store(StoreInventoryCycleCountRequest $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
-        $v   = $request->validated();
-        $dto = InventoryCycleCountData::fromArray([
-            'tenantId'        => $v['tenant_id'],
-            'referenceNumber' => $v['reference_number'],
-            'warehouseId'     => $v['warehouse_id'],
-            'zoneId'          => $v['zone_id'] ?? null,
-            'locationId'      => $v['location_id'] ?? null,
-            'countMethod'     => $v['count_method'] ?? 'manual',
-            'status'          => 'draft',
-            'assignedTo'      => $v['assigned_to'] ?? null,
-            'scheduledAt'     => $v['scheduled_at'] ?? null,
-            'notes'           => $v['notes'] ?? null,
-            'metadata'        => $v['metadata'] ?? null,
+        $request->validate([
+            'tenant_id'    => 'required|integer',
+            'warehouse_id' => 'required|integer',
+            'method'       => 'required|string',
+            'status'       => 'sometimes|string',
         ]);
-        $count = $this->createService->execute($dto->toArray());
-        return (new InventoryCycleCountResource($count))->response()->setStatusCode(201);
+
+        $count = $this->createService->execute($request->all());
+        return response()->json($count, 201);
     }
 
-    public function show(int $id): InventoryCycleCountResource|JsonResponse
+    public function reconcile(Request $request, int $id): JsonResponse
     {
-        $count = $this->findService->find($id);
-        if (! $count) { return response()->json(['message' => 'Not found'], 404); }
-        return new InventoryCycleCountResource($count);
-    }
+        $request->validate(['reconciled_by' => 'required|integer']);
 
-    public function update(UpdateInventoryCycleCountRequest $request, int $id): InventoryCycleCountResource
-    {
-        $dto = UpdateInventoryCycleCountData::fromArray(array_merge(['id' => $id], $request->validated()));
-        return new InventoryCycleCountResource($this->updateService->execute($dto->toArray()));
-    }
-
-    public function destroy(int $id): JsonResponse
-    {
-        $this->deleteService->execute(['id' => $id]);
-        return response()->json(['message' => 'Cycle count deleted successfully']);
-    }
-
-    public function reconcile(int $id): InventoryCycleCountResource
-    {
-        $count = $this->reconcileService->execute(['id' => $id]);
-
-        return new InventoryCycleCountResource($count);
+        try {
+            $count = $this->reconcileService->execute($id, (int) $request->input('reconciled_by'));
+            return response()->json($count);
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 }

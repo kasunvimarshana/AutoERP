@@ -2,11 +2,14 @@
 
 use Illuminate\Support\Facades\Route;
 use Modules\Dispatch\Infrastructure\Http\Controllers\DispatchController;
-use Modules\Dispatch\Infrastructure\Http\Controllers\DispatchLineController;
 
-Route::apiResource('dispatches', DispatchController::class);
-Route::post('dispatches/{id}/confirm', [DispatchController::class, 'confirm']);
-Route::post('dispatches/{id}/ship', [DispatchController::class, 'ship']);
-Route::post('dispatches/{id}/deliver', [DispatchController::class, 'deliver']);
-Route::post('dispatches/{id}/cancel', [DispatchController::class, 'cancel']);
-Route::apiResource('dispatch-lines', DispatchLineController::class);
+Route::prefix('dispatches')->group(function () {
+    Route::get('/',                   [DispatchController::class, 'index']);
+    Route::post('/',                  [DispatchController::class, 'store']);
+    Route::get('/{id}',               [DispatchController::class, 'show']);
+    Route::patch('/{id}',             [DispatchController::class, 'update']);
+    Route::delete('/{id}',            [DispatchController::class, 'destroy']);
+    Route::post('/{id}/process',      [DispatchController::class, 'process']);
+    Route::post('/{id}/dispatch',     [DispatchController::class, 'dispatch']);
+    Route::post('/{id}/deliver',      [DispatchController::class, 'deliver']);
+});

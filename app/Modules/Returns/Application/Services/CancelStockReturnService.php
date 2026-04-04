@@ -1,37 +1,32 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Returns\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
+use Illuminate\Support\Facades\Event;
 use Modules\Returns\Application\Contracts\CancelStockReturnServiceInterface;
 use Modules\Returns\Domain\Entities\StockReturn;
 use Modules\Returns\Domain\Events\StockReturnCancelled;
-use Modules\Returns\Domain\Exceptions\StockReturnNotFoundException;
 use Modules\Returns\Domain\RepositoryInterfaces\StockReturnRepositoryInterface;
+use Modules\Returns\Domain\ValueObjects\ReturnStatus;
 
-class CancelStockReturnService extends BaseService implements CancelStockReturnServiceInterface
+class CancelStockReturnService implements CancelStockReturnServiceInterface
 {
-    public function __construct(private readonly StockReturnRepositoryInterface $returnRepository)
-    {
-        parent::__construct($returnRepository);
-    }
+    public function __construct(
+        private readonly StockReturnRepositoryInterface $repository,
+    ) {}
 
-    protected function handle(array $data): StockReturn
+    public function execute(StockReturn $return): StockReturn
     {
-        $id     = $data['id'];
-        $return = $this->returnRepository->find($id);
-
-        if (! $return) {
-            throw new StockReturnNotFoundException($id);
+        if ($return->status === ReturnStatus::COMPLETED) {
+            throw new \DomainException('Cannot cancel a completed stock return.');
         }
 
-        $return->cancel();
+        $updated = $this->repository->update($return, [
+            'status' => ReturnStatus::CANCELLED,
+        ]);
 
-        $saved = $this->returnRepository->save($return);
-        $this->addEvent(new StockReturnCancelled($saved));
+        Event::dispatch(new StockReturnCancelled($updated->tenantId, $updated->id));
 
-        return $saved;
+        return $updated;
     }
 }

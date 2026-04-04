@@ -1,9 +1,10 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Supplier\Application\Contracts;
 
-use Modules\Core\Application\Contracts\ServiceInterface;
+use Modules\Supplier\Application\DTOs\SupplierData;
+use Modules\Supplier\Domain\Entities\Supplier;
 
-interface UpdateSupplierServiceInterface extends ServiceInterface {}
+interface UpdateSupplierServiceInterface
+{
+    public function execute(int $id, SupplierData $data): Supplier;
+}

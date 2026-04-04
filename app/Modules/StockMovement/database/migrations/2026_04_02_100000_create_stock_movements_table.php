@@ -1,40 +1,38 @@
 <?php
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
         Schema::create('stock_movements', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('tenant_id')->index();
-            $table->string('reference_number', 100)->unique();
-            $table->string('movement_type', 50);
-            $table->string('status', 50)->default('draft');
+            $table->unsignedBigInteger('tenant_id');
             $table->unsignedBigInteger('product_id');
-            $table->unsignedBigInteger('variation_id')->nullable();
-            $table->unsignedBigInteger('from_location_id')->nullable();
-            $table->unsignedBigInteger('to_location_id')->nullable();
-            $table->unsignedBigInteger('batch_id')->nullable();
-            $table->unsignedBigInteger('serial_number_id')->nullable();
-            $table->unsignedBigInteger('uom_id')->nullable();
+            $table->unsignedBigInteger('variant_id')->nullable();
+            $table->unsignedBigInteger('warehouse_id');
+            $table->unsignedBigInteger('location_id');
+            $table->string('movement_type', 50);
             $table->decimal('quantity', 15, 4);
-            $table->decimal('unit_cost', 15, 4)->nullable();
-            $table->string('currency', 3)->default('USD');
-            $table->string('reference_type', 100)->nullable();
-            $table->unsignedBigInteger('reference_id')->nullable();
-            $table->unsignedBigInteger('performed_by')->nullable();
-            $table->timestamp('movement_date')->nullable();
+            $table->string('reference_number', 100);
+            $table->unsignedBigInteger('batch_id')->nullable();
+            $table->string('lot_number')->nullable();
+            $table->string('serial_number')->nullable();
+            $table->decimal('unit_cost', 15, 6)->nullable();
+            $table->unsignedBigInteger('related_movement_id')->nullable();
             $table->text('notes')->nullable();
-            $table->json('metadata')->nullable();
+            $table->timestamp('moved_at')->nullable();
+            $table->unsignedBigInteger('moved_by')->nullable();
+            $table->unsignedBigInteger('created_by')->nullable();
+            $table->unsignedBigInteger('updated_by')->nullable();
+            $table->unsignedBigInteger('deleted_by')->nullable();
             $table->timestamps();
             $table->softDeletes();
+            $table->unique('reference_number');
             $table->index(['tenant_id', 'product_id']);
-            $table->index(['tenant_id', 'movement_type']);
-            $table->index(['tenant_id', 'reference_number']);
+            $table->index('movement_type');
+            $table->foreign('related_movement_id')->references('id')->on('stock_movements')->nullOnDelete();
         });
     }
 

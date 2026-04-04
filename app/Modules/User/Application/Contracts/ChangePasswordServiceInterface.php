@@ -1,12 +1,10 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\User\Application\Contracts;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
+use Modules\User\Application\DTOs\ChangePasswordData;
+use Modules\User\Domain\Entities\User;
 
-/**
- * @method void execute(array $data = [])
- */
-interface ChangePasswordServiceInterface extends WriteServiceInterface {}
+interface ChangePasswordServiceInterface
+{
+    public function execute(User $user, ChangePasswordData $data): bool;
+}

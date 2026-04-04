@@ -1,80 +1,50 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Inventory\Infrastructure\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Inventory\Application\Contracts\CreateInventoryBatchServiceInterface;
-use Modules\Inventory\Application\Contracts\DeleteInventoryBatchServiceInterface;
-use Modules\Inventory\Application\Contracts\FindInventoryBatchServiceInterface;
-use Modules\Inventory\Application\Contracts\UpdateInventoryBatchServiceInterface;
-use Modules\Inventory\Application\DTOs\InventoryBatchData;
-use Modules\Inventory\Application\DTOs\UpdateInventoryBatchData;
-use Modules\Inventory\Infrastructure\Http\Requests\StoreInventoryBatchRequest;
-use Modules\Inventory\Infrastructure\Http\Requests\UpdateInventoryBatchRequest;
-use Modules\Inventory\Infrastructure\Http\Resources\InventoryBatchCollection;
+use Modules\Inventory\Domain\RepositoryInterfaces\InventoryBatchRepositoryInterface;
 use Modules\Inventory\Infrastructure\Http\Resources\InventoryBatchResource;
 
-class InventoryBatchController extends AuthorizedController
+class InventoryBatchController extends Controller
 {
     public function __construct(
-        protected FindInventoryBatchServiceInterface $findService,
-        protected CreateInventoryBatchServiceInterface $createService,
-        protected UpdateInventoryBatchServiceInterface $updateService,
-        protected DeleteInventoryBatchServiceInterface $deleteService,
+        private readonly InventoryBatchRepositoryInterface $repository,
+        private readonly CreateInventoryBatchServiceInterface $createService,
     ) {}
 
-    public function index(Request $request): InventoryBatchCollection
+    public function index(Request $request): JsonResponse
     {
-        $filters = $request->only(['product_id', 'status', 'tenant_id']);
-        return new InventoryBatchCollection($this->findService->list($filters, $request->integer('per_page', 15), $request->integer('page', 1)));
+        $tenantId  = (int) $request->query('tenant_id', 0);
+        $productId = (int) $request->query('product_id', 0);
+
+        if ($tenantId > 0 && $productId > 0) {
+            $batches = $this->repository->findByProduct($productId, $tenantId);
+            return response()->json($batches);
+        }
+
+        return response()->json([]);
     }
 
-    public function store(StoreInventoryBatchRequest $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
-        $v   = $request->validated();
-        $dto = InventoryBatchData::fromArray([
-            'tenantId'         => $v['tenant_id'],
-            'productId'        => $v['product_id'],
-            'variationId'      => $v['variation_id'] ?? null,
-            'batchNumber'      => $v['batch_number'],
-            'lotNumber'        => $v['lot_number'] ?? null,
-            'manufactureDate'  => $v['manufacture_date'] ?? null,
-            'expiryDate'       => $v['expiry_date'] ?? null,
-            'bestBeforeDate'   => $v['best_before_date'] ?? null,
-            'supplierId'       => $v['supplier_id'] ?? null,
-            'supplierBatchRef' => $v['supplier_batch_ref'] ?? null,
-            'initialQty'       => $v['initial_qty'] ?? 0.0,
-            'unitCost'         => $v['unit_cost'] ?? 0.0,
-            'currency'         => $v['currency'] ?? 'USD',
-            'status'           => $v['status'] ?? 'active',
-            'notes'            => $v['notes'] ?? null,
-            'metadata'         => $v['metadata'] ?? null,
+        $request->validate([
+            'tenant_id'    => 'required|integer',
+            'product_id'   => 'required|integer',
+            'batch_number' => 'required|string',
+            'status'       => 'sometimes|string',
         ]);
-        $batch = $this->createService->execute($dto->toArray());
-        return (new InventoryBatchResource($batch))->response()->setStatusCode(201);
+
+        $batch = $this->createService->execute($request->all());
+        return response()->json(new InventoryBatchResource($batch), 201);
     }
 
-    public function show(int $id): InventoryBatchResource|JsonResponse
+    public function show(int $id): JsonResponse
     {
-        $batch = $this->findService->find($id);
-        if (! $batch) { return response()->json(['message' => 'Not found'], 404); }
-        return new InventoryBatchResource($batch);
-    }
-
-    public function update(UpdateInventoryBatchRequest $request, int $id): InventoryBatchResource
-    {
-        $v   = $request->validated();
-        $dto = UpdateInventoryBatchData::fromArray(array_merge(['id' => $id], $v));
-        return new InventoryBatchResource($this->updateService->execute($dto->toArray()));
-    }
-
-    public function destroy(int $id): JsonResponse
-    {
-        $this->deleteService->execute(['id' => $id]);
-        return response()->json(['message' => 'Inventory batch deleted successfully']);
+        $batch = $this->repository->findById($id);
+        if (!$batch) return response()->json(['message' => 'Not found'], 404);
+        return response()->json(new InventoryBatchResource($batch));
     }
 }

@@ -1,55 +1,22 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Supplier\Application\DTOs;
 
-use Modules\Core\Application\DTOs\BaseDto;
+use Modules\Core\Application\DTOs\BaseDTO;
 
-class SupplierData extends BaseDto
+class SupplierData extends BaseDTO
 {
-    public int $tenant_id;
-    public string $name;
-    public string $code;
-    public ?int $user_id;
-    public ?string $email;
-    public ?string $phone;
-    public ?array $address;
-    public ?array $contact_person;
-    public ?string $payment_terms;
-    public string $currency;
-    public ?string $tax_number;
-    public string $status;
-    public string $type;
-    public ?array $attributes;
-    public ?array $metadata;
-
-    public function __construct()
-    {
-        $this->currency = 'USD';
-        $this->status   = 'active';
-        $this->type     = 'other';
-        parent::__construct();
-    }
-
-    public function rules(): array
-    {
-        return [
-            'tenant_id'      => 'required|integer|exists:tenants,id',
-            'name'           => 'required|string|max:255',
-            'code'           => 'required|string|max:100',
-            'user_id'        => 'nullable|integer|exists:users,id',
-            'email'          => 'nullable|email|max:255',
-            'phone'          => 'nullable|string|max:50',
-            'address'        => 'nullable|array',
-            'contact_person' => 'nullable|array',
-            'payment_terms'  => 'nullable|string|max:100',
-            'currency'       => 'nullable|string|size:3',
-            'tax_number'     => 'nullable|string|max:100',
-            'status'         => 'nullable|string|in:active,inactive,draft',
-            'type'           => 'nullable|string|in:manufacturer,distributor,retailer,other',
-            'attributes'     => 'nullable|array',
-            'metadata'       => 'nullable|array',
-        ];
-    }
+    public function __construct(
+        public readonly int $tenantId,
+        public readonly string $name,
+        public readonly string $code,
+        public readonly string $status = 'active',
+        public readonly ?string $email = null,
+        public readonly ?string $phone = null,
+        public readonly ?string $address = null,
+        public readonly ?string $city = null,
+        public readonly ?string $country = null,
+        public readonly ?string $taxNumber = null,
+        public readonly ?string $currency = 'USD',
+        public readonly ?string $notes = null,
+    ) {}
 }

@@ -1,38 +1,29 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Returns\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
+use Illuminate\Support\Facades\Event;
 use Modules\Returns\Application\Contracts\IssueCreditMemoServiceInterface;
 use Modules\Returns\Domain\Entities\StockReturn;
 use Modules\Returns\Domain\Events\StockReturnCreditMemoIssued;
-use Modules\Returns\Domain\Exceptions\StockReturnNotFoundException;
 use Modules\Returns\Domain\RepositoryInterfaces\StockReturnRepositoryInterface;
 
-class IssueCreditMemoService extends BaseService implements IssueCreditMemoServiceInterface
+class IssueCreditMemoService implements IssueCreditMemoServiceInterface
 {
-    public function __construct(private readonly StockReturnRepositoryInterface $returnRepository)
+    public function __construct(
+        private readonly StockReturnRepositoryInterface $repository,
+    ) {}
+
+    public function execute(StockReturn $return): StockReturn
     {
-        parent::__construct($returnRepository);
-    }
+        $creditMemoNumber = 'CM-' . strtoupper($return->returnNumber);
 
-    protected function handle(array $data): StockReturn
-    {
-        $id        = $data['id'];
-        $reference = $data['credit_memo_reference'];
-        $return    = $this->returnRepository->find($id);
+        $updated = $this->repository->update($return, [
+            'credit_memo_number' => $creditMemoNumber,
+        ]);
 
-        if (! $return) {
-            throw new StockReturnNotFoundException($id);
-        }
+        Event::dispatch(new StockReturnCreditMemoIssued($updated->tenantId, $updated->id));
 
-        $return->issueCreditMemo($reference);
-
-        $saved = $this->returnRepository->save($return);
-        $this->addEvent(new StockReturnCreditMemoIssued($saved));
-
-        return $saved;
+        return $updated;
     }
 }

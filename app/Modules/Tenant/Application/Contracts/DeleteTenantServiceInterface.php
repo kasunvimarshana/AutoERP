@@ -1,12 +1,9 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Tenant\Application\Contracts;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
+use Modules\Tenant\Domain\Entities\Tenant;
 
-/**
- * @method bool execute(array $data = [])
- */
-interface DeleteTenantServiceInterface extends WriteServiceInterface {}
+interface DeleteTenantServiceInterface
+{
+    public function execute(Tenant $tenant): bool;
+}

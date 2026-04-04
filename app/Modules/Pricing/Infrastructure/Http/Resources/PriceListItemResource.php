@@ -1,32 +1,25 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Pricing\Infrastructure\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Pricing\Domain\Entities\PriceListItem;
 
 class PriceListItemResource extends JsonResource
 {
+    public function __construct(private readonly PriceListItem $item) { parent::__construct($item); }
+
     public function toArray($request): array
     {
         return [
-            'id'              => $this->getId(),
-            'tenant_id'       => $this->getTenantId(),
-            'price_list_id'   => $this->getPriceListId(),
-            'product_id'      => $this->getProductId(),
-            'variation_id'    => $this->getVariationId(),
-            'unit_price'      => $this->getUnitPrice(),
-            'min_quantity'    => $this->getMinQuantity(),
-            'max_quantity'    => $this->getMaxQuantity(),
-            'discount_percent'=> $this->getDiscountPercent(),
-            'markup_percent'  => $this->getMarkupPercent(),
-            'currency_code'   => $this->getCurrencyCode(),
-            'uom_code'        => $this->getUomCode(),
-            'is_active'       => $this->isActive(),
-            'metadata'        => $this->getMetadata()->toArray(),
-            'created_at'      => $this->getCreatedAt()->format('c'),
-            'updated_at'      => $this->getUpdatedAt()->format('c'),
+            'id'               => $this->item->id,
+            'price_list_id'    => $this->item->priceListId,
+            'product_id'       => $this->item->productId,
+            'price'            => $this->item->price,
+            'variant_id'       => $this->item->variantId,
+            'min_qty'          => $this->item->minQty,
+            'max_qty'          => $this->item->maxQty,
+            'discount_percent' => $this->item->discountPercent,
+            'uom'              => $this->item->uom,
         ];
     }
 }

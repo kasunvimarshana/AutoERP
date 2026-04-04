@@ -1,93 +1,27 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Inventory\Domain\ValueObjects;
-
-use InvalidArgumentException;
 
 class SerialStatus
 {
-    public const AVAILABLE  = 'available';
-    public const RESERVED   = 'reserved';
-    public const SOLD       = 'sold';
-    public const RETURNED   = 'returned';
-    public const DAMAGED    = 'damaged';
-    public const SCRAPPED   = 'scrapped';
-    public const IN_TRANSIT = 'in_transit';
+    public const AVAILABLE = 'available';
+    public const SOLD      = 'sold';
+    public const RETURNED  = 'returned';
+    public const SCRAPPED  = 'scrapped';
+    public const IN_REPAIR = 'in_repair';
 
-    public const VALID_STATUSES = [
-        self::AVAILABLE,
-        self::RESERVED,
-        self::SOLD,
-        self::RETURNED,
-        self::DAMAGED,
-        self::SCRAPPED,
-        self::IN_TRANSIT,
-    ];
+    private static array $valid = [self::AVAILABLE, self::SOLD, self::RETURNED, self::SCRAPPED, self::IN_REPAIR];
 
-    private string $value;
+    private function __construct(public readonly string $value) {}
 
-    public function __construct(string $value)
+    public static function from(string $v): self
     {
-        if (! in_array($value, self::VALID_STATUSES, true)) {
-            throw new InvalidArgumentException("Invalid serial status: {$value}");
+        if (!in_array($v, self::$valid, true)) {
+            throw new \InvalidArgumentException("Invalid serial status: {$v}");
         }
-        $this->value = $value;
+        return new self($v);
     }
 
-    public function value(): string
-    {
-        return $this->value;
-    }
-
-    public function isAvailable(): bool
-    {
-        return $this->value === self::AVAILABLE;
-    }
-
-    public function isReserved(): bool
-    {
-        return $this->value === self::RESERVED;
-    }
-
-    public function isSold(): bool
-    {
-        return $this->value === self::SOLD;
-    }
-
-    public function isReturned(): bool
-    {
-        return $this->value === self::RETURNED;
-    }
-
-    public function isDamaged(): bool
-    {
-        return $this->value === self::DAMAGED;
-    }
-
-    public function isScrapped(): bool
-    {
-        return $this->value === self::SCRAPPED;
-    }
-
-    public function isInTransit(): bool
-    {
-        return $this->value === self::IN_TRANSIT;
-    }
-
-    public function equals(self $other): bool
-    {
-        return $this->value === $other->value;
-    }
-
-    public function __toString(): string
-    {
-        return $this->value;
-    }
-
-    public static function values(): array
-    {
-        return self::VALID_STATUSES;
-    }
+    public static function assertValid(string $v): void { self::from($v); }
+    public static function valid(): array { return self::$valid; }
+    public function __toString(): string { return $this->value; }
 }

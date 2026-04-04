@@ -1,18 +1,13 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Inventory\Domain\RepositoryInterfaces;
 
-use Illuminate\Support\Collection;
-use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
 use Modules\Inventory\Domain\Entities\InventoryCycleCount;
 
-interface InventoryCycleCountRepositoryInterface extends RepositoryInterface
+interface InventoryCycleCountRepositoryInterface
 {
-    public function save(InventoryCycleCount $cycleCount): InventoryCycleCount;
-
-    public function findByWarehouse(int $tenantId, int $warehouseId): Collection;
-
-    public function findByStatus(int $tenantId, string $status): Collection;
+    public function findById(int $id): ?InventoryCycleCount;
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): \Illuminate\Pagination\LengthAwarePaginator;
+    public function create(array $data): InventoryCycleCount;
+    public function update(InventoryCycleCount $count, array $data): InventoryCycleCount;
+    public function save(InventoryCycleCount $count): InventoryCycleCount;
 }

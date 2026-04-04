@@ -1,136 +1,187 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Returns\Infrastructure\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Returns\Application\Contracts\ApproveStockReturnServiceInterface;
 use Modules\Returns\Application\Contracts\CancelStockReturnServiceInterface;
 use Modules\Returns\Application\Contracts\CompleteStockReturnServiceInterface;
 use Modules\Returns\Application\Contracts\CreateStockReturnServiceInterface;
-use Modules\Returns\Application\Contracts\DeleteStockReturnServiceInterface;
-use Modules\Returns\Application\Contracts\FindStockReturnServiceInterface;
 use Modules\Returns\Application\Contracts\IssueCreditMemoServiceInterface;
-use Modules\Returns\Application\Contracts\RejectStockReturnServiceInterface;
-use Modules\Returns\Application\Contracts\UpdateStockReturnServiceInterface;
 use Modules\Returns\Application\DTOs\StockReturnData;
-use Modules\Returns\Application\DTOs\UpdateStockReturnData;
-use Modules\Returns\Infrastructure\Http\Requests\StoreStockReturnRequest;
-use Modules\Returns\Infrastructure\Http\Requests\UpdateStockReturnRequest;
-use Modules\Returns\Infrastructure\Http\Resources\StockReturnCollection;
+use Modules\Returns\Domain\RepositoryInterfaces\StockReturnRepositoryInterface;
 use Modules\Returns\Infrastructure\Http\Resources\StockReturnResource;
 
-class StockReturnController extends AuthorizedController
+class StockReturnController extends Controller
 {
     public function __construct(
-        protected FindStockReturnServiceInterface $findService,
-        protected CreateStockReturnServiceInterface $createService,
-        protected UpdateStockReturnServiceInterface $updateService,
-        protected DeleteStockReturnServiceInterface $deleteService,
-        protected ApproveStockReturnServiceInterface $approveService,
-        protected RejectStockReturnServiceInterface $rejectService,
-        protected CompleteStockReturnServiceInterface $completeService,
-        protected CancelStockReturnServiceInterface $cancelService,
-        protected IssueCreditMemoServiceInterface $issueCreditMemoService,
+        private readonly StockReturnRepositoryInterface $repository,
+        private readonly CreateStockReturnServiceInterface $createService,
+        private readonly ApproveStockReturnServiceInterface $approveService,
+        private readonly CancelStockReturnServiceInterface $cancelService,
+        private readonly CompleteStockReturnServiceInterface $completeService,
+        private readonly IssueCreditMemoServiceInterface $issueCreditService,
     ) {}
 
-    public function index(Request $request): StockReturnCollection
+    public function index(Request $request): JsonResponse
     {
-        $filters = $request->only(['tenant_id', 'status', 'return_type', 'party_id']);
-        return new StockReturnCollection(
-            $this->findService->list($filters, $request->integer('per_page', 15), $request->integer('page', 1))
+        $tenantId = (int) $request->query('tenant_id', 0);
+        $returns = $this->repository->findAll(
+            $tenantId,
+            $request->only(['status', 'return_type', 'warehouse_id', 'customer_id', 'supplier_id'])
         );
+
+        return response()->json($returns);
     }
 
-    public function store(StoreStockReturnRequest $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
-        $v   = $request->validated();
-        $dto = StockReturnData::fromArray([
-            'tenantId'              => $v['tenant_id'],
-            'referenceNumber'       => $v['reference_number'],
-            'returnType'            => $v['return_type'],
-            'partyId'               => $v['party_id'],
-            'partyType'             => $v['party_type'],
-            'originalReferenceId'   => $v['original_reference_id'] ?? null,
-            'originalReferenceType' => $v['original_reference_type'] ?? null,
-            'returnReason'          => $v['return_reason'] ?? null,
-            'totalAmount'           => $v['total_amount'] ?? 0.0,
-            'currency'              => $v['currency'] ?? 'USD',
-            'restock'               => $v['restock'] ?? true,
-            'restockLocationId'     => $v['restock_location_id'] ?? null,
-            'restockingFee'         => $v['restocking_fee'] ?? 0.0,
-            'notes'                 => $v['notes'] ?? null,
-            'metadata'              => $v['metadata'] ?? null,
-            'status'                => $v['status'] ?? 'draft',
+        $validated = $request->validate([
+            'tenant_id'              => 'required|integer',
+            'warehouse_id'           => 'required|integer',
+            'return_number'          => 'required|string|max:100',
+            'return_type'            => 'required|string|max:20',
+            'lines'                  => 'nullable|array',
+            'lines.*.product_id'     => 'required|integer',
+            'lines.*.return_qty'     => 'required|numeric|min:0.0001',
+            'lines.*.location_id'    => 'required|integer',
+            'customer_id'            => 'nullable|integer',
+            'supplier_id'            => 'nullable|integer',
+            'original_order_id'      => 'nullable|integer',
+            'original_order_type'    => 'nullable|string|max:50',
+            'reason'                 => 'nullable|string',
+            'notes'                  => 'nullable|string',
         ]);
 
-        $return = $this->createService->execute($dto->toArray());
-        return (new StockReturnResource($return))->response()->setStatusCode(201);
+        try {
+            $dto = new StockReturnData(
+                tenantId: $validated['tenant_id'],
+                warehouseId: $validated['warehouse_id'],
+                returnNumber: $validated['return_number'],
+                returnType: $validated['return_type'],
+                lines: $validated['lines'] ?? [],
+                customerId: $validated['customer_id'] ?? null,
+                supplierId: $validated['supplier_id'] ?? null,
+                originalOrderId: $validated['original_order_id'] ?? null,
+                originalOrderType: $validated['original_order_type'] ?? null,
+                reason: $validated['reason'] ?? null,
+                notes: $validated['notes'] ?? null,
+            );
+
+            $return = $this->createService->execute($dto);
+
+            return response()->json(new StockReturnResource($return), 201);
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
-    public function show(int $id): StockReturnResource|JsonResponse
+    public function show(int $id): JsonResponse
     {
-        $return = $this->findService->find($id);
-        if (! $return) { return response()->json(['message' => 'Not found'], 404); }
-        return new StockReturnResource($return);
+        $return = $this->repository->findById($id);
+        if (!$return) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        return response()->json(new StockReturnResource($return));
     }
 
-    public function update(UpdateStockReturnRequest $request, int $id): StockReturnResource
+    public function update(Request $request, int $id): JsonResponse
     {
-        $v   = $request->validated();
-        $dto = UpdateStockReturnData::fromArray(array_merge(['id' => $id], [
-            'returnReason' => $v['return_reason'] ?? null,
-            'notes'        => $v['notes'] ?? null,
-            'metadata'     => $v['metadata'] ?? null,
-        ]));
-        return new StockReturnResource($this->updateService->execute($dto->toArray()));
+        $return = $this->repository->findById($id);
+        if (!$return) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        $validated = $request->validate([
+            'reason' => 'nullable|string',
+            'notes'  => 'nullable|string',
+        ]);
+
+        $updated = $this->repository->update($return, $validated);
+
+        return response()->json(new StockReturnResource($updated));
     }
 
     public function destroy(int $id): JsonResponse
     {
-        $this->deleteService->execute(['id' => $id]);
-        return response()->json(['message' => 'Stock return deleted successfully']);
+        $return = $this->repository->findById($id);
+        if (!$return) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        \Modules\Returns\Infrastructure\Persistence\Eloquent\Models\StockReturnModel::findOrFail($id)->delete();
+
+        return response()->json(null, 204);
     }
 
     public function approve(Request $request, int $id): JsonResponse
     {
-        $return = $this->approveService->execute([
-            'id'          => $id,
-            'approved_by' => $request->integer('approved_by'),
-        ]);
-        return (new StockReturnResource($return))->response();
-    }
+        $request->validate(['approved_by' => 'required|integer']);
 
-    public function reject(int $id): JsonResponse
-    {
-        $return = $this->rejectService->execute(['id' => $id]);
-        return (new StockReturnResource($return))->response();
-    }
+        $return = $this->repository->findById($id);
+        if (!$return) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
 
-    public function complete(Request $request, int $id): JsonResponse
-    {
-        $return = $this->completeService->execute([
-            'id'           => $id,
-            'processed_by' => $request->integer('processed_by'),
-        ]);
-        return (new StockReturnResource($return))->response();
+        try {
+            $updated = $this->approveService->execute($return, (int) $request->input('approved_by'));
+
+            return response()->json(new StockReturnResource($updated));
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     public function cancel(int $id): JsonResponse
     {
-        $return = $this->cancelService->execute(['id' => $id]);
-        return (new StockReturnResource($return))->response();
+        $return = $this->repository->findById($id);
+        if (!$return) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        try {
+            $updated = $this->cancelService->execute($return);
+
+            return response()->json(new StockReturnResource($updated));
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
-    public function issueCreditMemo(Request $request, int $id): JsonResponse
+    public function complete(Request $request, int $id): JsonResponse
     {
-        $return = $this->issueCreditMemoService->execute([
-            'id'                    => $id,
-            'credit_memo_reference' => $request->string('credit_memo_reference'),
-        ]);
-        return (new StockReturnResource($return))->response();
+        $request->validate(['completed_by' => 'required|integer']);
+
+        $return = $this->repository->findById($id);
+        if (!$return) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        try {
+            $updated = $this->completeService->execute($return, (int) $request->input('completed_by'));
+
+            return response()->json(new StockReturnResource($updated));
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    public function issueCredit(int $id): JsonResponse
+    {
+        $return = $this->repository->findById($id);
+        if (!$return) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        try {
+            $updated = $this->issueCreditService->execute($return);
+
+            return response()->json(new StockReturnResource($updated));
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 }

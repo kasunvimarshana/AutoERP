@@ -1,138 +1,116 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\StockMovement\Infrastructure\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
-use Modules\StockMovement\Application\Contracts\ConfirmStockMovementServiceInterface;
 use Modules\StockMovement\Application\Contracts\CreateStockMovementServiceInterface;
-use Modules\StockMovement\Application\Contracts\DeleteStockMovementServiceInterface;
-use Modules\StockMovement\Application\Contracts\FindStockMovementServiceInterface;
 use Modules\StockMovement\Application\Contracts\TransferStockServiceInterface;
-use Modules\StockMovement\Application\Contracts\UpdateStockMovementServiceInterface;
 use Modules\StockMovement\Application\DTOs\StockMovementData;
 use Modules\StockMovement\Application\DTOs\TransferStockData;
-use Modules\StockMovement\Application\DTOs\UpdateStockMovementData;
-use Modules\StockMovement\Infrastructure\Http\Requests\StoreStockMovementRequest;
-use Modules\StockMovement\Infrastructure\Http\Requests\UpdateStockMovementRequest;
-use Modules\StockMovement\Infrastructure\Http\Resources\StockMovementCollection;
+use Modules\StockMovement\Domain\RepositoryInterfaces\StockMovementRepositoryInterface;
 use Modules\StockMovement\Infrastructure\Http\Resources\StockMovementResource;
 
-class StockMovementController extends AuthorizedController
+class StockMovementController extends Controller
 {
     public function __construct(
-        protected FindStockMovementServiceInterface $findService,
-        protected CreateStockMovementServiceInterface $createService,
-        protected UpdateStockMovementServiceInterface $updateService,
-        protected DeleteStockMovementServiceInterface $deleteService,
-        protected ConfirmStockMovementServiceInterface $confirmService,
-        protected TransferStockServiceInterface $transferService,
+        private readonly StockMovementRepositoryInterface $repository,
+        private readonly CreateStockMovementServiceInterface $createService,
+        private readonly TransferStockServiceInterface $transferService,
     ) {}
 
-    public function index(Request $request): StockMovementCollection
+    public function index(Request $request): JsonResponse
     {
-        $filters = $request->only(['product_id', 'movement_type', 'status', 'tenant_id']);
-        return new StockMovementCollection($this->findService->list($filters, $request->integer('per_page', 15), $request->integer('page', 1)));
+        $tenantId = (int) $request->query('tenant_id', 0);
+        $movements = $this->repository->findAll($tenantId, $request->only(['movement_type', 'product_id', 'warehouse_id']));
+        return response()->json($movements);
     }
 
-    public function store(StoreStockMovementRequest $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
-        $v   = $request->validated();
-        $dto = StockMovementData::fromArray([
-            'tenantId'        => $v['tenant_id'],
-            'referenceNumber' => $v['reference_number'],
-            'movementType'    => $v['movement_type'],
-            'productId'       => $v['product_id'],
-            'quantity'        => $v['quantity'],
-            'variationId'     => $v['variation_id'] ?? null,
-            'fromLocationId'  => $v['from_location_id'] ?? null,
-            'toLocationId'    => $v['to_location_id'] ?? null,
-            'batchId'         => $v['batch_id'] ?? null,
-            'serialNumberId'  => $v['serial_number_id'] ?? null,
-            'uomId'           => $v['uom_id'] ?? null,
-            'unitCost'        => $v['unit_cost'] ?? null,
-            'currency'        => $v['currency'] ?? 'USD',
-            'referenceType'   => $v['reference_type'] ?? null,
-            'referenceId'     => $v['reference_id'] ?? null,
-            'performedBy'     => $v['performed_by'] ?? null,
-            'movementDate'    => $v['movement_date'] ?? null,
-            'notes'           => $v['notes'] ?? null,
-            'metadata'        => $v['metadata'] ?? null,
-            'status'          => $v['status'] ?? 'draft',
+        $validated = $request->validate([
+            'tenant_id'        => 'required|integer',
+            'product_id'       => 'required|integer',
+            'warehouse_id'     => 'required|integer',
+            'location_id'      => 'required|integer',
+            'movement_type'    => 'required|string',
+            'quantity'         => 'required|numeric|min:0.0001',
+            'reference_number' => 'required|string|max:100',
+            'variant_id'       => 'nullable|integer',
+            'batch_id'         => 'nullable|integer',
+            'lot_number'       => 'nullable|string',
+            'serial_number'    => 'nullable|string',
+            'unit_cost'        => 'nullable|numeric|min:0',
+            'notes'            => 'nullable|string',
+            'moved_by'         => 'nullable|integer',
         ]);
-        $movement = $this->createService->execute($dto->toArray());
-        return (new StockMovementResource($movement))->response()->setStatusCode(201);
-    }
 
-    public function show(int $id): StockMovementResource|JsonResponse
-    {
-        $movement = $this->findService->find($id);
-        if (! $movement) {
-            return response()->json(['message' => 'Not found'], 404);
+        try {
+            $dto = new StockMovementData(
+                tenantId: $validated['tenant_id'],
+                productId: $validated['product_id'],
+                warehouseId: $validated['warehouse_id'],
+                locationId: $validated['location_id'],
+                movementType: $validated['movement_type'],
+                quantity: (float) $validated['quantity'],
+                referenceNumber: $validated['reference_number'],
+                variantId: $validated['variant_id'] ?? null,
+                batchId: $validated['batch_id'] ?? null,
+                lotNumber: $validated['lot_number'] ?? null,
+                serialNumber: $validated['serial_number'] ?? null,
+                unitCost: isset($validated['unit_cost']) ? (float) $validated['unit_cost'] : null,
+                notes: $validated['notes'] ?? null,
+                movedBy: $validated['moved_by'] ?? null,
+            );
+            $movement = $this->createService->execute($dto);
+            return response()->json(new StockMovementResource($movement), 201);
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
         }
-        return new StockMovementResource($movement);
     }
 
-    public function update(UpdateStockMovementRequest $request, int $id): StockMovementResource
+    public function show(int $id): JsonResponse
     {
-        $v   = $request->validated();
-        $dto = UpdateStockMovementData::fromArray(array_merge(['id' => $id], $v));
-        return new StockMovementResource($this->updateService->execute($dto->toArray()));
-    }
-
-    public function destroy(int $id): JsonResponse
-    {
-        $this->deleteService->execute(['id' => $id]);
-        return response()->json(['message' => 'Stock movement deleted successfully']);
-    }
-
-    public function confirm(int $id): StockMovementResource
-    {
-        return new StockMovementResource($this->confirmService->execute(['id' => $id]));
+        $movement = $this->repository->findById($id);
+        if (!$movement) return response()->json(['message' => 'Not found'], 404);
+        return response()->json(new StockMovementResource($movement));
     }
 
     public function transfer(Request $request): JsonResponse
     {
-        $v   = $request->validate([
-            'tenant_id'        => 'required|integer',
-            'reference_number' => 'required|string|max:100',
-            'product_id'       => 'required|integer',
-            'quantity'         => 'required|numeric|min:0.001',
-            'from_location_id' => 'required|integer',
-            'to_location_id'   => 'required|integer',
-            'variation_id'     => 'nullable|integer',
-            'batch_id'         => 'nullable|integer',
-            'serial_number_id' => 'nullable|integer',
-            'uom_id'           => 'nullable|integer',
-            'unit_cost'        => 'nullable|numeric|min:0',
-            'currency'         => 'nullable|string|size:3',
-            'performed_by'     => 'nullable|integer',
-            'notes'            => 'nullable|string',
-            'metadata'         => 'nullable|array',
+        $validated = $request->validate([
+            'tenant_id'         => 'required|integer',
+            'product_id'        => 'required|integer',
+            'from_warehouse_id' => 'required|integer',
+            'from_location_id'  => 'required|integer',
+            'to_warehouse_id'   => 'required|integer',
+            'to_location_id'    => 'required|integer',
+            'quantity'          => 'required|numeric|min:0.0001',
+            'reference'         => 'required|string|max:100',
+            'batch_id'          => 'nullable|integer',
+            'variant_id'        => 'nullable|integer',
         ]);
 
-        $dto      = TransferStockData::fromArray([
-            'tenantId'        => $v['tenant_id'],
-            'referenceNumber' => $v['reference_number'],
-            'productId'       => $v['product_id'],
-            'quantity'        => $v['quantity'],
-            'fromLocationId'  => $v['from_location_id'],
-            'toLocationId'    => $v['to_location_id'],
-            'variationId'     => $v['variation_id'] ?? null,
-            'batchId'         => $v['batch_id'] ?? null,
-            'serialNumberId'  => $v['serial_number_id'] ?? null,
-            'uomId'           => $v['uom_id'] ?? null,
-            'unitCost'        => $v['unit_cost'] ?? null,
-            'currency'        => $v['currency'] ?? 'USD',
-            'performedBy'     => $v['performed_by'] ?? null,
-            'notes'           => $v['notes'] ?? null,
-            'metadata'        => $v['metadata'] ?? null,
-        ]);
-        $movement = $this->transferService->execute($dto->toArray());
-
-        return (new StockMovementResource($movement))->response()->setStatusCode(201);
+        try {
+            $dto = new TransferStockData(
+                tenantId: $validated['tenant_id'],
+                productId: $validated['product_id'],
+                fromWarehouseId: $validated['from_warehouse_id'],
+                fromLocationId: $validated['from_location_id'],
+                toWarehouseId: $validated['to_warehouse_id'],
+                toLocationId: $validated['to_location_id'],
+                quantity: (float) $validated['quantity'],
+                reference: $validated['reference'],
+                batchId: $validated['batch_id'] ?? null,
+                variantId: $validated['variant_id'] ?? null,
+            );
+            [$from, $to] = $this->transferService->execute($dto);
+            return response()->json([
+                'from' => new StockMovementResource($from),
+                'to'   => new StockMovementResource($to),
+            ], 201);
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 }

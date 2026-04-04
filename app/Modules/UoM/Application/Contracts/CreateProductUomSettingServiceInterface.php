@@ -1,9 +1,9 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\UoM\Application\Contracts;
+use Modules\UoM\Application\DTOs\ProductUomSettingData;
+use Modules\UoM\Domain\Entities\ProductUomSetting;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
-
-interface CreateProductUomSettingServiceInterface extends WriteServiceInterface {}
+interface CreateProductUomSettingServiceInterface
+{
+    public function execute(ProductUomSettingData $data): ProductUomSetting;
+}

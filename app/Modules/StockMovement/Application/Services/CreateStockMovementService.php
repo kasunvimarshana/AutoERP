@@ -1,56 +1,39 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\StockMovement\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
-use Modules\Core\Domain\ValueObjects\Metadata;
+use Illuminate\Support\Facades\Event;
 use Modules\StockMovement\Application\Contracts\CreateStockMovementServiceInterface;
 use Modules\StockMovement\Application\DTOs\StockMovementData;
 use Modules\StockMovement\Domain\Entities\StockMovement;
 use Modules\StockMovement\Domain\Events\StockMovementCreated;
 use Modules\StockMovement\Domain\RepositoryInterfaces\StockMovementRepositoryInterface;
 
-class CreateStockMovementService extends BaseService implements CreateStockMovementServiceInterface
+class CreateStockMovementService implements CreateStockMovementServiceInterface
 {
-    public function __construct(private readonly StockMovementRepositoryInterface $movementRepository)
+    public function __construct(private readonly StockMovementRepositoryInterface $repository) {}
+
+    public function execute(StockMovementData $data): StockMovement
     {
-        parent::__construct($movementRepository);
-    }
+        $movement = $this->repository->create([
+            'tenant_id'        => $data->tenantId,
+            'product_id'       => $data->productId,
+            'warehouse_id'     => $data->warehouseId,
+            'location_id'      => $data->locationId,
+            'movement_type'    => $data->movementType,
+            'quantity'         => $data->quantity,
+            'reference_number' => $data->referenceNumber,
+            'variant_id'       => $data->variantId,
+            'batch_id'         => $data->batchId,
+            'lot_number'       => $data->lotNumber,
+            'serial_number'    => $data->serialNumber,
+            'unit_cost'        => $data->unitCost,
+            'notes'            => $data->notes,
+            'moved_by'         => $data->movedBy,
+            'moved_at'         => now(),
+        ]);
 
-    protected function handle(array $data): StockMovement
-    {
-        $dto = StockMovementData::fromArray($data);
+        Event::dispatch(new StockMovementCreated($movement->tenantId, $movement->id));
 
-        $movementDate = $dto->movementDate ? new \DateTimeImmutable($dto->movementDate) : null;
-
-        $movement = new StockMovement(
-            tenantId:        $dto->tenantId,
-            referenceNumber: $dto->referenceNumber,
-            movementType:    $dto->movementType,
-            productId:       $dto->productId,
-            quantity:        $dto->quantity,
-            variationId:     $dto->variationId,
-            fromLocationId:  $dto->fromLocationId,
-            toLocationId:    $dto->toLocationId,
-            batchId:         $dto->batchId,
-            serialNumberId:  $dto->serialNumberId,
-            uomId:           $dto->uomId,
-            unitCost:        $dto->unitCost,
-            currency:        $dto->currency,
-            referenceType:   $dto->referenceType,
-            referenceId:     $dto->referenceId,
-            performedBy:     $dto->performedBy,
-            movementDate:    $movementDate,
-            notes:           $dto->notes,
-            metadata:        $dto->metadata ? new Metadata($dto->metadata) : null,
-            status:          $dto->status,
-        );
-
-        $saved = $this->movementRepository->save($movement);
-        $this->addEvent(new StockMovementCreated($saved));
-
-        return $saved;
+        return $movement;
     }
 }

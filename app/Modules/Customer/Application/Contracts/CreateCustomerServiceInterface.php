@@ -1,9 +1,10 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Customer\Application\Contracts;
 
-use Modules\Core\Application\Contracts\ServiceInterface;
+use Modules\Customer\Application\DTOs\CustomerData;
+use Modules\Customer\Domain\Entities\Customer;
 
-interface CreateCustomerServiceInterface extends ServiceInterface {}
+interface CreateCustomerServiceInterface
+{
+    public function execute(CustomerData $data): Customer;
+}

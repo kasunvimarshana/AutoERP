@@ -1,24 +1,11 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Pricing\Domain\Events;
-
 use Modules\Core\Domain\Events\BaseEvent;
-use Modules\Pricing\Domain\Entities\PriceList;
 
 class PriceListCreated extends BaseEvent
 {
-    public function __construct(public readonly PriceList $priceList)
+    public function __construct(int $tenantId, public readonly int $priceListId)
     {
-        parent::__construct($priceList->getTenantId());
-    }
-
-    public function broadcastWith(): array
-    {
-        return array_merge(parent::broadcastWith(), [
-            'id'        => $this->priceList->getId(),
-            'tenant_id' => $this->priceList->getTenantId(),
-        ]);
+        parent::__construct($tenantId);
     }
 }

@@ -1,15 +1,13 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\SalesOrder\Domain\RepositoryInterfaces;
 
-use Illuminate\Support\Collection;
-use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
 use Modules\SalesOrder\Domain\Entities\SalesOrderLine;
 
-interface SalesOrderLineRepositoryInterface extends RepositoryInterface
+interface SalesOrderLineRepositoryInterface
 {
-    public function save(SalesOrderLine $line): SalesOrderLine;
-    public function findBySalesOrder(int $salesOrderId): Collection;
+    public function findById(int $id): ?SalesOrderLine;
+    public function findBySalesOrder(int $salesOrderId): array;
+    public function create(array $data): SalesOrderLine;
+    public function update(SalesOrderLine $line, array $data): SalesOrderLine;
 }

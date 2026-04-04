@@ -1,17 +1,21 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Returns\Domain\RepositoryInterfaces;
 
-use Illuminate\Support\Collection;
-use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Modules\Returns\Domain\Entities\ReturnAuthorization;
 
-interface ReturnAuthorizationRepositoryInterface extends RepositoryInterface
+interface ReturnAuthorizationRepositoryInterface
 {
-    public function save(ReturnAuthorization $auth): ReturnAuthorization;
+    public function findById(int $id): ?ReturnAuthorization;
+
     public function findByRmaNumber(int $tenantId, string $rmaNumber): ?ReturnAuthorization;
-    public function findByParty(int $tenantId, int $partyId, string $partyType): Collection;
-    public function findByStatus(int $tenantId, string $status): Collection;
+
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator;
+
+    public function create(array $data): ReturnAuthorization;
+
+    public function update(ReturnAuthorization $rma, array $data): ReturnAuthorization;
+
+    public function save(ReturnAuthorization $rma): ReturnAuthorization;
 }

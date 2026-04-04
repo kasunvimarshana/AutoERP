@@ -1,22 +1,11 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\UoM\Domain\Events;
-
 use Modules\Core\Domain\Events\BaseEvent;
 
 class ProductUomSettingDeleted extends BaseEvent
 {
-    public function __construct(public readonly int $settingId, int $tenantId)
+    public function __construct(int $tenantId, public readonly int $entityId)
     {
         parent::__construct($tenantId);
-    }
-
-    public function broadcastWith(): array
-    {
-        return array_merge(parent::broadcastWith(), [
-            'id' => $this->settingId,
-        ]);
     }
 }

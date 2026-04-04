@@ -1,93 +1,28 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Inventory\Domain\ValueObjects;
-
-use InvalidArgumentException;
 
 class StockStatus
 {
     public const AVAILABLE  = 'available';
     public const RESERVED   = 'reserved';
-    public const ACTIVE     = 'active';
+    public const ON_HOLD    = 'on_hold';
     public const QUARANTINE = 'quarantine';
+    public const DAMAGED    = 'damaged';
     public const EXPIRED    = 'expired';
-    public const DEPLETED   = 'depleted';
-    public const RECALLED   = 'recalled';
 
-    public const VALID_STATUSES = [
-        self::AVAILABLE,
-        self::RESERVED,
-        self::ACTIVE,
-        self::QUARANTINE,
-        self::EXPIRED,
-        self::DEPLETED,
-        self::RECALLED,
-    ];
+    private static array $valid = [self::AVAILABLE, self::RESERVED, self::ON_HOLD, self::QUARANTINE, self::DAMAGED, self::EXPIRED];
 
-    private string $value;
+    private function __construct(public readonly string $value) {}
 
-    public function __construct(string $value)
+    public static function from(string $v): self
     {
-        if (! in_array($value, self::VALID_STATUSES, true)) {
-            throw new InvalidArgumentException("Invalid stock status: {$value}");
+        if (!in_array($v, self::$valid, true)) {
+            throw new \InvalidArgumentException("Invalid stock status: {$v}");
         }
-        $this->value = $value;
+        return new self($v);
     }
 
-    public function value(): string
-    {
-        return $this->value;
-    }
-
-    public function isActive(): bool
-    {
-        return $this->value === self::ACTIVE;
-    }
-
-    public function isAvailable(): bool
-    {
-        return $this->value === self::AVAILABLE;
-    }
-
-    public function isReserved(): bool
-    {
-        return $this->value === self::RESERVED;
-    }
-
-    public function isQuarantine(): bool
-    {
-        return $this->value === self::QUARANTINE;
-    }
-
-    public function isExpired(): bool
-    {
-        return $this->value === self::EXPIRED;
-    }
-
-    public function isDepleted(): bool
-    {
-        return $this->value === self::DEPLETED;
-    }
-
-    public function isRecalled(): bool
-    {
-        return $this->value === self::RECALLED;
-    }
-
-    public function equals(self $other): bool
-    {
-        return $this->value === $other->value;
-    }
-
-    public function __toString(): string
-    {
-        return $this->value;
-    }
-
-    public static function values(): array
-    {
-        return self::VALID_STATUSES;
-    }
+    public static function assertValid(string $v): void { self::from($v); }
+    public static function valid(): array { return self::$valid; }
+    public function __toString(): string { return $this->value; }
 }

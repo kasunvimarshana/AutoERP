@@ -1,12 +1,10 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Tenant\Application\Contracts;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
+use Modules\Tenant\Application\DTOs\TenantData;
+use Modules\Tenant\Domain\Entities\Tenant;
 
-/**
- * @method \Modules\Tenant\Domain\Entities\Tenant execute(array $data = [])
- */
-interface UpdateTenantServiceInterface extends WriteServiceInterface {}
+interface UpdateTenantServiceInterface
+{
+    public function execute(Tenant $tenant, TenantData $data): Tenant;
+}

@@ -1,11 +1,7 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\UoM\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\UoM\Domain\Entities\UnitOfMeasure;
 use Modules\UoM\Domain\RepositoryInterfaces\UnitOfMeasureRepositoryInterface;
@@ -16,91 +12,60 @@ class EloquentUnitOfMeasureRepository extends EloquentRepository implements Unit
     public function __construct(UnitOfMeasureModel $model)
     {
         parent::__construct($model);
-        $this->setDomainEntityMapper(fn (UnitOfMeasureModel $model): UnitOfMeasure => $this->mapModelToDomainEntity($model));
     }
 
-    public function save(UnitOfMeasure $unit): UnitOfMeasure
+    public function findById(int $id): ?UnitOfMeasure
     {
-        $savedModel = null;
-
-        DB::transaction(function () use ($unit, &$savedModel) {
-            if ($unit->getId()) {
-                $data = [
-                    'tenant_id'       => $unit->getTenantId(),
-                    'uom_category_id' => $unit->getUomCategoryId(),
-                    'name'            => $unit->getName(),
-                    'code'            => $unit->getCode(),
-                    'symbol'          => $unit->getSymbol(),
-                    'is_base_unit'    => $unit->isBaseUnit(),
-                    'factor'          => $unit->getFactor(),
-                    'description'     => $unit->getDescription(),
-                    'is_active'       => $unit->isActive(),
-                ];
-                $savedModel = $this->update($unit->getId(), $data);
-            } else {
-                $savedModel = $this->model->create([
-                    'tenant_id'       => $unit->getTenantId(),
-                    'uom_category_id' => $unit->getUomCategoryId(),
-                    'name'            => $unit->getName(),
-                    'code'            => $unit->getCode(),
-                    'symbol'          => $unit->getSymbol(),
-                    'is_base_unit'    => $unit->isBaseUnit(),
-                    'factor'          => $unit->getFactor(),
-                    'description'     => $unit->getDescription(),
-                    'is_active'       => $unit->isActive(),
-                ]);
-            }
-        });
-
-        if (! $savedModel instanceof UnitOfMeasureModel) {
-            throw new \RuntimeException('Failed to save UnitOfMeasure.');
-        }
-
-        return $this->mapModelToDomainEntity($savedModel);
+        $model = parent::findById($id);
+        return $model ? $this->toEntity($model) : null;
     }
 
-    public function findByCode(int $tenantId, string $code): ?UnitOfMeasure
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $model = $this->model->where('tenant_id', $tenantId)
-            ->where('code', $code)
-            ->first();
-
-        return $model ? $this->mapModelToDomainEntity($model) : null;
+        $query = $this->model->where('tenant_id', $tenantId);
+        $this->applyFilters($query, $filters);
+        $paginator = $query->paginate($perPage);
+        $paginator->getCollection()->transform(fn($m) => $this->toEntity($m));
+        return $paginator;
     }
 
-    public function findByCategory(int $tenantId, int $categoryId): Collection
+    public function findByCategory(int $categoryId): array
     {
-        return $this->model->where('tenant_id', $tenantId)
-            ->where('uom_category_id', $categoryId)
-            ->get()
-            ->map(fn ($m) => $this->mapModelToDomainEntity($m));
+        return $this->model->where('category_id', $categoryId)->get()
+            ->map(fn($m) => $this->toEntity($m))
+            ->all();
     }
 
-    public function findBaseUnit(int $tenantId, int $categoryId): ?UnitOfMeasure
+    public function create(array $data): UnitOfMeasure
     {
-        $model = $this->model->where('tenant_id', $tenantId)
-            ->where('uom_category_id', $categoryId)
-            ->where('is_base_unit', true)
-            ->first();
-
-        return $model ? $this->mapModelToDomainEntity($model) : null;
+        $model = parent::create($data);
+        return $this->toEntity($model);
     }
 
-    private function mapModelToDomainEntity(UnitOfMeasureModel $model): UnitOfMeasure
+    public function update(UnitOfMeasure $uom, array $data): UnitOfMeasure
+    {
+        $model = $this->model->findOrFail($uom->id);
+        $updated = parent::update($model, $data);
+        return $this->toEntity($updated);
+    }
+
+    public function delete(UnitOfMeasure $uom): bool
+    {
+        $model = $this->model->findOrFail($uom->id);
+        return parent::delete($model);
+    }
+
+    private function toEntity(UnitOfMeasureModel $model): UnitOfMeasure
     {
         return new UnitOfMeasure(
-            tenantId:      $model->tenant_id,
-            uomCategoryId: $model->uom_category_id,
-            name:          $model->name,
-            code:          $model->code,
-            symbol:        $model->symbol,
-            isBaseUnit:    (bool) $model->is_base_unit,
-            factor:        (float) $model->factor,
-            description:   $model->description,
-            isActive:      (bool) $model->is_active,
-            id:            $model->id,
-            createdAt:     $model->created_at,
-            updatedAt:     $model->updated_at
+            id: $model->id,
+            tenantId: $model->tenant_id,
+            categoryId: $model->category_id,
+            name: $model->name,
+            symbol: $model->symbol,
+            conversionFactor: (float) $model->conversion_factor,
+            isBase: (bool) $model->is_base,
+            isActive: (bool) $model->is_active,
         );
     }
 }

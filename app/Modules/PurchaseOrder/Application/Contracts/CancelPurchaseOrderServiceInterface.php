@@ -1,9 +1,7 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\PurchaseOrder\Application\Contracts;
-
-use Modules\Core\Application\Contracts\WriteServiceInterface;
-
-interface CancelPurchaseOrderServiceInterface extends WriteServiceInterface {}
+use Modules\PurchaseOrder\Domain\Entities\PurchaseOrder;
+interface CancelPurchaseOrderServiceInterface
+{
+    public function execute(int $poId): PurchaseOrder;
+}

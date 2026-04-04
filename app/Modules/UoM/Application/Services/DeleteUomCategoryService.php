@@ -1,41 +1,24 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\UoM\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
 use Modules\UoM\Application\Contracts\DeleteUomCategoryServiceInterface;
 use Modules\UoM\Domain\Events\UomCategoryDeleted;
-use Modules\UoM\Domain\Exceptions\UomCategoryNotFoundException;
 use Modules\UoM\Domain\RepositoryInterfaces\UomCategoryRepositoryInterface;
 
-class DeleteUomCategoryService extends BaseService implements DeleteUomCategoryServiceInterface
+class DeleteUomCategoryService implements DeleteUomCategoryServiceInterface
 {
-    private UomCategoryRepositoryInterface $categoryRepository;
+    public function __construct(
+        private readonly UomCategoryRepositoryInterface $repository,
+    ) {}
 
-    public function __construct(UomCategoryRepositoryInterface $repository)
+    public function execute(int $id): bool
     {
-        parent::__construct($repository);
-        $this->categoryRepository = $repository;
-    }
-
-    protected function handle(array $data): bool
-    {
-        $id       = $data['id'];
-        $category = $this->categoryRepository->find($id);
-
-        if (! $category) {
-            throw new UomCategoryNotFoundException($id);
+        $category = $this->repository->findById($id);
+        if (!$category) {
+            throw new \DomainException("UomCategory not found: {$id}");
         }
-
-        $tenantId = $category->getTenantId();
-        $deleted  = $this->categoryRepository->delete($id);
-
-        if ($deleted) {
-            $this->addEvent(new UomCategoryDeleted($id, $tenantId));
-        }
-
-        return $deleted;
+        $result = $this->repository->delete($category);
+        event(new UomCategoryDeleted($category->tenantId, $id));
+        return $result;
     }
 }

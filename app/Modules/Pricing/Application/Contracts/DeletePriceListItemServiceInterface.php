@@ -1,9 +1,8 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Pricing\Application\Contracts;
+use Modules\Pricing\Domain\Entities\PriceListItem;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
-
-interface DeletePriceListItemServiceInterface extends WriteServiceInterface {}
+interface DeletePriceListItemServiceInterface
+{
+    public function execute(PriceListItem $item): bool;
+}

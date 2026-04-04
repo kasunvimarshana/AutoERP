@@ -1,11 +1,6 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\PurchaseOrder\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\PurchaseOrder\Domain\Entities\PurchaseOrderLine;
 use Modules\PurchaseOrder\Domain\RepositoryInterfaces\PurchaseOrderLineRepositoryInterface;
@@ -16,80 +11,47 @@ class EloquentPurchaseOrderLineRepository extends EloquentRepository implements 
     public function __construct(PurchaseOrderLineModel $model)
     {
         parent::__construct($model);
-        $this->setDomainEntityMapper(fn (PurchaseOrderLineModel $m): PurchaseOrderLine => $this->mapModelToDomainEntity($m));
     }
 
-    public function save(PurchaseOrderLine $line): PurchaseOrderLine
+    public function findById(int $id): ?PurchaseOrderLine
     {
-        $savedModel = null;
-
-        DB::transaction(function () use ($line, &$savedModel) {
-            $data = [
-                'tenant_id'         => $line->getTenantId(),
-                'purchase_order_id' => $line->getPurchaseOrderId(),
-                'line_number'       => $line->getLineNumber(),
-                'product_id'        => $line->getProductId(),
-                'variation_id'      => $line->getVariationId(),
-                'description'       => $line->getDescription(),
-                'uom_id'            => $line->getUomId(),
-                'quantity_ordered'  => $line->getQuantityOrdered(),
-                'quantity_received' => $line->getQuantityReceived(),
-                'unit_price'        => $line->getUnitPrice(),
-                'discount_percent'  => $line->getDiscountPercent(),
-                'tax_percent'       => $line->getTaxPercent(),
-                'line_total'        => $line->getLineTotal(),
-                'expected_date'     => $line->getExpectedDate(),
-                'notes'             => $line->getNotes(),
-                'metadata'          => $line->getMetadata(),
-                'status'            => $line->getStatus(),
-            ];
-
-            if ($line->getId()) {
-                $savedModel = $this->update($line->getId(), $data);
-            } else {
-                $savedModel = $this->model->create($data);
-            }
-        });
-
-        if (! $savedModel instanceof PurchaseOrderLineModel) {
-            throw new \RuntimeException('Failed to save PurchaseOrderLine.');
-        }
-
-        return $this->mapModelToDomainEntity($savedModel);
+        $model = parent::findById($id);
+        return $model ? $this->toEntity($model) : null;
     }
 
-    public function findByOrder(int $purchaseOrderId): Collection
+    public function findByPurchaseOrder(int $purchaseOrderId): array
     {
-        return $this->model
-            ->where('purchase_order_id', $purchaseOrderId)
-            ->orderBy('line_number')
+        return $this->model->where('purchase_order_id', $purchaseOrderId)
             ->get()
-            ->map(fn ($m) => $this->mapModelToDomainEntity($m));
+            ->map(fn($m) => $this->toEntity($m))
+            ->all();
     }
 
-    private function mapModelToDomainEntity(PurchaseOrderLineModel $model): PurchaseOrderLine
+    public function create(array $data): PurchaseOrderLine
+    {
+        $model = parent::create($data);
+        return $this->toEntity($model);
+    }
+
+    public function update(PurchaseOrderLine $line, array $data): PurchaseOrderLine
+    {
+        $model = $this->model->findOrFail($line->id);
+        $updated = parent::update($model, $data);
+        return $this->toEntity($updated);
+    }
+
+    private function toEntity(object $model): PurchaseOrderLine
     {
         return new PurchaseOrderLine(
-            tenantId:         $model->tenant_id,
-            purchaseOrderId:  $model->purchase_order_id,
-            lineNumber:       (int) $model->line_number,
-            productId:        $model->product_id,
-            quantityOrdered:  (float) $model->quantity_ordered,
-            unitPrice:        (float) $model->unit_price,
-            variationId:      $model->variation_id,
-            description:      $model->description,
-            uomId:            $model->uom_id,
-            quantityReceived: (float) $model->quantity_received,
-            discountPercent:  (float) $model->discount_percent,
-            taxPercent:       (float) $model->tax_percent,
-            lineTotal:        (float) $model->line_total,
-            expectedDate:     $model->expected_date,
-            notes:            $model->notes,
-            metadata:         isset($model->metadata) ? (array) $model->metadata : null,
-            status:           $model->status,
-            id:               $model->id,
-            createdAt:        $model->created_at,
-            updatedAt:        $model->updated_at,
+            id: $model->id,
+            purchaseOrderId: $model->purchase_order_id,
+            productId: $model->product_id,
+            orderedQty: (float) $model->ordered_qty,
+            unitCost: (float) $model->unit_cost,
+            lineTotal: (float) $model->line_total,
+            variantId: $model->variant_id,
+            notes: $model->notes,
+            receivedQty: (float) $model->received_qty,
         );
     }
 }

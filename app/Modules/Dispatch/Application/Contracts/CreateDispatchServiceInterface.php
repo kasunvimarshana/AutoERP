@@ -1,9 +1,11 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Dispatch\Application\Contracts;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
+use Modules\Dispatch\Application\DTOs\DispatchData;
+use Modules\Dispatch\Domain\Entities\Dispatch;
 
-interface CreateDispatchServiceInterface extends WriteServiceInterface {}
+interface CreateDispatchServiceInterface
+{
+    public function execute(DispatchData $data): Dispatch;
+}

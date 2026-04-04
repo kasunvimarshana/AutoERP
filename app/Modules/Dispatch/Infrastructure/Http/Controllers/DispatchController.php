@@ -1,143 +1,142 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Dispatch\Infrastructure\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
-use Modules\Dispatch\Application\Contracts\CancelDispatchServiceInterface;
-use Modules\Dispatch\Application\Contracts\ConfirmDispatchServiceInterface;
 use Modules\Dispatch\Application\Contracts\CreateDispatchServiceInterface;
-use Modules\Dispatch\Application\Contracts\DeleteDispatchServiceInterface;
-use Modules\Dispatch\Application\Contracts\DeliverDispatchServiceInterface;
-use Modules\Dispatch\Application\Contracts\FindDispatchServiceInterface;
-use Modules\Dispatch\Application\Contracts\ShipDispatchServiceInterface;
-use Modules\Dispatch\Application\Contracts\UpdateDispatchServiceInterface;
+use Modules\Dispatch\Application\Contracts\DispatchShipmentServiceInterface;
+use Modules\Dispatch\Application\Contracts\MarkDeliveredServiceInterface;
+use Modules\Dispatch\Application\Contracts\ProcessDispatchServiceInterface;
 use Modules\Dispatch\Application\DTOs\DispatchData;
-use Modules\Dispatch\Application\DTOs\UpdateDispatchData;
-use Modules\Dispatch\Infrastructure\Http\Requests\StoreDispatchRequest;
-use Modules\Dispatch\Infrastructure\Http\Requests\UpdateDispatchRequest;
-use Modules\Dispatch\Infrastructure\Http\Resources\DispatchCollection;
+use Modules\Dispatch\Domain\RepositoryInterfaces\DispatchRepositoryInterface;
 use Modules\Dispatch\Infrastructure\Http\Resources\DispatchResource;
+use Modules\Dispatch\Infrastructure\Persistence\Eloquent\Models\DispatchModel;
 
-class DispatchController extends AuthorizedController
+class DispatchController extends Controller
 {
     public function __construct(
-        protected FindDispatchServiceInterface $findService,
-        protected CreateDispatchServiceInterface $createService,
-        protected UpdateDispatchServiceInterface $updateService,
-        protected DeleteDispatchServiceInterface $deleteService,
-        protected ConfirmDispatchServiceInterface $confirmService,
-        protected ShipDispatchServiceInterface $shipService,
-        protected DeliverDispatchServiceInterface $deliverService,
-        protected CancelDispatchServiceInterface $cancelService,
+        private readonly DispatchRepositoryInterface $repository,
+        private readonly CreateDispatchServiceInterface $createService,
+        private readonly ProcessDispatchServiceInterface $processService,
+        private readonly DispatchShipmentServiceInterface $dispatchShipmentService,
+        private readonly MarkDeliveredServiceInterface $markDeliveredService,
     ) {}
 
-    public function index(Request $request): DispatchCollection
+    public function index(Request $request): JsonResponse
     {
-        $filters = $request->only(['tenant_id', 'status', 'warehouse_id', 'sales_order_id', 'customer_id']);
-
-        return new DispatchCollection(
-            $this->findService->list($filters, $request->integer('per_page', 15), $request->integer('page', 1))
+        $tenantId = (int) $request->query('tenant_id', 0);
+        $dispatches = $this->repository->findAll(
+            $tenantId,
+            $request->only(['status', 'sales_order_id', 'warehouse_id'])
         );
+        return response()->json($dispatches);
     }
 
-    public function store(StoreDispatchRequest $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
-        $v   = $request->validated();
-        $dto = DispatchData::fromArray([
-            'tenantId'             => $v['tenant_id'],
-            'referenceNumber'      => $v['reference_number'],
-            'warehouseId'          => $v['warehouse_id'],
-            'customerId'           => $v['customer_id'],
-            'dispatchDate'         => $v['dispatch_date'],
-            'salesOrderId'         => $v['sales_order_id'] ?? null,
-            'customerReference'    => $v['customer_reference'] ?? null,
-            'estimatedDeliveryDate'=> $v['estimated_delivery_date'] ?? null,
-            'carrier'              => $v['carrier'] ?? null,
-            'notes'                => $v['notes'] ?? null,
-            'metadata'             => $v['metadata'] ?? null,
-            'status'               => $v['status'] ?? 'draft',
-            'currency'             => $v['currency'] ?? 'USD',
-            'totalWeight'          => $v['total_weight'] ?? null,
+        $validated = $request->validate([
+            'tenant_id'                        => 'required|integer',
+            'sales_order_id'                   => 'required|integer',
+            'warehouse_id'                     => 'required|integer',
+            'dispatch_number'                  => 'required|string|max:100',
+            'lines'                            => 'required|array|min:1',
+            'lines.*.sales_order_line_id'      => 'required|integer',
+            'lines.*.product_id'               => 'required|integer',
+            'lines.*.dispatched_qty'           => 'required|numeric|min:0.0001',
+            'lines.*.location_id'              => 'required|integer',
+            'carrier'                          => 'nullable|string|max:100',
+            'tracking_number'                  => 'nullable|string|max:100',
+            'shipping_address'                 => 'nullable|string',
         ]);
 
-        $dispatch = $this->createService->execute($dto->toArray());
-
-        return (new DispatchResource($dispatch))->response()->setStatusCode(201);
-    }
-
-    public function show(int $id): DispatchResource|JsonResponse
-    {
-        $dispatch = $this->findService->find($id);
-        if (! $dispatch) {
-            return response()->json(['message' => 'Not found'], 404);
+        try {
+            $dto = new DispatchData(
+                tenantId: $validated['tenant_id'],
+                salesOrderId: $validated['sales_order_id'],
+                warehouseId: $validated['warehouse_id'],
+                dispatchNumber: $validated['dispatch_number'],
+                lines: $validated['lines'],
+                carrier: $validated['carrier'] ?? null,
+                trackingNumber: $validated['tracking_number'] ?? null,
+                shippingAddress: $validated['shipping_address'] ?? null,
+            );
+            $dispatch = $this->createService->execute($dto);
+            return response()->json(new DispatchResource($dispatch), 201);
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
         }
-
-        return new DispatchResource($dispatch);
     }
 
-    public function update(UpdateDispatchRequest $request, int $id): DispatchResource
+    public function show(int $id): JsonResponse
     {
-        $v   = $request->validated();
-        $dto = UpdateDispatchData::fromArray([
-            'id'                   => $id,
-            'customerReference'    => $v['customer_reference'] ?? null,
-            'estimatedDeliveryDate'=> $v['estimated_delivery_date'] ?? null,
-            'carrier'              => $v['carrier'] ?? null,
-            'trackingNumber'       => $v['tracking_number'] ?? null,
-            'notes'                => $v['notes'] ?? null,
-            'metadata'             => $v['metadata'] ?? null,
-            'totalWeight'          => $v['total_weight'] ?? null,
+        $dispatch = $this->repository->findById($id);
+        if (!$dispatch) return response()->json(['message' => 'Not found'], 404);
+        return response()->json(new DispatchResource($dispatch));
+    }
+
+    public function update(Request $request, int $id): JsonResponse
+    {
+        $dispatch = $this->repository->findById($id);
+        if (!$dispatch) return response()->json(['message' => 'Not found'], 404);
+
+        $validated = $request->validate([
+            'tracking_number'  => 'nullable|string|max:100',
+            'carrier'          => 'nullable|string|max:100',
+            'shipping_address' => 'nullable|string',
+            'notes'            => 'nullable|string',
         ]);
 
-        return new DispatchResource($this->updateService->execute($dto->toArray()));
+        $updated = $this->repository->update($dispatch, $validated);
+        return response()->json(new DispatchResource($updated));
     }
 
     public function destroy(int $id): JsonResponse
     {
-        $this->deleteService->execute(['id' => $id]);
-
-        return response()->json(['message' => 'Dispatch deleted successfully']);
+        $dispatch = $this->repository->findById($id);
+        if (!$dispatch) return response()->json(['message' => 'Not found'], 404);
+        DispatchModel::findOrFail($id)->delete();
+        return response()->json(null, 204);
     }
 
-    public function confirm(Request $request, int $id): JsonResponse
+    public function process(int $id): JsonResponse
     {
-        $dispatch = $this->confirmService->execute([
-            'id'           => $id,
-            'confirmed_by' => $request->integer('confirmed_by'),
-        ]);
-
-        return (new DispatchResource($dispatch))->response();
+        $dispatch = $this->repository->findById($id);
+        if (!$dispatch) return response()->json(['message' => 'Not found'], 404);
+        try {
+            $dispatch = $this->processService->execute($dispatch);
+            return response()->json(new DispatchResource($dispatch));
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
-    public function ship(Request $request, int $id): JsonResponse
+    public function dispatch(Request $request, int $id): JsonResponse
     {
-        $dispatch = $this->shipService->execute([
-            'id'              => $id,
-            'shipped_by'      => $request->integer('shipped_by'),
-            'tracking_number' => $request->input('tracking_number'),
-        ]);
-
-        return (new DispatchResource($dispatch))->response();
+        $dispatch = $this->repository->findById($id);
+        if (!$dispatch) return response()->json(['message' => 'Not found'], 404);
+        $request->validate(['dispatched_by' => 'required|integer']);
+        try {
+            $dispatch = $this->dispatchShipmentService->execute(
+                $dispatch,
+                (int) $request->input('dispatched_by')
+            );
+            return response()->json(new DispatchResource($dispatch));
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
-    public function deliver(Request $request, int $id): JsonResponse
+    public function deliver(int $id): JsonResponse
     {
-        $dispatch = $this->deliverService->execute([
-            'id'                   => $id,
-            'actual_delivery_date' => $request->input('actual_delivery_date'),
-        ]);
-
-        return (new DispatchResource($dispatch))->response();
-    }
-
-    public function cancel(int $id): JsonResponse
-    {
-        $dispatch = $this->cancelService->execute(['id' => $id]);
-
-        return (new DispatchResource($dispatch))->response();
+        $dispatch = $this->repository->findById($id);
+        if (!$dispatch) return response()->json(['message' => 'Not found'], 404);
+        try {
+            $dispatch = $this->markDeliveredService->execute($dispatch);
+            return response()->json(new DispatchResource($dispatch));
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 }

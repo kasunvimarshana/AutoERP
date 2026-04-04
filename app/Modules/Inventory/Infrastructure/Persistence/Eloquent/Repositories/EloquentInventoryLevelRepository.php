@@ -1,11 +1,7 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Inventory\Domain\Entities\InventoryLevel;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryLevelRepositoryInterface;
@@ -16,59 +12,19 @@ class EloquentInventoryLevelRepository extends EloquentRepository implements Inv
     public function __construct(InventoryLevelModel $model)
     {
         parent::__construct($model);
-        $this->setDomainEntityMapper(fn (InventoryLevelModel $m): InventoryLevel => $this->mapModelToDomainEntity($m));
     }
 
-    public function save(InventoryLevel $level): InventoryLevel
+    public function findById(int $id): ?InventoryLevel
     {
-        $savedModel = null;
-        DB::transaction(function () use ($level, &$savedModel) {
-            $data = [
-                'tenant_id'    => $level->getTenantId(),
-                'product_id'   => $level->getProductId(),
-                'variation_id' => $level->getVariationId(),
-                'location_id'  => $level->getLocationId(),
-                'batch_id'     => $level->getBatchId(),
-                'uom_id'       => $level->getUomId(),
-                'qty_on_hand'  => $level->getQtyOnHand(),
-                'qty_reserved' => $level->getQtyReserved(),
-                'qty_available'=> $level->getQtyAvailable(),
-                'qty_on_order' => $level->getQtyOnOrder(),
-                'reorder_point'=> $level->getReorderPoint(),
-                'reorder_qty'  => $level->getReorderQty(),
-                'max_qty'      => $level->getMaxQty(),
-                'min_qty'      => $level->getMinQty(),
-                'last_counted_at' => $level->getLastCountedAt()?->format('Y-m-d H:i:s'),
-            ];
-            if ($level->getId()) {
-                $savedModel = $this->update($level->getId(), $data);
-            } else {
-                $savedModel = $this->model->create($data);
-            }
-        });
-
-        if (! $savedModel instanceof InventoryLevelModel) {
-            throw new \RuntimeException('Failed to save InventoryLevel.');
-        }
-
-        return $this->mapModelToDomainEntity($savedModel);
+        $model = parent::findById($id);
+        return $model ? $this->toEntity($model) : null;
     }
 
-    public function findByProduct(int $tenantId, int $productId): Collection
+    public function findByProductWarehouseLocation(int $productId, int $warehouseId, int $locationId, ?int $batchId = null): ?InventoryLevel
     {
-        return $this->model->where('tenant_id', $tenantId)->where('product_id', $productId)->get()
-            ->map(fn ($m) => $this->mapModelToDomainEntity($m));
-    }
-
-    public function findByProductAndLocation(int $tenantId, int $productId, ?int $locationId, ?int $batchId): ?InventoryLevel
-    {
-        $query = $this->model->where('tenant_id', $tenantId)->where('product_id', $productId);
-
-        if ($locationId !== null) {
-            $query->where('location_id', $locationId);
-        } else {
-            $query->whereNull('location_id');
-        }
+        $query = $this->model->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->where('location_id', $locationId);
 
         if ($batchId !== null) {
             $query->where('batch_id', $batchId);
@@ -77,37 +33,92 @@ class EloquentInventoryLevelRepository extends EloquentRepository implements Inv
         }
 
         $model = $query->first();
-
-        return $model ? $this->mapModelToDomainEntity($model) : null;
+        return $model ? $this->toEntity($model) : null;
     }
 
-    public function getTotalStock(int $tenantId, int $productId): float
+    public function findByProduct(int $productId, int $tenantId): array
     {
-        return (float) $this->model->where('tenant_id', $tenantId)->where('product_id', $productId)
-            ->sum('qty_on_hand');
+        return $this->model->where('product_id', $productId)
+            ->where('tenant_id', $tenantId)
+            ->get()
+            ->map(fn($m) => $this->toEntity($m))
+            ->all();
     }
 
-    private function mapModelToDomainEntity(InventoryLevelModel $model): InventoryLevel
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
+    {
+        $query = $this->model->where('tenant_id', $tenantId);
+        $this->applyFilters($query, $filters);
+        return $query->paginate($perPage);
+    }
+
+    public function findByProductForAllocation(int $productId, int $warehouseId, string $algorithm): array
+    {
+        $query = $this->model
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->whereRaw('quantity_available > 0');
+
+        switch ($algorithm) {
+            case 'fefo':
+                // Join inventory_batches to order by expiry_date ascending (nearest expiry first)
+                $query->leftJoin('inventory_batches', 'inventory_levels.batch_id', '=', 'inventory_batches.id')
+                    ->select('inventory_levels.*')
+                    ->orderByRaw('inventory_batches.expiry_date IS NULL')
+                    ->orderBy('inventory_batches.expiry_date', 'asc');
+                break;
+
+            case 'lifo':
+                $query->orderBy('inventory_levels.created_at', 'desc');
+                break;
+
+            case 'fifo':
+            case 'nearest':
+            case 'zone_based':
+            default:
+                $query->orderBy('inventory_levels.created_at', 'asc');
+        }
+
+        return $query->get()->map(fn($m) => $this->toEntity($m))->all();
+    }
+
+
+
+    public function update(InventoryLevel $level, array $data): InventoryLevel
+    {
+        $model = $this->model->findOrFail($level->id);
+        $updated = parent::update($model, $data);
+        return $this->toEntity($updated);
+    }
+
+    public function save(InventoryLevel $level): InventoryLevel
+    {
+        $model = $this->model->findOrFail($level->id);
+        $updated = parent::update($model, [
+            'quantity_on_hand'   => $level->quantityOnHand,
+            'quantity_reserved'  => $level->quantityReserved,
+            'quantity_available' => $level->quantityAvailable,
+            'quantity_on_order'  => $level->quantityOnOrder,
+        ]);
+        return $this->toEntity($updated);
+    }
+
+    private function toEntity(object $model): InventoryLevel
     {
         return new InventoryLevel(
-            tenantId:      $model->tenant_id,
-            productId:     $model->product_id,
-            variationId:   $model->variation_id,
-            locationId:    $model->location_id,
-            batchId:       $model->batch_id,
-            uomId:         $model->uom_id,
-            qtyOnHand:     (float) $model->qty_on_hand,
-            qtyReserved:   (float) $model->qty_reserved,
-            qtyAvailable:  (float) $model->qty_available,
-            qtyOnOrder:    (float) $model->qty_on_order,
-            reorderPoint:  isset($model->reorder_point) ? (float) $model->reorder_point : null,
-            reorderQty:    isset($model->reorder_qty) ? (float) $model->reorder_qty : null,
-            maxQty:        isset($model->max_qty) ? (float) $model->max_qty : null,
-            minQty:        isset($model->min_qty) ? (float) $model->min_qty : null,
-            lastCountedAt: $model->last_counted_at,
-            id:            $model->id,
-            createdAt:     $model->created_at,
-            updatedAt:     $model->updated_at,
+            id: $model->id,
+            tenantId: $model->tenant_id,
+            productId: $model->product_id,
+            warehouseId: $model->warehouse_id,
+            locationId: $model->location_id,
+            quantityOnHand: (float) $model->quantity_on_hand,
+            quantityReserved: (float) $model->quantity_reserved,
+            quantityAvailable: (float) $model->quantity_available,
+            quantityOnOrder: (float) $model->quantity_on_order,
+            batchId: $model->batch_id,
+            lotId: $model->lot_id,
+            serialId: $model->serial_id,
+            stockStatus: $model->stock_status,
         );
     }
 }

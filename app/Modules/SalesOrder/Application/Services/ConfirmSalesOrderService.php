@@ -1,37 +1,25 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\SalesOrder\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
+use Illuminate\Support\Facades\Event;
 use Modules\SalesOrder\Application\Contracts\ConfirmSalesOrderServiceInterface;
 use Modules\SalesOrder\Domain\Entities\SalesOrder;
 use Modules\SalesOrder\Domain\Events\SalesOrderConfirmed;
-use Modules\SalesOrder\Domain\Exceptions\SalesOrderNotFoundException;
 use Modules\SalesOrder\Domain\RepositoryInterfaces\SalesOrderRepositoryInterface;
+use Modules\SalesOrder\Domain\ValueObjects\SalesOrderStatus;
 
-class ConfirmSalesOrderService extends BaseService implements ConfirmSalesOrderServiceInterface
+class ConfirmSalesOrderService implements ConfirmSalesOrderServiceInterface
 {
-    public function __construct(private readonly SalesOrderRepositoryInterface $orderRepository)
-    {
-        parent::__construct($orderRepository);
-    }
+    public function __construct(private readonly SalesOrderRepositoryInterface $repository) {}
 
-    protected function handle(array $data): SalesOrder
+    public function execute(SalesOrder $so): SalesOrder
     {
-        $id    = $data['id'];
-        $order = $this->orderRepository->find($id);
-
-        if (! $order) {
-            throw new SalesOrderNotFoundException($id);
+        if ($so->status === SalesOrderStatus::CANCELLED) {
+            throw new \DomainException("Cannot confirm a cancelled sales order.");
         }
-
-        $order->confirm((int) $data['confirmed_by']);
-
-        $saved = $this->orderRepository->save($order);
-        $this->addEvent(new SalesOrderConfirmed($saved->getId(), (int) $data['confirmed_by']));
-
-        return $saved;
+        $so = $this->repository->update($so, ['status' => SalesOrderStatus::CONFIRMED]);
+        Event::dispatch(new SalesOrderConfirmed($so->tenantId, $so->id));
+        return $so;
     }
 }

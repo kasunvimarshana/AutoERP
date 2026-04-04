@@ -1,9 +1,9 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\UoM\Application\Contracts;
+use Modules\UoM\Application\DTOs\UomConversionData;
+use Modules\UoM\Domain\Entities\UomConversion;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
-
-interface CreateUomConversionServiceInterface extends WriteServiceInterface {}
+interface CreateUomConversionServiceInterface
+{
+    public function execute(UomConversionData $data): UomConversion;
+}

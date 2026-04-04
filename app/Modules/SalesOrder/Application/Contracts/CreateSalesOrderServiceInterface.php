@@ -1,9 +1,11 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\SalesOrder\Application\Contracts;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
+use Modules\SalesOrder\Application\DTOs\SalesOrderData;
+use Modules\SalesOrder\Domain\Entities\SalesOrder;
 
-interface CreateSalesOrderServiceInterface extends WriteServiceInterface {}
+interface CreateSalesOrderServiceInterface
+{
+    public function execute(SalesOrderData $data): SalesOrder;
+}

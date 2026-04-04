@@ -1,29 +1,29 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Warehouse\Infrastructure\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Warehouse\Domain\Entities\Warehouse;
 
 class WarehouseResource extends JsonResource
 {
-    public function toArray($request)
+    public function __construct(private readonly Warehouse $warehouse)
+    {
+        parent::__construct($warehouse);
+    }
+
+    public function toArray($request): array
     {
         return [
-            'id'          => $this->getId(),
-            'tenant_id'   => $this->getTenantId(),
-            'name'        => $this->getName()->value(),
-            'type'        => $this->getType(),
-            'code'        => $this->getCode()?->value(),
-            'description' => $this->getDescription(),
-            'address'     => $this->getAddress(),
-            'capacity'    => $this->getCapacity(),
-            'location_id' => $this->getLocationId(),
-            'metadata'    => $this->getMetadata()?->toArray() ?? [],
-            'is_active'   => $this->isActive(),
-            'created_at'  => $this->getCreatedAt()->format('c'),
-            'updated_at'  => $this->getUpdatedAt()->format('c'),
+            'id'        => $this->warehouse->id,
+            'tenantId'  => $this->warehouse->tenantId,
+            'code'      => $this->warehouse->code,
+            'name'      => $this->warehouse->name,
+            'type'      => $this->warehouse->type,
+            'status'    => $this->warehouse->status,
+            'address'   => $this->warehouse->address,
+            'city'      => $this->warehouse->city,
+            'country'   => $this->warehouse->country,
+            'isDefault' => $this->warehouse->isDefault,
         ];
     }
 }

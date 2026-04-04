@@ -1,24 +1,12 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Inventory\Domain\Events;
 
 use Modules\Core\Domain\Events\BaseEvent;
-use Modules\Inventory\Domain\Entities\InventoryBatch;
 
 class InventoryBatchCreated extends BaseEvent
 {
-    public function __construct(public readonly InventoryBatch $batch)
+    public function __construct(int $tenantId, public readonly int $batchId)
     {
-        parent::__construct($batch->getTenantId(), $batch->getId());
-    }
-
-    public function broadcastWith(): array
-    {
-        return array_merge(parent::broadcastWith(), [
-            'id'        => $this->batch->getId(),
-            'tenant_id' => $this->batch->getTenantId(),
-        ]);
+        parent::__construct($tenantId);
     }
 }

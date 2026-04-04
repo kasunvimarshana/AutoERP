@@ -1,25 +1,12 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\User\Application\DTOs;
 
-use Modules\Core\Application\DTOs\BaseDto;
+use Modules\Core\Application\DTOs\BaseDTO;
 
-class ChangePasswordData extends BaseDto
+class ChangePasswordData extends BaseDTO
 {
-    public string $current_password;
-
-    public string $password;
-
-    public string $password_confirmation;
-
-    public function rules(): array
-    {
-        return [
-            'current_password'      => 'required|string',
-            'password'              => 'required|string|min:8|confirmed',
-            'password_confirmation' => 'required|string',
-        ];
-    }
+    public function __construct(
+        public readonly string $currentPassword,
+        public readonly string $newPassword,
+    ) {}
 }

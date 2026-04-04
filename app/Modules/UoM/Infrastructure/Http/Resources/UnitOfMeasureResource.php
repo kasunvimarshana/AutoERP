@@ -1,28 +1,27 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\UoM\Infrastructure\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\UoM\Domain\Entities\UnitOfMeasure;
 
 class UnitOfMeasureResource extends JsonResource
 {
+    public function __construct(private readonly UnitOfMeasure $entity)
+    {
+        parent::__construct($entity);
+    }
+
     public function toArray($request): array
     {
         return [
-            'id'              => $this->getId(),
-            'tenant_id'       => $this->getTenantId(),
-            'uom_category_id' => $this->getUomCategoryId(),
-            'name'            => $this->getName(),
-            'code'            => $this->getCode(),
-            'symbol'          => $this->getSymbol(),
-            'is_base_unit'    => $this->isBaseUnit(),
-            'factor'          => $this->getFactor(),
-            'description'     => $this->getDescription(),
-            'is_active'       => $this->isActive(),
-            'created_at'      => $this->getCreatedAt()->format('c'),
-            'updated_at'      => $this->getUpdatedAt()->format('c'),
+            'id'                => $this->entity->id,
+            'tenant_id'         => $this->entity->tenantId,
+            'category_id'       => $this->entity->categoryId,
+            'name'              => $this->entity->name,
+            'symbol'            => $this->entity->symbol,
+            'conversion_factor' => $this->entity->conversionFactor,
+            'is_base'           => $this->entity->isBase,
+            'is_active'         => $this->entity->isActive,
         ];
     }
 }

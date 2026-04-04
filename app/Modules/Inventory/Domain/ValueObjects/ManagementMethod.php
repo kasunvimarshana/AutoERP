@@ -1,65 +1,27 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Inventory\Domain\ValueObjects;
-
-use InvalidArgumentException;
 
 class ManagementMethod
 {
-    public const PERPETUAL = 'perpetual';
-    public const PERIODIC  = 'periodic';
+    public const STANDARD         = 'standard';
+    public const BATCH            = 'batch';
+    public const LOT              = 'lot';
+    public const SERIAL           = 'serial';
+    public const BATCH_AND_SERIAL = 'batch_and_serial';
 
-    public const VALID_METHODS = [
-        self::PERPETUAL,
-        self::PERIODIC,
-    ];
+    private static array $valid = [self::STANDARD, self::BATCH, self::LOT, self::SERIAL, self::BATCH_AND_SERIAL];
 
-    private string $value;
+    private function __construct(public readonly string $value) {}
 
-    public function __construct(string $value)
+    public static function from(string $v): self
     {
-        if (! in_array($value, self::VALID_METHODS, true)) {
-            throw new InvalidArgumentException("Invalid management method: {$value}");
+        if (!in_array($v, self::$valid, true)) {
+            throw new \InvalidArgumentException("Invalid management method: {$v}");
         }
-        $this->value = $value;
+        return new self($v);
     }
 
-    public function value(): string
-    {
-        return $this->value;
-    }
-
-    public function isPerpetual(): bool
-    {
-        return $this->value === self::PERPETUAL;
-    }
-
-    public function isPeriodic(): bool
-    {
-        return $this->value === self::PERIODIC;
-    }
-
-    public function equals(self $other): bool
-    {
-        return $this->value === $other->value;
-    }
-
-    public function __toString(): string
-    {
-        return $this->value;
-    }
-
-    public static function assertValid(string $value): void
-    {
-        if (! in_array($value, self::VALID_METHODS, true)) {
-            throw new InvalidArgumentException("Invalid management method: {$value}");
-        }
-    }
-
-    public static function values(): array
-    {
-        return self::VALID_METHODS;
-    }
+    public static function assertValid(string $v): void { self::from($v); }
+    public static function valid(): array { return self::$valid; }
+    public function __toString(): string { return $this->value; }
 }

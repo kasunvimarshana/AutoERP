@@ -1,18 +1,16 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Product\Domain\RepositoryInterfaces;
 
-use Illuminate\Support\Collection;
-use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Modules\Product\Domain\Entities\Product;
 
-interface ProductRepositoryInterface extends RepositoryInterface
+interface ProductRepositoryInterface
 {
+    public function findById(int $id): ?Product;
     public function findBySku(int $tenantId, string $sku): ?Product;
-
-    public function findByTenant(int $tenantId): Collection;
-
-    public function save(Product $product): Product;
+    public function findByBarcode(int $tenantId, string $barcode): ?Product;
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator;
+    public function create(array $data): Product;
+    public function update(Product $product, array $data): Product;
+    public function delete(Product $product): bool;
 }

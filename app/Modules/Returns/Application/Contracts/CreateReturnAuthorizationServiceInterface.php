@@ -1,9 +1,11 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Returns\Application\Contracts;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
+use Modules\Returns\Application\DTOs\ReturnAuthorizationData;
+use Modules\Returns\Domain\Entities\ReturnAuthorization;
 
-interface CreateReturnAuthorizationServiceInterface extends WriteServiceInterface {}
+interface CreateReturnAuthorizationServiceInterface
+{
+    public function execute(ReturnAuthorizationData $data): ReturnAuthorization;
+}

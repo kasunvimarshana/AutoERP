@@ -1,46 +1,34 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Returns\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
-use Modules\Core\Domain\ValueObjects\Metadata;
+use Illuminate\Support\Facades\Event;
 use Modules\Returns\Application\Contracts\CreateReturnAuthorizationServiceInterface;
 use Modules\Returns\Application\DTOs\ReturnAuthorizationData;
 use Modules\Returns\Domain\Entities\ReturnAuthorization;
 use Modules\Returns\Domain\Events\ReturnAuthorizationCreated;
 use Modules\Returns\Domain\RepositoryInterfaces\ReturnAuthorizationRepositoryInterface;
+use Modules\Returns\Domain\ValueObjects\RmaStatus;
 
-class CreateReturnAuthorizationService extends BaseService implements CreateReturnAuthorizationServiceInterface
+class CreateReturnAuthorizationService implements CreateReturnAuthorizationServiceInterface
 {
-    public function __construct(private readonly ReturnAuthorizationRepositoryInterface $authorizationRepository)
+    public function __construct(
+        private readonly ReturnAuthorizationRepositoryInterface $repository,
+    ) {}
+
+    public function execute(ReturnAuthorizationData $data): ReturnAuthorization
     {
-        parent::__construct($authorizationRepository);
-    }
+        $rma = $this->repository->create([
+            'tenant_id'       => $data->tenantId,
+            'stock_return_id' => $data->stockReturnId,
+            'rma_number'      => $data->rmaNumber,
+            'status'          => RmaStatus::PENDING,
+            'expires_at'      => $data->expiresAt,
+            'notes'           => $data->notes,
+        ]);
 
-    protected function handle(array $data): ReturnAuthorization
-    {
-        $dto = ReturnAuthorizationData::fromArray($data);
+        Event::dispatch(new ReturnAuthorizationCreated($rma->tenantId, $rma->id));
 
-        $expiresAt = $dto->expiresAt ? new \DateTimeImmutable($dto->expiresAt) : null;
-
-        $authorization = new ReturnAuthorization(
-            tenantId:   $dto->tenantId,
-            rmaNumber:  $dto->rmaNumber,
-            returnType: $dto->returnType,
-            partyId:    $dto->partyId,
-            partyType:  $dto->partyType,
-            reason:     $dto->reason,
-            status:     $dto->status,
-            expiresAt:  $expiresAt,
-            notes:      $dto->notes,
-            metadata:   $dto->metadata ? new Metadata($dto->metadata) : null,
-        );
-
-        $saved = $this->authorizationRepository->save($authorization);
-        $this->addEvent(new ReturnAuthorizationCreated($saved));
-
-        return $saved;
+        return $rma;
     }
 }

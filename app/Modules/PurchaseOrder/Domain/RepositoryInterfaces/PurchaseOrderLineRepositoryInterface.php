@@ -1,15 +1,10 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\PurchaseOrder\Domain\RepositoryInterfaces;
-
-use Illuminate\Support\Collection;
-use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
 use Modules\PurchaseOrder\Domain\Entities\PurchaseOrderLine;
-
-interface PurchaseOrderLineRepositoryInterface extends RepositoryInterface
+interface PurchaseOrderLineRepositoryInterface
 {
-    public function save(PurchaseOrderLine $line): PurchaseOrderLine;
-    public function findByOrder(int $purchaseOrderId): Collection;
+    public function findById(int $id): ?PurchaseOrderLine;
+    public function findByPurchaseOrder(int $purchaseOrderId): array;
+    public function create(array $data): PurchaseOrderLine;
+    public function update(PurchaseOrderLine $line, array $data): PurchaseOrderLine;
 }

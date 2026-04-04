@@ -1,10 +1,7 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Supplier\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Support\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Supplier\Domain\Entities\Supplier;
 use Modules\Supplier\Domain\RepositoryInterfaces\SupplierRepositoryInterface;
@@ -15,78 +12,64 @@ class EloquentSupplierRepository extends EloquentRepository implements SupplierR
     public function __construct(SupplierModel $model)
     {
         parent::__construct($model);
-        $this->setDomainEntityMapper(fn (SupplierModel $model): Supplier => $this->mapModelToDomainEntity($model));
+    }
+
+    public function findById(int $id): ?Supplier
+    {
+        $model = parent::findById($id);
+        return $model ? $this->toEntity($model) : null;
     }
 
     public function findByCode(int $tenantId, string $code): ?Supplier
     {
         $model = $this->model->where('tenant_id', $tenantId)->where('code', $code)->first();
-
-        return $model ? $this->toDomainEntity($model) : null;
+        return $model ? $this->toEntity($model) : null;
     }
 
-    public function findByTenant(int $tenantId): Collection
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        return $this->toDomainCollection($this->model->where('tenant_id', $tenantId)->get());
-    }
-
-    public function findByUserId(int $tenantId, int $userId): ?Supplier
-    {
-        $model = $this->model->where('tenant_id', $tenantId)->where('user_id', $userId)->first();
-
-        return $model ? $this->toDomainEntity($model) : null;
-    }
-
-    public function save(Supplier $supplier): Supplier
-    {
-        $data = [
-            'tenant_id'      => $supplier->getTenantId(),
-            'user_id'        => $supplier->getUserId(),
-            'name'           => $supplier->getName(),
-            'code'           => $supplier->getCode(),
-            'email'          => $supplier->getEmail(),
-            'phone'          => $supplier->getPhone(),
-            'address'        => $supplier->getAddress(),
-            'contact_person' => $supplier->getContactPerson(),
-            'payment_terms'  => $supplier->getPaymentTerms(),
-            'currency'       => $supplier->getCurrency(),
-            'tax_number'     => $supplier->getTaxNumber(),
-            'status'         => $supplier->getStatus(),
-            'type'           => $supplier->getType(),
-            'attributes'     => $supplier->getAttributes(),
-            'metadata'       => $supplier->getMetadata(),
-        ];
-
-        if ($supplier->getId()) {
-            $model = $this->update($supplier->getId(), $data);
-        } else {
-            $model = $this->create($data);
+        $query = $this->model->where('tenant_id', $tenantId);
+        foreach ($filters as $key => $value) {
+            $query->where($key, $value);
         }
-
-        return $this->toDomainEntity($model);
+        return $query->paginate($perPage);
     }
 
-    private function mapModelToDomainEntity(SupplierModel $model): Supplier
+    public function create(array $data): Supplier
+    {
+        $model = parent::create($data);
+        return $this->toEntity($model);
+    }
+
+    public function update(Supplier $supplier, array $data): Supplier
+    {
+        $model = $this->model->findOrFail($supplier->id);
+        $updated = parent::update($model, $data);
+        return $this->toEntity($updated);
+    }
+
+    public function delete(Supplier $supplier): bool
+    {
+        $model = $this->model->findOrFail($supplier->id);
+        return parent::delete($model);
+    }
+
+    private function toEntity(object $model): Supplier
     {
         return new Supplier(
+            id: $model->id,
             tenantId: $model->tenant_id,
             name: $model->name,
             code: $model->code,
-            userId: $model->user_id,
+            status: $model->status,
             email: $model->email,
             phone: $model->phone,
             address: $model->address,
-            contactPerson: $model->contact_person,
-            paymentTerms: $model->payment_terms,
-            currency: $model->currency,
+            city: $model->city,
+            country: $model->country,
             taxNumber: $model->tax_number,
-            status: $model->status,
-            type: $model->type,
-            attributes: $model->attributes,
-            metadata: $model->metadata,
-            id: $model->id,
-            createdAt: $model->created_at,
-            updatedAt: $model->updated_at,
+            currency: $model->currency,
+            notes: $model->notes,
         );
     }
 }

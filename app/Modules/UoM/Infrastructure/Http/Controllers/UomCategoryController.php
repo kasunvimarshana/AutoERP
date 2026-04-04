@@ -1,115 +1,91 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\UoM\Infrastructure\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\UoM\Application\Contracts\CreateUomCategoryServiceInterface;
 use Modules\UoM\Application\Contracts\DeleteUomCategoryServiceInterface;
-use Modules\UoM\Application\Contracts\FindUomCategoryServiceInterface;
 use Modules\UoM\Application\Contracts\UpdateUomCategoryServiceInterface;
 use Modules\UoM\Application\DTOs\UomCategoryData;
-use Modules\UoM\Application\DTOs\UpdateUomCategoryData;
-use Modules\UoM\Domain\Entities\UomCategory;
-use Modules\UoM\Infrastructure\Http\Requests\StoreUomCategoryRequest;
-use Modules\UoM\Infrastructure\Http\Requests\UpdateUomCategoryRequest;
-use Modules\UoM\Infrastructure\Http\Resources\UomCategoryCollection;
+use Modules\UoM\Domain\RepositoryInterfaces\UomCategoryRepositoryInterface;
 use Modules\UoM\Infrastructure\Http\Resources\UomCategoryResource;
 
-class UomCategoryController extends AuthorizedController
+class UomCategoryController extends Controller
 {
     public function __construct(
-        protected FindUomCategoryServiceInterface $findService,
-        protected CreateUomCategoryServiceInterface $createService,
-        protected UpdateUomCategoryServiceInterface $updateService,
-        protected DeleteUomCategoryServiceInterface $deleteService,
+        private readonly UomCategoryRepositoryInterface $repository,
+        private readonly CreateUomCategoryServiceInterface $createService,
+        private readonly UpdateUomCategoryServiceInterface $updateService,
+        private readonly DeleteUomCategoryServiceInterface $deleteService,
     ) {}
 
-    public function index(Request $request): UomCategoryCollection
+    public function index(Request $request): JsonResponse
     {
-        $this->authorize('viewAny', UomCategory::class);
-        $filters = $request->only(['name', 'code', 'is_active', 'tenant_id']);
-        $perPage = $request->integer('per_page', 15);
-        $page    = $request->integer('page', 1);
-        $sort    = $request->input('sort');
-        $include = $request->input('include');
+        $tenantId = (int) $request->query('tenant_id', 0);
+        $filters  = $request->only(['name', 'measure_type', 'is_active']);
+        $perPage  = (int) $request->query('per_page', 15);
 
-        $categories = $this->findService->list($filters, $perPage, $page, $sort, $include);
-
-        return new UomCategoryCollection($categories);
+        $paginator = $this->repository->findAll($tenantId, $filters, $perPage);
+        return response()->json($paginator);
     }
 
-    public function store(StoreUomCategoryRequest $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
-        $this->authorize('create', UomCategory::class);
-        $validated = $request->validated();
-
-        $dto = UomCategoryData::fromArray([
-            'tenantId'    => $validated['tenant_id'],
-            'name'        => $validated['name'],
-            'code'        => $validated['code'],
-            'description' => $validated['description'] ?? null,
-            'isActive'    => $validated['is_active'] ?? true,
+        $validated = $request->validate([
+            'tenant_id'    => 'required|integer',
+            'name'         => 'required|string|max:255',
+            'measure_type' => 'required|string|max:50',
+            'is_active'    => 'boolean',
+            'description'  => 'nullable|string',
         ]);
 
-        $category = $this->createService->execute($dto->toArray());
+        $data = new UomCategoryData(
+            tenantId: $validated['tenant_id'],
+            name: $validated['name'],
+            measureType: $validated['measure_type'],
+            isActive: $validated['is_active'] ?? true,
+            description: $validated['description'] ?? null,
+        );
 
-        return (new UomCategoryResource($category))->response()->setStatusCode(201);
+        $category = $this->createService->execute($data);
+        return response()->json(new UomCategoryResource($category), 201);
     }
 
-    public function show(int $id): UomCategoryResource
+    public function show(int $id): JsonResponse
     {
-        $category = $this->findService->find($id);
-        if (! $category) {
-            abort(404);
+        $category = $this->repository->findById($id);
+        if (!$category) {
+            return response()->json(['message' => 'Not found'], 404);
         }
-        $this->authorize('view', $category);
-
-        return new UomCategoryResource($category);
+        return response()->json(new UomCategoryResource($category));
     }
 
-    public function update(UpdateUomCategoryRequest $request, int $id): UomCategoryResource
+    public function update(Request $request, int $id): JsonResponse
     {
-        $category = $this->findService->find($id);
-        if (! $category) {
-            abort(404);
-        }
-        $this->authorize('update', $category);
+        $validated = $request->validate([
+            'tenant_id'    => 'required|integer',
+            'name'         => 'required|string|max:255',
+            'measure_type' => 'required|string|max:50',
+            'is_active'    => 'boolean',
+            'description'  => 'nullable|string',
+        ]);
 
-        $validated = $request->validated();
-        $payload   = ['id' => $id];
+        $data = new UomCategoryData(
+            tenantId: $validated['tenant_id'],
+            name: $validated['name'],
+            measureType: $validated['measure_type'],
+            isActive: $validated['is_active'] ?? true,
+            description: $validated['description'] ?? null,
+        );
 
-        if (array_key_exists('name', $validated)) {
-            $payload['name'] = $validated['name'];
-        }
-        if (array_key_exists('code', $validated)) {
-            $payload['code'] = $validated['code'];
-        }
-        if (array_key_exists('description', $validated)) {
-            $payload['description'] = $validated['description'];
-        }
-        if (array_key_exists('is_active', $validated)) {
-            $payload['isActive'] = $validated['is_active'];
-        }
-
-        $dto     = UpdateUomCategoryData::fromArray($payload);
-        $updated = $this->updateService->execute($dto->toArray() + ['id' => $id]);
-
-        return new UomCategoryResource($updated);
+        $category = $this->updateService->execute($id, $data);
+        return response()->json(new UomCategoryResource($category));
     }
 
     public function destroy(int $id): JsonResponse
     {
-        $category = $this->findService->find($id);
-        if (! $category) {
-            abort(404);
-        }
-        $this->authorize('delete', $category);
-        $this->deleteService->execute(['id' => $id]);
-
-        return response()->json(['message' => 'UoM category deleted successfully']);
+        $this->deleteService->execute($id);
+        return response()->json(null, 204);
     }
 }

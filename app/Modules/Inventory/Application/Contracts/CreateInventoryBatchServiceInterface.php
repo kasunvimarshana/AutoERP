@@ -1,9 +1,9 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Inventory\Application\Contracts;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
+use Modules\Inventory\Domain\Entities\InventoryBatch;
 
-interface CreateInventoryBatchServiceInterface extends WriteServiceInterface {}
+interface CreateInventoryBatchServiceInterface
+{
+    public function execute(array $data): InventoryBatch;
+}

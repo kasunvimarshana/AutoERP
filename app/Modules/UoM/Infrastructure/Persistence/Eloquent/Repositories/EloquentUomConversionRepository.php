@@ -1,10 +1,6 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\UoM\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Support\Facades\DB;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\UoM\Domain\Entities\UomConversion;
 use Modules\UoM\Domain\RepositoryInterfaces\UomConversionRepositoryInterface;
@@ -15,62 +11,53 @@ class EloquentUomConversionRepository extends EloquentRepository implements UomC
     public function __construct(UomConversionModel $model)
     {
         parent::__construct($model);
-        $this->setDomainEntityMapper(fn (UomConversionModel $model): UomConversion => $this->mapModelToDomainEntity($model));
     }
 
-    public function save(UomConversion $conversion): UomConversion
+    public function findById(int $id): ?UomConversion
     {
-        $savedModel = null;
+        $model = parent::findById($id);
+        return $model ? $this->toEntity($model) : null;
+    }
 
-        DB::transaction(function () use ($conversion, &$savedModel) {
-            if ($conversion->getId()) {
-                $data = [
-                    'tenant_id'   => $conversion->getTenantId(),
-                    'from_uom_id' => $conversion->getFromUomId(),
-                    'to_uom_id'   => $conversion->getToUomId(),
-                    'factor'      => $conversion->getFactor(),
-                    'is_active'   => $conversion->isActive(),
-                ];
-                $savedModel = $this->update($conversion->getId(), $data);
-            } else {
-                $savedModel = $this->model->create([
-                    'tenant_id'   => $conversion->getTenantId(),
-                    'from_uom_id' => $conversion->getFromUomId(),
-                    'to_uom_id'   => $conversion->getToUomId(),
-                    'factor'      => $conversion->getFactor(),
-                    'is_active'   => $conversion->isActive(),
-                ]);
-            }
-        });
-
-        if (! $savedModel instanceof UomConversionModel) {
-            throw new \RuntimeException('Failed to save UomConversion.');
+    public function findByFromTo(int $fromId, int $toId, ?int $productId = null): ?UomConversion
+    {
+        $query = $this->model->where('from_uom_id', $fromId)->where('to_uom_id', $toId);
+        if ($productId !== null) {
+            $query->where('product_id', $productId);
+        } else {
+            $query->whereNull('product_id');
         }
-
-        return $this->mapModelToDomainEntity($savedModel);
+        $model = $query->first();
+        return $model ? $this->toEntity($model) : null;
     }
 
-    public function findConversion(int $tenantId, int $fromUomId, int $toUomId): ?UomConversion
+    public function create(array $data): UomConversion
     {
-        $model = $this->model->where('tenant_id', $tenantId)
-            ->where('from_uom_id', $fromUomId)
-            ->where('to_uom_id', $toUomId)
-            ->first();
-
-        return $model ? $this->mapModelToDomainEntity($model) : null;
+        $model = parent::create($data);
+        return $this->toEntity($model);
     }
 
-    private function mapModelToDomainEntity(UomConversionModel $model): UomConversion
+    public function update(UomConversion $conversion, array $data): UomConversion
+    {
+        $model = $this->model->findOrFail($conversion->id);
+        $updated = parent::update($model, $data);
+        return $this->toEntity($updated);
+    }
+
+    public function delete(UomConversion $conversion): bool
+    {
+        $model = $this->model->findOrFail($conversion->id);
+        return parent::delete($model);
+    }
+
+    private function toEntity(UomConversionModel $model): UomConversion
     {
         return new UomConversion(
-            tenantId:  $model->tenant_id,
+            id: $model->id,
             fromUomId: $model->from_uom_id,
-            toUomId:   $model->to_uom_id,
-            factor:    (float) $model->factor,
-            isActive:  (bool) $model->is_active,
-            id:        $model->id,
-            createdAt: $model->created_at,
-            updatedAt: $model->updated_at
+            toUomId: $model->to_uom_id,
+            factor: (float) $model->factor,
+            productId: $model->product_id,
         );
     }
 }

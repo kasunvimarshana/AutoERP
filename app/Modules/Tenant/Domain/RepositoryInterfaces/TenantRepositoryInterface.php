@@ -1,15 +1,14 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Tenant\Domain\RepositoryInterfaces;
 
-use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
 use Modules\Tenant\Domain\Entities\Tenant;
 
-interface TenantRepositoryInterface extends RepositoryInterface
+interface TenantRepositoryInterface
 {
-    public function findByDomain(string $domain): ?Tenant;
-
-    public function save(Tenant $tenant): Tenant;
+    public function findById(int $id): ?Tenant;
+    public function findBySlug(string $slug): ?Tenant;
+    public function findAll(array $filters = [], int $perPage = 15): \Illuminate\Pagination\LengthAwarePaginator;
+    public function create(array $data): Tenant;
+    public function update(Tenant $tenant, array $data): Tenant;
+    public function delete(Tenant $tenant): bool;
 }

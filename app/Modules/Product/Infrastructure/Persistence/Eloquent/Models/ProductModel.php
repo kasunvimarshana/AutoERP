@@ -1,55 +1,19 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Product\Infrastructure\Persistence\Eloquent\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 
-class ProductModel extends Model
+class ProductModel extends BaseModel
 {
-    use HasAudit, SoftDeletes;
-
     protected $table = 'products';
 
-    protected $fillable = [
-        'tenant_id',
-        'sku',
-        'name',
-        'description',
-        'price',
-        'currency',
-        'category',
-        'status',
-        'type',
-        'units_of_measure',
-        'attributes',
-        'metadata',
-    ];
-
     protected $casts = [
-        'price'            => 'float',
-        'units_of_measure' => 'array',
-        'attributes'       => 'array',
-        'metadata'         => 'array',
+        'base_price'      => 'float',
+        'cost_price'      => 'float',
+        'track_inventory' => 'boolean',
+        'track_batch'     => 'boolean',
+        'track_serial'    => 'boolean',
+        'track_lot'       => 'boolean',
+        'attributes'      => 'array',
     ];
-
-    public function images(): HasMany
-    {
-        return $this->hasMany(ProductImageModel::class, 'product_id')->orderBy('sort_order');
-    }
-
-    public function variations(): HasMany
-    {
-        return $this->hasMany(ProductVariationModel::class, 'product_id')->orderBy('sort_order');
-    }
-
-    public function comboItems(): HasMany
-    {
-        return $this->hasMany(ProductComboItemModel::class, 'product_id')->orderBy('sort_order');
-    }
 }
-

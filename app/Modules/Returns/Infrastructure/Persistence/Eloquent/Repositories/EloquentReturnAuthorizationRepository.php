@@ -1,12 +1,8 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Returns\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Modules\Core\Domain\ValueObjects\Metadata;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Returns\Domain\Entities\ReturnAuthorization;
 use Modules\Returns\Domain\RepositoryInterfaces\ReturnAuthorizationRepositoryInterface;
@@ -17,91 +13,71 @@ class EloquentReturnAuthorizationRepository extends EloquentRepository implement
     public function __construct(ReturnAuthorizationModel $model)
     {
         parent::__construct($model);
-        $this->setDomainEntityMapper(fn (ReturnAuthorizationModel $m): ReturnAuthorization => $this->mapModelToDomainEntity($m));
     }
 
-    public function save(ReturnAuthorization $auth): ReturnAuthorization
+    public function findById(int $id): ?ReturnAuthorization
     {
-        $savedModel = null;
+        $model = parent::findById($id);
 
-        DB::transaction(function () use ($auth, &$savedModel) {
-            $data = [
-                'tenant_id'       => $auth->getTenantId(),
-                'rma_number'      => $auth->getRmaNumber(),
-                'return_type'     => $auth->getReturnType(),
-                'party_id'        => $auth->getPartyId(),
-                'party_type'      => $auth->getPartyType(),
-                'reason'          => $auth->getReason(),
-                'status'          => $auth->getStatus(),
-                'authorized_by'   => $auth->getAuthorizedBy(),
-                'authorized_at'   => $auth->getAuthorizedAt()?->format('Y-m-d H:i:s'),
-                'expires_at'      => $auth->getExpiresAt()?->format('Y-m-d H:i:s'),
-                'cancelled_at'    => $auth->getCancelledAt()?->format('Y-m-d H:i:s'),
-                'stock_return_id' => $auth->getStockReturnId(),
-                'notes'           => $auth->getNotes(),
-                'metadata'        => $auth->getMetadata()->toArray(),
-            ];
-
-            if ($auth->getId()) {
-                $savedModel = $this->update($auth->getId(), $data);
-            } else {
-                $savedModel = $this->model->create($data);
-            }
-        });
-
-        if (! $savedModel instanceof ReturnAuthorizationModel) {
-            throw new \RuntimeException('Failed to save ReturnAuthorization.');
-        }
-
-        return $this->mapModelToDomainEntity($savedModel);
+        return $model ? $this->toEntity($model) : null;
     }
 
     public function findByRmaNumber(int $tenantId, string $rmaNumber): ?ReturnAuthorization
     {
         $model = $this->model->where('tenant_id', $tenantId)->where('rma_number', $rmaNumber)->first();
 
-        return $model ? $this->mapModelToDomainEntity($model) : null;
+        return $model ? $this->toEntity($model) : null;
     }
 
-    public function findByParty(int $tenantId, int $partyId, string $partyType): Collection
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        return $this->model
-            ->where('tenant_id', $tenantId)
-            ->where('party_id', $partyId)
-            ->where('party_type', $partyType)
-            ->get()
-            ->map(fn ($m) => $this->mapModelToDomainEntity($m));
+        $query = $this->model->where('tenant_id', $tenantId);
+        $this->applyFilters($query, $filters);
+
+        return $query->paginate($perPage);
     }
 
-    public function findByStatus(int $tenantId, string $status): Collection
+    public function create(array $data): ReturnAuthorization
     {
-        return $this->model
-            ->where('tenant_id', $tenantId)
-            ->where('status', $status)
-            ->get()
-            ->map(fn ($m) => $this->mapModelToDomainEntity($m));
+        $model = parent::create($data);
+
+        return $this->toEntity($model);
     }
 
-    private function mapModelToDomainEntity(ReturnAuthorizationModel $model): ReturnAuthorization
+    public function update(ReturnAuthorization $rma, array $data): ReturnAuthorization
+    {
+        $model = $this->model->findOrFail($rma->id);
+        $updated = parent::update($model, $data);
+
+        return $this->toEntity($updated);
+    }
+
+    public function save(ReturnAuthorization $rma): ReturnAuthorization
+    {
+        $model = $this->model->findOrFail($rma->id);
+        $updated = parent::update($model, [
+            'status'      => $rma->status,
+            'approved_by' => $rma->approvedBy,
+            'approved_at' => $rma->approvedAt,
+            'expires_at'  => $rma->expiresAt,
+            'notes'       => $rma->notes,
+        ]);
+
+        return $this->toEntity($updated);
+    }
+
+    private function toEntity(object $model): ReturnAuthorization
     {
         return new ReturnAuthorization(
-            tenantId:      $model->tenant_id,
-            rmaNumber:     $model->rma_number,
-            returnType:    $model->return_type,
-            partyId:       $model->party_id,
-            partyType:     $model->party_type,
-            reason:        $model->reason,
-            status:        $model->status,
-            authorizedBy:  $model->authorized_by,
-            authorizedAt:  $model->authorized_at,
-            expiresAt:     $model->expires_at,
-            cancelledAt:   $model->cancelled_at,
+            id: $model->id,
+            tenantId: $model->tenant_id,
+            rmaNumber: $model->rma_number,
             stockReturnId: $model->stock_return_id,
-            notes:         $model->notes,
-            metadata:      isset($model->metadata) ? new Metadata((array) $model->metadata) : null,
-            id:            $model->id,
-            createdAt:     $model->created_at,
-            updatedAt:     $model->updated_at,
+            status: $model->status,
+            expiresAt: $model->expires_at ? new \DateTimeImmutable((string) $model->expires_at) : null,
+            approvedBy: $model->approved_by,
+            approvedAt: $model->approved_at ? new \DateTimeImmutable((string) $model->approved_at) : null,
+            notes: $model->notes,
         );
     }
 }

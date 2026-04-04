@@ -1,9 +1,9 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Warehouse\Application\Contracts;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
+use Modules\Warehouse\Domain\Entities\Warehouse;
 
-interface DeleteWarehouseServiceInterface extends WriteServiceInterface {}
+interface DeleteWarehouseServiceInterface
+{
+    public function execute(Warehouse $warehouse): bool;
+}

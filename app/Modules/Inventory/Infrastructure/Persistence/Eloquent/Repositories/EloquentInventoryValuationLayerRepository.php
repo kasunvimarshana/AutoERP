@@ -1,12 +1,6 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Modules\Core\Domain\ValueObjects\Metadata;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Inventory\Domain\Entities\InventoryValuationLayer;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryValuationLayerRepositoryInterface;
@@ -17,79 +11,77 @@ class EloquentInventoryValuationLayerRepository extends EloquentRepository imple
     public function __construct(InventoryValuationLayerModel $model)
     {
         parent::__construct($model);
-        $this->setDomainEntityMapper(fn (InventoryValuationLayerModel $m): InventoryValuationLayer => $this->mapModelToDomainEntity($m));
+    }
+
+    public function findById(int $id): ?InventoryValuationLayer
+    {
+        $model = parent::findById($id);
+        return $model ? $this->toEntity($model) : null;
+    }
+
+    public function findByProduct(int $productId, int $warehouseId, string $valuationMethod): array
+    {
+        return $this->model->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->where('valuation_method', $valuationMethod)
+            ->get()
+            ->map(fn($m) => $this->toEntity($m))
+            ->all();
+    }
+
+    public function findByProductOrdered(int $productId, int $warehouseId, string $direction = 'asc'): array
+    {
+        return $this->model
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->where('remaining_quantity', '>', 0)
+            ->orderBy('receipt_date', $direction)
+            ->get()
+            ->map(fn($m) => $this->toEntity($m))
+            ->all();
+    }
+
+
+    {
+        $model = parent::create($data);
+        return $this->toEntity($model);
+    }
+
+    public function update(InventoryValuationLayer $layer, array $data): InventoryValuationLayer
+    {
+        $model = $this->model->findOrFail($layer->id);
+        $updated = parent::update($model, $data);
+        return $this->toEntity($updated);
     }
 
     public function save(InventoryValuationLayer $layer): InventoryValuationLayer
     {
-        $savedModel = null;
-        DB::transaction(function () use ($layer, &$savedModel) {
-            $data = [
-                'tenant_id'        => $layer->getTenantId(),
-                'product_id'       => $layer->getProductId(),
-                'variation_id'     => $layer->getVariationId(),
-                'batch_id'         => $layer->getBatchId(),
-                'location_id'      => $layer->getLocationId(),
-                'layer_date'       => $layer->getLayerDate()->format('Y-m-d'),
-                'qty_in'           => $layer->getQtyIn(),
-                'qty_remaining'    => $layer->getQtyRemaining(),
-                'unit_cost'        => $layer->getUnitCost(),
-                'currency'         => $layer->getCurrency(),
-                'valuation_method' => $layer->getValuationMethod(),
-                'reference_type'   => $layer->getReferenceType(),
-                'reference_id'     => $layer->getReferenceId(),
-                'is_closed'        => $layer->isClosed(),
-                'metadata'         => $layer->getMetadata()->toArray(),
-            ];
-            if ($layer->getId()) {
-                $savedModel = $this->update($layer->getId(), $data);
-            } else {
-                $savedModel = $this->model->create($data);
-            }
-        });
-
-        if (! $savedModel instanceof InventoryValuationLayerModel) {
-            throw new \RuntimeException('Failed to save InventoryValuationLayer.');
-        }
-
-        return $this->mapModelToDomainEntity($savedModel);
+        $model = $this->model->findOrFail($layer->id);
+        $updated = parent::update($model, [
+            'quantity'            => $layer->quantity,
+            'remaining_quantity'  => $layer->remainingQuantity,
+            'unit_cost'           => $layer->unitCost,
+            'total_cost'          => $layer->totalCost,
+        ]);
+        return $this->toEntity($updated);
     }
 
-    public function findOpenLayers(int $tenantId, int $productId, string $valuationMethod): Collection
-    {
-        return $this->model->where('tenant_id', $tenantId)->where('product_id', $productId)
-            ->where('valuation_method', $valuationMethod)->where('is_closed', false)
-            ->orderBy('layer_date')->get()
-            ->map(fn ($m) => $this->mapModelToDomainEntity($m));
-    }
-
-    public function findByProduct(int $tenantId, int $productId): Collection
-    {
-        return $this->model->where('tenant_id', $tenantId)->where('product_id', $productId)->get()
-            ->map(fn ($m) => $this->mapModelToDomainEntity($m));
-    }
-
-    private function mapModelToDomainEntity(InventoryValuationLayerModel $model): InventoryValuationLayer
+    private function toEntity(object $model): InventoryValuationLayer
     {
         return new InventoryValuationLayer(
-            tenantId:        $model->tenant_id,
-            productId:       $model->product_id,
-            layerDate:       $model->layer_date instanceof \DateTimeInterface ? $model->layer_date : new \DateTimeImmutable((string) $model->layer_date),
-            qtyIn:           (float) $model->qty_in,
-            unitCost:        (float) $model->unit_cost,
+            id: $model->id,
+            tenantId: $model->tenant_id,
+            productId: $model->product_id,
+            warehouseId: $model->warehouse_id,
             valuationMethod: $model->valuation_method,
-            variationId:     $model->variation_id,
-            batchId:         $model->batch_id,
-            locationId:      $model->location_id,
-            qtyRemaining:    (float) $model->qty_remaining,
-            currency:        $model->currency,
-            referenceType:   $model->reference_type,
-            referenceId:     $model->reference_id,
-            isClosed:        (bool) $model->is_closed,
-            metadata:        isset($model->metadata) ? new Metadata((array) $model->metadata) : null,
-            id:              $model->id,
-            createdAt:       $model->created_at,
-            updatedAt:       $model->updated_at,
+            quantity: (float) $model->quantity,
+            remainingQuantity: (float) ($model->remaining_quantity ?? $model->quantity),
+            unitCost: (float) $model->unit_cost,
+            totalCost: (float) $model->total_cost,
+            batchId: $model->batch_id,
+            receiptDate: $model->receipt_date ? new \DateTimeImmutable($model->receipt_date) : null,
+            referenceId: $model->reference_id,
+            referenceType: $model->reference_type,
         );
     }
 }

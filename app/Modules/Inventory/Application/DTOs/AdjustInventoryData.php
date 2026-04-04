@@ -1,31 +1,17 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Inventory\Application\DTOs;
 
-use Modules\Core\Application\DTOs\BaseDto;
+use Modules\Core\Application\DTOs\BaseDTO;
 
-class AdjustInventoryData extends BaseDto
+class AdjustInventoryData extends BaseDTO
 {
-    public int $id;
-
-    public float $adjustmentQty;
-
-    public string $reason;
-
-    public ?int $adjustedBy = null;
-
-    public ?string $notes = null;
-
-    public function rules(): array
-    {
-        return [
-            'id'            => 'required|integer',
-            'adjustmentQty' => 'required|numeric',
-            'reason'        => 'required|string|max:255',
-            'adjustedBy'    => 'nullable|integer',
-            'notes'         => 'nullable|string',
-        ];
-    }
+    public function __construct(
+        public readonly int $tenantId,
+        public readonly int $productId,
+        public readonly int $warehouseId,
+        public readonly int $locationId,
+        public readonly float $newQuantity,
+        public readonly string $reason,
+        public readonly ?int $batchId = null,
+    ) {}
 }

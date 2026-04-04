@@ -1,157 +1,82 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\User\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Hash;
-use Modules\Core\Domain\ValueObjects\Address;
-use Modules\Core\Domain\ValueObjects\Email;
-use Modules\Core\Domain\ValueObjects\PhoneNumber;
-use Modules\Core\Domain\ValueObjects\UserPreferences;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
-use Modules\User\Domain\Entities\Permission;
-use Modules\User\Domain\Entities\Role;
 use Modules\User\Domain\Entities\User;
 use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 
 class EloquentUserRepository extends EloquentRepository implements UserRepositoryInterface
 {
-    public function __construct(UserModel $model)
+    public function __construct(UserModel $model) { parent::__construct($model); }
+
+    public function findById(int $id): ?User
     {
-        parent::__construct($model);
-        $this->setDomainEntityMapper(fn (UserModel $model): User => $this->mapModelToDomainEntity($model));
+        $m = parent::findById($id);
+        return $m ? $this->toEntity($m) : null;
     }
 
-    public function findByEmail(int $tenantId, string $email): ?User
+    public function findByEmail(string $email): ?User
     {
-        $model = $this->model->where('tenant_id', $tenantId)
-            ->where('email', $email)
-            ->first();
-
-        return $model ? $this->toDomainEntity($model) : null;
+        $m = $this->model->where('email', $email)->first();
+        return $m ? $this->toEntity($m) : null;
     }
 
-    public function save(User $user): User
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $data = [
-            'tenant_id'   => $user->getTenantId(),
-            'email'       => $user->getEmail()->value(),
-            'first_name'  => $user->getFirstName(),
-            'last_name'   => $user->getLastName(),
-            'phone'       => $user->getPhone()?->value(),
-            'address'     => $user->getAddress()?->toArray(),
-            'preferences' => $user->getPreferences()->toArray(),
-            'active'      => $user->isActive(),
-            'avatar'      => $user->getAvatar(),
-        ];
-
-        if ($user->getId()) {
-            $model = $this->update($user->getId(), $data);
-        } else {
-            $model = $this->create($data);
-        }
-
-        /** @var UserModel $model */
-
-        // Sync roles
-        if ($user->getRoles()->isNotEmpty()) {
-            $roleIds = $user->getRoles()->pluck('id')->toArray();
-            $model->roles()->sync($roleIds);
-        }
-
-        $model->load('roles.permissions');
-
-        return $this->toDomainEntity($model);
+        return $this->model->where('tenant_id', $tenantId)->paginate($perPage);
     }
 
-    public function syncRoles(User $user, array $roleIds): void
+    public function create(array $data): User
     {
-        /** @var UserModel|null $model */
-        $model = $this->model->find($user->getId());
-        if ($model) {
-            $model->roles()->sync($roleIds);
-        }
+        return $this->toEntity(parent::create($data));
     }
 
-    public function changePassword(int $userId, string $hashedPassword): void
+    public function update(User $user, array $data): User
     {
-        $this->model->where('id', $userId)->update(['password' => $hashedPassword]);
+        $m = $this->model->findOrFail($user->id);
+        return $this->toEntity(parent::update($m, $data));
     }
 
-    public function updateAvatar(int $userId, ?string $avatarPath): void
+    public function delete(User $user): bool
     {
-        $this->model->where('id', $userId)->update(['avatar' => $avatarPath]);
+        return parent::delete($this->model->findOrFail($user->id));
     }
 
-    public function verifyPassword(int $userId, string $plainPassword): bool
+    public function verifyPassword(User $user, string $password): bool
     {
-        /** @var UserModel|null $model */
-        $model = $this->model->find($userId);
-
-        return $model && Hash::check($plainPassword, $model->password);
+        $m = $this->model->findOrFail($user->id);
+        return Hash::check($password, $m->password);
     }
 
-    /**
-     * Find a user by ID and convert to domain entity.
-     *
-     * {@inheritdoc}
-     */
-    public function find($id, array $columns = ['*']): ?User
+    public function changePassword(User $user, string $newPassword): bool
     {
-        $this->with(['roles.permissions']);
-
-        return parent::find($id, $columns);
+        $m = $this->model->findOrFail($user->id);
+        $m->password = Hash::make($newPassword);
+        return $m->save();
     }
 
-    /**
-     * Paginate users and convert each row to a domain entity.
-     *
-     * {@inheritdoc}
-     */
-    public function paginate(?int $perPage = null, array $columns = ['*'], ?string $pageName = null, ?int $page = null): LengthAwarePaginator
+    public function updateAvatar(User $user, string $avatarPath): User
     {
-        $this->with(['roles.permissions']);
-
-        return parent::paginate($perPage, $columns, $pageName, $page);
+        $m = $this->model->findOrFail($user->id);
+        $m->avatar = $avatarPath;
+        $m->save();
+        return $this->toEntity($m);
     }
 
-    private function mapModelToDomainEntity(UserModel $model): User
+    private function toEntity(object $m): User
     {
-        $phone = $model->phone ? new PhoneNumber($model->phone) : null;
-        $address = $model->address ? Address::fromArray($model->address) : null;
-        $preferences = new UserPreferences(
-            $model->preferences['language'] ?? 'en',
-            $model->preferences['timezone'] ?? 'UTC',
-            $model->preferences['notifications'] ?? []
+        return new User(
+            id: $m->id,
+            tenantId: $m->tenant_id,
+            name: $m->name,
+            email: $m->email,
+            status: $m->status,
+            avatar: $m->avatar ?? null,
+            preferences: $m->preferences ?? null,
+            emailVerifiedAt: $m->email_verified_at?->toDateTimeImmutable(),
         );
-
-        $user = new User(
-            tenantId: $model->tenant_id,
-            email: new Email($model->email),
-            firstName: $model->first_name,
-            lastName: $model->last_name,
-            phone: $phone,
-            address: $address,
-            preferences: $preferences,
-            active: $model->active,
-            id: $model->id,
-            createdAt: $model->created_at,
-            updatedAt: $model->updated_at,
-            avatar: $model->avatar
-        );
-
-        foreach ($model->roles as $roleModel) {
-            $role = new Role($roleModel->tenant_id, $roleModel->name, $roleModel->id);
-            foreach ($roleModel->permissions as $permModel) {
-                $perm = new Permission($permModel->tenant_id, $permModel->name, $permModel->id);
-                $role->grantPermission($perm);
-            }
-            $user->assignRole($role);
-        }
-
-        return $user;
     }
 }

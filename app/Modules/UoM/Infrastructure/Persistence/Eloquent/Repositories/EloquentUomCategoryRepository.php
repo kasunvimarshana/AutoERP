@@ -1,10 +1,7 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\UoM\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Support\Facades\DB;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\UoM\Domain\Entities\UomCategory;
 use Modules\UoM\Domain\RepositoryInterfaces\UomCategoryRepositoryInterface;
@@ -15,52 +12,51 @@ class EloquentUomCategoryRepository extends EloquentRepository implements UomCat
     public function __construct(UomCategoryModel $model)
     {
         parent::__construct($model);
-        $this->setDomainEntityMapper(fn (UomCategoryModel $model): UomCategory => $this->mapModelToDomainEntity($model));
     }
 
-    public function save(UomCategory $category): UomCategory
+    public function findById(int $id): ?UomCategory
     {
-        $savedModel = null;
-
-        DB::transaction(function () use ($category, &$savedModel) {
-            if ($category->getId()) {
-                $data = [
-                    'tenant_id'   => $category->getTenantId(),
-                    'name'        => $category->getName(),
-                    'code'        => $category->getCode(),
-                    'description' => $category->getDescription(),
-                    'is_active'   => $category->isActive(),
-                ];
-                $savedModel = $this->update($category->getId(), $data);
-            } else {
-                $savedModel = $this->model->create([
-                    'tenant_id'   => $category->getTenantId(),
-                    'name'        => $category->getName(),
-                    'code'        => $category->getCode(),
-                    'description' => $category->getDescription(),
-                    'is_active'   => $category->isActive(),
-                ]);
-            }
-        });
-
-        if (! $savedModel instanceof UomCategoryModel) {
-            throw new \RuntimeException('Failed to save UomCategory.');
-        }
-
-        return $this->mapModelToDomainEntity($savedModel);
+        $model = parent::findById($id);
+        return $model ? $this->toEntity($model) : null;
     }
 
-    private function mapModelToDomainEntity(UomCategoryModel $model): UomCategory
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
+    {
+        $query = $this->model->where('tenant_id', $tenantId);
+        $this->applyFilters($query, $filters);
+        $paginator = $query->paginate($perPage);
+        $paginator->getCollection()->transform(fn($m) => $this->toEntity($m));
+        return $paginator;
+    }
+
+    public function create(array $data): UomCategory
+    {
+        $model = parent::create($data);
+        return $this->toEntity($model);
+    }
+
+    public function update(UomCategory $category, array $data): UomCategory
+    {
+        $model = $this->model->findOrFail($category->id);
+        $updated = parent::update($model, $data);
+        return $this->toEntity($updated);
+    }
+
+    public function delete(UomCategory $category): bool
+    {
+        $model = $this->model->findOrFail($category->id);
+        return parent::delete($model);
+    }
+
+    private function toEntity(UomCategoryModel $model): UomCategory
     {
         return new UomCategory(
-            tenantId:    $model->tenant_id,
-            name:        $model->name,
-            code:        $model->code,
+            id: $model->id,
+            tenantId: $model->tenant_id,
+            name: $model->name,
+            measureType: $model->measure_type,
+            isActive: (bool) $model->is_active,
             description: $model->description,
-            isActive:    (bool) $model->is_active,
-            id:          $model->id,
-            createdAt:   $model->created_at,
-            updatedAt:   $model->updated_at
         );
     }
 }

@@ -1,37 +1,30 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Returns\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
+use Illuminate\Support\Facades\Event;
 use Modules\Returns\Application\Contracts\ApproveStockReturnServiceInterface;
 use Modules\Returns\Domain\Entities\StockReturn;
 use Modules\Returns\Domain\Events\StockReturnApproved;
-use Modules\Returns\Domain\Exceptions\StockReturnNotFoundException;
 use Modules\Returns\Domain\RepositoryInterfaces\StockReturnRepositoryInterface;
+use Modules\Returns\Domain\ValueObjects\ReturnStatus;
 
-class ApproveStockReturnService extends BaseService implements ApproveStockReturnServiceInterface
+class ApproveStockReturnService implements ApproveStockReturnServiceInterface
 {
-    public function __construct(private readonly StockReturnRepositoryInterface $returnRepository)
+    public function __construct(
+        private readonly StockReturnRepositoryInterface $repository,
+    ) {}
+
+    public function execute(StockReturn $return, int $approvedBy): StockReturn
     {
-        parent::__construct($returnRepository);
-    }
+        $updated = $this->repository->update($return, [
+            'status'      => ReturnStatus::APPROVED,
+            'approved_by' => $approvedBy,
+            'approved_at' => now(),
+        ]);
 
-    protected function handle(array $data): StockReturn
-    {
-        $id     = $data['id'];
-        $return = $this->returnRepository->find($id);
+        Event::dispatch(new StockReturnApproved($updated->tenantId, $updated->id));
 
-        if (! $return) {
-            throw new StockReturnNotFoundException($id);
-        }
-
-        $return->approve((int) $data['approved_by']);
-
-        $saved = $this->returnRepository->save($return);
-        $this->addEvent(new StockReturnApproved($saved));
-
-        return $saved;
+        return $updated;
     }
 }

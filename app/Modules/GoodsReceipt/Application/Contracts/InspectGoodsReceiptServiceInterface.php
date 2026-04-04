@@ -1,9 +1,7 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\GoodsReceipt\Application\Contracts;
-
-use Modules\Core\Application\Contracts\WriteServiceInterface;
-
-interface InspectGoodsReceiptServiceInterface extends WriteServiceInterface {}
+use Modules\GoodsReceipt\Domain\Entities\GoodsReceipt;
+interface InspectGoodsReceiptServiceInterface
+{
+    public function execute(int $grId, int $inspectedBy): GoodsReceipt;
+}

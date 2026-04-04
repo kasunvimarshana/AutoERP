@@ -1,9 +1,10 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Returns\Application\Contracts;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
+use Modules\Returns\Domain\Entities\StockReturnLine;
 
-interface FailQualityCheckServiceInterface extends WriteServiceInterface {}
+interface FailQualityCheckServiceInterface
+{
+    public function execute(StockReturnLine $line, int $checkedBy): StockReturnLine;
+}

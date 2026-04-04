@@ -1,23 +1,17 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\User\Domain\RepositoryInterfaces;
 
-use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
 use Modules\User\Domain\Entities\User;
 
-interface UserRepositoryInterface extends RepositoryInterface
+interface UserRepositoryInterface
 {
-    public function findByEmail(int $tenantId, string $email): ?User;
-
-    public function syncRoles(User $user, array $roleIds): void;
-
-    public function save(User $user): User;
-
-    public function changePassword(int $userId, string $hashedPassword): void;
-
-    public function updateAvatar(int $userId, ?string $avatarPath): void;
-
-    public function verifyPassword(int $userId, string $plainPassword): bool;
+    public function findById(int $id): ?User;
+    public function findByEmail(string $email): ?User;
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): \Illuminate\Pagination\LengthAwarePaginator;
+    public function create(array $data): User;
+    public function update(User $user, array $data): User;
+    public function delete(User $user): bool;
+    public function verifyPassword(User $user, string $password): bool;
+    public function changePassword(User $user, string $newPassword): bool;
+    public function updateAvatar(User $user, string $avatarPath): User;
 }

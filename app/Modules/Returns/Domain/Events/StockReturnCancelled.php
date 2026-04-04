@@ -1,24 +1,13 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Returns\Domain\Events;
 
 use Modules\Core\Domain\Events\BaseEvent;
-use Modules\Returns\Domain\Entities\StockReturn;
 
 class StockReturnCancelled extends BaseEvent
 {
-    public function __construct(public readonly StockReturn $stockReturn)
+    public function __construct(int $tenantId, public readonly int $returnId)
     {
-        parent::__construct($stockReturn->getTenantId(), $stockReturn->getId());
-    }
-
-    public function broadcastWith(): array
-    {
-        return array_merge(parent::broadcastWith(), [
-            'id'        => $this->stockReturn->getId(),
-            'tenant_id' => $this->stockReturn->getTenantId(),
-        ]);
+        parent::__construct($tenantId);
     }
 }

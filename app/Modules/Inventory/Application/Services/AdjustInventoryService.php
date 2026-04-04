@@ -1,42 +1,45 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Inventory\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
+use Illuminate\Support\Facades\Event;
 use Modules\Inventory\Application\Contracts\AdjustInventoryServiceInterface;
 use Modules\Inventory\Application\DTOs\AdjustInventoryData;
 use Modules\Inventory\Domain\Entities\InventoryLevel;
-use Modules\Inventory\Domain\Events\InventoryAdjusted;
-use Modules\Inventory\Domain\Exceptions\InventoryLevelNotFoundException;
+use Modules\Inventory\Domain\Events\StockAdjusted;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryLevelRepositoryInterface;
 
-class AdjustInventoryService extends BaseService implements AdjustInventoryServiceInterface
+class AdjustInventoryService implements AdjustInventoryServiceInterface
 {
-    public function __construct(private readonly InventoryLevelRepositoryInterface $levelRepository)
+    public function __construct(private readonly InventoryLevelRepositoryInterface $repository) {}
+
+    public function execute(AdjustInventoryData $data): InventoryLevel
     {
-        parent::__construct($levelRepository);
-    }
+        $level = $this->repository->findByProductWarehouseLocation(
+            $data->productId,
+            $data->warehouseId,
+            $data->locationId,
+            $data->batchId,
+        );
 
-    protected function handle(array $data): InventoryLevel
-    {
-        $dto   = AdjustInventoryData::fromArray($data);
-        $level = $this->levelRepository->find($dto->id);
-
-        if (! $level) {
-            throw new InventoryLevelNotFoundException($dto->id);
-        }
-
-        if ($dto->adjustmentQty >= 0.0) {
-            $level->addStock($dto->adjustmentQty);
+        if (!$level) {
+            $level = $this->repository->create([
+                'tenant_id'          => $data->tenantId,
+                'product_id'         => $data->productId,
+                'warehouse_id'       => $data->warehouseId,
+                'location_id'        => $data->locationId,
+                'quantity_on_hand'   => $data->newQuantity,
+                'quantity_reserved'  => 0,
+                'quantity_available' => $data->newQuantity,
+                'quantity_on_order'  => 0,
+                'batch_id'           => $data->batchId,
+            ]);
         } else {
-            $level->removeStock(abs($dto->adjustmentQty), allowNegative: false);
+            $level->adjust($data->newQuantity);
+            $level = $this->repository->save($level);
         }
 
-        $saved = $this->levelRepository->save($level);
-        $this->addEvent(new InventoryAdjusted($saved, $dto->adjustmentQty, $dto->reason));
+        Event::dispatch(new StockAdjusted($level->tenantId, $level->id));
 
-        return $saved;
+        return $level;
     }
 }

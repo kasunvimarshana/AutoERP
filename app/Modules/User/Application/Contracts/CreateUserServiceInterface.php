@@ -1,12 +1,10 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\User\Application\Contracts;
 
-use Modules\Core\Application\Contracts\ServiceInterface;
+use Modules\User\Application\DTOs\UserData;
+use Modules\User\Domain\Entities\User;
 
-/**
- * @method \Modules\User\Domain\Entities\User execute(array $data = [])
- */
-interface CreateUserServiceInterface extends ServiceInterface {}
+interface CreateUserServiceInterface
+{
+    public function execute(UserData $data): User;
+}

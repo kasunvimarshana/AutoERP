@@ -1,9 +1,10 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\GS1\Application\Contracts;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
+use Modules\GS1\Application\DTOs\GS1BarcodeData;
+use Modules\GS1\Domain\Entities\GS1Barcode;
 
-interface CreateGs1BarcodeServiceInterface extends WriteServiceInterface {}
+interface CreateGS1BarcodeServiceInterface
+{
+    public function execute(GS1BarcodeData $data): GS1Barcode;
+}

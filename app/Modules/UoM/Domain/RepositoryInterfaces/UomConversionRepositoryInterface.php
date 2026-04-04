@@ -1,15 +1,12 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\UoM\Domain\RepositoryInterfaces;
-
-use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
 use Modules\UoM\Domain\Entities\UomConversion;
 
-interface UomConversionRepositoryInterface extends RepositoryInterface
+interface UomConversionRepositoryInterface
 {
-    public function save(UomConversion $conversion): UomConversion;
-
-    public function findConversion(int $tenantId, int $fromUomId, int $toUomId): ?UomConversion;
+    public function findById(int $id): ?UomConversion;
+    public function findByFromTo(int $fromId, int $toId, ?int $productId = null): ?UomConversion;
+    public function create(array $data): UomConversion;
+    public function update(UomConversion $conversion, array $data): UomConversion;
+    public function delete(UomConversion $conversion): bool;
 }

@@ -1,9 +1,9 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\UoM\Application\Contracts;
+use Modules\UoM\Application\DTOs\UomCategoryData;
+use Modules\UoM\Domain\Entities\UomCategory;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
-
-interface UpdateUomCategoryServiceInterface extends WriteServiceInterface {}
+interface UpdateUomCategoryServiceInterface
+{
+    public function execute(int $id, UomCategoryData $data): UomCategory;
+}

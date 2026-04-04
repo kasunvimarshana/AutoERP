@@ -1,24 +1,25 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\UoM\Infrastructure\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\UoM\Domain\Entities\UomCategory;
 
 class UomCategoryResource extends JsonResource
 {
+    public function __construct(private readonly UomCategory $entity)
+    {
+        parent::__construct($entity);
+    }
+
     public function toArray($request): array
     {
         return [
-            'id'          => $this->getId(),
-            'tenant_id'   => $this->getTenantId(),
-            'name'        => $this->getName(),
-            'code'        => $this->getCode(),
-            'description' => $this->getDescription(),
-            'is_active'   => $this->isActive(),
-            'created_at'  => $this->getCreatedAt()->format('c'),
-            'updated_at'  => $this->getUpdatedAt()->format('c'),
+            'id'           => $this->entity->id,
+            'tenant_id'    => $this->entity->tenantId,
+            'name'         => $this->entity->name,
+            'measure_type' => $this->entity->measureType,
+            'is_active'    => $this->entity->isActive,
+            'description'  => $this->entity->description,
         ];
     }
 }

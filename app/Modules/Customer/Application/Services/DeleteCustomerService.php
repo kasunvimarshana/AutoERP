@@ -1,38 +1,25 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Customer\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
+use Illuminate\Support\Facades\Event;
 use Modules\Customer\Application\Contracts\DeleteCustomerServiceInterface;
 use Modules\Customer\Domain\Events\CustomerDeleted;
-use Modules\Customer\Domain\Exceptions\CustomerNotFoundException;
 use Modules\Customer\Domain\RepositoryInterfaces\CustomerRepositoryInterface;
 
-class DeleteCustomerService extends BaseService implements DeleteCustomerServiceInterface
+class DeleteCustomerService implements DeleteCustomerServiceInterface
 {
-    public function __construct(private readonly CustomerRepositoryInterface $customerRepository)
+    public function __construct(private readonly CustomerRepositoryInterface $repository) {}
+
+    public function execute(int $id): bool
     {
-        parent::__construct($customerRepository);
-    }
-
-    protected function handle(array $data): bool
-    {
-        $id       = $data['id'];
-        $customer = $this->customerRepository->find($id);
-
-        if (! $customer) {
-            throw new CustomerNotFoundException($id);
+        $customer = $this->repository->findById($id);
+        if (!$customer) {
+            throw new \DomainException("Customer not found: {$id}");
         }
-
-        $tenantId = $customer->getTenantId();
-        $deleted  = $this->customerRepository->delete($id);
-
-        if ($deleted) {
-            $this->addEvent(new CustomerDeleted($id, $tenantId));
+        $result = $this->repository->delete($customer);
+        if ($result) {
+            Event::dispatch(new CustomerDeleted($customer->tenantId, $customer->id));
         }
-
-        return $deleted;
+        return $result;
     }
 }

@@ -1,12 +1,7 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\StockMovement\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Modules\Core\Domain\ValueObjects\Metadata;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\StockMovement\Domain\Entities\StockMovement;
 use Modules\StockMovement\Domain\RepositoryInterfaces\StockMovementRepositoryInterface;
@@ -17,94 +12,60 @@ class EloquentStockMovementRepository extends EloquentRepository implements Stoc
     public function __construct(StockMovementModel $model)
     {
         parent::__construct($model);
-        $this->setDomainEntityMapper(fn (StockMovementModel $m): StockMovement => $this->mapModelToDomainEntity($m));
     }
 
-    public function save(StockMovement $movement): StockMovement
+    public function findById(int $id): ?StockMovement
     {
-        $savedModel = null;
-        DB::transaction(function () use ($movement, &$savedModel) {
-            $data = [
-                'tenant_id'        => $movement->getTenantId(),
-                'reference_number' => $movement->getReferenceNumber(),
-                'movement_type'    => $movement->getMovementType(),
-                'status'           => $movement->getStatus(),
-                'product_id'       => $movement->getProductId(),
-                'variation_id'     => $movement->getVariationId(),
-                'from_location_id' => $movement->getFromLocationId(),
-                'to_location_id'   => $movement->getToLocationId(),
-                'batch_id'         => $movement->getBatchId(),
-                'serial_number_id' => $movement->getSerialNumberId(),
-                'uom_id'           => $movement->getUomId(),
-                'quantity'         => $movement->getQuantity(),
-                'unit_cost'        => $movement->getUnitCost(),
-                'currency'         => $movement->getCurrency(),
-                'reference_type'   => $movement->getReferenceType(),
-                'reference_id'     => $movement->getReferenceId(),
-                'performed_by'     => $movement->getPerformedBy(),
-                'movement_date'    => $movement->getMovementDate()?->format('Y-m-d H:i:s'),
-                'notes'            => $movement->getNotes(),
-                'metadata'         => $movement->getMetadata()->toArray(),
-            ];
-            if ($movement->getId()) {
-                $savedModel = $this->update($movement->getId(), $data);
-            } else {
-                $savedModel = $this->model->create($data);
-            }
-        });
-
-        if (! $savedModel instanceof StockMovementModel) {
-            throw new \RuntimeException('Failed to save StockMovement.');
-        }
-
-        return $this->mapModelToDomainEntity($savedModel);
+        $model = parent::findById($id);
+        return $model ? $this->toEntity($model) : null;
     }
 
-    public function findByReferenceNumber(int $tenantId, string $ref): ?StockMovement
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $model = $this->model->where('tenant_id', $tenantId)->where('reference_number', $ref)->first();
-
-        return $model ? $this->mapModelToDomainEntity($model) : null;
+        $query = $this->model->where('tenant_id', $tenantId);
+        $this->applyFilters($query, $filters);
+        return $query->paginate($perPage);
     }
 
-    public function findByProduct(int $tenantId, int $productId): Collection
+    public function findByReference(string $referenceNumber): ?StockMovement
     {
-        return $this->model->where('tenant_id', $tenantId)->where('product_id', $productId)->get()
-            ->map(fn ($m) => $this->mapModelToDomainEntity($m));
+        $model = $this->model->where('reference_number', $referenceNumber)->first();
+        return $model ? $this->toEntity($model) : null;
     }
 
-    public function findByMovementType(int $tenantId, string $type): Collection
+    public function create(array $data): StockMovement
     {
-        return $this->model->where('tenant_id', $tenantId)->where('movement_type', $type)->get()
-            ->map(fn ($m) => $this->mapModelToDomainEntity($m));
+        $model = parent::create($data);
+        return $this->toEntity($model);
     }
 
-    private function mapModelToDomainEntity(StockMovementModel $model): StockMovement
+    public function update(StockMovement $movement, array $data): StockMovement
+    {
+        $model = $this->model->findOrFail($movement->id);
+        $updated = parent::update($model, $data);
+        return $this->toEntity($updated);
+    }
+
+    private function toEntity(object $model): StockMovement
     {
         return new StockMovement(
-            tenantId:        $model->tenant_id,
+            id: $model->id,
+            tenantId: $model->tenant_id,
+            productId: $model->product_id,
+            warehouseId: $model->warehouse_id,
+            locationId: $model->location_id,
+            movementType: $model->movement_type,
+            quantity: (float) $model->quantity,
             referenceNumber: $model->reference_number,
-            movementType:    $model->movement_type,
-            productId:       $model->product_id,
-            quantity:        (float) $model->quantity,
-            variationId:     $model->variation_id,
-            fromLocationId:  $model->from_location_id,
-            toLocationId:    $model->to_location_id,
-            batchId:         $model->batch_id,
-            serialNumberId:  $model->serial_number_id,
-            uomId:           $model->uom_id,
-            unitCost:        isset($model->unit_cost) ? (float) $model->unit_cost : null,
-            currency:        $model->currency,
-            referenceType:   $model->reference_type,
-            referenceId:     $model->reference_id,
-            performedBy:     $model->performed_by,
-            movementDate:    $model->movement_date,
-            notes:           $model->notes,
-            metadata:        isset($model->metadata) ? new Metadata((array) $model->metadata) : null,
-            status:          $model->status,
-            id:              $model->id,
-            createdAt:       $model->created_at,
-            updatedAt:       $model->updated_at,
+            variantId: $model->variant_id,
+            batchId: $model->batch_id,
+            lotNumber: $model->lot_number,
+            serialNumber: $model->serial_number,
+            unitCost: $model->unit_cost !== null ? (float) $model->unit_cost : null,
+            relatedMovementId: $model->related_movement_id,
+            notes: $model->notes,
+            movedAt: $model->moved_at ? new \DateTimeImmutable((string) $model->moved_at) : null,
+            movedBy: $model->moved_by,
         );
     }
 }

@@ -1,9 +1,8 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Pricing\Application\Contracts;
+use Modules\Pricing\Domain\Entities\PriceList;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
-
-interface UpdatePriceListServiceInterface extends WriteServiceInterface {}
+interface UpdatePriceListServiceInterface
+{
+    public function execute(PriceList $priceList, array $data): PriceList;
+}

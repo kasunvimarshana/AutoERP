@@ -1,9 +1,10 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Inventory\Application\Contracts;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
+use Modules\Inventory\Application\DTOs\InventorySettingData;
+use Modules\Inventory\Domain\Entities\InventorySetting;
 
-interface CreateInventorySettingServiceInterface extends WriteServiceInterface {}
+interface CreateInventorySettingServiceInterface
+{
+    public function execute(InventorySettingData $data): InventorySetting;
+}

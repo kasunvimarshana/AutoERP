@@ -1,9 +1,10 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Product\Application\Contracts;
 
-use Modules\Core\Application\Contracts\ServiceInterface;
+use Modules\Product\Application\DTOs\ProductData;
+use Modules\Product\Domain\Entities\Product;
 
-interface UpdateProductServiceInterface extends ServiceInterface {}
+interface UpdateProductServiceInterface
+{
+    public function execute(Product $product, ProductData $data): Product;
+}

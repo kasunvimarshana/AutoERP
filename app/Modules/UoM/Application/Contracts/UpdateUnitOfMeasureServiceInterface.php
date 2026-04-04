@@ -1,9 +1,9 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\UoM\Application\Contracts;
+use Modules\UoM\Application\DTOs\UnitOfMeasureData;
+use Modules\UoM\Domain\Entities\UnitOfMeasure;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
-
-interface UpdateUnitOfMeasureServiceInterface extends WriteServiceInterface {}
+interface UpdateUnitOfMeasureServiceInterface
+{
+    public function execute(int $id, UnitOfMeasureData $data): UnitOfMeasure;
+}

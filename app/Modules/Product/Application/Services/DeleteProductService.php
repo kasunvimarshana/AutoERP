@@ -1,38 +1,22 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Product\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
+use Illuminate\Support\Facades\Event;
 use Modules\Product\Application\Contracts\DeleteProductServiceInterface;
+use Modules\Product\Domain\Entities\Product;
 use Modules\Product\Domain\Events\ProductDeleted;
-use Modules\Product\Domain\Exceptions\ProductNotFoundException;
 use Modules\Product\Domain\RepositoryInterfaces\ProductRepositoryInterface;
 
-class DeleteProductService extends BaseService implements DeleteProductServiceInterface
+class DeleteProductService implements DeleteProductServiceInterface
 {
-    public function __construct(private readonly ProductRepositoryInterface $productRepository)
+    public function __construct(private readonly ProductRepositoryInterface $repository) {}
+
+    public function execute(Product $product): bool
     {
-        parent::__construct($productRepository);
-    }
-
-    protected function handle(array $data): bool
-    {
-        $id = $data['id'];
-        $product = $this->productRepository->find($id);
-
-        if (! $product) {
-            throw new ProductNotFoundException($id);
+        $result = $this->repository->delete($product);
+        if ($result) {
+            Event::dispatch(new ProductDeleted($product->tenantId, $product->id));
         }
-
-        $tenantId = $product->getTenantId();
-        $deleted = $this->productRepository->delete($id);
-
-        if ($deleted) {
-            $this->addEvent(new ProductDeleted($id, $tenantId));
-        }
-
-        return $deleted;
+        return $result;
     }
 }

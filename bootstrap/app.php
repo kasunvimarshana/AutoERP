@@ -3,27 +3,20 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use Modules\Auth\Infrastructure\Http\Middleware\CheckPermission;
-use Modules\Auth\Infrastructure\Http\Middleware\CheckRole;
-use Modules\Auth\Infrastructure\Http\Middleware\RedirectIfAuthenticated;
-use Modules\Tenant\Infrastructure\Http\Middleware\ResolveTenant;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
-        web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
+        web: __DIR__.'/../routes/web.php',
         commands: __DIR__.'/../routes/console.php',
-        channels: __DIR__.'/../routes/channels.php',
-        health: '/up',
+        apiPrefix: 'api',
     )
-    ->withMiddleware(function (Middleware $middleware): void {
+    ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
-            'resolve.tenant' => ResolveTenant::class,
-            'role' => CheckRole::class,
-            'permission' => CheckPermission::class,
-            'guest' => RedirectIfAuthenticated::class,
+            'auth.tenant' => \App\Http\Middleware\ResolveTenant::class,
         ]);
     })
-    ->withExceptions(function (Exceptions $exceptions): void {
+    ->withExceptions(function (Exceptions $exceptions) {
         //
-    })->create();
+    })
+    ->create();

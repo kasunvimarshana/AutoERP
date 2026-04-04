@@ -1,9 +1,8 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\StockMovement\Application\Contracts;
-
-use Modules\Core\Application\Contracts\WriteServiceInterface;
-
-interface CreateStockMovementServiceInterface extends WriteServiceInterface {}
+use Modules\StockMovement\Application\DTOs\StockMovementData;
+use Modules\StockMovement\Domain\Entities\StockMovement;
+interface CreateStockMovementServiceInterface
+{
+    public function execute(StockMovementData $data): StockMovement;
+}

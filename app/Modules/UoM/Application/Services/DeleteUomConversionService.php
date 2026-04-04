@@ -1,41 +1,28 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\UoM\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
 use Modules\UoM\Application\Contracts\DeleteUomConversionServiceInterface;
 use Modules\UoM\Domain\Events\UomConversionDeleted;
-use Modules\UoM\Domain\Exceptions\UomConversionNotFoundException;
 use Modules\UoM\Domain\RepositoryInterfaces\UomConversionRepositoryInterface;
+use Modules\UoM\Domain\RepositoryInterfaces\UnitOfMeasureRepositoryInterface;
 
-class DeleteUomConversionService extends BaseService implements DeleteUomConversionServiceInterface
+class DeleteUomConversionService implements DeleteUomConversionServiceInterface
 {
-    private UomConversionRepositoryInterface $conversionRepository;
+    public function __construct(
+        private readonly UomConversionRepositoryInterface $repository,
+        private readonly UnitOfMeasureRepositoryInterface $uomRepository,
+    ) {}
 
-    public function __construct(UomConversionRepositoryInterface $repository)
+    public function execute(int $id): bool
     {
-        parent::__construct($repository);
-        $this->conversionRepository = $repository;
-    }
-
-    protected function handle(array $data): bool
-    {
-        $id         = $data['id'];
-        $conversion = $this->conversionRepository->find($id);
-
-        if (! $conversion) {
-            throw new UomConversionNotFoundException($id);
+        $conversion = $this->repository->findById($id);
+        if (!$conversion) {
+            throw new \DomainException("UomConversion not found: {$id}");
         }
-
-        $tenantId = $conversion->getTenantId();
-        $deleted  = $this->conversionRepository->delete($id);
-
-        if ($deleted) {
-            $this->addEvent(new UomConversionDeleted($id, $tenantId));
-        }
-
-        return $deleted;
+        $fromUom = $this->uomRepository->findById($conversion->fromUomId);
+        $tenantId = $fromUom ? $fromUom->tenantId : 0;
+        $result = $this->repository->delete($conversion);
+        event(new UomConversionDeleted($tenantId, $id));
+        return $result;
     }
 }

@@ -1,21 +1,16 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Dispatch\Domain\RepositoryInterfaces;
 
-use Illuminate\Support\Collection;
-use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Modules\Dispatch\Domain\Entities\Dispatch;
 
-interface DispatchRepositoryInterface extends RepositoryInterface
+interface DispatchRepositoryInterface
 {
-    public function save(Dispatch $dispatch): Dispatch;
     public function findById(int $id): ?Dispatch;
-    public function delete(mixed $id): bool;
-    public function list(array $filters = [], ?int $perPage = null, int $page = 1): mixed;
-    public function findByWarehouse(int $tenantId, int $warehouseId): Collection;
-    public function findByStatus(int $tenantId, string $status): Collection;
-    public function findBySalesOrder(int $tenantId, int $salesOrderId): Collection;
-    public function findByReferenceNumber(int $tenantId, string $referenceNumber): ?Dispatch;
+    public function findByDispatchNumber(int $tenantId, string $dispatchNumber): ?Dispatch;
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator;
+    public function create(array $data): Dispatch;
+    public function update(Dispatch $dispatch, array $data): Dispatch;
+    public function save(Dispatch $dispatch): Dispatch;
 }

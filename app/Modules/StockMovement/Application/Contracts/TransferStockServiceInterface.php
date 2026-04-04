@@ -1,9 +1,7 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\StockMovement\Application\Contracts;
-
-use Modules\Core\Application\Contracts\WriteServiceInterface;
-
-interface TransferStockServiceInterface extends WriteServiceInterface {}
+use Modules\StockMovement\Application\DTOs\TransferStockData;
+interface TransferStockServiceInterface
+{
+    public function execute(TransferStockData $data): array;
+}

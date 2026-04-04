@@ -1,39 +1,33 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Dispatch\Infrastructure\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Dispatch\Domain\Entities\Dispatch;
 
 class DispatchResource extends JsonResource
 {
+    public function __construct(private readonly Dispatch $dispatch)
+    {
+        parent::__construct($dispatch);
+    }
+
     public function toArray($request): array
     {
         return [
-            'id'                     => $this->getId(),
-            'tenant_id'              => $this->getTenantId(),
-            'reference_number'       => $this->getReferenceNumber(),
-            'status'                 => $this->getStatus(),
-            'warehouse_id'           => $this->getWarehouseId(),
-            'sales_order_id'         => $this->getSalesOrderId(),
-            'customer_id'            => $this->getCustomerId(),
-            'customer_reference'     => $this->getCustomerReference(),
-            'dispatch_date'          => $this->getDispatchDate(),
-            'estimated_delivery_date'=> $this->getEstimatedDeliveryDate(),
-            'actual_delivery_date'   => $this->getActualDeliveryDate(),
-            'carrier'                => $this->getCarrier(),
-            'tracking_number'        => $this->getTrackingNumber(),
-            'currency'               => $this->getCurrency(),
-            'total_weight'           => $this->getTotalWeight(),
-            'notes'                  => $this->getNotes(),
-            'metadata'               => $this->getMetadata()->toArray(),
-            'confirmed_by'           => $this->getConfirmedBy(),
-            'confirmed_at'           => $this->getConfirmedAt()?->format('c'),
-            'shipped_by'             => $this->getShippedBy(),
-            'shipped_at'             => $this->getShippedAt()?->format('c'),
-            'created_at'             => $this->getCreatedAt()->format('c'),
-            'updated_at'             => $this->getUpdatedAt()->format('c'),
+            'id'               => $this->dispatch->id,
+            'tenant_id'        => $this->dispatch->tenantId,
+            'sales_order_id'   => $this->dispatch->salesOrderId,
+            'warehouse_id'     => $this->dispatch->warehouseId,
+            'dispatch_number'  => $this->dispatch->dispatchNumber,
+            'status'           => $this->dispatch->status,
+            'tracking_number'  => $this->dispatch->trackingNumber,
+            'carrier'          => $this->dispatch->carrier,
+            'shipping_address' => $this->dispatch->shippingAddress,
+            'notes'            => $this->dispatch->notes,
+            'dispatched_at'    => $this->dispatch->dispatchedAt?->format('Y-m-d\TH:i:s\Z'),
+            'delivered_at'     => $this->dispatch->deliveredAt?->format('Y-m-d\TH:i:s\Z'),
+            'dispatched_by'    => $this->dispatch->dispatchedBy,
         ];
     }
 }

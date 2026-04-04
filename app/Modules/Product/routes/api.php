@@ -1,31 +1,31 @@
 <?php
-
 use Illuminate\Support\Facades\Route;
-use Modules\Product\Infrastructure\Http\Controllers\ProductComboItemController;
+use Modules\Product\Infrastructure\Http\Controllers\ProductCategoryController;
 use Modules\Product\Infrastructure\Http\Controllers\ProductController;
-use Modules\Product\Infrastructure\Http\Controllers\ProductImageController;
-use Modules\Product\Infrastructure\Http\Controllers\ProductVariationController;
+use Modules\Product\Infrastructure\Http\Controllers\ProductVariantController;
 
-Route::middleware(['auth:api', 'resolve.tenant'])->group(function () {
-    Route::apiResource('products', ProductController::class);
-
-    Route::get('products/{product}/images', [ProductImageController::class, 'index']);
-    Route::post('products/{product}/images', [ProductImageController::class, 'store']);
-    Route::post('products/{product}/images/bulk', [ProductImageController::class, 'storeMany']);
-    Route::delete('products/{product}/images/{image}', [ProductImageController::class, 'destroy']);
-
-    // Variable product variations
-    Route::get('products/{product}/variations', [ProductVariationController::class, 'index']);
-    Route::post('products/{product}/variations', [ProductVariationController::class, 'store']);
-    Route::put('products/{product}/variations/{variation}', [ProductVariationController::class, 'update']);
-    Route::delete('products/{product}/variations/{variation}', [ProductVariationController::class, 'destroy']);
-
-    // Combo product items
-    Route::get('products/{product}/combo-items', [ProductComboItemController::class, 'index']);
-    Route::post('products/{product}/combo-items', [ProductComboItemController::class, 'store']);
-    Route::put('products/{product}/combo-items/{item}', [ProductComboItemController::class, 'update']);
-    Route::delete('products/{product}/combo-items/{item}', [ProductComboItemController::class, 'destroy']);
+Route::prefix('product-categories')->group(function () {
+    Route::get('/tree',    [ProductCategoryController::class, 'tree']);
+    Route::get('/',        [ProductCategoryController::class, 'index']);
+    Route::post('/',       [ProductCategoryController::class, 'store']);
+    Route::get('/{id}',    [ProductCategoryController::class, 'show']);
+    Route::patch('/{id}',  [ProductCategoryController::class, 'update']);
+    Route::delete('/{id}', [ProductCategoryController::class, 'destroy']);
 });
 
-// File serving (authenticated)
-Route::get('storage/product-images/{uuid}', [ProductImageController::class, 'serve'])->middleware('auth:api');
+Route::prefix('products')->group(function () {
+    Route::get('/',        [ProductController::class, 'index']);
+    Route::post('/',       [ProductController::class, 'store']);
+    Route::get('/{id}',    [ProductController::class, 'show']);
+    Route::patch('/{id}',  [ProductController::class, 'update']);
+    Route::delete('/{id}', [ProductController::class, 'destroy']);
+
+    Route::get('/{productId}/variants',  [ProductVariantController::class, 'index']);
+    Route::post('/{productId}/variants', [ProductVariantController::class, 'store']);
+});
+
+Route::prefix('product-variants')->group(function () {
+    Route::get('/{id}',    [ProductVariantController::class, 'show']);
+    Route::patch('/{id}',  [ProductVariantController::class, 'update']);
+    Route::delete('/{id}', [ProductVariantController::class, 'destroy']);
+});

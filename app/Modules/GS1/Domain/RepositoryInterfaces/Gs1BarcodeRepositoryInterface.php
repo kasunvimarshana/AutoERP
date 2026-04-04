@@ -1,18 +1,15 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\GS1\Domain\RepositoryInterfaces;
 
-use Illuminate\Support\Collection;
-use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
-use Modules\GS1\Domain\Entities\Gs1Barcode;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Modules\GS1\Domain\Entities\GS1Barcode;
 
-interface Gs1BarcodeRepositoryInterface extends RepositoryInterface
+interface GS1BarcodeRepositoryInterface
 {
-    public function save(Gs1Barcode $barcode): Gs1Barcode;
-
-    public function findByIdentifier(int $tenantId, int $identifierId): Collection;
-
-    public function findPrimary(int $tenantId, int $identifierId): ?Gs1Barcode;
+    public function findById(int $id): ?GS1Barcode;
+    public function findByGtin(string $gtin): ?GS1Barcode;
+    public function findByProduct(int $productId): array;
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator;
+    public function create(array $data): GS1Barcode;
+    public function update(GS1Barcode $barcode, array $data): GS1Barcode;
 }

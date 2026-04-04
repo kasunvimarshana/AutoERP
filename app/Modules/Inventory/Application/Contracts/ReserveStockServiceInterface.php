@@ -1,9 +1,9 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Inventory\Application\Contracts;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
+use Modules\Inventory\Domain\Entities\InventoryLevel;
 
-interface ReserveStockServiceInterface extends WriteServiceInterface {}
+interface ReserveStockServiceInterface
+{
+    public function execute(int $levelId, float $qty): InventoryLevel;
+}

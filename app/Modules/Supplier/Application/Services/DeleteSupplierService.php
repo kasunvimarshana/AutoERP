@@ -1,38 +1,25 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Supplier\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
+use Illuminate\Support\Facades\Event;
 use Modules\Supplier\Application\Contracts\DeleteSupplierServiceInterface;
 use Modules\Supplier\Domain\Events\SupplierDeleted;
-use Modules\Supplier\Domain\Exceptions\SupplierNotFoundException;
 use Modules\Supplier\Domain\RepositoryInterfaces\SupplierRepositoryInterface;
 
-class DeleteSupplierService extends BaseService implements DeleteSupplierServiceInterface
+class DeleteSupplierService implements DeleteSupplierServiceInterface
 {
-    public function __construct(private readonly SupplierRepositoryInterface $supplierRepository)
+    public function __construct(private readonly SupplierRepositoryInterface $repository) {}
+
+    public function execute(int $id): bool
     {
-        parent::__construct($supplierRepository);
-    }
-
-    protected function handle(array $data): bool
-    {
-        $id = $data['id'];
-        $supplier = $this->supplierRepository->find($id);
-
-        if (! $supplier) {
-            throw new SupplierNotFoundException($id);
+        $supplier = $this->repository->findById($id);
+        if (!$supplier) {
+            throw new \DomainException("Supplier not found: {$id}");
         }
-
-        $tenantId = $supplier->getTenantId();
-        $deleted = $this->supplierRepository->delete($id);
-
-        if ($deleted) {
-            $this->addEvent(new SupplierDeleted($id, $tenantId));
+        $result = $this->repository->delete($supplier);
+        if ($result) {
+            Event::dispatch(new SupplierDeleted($supplier->tenantId, $supplier->id));
         }
-
-        return $deleted;
+        return $result;
     }
 }

@@ -1,110 +1,93 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Pricing\Infrastructure\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
-use Modules\Pricing\Application\Contracts\ActivatePriceListServiceInterface;
 use Modules\Pricing\Application\Contracts\CreatePriceListServiceInterface;
-use Modules\Pricing\Application\Contracts\DeactivatePriceListServiceInterface;
 use Modules\Pricing\Application\Contracts\DeletePriceListServiceInterface;
-use Modules\Pricing\Application\Contracts\FindPriceListServiceInterface;
 use Modules\Pricing\Application\Contracts\UpdatePriceListServiceInterface;
 use Modules\Pricing\Application\DTOs\PriceListData;
-use Modules\Pricing\Application\DTOs\UpdatePriceListData;
-use Modules\Pricing\Infrastructure\Http\Requests\StorePriceListRequest;
-use Modules\Pricing\Infrastructure\Http\Requests\UpdatePriceListRequest;
-use Modules\Pricing\Infrastructure\Http\Resources\PriceListCollection;
+use Modules\Pricing\Domain\RepositoryInterfaces\PriceListRepositoryInterface;
 use Modules\Pricing\Infrastructure\Http\Resources\PriceListResource;
 
-class PriceListController extends AuthorizedController
+class PriceListController extends Controller
 {
     public function __construct(
-        protected FindPriceListServiceInterface $findService,
-        protected CreatePriceListServiceInterface $createService,
-        protected UpdatePriceListServiceInterface $updateService,
-        protected DeletePriceListServiceInterface $deleteService,
-        protected ActivatePriceListServiceInterface $activateService,
-        protected DeactivatePriceListServiceInterface $deactivateService,
+        private readonly PriceListRepositoryInterface $repository,
+        private readonly CreatePriceListServiceInterface $createService,
+        private readonly UpdatePriceListServiceInterface $updateService,
+        private readonly DeletePriceListServiceInterface $deleteService,
     ) {}
 
-    public function index(Request $request): PriceListCollection
+    public function index(Request $request): JsonResponse
     {
-        $filters = $request->only(['tenant_id', 'type', 'pricing_method', 'currency_code', 'is_active']);
-
-        return new PriceListCollection(
-            $this->findService->list($filters, $request->integer('per_page', 15), $request->integer('page', 1))
-        );
+        $tenantId = (int) $request->header('X-Tenant-ID', 1);
+        return response()->json($this->repository->findAll($tenantId));
     }
 
-    public function store(StorePriceListRequest $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
-        $v   = $request->validated();
-        $dto = PriceListData::fromArray([
-            'tenantId'      => $v['tenant_id'],
-            'name'          => $v['name'],
-            'code'          => $v['code'],
-            'type'          => $v['type'],
-            'pricingMethod' => $v['pricing_method'],
-            'currencyCode'  => $v['currency_code'],
-            'startDate'     => $v['start_date'] ?? null,
-            'endDate'       => $v['end_date'] ?? null,
-            'isActive'      => $v['is_active'] ?? true,
-            'description'   => $v['description'] ?? null,
-            'metadata'      => $v['metadata'] ?? null,
+        $validated = $request->validate([
+            'tenant_id'   => ['required', 'integer'],
+            'name'        => ['required', 'string', 'max:255'],
+            'code'        => ['required', 'string', 'max:50'],
+            'currency'    => ['sometimes', 'string', 'size:3'],
+            'is_default'  => ['sometimes', 'boolean'],
+            'is_active'   => ['sometimes', 'boolean'],
+            'valid_from'  => ['nullable', 'date'],
+            'valid_to'    => ['nullable', 'date'],
+            'description' => ['nullable', 'string'],
         ]);
-
-        $priceList = $this->createService->execute($dto->toArray());
-
-        return (new PriceListResource($priceList))->response()->setStatusCode(201);
+        $data = new PriceListData(
+            tenantId: $validated['tenant_id'],
+            name: $validated['name'],
+            code: $validated['code'],
+            currency: $validated['currency'] ?? 'USD',
+            isDefault: $validated['is_default'] ?? false,
+            isActive: $validated['is_active'] ?? true,
+            validFrom: $validated['valid_from'] ?? null,
+            validTo: $validated['valid_to'] ?? null,
+            description: $validated['description'] ?? null,
+        );
+        return response()->json(new PriceListResource($this->createService->execute($data)), 201);
     }
 
-    public function show(int $id): PriceListResource|JsonResponse
+    public function show(int $id): JsonResponse
     {
-        $priceList = $this->findService->find($id);
-        if (! $priceList) {
+        $pl = $this->repository->findById($id);
+        if (!$pl) {
             return response()->json(['message' => 'Not found'], 404);
         }
-
-        return new PriceListResource($priceList);
+        return response()->json(new PriceListResource($pl));
     }
 
-    public function update(UpdatePriceListRequest $request, int $id): PriceListResource
+    public function update(Request $request, int $id): JsonResponse
     {
-        $v   = $request->validated();
-        $dto = UpdatePriceListData::fromArray(array_merge(['id' => $id], [
-            'name'          => $v['name'] ?? null,
-            'code'          => $v['code'] ?? null,
-            'type'          => $v['type'] ?? null,
-            'pricingMethod' => $v['pricing_method'] ?? null,
-            'currencyCode'  => $v['currency_code'] ?? null,
-            'startDate'     => $v['start_date'] ?? null,
-            'endDate'       => $v['end_date'] ?? null,
-            'isActive'      => $v['is_active'] ?? null,
-            'description'   => $v['description'] ?? null,
-            'metadata'      => $v['metadata'] ?? null,
-        ]));
-
-        return new PriceListResource($this->updateService->execute($dto->toArray()));
+        $pl = $this->repository->findById($id);
+        if (!$pl) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+        $data = $request->validate([
+            'name'        => ['sometimes', 'string'],
+            'code'        => ['sometimes', 'string'],
+            'currency'    => ['sometimes', 'string', 'size:3'],
+            'is_default'  => ['sometimes', 'boolean'],
+            'is_active'   => ['sometimes', 'boolean'],
+            'valid_from'  => ['nullable', 'date'],
+            'valid_to'    => ['nullable', 'date'],
+            'description' => ['nullable', 'string'],
+        ]);
+        return response()->json(new PriceListResource($this->updateService->execute($pl, $data)));
     }
 
     public function destroy(int $id): JsonResponse
     {
-        $this->deleteService->execute(['id' => $id]);
-
-        return response()->json(['message' => 'Price list deleted successfully']);
-    }
-
-    public function activate(int $id): PriceListResource
-    {
-        return new PriceListResource($this->activateService->execute(['id' => $id]));
-    }
-
-    public function deactivate(int $id): PriceListResource
-    {
-        return new PriceListResource($this->deactivateService->execute(['id' => $id]));
+        $pl = $this->repository->findById($id);
+        if (!$pl) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+        $this->deleteService->execute($pl);
+        return response()->json(null, 204);
     }
 }

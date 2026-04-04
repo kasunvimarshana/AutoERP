@@ -1,39 +1,36 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\StockMovement\Infrastructure\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\StockMovement\Domain\Entities\StockMovement;
 
 class StockMovementResource extends JsonResource
 {
+    public function __construct(private readonly StockMovement $movement)
+    {
+        parent::__construct($movement);
+    }
+
     public function toArray($request): array
     {
         return [
-            'id'               => $this->getId(),
-            'tenant_id'        => $this->getTenantId(),
-            'reference_number' => $this->getReferenceNumber(),
-            'movement_type'    => $this->getMovementType(),
-            'status'           => $this->getStatus(),
-            'product_id'       => $this->getProductId(),
-            'variation_id'     => $this->getVariationId(),
-            'from_location_id' => $this->getFromLocationId(),
-            'to_location_id'   => $this->getToLocationId(),
-            'batch_id'         => $this->getBatchId(),
-            'serial_number_id' => $this->getSerialNumberId(),
-            'uom_id'           => $this->getUomId(),
-            'quantity'         => $this->getQuantity(),
-            'unit_cost'        => $this->getUnitCost(),
-            'currency'         => $this->getCurrency(),
-            'reference_type'   => $this->getReferenceType(),
-            'reference_id'     => $this->getReferenceId(),
-            'performed_by'     => $this->getPerformedBy(),
-            'movement_date'    => $this->getMovementDate()?->format('Y-m-d H:i:s'),
-            'notes'            => $this->getNotes(),
-            'metadata'         => $this->getMetadata()->toArray(),
-            'created_at'       => $this->getCreatedAt()->format('c'),
-            'updated_at'       => $this->getUpdatedAt()->format('c'),
+            'id'                  => $this->movement->id,
+            'tenant_id'           => $this->movement->tenantId,
+            'product_id'          => $this->movement->productId,
+            'warehouse_id'        => $this->movement->warehouseId,
+            'location_id'         => $this->movement->locationId,
+            'movement_type'       => $this->movement->movementType,
+            'quantity'            => $this->movement->quantity,
+            'reference_number'    => $this->movement->referenceNumber,
+            'variant_id'          => $this->movement->variantId,
+            'batch_id'            => $this->movement->batchId,
+            'lot_number'          => $this->movement->lotNumber,
+            'serial_number'       => $this->movement->serialNumber,
+            'unit_cost'           => $this->movement->unitCost,
+            'related_movement_id' => $this->movement->relatedMovementId,
+            'notes'               => $this->movement->notes,
+            'moved_at'            => $this->movement->movedAt?->format('Y-m-d\TH:i:s\Z'),
+            'moved_by'            => $this->movement->movedBy,
         ];
     }
 }

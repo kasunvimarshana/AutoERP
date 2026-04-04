@@ -1,15 +1,19 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Returns\Domain\RepositoryInterfaces;
 
-use Illuminate\Support\Collection;
-use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
 use Modules\Returns\Domain\Entities\StockReturnLine;
 
-interface StockReturnLineRepositoryInterface extends RepositoryInterface
+interface StockReturnLineRepositoryInterface
 {
+    public function findById(int $id): ?StockReturnLine;
+
+    /** @return StockReturnLine[] */
+    public function findByStockReturn(int $stockReturnId): array;
+
+    public function create(array $data): StockReturnLine;
+
+    public function update(StockReturnLine $line, array $data): StockReturnLine;
+
     public function save(StockReturnLine $line): StockReturnLine;
-    public function findByReturn(int $tenantId, int $returnId): Collection;
 }

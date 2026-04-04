@@ -1,9 +1,10 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Returns\Application\Contracts;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
+use Modules\Returns\Domain\Entities\StockReturn;
 
-interface ProcessReturnInventoryAdjustmentServiceInterface extends WriteServiceInterface {}
+interface ProcessReturnInventoryAdjustmentServiceInterface
+{
+    public function execute(StockReturn $return): void;
+}

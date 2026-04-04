@@ -1,87 +1,72 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\GS1\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Modules\Core\Domain\ValueObjects\Metadata;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
-use Modules\GS1\Domain\Entities\Gs1Barcode;
-use Modules\GS1\Domain\RepositoryInterfaces\Gs1BarcodeRepositoryInterface;
-use Modules\GS1\Infrastructure\Persistence\Eloquent\Models\Gs1BarcodeModel;
+use Modules\GS1\Domain\Entities\GS1Barcode;
+use Modules\GS1\Domain\RepositoryInterfaces\GS1BarcodeRepositoryInterface;
+use Modules\GS1\Infrastructure\Persistence\Eloquent\Models\GS1BarcodeModel;
 
-class EloquentGs1BarcodeRepository extends EloquentRepository implements Gs1BarcodeRepositoryInterface
+class EloquentGS1BarcodeRepository extends EloquentRepository implements GS1BarcodeRepositoryInterface
 {
-    public function __construct(Gs1BarcodeModel $model)
+    public function __construct(GS1BarcodeModel $model)
     {
         parent::__construct($model);
-        $this->setDomainEntityMapper(fn (Gs1BarcodeModel $m): Gs1Barcode => $this->mapModelToDomainEntity($m));
     }
 
-    public function save(Gs1Barcode $barcode): Gs1Barcode
+    public function findById(int $id): ?GS1Barcode
     {
-        $savedModel = null;
-        DB::transaction(function () use ($barcode, &$savedModel) {
-            $data = [
-                'tenant_id'               => $barcode->getTenantId(),
-                'gs1_identifier_id'       => $barcode->getGs1IdentifierId(),
-                'barcode_type'            => $barcode->getBarcodeType(),
-                'barcode_data'            => $barcode->getBarcodeData(),
-                'application_identifiers' => $barcode->getApplicationIdentifiers(),
-                'is_primary'              => $barcode->isPrimary(),
-                'is_active'               => $barcode->isActive(),
-                'metadata'                => $barcode->getMetadata()->toArray(),
-            ];
-            if ($barcode->getId()) {
-                $savedModel = $this->update($barcode->getId(), $data);
-            } else {
-                $savedModel = $this->model->create($data);
-            }
-        });
-
-        if (! $savedModel instanceof Gs1BarcodeModel) {
-            throw new \RuntimeException('Failed to save Gs1Barcode.');
-        }
-
-        return $this->mapModelToDomainEntity($savedModel);
+        $model = parent::findById($id);
+        return $model ? $this->toEntity($model) : null;
     }
 
-    public function findByIdentifier(int $tenantId, int $identifierId): Collection
+    public function findByGtin(string $gtin): ?GS1Barcode
     {
-        return $this->model
-            ->where('tenant_id', $tenantId)
-            ->where('gs1_identifier_id', $identifierId)
+        $model = $this->model->where('gtin', $gtin)->first();
+        return $model ? $this->toEntity($model) : null;
+    }
+
+    public function findByProduct(int $productId): array
+    {
+        return $this->model->where('product_id', $productId)
             ->get()
-            ->map(fn ($m) => $this->mapModelToDomainEntity($m));
+            ->map(fn ($m) => $this->toEntity($m))
+            ->all();
     }
 
-    public function findPrimary(int $tenantId, int $identifierId): ?Gs1Barcode
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $model = $this->model
-            ->where('tenant_id', $tenantId)
-            ->where('gs1_identifier_id', $identifierId)
-            ->where('is_primary', true)
-            ->first();
-
-        return $model ? $this->mapModelToDomainEntity($model) : null;
+        $query = $this->model->where('tenant_id', $tenantId);
+        $this->applyFilters($query, $filters);
+        return $query->paginate($perPage);
     }
 
-    private function mapModelToDomainEntity(Gs1BarcodeModel $model): Gs1Barcode
+    public function create(array $data): GS1Barcode
     {
-        return new Gs1Barcode(
-            tenantId:               $model->tenant_id,
-            gs1IdentifierId:        $model->gs1_identifier_id,
-            barcodeType:            $model->barcode_type,
-            barcodeData:            $model->barcode_data,
-            applicationIdentifiers: $model->application_identifiers,
-            isPrimary:              (bool) $model->is_primary,
-            isActive:               (bool) $model->is_active,
-            metadata:               isset($model->metadata) ? new Metadata((array) $model->metadata) : null,
-            id:                     $model->id,
-            createdAt:              $model->created_at,
-            updatedAt:              $model->updated_at,
+        $model = parent::create($data);
+        return $this->toEntity($model);
+    }
+
+    public function update(GS1Barcode $barcode, array $data): GS1Barcode
+    {
+        $model   = $this->model->findOrFail($barcode->id);
+        $updated = parent::update($model, $data);
+        return $this->toEntity($updated);
+    }
+
+    private function toEntity(object $model): GS1Barcode
+    {
+        return new GS1Barcode(
+            id:               $model->id,
+            tenantId:         $model->tenant_id,
+            productId:        $model->product_id,
+            gs1CompanyPrefix: $model->gs1_company_prefix,
+            itemReference:    $model->item_reference,
+            checkDigit:       $model->check_digit,
+            gtin:             $model->gtin,
+            barcodeType:      $model->barcode_type,
+            variantId:        $model->variant_id,
+            isActive:         (bool) $model->is_active,
         );
     }
 }

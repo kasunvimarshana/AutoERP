@@ -1,36 +1,32 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\Inventory\Application\Services;
 
-use Modules\Core\Application\Services\BaseService;
+use Illuminate\Support\Facades\Event;
 use Modules\Inventory\Application\Contracts\ReconcileInventoryServiceInterface;
 use Modules\Inventory\Domain\Entities\InventoryCycleCount;
+use Modules\Inventory\Domain\Events\CycleCountCompleted;
 use Modules\Inventory\Domain\Events\InventoryReconciled;
-use Modules\Inventory\Domain\Exceptions\InventoryCycleCountNotFoundException;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryCycleCountRepositoryInterface;
 
-class ReconcileInventoryService extends BaseService implements ReconcileInventoryServiceInterface
+class ReconcileInventoryService implements ReconcileInventoryServiceInterface
 {
-    public function __construct(private readonly InventoryCycleCountRepositoryInterface $cycleCountRepository)
-    {
-        parent::__construct($cycleCountRepository);
-    }
+    public function __construct(private readonly InventoryCycleCountRepositoryInterface $repository) {}
 
-    protected function handle(array $data): InventoryCycleCount
+    public function execute(int $cycleCountId, int $reconciledBy): InventoryCycleCount
     {
-        $id         = (int) $data['id'];
-        $cycleCount = $this->cycleCountRepository->find($id);
-
-        if (! $cycleCount) {
-            throw new InventoryCycleCountNotFoundException($id);
+        $count = $this->repository->findById($cycleCountId);
+        if (!$count) {
+            throw new \DomainException("Cycle count [{$cycleCountId}] not found.");
         }
 
-        $cycleCount->complete();
+        $saved = $this->repository->update($count, [
+            'status'       => 'completed',
+            'completed_at' => now(),
+            'updated_by'   => $reconciledBy,
+        ]);
 
-        $saved = $this->cycleCountRepository->save($cycleCount);
-        $this->addEvent(new InventoryReconciled($saved));
+        Event::dispatch(new CycleCountCompleted($saved->tenantId, $saved->id));
+        Event::dispatch(new InventoryReconciled($saved->tenantId, $saved->id));
 
         return $saved;
     }

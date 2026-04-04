@@ -1,12 +1,7 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\GoodsReceipt\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Modules\Core\Domain\ValueObjects\Metadata;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\GoodsReceipt\Domain\Entities\GoodsReceipt;
 use Modules\GoodsReceipt\Domain\RepositoryInterfaces\GoodsReceiptRepositoryInterface;
@@ -17,118 +12,73 @@ class EloquentGoodsReceiptRepository extends EloquentRepository implements Goods
     public function __construct(GoodsReceiptModel $model)
     {
         parent::__construct($model);
-        $this->setDomainEntityMapper(fn (GoodsReceiptModel $m): GoodsReceipt => $this->mapModelToDomainEntity($m));
-    }
-
-    public function save(GoodsReceipt $goodsReceipt): GoodsReceipt
-    {
-        $savedModel = null;
-
-        DB::transaction(function () use ($goodsReceipt, &$savedModel) {
-            $data = [
-                'tenant_id'         => $goodsReceipt->getTenantId(),
-                'reference_number'  => $goodsReceipt->getReferenceNumber(),
-                'status'            => $goodsReceipt->getStatus(),
-                'purchase_order_id' => $goodsReceipt->getPurchaseOrderId(),
-                'supplier_id'       => $goodsReceipt->getSupplierId(),
-                'warehouse_id'      => $goodsReceipt->getWarehouseId(),
-                'received_date'     => $goodsReceipt->getReceivedDate()?->format('Y-m-d'),
-                'currency'          => $goodsReceipt->getCurrency(),
-                'notes'             => $goodsReceipt->getNotes(),
-                'metadata'          => $goodsReceipt->getMetadata()->toArray(),
-                'received_by'       => $goodsReceipt->getReceivedBy(),
-                'approved_by'       => $goodsReceipt->getApprovedBy(),
-                'approved_at'       => $goodsReceipt->getApprovedAt()?->format('Y-m-d H:i:s'),
-                'put_away_by'       => $goodsReceipt->getPutAwayBy(),
-                'inspected_by'      => $goodsReceipt->getInspectedBy(),
-                'inspected_at'      => $goodsReceipt->getInspectedAt()?->format('Y-m-d H:i:s'),
-            ];
-
-            if ($goodsReceipt->getId()) {
-                $savedModel = $this->update($goodsReceipt->getId(), $data);
-            } else {
-                $savedModel = $this->model->create($data);
-            }
-        });
-
-        if (! $savedModel instanceof GoodsReceiptModel) {
-            throw new \RuntimeException('Failed to save GoodsReceipt.');
-        }
-
-        return $this->mapModelToDomainEntity($savedModel);
     }
 
     public function findById(int $id): ?GoodsReceipt
     {
-        $model = $this->findModel($id);
-
-        return $model ? $this->mapModelToDomainEntity($model) : null;
+        $model = parent::findById($id);
+        return $model ? $this->toEntity($model) : null;
     }
 
-    public function findByPurchaseOrder(int $tenantId, int $poId): Collection
+    public function findByGrNumber(int $tenantId, string $grNumber): ?GoodsReceipt
     {
-        return $this->model
-            ->where('tenant_id', $tenantId)
-            ->where('purchase_order_id', $poId)
-            ->get()
-            ->map(fn ($m) => $this->mapModelToDomainEntity($m));
+        $model = $this->model->where('tenant_id', $tenantId)->where('gr_number', $grNumber)->first();
+        return $model ? $this->toEntity($model) : null;
     }
 
-    public function findBySupplier(int $tenantId, int $supplierId): Collection
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        return $this->model
-            ->where('tenant_id', $tenantId)
-            ->where('supplier_id', $supplierId)
-            ->get()
-            ->map(fn ($m) => $this->mapModelToDomainEntity($m));
+        $query = $this->model->where('tenant_id', $tenantId);
+        $this->applyFilters($query, $filters);
+        return $query->paginate($perPage);
     }
 
-    public function findByStatus(int $tenantId, string $status): Collection
+    public function create(array $data): GoodsReceipt
     {
-        return $this->model
-            ->where('tenant_id', $tenantId)
-            ->where('status', $status)
-            ->get()
-            ->map(fn ($m) => $this->mapModelToDomainEntity($m));
+        $model = parent::create($data);
+        return $this->toEntity($model);
     }
 
-    public function list(array $filters = [], ?int $perPage = null, int $page = 1): mixed
+    public function update(GoodsReceipt $gr, array $data): GoodsReceipt
     {
-        $query = $this->model->newQuery();
-
-        foreach ($filters as $column => $value) {
-            $query->where($column, $value);
-        }
-
-        if ($perPage !== null) {
-            return $query->paginate($perPage, ['*'], 'page', $page);
-        }
-
-        return $query->get()->map(fn ($m) => $this->mapModelToDomainEntity($m));
+        $model = $this->model->findOrFail($gr->id);
+        $updated = parent::update($model, $data);
+        return $this->toEntity($updated);
     }
 
-    private function mapModelToDomainEntity(GoodsReceiptModel $model): GoodsReceipt
+    public function save(GoodsReceipt $gr): GoodsReceipt
+    {
+        $model = $this->model->findOrFail($gr->id);
+        $updated = parent::update($model, [
+            'status'       => $gr->status,
+            'inspected_by' => $gr->inspectedBy,
+            'inspected_at' => $gr->inspectedAt,
+            'put_away_by'  => $gr->putAwayBy,
+            'put_away_at'  => $gr->putAwayAt,
+            'received_by'  => $gr->receivedBy,
+            'received_at'  => $gr->receivedAt,
+        ]);
+        return $this->toEntity($updated);
+    }
+
+    private function toEntity(object $model): GoodsReceipt
     {
         return new GoodsReceipt(
-            tenantId:        $model->tenant_id,
-            referenceNumber: $model->reference_number,
-            supplierId:      $model->supplier_id,
+            id: $model->id,
+            tenantId: $model->tenant_id,
+            warehouseId: $model->warehouse_id,
+            grNumber: $model->gr_number,
+            status: $model->status,
             purchaseOrderId: $model->purchase_order_id,
-            warehouseId:     $model->warehouse_id,
-            receivedDate:    $model->received_date,
-            currency:        $model->currency,
-            notes:           $model->notes,
-            metadata:        isset($model->metadata) ? new Metadata((array) $model->metadata) : null,
-            status:          $model->status,
-            receivedBy:      $model->received_by,
-            approvedBy:      $model->approved_by,
-            approvedAt:      $model->approved_at,
-            inspectedBy:     $model->inspected_by ?? null,
-            inspectedAt:     $model->inspected_at ?? null,
-            putAwayBy:       $model->put_away_by ?? null,
-            id:              $model->id,
-            createdAt:       $model->created_at,
-            updatedAt:       $model->updated_at,
+            supplierId: $model->supplier_id,
+            supplierReference: $model->supplier_reference,
+            notes: $model->notes,
+            receivedAt: $model->received_at ? new \DateTimeImmutable((string) $model->received_at) : null,
+            receivedBy: $model->received_by,
+            inspectedBy: $model->inspected_by,
+            inspectedAt: $model->inspected_at ? new \DateTimeImmutable((string) $model->inspected_at) : null,
+            putAwayBy: $model->put_away_by,
+            putAwayAt: $model->put_away_at ? new \DateTimeImmutable((string) $model->put_away_at) : null,
         );
     }
 }

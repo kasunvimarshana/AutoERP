@@ -1,13 +1,13 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\UoM\Domain\RepositoryInterfaces;
-
-use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Modules\UoM\Domain\Entities\UomCategory;
 
-interface UomCategoryRepositoryInterface extends RepositoryInterface
+interface UomCategoryRepositoryInterface
 {
-    public function save(UomCategory $category): UomCategory;
+    public function findById(int $id): ?UomCategory;
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator;
+    public function create(array $data): UomCategory;
+    public function update(UomCategory $category, array $data): UomCategory;
+    public function delete(UomCategory $category): bool;
 }

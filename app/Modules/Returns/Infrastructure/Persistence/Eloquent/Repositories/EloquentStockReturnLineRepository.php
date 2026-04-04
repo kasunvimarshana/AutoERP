@@ -1,11 +1,7 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Returns\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Returns\Domain\Entities\StockReturnLine;
 use Modules\Returns\Domain\RepositoryInterfaces\StockReturnLineRepositoryInterface;
@@ -16,80 +12,73 @@ class EloquentStockReturnLineRepository extends EloquentRepository implements St
     public function __construct(StockReturnLineModel $model)
     {
         parent::__construct($model);
-        $this->setDomainEntityMapper(fn (StockReturnLineModel $m): StockReturnLine => $this->mapModelToDomainEntity($m));
+    }
+
+    public function findById(int $id): ?StockReturnLine
+    {
+        $model = parent::findById($id);
+
+        return $model ? $this->toEntity($model) : null;
+    }
+
+    public function findByStockReturn(int $stockReturnId): array
+    {
+        return $this->model->where('stock_return_id', $stockReturnId)
+            ->get()
+            ->map(fn ($m) => $this->toEntity($m))
+            ->all();
+    }
+
+    public function create(array $data): StockReturnLine
+    {
+        $model = parent::create($data);
+
+        return $this->toEntity($model);
+    }
+
+    public function update(StockReturnLine $line, array $data): StockReturnLine
+    {
+        $model = $this->model->findOrFail($line->id);
+        $updated = parent::update($model, $data);
+
+        return $this->toEntity($updated);
     }
 
     public function save(StockReturnLine $line): StockReturnLine
     {
-        $savedModel = null;
+        $model = $this->model->findOrFail($line->id);
+        $updated = parent::update($model, [
+            'quality_check_result' => $line->qualityCheckResult,
+            'quality_checked_by'   => $line->qualityCheckedBy,
+            'quality_checked_at'   => $line->qualityCheckedAt,
+            'condition'            => $line->condition,
+            'restock_action'       => $line->restockAction,
+            'notes'                => $line->notes,
+        ]);
 
-        DB::transaction(function () use ($line, &$savedModel) {
-            $data = [
-                'tenant_id'          => $line->getTenantId(),
-                'stock_return_id'    => $line->getStockReturnId(),
-                'product_id'         => $line->getProductId(),
-                'variation_id'       => $line->getVariationId(),
-                'batch_id'           => $line->getBatchId(),
-                'serial_number_id'   => $line->getSerialNumberId(),
-                'uom_id'             => $line->getUomId(),
-                'quantity_requested' => $line->getQuantityRequested(),
-                'quantity_approved'  => $line->getQuantityApproved(),
-                'unit_price'         => $line->getUnitPrice(),
-                'unit_cost'          => $line->getUnitCost(),
-                'condition'          => $line->getCondition(),
-                'disposition'        => $line->getDisposition(),
-                'quality_check_status' => $line->getQualityCheckStatus(),
-                'quality_checked_by' => $line->getQualityCheckedBy(),
-                'quality_checked_at' => $line->getQualityCheckedAt()?->format('Y-m-d H:i:s'),
-                'notes'              => $line->getNotes(),
-            ];
-
-            if ($line->getId()) {
-                $savedModel = $this->update($line->getId(), $data);
-            } else {
-                $savedModel = $this->model->create($data);
-            }
-        });
-
-        if (! $savedModel instanceof StockReturnLineModel) {
-            throw new \RuntimeException('Failed to save StockReturnLine.');
-        }
-
-        return $this->mapModelToDomainEntity($savedModel);
+        return $this->toEntity($updated);
     }
 
-    public function findByReturn(int $tenantId, int $returnId): Collection
-    {
-        return $this->model
-            ->where('tenant_id', $tenantId)
-            ->where('stock_return_id', $returnId)
-            ->get()
-            ->map(fn ($m) => $this->mapModelToDomainEntity($m));
-    }
-
-    private function mapModelToDomainEntity(StockReturnLineModel $model): StockReturnLine
+    private function toEntity(object $model): StockReturnLine
     {
         return new StockReturnLine(
-            tenantId:           $model->tenant_id,
-            stockReturnId:      $model->stock_return_id,
-            productId:          $model->product_id,
-            quantityRequested:  (float) $model->quantity_requested,
-            variationId:        $model->variation_id,
-            batchId:            $model->batch_id,
-            serialNumberId:     $model->serial_number_id,
-            uomId:              $model->uom_id,
-            quantityApproved:   isset($model->quantity_approved) ? (float) $model->quantity_approved : null,
-            unitPrice:          isset($model->unit_price) ? (float) $model->unit_price : null,
-            unitCost:           isset($model->unit_cost) ? (float) $model->unit_cost : null,
-            condition:          $model->condition,
-            disposition:        $model->disposition,
-            qualityCheckStatus: $model->quality_check_status,
-            qualityCheckedBy:   $model->quality_checked_by,
-            qualityCheckedAt:   $model->quality_checked_at,
-            notes:              $model->notes,
-            id:                 $model->id,
-            createdAt:          $model->created_at,
-            updatedAt:          $model->updated_at,
+            id: $model->id,
+            stockReturnId: $model->stock_return_id,
+            productId: $model->product_id,
+            returnQty: (float) $model->return_qty,
+            condition: $model->condition,
+            qualityCheckResult: $model->quality_check_result,
+            locationId: $model->location_id,
+            variantId: $model->variant_id,
+            originalBatchId: $model->original_batch_id,
+            originalLotNumber: $model->original_lot_number,
+            originalSerialNumber: $model->original_serial_number,
+            unitPrice: $model->unit_price !== null ? (float) $model->unit_price : null,
+            lineTotal: $model->line_total !== null ? (float) $model->line_total : null,
+            restockAction: $model->restock_action,
+            notes: $model->notes,
+            qualityCheckedBy: $model->quality_checked_by,
+            qualityCheckedAt: $model->quality_checked_at ? new \DateTimeImmutable((string) $model->quality_checked_at) : null,
         );
     }
 }

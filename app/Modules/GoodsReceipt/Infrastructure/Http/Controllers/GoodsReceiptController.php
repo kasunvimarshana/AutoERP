@@ -1,148 +1,130 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\GoodsReceipt\Infrastructure\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
-use Modules\GoodsReceipt\Application\Contracts\ApproveGoodsReceiptServiceInterface;
-use Modules\GoodsReceipt\Application\Contracts\CancelGoodsReceiptServiceInterface;
+use Modules\GoodsReceipt\Application\Contracts\CompleteGoodsReceiptServiceInterface;
 use Modules\GoodsReceipt\Application\Contracts\CreateGoodsReceiptServiceInterface;
-use Modules\GoodsReceipt\Application\Contracts\DeleteGoodsReceiptServiceInterface;
-use Modules\GoodsReceipt\Application\Contracts\FindGoodsReceiptServiceInterface;
 use Modules\GoodsReceipt\Application\Contracts\InspectGoodsReceiptServiceInterface;
 use Modules\GoodsReceipt\Application\Contracts\PutAwayGoodsReceiptServiceInterface;
-use Modules\GoodsReceipt\Application\Contracts\ReceiveGoodsReceiptServiceInterface;
-use Modules\GoodsReceipt\Application\Contracts\UpdateGoodsReceiptServiceInterface;
 use Modules\GoodsReceipt\Application\DTOs\GoodsReceiptData;
-use Modules\GoodsReceipt\Application\DTOs\UpdateGoodsReceiptData;
-use Modules\GoodsReceipt\Infrastructure\Http\Requests\StoreGoodsReceiptRequest;
-use Modules\GoodsReceipt\Infrastructure\Http\Requests\UpdateGoodsReceiptRequest;
-use Modules\GoodsReceipt\Infrastructure\Http\Resources\GoodsReceiptCollection;
+use Modules\GoodsReceipt\Domain\RepositoryInterfaces\GoodsReceiptRepositoryInterface;
 use Modules\GoodsReceipt\Infrastructure\Http\Resources\GoodsReceiptResource;
 
-class GoodsReceiptController extends AuthorizedController
+class GoodsReceiptController extends Controller
 {
     public function __construct(
-        protected FindGoodsReceiptServiceInterface $findService,
-        protected CreateGoodsReceiptServiceInterface $createService,
-        protected UpdateGoodsReceiptServiceInterface $updateService,
-        protected DeleteGoodsReceiptServiceInterface $deleteService,
-        protected ReceiveGoodsReceiptServiceInterface $receiveService,
-        protected ApproveGoodsReceiptServiceInterface $approveService,
-        protected CancelGoodsReceiptServiceInterface $cancelService,
-        protected InspectGoodsReceiptServiceInterface $inspectService,
-        protected PutAwayGoodsReceiptServiceInterface $putAwayService,
+        private readonly GoodsReceiptRepositoryInterface $repository,
+        private readonly CreateGoodsReceiptServiceInterface $createService,
+        private readonly InspectGoodsReceiptServiceInterface $inspectService,
+        private readonly PutAwayGoodsReceiptServiceInterface $putAwayService,
+        private readonly CompleteGoodsReceiptServiceInterface $completeService,
     ) {}
 
-    public function index(Request $request): GoodsReceiptCollection
+    public function index(Request $request): JsonResponse
     {
-        $filters = $request->only(['tenant_id', 'status', 'supplier_id', 'purchase_order_id']);
-
-        return new GoodsReceiptCollection(
-            $this->findService->list($filters, $request->integer('per_page', 15), $request->integer('page', 1))
-        );
+        $tenantId = (int) $request->query('tenant_id', 0);
+        $grs = $this->repository->findAll($tenantId, $request->only(['status', 'supplier_id', 'warehouse_id', 'purchase_order_id']));
+        return response()->json($grs);
     }
 
-    public function store(StoreGoodsReceiptRequest $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
-        $v   = $request->validated();
-        $dto = GoodsReceiptData::fromArray([
-            'tenantId'        => $v['tenant_id'],
-            'referenceNumber' => $v['reference_number'],
-            'supplierId'      => $v['supplier_id'],
-            'purchaseOrderId' => $v['purchase_order_id'] ?? null,
-            'warehouseId'     => $v['warehouse_id'] ?? null,
-            'receivedDate'    => $v['received_date'] ?? null,
-            'currency'        => $v['currency'] ?? 'USD',
-            'notes'           => $v['notes'] ?? null,
-            'metadata'        => $v['metadata'] ?? null,
-            'status'          => $v['status'] ?? 'draft',
-            'receivedBy'      => $v['received_by'] ?? null,
+        $validated = $request->validate([
+            'tenant_id'              => 'required|integer',
+            'warehouse_id'           => 'required|integer',
+            'gr_number'              => 'required|string|max:100',
+            'lines'                  => 'required|array|min:1',
+            'lines.*.product_id'     => 'required|integer',
+            'lines.*.expected_qty'   => 'required|numeric|min:0.0001',
+            'lines.*.received_qty'   => 'nullable|numeric|min:0',
+            'lines.*.location_id'    => 'required|integer',
+            'purchase_order_id'      => 'nullable|integer',
+            'supplier_id'            => 'nullable|integer',
+            'supplier_reference'     => 'nullable|string',
+            'notes'                  => 'nullable|string',
+            'received_by'            => 'nullable|integer',
         ]);
 
-        $receipt = $this->createService->execute($dto->toArray());
-
-        return (new GoodsReceiptResource($receipt))->response()->setStatusCode(201);
-    }
-
-    public function show(int $id): GoodsReceiptResource|JsonResponse
-    {
-        $receipt = $this->findService->find($id);
-        if (! $receipt) {
-            return response()->json(['message' => 'Not found'], 404);
+        try {
+            $dto = new GoodsReceiptData(
+                tenantId: $validated['tenant_id'],
+                warehouseId: $validated['warehouse_id'],
+                grNumber: $validated['gr_number'],
+                lines: $validated['lines'],
+                purchaseOrderId: $validated['purchase_order_id'] ?? null,
+                supplierId: $validated['supplier_id'] ?? null,
+                supplierReference: $validated['supplier_reference'] ?? null,
+                notes: $validated['notes'] ?? null,
+                receivedBy: $validated['received_by'] ?? null,
+            );
+            $gr = $this->createService->execute($dto);
+            return response()->json(new GoodsReceiptResource($gr), 201);
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
         }
-
-        return new GoodsReceiptResource($receipt);
     }
 
-    public function update(UpdateGoodsReceiptRequest $request, int $id): GoodsReceiptResource
+    public function show(int $id): JsonResponse
     {
-        $v   = $request->validated();
-        $dto = UpdateGoodsReceiptData::fromArray([
-            'id'           => $id,
-            'notes'        => $v['notes'] ?? null,
-            'metadata'     => $v['metadata'] ?? null,
-            'receivedDate' => $v['received_date'] ?? null,
-            'warehouseId'  => $v['warehouse_id'] ?? null,
+        $gr = $this->repository->findById($id);
+        if (!$gr) return response()->json(['message' => 'Not found'], 404);
+        return response()->json(new GoodsReceiptResource($gr));
+    }
+
+    public function update(Request $request, int $id): JsonResponse
+    {
+        $gr = $this->repository->findById($id);
+        if (!$gr) return response()->json(['message' => 'Not found'], 404);
+
+        $validated = $request->validate([
+            'notes'              => 'nullable|string',
+            'supplier_reference' => 'nullable|string',
         ]);
 
-        return new GoodsReceiptResource($this->updateService->execute($dto->toArray()));
+        $updated = $this->repository->update($gr, $validated);
+        return response()->json(new GoodsReceiptResource($updated));
     }
 
     public function destroy(int $id): JsonResponse
     {
-        $this->deleteService->execute(['id' => $id]);
-
-        return response()->json(['message' => 'Goods receipt deleted successfully']);
-    }
-
-    public function receive(Request $request, int $id): JsonResponse
-    {
-        $receipt = $this->receiveService->execute([
-            'id'          => $id,
-            'received_by' => $request->integer('received_by'),
-        ]);
-
-        return (new GoodsReceiptResource($receipt))->response();
-    }
-
-    public function approve(Request $request, int $id): JsonResponse
-    {
-        $receipt = $this->approveService->execute([
-            'id'          => $id,
-            'approved_by' => $request->integer('approved_by'),
-        ]);
-
-        return (new GoodsReceiptResource($receipt))->response();
-    }
-
-    public function cancel(int $id): JsonResponse
-    {
-        $receipt = $this->cancelService->execute(['id' => $id]);
-
-        return (new GoodsReceiptResource($receipt))->response();
+        $gr = $this->repository->findById($id);
+        if (!$gr) return response()->json(['message' => 'Not found'], 404);
+        $model = \Modules\GoodsReceipt\Infrastructure\Persistence\Eloquent\Models\GoodsReceiptModel::findOrFail($id);
+        $model->delete();
+        return response()->json(null, 204);
     }
 
     public function inspect(Request $request, int $id): JsonResponse
     {
-        $receipt = $this->inspectService->execute([
-            'id'           => $id,
-            'inspected_by' => $request->integer('inspected_by'),
-        ]);
-
-        return (new GoodsReceiptResource($receipt))->response();
+        $request->validate(['inspected_by' => 'required|integer']);
+        try {
+            $gr = $this->inspectService->execute($id, (int) $request->input('inspected_by'));
+            return response()->json(new GoodsReceiptResource($gr));
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     public function putAway(Request $request, int $id): JsonResponse
     {
-        $receipt = $this->putAwayService->execute([
-            'id'          => $id,
-            'put_away_by' => $request->integer('put_away_by'),
-        ]);
+        $request->validate(['put_away_by' => 'required|integer']);
+        try {
+            $gr = $this->putAwayService->execute($id, (int) $request->input('put_away_by'));
+            return response()->json(new GoodsReceiptResource($gr));
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
 
-        return (new GoodsReceiptResource($receipt))->response();
+    public function complete(int $id): JsonResponse
+    {
+        try {
+            $gr = $this->completeService->execute($id);
+            return response()->json(new GoodsReceiptResource($gr));
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 }

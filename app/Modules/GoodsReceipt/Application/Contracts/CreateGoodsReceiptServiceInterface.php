@@ -1,9 +1,8 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\GoodsReceipt\Application\Contracts;
-
-use Modules\Core\Application\Contracts\WriteServiceInterface;
-
-interface CreateGoodsReceiptServiceInterface extends WriteServiceInterface {}
+use Modules\GoodsReceipt\Application\DTOs\GoodsReceiptData;
+use Modules\GoodsReceipt\Domain\Entities\GoodsReceipt;
+interface CreateGoodsReceiptServiceInterface
+{
+    public function execute(GoodsReceiptData $data): GoodsReceipt;
+}

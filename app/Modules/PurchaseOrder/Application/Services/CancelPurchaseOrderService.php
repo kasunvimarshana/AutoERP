@@ -1,37 +1,25 @@
 <?php
-
-declare(strict_types=1);
-
 namespace Modules\PurchaseOrder\Application\Services;
-
-use Modules\Core\Application\Services\BaseService;
+use Illuminate\Support\Facades\Event;
 use Modules\PurchaseOrder\Application\Contracts\CancelPurchaseOrderServiceInterface;
 use Modules\PurchaseOrder\Domain\Entities\PurchaseOrder;
 use Modules\PurchaseOrder\Domain\Events\PurchaseOrderCancelled;
-use Modules\PurchaseOrder\Domain\Exceptions\PurchaseOrderNotFoundException;
 use Modules\PurchaseOrder\Domain\RepositoryInterfaces\PurchaseOrderRepositoryInterface;
+use Modules\PurchaseOrder\Domain\ValueObjects\PurchaseOrderStatus;
 
-class CancelPurchaseOrderService extends BaseService implements CancelPurchaseOrderServiceInterface
+class CancelPurchaseOrderService implements CancelPurchaseOrderServiceInterface
 {
-    public function __construct(private readonly PurchaseOrderRepositoryInterface $orderRepository)
-    {
-        parent::__construct($orderRepository);
-    }
+    public function __construct(private readonly PurchaseOrderRepositoryInterface $repository) {}
 
-    protected function handle(array $data): PurchaseOrder
+    public function execute(int $poId): PurchaseOrder
     {
-        $id    = $data['id'];
-        $order = $this->orderRepository->find($id);
-
-        if (! $order) {
-            throw new PurchaseOrderNotFoundException($id);
+        $po = $this->repository->findById($poId);
+        if (!$po) throw new \DomainException("Purchase order not found: {$poId}");
+        if (in_array($po->status, [PurchaseOrderStatus::RECEIVED, PurchaseOrderStatus::CLOSED], true)) {
+            throw new \DomainException("Cannot cancel a purchase order with status: {$po->status}");
         }
-
-        $order->cancel();
-
-        $saved = $this->orderRepository->save($order);
-        $this->addEvent(new PurchaseOrderCancelled($saved->getId()));
-
-        return $saved;
+        $po = $this->repository->update($po, ['status' => PurchaseOrderStatus::CANCELLED]);
+        Event::dispatch(new PurchaseOrderCancelled($po->tenantId, $po->id));
+        return $po;
     }
 }

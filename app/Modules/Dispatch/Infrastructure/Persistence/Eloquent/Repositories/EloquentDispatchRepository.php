@@ -1,12 +1,8 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Dispatch\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Modules\Core\Domain\ValueObjects\Metadata;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Dispatch\Domain\Entities\Dispatch;
 use Modules\Dispatch\Domain\RepositoryInterfaces\DispatchRepositoryInterface;
@@ -17,142 +13,70 @@ class EloquentDispatchRepository extends EloquentRepository implements DispatchR
     public function __construct(DispatchModel $model)
     {
         parent::__construct($model);
-        $this->setDomainEntityMapper(fn (DispatchModel $m): Dispatch => $this->mapModelToDomainEntity($m));
-    }
-
-    public function save(Dispatch $dispatch): Dispatch
-    {
-        $savedModel = null;
-
-        DB::transaction(function () use ($dispatch, &$savedModel) {
-            $data = [
-                'tenant_id'              => $dispatch->getTenantId(),
-                'reference_number'       => $dispatch->getReferenceNumber(),
-                'status'                 => $dispatch->getStatus(),
-                'warehouse_id'           => $dispatch->getWarehouseId(),
-                'sales_order_id'         => $dispatch->getSalesOrderId(),
-                'customer_id'            => $dispatch->getCustomerId(),
-                'customer_reference'     => $dispatch->getCustomerReference(),
-                'dispatch_date'          => $dispatch->getDispatchDate(),
-                'estimated_delivery_date'=> $dispatch->getEstimatedDeliveryDate(),
-                'actual_delivery_date'   => $dispatch->getActualDeliveryDate(),
-                'carrier'                => $dispatch->getCarrier(),
-                'tracking_number'        => $dispatch->getTrackingNumber(),
-                'currency'               => $dispatch->getCurrency(),
-                'total_weight'           => $dispatch->getTotalWeight(),
-                'notes'                  => $dispatch->getNotes(),
-                'metadata'               => $dispatch->getMetadata()->toArray(),
-                'confirmed_by'           => $dispatch->getConfirmedBy(),
-                'confirmed_at'           => $dispatch->getConfirmedAt()?->format('Y-m-d H:i:s'),
-                'shipped_by'             => $dispatch->getShippedBy(),
-                'shipped_at'             => $dispatch->getShippedAt()?->format('Y-m-d H:i:s'),
-            ];
-
-            if ($dispatch->getId()) {
-                $savedModel = $this->update($dispatch->getId(), $data);
-            } else {
-                $savedModel = $this->model->create($data);
-            }
-        });
-
-        if (! $savedModel instanceof DispatchModel) {
-            throw new \RuntimeException('Failed to save Dispatch.');
-        }
-
-        return $this->mapModelToDomainEntity($savedModel);
     }
 
     public function findById(int $id): ?Dispatch
     {
-        $model = $this->findModel($id);
-
-        return $model ? $this->mapModelToDomainEntity($model) : null;
+        $model = parent::findById($id);
+        return $model ? $this->toEntity($model) : null;
     }
 
-    public function findByWarehouse(int $tenantId, int $warehouseId): Collection
+    public function findByDispatchNumber(int $tenantId, string $dispatchNumber): ?Dispatch
     {
-        return $this->model
-            ->where('tenant_id', $tenantId)
-            ->where('warehouse_id', $warehouseId)
-            ->get()
-            ->map(fn ($m) => $this->mapModelToDomainEntity($m));
-    }
-
-    public function findByStatus(int $tenantId, string $status): Collection
-    {
-        return $this->model
-            ->where('tenant_id', $tenantId)
-            ->where('status', $status)
-            ->get()
-            ->map(fn ($m) => $this->mapModelToDomainEntity($m));
-    }
-
-    public function findBySalesOrder(int $tenantId, int $salesOrderId): Collection
-    {
-        return $this->model
-            ->where('tenant_id', $tenantId)
-            ->where('sales_order_id', $salesOrderId)
-            ->get()
-            ->map(fn ($m) => $this->mapModelToDomainEntity($m));
-    }
-
-    public function findByReferenceNumber(int $tenantId, string $referenceNumber): ?Dispatch
-    {
-        $model = $this->model
-            ->where('tenant_id', $tenantId)
-            ->where('reference_number', $referenceNumber)
+        $model = $this->model->where('tenant_id', $tenantId)
+            ->where('dispatch_number', $dispatchNumber)
             ->first();
-
-        return $model ? $this->mapModelToDomainEntity($model) : null;
+        return $model ? $this->toEntity($model) : null;
     }
 
-    public function list(array $filters = [], ?int $perPage = null, int $page = 1): mixed
+    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = $this->model->newQuery();
-
-        foreach ($filters as $column => $value) {
-            $query->where($column, $value);
-        }
-
-        if ($perPage !== null) {
-            return $query->paginate($perPage, ['*'], 'page', $page);
-        }
-
-        return $query->get()->map(fn ($m) => $this->mapModelToDomainEntity($m));
+        $query = $this->model->where('tenant_id', $tenantId);
+        $this->applyFilters($query, $filters);
+        return $query->paginate($perPage);
     }
 
-    private function mapModelToDomainEntity(DispatchModel $model): Dispatch
+    public function create(array $data): Dispatch
+    {
+        $model = parent::create($data);
+        return $this->toEntity($model);
+    }
+
+    public function update(Dispatch $dispatch, array $data): Dispatch
+    {
+        $model = $this->model->findOrFail($dispatch->id);
+        $updated = parent::update($model, $data);
+        return $this->toEntity($updated);
+    }
+
+    public function save(Dispatch $dispatch): Dispatch
+    {
+        $model = $this->model->findOrFail($dispatch->id);
+        $updated = parent::update($model, [
+            'status'        => $dispatch->status,
+            'dispatched_at' => $dispatch->dispatchedAt,
+            'dispatched_by' => $dispatch->dispatchedBy,
+            'delivered_at'  => $dispatch->deliveredAt,
+        ]);
+        return $this->toEntity($updated);
+    }
+
+    private function toEntity(object $model): Dispatch
     {
         return new Dispatch(
-            tenantId:              $model->tenant_id,
-            referenceNumber:       $model->reference_number,
-            warehouseId:           $model->warehouse_id,
-            customerId:            $model->customer_id,
-            dispatchDate:          $model->dispatch_date instanceof \DateTimeInterface
-                                       ? $model->dispatch_date->format('Y-m-d')
-                                       : (string) $model->dispatch_date,
-            salesOrderId:          $model->sales_order_id,
-            customerReference:     $model->customer_reference,
-            estimatedDeliveryDate: $model->estimated_delivery_date instanceof \DateTimeInterface
-                                       ? $model->estimated_delivery_date->format('Y-m-d')
-                                       : $model->estimated_delivery_date,
-            actualDeliveryDate:    $model->actual_delivery_date instanceof \DateTimeInterface
-                                       ? $model->actual_delivery_date->format('Y-m-d')
-                                       : $model->actual_delivery_date,
-            carrier:               $model->carrier,
-            trackingNumber:        $model->tracking_number,
-            currency:              $model->currency,
-            totalWeight:           $model->total_weight !== null ? (float) $model->total_weight : null,
-            notes:                 $model->notes,
-            metadata:              isset($model->metadata) ? new Metadata((array) $model->metadata) : null,
-            status:                $model->status,
-            confirmedBy:           $model->confirmed_by,
-            confirmedAt:           $model->confirmed_at,
-            shippedBy:             $model->shipped_by,
-            shippedAt:             $model->shipped_at,
-            id:                    $model->id,
-            createdAt:             $model->created_at,
-            updatedAt:             $model->updated_at,
+            id: $model->id,
+            tenantId: $model->tenant_id,
+            salesOrderId: $model->sales_order_id,
+            warehouseId: $model->warehouse_id,
+            dispatchNumber: $model->dispatch_number,
+            status: $model->status,
+            trackingNumber: $model->tracking_number,
+            carrier: $model->carrier,
+            shippingAddress: $model->shipping_address,
+            notes: $model->notes,
+            dispatchedAt: $model->dispatched_at ? new \DateTimeImmutable((string) $model->dispatched_at) : null,
+            deliveredAt: $model->delivered_at ? new \DateTimeImmutable((string) $model->delivered_at) : null,
+            dispatchedBy: $model->dispatched_by,
         );
     }
 }

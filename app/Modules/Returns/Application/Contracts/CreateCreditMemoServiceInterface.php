@@ -1,9 +1,11 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Modules\Returns\Application\Contracts;
 
-use Modules\Core\Application\Contracts\WriteServiceInterface;
+use Modules\Returns\Application\DTOs\CreditMemoData;
+use Modules\Returns\Domain\Entities\CreditMemo;
 
-interface CreateCreditMemoServiceInterface extends WriteServiceInterface {}
+interface CreateCreditMemoServiceInterface
+{
+    public function execute(CreditMemoData $data): CreditMemo;
+}
