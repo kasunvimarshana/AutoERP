@@ -1,71 +1,21 @@
 <?php
+declare(strict_types=1);
 namespace Modules\Pricing\Infrastructure\Persistence\Eloquent\Repositories;
-
-use Illuminate\Pagination\LengthAwarePaginator;
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Modules\Pricing\Domain\Entities\PriceList;
 use Modules\Pricing\Domain\RepositoryInterfaces\PriceListRepositoryInterface;
 use Modules\Pricing\Infrastructure\Persistence\Eloquent\Models\PriceListModel;
-
-class EloquentPriceListRepository extends EloquentRepository implements PriceListRepositoryInterface
-{
-    public function __construct(PriceListModel $model)
-    {
-        parent::__construct($model);
+class EloquentPriceListRepository implements PriceListRepositoryInterface {
+    public function __construct(private readonly PriceListModel $model) {}
+    private function toEntity(PriceListModel $m): PriceList {
+        return new PriceList($m->id,$m->tenant_id,$m->name,$m->currency,(float)$m->discount_percent,
+            (bool)$m->is_default,(bool)$m->is_active,$m->valid_from?->format('Y-m-d'),$m->valid_to?->format('Y-m-d'),$m->created_at,$m->updated_at);
     }
-
-    public function findById(int $id): ?PriceList
-    {
-        $m = parent::findById($id);
-        return $m ? $this->toEntity($m) : null;
+    public function findById(int $id): ?PriceList { $m=$this->model->newQuery()->find($id); return $m?$this->toEntity($m):null; }
+    public function findByTenant(int $tenantId, int $perPage = 15, int $page = 1): LengthAwarePaginator {
+        return $this->model->newQuery()->where('tenant_id',$tenantId)->paginate($perPage,['*'],'page',$page)->through(fn($m)=>$this->toEntity($m));
     }
-
-    public function findByCode(int $tenantId, string $code): ?PriceList
-    {
-        $m = $this->model->where('tenant_id', $tenantId)->where('code', $code)->first();
-        return $m ? $this->toEntity($m) : null;
-    }
-
-    public function findDefault(int $tenantId): ?PriceList
-    {
-        $m = $this->model->where('tenant_id', $tenantId)->where('is_default', true)->first();
-        return $m ? $this->toEntity($m) : null;
-    }
-
-    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
-    {
-        return $this->model->where('tenant_id', $tenantId)->paginate($perPage);
-    }
-
-    public function create(array $data): PriceList
-    {
-        return $this->toEntity(parent::create($data));
-    }
-
-    public function update(PriceList $priceList, array $data): PriceList
-    {
-        $m = $this->model->findOrFail($priceList->id);
-        return $this->toEntity(parent::update($m, $data));
-    }
-
-    public function delete(PriceList $priceList): bool
-    {
-        return parent::delete($this->model->findOrFail($priceList->id));
-    }
-
-    private function toEntity(object $m): PriceList
-    {
-        return new PriceList(
-            id: $m->id,
-            tenantId: $m->tenant_id,
-            name: $m->name,
-            code: $m->code,
-            currency: $m->currency,
-            isDefault: (bool) $m->is_default,
-            isActive: (bool) $m->is_active,
-            validFrom: $m->valid_from?->toDateString(),
-            validTo: $m->valid_to?->toDateString(),
-            description: $m->description,
-        );
-    }
+    public function create(array $data): PriceList { return $this->toEntity($this->model->newQuery()->create($data)); }
+    public function update(int $id, array $data): ?PriceList { $m=$this->model->newQuery()->find($id); if(!$m)return null; $m->update($data); return $this->toEntity($m->fresh()); }
+    public function delete(int $id): bool { $m=$this->model->newQuery()->find($id); return $m?(bool)$m->delete():false; }
 }

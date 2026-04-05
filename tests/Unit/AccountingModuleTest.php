@@ -1,247 +1,252 @@
 <?php
-
+declare(strict_types=1);
 namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
-use Modules\Accounting\Domain\ValueObjects\AccountType;
-use Modules\Accounting\Domain\ValueObjects\JournalEntryStatus;
-use Modules\Accounting\Domain\ValueObjects\PaymentStatus;
-use Modules\Accounting\Domain\ValueObjects\PaymentMethod;
 use Modules\Accounting\Domain\Entities\Account;
 use Modules\Accounting\Domain\Entities\JournalEntry;
-use Modules\Accounting\Domain\Entities\JournalLine;
+use Modules\Accounting\Domain\Entities\JournalEntryLine;
 use Modules\Accounting\Domain\Entities\Payment;
 use Modules\Accounting\Domain\Entities\Refund;
 
 class AccountingModuleTest extends TestCase
 {
-    // --- AccountType ---
-
-    public function test_account_type_valid_returns_five_types(): void
+    private function makeAccount(array $overrides = []): Account
     {
-        $this->assertCount(5, AccountType::valid());
-    }
-
-    public function test_account_type_from_asset(): void
-    {
-        $t = AccountType::from(AccountType::ASSET);
-        $this->assertSame(AccountType::ASSET, (string) $t);
-    }
-
-    public function test_account_type_from_liability(): void
-    {
-        $t = AccountType::from(AccountType::LIABILITY);
-        $this->assertSame(AccountType::LIABILITY, (string) $t);
-    }
-
-    public function test_account_type_from_equity(): void
-    {
-        $t = AccountType::from(AccountType::EQUITY);
-        $this->assertSame(AccountType::EQUITY, (string) $t);
-    }
-
-    public function test_account_type_from_revenue(): void
-    {
-        $t = AccountType::from(AccountType::REVENUE);
-        $this->assertSame(AccountType::REVENUE, (string) $t);
-    }
-
-    public function test_account_type_from_expense(): void
-    {
-        $t = AccountType::from(AccountType::EXPENSE);
-        $this->assertSame(AccountType::EXPENSE, (string) $t);
-    }
-
-    public function test_account_type_from_invalid_throws(): void
-    {
-        $this->expectException(\InvalidArgumentException::class);
-        AccountType::from('invalid_type');
-    }
-
-    // --- JournalEntryStatus ---
-
-    public function test_journal_entry_status_draft_constant(): void
-    {
-        $this->assertSame('draft', JournalEntryStatus::DRAFT);
-    }
-
-    public function test_journal_entry_status_posted_constant(): void
-    {
-        $this->assertSame('posted', JournalEntryStatus::POSTED);
-    }
-
-    public function test_journal_entry_status_reversed_constant(): void
-    {
-        $this->assertSame('reversed', JournalEntryStatus::REVERSED);
-    }
-
-    // --- PaymentStatus ---
-
-    public function test_payment_status_constants_exist(): void
-    {
-        $this->assertSame('pending',   PaymentStatus::PENDING);
-        $this->assertSame('completed', PaymentStatus::COMPLETED);
-        $this->assertSame('failed',    PaymentStatus::FAILED);
-        $this->assertSame('refunded',  PaymentStatus::REFUNDED);
-        $this->assertSame('cancelled', PaymentStatus::CANCELLED);
-    }
-
-    // --- PaymentMethod ---
-
-    public function test_payment_method_constants_exist(): void
-    {
-        $this->assertSame('cash',          PaymentMethod::CASH);
-        $this->assertSame('bank_transfer', PaymentMethod::BANK_TRANSFER);
-        $this->assertSame('card',          PaymentMethod::CARD);
-        $this->assertSame('cheque',        PaymentMethod::CHEQUE);
-        $this->assertSame('credit',        PaymentMethod::CREDIT);
-    }
-
-    // --- Account entity ---
-
-    public function test_account_construction_and_accessors(): void
-    {
-        $account = new Account(
-            id: 1,
-            tenantId: 10,
-            code: '1000',
-            name: 'Cash',
-            type: AccountType::ASSET,
+        return new Account(
+            $overrides['id'] ?? 1, $overrides['tenant_id'] ?? 1,
+            $overrides['code'] ?? '1000', $overrides['name'] ?? 'Cash',
+            $overrides['type'] ?? 'asset', 'current', null,
+            $overrides['balance'] ?? 0.0, 'USD', true, null, null, null
         );
-
-        $this->assertSame(1,                $account->id);
-        $this->assertSame(10,               $account->tenantId);
-        $this->assertSame('1000',           $account->code);
-        $this->assertSame('Cash',           $account->name);
-        $this->assertSame(AccountType::ASSET, $account->type);
     }
-
-    public function test_account_defaults(): void
+    private function makeJournalEntry(string $status = 'draft', float $debit = 100.0, float $credit = 100.0): JournalEntry
     {
-        $account = new Account(null, 5, 'EXP-001', 'Office Supplies', AccountType::EXPENSE);
-
-        $this->assertNull($account->id);
-        $this->assertNull($account->parentId);
-        $this->assertSame('USD', $account->currency);
-        $this->assertTrue($account->isActive);
-    }
-
-    // --- JournalEntry entity ---
-
-    public function test_journal_entry_construction(): void
-    {
-        $entry = new JournalEntry(
-            id: 1,
-            tenantId: 2,
-            referenceNumber: 'JE-0001',
-            status: JournalEntryStatus::DRAFT,
-            entryDate: '2025-01-15',
+        return new JournalEntry(
+            1, 1, 'JE-001', $status, 'Test Entry', 'USD',
+            $debit, $credit, null, null, [], null, null, null
         );
-
-        $this->assertSame(1,              $entry->id);
-        $this->assertSame('JE-0001',      $entry->referenceNumber);
-        $this->assertSame('draft',        $entry->status);
-        $this->assertSame('2025-01-15',   $entry->entryDate);
     }
 
-    public function test_journal_entry_optional_fields_default_null(): void
+    public function test_account_creation(): void
     {
-        $entry = new JournalEntry(null, 3, 'JE-0002', JournalEntryStatus::POSTED, '2025-02-01');
-
-        $this->assertNull($entry->description);
-        $this->assertNull($entry->postedBy);
-        $this->assertNull($entry->reversedBy);
+        $acc = $this->makeAccount();
+        $this->assertEquals('1000', $acc->getCode());
+        $this->assertEquals('asset', $acc->getType());
+        $this->assertEquals(0.0, $acc->getBalance());
+        $this->assertTrue($acc->isActive());
     }
 
-    // --- JournalLine entity ---
-
-    public function test_journal_line_debit_entry(): void
+    public function test_account_debit(): void
     {
-        $line = new JournalLine(id: 1, journalEntryId: 10, accountId: 5, debit: 100.0, credit: 0.0);
-
-        $this->assertSame(100.0, $line->debit);
-        $this->assertSame(0.0,   $line->credit);
+        $acc = $this->makeAccount(['balance' => 500.0]);
+        $acc->debit(200.0);
+        $this->assertEquals(700.0, $acc->getBalance());
     }
 
-    public function test_journal_line_credit_entry(): void
+    public function test_account_credit(): void
     {
-        $line = new JournalLine(id: 2, journalEntryId: 10, accountId: 6, debit: 0.0, credit: 50.0);
-
-        $this->assertSame(0.0,  $line->debit);
-        $this->assertSame(50.0, $line->credit);
+        $acc = $this->makeAccount(['balance' => 500.0]);
+        $acc->credit(100.0);
+        $this->assertEquals(400.0, $acc->getBalance());
     }
 
-    public function test_journal_line_throws_when_both_debit_and_credit_positive(): void
+    public function test_journal_entry_is_balanced(): void
     {
+        $je = $this->makeJournalEntry('draft', 100.0, 100.0);
+        $this->assertTrue($je->isBalanced());
+    }
+
+    public function test_journal_entry_is_not_balanced(): void
+    {
+        $je = $this->makeJournalEntry('draft', 100.0, 90.0);
+        $this->assertFalse($je->isBalanced());
+    }
+
+    public function test_journal_entry_post(): void
+    {
+        $je = $this->makeJournalEntry('draft', 100.0, 100.0);
+        $je->post();
+        $this->assertEquals('posted', $je->getStatus());
+        $this->assertNotNull($je->getPostedAt());
+    }
+
+    public function test_journal_entry_post_fails_if_not_draft(): void
+    {
+        $je = $this->makeJournalEntry('posted', 100.0, 100.0);
         $this->expectException(\DomainException::class);
-        new JournalLine(id: null, journalEntryId: 1, accountId: 1, debit: 100.0, credit: 50.0);
+        $je->post();
     }
 
-    public function test_journal_line_throws_when_debit_negative(): void
+    public function test_journal_entry_post_fails_if_unbalanced(): void
     {
+        $je = $this->makeJournalEntry('draft', 100.0, 90.0);
         $this->expectException(\DomainException::class);
-        new JournalLine(id: null, journalEntryId: 1, accountId: 1, debit: -10.0, credit: 0.0);
+        $je->post();
     }
 
-    public function test_journal_line_throws_when_credit_negative(): void
-    {
-        $this->expectException(\DomainException::class);
-        new JournalLine(id: null, journalEntryId: 1, accountId: 1, debit: 0.0, credit: -5.0);
-    }
+    // ──────────────────────────────────────────────────────────────────────
+    // Payment entity tests
+    // ──────────────────────────────────────────────────────────────────────
 
-    // --- Payment entity ---
-
-    public function test_payment_construction(): void
+    private function makePayment(string $status = 'pending'): Payment
     {
-        $payment = new Payment(
-            id: 1,
-            tenantId: 1,
-            referenceNumber: 'PAY-001',
-            status: PaymentStatus::COMPLETED,
-            method: PaymentMethod::CASH,
-            amount: 250.00,
+        return new Payment(
+            1, 1, 'purchase_order', 10, 500.0, 'USD',
+            'bank_transfer', $status, 'outbound',
+            'PAY-REF-001', 'Supplier payment', new \DateTimeImmutable(), null, null, null
         );
-
-        $this->assertSame(1,       $payment->id);
-        $this->assertSame(250.00,  $payment->amount);
-        $this->assertSame('cash',  $payment->method);
-        $this->assertSame('completed', $payment->status);
     }
 
-    public function test_payment_defaults(): void
+    public function test_payment_creation(): void
     {
-        $payment = new Payment(null, 2, 'PAY-002', PaymentStatus::PENDING, PaymentMethod::BANK_TRANSFER, 99.99);
-
-        $this->assertNull($payment->id);
-        $this->assertSame('USD', $payment->currency);
-        $this->assertNull($payment->notes);
-        $this->assertNull($payment->journalEntryId);
+        $p = $this->makePayment();
+        $this->assertEquals(500.0, $p->getAmount());
+        $this->assertEquals('USD', $p->getCurrency());
+        $this->assertEquals('bank_transfer', $p->getPaymentMethod());
+        $this->assertEquals('pending', $p->getStatus());
+        $this->assertTrue($p->isPending());
+        $this->assertEquals('outbound', $p->getDirection());
     }
 
-    // --- Refund entity ---
-
-    public function test_refund_construction(): void
+    public function test_payment_complete_transitions_status(): void
     {
-        $refund = new Refund(
-            id: 1,
-            tenantId: 1,
-            paymentId: 42,
-            amount: 50.00,
+        $p = $this->makePayment();
+        $p->complete();
+        $this->assertEquals('completed', $p->getStatus());
+        $this->assertFalse($p->isPending());
+    }
+
+    public function test_payment_fail_transitions_status(): void
+    {
+        $p = $this->makePayment();
+        $p->fail();
+        $this->assertEquals('failed', $p->getStatus());
+    }
+
+    public function test_payment_cancel_transitions_status(): void
+    {
+        $p = $this->makePayment();
+        $p->cancel();
+        $this->assertEquals('cancelled', $p->getStatus());
+    }
+
+    public function test_payment_inbound_direction(): void
+    {
+        $p = new Payment(
+            2, 1, 'sales_order', 5, 250.0, 'USD',
+            'cash', 'pending', 'inbound',
+            null, null, new \DateTimeImmutable(), null, null, null
         );
-
-        $this->assertSame(1,     $refund->id);
-        $this->assertSame(42,    $refund->paymentId);
-        $this->assertSame(50.00, $refund->amount);
+        $this->assertEquals('inbound', $p->getDirection());
     }
 
-    public function test_refund_defaults(): void
-    {
-        $refund = new Refund(null, 1, 10, 25.00);
+    // ──────────────────────────────────────────────────────────────────────
+    // Refund entity tests
+    // ──────────────────────────────────────────────────────────────────────
 
-        $this->assertNull($refund->id);
-        $this->assertSame('USD',     $refund->currency);
-        $this->assertSame('pending', $refund->status);
-        $this->assertNull($refund->reason);
-        $this->assertNull($refund->processedBy);
+    private function makeRefund(string $status = 'pending'): Refund
+    {
+        return new Refund(
+            1, 1, 100, 200.0, 'USD', $status,
+            'Defective goods', 'REF-001',
+            new \DateTimeImmutable(), null, null, null
+        );
+    }
+
+    public function test_refund_creation(): void
+    {
+        $r = $this->makeRefund();
+        $this->assertEquals(200.0, $r->getAmount());
+        $this->assertEquals('USD', $r->getCurrency());
+        $this->assertEquals(100, $r->getOriginalPaymentId());
+        $this->assertEquals('pending', $r->getStatus());
+        $this->assertEquals('Defective goods', $r->getReason());
+        $this->assertEquals('REF-001', $r->getReference());
+    }
+
+    public function test_refund_complete_transitions_status(): void
+    {
+        $r = $this->makeRefund();
+        $r->complete();
+        $this->assertEquals('completed', $r->getStatus());
+    }
+
+    public function test_refund_fail_transitions_status(): void
+    {
+        $r = $this->makeRefund();
+        $r->fail();
+        $this->assertEquals('failed', $r->getStatus());
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // JournalEntryLine entity tests
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function test_journal_entry_line_debit(): void
+    {
+        $line = new JournalEntryLine(1, 1, 100, 500.0, 0.0, 'Cash payment', null);
+        $this->assertEquals(500.0, $line->getDebitAmount());
+        $this->assertEquals(0.0, $line->getCreditAmount());
+        $this->assertEquals(100, $line->getAccountId());
+        $this->assertEquals('Cash payment', $line->getDescription());
+    }
+
+    public function test_journal_entry_line_credit(): void
+    {
+        $line = new JournalEntryLine(2, 1, 200, 0.0, 500.0, 'Accounts payable', 'INV-001');
+        $this->assertEquals(0.0, $line->getDebitAmount());
+        $this->assertEquals(500.0, $line->getCreditAmount());
+        $this->assertEquals('INV-001', $line->getReferenceLine());
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Account – additional tests
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function test_account_credit_decreases_balance(): void
+    {
+        // credit() always decreases balance in double-entry (debit = increase, credit = decrease)
+        $acc = $this->makeAccount(['type' => 'asset', 'balance' => 1000.0]);
+        $acc->credit(200.0);
+        $this->assertEquals(800.0, $acc->getBalance());
+    }
+
+    public function test_account_zero_balance(): void
+    {
+        $acc = $this->makeAccount(['balance' => 0.0]);
+        $this->assertEquals(0.0, $acc->getBalance());
+    }
+
+    public function test_account_inactive(): void
+    {
+        $acc = new Account(
+            2, 1, '2000', 'Accounts Payable', 'liability', 'current', null,
+            0.0, 'USD', false, null, null, null
+        );
+        $this->assertFalse($acc->isActive());
+        $this->assertEquals('liability', $acc->getType());
+    }
+
+    public function test_journal_entry_getters(): void
+    {
+        $je = $this->makeJournalEntry();
+        $this->assertEquals(1, $je->getId());
+        $this->assertEquals(1, $je->getTenantId());
+        $this->assertEquals('JE-001', $je->getEntryNumber());
+        $this->assertEquals('draft', $je->getStatus());
+        $this->assertEquals('Test Entry', $je->getDescription());
+        $this->assertEquals('USD', $je->getCurrency());
+        $this->assertIsArray($je->getLines());
+    }
+
+    public function test_journal_entry_is_balanced_with_float_tolerance(): void
+    {
+        // Small float differences within tolerance should be considered balanced
+        $je = new JournalEntry(
+            1, 1, 'JE-002', 'draft', 'Float test', 'USD',
+            100.00001, 100.0, null, null, [], null, null, null
+        );
+        $this->assertTrue($je->isBalanced());
     }
 }

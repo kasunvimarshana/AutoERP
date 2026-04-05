@@ -1,82 +1,98 @@
 <?php
+declare(strict_types=1);
 namespace Modules\User\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Hash;
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\User\Domain\Entities\User;
 use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 
-class EloquentUserRepository extends EloquentRepository implements UserRepositoryInterface
+class EloquentUserRepository implements UserRepositoryInterface
 {
-    public function __construct(UserModel $model) { parent::__construct($model); }
+    public function __construct(private readonly UserModel $model) {}
+
+    private function toEntity(UserModel $m): User
+    {
+        return new User(
+            $m->id,
+            $m->tenant_id,
+            $m->name,
+            $m->email,
+            $m->password,
+            $m->status,
+            $m->phone,
+            $m->avatar,
+            $m->preferences,
+            $m->email_verified_at,
+            $m->created_at,
+            $m->updated_at,
+        );
+    }
 
     public function findById(int $id): ?User
     {
-        $m = parent::findById($id);
+        $m = $this->model->newQuery()->find($id);
         return $m ? $this->toEntity($m) : null;
     }
 
     public function findByEmail(string $email): ?User
     {
-        $m = $this->model->where('email', $email)->first();
+        $m = $this->model->newQuery()->where('email', $email)->first();
         return $m ? $this->toEntity($m) : null;
     }
 
-    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
+    public function findByTenant(int $tenantId, int $perPage = 15, int $page = 1): LengthAwarePaginator
     {
-        return $this->model->where('tenant_id', $tenantId)->paginate($perPage);
+        return $this->model->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->paginate($perPage, ['*'], 'page', $page)
+            ->through(fn($m) => $this->toEntity($m));
     }
 
     public function create(array $data): User
     {
-        return $this->toEntity(parent::create($data));
-    }
-
-    public function update(User $user, array $data): User
-    {
-        $m = $this->model->findOrFail($user->id);
-        return $this->toEntity(parent::update($m, $data));
-    }
-
-    public function delete(User $user): bool
-    {
-        return parent::delete($this->model->findOrFail($user->id));
-    }
-
-    public function verifyPassword(User $user, string $password): bool
-    {
-        $m = $this->model->findOrFail($user->id);
-        return Hash::check($password, $m->password);
-    }
-
-    public function changePassword(User $user, string $newPassword): bool
-    {
-        $m = $this->model->findOrFail($user->id);
-        $m->password = Hash::make($newPassword);
-        return $m->save();
-    }
-
-    public function updateAvatar(User $user, string $avatarPath): User
-    {
-        $m = $this->model->findOrFail($user->id);
-        $m->avatar = $avatarPath;
-        $m->save();
+        $m = $this->model->newQuery()->create($data);
         return $this->toEntity($m);
     }
 
-    private function toEntity(object $m): User
+    public function update(int $id, array $data): ?User
     {
-        return new User(
-            id: $m->id,
-            tenantId: $m->tenant_id,
-            name: $m->name,
-            email: $m->email,
-            status: $m->status,
-            avatar: $m->avatar ?? null,
-            preferences: $m->preferences ?? null,
-            emailVerifiedAt: $m->email_verified_at?->toDateTimeImmutable(),
-        );
+        $m = $this->model->newQuery()->find($id);
+        if (!$m) {
+            return null;
+        }
+        $m->update($data);
+        return $this->toEntity($m->fresh());
+    }
+
+    public function delete(int $id): bool
+    {
+        $m = $this->model->newQuery()->find($id);
+        return $m ? (bool) $m->delete() : false;
+    }
+
+    public function verifyPassword(int $id, string $password): bool
+    {
+        $m = $this->model->newQuery()->find($id);
+        return $m ? Hash::check($password, $m->password) : false;
+    }
+
+    public function changePassword(int $id, string $hashedPassword): bool
+    {
+        $m = $this->model->newQuery()->find($id);
+        if (!$m) {
+            return false;
+        }
+        return (bool) $m->update(['password' => $hashedPassword]);
+    }
+
+    public function updateAvatar(int $id, ?string $avatarPath): bool
+    {
+        $m = $this->model->newQuery()->find($id);
+        if (!$m) {
+            return false;
+        }
+        return (bool) $m->update(['avatar' => $avatarPath]);
     }
 }

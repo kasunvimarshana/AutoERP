@@ -1,70 +1,56 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Pagination\LengthAwarePaginator;
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Modules\Inventory\Domain\Entities\InventoryCycleCount;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryCycleCountRepositoryInterface;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\InventoryCycleCountModel;
 
-class EloquentInventoryCycleCountRepository extends EloquentRepository implements InventoryCycleCountRepositoryInterface
+class EloquentInventoryCycleCountRepository implements InventoryCycleCountRepositoryInterface
 {
-    public function __construct(InventoryCycleCountModel $model)
+    public function __construct(private readonly InventoryCycleCountModel $model) {}
+
+    private function toEntity(InventoryCycleCountModel $m): InventoryCycleCount
     {
-        parent::__construct($model);
+        return new InventoryCycleCount($m->id, $m->tenant_id, $m->warehouse_id, $m->product_id,
+            $m->status, $m->counted_by, $m->started_at, $m->completed_at, $m->notes,
+            $m->created_at, $m->updated_at);
     }
 
     public function findById(int $id): ?InventoryCycleCount
     {
-        $model = parent::findById($id);
-        return $model ? $this->toEntity($model) : null;
+        $m = $this->model->newQuery()->find($id);
+        return $m ? $this->toEntity($m) : null;
     }
 
-    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
+    public function findByWarehouse(int $tenantId, int $warehouseId, int $perPage = 15, int $page = 1): LengthAwarePaginator
     {
-        $query = $this->model->where('tenant_id', $tenantId);
-        $this->applyFilters($query, $filters);
-        return $query->paginate($perPage);
+        return $this->model->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->where('warehouse_id', $warehouseId)
+            ->paginate($perPage, ['*'], 'page', $page);
     }
 
     public function create(array $data): InventoryCycleCount
     {
-        $model = parent::create($data);
-        return $this->toEntity($model);
+        $m = $this->model->newQuery()->create($data);
+        return $this->toEntity($m);
     }
 
-    public function update(InventoryCycleCount $count, array $data): InventoryCycleCount
+    public function update(int $id, array $data): ?InventoryCycleCount
     {
-        $model = $this->model->findOrFail($count->id);
-        $updated = parent::update($model, $data);
-        return $this->toEntity($updated);
+        $m = $this->model->newQuery()->find($id);
+        if (!$m) return null;
+        $m->update($data);
+        return $this->toEntity($m->fresh());
     }
 
-    public function save(InventoryCycleCount $count): InventoryCycleCount
+    public function delete(int $id): bool
     {
-        $model = $this->model->findOrFail($count->id);
-        $updated = parent::update($model, [
-            'status'       => $count->status,
-            'completed_at' => $count->completedAt,
-            'scheduled_at' => $count->scheduledAt,
-            'assigned_to'  => $count->assignedTo,
-            'reference'    => $count->reference,
-        ]);
-        return $this->toEntity($updated);
-    }
-
-    private function toEntity(object $model): InventoryCycleCount
-    {
-        return new InventoryCycleCount(
-            id: $model->id,
-            tenantId: $model->tenant_id,
-            warehouseId: $model->warehouse_id,
-            method: $model->method,
-            status: $model->status,
-            reference: $model->reference,
-            assignedTo: $model->assigned_to,
-            scheduledAt: $model->scheduled_at ? new \DateTimeImmutable($model->scheduled_at) : null,
-            completedAt: $model->completed_at ? new \DateTimeImmutable($model->completed_at) : null,
-        );
+        $m = $this->model->newQuery()->find($id);
+        return $m ? (bool)$m->delete() : false;
     }
 }

@@ -1,77 +1,74 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Modules\Inventory\Domain\Entities;
 
-use Modules\Core\Domain\Entities\BaseEntity;
-
-class InventoryLevel extends BaseEntity
+class InventoryLevel
 {
-    private const FLOAT_TOLERANCE = 0.0001;
+    public const FLOAT_TOLERANCE = 0.0001;
+
     public function __construct(
-        ?int $id,
-        public readonly int $tenantId,
-        public readonly int $productId,
-        public readonly int $warehouseId,
-        public readonly int $locationId,
-        public float $quantityOnHand,
-        public float $quantityReserved,
-        public float $quantityAvailable,
-        public float $quantityOnOrder,
-        public readonly ?int $batchId = null,
-        public readonly ?int $lotId = null,
-        public readonly ?int $serialId = null,
-        public readonly ?string $stockStatus = 'available',
-    ) {
-        parent::__construct($id);
+        private ?int $id,
+        private int $tenantId,
+        private int $productId,
+        private int $warehouseId,
+        private ?int $locationId,
+        private float $quantityOnHand,
+        private float $quantityReserved,
+        private float $quantityInTransit,
+        private string $valuationMethod,  // fifo|lifo|average|specific
+        private ?\DateTimeInterface $createdAt,
+        private ?\DateTimeInterface $updatedAt,
+    ) {}
+
+    public function getId(): ?int { return $this->id; }
+    public function getTenantId(): int { return $this->tenantId; }
+    public function getProductId(): int { return $this->productId; }
+    public function getWarehouseId(): int { return $this->warehouseId; }
+    public function getLocationId(): ?int { return $this->locationId; }
+    public function getQuantityOnHand(): float { return $this->quantityOnHand; }
+    public function getQuantityReserved(): float { return $this->quantityReserved; }
+    public function getQuantityInTransit(): float { return $this->quantityInTransit; }
+    public function getAvailableQuantity(): float { return $this->quantityOnHand - $this->quantityReserved; }
+    public function getValuationMethod(): string { return $this->valuationMethod; }
+    public function getCreatedAt(): ?\DateTimeInterface { return $this->createdAt; }
+    public function getUpdatedAt(): ?\DateTimeInterface { return $this->updatedAt; }
+
+    public function receive(float $quantity): void
+    {
+        if ($quantity <= 0) throw new \InvalidArgumentException("Receive quantity must be positive.");
+        $this->quantityOnHand += $quantity;
     }
 
-    public function reserve(float $qty): void
+    public function issue(float $quantity): void
     {
-        if ($qty > $this->quantityAvailable) {
-            throw new \DomainException("Insufficient available stock to reserve.");
+        if ($quantity <= 0) throw new \InvalidArgumentException("Issue quantity must be positive.");
+        if ($this->getAvailableQuantity() < $quantity - self::FLOAT_TOLERANCE) {
+            throw new \DomainException("Insufficient stock. Available: {$this->getAvailableQuantity()}, Requested: {$quantity}");
         }
-        $this->quantityReserved += $qty;
-        $this->quantityAvailable -= $qty;
+        $this->quantityOnHand -= $quantity;
     }
 
-    public function release(float $qty): void
+    public function reserve(float $quantity): void
     {
-        $qty = min($qty, $this->quantityReserved);
-        $this->quantityReserved -= $qty;
-        $this->quantityAvailable += $qty;
-    }
-
-    public function adjust(float $newQtyOnHand): void
-    {
-        $this->quantityOnHand    = $newQtyOnHand;
-        $this->quantityAvailable = $newQtyOnHand - $this->quantityReserved;
-    }
-
-    /**
-     * Confirm physical issuance of previously-reserved stock.
-     * Reduces both quantityOnHand and quantityReserved by $qty.
-     *
-     * @throws \DomainException if $qty exceeds quantityReserved
-     */
-    public function issue(float $qty): void
-    {
-        if ($qty > $this->quantityReserved + self::FLOAT_TOLERANCE) {
-            throw new \DomainException(
-                "Cannot issue {$qty} units: only {$this->quantityReserved} are reserved."
-            );
+        if ($quantity <= 0) throw new \InvalidArgumentException("Reserve quantity must be positive.");
+        if ($this->getAvailableQuantity() < $quantity - self::FLOAT_TOLERANCE) {
+            throw new \DomainException("Insufficient stock to reserve. Available: {$this->getAvailableQuantity()}, Requested: {$quantity}");
         }
-
-        $qty = min($qty, $this->quantityReserved);
-        $this->quantityReserved -= $qty;
-        $this->quantityOnHand   -= $qty;
-        // quantityAvailable was already reduced during reserve(); no change here.
+        $this->quantityReserved += $quantity;
     }
 
-    /**
-     * Receive stock: increase on-hand and available quantities by $qty.
-     */
-    public function receive(float $qty): void
+    public function releaseReservation(float $quantity): void
     {
-        $this->quantityOnHand    += $qty;
-        $this->quantityAvailable += $qty;
+        if ($quantity <= 0) throw new \InvalidArgumentException("Release quantity must be positive.");
+        $this->quantityReserved = max(0.0, $this->quantityReserved - $quantity);
+    }
+
+    public function adjust(float $newQuantity): float
+    {
+        $diff = $newQuantity - $this->quantityOnHand;
+        $this->quantityOnHand = $newQuantity;
+        return $diff;
     }
 }

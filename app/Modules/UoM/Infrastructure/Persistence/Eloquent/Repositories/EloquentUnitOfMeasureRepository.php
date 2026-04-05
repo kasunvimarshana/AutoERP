@@ -1,71 +1,28 @@
 <?php
+declare(strict_types=1);
 namespace Modules\UoM\Infrastructure\Persistence\Eloquent\Repositories;
-
-use Illuminate\Pagination\LengthAwarePaginator;
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Modules\UoM\Domain\Entities\UnitOfMeasure;
 use Modules\UoM\Domain\RepositoryInterfaces\UnitOfMeasureRepositoryInterface;
 use Modules\UoM\Infrastructure\Persistence\Eloquent\Models\UnitOfMeasureModel;
-
-class EloquentUnitOfMeasureRepository extends EloquentRepository implements UnitOfMeasureRepositoryInterface
-{
-    public function __construct(UnitOfMeasureModel $model)
-    {
-        parent::__construct($model);
+class EloquentUnitOfMeasureRepository implements UnitOfMeasureRepositoryInterface {
+    public function __construct(private readonly UnitOfMeasureModel $model) {}
+    private function toEntity(UnitOfMeasureModel $m): UnitOfMeasure {
+        return new UnitOfMeasure($m->id,$m->tenant_id,$m->category_id,$m->name,$m->symbol,
+            (bool)$m->is_base,(float)$m->conversion_factor,$m->type,(bool)$m->is_active,$m->created_at,$m->updated_at);
     }
-
-    public function findById(int $id): ?UnitOfMeasure
-    {
-        $model = parent::findById($id);
-        return $model ? $this->toEntity($model) : null;
+    public function findById(int $id): ?UnitOfMeasure { $m=$this->model->newQuery()->find($id); return $m?$this->toEntity($m):null; }
+    public function findByCategory(int $categoryId): array {
+        return $this->model->newQuery()->where('category_id',$categoryId)->get()->map(fn($m)=>$this->toEntity($m))->all();
     }
-
-    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
-    {
-        $query = $this->model->where('tenant_id', $tenantId);
-        $this->applyFilters($query, $filters);
-        $paginator = $query->paginate($perPage);
-        $paginator->getCollection()->transform(fn($m) => $this->toEntity($m));
-        return $paginator;
+    public function findByTenant(int $tenantId, int $perPage = 15, int $page = 1): LengthAwarePaginator {
+        return $this->model->newQuery()->where('tenant_id',$tenantId)->paginate($perPage,['*'],'page',$page)->through(fn($m)=>$this->toEntity($m));
     }
-
-    public function findByCategory(int $categoryId): array
-    {
-        return $this->model->where('category_id', $categoryId)->get()
-            ->map(fn($m) => $this->toEntity($m))
-            ->all();
+    public function findBaseUnit(int $categoryId): ?UnitOfMeasure {
+        $m=$this->model->newQuery()->where('category_id',$categoryId)->where('is_base',true)->first();
+        return $m?$this->toEntity($m):null;
     }
-
-    public function create(array $data): UnitOfMeasure
-    {
-        $model = parent::create($data);
-        return $this->toEntity($model);
-    }
-
-    public function update(UnitOfMeasure $uom, array $data): UnitOfMeasure
-    {
-        $model = $this->model->findOrFail($uom->id);
-        $updated = parent::update($model, $data);
-        return $this->toEntity($updated);
-    }
-
-    public function delete(UnitOfMeasure $uom): bool
-    {
-        $model = $this->model->findOrFail($uom->id);
-        return parent::delete($model);
-    }
-
-    private function toEntity(UnitOfMeasureModel $model): UnitOfMeasure
-    {
-        return new UnitOfMeasure(
-            id: $model->id,
-            tenantId: $model->tenant_id,
-            categoryId: $model->category_id,
-            name: $model->name,
-            symbol: $model->symbol,
-            conversionFactor: (float) $model->conversion_factor,
-            isBase: (bool) $model->is_base,
-            isActive: (bool) $model->is_active,
-        );
-    }
+    public function create(array $data): UnitOfMeasure { return $this->toEntity($this->model->newQuery()->create($data)); }
+    public function update(int $id, array $data): ?UnitOfMeasure { $m=$this->model->newQuery()->find($id); if(!$m)return null; $m->update($data); return $this->toEntity($m->fresh()); }
+    public function delete(int $id): bool { $m=$this->model->newQuery()->find($id); return $m?(bool)$m->delete():false; }
 }

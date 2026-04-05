@@ -1,60 +1,44 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Modules\Accounting\Application\Services;
 
-use Illuminate\Contracts\Events\Dispatcher;
 use Modules\Accounting\Application\Contracts\CreateJournalEntryServiceInterface;
-use Modules\Accounting\Application\DTOs\JournalEntryData;
+use Modules\Accounting\Application\DTOs\CreateJournalEntryData;
 use Modules\Accounting\Domain\Entities\JournalEntry;
-use Modules\Accounting\Domain\Events\JournalEntryCreated;
-use Modules\Accounting\Domain\Repositories\JournalEntryRepositoryInterface;
-use Modules\Accounting\Domain\ValueObjects\JournalEntryStatus;
+use Modules\Accounting\Domain\Entities\JournalEntryLine;
+use Modules\Accounting\Domain\RepositoryInterfaces\JournalEntryRepositoryInterface;
 
 class CreateJournalEntryService implements CreateJournalEntryServiceInterface
 {
-    public function __construct(
-        private readonly JournalEntryRepositoryInterface $journalEntryRepository,
-        private readonly Dispatcher $dispatcher,
-    ) {}
+    public function __construct(private readonly JournalEntryRepositoryInterface $repo) {}
 
-    public function execute(JournalEntryData $data): JournalEntry
+    public function execute(CreateJournalEntryData $data): JournalEntry
     {
-        $totalDebits  = 0.0;
-        $totalCredits = 0.0;
+        $lines = array_map(fn($l) => new JournalEntryLine(
+            null,
+            null,
+            (int) $l['account_id'],
+            (float) ($l['debit'] ?? 0),
+            (float) ($l['credit'] ?? 0),
+            $l['description'] ?? null,
+            $l['reference_line'] ?? null,
+        ), $data->lines);
 
-        foreach ($data->lines as $line) {
-            $totalDebits  += (float) ($line['debit']  ?? 0);
-            $totalCredits += (float) ($line['credit'] ?? 0);
+        // Validate balance before persisting
+        $totalDebit  = array_sum(array_map(fn($l) => $l->getDebitAmount(), $lines));
+        $totalCredit = array_sum(array_map(fn($l) => $l->getCreditAmount(), $lines));
+        if (abs($totalDebit - $totalCredit) > 0.0001) {
+            throw new \Modules\Accounting\Domain\Exceptions\JournalEntryImbalancedException($totalDebit, $totalCredit);
         }
 
-        if (round($totalDebits, 4) !== round($totalCredits, 4)) {
-            throw new \DomainException(
-                "Journal entry is not balanced: debits ({$totalDebits}) != credits ({$totalCredits})"
-            );
-        }
-
-        $entry = $this->journalEntryRepository->create([
-            'tenant_id'        => $data->tenantId,
-            'reference_number' => $data->referenceNumber,
-            'status'           => JournalEntryStatus::DRAFT,
-            'entry_date'       => $data->entryDate,
+        return $this->repo->create([
+            'tenant_id'        => $data->tenant_id,
+            'reference'        => $data->reference,
             'description'      => $data->description,
-            'source_type'      => $data->sourceType,
-            'source_id'        => $data->sourceId,
-        ]);
-
-        foreach ($data->lines as $line) {
-            $this->journalEntryRepository->addLine($entry->id, [
-                'journal_entry_id' => $entry->id,
-                'account_id'       => $line['account_id'],
-                'debit'            => $line['debit']       ?? 0,
-                'credit'           => $line['credit']      ?? 0,
-                'currency'         => $line['currency']    ?? 'USD',
-                'description'      => $line['description'] ?? null,
-            ]);
-        }
-
-        $this->dispatcher->dispatch(new JournalEntryCreated($entry->tenantId, $entry->id));
-
-        return $entry;
+            'transaction_date' => $data->transaction_date,
+            'status'           => 'draft',
+        ], $lines);
     }
 }

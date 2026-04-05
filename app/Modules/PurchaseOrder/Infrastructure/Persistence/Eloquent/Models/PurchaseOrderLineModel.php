@@ -1,15 +1,10 @@
 <?php
+declare(strict_types=1);
 namespace Modules\PurchaseOrder\Infrastructure\Persistence\Eloquent\Models;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
-
-class PurchaseOrderLineModel extends BaseModel
-{
+use Illuminate\Database\Eloquent\Model;
+class PurchaseOrderLineModel extends Model {
     protected $table = 'purchase_order_lines';
-
-    protected $casts = [
-        'ordered_qty'  => 'float',
-        'received_qty' => 'float',
-        'unit_cost'    => 'float',
-        'line_total'   => 'float',
-    ];
+    public $timestamps = false;
+    protected $fillable = ['purchase_order_id','product_id','quantity','unit_cost','total_cost','notes'];
+    protected $casts = ['id'=>'int','purchase_order_id'=>'int','product_id'=>'int','quantity'=>'float','unit_cost'=>'float','total_cost'=>'float'];
 }

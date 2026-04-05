@@ -1,44 +1,31 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Modules\Inventory\Application\Services;
 
-use Illuminate\Support\Facades\Event;
 use Modules\Inventory\Application\Contracts\AdjustInventoryServiceInterface;
 use Modules\Inventory\Application\DTOs\AdjustInventoryData;
 use Modules\Inventory\Domain\Entities\InventoryLevel;
-use Modules\Inventory\Domain\Events\StockAdjusted;
+use Modules\Inventory\Domain\Events\InventoryAdjusted;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryLevelRepositoryInterface;
 
 class AdjustInventoryService implements AdjustInventoryServiceInterface
 {
-    public function __construct(private readonly InventoryLevelRepositoryInterface $repository) {}
+    public function __construct(private readonly InventoryLevelRepositoryInterface $levelRepo) {}
 
     public function execute(AdjustInventoryData $data): InventoryLevel
     {
-        $level = $this->repository->findByProductWarehouseLocation(
-            $data->productId,
-            $data->warehouseId,
-            $data->locationId,
-            $data->batchId,
+        $level = $this->levelRepo->upsert(
+            $data->tenant_id, $data->product_id, $data->warehouse_id, $data->location_id, 'fifo'
         );
 
-        if (!$level) {
-            $level = $this->repository->create([
-                'tenant_id'          => $data->tenantId,
-                'product_id'         => $data->productId,
-                'warehouse_id'       => $data->warehouseId,
-                'location_id'        => $data->locationId,
-                'quantity_on_hand'   => $data->newQuantity,
-                'quantity_reserved'  => 0,
-                'quantity_available' => $data->newQuantity,
-                'quantity_on_order'  => 0,
-                'batch_id'           => $data->batchId,
-            ]);
-        } else {
-            $level->adjust($data->newQuantity);
-            $level = $this->repository->save($level);
-        }
+        $diff = $level->adjust($data->new_quantity);
+        $this->levelRepo->update($level->getId(), [
+            'quantity_on_hand' => $level->getQuantityOnHand(),
+        ]);
 
-        Event::dispatch(new StockAdjusted($level->tenantId, $level->id));
+        event(new InventoryAdjusted($data->tenant_id, $data->product_id, $data->warehouse_id, $diff));
 
         return $level;
     }

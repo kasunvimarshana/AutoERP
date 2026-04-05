@@ -1,498 +1,297 @@
 <?php
-
+declare(strict_types=1);
 namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
-use Modules\Inventory\Domain\ValueObjects\ValuationMethod;
-use Modules\Inventory\Domain\ValueObjects\ManagementMethod;
-use Modules\Inventory\Domain\ValueObjects\StockRotationStrategy;
-use Modules\Inventory\Domain\ValueObjects\AllocationAlgorithm;
-use Modules\Inventory\Domain\ValueObjects\CycleCountMethod;
+use Modules\Inventory\Domain\Entities\InventoryBatch;
 use Modules\Inventory\Domain\Entities\InventoryLevel;
 use Modules\Inventory\Domain\Entities\InventoryValuationLayer;
 
 class InventoryModuleTest extends TestCase
 {
-    // --------------- ValuationMethod VO ---------------
-
-    public function test_valuation_method_fifo(): void
+    private function makeLevel(float $onHand = 100.0, float $reserved = 0.0): InventoryLevel
     {
-        $vo = ValuationMethod::from(ValuationMethod::FIFO);
-        $this->assertSame('fifo', (string) $vo);
+        return new InventoryLevel(1, 1, 1, 1, null, $onHand, $reserved, 0.0, 'fifo', null, null);
+    }
+    private function makeValuationLayer(float $qty = 50.0, float $cost = 10.0): InventoryValuationLayer
+    {
+        return new InventoryValuationLayer(1, 1, 1, 1, $qty, $qty, $cost, new \DateTimeImmutable(), null, null, null, null);
     }
 
-    public function test_valuation_method_lifo(): void
+    public function test_inventory_level_creation(): void
     {
-        $vo = ValuationMethod::from(ValuationMethod::LIFO);
-        $this->assertSame('lifo', (string) $vo);
+        $level = $this->makeLevel(100.0, 20.0);
+        $this->assertEquals(100.0, $level->getQuantityOnHand());
+        $this->assertEquals(20.0, $level->getQuantityReserved());
+        $this->assertEquals(80.0, $level->getAvailableQuantity());
+        $this->assertEquals('fifo', $level->getValuationMethod());
     }
 
-    public function test_valuation_method_average(): void
+    public function test_receive_increases_on_hand(): void
     {
-        $vo = ValuationMethod::from(ValuationMethod::AVERAGE);
-        $this->assertSame('average', (string) $vo);
+        $level = $this->makeLevel(100.0);
+        $level->receive(50.0);
+        $this->assertEquals(150.0, $level->getQuantityOnHand());
     }
 
-    public function test_valuation_method_specific(): void
+    public function test_receive_rejects_negative_quantity(): void
     {
-        $vo = ValuationMethod::from(ValuationMethod::SPECIFIC);
-        $this->assertSame('specific', (string) $vo);
-    }
-
-    public function test_valuation_method_standard(): void
-    {
-        $vo = ValuationMethod::from(ValuationMethod::STANDARD);
-        $this->assertSame('standard', (string) $vo);
-    }
-
-    public function test_valuation_method_invalid_throws(): void
-    {
+        $level = $this->makeLevel(100.0);
         $this->expectException(\InvalidArgumentException::class);
-        ValuationMethod::from('bogus');
+        $level->receive(-1.0);
     }
 
-    public function test_valuation_method_valid_returns_array(): void
+    public function test_issue_decreases_on_hand(): void
     {
-        $this->assertIsArray(ValuationMethod::valid());
-        $this->assertContains('fifo', ValuationMethod::valid());
+        $level = $this->makeLevel(100.0, 0.0);
+        $level->issue(30.0);
+        $this->assertEquals(70.0, $level->getQuantityOnHand());
     }
 
-    // --------------- ManagementMethod VO ---------------
-
-    public function test_management_method_standard(): void
+    public function test_issue_fails_when_insufficient(): void
     {
-        $vo = ManagementMethod::from(ManagementMethod::STANDARD);
-        $this->assertSame('standard', (string) $vo);
-    }
-
-    public function test_management_method_batch(): void
-    {
-        $vo = ManagementMethod::from(ManagementMethod::BATCH);
-        $this->assertSame('batch', (string) $vo);
-    }
-
-    public function test_management_method_lot(): void
-    {
-        $vo = ManagementMethod::from(ManagementMethod::LOT);
-        $this->assertSame('lot', (string) $vo);
-    }
-
-    public function test_management_method_serial(): void
-    {
-        $vo = ManagementMethod::from(ManagementMethod::SERIAL);
-        $this->assertSame('serial', (string) $vo);
-    }
-
-    public function test_management_method_batch_and_serial(): void
-    {
-        $vo = ManagementMethod::from(ManagementMethod::BATCH_AND_SERIAL);
-        $this->assertSame('batch_and_serial', (string) $vo);
-    }
-
-    public function test_management_method_invalid_throws(): void
-    {
-        $this->expectException(\InvalidArgumentException::class);
-        ManagementMethod::from('unknown');
-    }
-
-    // --------------- StockRotationStrategy VO ---------------
-
-    public function test_stock_rotation_fifo(): void
-    {
-        $vo = StockRotationStrategy::from(StockRotationStrategy::FIFO);
-        $this->assertSame('fifo', (string) $vo);
-    }
-
-    public function test_stock_rotation_lifo(): void
-    {
-        $vo = StockRotationStrategy::from(StockRotationStrategy::LIFO);
-        $this->assertSame('lifo', (string) $vo);
-    }
-
-    public function test_stock_rotation_fefo(): void
-    {
-        $vo = StockRotationStrategy::from(StockRotationStrategy::FEFO);
-        $this->assertSame('fefo', (string) $vo);
-    }
-
-    public function test_stock_rotation_lefo(): void
-    {
-        $vo = StockRotationStrategy::from(StockRotationStrategy::LEFO);
-        $this->assertSame('lefo', (string) $vo);
-    }
-
-    public function test_stock_rotation_invalid_throws(): void
-    {
-        $this->expectException(\InvalidArgumentException::class);
-        StockRotationStrategy::from('invalid');
-    }
-
-    // --------------- AllocationAlgorithm VO ---------------
-
-    public function test_allocation_algorithm_fifo(): void
-    {
-        $vo = AllocationAlgorithm::from(AllocationAlgorithm::FIFO);
-        $this->assertSame('fifo', (string) $vo);
-    }
-
-    public function test_allocation_algorithm_nearest(): void
-    {
-        $vo = AllocationAlgorithm::from(AllocationAlgorithm::NEAREST);
-        $this->assertSame('nearest', (string) $vo);
-    }
-
-    public function test_allocation_algorithm_zone_based(): void
-    {
-        $vo = AllocationAlgorithm::from(AllocationAlgorithm::ZONE_BASED);
-        $this->assertSame('zone_based', (string) $vo);
-    }
-
-    public function test_allocation_algorithm_fefo(): void
-    {
-        $vo = AllocationAlgorithm::from(AllocationAlgorithm::FEFO);
-        $this->assertSame('fefo', (string) $vo);
-    }
-
-    public function test_allocation_algorithm_invalid_throws(): void
-    {
-        $this->expectException(\InvalidArgumentException::class);
-        AllocationAlgorithm::from('wrong');
-    }
-
-    // --------------- CycleCountMethod VO ---------------
-
-    public function test_cycle_count_full(): void
-    {
-        $vo = CycleCountMethod::from(CycleCountMethod::FULL);
-        $this->assertSame('full', (string) $vo);
-    }
-
-    public function test_cycle_count_partial(): void
-    {
-        $vo = CycleCountMethod::from(CycleCountMethod::PARTIAL);
-        $this->assertSame('partial', (string) $vo);
-    }
-
-    public function test_cycle_count_abc(): void
-    {
-        $vo = CycleCountMethod::from(CycleCountMethod::ABC);
-        $this->assertSame('abc', (string) $vo);
-    }
-
-    public function test_cycle_count_random(): void
-    {
-        $vo = CycleCountMethod::from(CycleCountMethod::RANDOM);
-        $this->assertSame('random', (string) $vo);
-    }
-
-    public function test_cycle_count_periodic(): void
-    {
-        $vo = CycleCountMethod::from(CycleCountMethod::PERIODIC);
-        $this->assertSame('periodic', (string) $vo);
-    }
-
-    public function test_cycle_count_invalid_throws(): void
-    {
-        $this->expectException(\InvalidArgumentException::class);
-        CycleCountMethod::from('nope');
-    }
-
-    // --------------- InventoryLevel entity ---------------
-
-    private function makeLevel(float $onHand = 100.0, float $reserved = 20.0, float $available = 80.0): InventoryLevel
-    {
-        return new InventoryLevel(
-            id: 1,
-            tenantId: 1,
-            productId: 10,
-            warehouseId: 5,
-            locationId: 3,
-            quantityOnHand: $onHand,
-            quantityReserved: $reserved,
-            quantityAvailable: $available,
-            quantityOnOrder: 0.0,
-        );
-    }
-
-    public function test_inventory_level_reserve_reduces_available(): void
-    {
-        $level = $this->makeLevel();
-        $level->reserve(10.0);
-        $this->assertSame(70.0, $level->quantityAvailable);
-    }
-
-    public function test_inventory_level_reserve_increases_reserved(): void
-    {
-        $level = $this->makeLevel();
-        $level->reserve(10.0);
-        $this->assertSame(30.0, $level->quantityReserved);
-    }
-
-    public function test_inventory_level_reserve_insufficient_stock_throws(): void
-    {
-        $level = $this->makeLevel();
+        $level = $this->makeLevel(50.0, 40.0);
         $this->expectException(\DomainException::class);
-        $level->reserve(200.0);
+        $level->issue(20.0); // available = 10, requested = 20
     }
 
-    public function test_inventory_level_release_reduces_reserved(): void
+    public function test_reserve_increases_reserved(): void
     {
-        $level = $this->makeLevel();
-        $level->release(10.0);
-        $this->assertSame(10.0, $level->quantityReserved);
+        $level = $this->makeLevel(100.0, 0.0);
+        $level->reserve(30.0);
+        $this->assertEquals(30.0, $level->getQuantityReserved());
+        $this->assertEquals(70.0, $level->getAvailableQuantity());
     }
 
-    public function test_inventory_level_release_increases_available(): void
+    public function test_reserve_fails_when_insufficient(): void
     {
-        $level = $this->makeLevel();
-        $level->release(10.0);
-        $this->assertSame(90.0, $level->quantityAvailable);
+        $level = $this->makeLevel(50.0, 40.0);
+        $this->expectException(\DomainException::class);
+        $level->reserve(20.0); // available = 10, requested = 20
     }
 
-    public function test_inventory_level_release_caps_at_reserved(): void
+    public function test_valuation_layer_remaining_quantity(): void
     {
-        $level = $this->makeLevel();
-        $level->release(999.0);
-        $this->assertSame(0.0, $level->quantityReserved);
-        $this->assertSame(100.0, $level->quantityAvailable);
-    }
-
-    public function test_inventory_level_adjust_updates_on_hand(): void
-    {
-        $level = $this->makeLevel();
-        $level->adjust(150.0);
-        $this->assertSame(150.0, $level->quantityOnHand);
-    }
-
-    public function test_inventory_level_adjust_recalculates_available(): void
-    {
-        $level = $this->makeLevel();
-        $level->adjust(50.0);
-        $this->assertSame(30.0, $level->quantityAvailable);
-    }
-
-    public function test_inventory_level_id_is_stored(): void
-    {
-        $level = $this->makeLevel();
-        $this->assertSame(1, $level->id);
-    }
-
-    public function test_inventory_level_construction_defaults(): void
-    {
-        $level = new InventoryLevel(
-            id: null,
-            tenantId: 2,
-            productId: 99,
-            warehouseId: 1,
-            locationId: 1,
-            quantityOnHand: 0.0,
-            quantityReserved: 0.0,
-            quantityAvailable: 0.0,
-            quantityOnOrder: 0.0,
-        );
-        $this->assertNull($level->id);
-        $this->assertSame('available', $level->stockStatus);
-    }
-
-    // --------------- InventoryValuationLayer entity ---------------
-
-    private function makeLayer(
-        float $quantity = 100.0,
-        float $unitCost = 10.0,
-        ?int $id = 1
-    ): InventoryValuationLayer {
-        return new InventoryValuationLayer(
-            id: $id,
-            tenantId: 1,
-            productId: 10,
-            warehouseId: 5,
-            valuationMethod: ValuationMethod::FIFO,
-            quantity: $quantity,
-            remainingQuantity: $quantity,
-            unitCost: $unitCost,
-            totalCost: $quantity * $unitCost,
-        );
-    }
-
-    public function test_valuation_layer_construction_stores_id(): void
-    {
-        $layer = $this->makeLayer();
-        $this->assertSame(1, $layer->id);
-    }
-
-    public function test_valuation_layer_construction_stores_remaining_quantity(): void
-    {
-        $layer = $this->makeLayer(50.0);
-        $this->assertSame(50.0, $layer->remainingQuantity);
-    }
-
-    public function test_valuation_layer_has_stock_returns_true_when_remaining(): void
-    {
-        $layer = $this->makeLayer(10.0);
+        $layer = $this->makeValuationLayer(50.0, 10.0);
+        $this->assertEquals(50.0, $layer->getQuantityRemaining());
         $this->assertTrue($layer->hasStock());
     }
 
-    public function test_valuation_layer_has_stock_returns_false_when_empty(): void
+    public function test_valuation_layer_consume(): void
     {
-        $layer = $this->makeLayer(0.0);
+        $layer = $this->makeValuationLayer(50.0, 10.0);
+        $layer->consume(20.0);
+        $this->assertEquals(30.0, $layer->getQuantityRemaining());
+        $this->assertTrue($layer->hasStock());
+    }
+
+    public function test_valuation_layer_consume_all(): void
+    {
+        $layer = $this->makeValuationLayer(50.0, 10.0);
+        $layer->consume(50.0);
+        $this->assertEquals(0.0, $layer->getQuantityRemaining());
         $this->assertFalse($layer->hasStock());
     }
 
-    public function test_valuation_layer_consume_reduces_remaining_quantity(): void
+    public function test_float_tolerance(): void
     {
-        $layer = $this->makeLayer(100.0, 5.0);
-        $layer->consume(30.0);
-        $this->assertSame(70.0, $layer->remainingQuantity);
+        $this->assertEquals(0.0001, InventoryLevel::FLOAT_TOLERANCE);
     }
 
-    public function test_valuation_layer_consume_returns_correct_cost(): void
+    // ──────────────────────────────────────────────────────────────────────
+    // InventoryLevel – release reservation
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function test_release_reservation_decreases_reserved(): void
     {
-        $layer = $this->makeLayer(100.0, 5.0);
-        $cost = $layer->consume(20.0);
-        $this->assertSame(100.0, $cost); // 20 * 5
+        $level = $this->makeLevel(100.0, 50.0);
+        $level->releaseReservation(20.0);
+        $this->assertEquals(30.0, $level->getQuantityReserved());
+        $this->assertEquals(70.0, $level->getAvailableQuantity());
     }
 
-    public function test_valuation_layer_consume_partial_layer(): void
+    public function test_release_reservation_clamps_to_zero(): void
     {
-        $layer = $this->makeLayer(10.0, 8.0);
-        $cost = $layer->consume(5.0);
-        $this->assertSame(40.0, $cost);
-        $this->assertSame(5.0, $layer->remainingQuantity);
+        $level = $this->makeLevel(100.0, 10.0);
+        $level->releaseReservation(100.0);
+        $this->assertEquals(0.0, $level->getQuantityReserved());
     }
 
-    public function test_valuation_layer_consume_clamps_to_available(): void
+    public function test_release_reservation_rejects_non_positive_quantity(): void
     {
-        $layer = $this->makeLayer(10.0, 4.0);
-        // Request more than available; should consume only what is available
-        $cost = $layer->consume(999.0);
-        $this->assertSame(40.0, $cost); // 10 * 4
-        $this->assertSame(0.0, $layer->remainingQuantity);
+        $level = $this->makeLevel(100.0, 50.0);
+        $this->expectException(\InvalidArgumentException::class);
+        $level->releaseReservation(0.0);
     }
 
-    public function test_valuation_layer_consume_zero_remaining_returns_zero(): void
+    public function test_release_reservation_rejects_negative_quantity(): void
     {
-        $layer = $this->makeLayer(0.0, 10.0);
-        $cost = $layer->consume(5.0);
-        $this->assertSame(0.0, $cost);
+        $level = $this->makeLevel(100.0, 50.0);
+        $this->expectException(\InvalidArgumentException::class);
+        $level->releaseReservation(-5.0);
     }
 
-    public function test_valuation_layer_consume_updates_total_cost(): void
+    // ──────────────────────────────────────────────────────────────────────
+    // InventoryLevel – adjust
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function test_adjust_sets_exact_quantity_and_returns_diff(): void
     {
-        $layer = $this->makeLayer(100.0, 3.0);
-        $layer->consume(40.0);
-        // remaining = 60, total_cost = 60 * 3 = 180
-        $this->assertSame(180.0, $layer->totalCost);
+        $level = $this->makeLevel(80.0);
+        $diff  = $level->adjust(100.0);
+
+        $this->assertEquals(100.0, $level->getQuantityOnHand());
+        $this->assertEqualsWithDelta(20.0, $diff, 0.001);
     }
 
-    public function test_valuation_layer_sequential_consume(): void
+    public function test_adjust_downward_returns_negative_diff(): void
     {
-        $layer = $this->makeLayer(100.0, 2.0);
-        $layer->consume(30.0);
-        $layer->consume(50.0);
-        $this->assertSame(20.0, $layer->remainingQuantity);
+        $level = $this->makeLevel(80.0);
+        $diff  = $level->adjust(60.0);
+
+        $this->assertEquals(60.0, $level->getQuantityOnHand());
+        $this->assertEqualsWithDelta(-20.0, $diff, 0.001);
     }
 
-    public function test_valuation_layer_optional_fields_nullable(): void
+    public function test_adjust_to_zero_is_allowed(): void
     {
-        $layer = new InventoryValuationLayer(
-            id: null,
-            tenantId: 1,
-            productId: 1,
-            warehouseId: 1,
-            valuationMethod: ValuationMethod::AVERAGE,
-            quantity: 10.0,
-            remainingQuantity: 10.0,
-            unitCost: 1.0,
-            totalCost: 10.0,
+        $level = $this->makeLevel(50.0);
+        $diff  = $level->adjust(0.0);
+
+        $this->assertEquals(0.0, $level->getQuantityOnHand());
+        $this->assertEqualsWithDelta(-50.0, $diff, 0.001);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // InventoryLevel – getters
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function test_inventory_level_in_transit_quantity(): void
+    {
+        $level = new InventoryLevel(1, 1, 1, 1, null, 100.0, 10.0, 25.0, 'fifo', null, null);
+        $this->assertEquals(25.0, $level->getQuantityInTransit());
+    }
+
+    public function test_inventory_level_location_id_nullable(): void
+    {
+        $level = new InventoryLevel(1, 1, 1, 1, null, 100.0, 0.0, 0.0, 'fifo', null, null);
+        $this->assertNull($level->getLocationId());
+
+        $level2 = new InventoryLevel(2, 1, 1, 1, 5, 100.0, 0.0, 0.0, 'fifo', null, null);
+        $this->assertEquals(5, $level2->getLocationId());
+    }
+
+    public function test_inventory_level_valuation_methods(): void
+    {
+        foreach (['fifo', 'lifo', 'average', 'specific'] as $method) {
+            $level = new InventoryLevel(1, 1, 1, 1, null, 100.0, 0.0, 0.0, $method, null, null);
+            $this->assertEquals($method, $level->getValuationMethod());
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // InventoryBatch – batch/lot/serial tracking
+    // ──────────────────────────────────────────────────────────────────────
+
+    private function makeBatch(
+        float $qty = 100.0,
+        float $remaining = 100.0,
+        string $status = 'active',
+        ?\DateTimeInterface $expiresAt = null,
+    ): InventoryBatch {
+        return new InventoryBatch(
+            1, 1, 1, 1,
+            'BATCH-001', 'LOT-001', null,
+            $qty, $remaining, 5.0,
+            new \DateTimeImmutable('2024-01-01'),
+            $expiresAt,
+            new \DateTimeImmutable('2024-01-15'),
+            $status, 'GR-001', null, null,
         );
-        $this->assertNull($layer->id);
-        $this->assertNull($layer->batchId);
-        $this->assertNull($layer->receiptDate);
-        $this->assertNull($layer->referenceId);
-        $this->assertNull($layer->referenceType);
     }
 
-    // --------------- InventoryLevel::issue() + receive() ---------------
-
-    public function test_inventory_level_issue_reduces_on_hand(): void
+    public function test_inventory_batch_creation(): void
     {
-        $level = $this->makeLevel(100.0, 30.0, 70.0);
-        $level->issue(20.0);
-        $this->assertSame(80.0, $level->quantityOnHand);
+        $b = $this->makeBatch();
+        $this->assertEquals(1, $b->getId());
+        $this->assertEquals('BATCH-001', $b->getBatchNumber());
+        $this->assertEquals('LOT-001', $b->getLotNumber());
+        $this->assertNull($b->getSerialNumber());
+        $this->assertEquals(100.0, $b->getQuantity());
+        $this->assertEquals(100.0, $b->getQuantityRemaining());
+        $this->assertEquals(5.0, $b->getCostPrice());
+        $this->assertEquals('active', $b->getStatus());
+        $this->assertTrue($b->isActive());
+        $this->assertTrue($b->hasStock());
     }
 
-    public function test_inventory_level_issue_reduces_reserved(): void
+    public function test_inventory_batch_consume_partial(): void
     {
-        $level = $this->makeLevel(100.0, 30.0, 70.0);
-        $level->issue(20.0);
-        $this->assertSame(10.0, $level->quantityReserved);
+        $b = $this->makeBatch(100.0, 100.0);
+        $b->consume(30.0);
+        $this->assertEquals(70.0, $b->getQuantityRemaining());
+        $this->assertTrue($b->hasStock());
+        $this->assertTrue($b->isActive());
     }
 
-    public function test_inventory_level_issue_does_not_change_available(): void
+    public function test_inventory_batch_consume_all_marks_exhausted(): void
     {
-        // quantityAvailable was already reduced when reserve() was called
-        $level = $this->makeLevel(100.0, 30.0, 70.0);
-        $level->issue(20.0);
-        $this->assertSame(70.0, $level->quantityAvailable);
+        $b = $this->makeBatch(50.0, 50.0);
+        $b->consume(50.0);
+        $this->assertEquals(0.0, $b->getQuantityRemaining());
+        $this->assertEquals('exhausted', $b->getStatus());
+        $this->assertFalse($b->hasStock());
     }
 
-    public function test_inventory_level_issue_clamps_to_reserved(): void
+    public function test_inventory_batch_consume_throws_on_overconsumption(): void
     {
-        $level = $this->makeLevel(100.0, 10.0, 90.0);
-        // Issuing exactly reserved qty
-        $level->issue(10.0);
-        $this->assertSame(0.0, $level->quantityReserved);
-        $this->assertSame(90.0, $level->quantityOnHand);
-    }
-
-    public function test_inventory_level_issue_exceeds_reserved_throws(): void
-    {
-        $level = $this->makeLevel(100.0, 10.0, 90.0);
+        $b = $this->makeBatch(50.0, 20.0);
         $this->expectException(\DomainException::class);
-        $level->issue(50.0);
+        $b->consume(30.0);  // only 20 remaining
     }
 
-    public function test_inventory_level_issue_zero_qty_is_noop(): void
+    public function test_inventory_batch_is_expired_by_status(): void
     {
-        $level = $this->makeLevel(100.0, 20.0, 80.0);
-        $level->issue(0.0);
-        $this->assertSame(100.0, $level->quantityOnHand);
-        $this->assertSame(20.0, $level->quantityReserved);
+        $b = $this->makeBatch(50.0, 50.0, 'expired');
+        $this->assertTrue($b->isExpired());
     }
 
-    public function test_inventory_level_receive_increases_on_hand(): void
+    public function test_inventory_batch_is_expired_by_date(): void
     {
-        $level = $this->makeLevel(50.0, 0.0, 50.0);
-        $level->receive(25.0);
-        $this->assertSame(75.0, $level->quantityOnHand);
+        $pastDate = new \DateTimeImmutable('2020-01-01');
+        $b        = $this->makeBatch(50.0, 50.0, 'active', $pastDate);
+        $this->assertTrue($b->isExpired());
     }
 
-    public function test_inventory_level_receive_increases_available(): void
+    public function test_inventory_batch_is_not_expired_with_future_date(): void
     {
-        $level = $this->makeLevel(50.0, 10.0, 40.0);
-        $level->receive(25.0);
-        $this->assertSame(65.0, $level->quantityAvailable);
+        $futureDate = new \DateTimeImmutable('+1 year');
+        $b          = $this->makeBatch(50.0, 50.0, 'active', $futureDate);
+        $this->assertFalse($b->isExpired());
     }
 
-    public function test_inventory_level_receive_does_not_change_reserved(): void
+    public function test_inventory_batch_no_expiry_date_not_expired(): void
     {
-        $level = $this->makeLevel(50.0, 10.0, 40.0);
-        $level->receive(25.0);
-        $this->assertSame(10.0, $level->quantityReserved);
+        $b = $this->makeBatch(50.0, 50.0, 'active', null);
+        $this->assertFalse($b->isExpired());
     }
 
-    public function test_inventory_level_reserve_then_issue_full_cycle(): void
+    public function test_inventory_batch_serial_number(): void
     {
-        $level = $this->makeLevel(100.0, 0.0, 100.0);
-        // Reserve
-        $level->reserve(30.0);
-        $this->assertSame(30.0, $level->quantityReserved);
-        $this->assertSame(70.0, $level->quantityAvailable);
-        $this->assertSame(100.0, $level->quantityOnHand);
-        // Issue (confirm dispatch)
-        $level->issue(30.0);
-        $this->assertSame(0.0, $level->quantityReserved);
-        $this->assertSame(70.0, $level->quantityAvailable);
-        $this->assertSame(70.0, $level->quantityOnHand);
+        $b = new InventoryBatch(
+            2, 1, 1, 1, 'SN-BATCH', null, 'SN-12345678',
+            1.0, 1.0, 999.99,
+            null, null, new \DateTimeImmutable(),
+            'active', null, null, null,
+        );
+        $this->assertEquals('SN-12345678', $b->getSerialNumber());
+        $this->assertNull($b->getLotNumber());
+    }
+
+    public function test_inventory_batch_reference_and_warehouse(): void
+    {
+        $b = $this->makeBatch();
+        $this->assertEquals(1, $b->getWarehouseId());
+        $this->assertEquals('GR-001', $b->getReference());
     }
 }

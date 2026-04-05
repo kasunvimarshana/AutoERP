@@ -1,61 +1,88 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Modules\Product\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Pagination\LengthAwarePaginator;
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Modules\Product\Domain\Entities\ProductCategory;
 use Modules\Product\Domain\RepositoryInterfaces\ProductCategoryRepositoryInterface;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductCategoryModel;
 
-class EloquentProductCategoryRepository extends EloquentRepository implements ProductCategoryRepositoryInterface
+class EloquentProductCategoryRepository implements ProductCategoryRepositoryInterface
 {
-    public function __construct(ProductCategoryModel $model)
+    public function __construct(private readonly ProductCategoryModel $model) {}
+
+    private function toEntity(ProductCategoryModel $m): ProductCategory
     {
-        parent::__construct($model);
+        return new ProductCategory($m->id, $m->tenant_id, $m->parent_id, $m->name, $m->slug,
+            $m->description, (bool)$m->is_active, (int)$m->level, $m->created_at, $m->updated_at);
     }
 
     public function findById(int $id): ?ProductCategory
     {
-        $model = parent::findById($id);
-        return $model ? $this->toEntity($model) : null;
+        $m = $this->model->newQuery()->find($id);
+        return $m ? $this->toEntity($m) : null;
     }
 
-    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
+    public function findBySlug(int $tenantId, string $slug): ?ProductCategory
     {
-        $query = $this->model->newQuery()->where('tenant_id', $tenantId);
-        $this->applyFilters($query, $filters);
-        return $query->paginate($perPage);
+        $m = $this->model->newQuery()->where('tenant_id',$tenantId)->where('slug',$slug)->first();
+        return $m ? $this->toEntity($m) : null;
+    }
+
+    public function findByTenant(int $tenantId, int $perPage = 15, int $page = 1): LengthAwarePaginator
+    {
+        return $this->model->newQuery()->where('tenant_id',$tenantId)
+            ->paginate($perPage, ['*'], 'page', $page)
+            ->through(fn($m) => $this->toEntity($m));
+    }
+
+    public function findByParent(int $tenantId, ?int $parentId): array
+    {
+        return $this->model->newQuery()->where('tenant_id',$tenantId)->where('parent_id',$parentId)
+            ->get()->map(fn($m) => $this->toEntity($m))->all();
     }
 
     public function create(array $data): ProductCategory
     {
-        $model = parent::create($data);
-        return $this->toEntity($model);
+        $m = $this->model->newQuery()->create($data);
+        return $this->toEntity($m);
     }
 
-    public function update(ProductCategory $category, array $data): ProductCategory
+    public function update(int $id, array $data): ?ProductCategory
     {
-        $model   = $this->model->findOrFail($category->id);
-        $updated = parent::update($model, $data);
-        return $this->toEntity($updated);
+        $m = $this->model->newQuery()->find($id);
+        if (!$m) return null;
+        $m->update($data);
+        return $this->toEntity($m->fresh());
     }
 
-    public function delete(ProductCategory $category): bool
+    public function delete(int $id): bool
     {
-        $model = $this->model->findOrFail($category->id);
-        return parent::delete($model);
+        $m = $this->model->newQuery()->find($id);
+        return $m ? (bool)$m->delete() : false;
     }
 
-    private function toEntity(object $model): ProductCategory
+    public function buildTree(int $tenantId): array
     {
-        return new ProductCategory(
-            id:          $model->id,
-            tenantId:    $model->tenant_id,
-            name:        $model->name,
-            slug:        $model->slug,
-            parentId:    $model->parent_id,
-            description: $model->description,
-            isActive:    (bool) $model->is_active,
-        );
+        $all = $this->model->newQuery()->with('children')
+            ->where('tenant_id',$tenantId)->whereNull('parent_id')->get();
+        return $this->buildTreeFromNodes($all);
+    }
+
+    private function buildTreeFromNodes($nodes): array
+    {
+        return $nodes->map(function ($node) {
+            $e = $this->toEntity($node);
+            return [
+                'id'          => $e->getId(),
+                'name'        => $e->getName(),
+                'slug'        => $e->getSlug(),
+                'level'       => $e->getLevel(),
+                'is_active'   => $e->isActive(),
+                'children'    => $this->buildTreeFromNodes($node->children),
+            ];
+        })->all();
     }
 }

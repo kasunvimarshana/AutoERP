@@ -1,51 +1,62 @@
 <?php
+declare(strict_types=1);
 namespace Modules\Authorization\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Modules\Authorization\Domain\Entities\Permission;
 use Modules\Authorization\Domain\RepositoryInterfaces\PermissionRepositoryInterface;
 use Modules\Authorization\Infrastructure\Persistence\Eloquent\Models\PermissionModel;
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 
-class EloquentPermissionRepository extends EloquentRepository implements PermissionRepositoryInterface
+class EloquentPermissionRepository implements PermissionRepositoryInterface
 {
-    public function __construct(PermissionModel $model) { parent::__construct($model); }
+    public function __construct(private readonly PermissionModel $model) {}
+
+    private function toEntity(PermissionModel $m): Permission
+    {
+        return new Permission($m->id, $m->name, $m->slug, $m->module, $m->description, $m->created_at, $m->updated_at);
+    }
 
     public function findById(int $id): ?Permission
     {
-        $m = parent::findById($id);
+        $m = $this->model->newQuery()->find($id);
         return $m ? $this->toEntity($m) : null;
     }
 
-    public function findByName(string $name): ?Permission
+    public function findAll(int $perPage = 15, int $page = 1): LengthAwarePaginator
     {
-        $m = $this->model->where('name', $name)->first();
-        return $m ? $this->toEntity($m) : null;
+        return $this->model->newQuery()
+            ->paginate($perPage, ['*'], 'page', $page)
+            ->through(fn($m) => $this->toEntity($m));
     }
 
-    public function findAll(int $perPage = 50): LengthAwarePaginator
+    public function findByModule(string $module): array
     {
-        return $this->model->orderBy('name')->paginate($perPage);
+        return $this->model->newQuery()
+            ->where('module', $module)
+            ->get()
+            ->map(fn($m) => $this->toEntity($m))
+            ->all();
     }
 
     public function create(array $data): Permission
     {
-        return $this->toEntity(parent::create($data));
+        $m = $this->model->newQuery()->create($data);
+        return $this->toEntity($m);
     }
 
-    public function delete(Permission $permission): bool
+    public function update(int $id, array $data): ?Permission
     {
-        $m = $this->model->findOrFail($permission->id);
-        return parent::delete($m);
+        $m = $this->model->newQuery()->find($id);
+        if (!$m) {
+            return null;
+        }
+        $m->update($data);
+        return $this->toEntity($m->fresh());
     }
 
-    private function toEntity(object $m): Permission
+    public function delete(int $id): bool
     {
-        return new Permission(
-            id:          $m->id,
-            name:        $m->name,
-            guardName:   $m->guard_name,
-            description: $m->description ?? null,
-        );
+        $m = $this->model->newQuery()->find($id);
+        return $m ? (bool) $m->delete() : false;
     }
 }

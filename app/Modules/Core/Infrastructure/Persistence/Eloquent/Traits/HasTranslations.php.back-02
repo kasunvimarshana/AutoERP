@@ -1,0 +1,354 @@
+<?php
+
+namespace Modules\Core\Infrastructure\Persistence\Eloquent\Traits;
+
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Model;
+use InvalidArgumentException;
+
+trait HasTranslations
+{
+    /**
+     * The attributes that are translatable.
+     * Override in your model: protected $translatable = ['title', 'body'];
+     *
+     * @var array<string>
+     */
+    protected $translatable = [];
+
+    /**
+     * Boot the trait – ensure translatable attributes are fillable.
+     */
+    protected static function bootHasTranslations(): void
+    {
+        static::retrieved(function (Model $model) {
+            $model->mergeFillable($model->getTranslatableAttributes());
+        });
+
+        static::saving(function (Model $model) {
+            $model->ensureTranslatableAttributesAreValidJson();
+        });
+    }
+
+    /**
+     * Ensure that all translatable attributes contain valid JSON.
+     *
+     * @throws \InvalidArgumentException
+     */
+    protected function ensureTranslatableAttributesAreValidJson(): void
+    {
+        foreach ($this->getTranslatableAttributes() as $key) {
+            $value = $this->attributes[$key] ?? null;
+            if ($value !== null && !$this->isValidJsonArray($value)) {
+                throw new InvalidArgumentException(
+                    "Translatable attribute [{$key}] must be a valid JSON array of translations."
+                );
+            }
+        }
+    }
+
+    /**
+     * Get the list of translatable attributes.
+     *
+     * @return array<string>
+     */
+    public function getTranslatableAttributes(): array
+    {
+        return property_exists($this, 'translatable') ? $this->translatable : [];
+    }
+
+    /**
+     * Check if an attribute is translatable.
+     *
+     * @param string $key
+     * @return bool
+     */
+    public function isTranslatableAttribute(string $key): bool
+    {
+        return in_array($key, $this->getTranslatableAttributes(), true);
+    }
+
+    /**
+     * Get a translation for a given attribute and locale.
+     *
+     * @param string $key
+     * @param string $locale
+     * @param bool   $useFallbackLocale
+     * @return mixed
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function getTranslation(string $key, string $locale, bool $useFallbackLocale = true)
+    {
+        $this->ensureIsTranslatable($key);
+
+        $translations = $this->getTranslations($key);
+        $value = $translations[$locale] ?? null;
+
+        if ($useFallbackLocale && is_null($value) && $this->getFallbackLocale() !== $locale) {
+            $value = $translations[$this->getFallbackLocale()] ?? null;
+        }
+
+        return $value;
+    }
+
+    /**
+     * Set a translation for a given attribute and locale.
+     *
+     * @param string $key
+     * @param string $locale
+     * @param mixed  $value
+     * @return $this
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function setTranslation(string $key, string $locale, $value): self
+    {
+        $this->ensureIsTranslatable($key);
+
+        $translations = $this->getTranslations($key);
+        $translations[$locale] = $value;
+
+        $this->attributes[$key] = $this->encodeTranslations($translations);
+
+        return $this;
+    }
+
+    /**
+     * Get all translations for a given attribute.
+     *
+     * @param string $key
+     * @return array
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function getTranslations(string $key): array
+    {
+        $this->ensureIsTranslatable($key);
+
+        $value = $this->getAttributeValue($key);
+
+        if (is_string($value) && $this->isJson($value)) {
+            $value = json_decode($value, true);
+        }
+
+        return is_array($value) ? $value : [];
+    }
+
+    /**
+     * Forget one or all translations for an attribute.
+     *
+     * @param string      $key
+     * @param string|null $locale  If null, all translations are forgotten.
+     * @return $this
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function forgetTranslation(string $key, ?string $locale = null): self
+    {
+        $this->ensureIsTranslatable($key);
+
+        if ($locale) {
+            $translations = $this->getTranslations($key);
+            unset($translations[$locale]);
+            $this->attributes[$key] = $this->encodeTranslations($translations);
+        } else {
+            $this->attributes[$key] = $this->encodeTranslations([]);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Intercept attribute access to return the translation for the current locale.
+     *
+     * @param string $key
+     * @return mixed
+     */
+    public function __get($key)
+    {
+        if ($this->isTranslatableAttribute($key)) {
+            return $this->getTranslation($key, $this->getLocale());
+        }
+
+        return parent::__get($key);
+    }
+
+    /**
+     * Intercept attribute setting to allow direct assignment of translations.
+     *
+     * @param string $key
+     * @param mixed  $value
+     * @return void
+     */
+    public function setAttribute($key, $value)
+    {
+        if ($this->isTranslatableAttribute($key) && is_array($value)) {
+            // If an array is passed, treat it as a set of translations keyed by locale.
+            $this->attributes[$key] = $this->encodeTranslations($value);
+            return;
+        }
+
+        parent::setAttribute($key, $value);
+    }
+
+    // -----------  QUERY SCOPES  -----------
+
+    /**
+     * Scope a query to only include records where the translation for a given locale matches a value.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param string $key
+     * @param string $locale
+     * @param mixed  $value
+     * @param string $operator  (=, !=, like, etc.)
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeWhereLocale($query, string $key, string $locale, $value, string $operator = '=')
+    {
+        return $query->where($this->getJsonPath($key, $locale), $operator, $value);
+    }
+
+    /**
+     * Scope a query to only include records where the translation for one of several locales matches a value.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param string $key
+     * @param array  $locales
+     * @param mixed  $value
+     * @param string $operator
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeWhereLocales($query, string $key, array $locales, $value, string $operator = '=')
+    {
+        return $query->where(function ($q) use ($key, $locales, $value, $operator) {
+            foreach ($locales as $locale) {
+                $q->orWhere($this->getJsonPath($key, $locale), $operator, $value);
+            }
+        });
+    }
+
+    /**
+     * Scope a query to only include records where the JSON column for a locale contains a given value.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param string $key
+     * @param string $locale
+     * @param mixed  $value
+     * @param string $operand
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeWhereJsonContainsLocale($query, string $key, string $locale, $value, string $operand = '=')
+    {
+        return $query->where($this->getJsonPath($key, $locale), $operand, $value);
+    }
+
+    /**
+     * Scope a query to only include records where the JSON column for any of the locales contains a given value.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param string $key
+     * @param array  $locales
+     * @param mixed  $value
+     * @param string $operand
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeWhereJsonContainsLocales($query, string $key, array $locales, $value, string $operand = '=')
+    {
+        return $query->where(function ($q) use ($key, $locales, $value, $operand) {
+            foreach ($locales as $locale) {
+                $q->orWhere($this->getJsonPath($key, $locale), $operand, $value);
+            }
+        });
+    }
+
+    // -----------  PROTECTED UTILITIES (override for customization) -----------
+
+    /**
+     * Get the current application locale.
+     *
+     * @return string
+     */
+    protected function getLocale(): string
+    {
+        return app()->getLocale();
+    }
+
+    /**
+     * Get the fallback locale from configuration.
+     *
+     * @return string
+     */
+    protected function getFallbackLocale(): string
+    {
+        return config('app.fallback_locale', 'en');
+    }
+
+    /**
+     * Encode an array of translations to JSON.
+     *
+     * @param array $translations
+     * @return string
+     */
+    protected function encodeTranslations(array $translations): string
+    {
+        return json_encode($translations, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * Determine if a string is valid JSON.
+     *
+     * @param string $string
+     * @return bool
+     */
+    protected function isJson(string $string): bool
+    {
+        json_decode($string);
+        return json_last_error() === JSON_ERROR_NONE;
+    }
+
+    /**
+     * Determine if a value is a valid JSON array (object) of translations.
+     *
+     * @param mixed $value
+     * @return bool
+     */
+    protected function isValidJsonArray($value): bool
+    {
+        if (!is_string($value) || !$this->isJson($value)) {
+            return false;
+        }
+
+        $decoded = json_decode($value, true);
+        return is_array($decoded) && !empty($decoded);
+    }
+
+    /**
+     * Ensure an attribute is translatable.
+     *
+     * @param string $key
+     * @return void
+     *
+     * @throws \InvalidArgumentException
+     */
+    protected function ensureIsTranslatable(string $key): void
+    {
+        if (!$this->isTranslatableAttribute($key)) {
+            throw new InvalidArgumentException("Attribute [{$key}] is not translatable.");
+        }
+    }
+
+    /**
+     * Build a JSON path for a given attribute and locale.
+     *
+     * Example: 'name->en' (for MySQL) – override for other databases.
+     *
+     * @param string $key
+     * @param string $locale
+     * @return string
+     */
+    protected function getJsonPath(string $key, string $locale): string
+    {
+        return sprintf('%s->%s', $key, $locale);
+    }
+}

@@ -1,29 +1,46 @@
 <?php
+declare(strict_types=1);
 namespace Modules\Authorization\Infrastructure\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Modules\Authorization\Application\Contracts\AssignUserRoleServiceInterface;
-use Modules\Authorization\Application\DTOs\AssignUserRoleData;
+use Illuminate\Routing\Controller;
+use Modules\Authorization\Application\Contracts\UserRoleServiceInterface;
 
 class UserRoleController extends Controller
 {
-    public function __construct(
-        private readonly AssignUserRoleServiceInterface $assignService,
-    ) {}
+    public function __construct(private readonly UserRoleServiceInterface $service) {}
 
-    public function assign(Request $request, int $userId): JsonResponse
+    public function getUserRoles(int $userId): JsonResponse
     {
-        $request->validate([
-            'role_id'   => ['required', 'integer'],
-            'tenant_id' => ['required', 'integer'],
-        ]);
-        $userRole = $this->assignService->execute(new AssignUserRoleData(
-            tenantId: $request->integer('tenant_id'),
-            userId:   $userId,
-            roleId:   $request->integer('role_id'),
-        ));
-        return response()->json(['user_id' => $userRole->userId, 'role_id' => $userRole->roleId], 201);
+        return response()->json($this->service->getUserRoles($userId));
+    }
+
+    public function assignRole(Request $request, int $userId): JsonResponse
+    {
+        $this->service->assignRole($userId, (int) $request->get('role_id'));
+        return response()->json(['message' => 'Role assigned.']);
+    }
+
+    public function removeRole(int $userId, int $roleId): JsonResponse
+    {
+        $this->service->removeRole($userId, $roleId);
+        return response()->json(['message' => 'Role removed.']);
+    }
+
+    public function syncRoles(Request $request, int $userId): JsonResponse
+    {
+        $this->service->syncRoles($userId, $request->get('role_ids', []));
+        return response()->json(['message' => 'Roles synced.']);
+    }
+
+    public function userHasPermission(int $userId, string $permissionSlug): JsonResponse
+    {
+        return response()->json(['has_permission' => $this->service->userHasPermission($userId, $permissionSlug)]);
+    }
+
+    public function userHasRole(int $userId, string $roleSlug): JsonResponse
+    {
+        return response()->json(['has_role' => $this->service->userHasRole($userId, $roleSlug)]);
     }
 }

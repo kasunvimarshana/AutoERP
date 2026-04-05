@@ -1,17 +1,17 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Modules\Inventory\Application\DTOs;
 
 use Modules\Core\Application\DTOs\BaseDTO;
 
 class AdjustInventoryData extends BaseDTO
 {
-    public function __construct(
-        public readonly int $tenantId,
-        public readonly int $productId,
-        public readonly int $warehouseId,
-        public readonly int $locationId,
-        public readonly float $newQuantity,
-        public readonly string $reason,
-        public readonly ?int $batchId = null,
-    ) {}
+    public int $tenant_id;
+    public int $product_id;
+    public int $warehouse_id;
+    public ?int $location_id = null;
+    public float $new_quantity;
+    public ?string $reason = null;
 }

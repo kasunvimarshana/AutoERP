@@ -1,19 +1,13 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Modules\Inventory\Application\Contracts;
 
 use Modules\Inventory\Application\DTOs\IssueStockData;
+use Modules\Inventory\Domain\Entities\InventoryLevel;
 
 interface IssueStockServiceInterface
 {
-    /**
-     * Outbound stock issue orchestrator.
-     *
-     * Allocates stock from InventoryLevel records using the configured allocation
-     * algorithm, consumes matching InventoryValuationLayers, and confirms the
-     * physical issuance on each level.
-     *
-     * @return array{allocations: array, total_cost: float}
-     * @throws \DomainException if insufficient stock or layers
-     */
-    public function execute(IssueStockData $data): array;
+    public function execute(IssueStockData $data): InventoryLevel;
 }

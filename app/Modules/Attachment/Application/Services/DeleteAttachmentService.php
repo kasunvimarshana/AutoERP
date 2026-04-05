@@ -1,38 +1,36 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Attachment\Application\Services;
 
-use Illuminate\Contracts\Events\Dispatcher;
-use Illuminate\Support\Facades\Storage;
 use Modules\Attachment\Application\Contracts\DeleteAttachmentServiceInterface;
-use Modules\Attachment\Domain\Entities\Attachment;
 use Modules\Attachment\Domain\Events\AttachmentDeleted;
+use Modules\Attachment\Domain\Exceptions\AttachmentNotFoundException;
 use Modules\Attachment\Domain\RepositoryInterfaces\AttachmentRepositoryInterface;
 
 class DeleteAttachmentService implements DeleteAttachmentServiceInterface
 {
-    public function __construct(
-        private readonly AttachmentRepositoryInterface $repo,
-        private readonly Dispatcher $dispatcher,
-    ) {}
+    public function __construct(private readonly AttachmentRepositoryInterface $repo) {}
 
-    public function execute(Attachment $attachment): bool
+    public function execute(int $id): bool
     {
-        try {
-            Storage::disk($attachment->disk)->delete($attachment->path);
-        } catch (\Throwable $e) {
-            // Log but continue — the DB record should still be removed
-            logger()->warning('Attachment file could not be deleted from storage', [
-                'attachment_id' => $attachment->id,
-                'path'          => $attachment->path,
-                'error'         => $e->getMessage(),
-            ]);
+        $attachment = $this->repo->findById($id);
+        if (!$attachment) {
+            throw new AttachmentNotFoundException($id);
         }
 
-        $deleted = $this->repo->delete($attachment);
+        $result = $this->repo->delete($id);
 
-        $this->dispatcher->dispatch(new AttachmentDeleted($attachment->tenantId, $attachment->id));
+        if ($result) {
+            event(new AttachmentDeleted(
+                $attachment->getTenantId(),
+                $attachment->getId(),
+                $attachment->getAttachableType(),
+                $attachment->getAttachableId()
+            ));
+        }
 
-        return $deleted;
+        return $result;
     }
 }

@@ -1,23 +1,19 @@
 <?php
+declare(strict_types=1);
 namespace Modules\GoodsReceipt\Application\Services;
-
-use Illuminate\Support\Facades\Event;
 use Modules\GoodsReceipt\Application\Contracts\InspectGoodsReceiptServiceInterface;
 use Modules\GoodsReceipt\Domain\Entities\GoodsReceipt;
 use Modules\GoodsReceipt\Domain\Events\GoodsReceiptInspected;
 use Modules\GoodsReceipt\Domain\RepositoryInterfaces\GoodsReceiptRepositoryInterface;
-
-class InspectGoodsReceiptService implements InspectGoodsReceiptServiceInterface
-{
-    public function __construct(private readonly GoodsReceiptRepositoryInterface $repository) {}
-
-    public function execute(int $grId, int $inspectedBy): GoodsReceipt
-    {
-        $gr = $this->repository->findById($grId);
-        if (!$gr) throw new \DomainException("Goods receipt not found: {$grId}");
+use Modules\Core\Domain\Exceptions\NotFoundException;
+class InspectGoodsReceiptService implements InspectGoodsReceiptServiceInterface {
+    public function __construct(private readonly GoodsReceiptRepositoryInterface $repo) {}
+    public function execute(int $id, int $inspectedBy): GoodsReceipt {
+        $gr=$this->repo->findById($id);
+        if(!$gr) throw new NotFoundException("GoodsReceipt", $id);
         $gr->inspect($inspectedBy);
-        $gr = $this->repository->save($gr);
-        Event::dispatch(new GoodsReceiptInspected($gr->tenantId, $gr->id));
-        return $gr;
+        $this->repo->update($id,['status'=>'inspected','inspected_by'=>$inspectedBy,'inspected_at'=>now()]);
+        event(new GoodsReceiptInspected($gr->getTenantId(),$id));
+        return $this->repo->findById($id);
     }
 }

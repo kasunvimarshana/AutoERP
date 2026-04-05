@@ -1,16 +1,28 @@
 <?php
+declare(strict_types=1);
 namespace Modules\Authorization\Infrastructure\Persistence\Eloquent\Models;
 
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 
 class RoleModel extends BaseModel
 {
     protected $table = 'roles';
-    protected $guarded = ['id'];
+    protected $fillable = ['tenant_id', 'name', 'slug', 'description'];
+    protected $casts = [
+        'id' => 'int',
+        'tenant_id' => 'int',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
+    ];
 
-    public function permissions(): BelongsToMany
+    public function permissions()
     {
-        return $this->belongsToMany(PermissionModel::class, 'role_permissions', 'role_id', 'permission_id');
+        return $this->belongsToMany(
+            PermissionModel::class,
+            'role_permissions',
+            'role_id',
+            'permission_id'
+        );
     }
 }

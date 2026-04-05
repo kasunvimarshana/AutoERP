@@ -1,78 +1,72 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Modules\Inventory\Application\Services;
 
-use Illuminate\Support\Facades\Event;
-use Modules\Inventory\Application\Contracts\AddValuationLayerServiceInterface;
+use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Application\Contracts\ReceiveStockServiceInterface;
-use Modules\Inventory\Application\DTOs\AddValuationLayerData;
 use Modules\Inventory\Application\DTOs\ReceiveStockData;
-use Modules\Inventory\Domain\Events\InventoryLevelUpdated;
+use Modules\Inventory\Domain\Entities\InventoryLevel;
 use Modules\Inventory\Domain\Events\StockReceived;
+use Modules\Inventory\Domain\RepositoryInterfaces\InventoryBatchRepositoryInterface;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryLevelRepositoryInterface;
+use Modules\Inventory\Domain\RepositoryInterfaces\InventoryValuationLayerRepositoryInterface;
 
-/**
- * Inbound stock receipt orchestrator.
- *
- * 1. Creates or updates the InventoryLevel (quantity_on_hand / quantity_available).
- * 2. Appends a new InventoryValuationLayer for FIFO/LIFO/Average cost tracking.
- * 3. Dispatches StockReceived + InventoryLevelUpdated events.
- */
 class ReceiveStockService implements ReceiveStockServiceInterface
 {
     public function __construct(
-        private readonly InventoryLevelRepositoryInterface $levelRepository,
-        private readonly AddValuationLayerServiceInterface $addLayerService,
+        private readonly InventoryLevelRepositoryInterface $levelRepo,
+        private readonly InventoryBatchRepositoryInterface $batchRepo,
+        private readonly InventoryValuationLayerRepositoryInterface $layerRepo,
     ) {}
 
-    public function execute(ReceiveStockData $data): array
+    public function execute(ReceiveStockData $data): InventoryLevel
     {
-        // 1. Create or update inventory level
-        $level = $this->levelRepository->findByProductWarehouseLocation(
-            $data->productId,
-            $data->warehouseId,
-            $data->locationId,
-            $data->batchId,
-        );
+        return DB::transaction(function () use ($data): InventoryLevel {
+            $level = $this->levelRepo->upsert(
+                $data->tenant_id, $data->product_id, $data->warehouse_id,
+                $data->location_id, $data->valuation_method
+            );
 
-        if ($level === null) {
-            $level = $this->levelRepository->create([
-                'tenant_id'          => $data->tenantId,
-                'product_id'         => $data->productId,
-                'warehouse_id'       => $data->warehouseId,
-                'location_id'        => $data->locationId,
-                'quantity_on_hand'   => $data->quantity,
-                'quantity_reserved'  => 0.0,
-                'quantity_available' => $data->quantity,
-                'quantity_on_order'  => 0.0,
-                'batch_id'           => $data->batchId,
-                'stock_status'       => 'available',
-            ]);
-        } else {
             $level->receive($data->quantity);
-            $level = $this->levelRepository->save($level);
-        }
+            $this->levelRepo->update($level->getId(), [
+                'quantity_on_hand' => $level->getQuantityOnHand(),
+            ]);
 
-        // 2. Add valuation layer
-        $layer = $this->addLayerService->execute(new AddValuationLayerData(
-            tenantId:        $data->tenantId,
-            productId:       $data->productId,
-            warehouseId:     $data->warehouseId,
-            valuationMethod: $data->valuationMethod,
-            quantity:        $data->quantity,
-            unitCost:        $data->unitCost,
-            batchId:         $data->batchId,
-            receiptDate:     $data->receiptDate ?? now()->toDateString(),
-            referenceType:   $data->referenceType,
-            referenceId:     $data->referenceId,
-        ));
+            if ($data->batch_number) {
+                $this->batchRepo->create([
+                    'tenant_id'       => $data->tenant_id,
+                    'product_id'      => $data->product_id,
+                    'warehouse_id'    => $data->warehouse_id,
+                    'batch_number'    => $data->batch_number,
+                    'lot_number'      => $data->lot_number,
+                    'serial_number'   => $data->serial_number,
+                    'quantity'        => $data->quantity,
+                    'quantity_remaining' => $data->quantity,
+                    'cost_price'      => $data->unit_cost,
+                    'manufactured_at' => $data->manufactured_at,
+                    'expires_at'      => $data->expires_at,
+                    'received_at'     => now(),
+                    'status'          => 'active',
+                    'reference'       => $data->reference,
+                ]);
+            }
 
-        // 3. Dispatch events
-        Event::dispatch(new StockReceived($data->tenantId, $level->id));
-        Event::dispatch(new InventoryLevelUpdated($data->tenantId, $level->id));
+            $this->layerRepo->create([
+                'tenant_id'          => $data->tenant_id,
+                'product_id'         => $data->product_id,
+                'warehouse_id'       => $data->warehouse_id,
+                'quantity'           => $data->quantity,
+                'quantity_remaining' => $data->quantity,
+                'unit_cost'          => $data->unit_cost,
+                'received_at'        => now(),
+                'reference'          => $data->reference,
+            ]);
 
-        return [
-            'level_id' => $level->id,
-            'layer_id' => $layer->id,
-        ];
+            event(new StockReceived($data->tenant_id, $data->product_id, $data->warehouse_id, $data->quantity));
+
+            return $level;
+        });
     }
 }

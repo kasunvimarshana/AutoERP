@@ -1,52 +1,46 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Modules\Inventory\Domain\Entities;
 
-use Modules\Core\Domain\Entities\BaseEntity;
-
-class InventoryValuationLayer extends BaseEntity
+class InventoryValuationLayer
 {
     public function __construct(
-        ?int $id,
-        public readonly int $tenantId,
-        public readonly int $productId,
-        public readonly int $warehouseId,
-        public readonly string $valuationMethod,
-        public float $quantity,
-        public float $remainingQuantity,
-        public float $unitCost,
-        public float $totalCost,
-        public readonly ?int $batchId = null,
-        public readonly ?\DateTimeImmutable $receiptDate = null,
-        public readonly ?int $referenceId = null,
-        public readonly ?string $referenceType = null,
-    ) {
-        parent::__construct($id);
-    }
+        private ?int $id,
+        private int $tenantId,
+        private int $productId,
+        private int $warehouseId,
+        private float $quantity,
+        private float $quantityRemaining,
+        private float $unitCost,
+        private \DateTimeInterface $receivedAt,
+        private ?string $reference,
+        private ?int $batchId,
+        private ?\DateTimeInterface $createdAt,
+        private ?\DateTimeInterface $updatedAt,
+    ) {}
 
-    /**
-     * Consume up to $qty units from this layer.
-     * Returns the cost consumed.
-     *
-     * @throws \DomainException if the layer has no remaining quantity
-     */
-    public function consume(float $qty): float
-    {
-        if ($this->remainingQuantity <= 0) {
-            return 0.0;
-        }
+    public function getId(): ?int { return $this->id; }
+    public function getTenantId(): int { return $this->tenantId; }
+    public function getProductId(): int { return $this->productId; }
+    public function getWarehouseId(): int { return $this->warehouseId; }
+    public function getQuantity(): float { return $this->quantity; }
+    public function getQuantityRemaining(): float { return $this->quantityRemaining; }
+    public function getUnitCost(): float { return $this->unitCost; }
+    public function getReceivedAt(): \DateTimeInterface { return $this->receivedAt; }
+    public function getReference(): ?string { return $this->reference; }
+    public function getBatchId(): ?int { return $this->batchId; }
+    public function getCreatedAt(): ?\DateTimeInterface { return $this->createdAt; }
+    public function getUpdatedAt(): ?\DateTimeInterface { return $this->updatedAt; }
 
-        $consumed = min($qty, $this->remainingQuantity);
-        $cost = $consumed * $this->unitCost;
-
-        $this->remainingQuantity -= $consumed;
-        $this->totalCost = $this->remainingQuantity * $this->unitCost;
-
-        return $cost;
-    }
-
-    /** Whether this layer still has stock available for consumption. */
     public function hasStock(): bool
     {
-        return $this->remainingQuantity > 0;
+        return $this->quantityRemaining > InventoryLevel::FLOAT_TOLERANCE;
+    }
+
+    public function consume(float $qty): void
+    {
+        $this->quantityRemaining = max(0.0, $this->quantityRemaining - $qty);
     }
 }

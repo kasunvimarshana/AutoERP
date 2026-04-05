@@ -1,21 +1,25 @@
 <?php
+declare(strict_types=1);
 namespace Modules\Tenant\Application\Services;
 
-use Illuminate\Support\Facades\Event;
 use Modules\Tenant\Application\Contracts\UpdateTenantServiceInterface;
-use Modules\Tenant\Application\DTOs\TenantData;
+use Modules\Tenant\Application\DTOs\UpdateTenantData;
 use Modules\Tenant\Domain\Entities\Tenant;
 use Modules\Tenant\Domain\Events\TenantUpdated;
+use Modules\Tenant\Domain\Exceptions\TenantNotFoundException;
 use Modules\Tenant\Domain\RepositoryInterfaces\TenantRepositoryInterface;
 
 class UpdateTenantService implements UpdateTenantServiceInterface
 {
-    public function __construct(private readonly TenantRepositoryInterface $repository) {}
+    public function __construct(private readonly TenantRepositoryInterface $repo) {}
 
-    public function execute(Tenant $tenant, TenantData $data): Tenant
+    public function execute(int $id, UpdateTenantData $data): Tenant
     {
-        $updated = $this->repository->update($tenant, $data->toArray());
-        Event::dispatch(new TenantUpdated($tenant->id, $tenant->id));
-        return $updated;
+        $tenant = $this->repo->update($id, array_filter($data->toArray(), fn($v) => $v !== null));
+        if (!$tenant) {
+            throw new TenantNotFoundException($id);
+        }
+        event(new TenantUpdated($tenant->getId(), $tenant->getId()));
+        return $tenant;
     }
 }

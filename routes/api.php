@@ -2,4 +2,4 @@
 
 use Illuminate\Support\Facades\Route;
 
-Route::get('/health', fn () => response()->json(['status' => 'ok']));
+Route::get('/health', [\Modules\Core\Infrastructure\Http\Controllers\HealthController::class, 'check']);

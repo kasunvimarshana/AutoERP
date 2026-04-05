@@ -1,65 +1,20 @@
 <?php
+declare(strict_types=1);
 namespace Modules\Pricing\Infrastructure\Persistence\Eloquent\Repositories;
-
-use Illuminate\Pagination\LengthAwarePaginator;
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Modules\Pricing\Domain\Entities\TaxRate;
 use Modules\Pricing\Domain\RepositoryInterfaces\TaxRateRepositoryInterface;
 use Modules\Pricing\Infrastructure\Persistence\Eloquent\Models\TaxRateModel;
-
-class EloquentTaxRateRepository extends EloquentRepository implements TaxRateRepositoryInterface
-{
-    public function __construct(TaxRateModel $model)
-    {
-        parent::__construct($model);
+class EloquentTaxRateRepository implements TaxRateRepositoryInterface {
+    public function __construct(private readonly TaxRateModel $model) {}
+    private function toEntity(TaxRateModel $m): TaxRate {
+        return new TaxRate($m->id,$m->tenant_id,$m->name,$m->code,(float)$m->rate,$m->type,(bool)$m->is_compound,(bool)$m->is_active,$m->applies_to,$m->created_at,$m->updated_at);
     }
-
-    public function findById(int $id): ?TaxRate
-    {
-        $m = parent::findById($id);
-        return $m ? $this->toEntity($m) : null;
+    public function findById(int $id): ?TaxRate { $m=$this->model->newQuery()->find($id); return $m?$this->toEntity($m):null; }
+    public function findByTenant(int $tenantId, int $perPage = 15, int $page = 1): LengthAwarePaginator {
+        return $this->model->newQuery()->where('tenant_id',$tenantId)->paginate($perPage,['*'],'page',$page)->through(fn($m)=>$this->toEntity($m));
     }
-
-    public function findByCode(int $tenantId, string $code): ?TaxRate
-    {
-        $m = $this->model->where('tenant_id', $tenantId)->where('code', $code)->first();
-        return $m ? $this->toEntity($m) : null;
-    }
-
-    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
-    {
-        return $this->model->where('tenant_id', $tenantId)->paginate($perPage);
-    }
-
-    public function create(array $data): TaxRate
-    {
-        return $this->toEntity(parent::create($data));
-    }
-
-    public function update(TaxRate $rate, array $data): TaxRate
-    {
-        $m = $this->model->findOrFail($rate->id);
-        return $this->toEntity(parent::update($m, $data));
-    }
-
-    public function delete(TaxRate $rate): bool
-    {
-        return parent::delete($this->model->findOrFail($rate->id));
-    }
-
-    private function toEntity(object $m): TaxRate
-    {
-        return new TaxRate(
-            id: $m->id,
-            tenantId: $m->tenant_id,
-            name: $m->name,
-            code: $m->code,
-            rate: (float) $m->rate,
-            type: $m->type,
-            isActive: (bool) $m->is_active,
-            description: $m->description,
-            region: $m->region,
-            taxClass: $m->tax_class,
-        );
-    }
+    public function create(array $data): TaxRate { return $this->toEntity($this->model->newQuery()->create($data)); }
+    public function update(int $id, array $data): ?TaxRate { $m=$this->model->newQuery()->find($id); if(!$m)return null; $m->update($data); return $this->toEntity($m->fresh()); }
+    public function delete(int $id): bool { $m=$this->model->newQuery()->find($id); return $m?(bool)$m->delete():false; }
 }

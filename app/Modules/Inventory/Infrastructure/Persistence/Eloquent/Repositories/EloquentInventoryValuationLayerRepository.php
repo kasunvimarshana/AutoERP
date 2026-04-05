@@ -1,87 +1,80 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Inventory\Domain\Entities\InventoryValuationLayer;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryValuationLayerRepositoryInterface;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\InventoryValuationLayerModel;
 
-class EloquentInventoryValuationLayerRepository extends EloquentRepository implements InventoryValuationLayerRepositoryInterface
+class EloquentInventoryValuationLayerRepository implements InventoryValuationLayerRepositoryInterface
 {
-    public function __construct(InventoryValuationLayerModel $model)
+    public function __construct(private readonly InventoryValuationLayerModel $model) {}
+
+    private function toEntity(InventoryValuationLayerModel $m): InventoryValuationLayer
     {
-        parent::__construct($model);
+        return new InventoryValuationLayer($m->id, $m->tenant_id, $m->product_id, $m->warehouse_id,
+            (float)$m->quantity, (float)$m->quantity_remaining, (float)$m->unit_cost,
+            $m->received_at, $m->reference, $m->batch_id, $m->created_at, $m->updated_at);
     }
 
     public function findById(int $id): ?InventoryValuationLayer
     {
-        $model = parent::findById($id);
-        return $model ? $this->toEntity($model) : null;
+        $m = $this->model->newQuery()->find($id);
+        return $m ? $this->toEntity($m) : null;
     }
 
-    public function findByProduct(int $productId, int $warehouseId, string $valuationMethod): array
+    public function findByProduct(int $tenantId, int $productId, int $warehouseId): array
     {
-        return $this->model->where('product_id', $productId)
-            ->where('warehouse_id', $warehouseId)
-            ->where('valuation_method', $valuationMethod)
-            ->get()
-            ->map(fn($m) => $this->toEntity($m))
-            ->all();
-    }
-
-    public function findByProductOrdered(int $productId, int $warehouseId, string $direction = 'asc'): array
-    {
-        return $this->model
+        return $this->model->newQuery()
+            ->where('tenant_id', $tenantId)
             ->where('product_id', $productId)
             ->where('warehouse_id', $warehouseId)
-            ->where('remaining_quantity', '>', 0)
-            ->orderBy('receipt_date', $direction)
-            ->get()
-            ->map(fn($m) => $this->toEntity($m))
-            ->all();
+            ->orderBy('received_at')
+            ->get()->map(fn($m) => $this->toEntity($m))->all();
     }
 
-
+    public function findLayersForConsumption(int $tenantId, int $productId, int $warehouseId, string $method): array
     {
-        $model = parent::create($data);
-        return $this->toEntity($model);
+        $q = $this->model->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->where('quantity_remaining', '>', 0);
+
+        if ($method === 'lifo') {
+            $q->orderByDesc('received_at');
+        } else {
+            $q->orderBy('received_at'); // fifo and average
+        }
+
+        return $q->get()->map(fn($m) => $this->toEntity($m))->all();
     }
 
-    public function update(InventoryValuationLayer $layer, array $data): InventoryValuationLayer
+    public function create(array $data): InventoryValuationLayer
     {
-        $model = $this->model->findOrFail($layer->id);
-        $updated = parent::update($model, $data);
-        return $this->toEntity($updated);
+        $m = $this->model->newQuery()->create($data);
+        return $this->toEntity($m);
     }
 
-    public function save(InventoryValuationLayer $layer): InventoryValuationLayer
+    public function update(int $id, array $data): ?InventoryValuationLayer
     {
-        $model = $this->model->findOrFail($layer->id);
-        $updated = parent::update($model, [
-            'quantity'            => $layer->quantity,
-            'remaining_quantity'  => $layer->remainingQuantity,
-            'unit_cost'           => $layer->unitCost,
-            'total_cost'          => $layer->totalCost,
-        ]);
-        return $this->toEntity($updated);
+        $m = $this->model->newQuery()->find($id);
+        if (!$m) return null;
+        $m->update($data);
+        return $this->toEntity($m->fresh());
     }
 
-    private function toEntity(object $model): InventoryValuationLayer
+    public function getAverageCost(int $tenantId, int $productId, int $warehouseId): float
     {
-        return new InventoryValuationLayer(
-            id: $model->id,
-            tenantId: $model->tenant_id,
-            productId: $model->product_id,
-            warehouseId: $model->warehouse_id,
-            valuationMethod: $model->valuation_method,
-            quantity: (float) $model->quantity,
-            remainingQuantity: (float) ($model->remaining_quantity ?? $model->quantity),
-            unitCost: (float) $model->unit_cost,
-            totalCost: (float) $model->total_cost,
-            batchId: $model->batch_id,
-            receiptDate: $model->receipt_date ? new \DateTimeImmutable($model->receipt_date) : null,
-            referenceId: $model->reference_id,
-            referenceType: $model->reference_type,
-        );
+        $result = $this->model->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->where('quantity_remaining', '>', 0)
+            ->selectRaw('SUM(unit_cost * quantity_remaining) / NULLIF(SUM(quantity_remaining), 0) as avg_cost')
+            ->value('avg_cost');
+        return $result ? (float)$result : 0.0;
     }
 }

@@ -1,72 +1,55 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Modules\Inventory\Application\Services;
 
-use Illuminate\Support\Facades\Event;
-use Modules\Inventory\Application\Contracts\AllocateStockServiceInterface;
-use Modules\Inventory\Application\Contracts\ConsumeValuationLayersServiceInterface;
+use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Application\Contracts\IssueStockServiceInterface;
-use Modules\Inventory\Application\DTOs\AllocateStockData;
-use Modules\Inventory\Application\DTOs\ConsumeValuationLayersData;
 use Modules\Inventory\Application\DTOs\IssueStockData;
-use Modules\Inventory\Domain\Events\InventoryLevelUpdated;
+use Modules\Inventory\Domain\Entities\InventoryLevel;
 use Modules\Inventory\Domain\Events\StockIssued;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryLevelRepositoryInterface;
+use Modules\Inventory\Domain\RepositoryInterfaces\InventoryValuationLayerRepositoryInterface;
 
-/**
- * Outbound stock issue orchestrator.
- *
- * 1. Allocates (reserves) stock from InventoryLevel records using the configured algorithm.
- * 2. Consumes matching InventoryValuationLayers (FIFO/LIFO/Average).
- * 3. Confirms physical issuance on each InventoryLevel (reduces on-hand).
- * 4. Dispatches StockIssued + InventoryLevelUpdated events per level.
- */
 class IssueStockService implements IssueStockServiceInterface
 {
     public function __construct(
-        private readonly AllocateStockServiceInterface $allocateService,
-        private readonly ConsumeValuationLayersServiceInterface $consumeService,
-        private readonly InventoryLevelRepositoryInterface $levelRepository,
+        private readonly InventoryLevelRepositoryInterface $levelRepo,
+        private readonly InventoryValuationLayerRepositoryInterface $layerRepo,
     ) {}
 
-    public function execute(IssueStockData $data): array
+    public function execute(IssueStockData $data): InventoryLevel
     {
-        // 1. Allocate stock (reserves qty across levels using the configured algorithm)
-        $allocations = $this->allocateService->execute(new AllocateStockData(
-            tenantId:            $data->tenantId,
-            productId:           $data->productId,
-            warehouseId:         $data->warehouseId,
-            quantity:            $data->quantity,
-            allocationAlgorithm: $data->allocationAlgorithm,
-        ));
-
-        // 2. Consume valuation layers to determine COGS
-        $totalCost = $this->consumeService->execute(new ConsumeValuationLayersData(
-            tenantId:        $data->tenantId,
-            productId:       $data->productId,
-            warehouseId:     $data->warehouseId,
-            valuationMethod: $data->valuationMethod,
-            quantity:        $data->quantity,
-            referenceType:   $data->referenceType,
-            referenceId:     $data->referenceId,
-        ));
-
-        // 3. Confirm physical issuance: reduce on-hand on each allocated level
-        foreach ($allocations as $allocation) {
-            $level = $this->levelRepository->findById($allocation['level_id']);
-            if ($level === null) {
-                continue;
+        return DB::transaction(function () use ($data): InventoryLevel {
+            $level = $this->levelRepo->findByProduct($data->tenant_id, $data->product_id, $data->warehouse_id);
+            if (!$level) {
+                throw new \DomainException("No inventory level found for product [{$data->product_id}] in warehouse [{$data->warehouse_id}].");
             }
 
-            $level->issue($allocation['quantity']);
-            $this->levelRepository->save($level);
+            $level->issue($data->quantity);
+            $this->levelRepo->update($level->getId(), [
+                'quantity_on_hand' => $level->getQuantityOnHand(),
+            ]);
 
-            Event::dispatch(new StockIssued($data->tenantId, $level->id));
-            Event::dispatch(new InventoryLevelUpdated($data->tenantId, $level->id));
-        }
+            // Consume valuation layers (FIFO/LIFO/Average)
+            $remaining = $data->quantity;
+            $layers    = $this->layerRepo->findLayersForConsumption(
+                $data->tenant_id, $data->product_id, $data->warehouse_id, $data->allocation_strategy
+            );
+            foreach ($layers as $layer) {
+                if ($remaining <= InventoryLevel::FLOAT_TOLERANCE) break;
+                $consume = min($remaining, $layer->getQuantityRemaining());
+                $layer->consume($consume);
+                $this->layerRepo->update($layer->getId(), [
+                    'quantity_remaining' => $layer->getQuantityRemaining(),
+                ]);
+                $remaining -= $consume;
+            }
 
-        return [
-            'allocations' => $allocations,
-            'total_cost'  => $totalCost,
-        ];
+            event(new StockIssued($data->tenant_id, $data->product_id, $data->warehouse_id, $data->quantity));
+
+            return $level;
+        });
     }
 }

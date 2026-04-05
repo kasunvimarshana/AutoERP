@@ -1,87 +1,32 @@
 <?php
-
+declare(strict_types=1);
 namespace Modules\SalesOrder\Infrastructure\Persistence\Eloquent\Repositories;
-
-use Illuminate\Pagination\LengthAwarePaginator;
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Modules\SalesOrder\Domain\Entities\SalesOrder;
 use Modules\SalesOrder\Domain\RepositoryInterfaces\SalesOrderRepositoryInterface;
+use Modules\SalesOrder\Infrastructure\Persistence\Eloquent\Models\SalesOrderLineModel;
 use Modules\SalesOrder\Infrastructure\Persistence\Eloquent\Models\SalesOrderModel;
-
-class EloquentSalesOrderRepository extends EloquentRepository implements SalesOrderRepositoryInterface
-{
-    public function __construct(SalesOrderModel $model)
-    {
-        parent::__construct($model);
+class EloquentSalesOrderRepository implements SalesOrderRepositoryInterface {
+    public function __construct(private readonly SalesOrderModel $model, private readonly SalesOrderLineModel $lineModel) {}
+    private function toEntity(SalesOrderModel $m): SalesOrder {
+        return new SalesOrder($m->id,$m->tenant_id,$m->customer_id,$m->warehouse_id,$m->so_number,$m->status,
+            (float)$m->subtotal,(float)$m->tax_amount,(float)$m->total_amount,$m->currency,$m->notes,$m->created_by,$m->lines->toArray(),$m->created_at,$m->updated_at);
     }
-
-    public function findById(int $id): ?SalesOrder
-    {
-        $model = parent::findById($id);
-        return $model ? $this->toEntity($model) : null;
+    public function findById(int $id): ?SalesOrder { $m=$this->model->newQuery()->with('lines')->find($id); return $m?$this->toEntity($m):null; }
+    public function findByTenant(int $tenantId, array $filters = [], int $perPage = 15, int $page = 1): LengthAwarePaginator {
+        $q=$this->model->newQuery()->with('lines')->where('tenant_id',$tenantId);
+        if(!empty($filters['status'])) $q->where('status',$filters['status']);
+        return $q->paginate($perPage,['*'],'page',$page)->through(fn($m)=>$this->toEntity($m));
     }
-
-    public function findBySoNumber(int $tenantId, string $soNumber): ?SalesOrder
-    {
-        $model = $this->model->where('tenant_id', $tenantId)->where('so_number', $soNumber)->first();
-        return $model ? $this->toEntity($model) : null;
+    public function create(array $data, array $lines): SalesOrder {
+        return DB::transaction(function() use ($data,$lines) {
+            $m=$this->model->newQuery()->create($data);
+            foreach($lines as $l) $this->lineModel->newQuery()->create(array_merge($l,['sales_order_id'=>$m->id]));
+            return $this->findById($m->id);
+        });
     }
-
-    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
-    {
-        $query = $this->model->where('tenant_id', $tenantId);
-        $this->applyFilters($query, $filters);
-        return $query->paginate($perPage);
-    }
-
-    public function create(array $data): SalesOrder
-    {
-        $model = parent::create($data);
-        return $this->toEntity($model);
-    }
-
-    public function update(SalesOrder $so, array $data): SalesOrder
-    {
-        $model = $this->model->findOrFail($so->id);
-        $updated = parent::update($model, $data);
-        return $this->toEntity($updated);
-    }
-
-    public function save(SalesOrder $so): SalesOrder
-    {
-        $model = $this->model->findOrFail($so->id);
-        $updated = parent::update($model, [
-            'status'    => $so->status,
-            'picked_by' => $so->pickedBy,
-            'picked_at' => $so->pickedAt,
-            'packed_by' => $so->packedBy,
-            'packed_at' => $so->packedAt,
-        ]);
-        return $this->toEntity($updated);
-    }
-
-    private function toEntity(object $model): SalesOrder
-    {
-        return new SalesOrder(
-            id: $model->id,
-            tenantId: $model->tenant_id,
-            warehouseId: $model->warehouse_id,
-            customerId: $model->customer_id,
-            soNumber: $model->so_number,
-            status: $model->status,
-            totalAmount: $model->total_amount !== null ? (float) $model->total_amount : null,
-            taxAmount: $model->tax_amount !== null ? (float) $model->tax_amount : null,
-            discountAmount: $model->discount_amount !== null ? (float) $model->discount_amount : null,
-            currency: $model->currency,
-            shippingAddress: $model->shipping_address,
-            notes: $model->notes,
-            expectedDeliveryDate: $model->expected_delivery_date
-                ? new \DateTimeImmutable((string) $model->expected_delivery_date)
-                : null,
-            pickedBy: $model->picked_by,
-            pickedAt: $model->picked_at ? new \DateTimeImmutable((string) $model->picked_at) : null,
-            packedBy: $model->packed_by,
-            packedAt: $model->packed_at ? new \DateTimeImmutable((string) $model->packed_at) : null,
-        );
-    }
+    public function update(int $id, array $data): ?SalesOrder { $m=$this->model->newQuery()->find($id); if(!$m)return null; $m->update($data); return $this->findById($id); }
+    public function updateStatus(int $id, string $status): bool { $m=$this->model->newQuery()->find($id); if(!$m)return false; $m->update(['status'=>$status]); return true; }
+    public function delete(int $id): bool { $m=$this->model->newQuery()->find($id); return $m?(bool)$m->delete():false; }
 }

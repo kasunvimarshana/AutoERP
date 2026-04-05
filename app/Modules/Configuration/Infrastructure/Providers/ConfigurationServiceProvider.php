@@ -1,44 +1,44 @@
 <?php
+declare(strict_types=1);
 namespace Modules\Configuration\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Modules\Configuration\Application\Contracts\CreateOrganizationUnitServiceInterface;
-use Modules\Configuration\Application\Contracts\DeleteOrganizationUnitServiceInterface;
-use Modules\Configuration\Application\Contracts\GetSettingGroupServiceInterface;
-use Modules\Configuration\Application\Contracts\GetSettingServiceInterface;
-use Modules\Configuration\Application\Contracts\OrgUnitTreeServiceInterface;
-use Modules\Configuration\Application\Contracts\SetSettingServiceInterface;
-use Modules\Configuration\Application\Contracts\UpdateOrganizationUnitServiceInterface;
-use Modules\Configuration\Application\Services\CreateOrganizationUnitService;
-use Modules\Configuration\Application\Services\DeleteOrganizationUnitService;
-use Modules\Configuration\Application\Services\GetSettingGroupService;
-use Modules\Configuration\Application\Services\GetSettingService;
-use Modules\Configuration\Application\Services\OrgUnitTreeService;
-use Modules\Configuration\Application\Services\SetSettingService;
-use Modules\Configuration\Application\Services\UpdateOrganizationUnitService;
-use Modules\Configuration\Domain\RepositoryInterfaces\OrganizationUnitRepositoryInterface;
-use Modules\Configuration\Domain\RepositoryInterfaces\SystemSettingRepositoryInterface;
-use Modules\Configuration\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrganizationUnitRepository;
-use Modules\Configuration\Infrastructure\Persistence\Eloquent\Repositories\EloquentSystemSettingRepository;
+use Modules\Configuration\Application\Contracts\OrgUnitServiceInterface;
+use Modules\Configuration\Application\Contracts\SettingServiceInterface;
+use Modules\Configuration\Application\Services\OrgUnitService;
+use Modules\Configuration\Application\Services\SettingService;
+use Modules\Configuration\Domain\RepositoryInterfaces\OrgUnitRepositoryInterface;
+use Modules\Configuration\Domain\RepositoryInterfaces\SettingRepositoryInterface;
+use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\OrgUnitClosureModel;
+use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\OrgUnitModel;
+use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\SettingModel;
+use Modules\Configuration\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrgUnitRepository;
+use Modules\Configuration\Infrastructure\Persistence\Eloquent\Repositories\EloquentSettingRepository;
 
 class ConfigurationServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->bind(SystemSettingRepositoryInterface::class, EloquentSystemSettingRepository::class);
-        $this->app->bind(OrganizationUnitRepositoryInterface::class, EloquentOrganizationUnitRepository::class);
-        $this->app->bind(GetSettingServiceInterface::class, GetSettingService::class);
-        $this->app->bind(GetSettingGroupServiceInterface::class, GetSettingGroupService::class);
-        $this->app->bind(SetSettingServiceInterface::class, SetSettingService::class);
-        $this->app->bind(CreateOrganizationUnitServiceInterface::class, CreateOrganizationUnitService::class);
-        $this->app->bind(UpdateOrganizationUnitServiceInterface::class, UpdateOrganizationUnitService::class);
-        $this->app->bind(DeleteOrganizationUnitServiceInterface::class, DeleteOrganizationUnitService::class);
-        $this->app->bind(OrgUnitTreeServiceInterface::class, OrgUnitTreeService::class);
+        $this->app->bind(SettingRepositoryInterface::class, fn($app) =>
+            new EloquentSettingRepository($app->make(SettingModel::class))
+        );
+        $this->app->bind(OrgUnitRepositoryInterface::class, fn($app) =>
+            new EloquentOrgUnitRepository(
+                $app->make(OrgUnitModel::class),
+                $app->make(OrgUnitClosureModel::class)
+            )
+        );
+        $this->app->bind(SettingServiceInterface::class, fn($app) =>
+            new SettingService($app->make(SettingRepositoryInterface::class))
+        );
+        $this->app->bind(OrgUnitServiceInterface::class, fn($app) =>
+            new OrgUnitService($app->make(OrgUnitRepositoryInterface::class))
+        );
     }
 
     public function boot(): void
     {
-        $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
-        $this->loadRoutesFrom(__DIR__ . '/../../routes/api.php');
+        $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
+        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
     }
 }

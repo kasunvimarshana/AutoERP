@@ -1,11 +1,11 @@
 <?php
+declare(strict_types=1);
 namespace Modules\StockMovement\Domain\RepositoryInterfaces;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Modules\StockMovement\Domain\Entities\StockMovement;
-interface StockMovementRepositoryInterface
-{
+interface StockMovementRepositoryInterface {
     public function findById(int $id): ?StockMovement;
-    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): \Illuminate\Pagination\LengthAwarePaginator;
-    public function findByReference(string $referenceNumber): ?StockMovement;
+    public function findByProduct(int $tenantId, int $productId, int $perPage = 15, int $page = 1): LengthAwarePaginator;
+    public function findByWarehouse(int $tenantId, int $warehouseId, int $perPage = 15, int $page = 1): LengthAwarePaginator;
     public function create(array $data): StockMovement;
-    public function update(StockMovement $movement, array $data): StockMovement;
 }

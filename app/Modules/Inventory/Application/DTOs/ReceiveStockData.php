@@ -1,21 +1,24 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Modules\Inventory\Application\DTOs;
 
 use Modules\Core\Application\DTOs\BaseDTO;
 
 class ReceiveStockData extends BaseDTO
 {
-    public function __construct(
-        public readonly int $tenantId,
-        public readonly int $productId,
-        public readonly int $warehouseId,
-        public readonly int $locationId,
-        public readonly float $quantity,
-        public readonly float $unitCost,
-        public readonly string $valuationMethod,
-        public readonly ?int $batchId = null,
-        public readonly ?string $receiptDate = null,
-        public readonly ?string $referenceType = null,
-        public readonly ?int $referenceId = null,
-    ) {}
+    public int $tenant_id;
+    public int $product_id;
+    public int $warehouse_id;
+    public ?int $location_id = null;
+    public float $quantity;
+    public float $unit_cost;
+    public string $valuation_method = 'fifo';
+    public ?string $batch_number = null;
+    public ?string $lot_number = null;
+    public ?string $serial_number = null;
+    public ?string $expires_at = null;
+    public ?string $manufactured_at = null;
+    public ?string $reference = null;
 }

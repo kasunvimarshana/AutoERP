@@ -1,27 +1,37 @@
 <?php
+declare(strict_types=1);
 namespace Modules\Product\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Product\Domain\Entities\ProductVariant;
 use Modules\Product\Domain\RepositoryInterfaces\ProductVariantRepositoryInterface;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductVariantModel;
 
-class EloquentProductVariantRepository extends EloquentRepository implements ProductVariantRepositoryInterface
+class EloquentProductVariantRepository implements ProductVariantRepositoryInterface
 {
-    public function __construct(ProductVariantModel $model)
+    public function __construct(private readonly ProductVariantModel $model) {}
+
+    private function toEntity(ProductVariantModel $m): ProductVariant
     {
-        parent::__construct($model);
+        return new ProductVariant(
+            $m->id, $m->tenant_id, $m->product_id,
+            $m->sku, $m->attributes ?? [],
+            $m->price_override, $m->cost_override,
+            $m->status ?? 'active',
+            $m->created_at, $m->updated_at,
+        );
     }
 
     public function findById(int $id): ?ProductVariant
     {
-        $model = parent::findById($id);
-        return $model ? $this->toEntity($model) : null;
+        $m = $this->model->newQuery()->find($id);
+        return $m ? $this->toEntity($m) : null;
     }
 
-    public function findByProduct(int $productId): array
+    public function findByProduct(int $tenantId, int $productId): array
     {
-        return $this->model->where('product_id', $productId)
+        return $this->model->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->where('product_id', $productId)
             ->get()
             ->map(fn($m) => $this->toEntity($m))
             ->all();
@@ -29,35 +39,21 @@ class EloquentProductVariantRepository extends EloquentRepository implements Pro
 
     public function create(array $data): ProductVariant
     {
-        $model = parent::create($data);
-        return $this->toEntity($model);
+        $m = $this->model->newQuery()->create($data);
+        return $this->findById($m->id);
     }
 
-    public function update(ProductVariant $variant, array $data): ProductVariant
+    public function update(int $id, array $data): ?ProductVariant
     {
-        $model   = $this->model->findOrFail($variant->id);
-        $updated = parent::update($model, $data);
-        return $this->toEntity($updated);
+        $m = $this->model->newQuery()->find($id);
+        if (!$m) return null;
+        $m->update($data);
+        return $this->findById($id);
     }
 
-    public function delete(ProductVariant $variant): bool
+    public function delete(int $id): bool
     {
-        $model = $this->model->findOrFail($variant->id);
-        return parent::delete($model);
-    }
-
-    private function toEntity(object $model): ProductVariant
-    {
-        return new ProductVariant(
-            id:         $model->id,
-            productId:  $model->product_id,
-            sku:        $model->sku,
-            name:       $model->name,
-            basePrice:  $model->base_price !== null ? (float) $model->base_price : null,
-            costPrice:  $model->cost_price !== null ? (float) $model->cost_price : null,
-            barcode:    $model->barcode,
-            attributes: $model->attributes,
-            isActive:   (bool) $model->is_active,
-        );
+        $m = $this->model->newQuery()->find($id);
+        return $m ? (bool)$m->delete() : false;
     }
 }

@@ -1,15 +1,17 @@
 <?php
+declare(strict_types=1);
 namespace Modules\Authorization\Domain\RepositoryInterfaces;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Modules\Authorization\Domain\Entities\Role;
 
 interface RoleRepositoryInterface
 {
     public function findById(int $id): ?Role;
-    public function findByName(int $tenantId, string $name): ?Role;
-    public function findAll(int $tenantId, int $perPage = 50): \Illuminate\Pagination\LengthAwarePaginator;
+    public function findByTenant(int $tenantId, int $perPage = 15, int $page = 1): LengthAwarePaginator;
     public function create(array $data): Role;
-    public function delete(Role $role): bool;
-    public function syncPermissions(Role $role, array $permissionIds): void;
-    public function getPermissionIds(Role $role): array;
+    public function update(int $id, array $data): ?Role;
+    public function delete(int $id): bool;
+    public function syncPermissions(int $roleId, array $permissionIds): void;
+    public function getPermissions(int $roleId): array;
 }

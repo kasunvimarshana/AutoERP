@@ -1,54 +1,104 @@
 <?php
+declare(strict_types=1);
 namespace Modules\StockMovement\Application\Services;
 
-use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\DB;
+use Modules\Inventory\Domain\RepositoryInterfaces\InventoryLevelRepositoryInterface;
 use Modules\StockMovement\Application\Contracts\TransferStockServiceInterface;
-use Modules\StockMovement\Application\DTOs\TransferStockData;
-use Modules\StockMovement\Domain\Events\StockTransferred;
+use Modules\StockMovement\Domain\Entities\StockMovement;
 use Modules\StockMovement\Domain\RepositoryInterfaces\StockMovementRepositoryInterface;
-use Modules\StockMovement\Domain\ValueObjects\MovementType;
 
 class TransferStockService implements TransferStockServiceInterface
 {
-    public function __construct(private readonly StockMovementRepositoryInterface $repository) {}
+    public function __construct(
+        private readonly StockMovementRepositoryInterface $movementRepo,
+        private readonly InventoryLevelRepositoryInterface $levelRepo,
+    ) {}
 
-    public function execute(TransferStockData $data): array
-    {
-        $issueRef   = $data->reference . '-OUT';
-        $receiptRef = $data->reference . '-IN';
+    public function execute(
+        int $tenantId,
+        int $productId,
+        int $fromWarehouseId,
+        int $toWarehouseId,
+        float $quantity,
+        float $unitCost,
+        string $reference,
+        int $createdBy,
+        ?int $fromLocationId = null,
+        ?int $toLocationId = null,
+        ?string $notes = null,
+    ): array {
+        if ($quantity <= 0) {
+            throw new \InvalidArgumentException("Transfer quantity must be positive.");
+        }
+        if ($fromWarehouseId === $toWarehouseId) {
+            throw new \InvalidArgumentException("Source and destination warehouses must differ.");
+        }
 
-        $issue = $this->repository->create([
-            'tenant_id'        => $data->tenantId,
-            'product_id'       => $data->productId,
-            'warehouse_id'     => $data->fromWarehouseId,
-            'location_id'      => $data->fromLocationId,
-            'movement_type'    => MovementType::TRANSFER_OUT,
-            'quantity'         => $data->quantity,
-            'reference_number' => $issueRef,
-            'variant_id'       => $data->variantId,
-            'batch_id'         => $data->batchId,
-            'moved_at'         => now(),
-        ]);
+        return DB::transaction(function () use (
+            $tenantId, $productId, $fromWarehouseId, $toWarehouseId,
+            $quantity, $unitCost, $reference, $createdBy, $fromLocationId, $toLocationId, $notes
+        ): array {
+            // 1. Validate source has sufficient stock
+            $sourceLevel = $this->levelRepo->findByProduct($tenantId, $productId, $fromWarehouseId);
+            if (!$sourceLevel || $sourceLevel->getAvailableQuantity() < $quantity - \Modules\Inventory\Domain\Entities\InventoryLevel::FLOAT_TOLERANCE) {
+                $available = $sourceLevel ? $sourceLevel->getAvailableQuantity() : 0.0;
+                throw new \DomainException(
+                    "Insufficient stock in source warehouse [{$fromWarehouseId}]. Available: {$available}, Requested: {$quantity}."
+                );
+            }
 
-        $receipt = $this->repository->create([
-            'tenant_id'           => $data->tenantId,
-            'product_id'          => $data->productId,
-            'warehouse_id'        => $data->toWarehouseId,
-            'location_id'         => $data->toLocationId,
-            'movement_type'       => MovementType::TRANSFER_IN,
-            'quantity'            => $data->quantity,
-            'reference_number'    => $receiptRef,
-            'variant_id'          => $data->variantId,
-            'batch_id'            => $data->batchId,
-            'related_movement_id' => $issue->id,
-            'moved_at'            => now(),
-        ]);
+            // 2. Deduct from source
+            $sourceLevel->issue($quantity);
+            $this->levelRepo->update($sourceLevel->getId(), [
+                'quantity_on_hand' => $sourceLevel->getQuantityOnHand(),
+            ]);
 
-        // Update the issue movement to reference the receipt
-        $this->repository->update($issue, ['related_movement_id' => $receipt->id]);
+            // 3. Add to destination
+            $destLevel = $this->levelRepo->upsert(
+                $tenantId, $productId, $toWarehouseId, $toLocationId,
+                $sourceLevel->getValuationMethod()
+            );
+            $destLevel->receive($quantity);
+            $this->levelRepo->update($destLevel->getId(), [
+                'quantity_on_hand' => $destLevel->getQuantityOnHand(),
+            ]);
 
-        Event::dispatch(new StockTransferred($data->tenantId, $issue->id, $receipt->id));
+            $movedAt = now();
 
-        return [$issue, $receipt];
+            // 4. Record ISSUE movement (outbound from source)
+            $issue = $this->movementRepo->create([
+                'tenant_id'        => $tenantId,
+                'product_id'       => $productId,
+                'warehouse_id'     => $fromWarehouseId,
+                'from_location_id' => $fromLocationId,
+                'to_location_id'   => null,
+                'movement_type'    => StockMovement::TYPE_TRANSFER,
+                'quantity'         => -$quantity,
+                'unit_cost'        => $unitCost,
+                'reference'        => $reference,
+                'notes'            => $notes,
+                'created_by'       => $createdBy,
+                'moved_at'         => $movedAt,
+            ]);
+
+            // 5. Record RECEIPT movement (inbound to destination)
+            $receipt = $this->movementRepo->create([
+                'tenant_id'        => $tenantId,
+                'product_id'       => $productId,
+                'warehouse_id'     => $toWarehouseId,
+                'from_location_id' => null,
+                'to_location_id'   => $toLocationId,
+                'movement_type'    => StockMovement::TYPE_TRANSFER,
+                'quantity'         => $quantity,
+                'unit_cost'        => $unitCost,
+                'reference'        => $reference,
+                'notes'            => $notes,
+                'created_by'       => $createdBy,
+                'moved_at'         => $movedAt,
+            ]);
+
+            return [$issue, $receipt];
+        });
     }
 }

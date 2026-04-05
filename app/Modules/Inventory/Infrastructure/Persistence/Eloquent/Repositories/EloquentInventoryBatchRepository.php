@@ -1,67 +1,83 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Modules\Inventory\Domain\Entities\InventoryBatch;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryBatchRepositoryInterface;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\InventoryBatchModel;
 
-class EloquentInventoryBatchRepository extends EloquentRepository implements InventoryBatchRepositoryInterface
+class EloquentInventoryBatchRepository implements InventoryBatchRepositoryInterface
 {
-    public function __construct(InventoryBatchModel $model)
+    public function __construct(private readonly InventoryBatchModel $model) {}
+
+    private function toEntity(InventoryBatchModel $m): InventoryBatch
     {
-        parent::__construct($model);
+        return new InventoryBatch($m->id, $m->tenant_id, $m->product_id, $m->warehouse_id,
+            $m->batch_number, $m->lot_number, $m->serial_number,
+            (float)$m->quantity, (float)$m->quantity_remaining, (float)$m->cost_price,
+            $m->manufactured_at, $m->expires_at, $m->received_at, $m->status, $m->reference,
+            $m->created_at, $m->updated_at);
     }
 
     public function findById(int $id): ?InventoryBatch
     {
-        $model = parent::findById($id);
-        return $model ? $this->toEntity($model) : null;
+        $m = $this->model->newQuery()->find($id);
+        return $m ? $this->toEntity($m) : null;
     }
 
-    public function findByNumber(int $tenantId, int $productId, string $batchNumber): ?InventoryBatch
+    public function findByProduct(int $tenantId, int $productId, int $warehouseId): LengthAwarePaginator
     {
-        $model = $this->model->where('tenant_id', $tenantId)
+        return $this->model->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->paginate(15);
+    }
+
+    public function findActiveBatches(int $tenantId, int $productId, int $warehouseId, string $strategy = 'fifo'): array
+    {
+        $q = $this->model->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->where('status', 'active')
+            ->where('quantity_remaining', '>', 0);
+
+        if ($strategy === 'lifo') {
+            $q->orderByDesc('received_at');
+        } elseif ($strategy === 'fefo') {
+            $q->orderBy('expires_at')->orderBy('received_at');
+        } else {
+            $q->orderBy('received_at');
+        }
+
+        return $q->get()->map(fn($m) => $this->toEntity($m))->all();
+    }
+
+    public function findByBatchNumber(int $tenantId, int $productId, string $batchNumber): ?InventoryBatch
+    {
+        $m = $this->model->newQuery()
+            ->where('tenant_id', $tenantId)
             ->where('product_id', $productId)
             ->where('batch_number', $batchNumber)
             ->first();
-        return $model ? $this->toEntity($model) : null;
-    }
-
-    public function findByProduct(int $productId, int $tenantId): array
-    {
-        return $this->model->where('product_id', $productId)
-            ->where('tenant_id', $tenantId)
-            ->get()
-            ->map(fn($m) => $this->toEntity($m))
-            ->all();
+        return $m ? $this->toEntity($m) : null;
     }
 
     public function create(array $data): InventoryBatch
     {
-        $model = parent::create($data);
-        return $this->toEntity($model);
+        $m = $this->model->newQuery()->create($data);
+        return $this->toEntity($m);
     }
 
-    public function update(InventoryBatch $batch, array $data): InventoryBatch
+    public function update(int $id, array $data): ?InventoryBatch
     {
-        $model = $this->model->findOrFail($batch->id);
-        $updated = parent::update($model, $data);
-        return $this->toEntity($updated);
-    }
-
-    private function toEntity(object $model): InventoryBatch
-    {
-        return new InventoryBatch(
-            id: $model->id,
-            tenantId: $model->tenant_id,
-            productId: $model->product_id,
-            batchNumber: $model->batch_number,
-            manufacturingDate: $model->manufacturing_date ? new \DateTimeImmutable($model->manufacturing_date) : null,
-            expiryDate: $model->expiry_date ? new \DateTimeImmutable($model->expiry_date) : null,
-            supplierId: $model->supplier_id,
-            status: $model->status,
-            attributes: $model->attributes,
-        );
+        $m = $this->model->newQuery()->find($id);
+        if (!$m) return null;
+        $m->update($data);
+        return $this->toEntity($m->fresh());
     }
 }

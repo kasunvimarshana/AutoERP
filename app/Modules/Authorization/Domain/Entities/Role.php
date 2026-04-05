@@ -1,17 +1,24 @@
 <?php
+declare(strict_types=1);
 namespace Modules\Authorization\Domain\Entities;
 
-use Modules\Core\Domain\Entities\BaseEntity;
-
-class Role extends BaseEntity
+class Role
 {
     public function __construct(
-        ?int $id,
-        public readonly int $tenantId,
-        public readonly string $name,
-        public readonly string $guardName = 'api',
-        public readonly ?string $description = null,
-    ) {
-        parent::__construct($id);
-    }
+        private ?int $id,
+        private int $tenantId,
+        private string $name,
+        private string $slug,
+        private ?string $description,
+        private ?\DateTimeInterface $createdAt,
+        private ?\DateTimeInterface $updatedAt,
+    ) {}
+
+    public function getId(): ?int { return $this->id; }
+    public function getTenantId(): int { return $this->tenantId; }
+    public function getName(): string { return $this->name; }
+    public function getSlug(): string { return $this->slug; }
+    public function getDescription(): ?string { return $this->description; }
+    public function getCreatedAt(): ?\DateTimeInterface { return $this->createdAt; }
+    public function getUpdatedAt(): ?\DateTimeInterface { return $this->updatedAt; }
 }

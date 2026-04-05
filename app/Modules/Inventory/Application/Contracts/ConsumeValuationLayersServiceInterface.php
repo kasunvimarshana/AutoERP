@@ -1,15 +1,20 @@
 <?php
+declare(strict_types=1);
 namespace Modules\Inventory\Application\Contracts;
-
-use Modules\Inventory\Application\DTOs\ConsumeValuationLayersData;
 
 interface ConsumeValuationLayersServiceInterface
 {
     /**
-     * Consume quantity from inventory valuation layers using FIFO, LIFO, or weighted-average.
+     * Consume valuation layers for an outbound stock movement.
+     * Returns the weighted-average unit cost consumed.
      *
-     * @return float Total cost consumed
-     * @throws \DomainException if insufficient stock exists in the layers
+     * @param string $method  fifo | lifo | average
      */
-    public function execute(ConsumeValuationLayersData $data): float;
+    public function execute(
+        int $tenantId,
+        int $productId,
+        int $warehouseId,
+        float $quantity,
+        string $method,
+    ): float;
 }

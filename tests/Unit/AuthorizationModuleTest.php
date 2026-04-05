@@ -1,313 +1,195 @@
 <?php
-
+declare(strict_types=1);
 namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
-use Modules\Authorization\Domain\Entities\Permission;
+use PHPUnit\Framework\MockObject\MockObject;
 use Modules\Authorization\Domain\Entities\Role;
-use Modules\Authorization\Domain\Entities\UserRole;
-use Modules\Authorization\Domain\Events\PermissionCreated;
-use Modules\Authorization\Domain\Events\PermissionDeleted;
-use Modules\Authorization\Domain\Events\RoleCreated;
-use Modules\Authorization\Domain\Events\RoleDeleted;
-use Modules\Authorization\Domain\Events\RolePermissionsSynced;
-use Modules\Authorization\Domain\Events\UserRoleAssigned;
-use Modules\Authorization\Application\DTOs\AssignUserRoleData;
-use Modules\Authorization\Application\DTOs\PermissionData;
-use Modules\Authorization\Application\DTOs\RoleData;
-use Modules\Authorization\Application\DTOs\SyncPermissionsData;
-use Modules\Authorization\Application\Services\AssignUserRoleService;
-use Modules\Authorization\Application\Services\CreatePermissionService;
-use Modules\Authorization\Application\Services\CreateRoleService;
-use Modules\Authorization\Application\Services\DeletePermissionService;
-use Modules\Authorization\Application\Services\DeleteRoleService;
-use Modules\Authorization\Application\Services\SyncRolePermissionsService;
-use Modules\Authorization\Domain\RepositoryInterfaces\PermissionRepositoryInterface;
+use Modules\Authorization\Domain\Entities\Permission;
+use Modules\Authorization\Domain\Exceptions\RoleNotFoundException;
+use Modules\Authorization\Domain\Exceptions\PermissionNotFoundException;
 use Modules\Authorization\Domain\RepositoryInterfaces\RoleRepositoryInterface;
+use Modules\Authorization\Domain\RepositoryInterfaces\PermissionRepositoryInterface;
 use Modules\Authorization\Domain\RepositoryInterfaces\UserRoleRepositoryInterface;
+use Modules\Authorization\Application\Services\RoleService;
+use Modules\Authorization\Application\Services\PermissionService;
+use Modules\Authorization\Application\Services\UserRoleService;
 
 class AuthorizationModuleTest extends TestCase
 {
-    // --- Permission entity ---
-
-    public function test_permission_construction_stores_id(): void
+    private function makeRole(int $id = 1): Role
     {
-        $p = new Permission(id: 1, name: 'products.view');
-        $this->assertSame(1, $p->id);
+        return new Role($id, 1, 'Admin', 'admin', 'Administrator role', new \DateTime(), new \DateTime());
     }
 
-    public function test_permission_construction_stores_name(): void
+    private function makePermission(int $id = 1): Permission
     {
-        $p = new Permission(id: 2, name: 'orders.create');
-        $this->assertSame('orders.create', $p->name);
+        return new Permission($id, 'View Users', 'users.view', 'user', 'Can view users', new \DateTime(), new \DateTime());
     }
 
-    public function test_permission_default_guard_name(): void
+    public function test_role_entity_getters(): void
     {
-        $p = new Permission(id: 1, name: 'tenants.view');
-        $this->assertSame('api', $p->guardName);
+        $role = $this->makeRole();
+        $this->assertEquals(1, $role->getId());
+        $this->assertEquals(1, $role->getTenantId());
+        $this->assertEquals('Admin', $role->getName());
+        $this->assertEquals('admin', $role->getSlug());
+        $this->assertEquals('Administrator role', $role->getDescription());
     }
 
-    public function test_permission_custom_guard_name(): void
+    public function test_permission_entity_getters(): void
     {
-        $p = new Permission(id: 1, name: 'admin.panel', guardName: 'web');
-        $this->assertSame('web', $p->guardName);
+        $permission = $this->makePermission();
+        $this->assertEquals(1, $permission->getId());
+        $this->assertEquals('View Users', $permission->getName());
+        $this->assertEquals('users.view', $permission->getSlug());
+        $this->assertEquals('user', $permission->getModule());
     }
 
-    public function test_permission_description_defaults_to_null(): void
+    public function test_role_service_finds_role(): void
     {
-        $p = new Permission(id: 1, name: 'users.delete');
-        $this->assertNull($p->description);
+        /** @var RoleRepositoryInterface&MockObject $repo */
+        $repo = $this->createMock(RoleRepositoryInterface::class);
+        $repo->expects($this->once())->method('findById')->with(1)->willReturn($this->makeRole());
+
+        $service = new RoleService($repo);
+        $result = $service->findById(1);
+        $this->assertEquals(1, $result->getId());
     }
 
-    public function test_permission_stores_description(): void
+    public function test_role_service_throws_not_found(): void
     {
-        $p = new Permission(id: 1, name: 'users.delete', description: 'Delete a user');
-        $this->assertSame('Delete a user', $p->description);
+        /** @var RoleRepositoryInterface&MockObject $repo */
+        $repo = $this->createMock(RoleRepositoryInterface::class);
+        $repo->method('findById')->willReturn(null);
+
+        $service = new RoleService($repo);
+        $this->expectException(RoleNotFoundException::class);
+        $service->findById(999);
     }
 
-    public function test_permission_id_can_be_null(): void
+    public function test_permission_service_throws_not_found(): void
     {
-        $p = new Permission(id: null, name: 'users.view');
-        $this->assertNull($p->id);
+        /** @var PermissionRepositoryInterface&MockObject $repo */
+        $repo = $this->createMock(PermissionRepositoryInterface::class);
+        $repo->method('findById')->willReturn(null);
+
+        $service = new PermissionService($repo);
+        $this->expectException(PermissionNotFoundException::class);
+        $service->findById(999);
     }
 
-    // --- Role entity ---
-
-    public function test_role_construction_stores_id(): void
+    public function test_role_not_found_exception_message(): void
     {
-        $r = new Role(id: 5, tenantId: 1, name: 'admin');
-        $this->assertSame(5, $r->id);
+        $e = new RoleNotFoundException(5);
+        $this->assertStringContainsString('5', $e->getMessage());
+        $this->assertStringContainsString('Role', $e->getMessage());
     }
 
-    public function test_role_construction_stores_tenant_id(): void
+    public function test_permission_not_found_exception_message(): void
     {
-        $r = new Role(id: 1, tenantId: 42, name: 'manager');
-        $this->assertSame(42, $r->tenantId);
+        $e = new PermissionNotFoundException(10);
+        $this->assertStringContainsString('10', $e->getMessage());
+        $this->assertStringContainsString('Permission', $e->getMessage());
     }
 
-    public function test_role_construction_stores_name(): void
+    // ──────────────────────────────────────────────────────────────────────
+    // UserRoleService tests
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function test_user_role_service_get_user_roles(): void
     {
-        $r = new Role(id: 1, tenantId: 1, name: 'warehouse_staff');
-        $this->assertSame('warehouse_staff', $r->name);
+        /** @var UserRoleRepositoryInterface&MockObject $repo */
+        $repo = $this->createMock(UserRoleRepositoryInterface::class);
+        $repo->expects($this->once())
+            ->method('getUserRoles')
+            ->with(5)
+            ->willReturn(['admin', 'manager']);
+
+        $service = new UserRoleService($repo);
+        $result  = $service->getUserRoles(5);
+
+        $this->assertEquals(['admin', 'manager'], $result);
     }
 
-    public function test_role_default_guard_name(): void
+    public function test_user_role_service_user_has_permission(): void
     {
-        $r = new Role(id: 1, tenantId: 1, name: 'viewer');
-        $this->assertSame('api', $r->guardName);
+        $repo = $this->createMock(UserRoleRepositoryInterface::class);
+        $repo->method('userHasPermission')->with(5, 'products.view')->willReturn(true);
+
+        $service = new UserRoleService($repo);
+        $this->assertTrue($service->userHasPermission(5, 'products.view'));
     }
 
-    public function test_role_description_defaults_to_null(): void
+    public function test_user_role_service_user_has_no_permission(): void
     {
-        $r = new Role(id: 1, tenantId: 1, name: 'auditor');
-        $this->assertNull($r->description);
+        $repo = $this->createMock(UserRoleRepositoryInterface::class);
+        $repo->method('userHasPermission')->with(5, 'products.delete')->willReturn(false);
+
+        $service = new UserRoleService($repo);
+        $this->assertFalse($service->userHasPermission(5, 'products.delete'));
     }
 
-    public function test_role_stores_description(): void
+    public function test_user_role_service_user_has_role(): void
     {
-        $r = new Role(id: 1, tenantId: 1, name: 'super_admin', description: 'Full access');
-        $this->assertSame('Full access', $r->description);
+        $repo = $this->createMock(UserRoleRepositoryInterface::class);
+        $repo->method('userHasRole')->with(5, 'admin')->willReturn(true);
+
+        $service = new UserRoleService($repo);
+        $this->assertTrue($service->userHasRole(5, 'admin'));
     }
 
-    public function test_role_id_can_be_null(): void
+    public function test_user_role_service_assign_role(): void
     {
-        $r = new Role(id: null, tenantId: 1, name: 'pending_role');
-        $this->assertNull($r->id);
+        $repo = $this->createMock(UserRoleRepositoryInterface::class);
+        $repo->expects($this->once())->method('assignRole')->with(5, 3);
+
+        $service = new UserRoleService($repo);
+        $service->assignRole(5, 3);  // should not throw
+        $this->assertTrue(true);  // reached here without exception
     }
 
-    // --- UserRole entity ---
-
-    public function test_user_role_construction_stores_id(): void
+    public function test_user_role_service_remove_role(): void
     {
-        $ur = new UserRole(id: 10, userId: 3, roleId: 7);
-        $this->assertSame(10, $ur->id);
+        $repo = $this->createMock(UserRoleRepositoryInterface::class);
+        $repo->expects($this->once())->method('removeRole')->with(5, 3);
+
+        $service = new UserRoleService($repo);
+        $service->removeRole(5, 3);
+        $this->assertTrue(true);
     }
 
-    public function test_user_role_stores_user_id(): void
+    public function test_user_role_service_sync_roles(): void
     {
-        $ur = new UserRole(id: 1, userId: 15, roleId: 2);
-        $this->assertSame(15, $ur->userId);
+        $repo = $this->createMock(UserRoleRepositoryInterface::class);
+        $repo->expects($this->once())->method('syncRoles')->with(5, [1, 2, 3]);
+
+        $service = new UserRoleService($repo);
+        $service->syncRoles(5, [1, 2, 3]);
+        $this->assertTrue(true);
     }
 
-    public function test_user_role_stores_role_id(): void
+    // ──────────────────────────────────────────────────────────────────────
+    // PermissionService additional tests
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function test_permission_service_finds_permission(): void
     {
-        $ur = new UserRole(id: 1, userId: 3, roleId: 99);
-        $this->assertSame(99, $ur->roleId);
+        $repo = $this->createMock(PermissionRepositoryInterface::class);
+        $repo->method('findById')->with(1)->willReturn($this->makePermission());
+
+        $service = new PermissionService($repo);
+        $result  = $service->findById(1);
+        $this->assertEquals('users.view', $result->getSlug());
     }
 
-    public function test_user_role_id_can_be_null(): void
+    // ──────────────────────────────────────────────────────────────────────
+    // Role entity – additional tests
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function test_role_with_no_description(): void
     {
-        $ur = new UserRole(id: null, userId: 1, roleId: 1);
-        $this->assertNull($ur->id);
-    }
-
-    // --- DTOs ---
-
-    public function test_role_data_stores_all_fields(): void
-    {
-        $dto = new RoleData(tenantId: 5, name: 'cashier', description: 'Cashier role');
-        $this->assertSame(5, $dto->tenantId);
-        $this->assertSame('cashier', $dto->name);
-        $this->assertSame('cashier role', strtolower($dto->description));
-    }
-
-    public function test_role_data_to_array(): void
-    {
-        $dto = new RoleData(tenantId: 1, name: 'admin');
-        $arr = $dto->toArray();
-        $this->assertArrayHasKey('tenantId', $arr);
-        $this->assertArrayHasKey('name', $arr);
-    }
-
-    public function test_permission_data_stores_name(): void
-    {
-        $dto = new PermissionData(name: 'roles.create');
-        $this->assertSame('roles.create', $dto->name);
-    }
-
-    public function test_permission_data_default_guard_name(): void
-    {
-        $dto = new PermissionData(name: 'roles.view');
-        $this->assertSame('api', $dto->guardName);
-    }
-
-    public function test_sync_permissions_data_stores_ids(): void
-    {
-        $dto = new SyncPermissionsData(roleId: 3, permissionIds: [1, 2, 5]);
-        $this->assertSame(3, $dto->roleId);
-        $this->assertSame([1, 2, 5], $dto->permissionIds);
-    }
-
-    public function test_assign_user_role_data_stores_fields(): void
-    {
-        $dto = new AssignUserRoleData(tenantId: 1, userId: 10, roleId: 3);
-        $this->assertSame(1, $dto->tenantId);
-        $this->assertSame(10, $dto->userId);
-        $this->assertSame(3, $dto->roleId);
-    }
-
-    // --- Events ---
-
-    public function test_role_created_event_stores_tenant_and_role(): void
-    {
-        $event = new RoleCreated(tenantId: 2, roleId: 7);
-        $this->assertSame(2, $event->tenantId);
-        $this->assertSame(7, $event->roleId);
-    }
-
-    public function test_role_deleted_event_stores_tenant_and_role(): void
-    {
-        $event = new RoleDeleted(tenantId: 3, roleId: 11);
-        $this->assertSame(3, $event->tenantId);
-        $this->assertSame(11, $event->roleId);
-    }
-
-    public function test_role_permissions_synced_event_stores_permission_ids(): void
-    {
-        $event = new RolePermissionsSynced(tenantId: 1, roleId: 4, permissionIds: [2, 3]);
-        $this->assertSame([2, 3], $event->permissionIds);
-        $this->assertSame(4, $event->roleId);
-    }
-
-    public function test_permission_created_event_stores_permission_id(): void
-    {
-        $event = new PermissionCreated(tenantId: 0, permissionId: 99);
-        $this->assertSame(99, $event->permissionId);
-    }
-
-    public function test_permission_deleted_event_stores_permission_id(): void
-    {
-        $event = new PermissionDeleted(tenantId: 0, permissionId: 55);
-        $this->assertSame(55, $event->permissionId);
-    }
-
-    public function test_user_role_assigned_event_stores_user_and_role(): void
-    {
-        $event = new UserRoleAssigned(tenantId: 1, userId: 8, roleId: 2);
-        $this->assertSame(8, $event->userId);
-        $this->assertSame(2, $event->roleId);
-        $this->assertSame(1, $event->tenantId);
-    }
-
-    // --- Service contracts exist ---
-
-    public function test_create_role_service_interface_exists(): void
-    {
-        $this->assertTrue(interface_exists(\Modules\Authorization\Application\Contracts\CreateRoleServiceInterface::class));
-    }
-
-    public function test_delete_role_service_interface_exists(): void
-    {
-        $this->assertTrue(interface_exists(\Modules\Authorization\Application\Contracts\DeleteRoleServiceInterface::class));
-    }
-
-    public function test_sync_role_permissions_service_interface_exists(): void
-    {
-        $this->assertTrue(interface_exists(\Modules\Authorization\Application\Contracts\SyncRolePermissionsServiceInterface::class));
-    }
-
-    public function test_create_permission_service_interface_exists(): void
-    {
-        $this->assertTrue(interface_exists(\Modules\Authorization\Application\Contracts\CreatePermissionServiceInterface::class));
-    }
-
-    public function test_delete_permission_service_interface_exists(): void
-    {
-        $this->assertTrue(interface_exists(\Modules\Authorization\Application\Contracts\DeletePermissionServiceInterface::class));
-    }
-
-    public function test_assign_user_role_service_interface_exists(): void
-    {
-        $this->assertTrue(interface_exists(\Modules\Authorization\Application\Contracts\AssignUserRoleServiceInterface::class));
-    }
-
-    // --- Service concrete classes exist ---
-
-    public function test_create_role_service_class_exists(): void
-    {
-        $this->assertTrue(class_exists(CreateRoleService::class));
-    }
-
-    public function test_delete_role_service_class_exists(): void
-    {
-        $this->assertTrue(class_exists(DeleteRoleService::class));
-    }
-
-    public function test_sync_role_permissions_service_class_exists(): void
-    {
-        $this->assertTrue(class_exists(SyncRolePermissionsService::class));
-    }
-
-    public function test_create_permission_service_class_exists(): void
-    {
-        $this->assertTrue(class_exists(CreatePermissionService::class));
-    }
-
-    public function test_delete_permission_service_class_exists(): void
-    {
-        $this->assertTrue(class_exists(DeletePermissionService::class));
-    }
-
-    public function test_assign_user_role_service_class_exists(): void
-    {
-        $this->assertTrue(class_exists(AssignUserRoleService::class));
-    }
-
-    // --- Repository interface contracts ---
-
-    public function test_permission_repository_interface_exists(): void
-    {
-        $this->assertTrue(interface_exists(PermissionRepositoryInterface::class));
-    }
-
-    public function test_role_repository_interface_exists(): void
-    {
-        $this->assertTrue(interface_exists(RoleRepositoryInterface::class));
-    }
-
-    public function test_user_role_repository_interface_exists(): void
-    {
-        $this->assertTrue(interface_exists(UserRoleRepositoryInterface::class));
+        $role = new Role(2, 1, 'Viewer', 'viewer', null, new \DateTime(), new \DateTime());
+        $this->assertNull($role->getDescription());
     }
 }

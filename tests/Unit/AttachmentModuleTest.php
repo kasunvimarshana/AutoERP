@@ -1,102 +1,106 @@
 <?php
-
+declare(strict_types=1);
 namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
-use Modules\Attachment\Domain\ValueObjects\AttachableType;
 use Modules\Attachment\Domain\Entities\Attachment;
 
 class AttachmentModuleTest extends TestCase
 {
-    // --- AttachableType constants ---
-
-    public function test_attachable_type_purchase_order_constant(): void
+    private function makeAttachment(array $overrides = []): Attachment
     {
-        $this->assertSame('purchase_order', AttachableType::PURCHASE_ORDER);
-    }
-
-    public function test_attachable_type_goods_receipt_constant(): void
-    {
-        $this->assertSame('goods_receipt', AttachableType::GOODS_RECEIPT);
-    }
-
-    public function test_attachable_type_sales_order_constant(): void
-    {
-        $this->assertSame('sales_order', AttachableType::SALES_ORDER);
-    }
-
-    public function test_attachable_type_stock_return_constant(): void
-    {
-        $this->assertSame('stock_return', AttachableType::STOCK_RETURN);
-    }
-
-    public function test_attachable_type_product_constant(): void
-    {
-        $this->assertSame('product', AttachableType::PRODUCT);
-    }
-
-    public function test_attachable_type_supplier_constant(): void
-    {
-        $this->assertSame('supplier', AttachableType::SUPPLIER);
-    }
-
-    public function test_attachable_type_customer_constant(): void
-    {
-        $this->assertSame('customer', AttachableType::CUSTOMER);
-    }
-
-    public function test_attachable_type_dispatch_constant(): void
-    {
-        $this->assertSame('dispatch', AttachableType::DISPATCH);
-    }
-
-    // --- Attachment entity ---
-
-    public function test_attachment_construction_all_fields(): void
-    {
-        $attachment = new Attachment(
-            id: 1,
-            tenantId: 5,
-            attachableType: AttachableType::PURCHASE_ORDER,
-            attachableId: 100,
-            disk: 's3',
-            path: 'uploads/po/file.pdf',
-            originalName: 'invoice.pdf',
-            mimeType: 'application/pdf',
-            size: 204800,
-            label: 'Invoice',
-            uploadedBy: 7,
+        return new Attachment(
+            1, 1, 'product', 10, 'file_abc.pdf', 'product-spec.pdf',
+            $overrides['mime'] ?? 'application/pdf', 1024, 'attachments/1/product/10/file_abc.pdf',
+            'local', 'spec', 1, null, null
         );
-
-        $this->assertSame(1,                              $attachment->id);
-        $this->assertSame(5,                              $attachment->tenantId);
-        $this->assertSame(AttachableType::PURCHASE_ORDER, $attachment->attachableType);
-        $this->assertSame(100,                            $attachment->attachableId);
-        $this->assertSame('s3',                           $attachment->disk);
-        $this->assertSame('uploads/po/file.pdf',          $attachment->path);
-        $this->assertSame('invoice.pdf',                  $attachment->originalName);
-        $this->assertSame('application/pdf',              $attachment->mimeType);
-        $this->assertSame(204800,                         $attachment->size);
-        $this->assertSame('Invoice',                      $attachment->label);
-        $this->assertSame(7,                              $attachment->uploadedBy);
     }
 
-    public function test_attachment_optional_fields_default_to_null(): void
+    public function test_attachment_creation(): void
     {
-        $attachment = new Attachment(
-            id: null,
-            tenantId: 1,
-            attachableType: AttachableType::SALES_ORDER,
-            attachableId: 50,
-            disk: 'local',
-            path: 'uploads/so/doc.png',
-            originalName: 'receipt.png',
-            mimeType: 'image/png',
-            size: 1024,
-        );
+        $att = $this->makeAttachment();
+        $this->assertEquals('product', $att->getAttachableType());
+        $this->assertEquals(10, $att->getAttachableId());
+        $this->assertEquals('product-spec.pdf', $att->getOriginalName());
+        $this->assertEquals(1024, $att->getSize());
+    }
 
-        $this->assertNull($attachment->id);
-        $this->assertNull($attachment->label);
-        $this->assertNull($attachment->uploadedBy);
+    public function test_attachment_is_pdf(): void
+    {
+        $att = $this->makeAttachment(['mime' => 'application/pdf']);
+        $this->assertTrue($att->isPdf());
+        $this->assertFalse($att->isImage());
+    }
+
+    public function test_attachment_is_image(): void
+    {
+        $att = $this->makeAttachment(['mime' => 'image/jpeg']);
+        $this->assertTrue($att->isImage());
+        $this->assertFalse($att->isPdf());
+    }
+
+    public function test_attachment_category(): void
+    {
+        $att = $this->makeAttachment();
+        $this->assertEquals('spec', $att->getCategory());
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Attachment – additional coverage
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function test_attachment_is_png_image(): void
+    {
+        $att = $this->makeAttachment(['mime' => 'image/png']);
+        $this->assertTrue($att->isImage());
+        $this->assertFalse($att->isPdf());
+    }
+
+    public function test_attachment_is_video(): void
+    {
+        $att = $this->makeAttachment(['mime' => 'video/mp4']);
+        $this->assertFalse($att->isImage());
+        $this->assertFalse($att->isPdf());
+    }
+
+    public function test_attachment_filename_and_path(): void
+    {
+        $att = $this->makeAttachment();
+        $this->assertEquals('file_abc.pdf', $att->getFilename());
+        $this->assertEquals('attachments/1/product/10/file_abc.pdf', $att->getPath());
+        $this->assertEquals('local', $att->getDisk());
+    }
+
+    public function test_attachment_tenant_and_uploader(): void
+    {
+        $att = $this->makeAttachment();
+        $this->assertEquals(1, $att->getTenantId());
+        $this->assertEquals(1, $att->getUploadedBy());
+    }
+
+    public function test_attachment_with_no_disk(): void
+    {
+        $att = new Attachment(
+            1, 1, 'invoice', 5, 'inv.pdf', 'Invoice-2024.pdf',
+            'application/pdf', 2048, 'files/inv.pdf', null,
+            null, null, null, null
+        );
+        $this->assertNull($att->getDisk());
+        $this->assertNull($att->getCategory());
+        $this->assertNull($att->getUploadedBy());
+    }
+
+    public function test_attachment_size(): void
+    {
+        $att = $this->makeAttachment();
+        $this->assertEquals(1024, $att->getSize());
+    }
+
+    public function test_attachment_polymorphic_types(): void
+    {
+        foreach (['product', 'purchase_order', 'sales_order', 'return_request'] as $type) {
+            $att = new Attachment(1, 1, $type, 1, 'f.pdf', 'f.pdf', 'application/pdf', 100, 'f.pdf', null, null, null, null, null);
+            $this->assertEquals($type, $att->getAttachableType());
+        }
     }
 }

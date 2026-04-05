@@ -1,71 +1,22 @@
 <?php
+declare(strict_types=1);
 namespace Modules\StockMovement\Infrastructure\Persistence\Eloquent\Repositories;
-
-use Illuminate\Pagination\LengthAwarePaginator;
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Modules\StockMovement\Domain\Entities\StockMovement;
 use Modules\StockMovement\Domain\RepositoryInterfaces\StockMovementRepositoryInterface;
 use Modules\StockMovement\Infrastructure\Persistence\Eloquent\Models\StockMovementModel;
-
-class EloquentStockMovementRepository extends EloquentRepository implements StockMovementRepositoryInterface
-{
-    public function __construct(StockMovementModel $model)
-    {
-        parent::__construct($model);
+class EloquentStockMovementRepository implements StockMovementRepositoryInterface {
+    public function __construct(private readonly StockMovementModel $model) {}
+    private function toEntity(StockMovementModel $m): StockMovement {
+        return new StockMovement($m->id,$m->tenant_id,$m->product_id,$m->warehouse_id,$m->from_location_id,$m->to_location_id,
+            $m->movement_type,(float)$m->quantity,(float)$m->unit_cost,$m->reference,$m->notes,$m->created_by,$m->moved_at,$m->created_at,$m->updated_at);
     }
-
-    public function findById(int $id): ?StockMovement
-    {
-        $model = parent::findById($id);
-        return $model ? $this->toEntity($model) : null;
+    public function findById(int $id): ?StockMovement { $m=$this->model->newQuery()->find($id); return $m?$this->toEntity($m):null; }
+    public function findByProduct(int $tenantId, int $productId, int $perPage = 15, int $page = 1): LengthAwarePaginator {
+        return $this->model->newQuery()->where('tenant_id',$tenantId)->where('product_id',$productId)->paginate($perPage,['*'],'page',$page)->through(fn($m)=>$this->toEntity($m));
     }
-
-    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
-    {
-        $query = $this->model->where('tenant_id', $tenantId);
-        $this->applyFilters($query, $filters);
-        return $query->paginate($perPage);
+    public function findByWarehouse(int $tenantId, int $warehouseId, int $perPage = 15, int $page = 1): LengthAwarePaginator {
+        return $this->model->newQuery()->where('tenant_id',$tenantId)->where('warehouse_id',$warehouseId)->paginate($perPage,['*'],'page',$page)->through(fn($m)=>$this->toEntity($m));
     }
-
-    public function findByReference(string $referenceNumber): ?StockMovement
-    {
-        $model = $this->model->where('reference_number', $referenceNumber)->first();
-        return $model ? $this->toEntity($model) : null;
-    }
-
-    public function create(array $data): StockMovement
-    {
-        $model = parent::create($data);
-        return $this->toEntity($model);
-    }
-
-    public function update(StockMovement $movement, array $data): StockMovement
-    {
-        $model = $this->model->findOrFail($movement->id);
-        $updated = parent::update($model, $data);
-        return $this->toEntity($updated);
-    }
-
-    private function toEntity(object $model): StockMovement
-    {
-        return new StockMovement(
-            id: $model->id,
-            tenantId: $model->tenant_id,
-            productId: $model->product_id,
-            warehouseId: $model->warehouse_id,
-            locationId: $model->location_id,
-            movementType: $model->movement_type,
-            quantity: (float) $model->quantity,
-            referenceNumber: $model->reference_number,
-            variantId: $model->variant_id,
-            batchId: $model->batch_id,
-            lotNumber: $model->lot_number,
-            serialNumber: $model->serial_number,
-            unitCost: $model->unit_cost !== null ? (float) $model->unit_cost : null,
-            relatedMovementId: $model->related_movement_id,
-            notes: $model->notes,
-            movedAt: $model->moved_at ? new \DateTimeImmutable((string) $model->moved_at) : null,
-            movedBy: $model->moved_by,
-        );
-    }
+    public function create(array $data): StockMovement { return $this->toEntity($this->model->newQuery()->create($data)); }
 }

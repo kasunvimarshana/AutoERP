@@ -1,14 +1,11 @@
 <?php
 use Illuminate\Support\Facades\Route;
 use Modules\GoodsReceipt\Infrastructure\Http\Controllers\GoodsReceiptController;
-
-Route::prefix('goods-receipts')->group(function () {
-    Route::get('/',                  [GoodsReceiptController::class, 'index']);
-    Route::post('/',                 [GoodsReceiptController::class, 'store']);
-    Route::get('/{id}',              [GoodsReceiptController::class, 'show']);
-    Route::patch('/{id}',            [GoodsReceiptController::class, 'update']);
-    Route::delete('/{id}',           [GoodsReceiptController::class, 'destroy']);
-    Route::post('/{id}/inspect',     [GoodsReceiptController::class, 'inspect']);
-    Route::post('/{id}/put-away',    [GoodsReceiptController::class, 'putAway']);
-    Route::post('/{id}/complete',    [GoodsReceiptController::class, 'complete']);
+Route::prefix('api')->group(function () {
+    Route::get('goods-receipts', [GoodsReceiptController::class, 'index']);
+    Route::post('goods-receipts', [GoodsReceiptController::class, 'store']);
+    Route::get('goods-receipts/{id}', [GoodsReceiptController::class, 'show']);
+    Route::post('goods-receipts/{id}/inspect', [GoodsReceiptController::class, 'inspect']);
+    Route::post('goods-receipts/{id}/put-away', [GoodsReceiptController::class, 'putAway']);
+    Route::delete('goods-receipts/{id}', [GoodsReceiptController::class, 'destroy']);
 });

@@ -1,149 +1,247 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
-use Modules\User\Domain\ValueObjects\UserStatus;
+use PHPUnit\Framework\MockObject\MockObject;
 use Modules\User\Domain\Entities\User;
+use Modules\User\Domain\Exceptions\UserNotFoundException;
+use Modules\User\Domain\Exceptions\InvalidCredentialsException;
+use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
+use Modules\User\Application\DTOs\UpdateProfileData;
+use Modules\User\Application\Services\GetUserService;
+use Modules\User\Application\Services\DeleteUserService;
 
 class UserProfileModuleTest extends TestCase
 {
-    // --------------- UserStatus VO ---------------
+    // ──────────────────────────────────────────────────────────────────────
+    // Helper factories
+    // ──────────────────────────────────────────────────────────────────────
 
-    public function test_user_status_active_value(): void
-    {
-        $this->assertSame('active', UserStatus::ACTIVE);
-    }
-
-    public function test_user_status_inactive_value(): void
-    {
-        $this->assertSame('inactive', UserStatus::INACTIVE);
-    }
-
-    public function test_user_status_banned_value(): void
-    {
-        $this->assertSame('banned', UserStatus::BANNED);
-    }
-
-    public function test_user_status_from_active(): void
-    {
-        $vo = UserStatus::from(UserStatus::ACTIVE);
-        $this->assertSame('active', (string) $vo);
-    }
-
-    public function test_user_status_from_inactive(): void
-    {
-        $vo = UserStatus::from(UserStatus::INACTIVE);
-        $this->assertSame('inactive', (string) $vo);
-    }
-
-    public function test_user_status_from_banned(): void
-    {
-        $vo = UserStatus::from(UserStatus::BANNED);
-        $this->assertSame('banned', (string) $vo);
-    }
-
-    public function test_user_status_invalid_throws(): void
-    {
-        $this->expectException(\InvalidArgumentException::class);
-        UserStatus::from('superuser');
-    }
-
-    public function test_user_status_valid_list_contains_expected(): void
-    {
-        $valid = UserStatus::valid();
-        $this->assertContains('active', $valid);
-        $this->assertContains('inactive', $valid);
-        $this->assertContains('banned', $valid);
-    }
-
-    // --------------- User entity ---------------
-
-    private function makeUser(): User
+    private function makeUser(int $id = 1, string $status = 'active'): User
     {
         return new User(
-            id: 1,
-            tenantId: 10,
-            name: 'Alice',
-            email: 'alice@example.com',
-            status: UserStatus::ACTIVE,
+            $id, 1, 'Alice Smith', 'alice@example.com', 'hashed_pw',
+            $status, '+1234567890', null, null, null,
+            new \DateTime(), new \DateTime(),
         );
     }
 
-    public function test_user_stores_id(): void
+    // ──────────────────────────────────────────────────────────────────────
+    // User entity – profile management methods
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function test_user_activate(): void
     {
-        $user = $this->makeUser();
-        $this->assertSame(1, $user->id);
+        $user = $this->makeUser(1, 'inactive');
+        $this->assertFalse($user->isActive());
+        $user->activate();
+        $this->assertTrue($user->isActive());
+        $this->assertEquals('active', $user->getStatus());
     }
 
-    public function test_user_stores_name(): void
+    public function test_user_deactivate_from_active(): void
     {
         $user = $this->makeUser();
-        $this->assertSame('Alice', $user->name);
+        $this->assertTrue($user->isActive());
+        $user->deactivate();
+        $this->assertFalse($user->isActive());
+        $this->assertEquals('inactive', $user->getStatus());
     }
 
-    public function test_user_stores_email(): void
+    public function test_user_update_profile_changes_name_and_phone(): void
     {
         $user = $this->makeUser();
-        $this->assertSame('alice@example.com', $user->email);
+        $user->updateProfile('Bob Jones', '+9876543210');
+        $this->assertEquals('Bob Jones', $user->getName());
+        $this->assertEquals('+9876543210', $user->getPhone());
     }
 
-    public function test_user_stores_status(): void
+    public function test_user_update_profile_clears_phone_when_null(): void
     {
         $user = $this->makeUser();
-        $this->assertSame(UserStatus::ACTIVE, $user->status);
+        $user->updateProfile('Bob Jones', null);
+        $this->assertNull($user->getPhone());
     }
 
-    public function test_user_stores_tenant_id(): void
+    public function test_user_change_password_updates_hash(): void
     {
         $user = $this->makeUser();
-        $this->assertSame(10, $user->tenantId);
+        $user->changePassword('new_hashed_password');
+        $this->assertEquals('new_hashed_password', $user->getPassword());
     }
 
-    public function test_user_null_id_is_allowed(): void
+    public function test_user_update_avatar_sets_path(): void
+    {
+        $user = $this->makeUser();
+        $this->assertNull($user->getAvatar());
+        $user->updateAvatar('avatars/alice.jpg');
+        $this->assertEquals('avatars/alice.jpg', $user->getAvatar());
+    }
+
+    public function test_user_update_avatar_clears_when_null(): void
     {
         $user = new User(
-            id: null,
-            tenantId: 5,
-            name: 'Bob',
-            email: 'bob@example.com',
-            status: UserStatus::INACTIVE,
+            1, 1, 'Alice', 'alice@example.com', 'pw', 'active',
+            null, 'avatars/old.jpg', null, null,
+            new \DateTime(), new \DateTime(),
         );
-        $this->assertNull($user->id);
+        $user->updateAvatar(null);
+        $this->assertNull($user->getAvatar());
     }
 
-    public function test_user_optional_fields_default_to_null(): void
+    public function test_user_update_preferences_stores_array(): void
     {
         $user = $this->makeUser();
-        $this->assertNull($user->avatar);
-        $this->assertNull($user->preferences);
-        $this->assertNull($user->emailVerifiedAt);
+        $this->assertNull($user->getPreferences());
+
+        $prefs = ['theme' => 'dark', 'lang' => 'en', 'notifications' => true];
+        $user->updatePreferences($prefs);
+        $this->assertEquals($prefs, $user->getPreferences());
     }
 
-    public function test_user_avatar_can_be_set(): void
+    public function test_user_update_preferences_can_be_cleared(): void
     {
         $user = new User(
-            id: 2,
-            tenantId: 1,
-            name: 'Carol',
-            email: 'carol@example.com',
-            status: UserStatus::ACTIVE,
-            avatar: 'https://cdn.example.com/avatar.png',
+            1, 1, 'Alice', 'alice@example.com', 'pw', 'active',
+            null, null, ['theme' => 'light'], null,
+            new \DateTime(), new \DateTime(),
         );
-        $this->assertSame('https://cdn.example.com/avatar.png', $user->avatar);
+        $user->updatePreferences(null);
+        $this->assertNull($user->getPreferences());
     }
 
-    public function test_user_preferences_can_be_set(): void
+    public function test_user_getters_return_correct_values(): void
     {
-        $prefs = ['theme' => 'dark', 'lang' => 'en'];
+        $created = new \DateTime('2024-01-01');
+        $updated = new \DateTime('2024-06-01');
+        $verified = new \DateTime('2024-02-01');
+
         $user = new User(
-            id: 3,
-            tenantId: 1,
-            name: 'Dave',
-            email: 'dave@example.com',
-            status: UserStatus::ACTIVE,
-            preferences: $prefs,
+            42, 5, 'Carol White', 'carol@example.com', 'hashed',
+            'active', '+111222333', 'avatars/carol.png',
+            ['lang' => 'fr'], $verified, $created, $updated,
         );
-        $this->assertSame($prefs, $user->preferences);
+
+        $this->assertEquals(42, $user->getId());
+        $this->assertEquals(5, $user->getTenantId());
+        $this->assertEquals('Carol White', $user->getName());
+        $this->assertEquals('carol@example.com', $user->getEmail());
+        $this->assertEquals('hashed', $user->getPassword());
+        $this->assertEquals('active', $user->getStatus());
+        $this->assertEquals('+111222333', $user->getPhone());
+        $this->assertEquals('avatars/carol.png', $user->getAvatar());
+        $this->assertEquals(['lang' => 'fr'], $user->getPreferences());
+        $this->assertEquals($verified, $user->getEmailVerifiedAt());
+        $this->assertEquals($created, $user->getCreatedAt());
+        $this->assertEquals($updated, $user->getUpdatedAt());
+        $this->assertTrue($user->isActive());
+    }
+
+    public function test_user_with_null_id_is_new(): void
+    {
+        $user = new User(
+            null, 1, 'New User', 'new@example.com', 'pw',
+            'active', null, null, null, null,
+            new \DateTime(), new \DateTime(),
+        );
+        $this->assertNull($user->getId());
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // GetUserService – these services do not dispatch events and are safe
+    // to test as pure units.
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function test_get_user_service_returns_found_user(): void
+    {
+        /** @var UserRepositoryInterface&MockObject $repo */
+        $repo = $this->createMock(UserRepositoryInterface::class);
+        $repo->expects($this->once())
+            ->method('findById')
+            ->with(42)
+            ->willReturn($this->makeUser(42));
+
+        $service = new GetUserService($repo);
+        $result  = $service->findById(42);
+
+        $this->assertEquals(42, $result->getId());
+        $this->assertEquals('Alice Smith', $result->getName());
+    }
+
+    public function test_get_user_service_throws_not_found_for_unknown_id(): void
+    {
+        $repo = $this->createMock(UserRepositoryInterface::class);
+        $repo->method('findById')->willReturn(null);
+
+        $service = new GetUserService($repo);
+        $this->expectException(UserNotFoundException::class);
+        $service->findById(999);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // DeleteUserService
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function test_delete_user_service_deletes_existing_user(): void
+    {
+        $repo = $this->createMock(UserRepositoryInterface::class);
+        $repo->method('findById')->willReturn($this->makeUser(1));
+        $repo->expects($this->once())->method('delete')->with(1)->willReturn(true);
+
+        $service = new DeleteUserService($repo);
+        $result  = $service->execute(1);
+
+        $this->assertTrue($result);
+    }
+
+    public function test_delete_user_service_throws_not_found(): void
+    {
+        $repo = $this->createMock(UserRepositoryInterface::class);
+        $repo->method('findById')->willReturn(null);
+
+        $service = new DeleteUserService($repo);
+        $this->expectException(UserNotFoundException::class);
+        $service->execute(999);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // InvalidCredentialsException
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function test_invalid_credentials_exception_message(): void
+    {
+        $e = new InvalidCredentialsException();
+        $this->assertStringContainsString('Invalid credentials', $e->getMessage());
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // UserNotFoundException
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function test_user_not_found_exception_contains_id(): void
+    {
+        $e = new UserNotFoundException(77);
+        $this->assertStringContainsString('77', $e->getMessage());
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // UpdateProfileData DTO
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function test_update_profile_data_from_array(): void
+    {
+        $dto = UpdateProfileData::fromArray(['name' => 'Dave', 'phone' => '+44777888999']);
+        $this->assertEquals('Dave', $dto->name);
+        $this->assertEquals('+44777888999', $dto->phone);
+    }
+
+    public function test_update_profile_data_phone_optional(): void
+    {
+        $dto = UpdateProfileData::fromArray(['name' => 'Dave']);
+        $this->assertEquals('Dave', $dto->name);
+        $this->assertNull($dto->phone);
     }
 }

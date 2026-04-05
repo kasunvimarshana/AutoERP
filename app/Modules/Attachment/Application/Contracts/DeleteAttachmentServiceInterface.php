@@ -1,10 +1,10 @@
 <?php
 
-namespace Modules\Attachment\Application\Contracts;
+declare(strict_types=1);
 
-use Modules\Attachment\Domain\Entities\Attachment;
+namespace Modules\Attachment\Application\Contracts;
 
 interface DeleteAttachmentServiceInterface
 {
-    public function execute(Attachment $attachment): bool;
+    public function execute(int $id): bool;
 }

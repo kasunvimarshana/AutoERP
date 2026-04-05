@@ -1,28 +1,28 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Modules\Inventory\Application\Services;
 
-use Illuminate\Support\Facades\Event;
 use Modules\Inventory\Application\Contracts\ReserveStockServiceInterface;
 use Modules\Inventory\Domain\Entities\InventoryLevel;
-use Modules\Inventory\Domain\Events\StockReserved;
+use Modules\Inventory\Domain\Exceptions\InsufficientStockException;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryLevelRepositoryInterface;
 
 class ReserveStockService implements ReserveStockServiceInterface
 {
-    public function __construct(private readonly InventoryLevelRepositoryInterface $repository) {}
+    public function __construct(private readonly InventoryLevelRepositoryInterface $repo) {}
 
-    public function execute(int $levelId, float $qty): InventoryLevel
+    public function execute(int $tenantId, int $productId, int $warehouseId, float $quantity): InventoryLevel
     {
-        $level = $this->repository->findById($levelId);
-        if (!$level) {
-            throw new \DomainException("Inventory level [{$levelId}] not found.");
-        }
+        $level = $this->repo->findByProduct($tenantId, $productId, $warehouseId);
+        if (!$level) throw new InsufficientStockException($productId, $quantity, 0);
 
-        $level->reserve($qty);
-        $saved = $this->repository->save($level);
+        $level->reserve($quantity);
+        $this->repo->update($level->getId(), [
+            'quantity_reserved' => $level->getQuantityReserved(),
+        ]);
 
-        Event::dispatch(new StockReserved($saved->tenantId, $saved->id));
-
-        return $saved;
+        return $level;
     }
 }

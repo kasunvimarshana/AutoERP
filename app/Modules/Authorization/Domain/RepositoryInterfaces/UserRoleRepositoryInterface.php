@@ -1,11 +1,13 @@
 <?php
+declare(strict_types=1);
 namespace Modules\Authorization\Domain\RepositoryInterfaces;
-
-use Modules\Authorization\Domain\Entities\UserRole;
 
 interface UserRoleRepositoryInterface
 {
-    public function assign(int $userId, int $roleId): UserRole;
-    public function revoke(int $userId, int $roleId): bool;
-    public function getRoleIdsForUser(int $userId): array;
+    public function getUserRoles(int $userId): array;
+    public function assignRole(int $userId, int $roleId): void;
+    public function removeRole(int $userId, int $roleId): void;
+    public function syncRoles(int $userId, array $roleIds): void;
+    public function userHasPermission(int $userId, string $permissionSlug): bool;
+    public function userHasRole(int $userId, string $roleSlug): bool;
 }

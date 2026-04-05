@@ -1,25 +1,23 @@
 <?php
+declare(strict_types=1);
 namespace Modules\Warehouse\Domain\Entities;
-
-use Modules\Core\Domain\Entities\BaseEntity;
-
-class WarehouseLocation extends BaseEntity
-{
+class WarehouseLocation {
     public function __construct(
-        ?int $id,
-        public readonly int $warehouseId,
-        public readonly int $zoneId,
-        public readonly string $code,
-        public readonly string $barcode,
-        public readonly string $locationType,
-        public readonly bool $isActive = true,
-        public readonly ?string $aisle = null,
-        public readonly ?string $bay = null,
-        public readonly ?string $level = null,
-        public readonly ?string $bin = null,
-        public readonly ?float $maxWeight = null,
-        public readonly ?float $maxVolume = null,
-    ) {
-        parent::__construct($id);
-    }
+        private ?int $id, private int $tenantId, private int $warehouseId,
+        private ?int $parentId, private string $name, private string $code,
+        private string $type, // aisle|rack|shelf|bin|zone
+        private int $level, private bool $isActive,
+        private ?\DateTimeInterface $createdAt, private ?\DateTimeInterface $updatedAt,
+    ) {}
+    public function getId(): ?int { return $this->id; }
+    public function getTenantId(): int { return $this->tenantId; }
+    public function getWarehouseId(): int { return $this->warehouseId; }
+    public function getParentId(): ?int { return $this->parentId; }
+    public function getName(): string { return $this->name; }
+    public function getCode(): string { return $this->code; }
+    public function getType(): string { return $this->type; }
+    public function getLevel(): int { return $this->level; }
+    public function isActive(): bool { return $this->isActive; }
+    public function getCreatedAt(): ?\DateTimeInterface { return $this->createdAt; }
+    public function getUpdatedAt(): ?\DateTimeInterface { return $this->updatedAt; }
 }

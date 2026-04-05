@@ -1,13 +1,11 @@
 <?php
+declare(strict_types=1);
 namespace Modules\User\Application\DTOs;
 
-use Modules\Core\Application\DTOs\BaseDTO;
+use Modules\Core\Application\DTOs\BaseDto;
 
-class UpdateProfileData extends BaseDTO
+class UpdateProfileData extends BaseDto
 {
-    public function __construct(
-        public readonly ?string $name = null,
-        public readonly ?string $email = null,
-        public readonly ?array $preferences = null,
-    ) {}
+    public string $name;
+    public ?string $phone = null;
 }

@@ -1,78 +1,48 @@
 <?php
+declare(strict_types=1);
 namespace Modules\PurchaseOrder\Infrastructure\Persistence\Eloquent\Repositories;
-
-use Illuminate\Pagination\LengthAwarePaginator;
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Modules\PurchaseOrder\Domain\Entities\PurchaseOrder;
 use Modules\PurchaseOrder\Domain\RepositoryInterfaces\PurchaseOrderRepositoryInterface;
+use Modules\PurchaseOrder\Infrastructure\Persistence\Eloquent\Models\PurchaseOrderLineModel;
 use Modules\PurchaseOrder\Infrastructure\Persistence\Eloquent\Models\PurchaseOrderModel;
-
-class EloquentPurchaseOrderRepository extends EloquentRepository implements PurchaseOrderRepositoryInterface
-{
-    public function __construct(PurchaseOrderModel $model)
-    {
-        parent::__construct($model);
+class EloquentPurchaseOrderRepository implements PurchaseOrderRepositoryInterface {
+    public function __construct(
+        private readonly PurchaseOrderModel $model,
+        private readonly PurchaseOrderLineModel $lineModel,
+    ) {}
+    private function toEntity(PurchaseOrderModel $m): PurchaseOrder {
+        return new PurchaseOrder($m->id,$m->tenant_id,$m->supplier_id,$m->warehouse_id,$m->po_number,
+            $m->status,(float)$m->total_amount,$m->currency,$m->expected_date?->format('Y-m-d'),$m->notes,
+            $m->created_by,$m->lines->toArray(),$m->created_at,$m->updated_at);
     }
-
-    public function findById(int $id): ?PurchaseOrder
-    {
-        $model = parent::findById($id);
-        return $model ? $this->toEntity($model) : null;
+    public function findById(int $id): ?PurchaseOrder {
+        $m=$this->model->newQuery()->with('lines')->find($id); return $m?$this->toEntity($m):null;
     }
-
-    public function findByPoNumber(int $tenantId, string $poNumber): ?PurchaseOrder
-    {
-        $model = $this->model->where('tenant_id', $tenantId)->where('po_number', $poNumber)->first();
-        return $model ? $this->toEntity($model) : null;
+    public function findByPoNumber(int $tenantId, string $poNumber): ?PurchaseOrder {
+        $m=$this->model->newQuery()->with('lines')->where('tenant_id',$tenantId)->where('po_number',$poNumber)->first();
+        return $m?$this->toEntity($m):null;
     }
-
-    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
-    {
-        $query = $this->model->where('tenant_id', $tenantId);
-        $this->applyFilters($query, $filters);
-        return $query->paginate($perPage);
+    public function findByTenant(int $tenantId, array $filters = [], int $perPage = 15, int $page = 1): LengthAwarePaginator {
+        $q=$this->model->newQuery()->with('lines')->where('tenant_id',$tenantId);
+        if(!empty($filters['status'])) $q->where('status',$filters['status']);
+        return $q->paginate($perPage,['*'],'page',$page)->through(fn($m)=>$this->toEntity($m));
     }
-
-    public function create(array $data): PurchaseOrder
-    {
-        $model = parent::create($data);
-        return $this->toEntity($model);
+    public function create(array $data, array $lines): PurchaseOrder {
+        return DB::transaction(function() use ($data, $lines) {
+            $m=$this->model->newQuery()->create($data);
+            foreach($lines as $line) {
+                $this->lineModel->newQuery()->create(array_merge($line,['purchase_order_id'=>$m->id]));
+            }
+            return $this->findById($m->id);
+        });
     }
-
-    public function update(PurchaseOrder $po, array $data): PurchaseOrder
-    {
-        $model = $this->model->findOrFail($po->id);
-        $updated = parent::update($model, $data);
-        return $this->toEntity($updated);
+    public function update(int $id, array $data): ?PurchaseOrder {
+        $m=$this->model->newQuery()->find($id); if(!$m)return null; $m->update($data); return $this->findById($id);
     }
-
-    public function save(PurchaseOrder $po): PurchaseOrder
-    {
-        $model = $this->model->findOrFail($po->id);
-        $updated = parent::update($model, [
-            'status'      => $po->status,
-            'approved_by' => $po->approvedBy,
-            'approved_at' => $po->approvedAt,
-        ]);
-        return $this->toEntity($updated);
+    public function updateStatus(int $id, string $status): bool {
+        $m=$this->model->newQuery()->find($id); if(!$m)return false; $m->update(['status'=>$status]); return true;
     }
-
-    private function toEntity(object $model): PurchaseOrder
-    {
-        return new PurchaseOrder(
-            id: $model->id,
-            tenantId: $model->tenant_id,
-            warehouseId: $model->warehouse_id,
-            supplierId: $model->supplier_id,
-            poNumber: $model->po_number,
-            status: $model->status,
-            totalAmount: $model->total_amount !== null ? (float) $model->total_amount : null,
-            taxAmount: $model->tax_amount !== null ? (float) $model->tax_amount : null,
-            currency: $model->currency,
-            notes: $model->notes,
-            expectedDeliveryDate: $model->expected_delivery_date ? new \DateTimeImmutable((string) $model->expected_delivery_date) : null,
-            approvedAt: $model->approved_at ? new \DateTimeImmutable((string) $model->approved_at) : null,
-            approvedBy: $model->approved_by,
-        );
-    }
+    public function delete(int $id): bool { $m=$this->model->newQuery()->find($id); return $m?(bool)$m->delete():false; }
 }

@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Modules\Inventory\Domain\RepositoryInterfaces;
 
 use Modules\Inventory\Domain\Entities\InventoryValuationLayer;
@@ -6,10 +9,9 @@ use Modules\Inventory\Domain\Entities\InventoryValuationLayer;
 interface InventoryValuationLayerRepositoryInterface
 {
     public function findById(int $id): ?InventoryValuationLayer;
-    public function findByProduct(int $productId, int $warehouseId, string $valuationMethod): array;
-    /** Return layers with remaining_quantity > 0, ordered for FIFO (asc) or LIFO (desc) consumption. */
-    public function findByProductOrdered(int $productId, int $warehouseId, string $direction = 'asc'): array;
+    public function findByProduct(int $tenantId, int $productId, int $warehouseId): array;
+    public function findLayersForConsumption(int $tenantId, int $productId, int $warehouseId, string $method): array;
     public function create(array $data): InventoryValuationLayer;
-    public function update(InventoryValuationLayer $layer, array $data): InventoryValuationLayer;
-    public function save(InventoryValuationLayer $layer): InventoryValuationLayer;
+    public function update(int $id, array $data): ?InventoryValuationLayer;
+    public function getAverageCost(int $tenantId, int $productId, int $warehouseId): float;
 }

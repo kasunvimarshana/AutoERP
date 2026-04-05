@@ -1,75 +1,40 @@
 <?php
+declare(strict_types=1);
 namespace Modules\Supplier\Infrastructure\Persistence\Eloquent\Repositories;
-
-use Illuminate\Pagination\LengthAwarePaginator;
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Modules\Supplier\Domain\Entities\Supplier;
 use Modules\Supplier\Domain\RepositoryInterfaces\SupplierRepositoryInterface;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierModel;
-
-class EloquentSupplierRepository extends EloquentRepository implements SupplierRepositoryInterface
-{
-    public function __construct(SupplierModel $model)
-    {
-        parent::__construct($model);
+class EloquentSupplierRepository implements SupplierRepositoryInterface {
+    public function __construct(private readonly SupplierModel $model) {}
+    private function toEntity(SupplierModel $m): Supplier {
+        return new Supplier($m->id, $m->tenant_id, $m->name, $m->code, $m->email,
+            $m->phone, $m->address, (bool)$m->is_active, $m->metadata, $m->created_at, $m->updated_at);
     }
-
-    public function findById(int $id): ?Supplier
-    {
-        $model = parent::findById($id);
-        return $model ? $this->toEntity($model) : null;
+    public function findById(int $id): ?Supplier {
+        $m = $this->model->newQuery()->find($id);
+        return $m ? $this->toEntity($m) : null;
     }
-
-    public function findByCode(int $tenantId, string $code): ?Supplier
-    {
-        $model = $this->model->where('tenant_id', $tenantId)->where('code', $code)->first();
-        return $model ? $this->toEntity($model) : null;
+    public function findByCode(int $tenantId, string $code): ?Supplier {
+        $m = $this->model->newQuery()->where('tenant_id',$tenantId)->where('code',$code)->first();
+        return $m ? $this->toEntity($m) : null;
     }
-
-    public function findAll(int $tenantId, array $filters = [], int $perPage = 15): LengthAwarePaginator
-    {
-        $query = $this->model->where('tenant_id', $tenantId);
-        foreach ($filters as $key => $value) {
-            $query->where($key, $value);
-        }
-        return $query->paginate($perPage);
+    public function findByTenant(int $tenantId, int $perPage = 15, int $page = 1): LengthAwarePaginator {
+        return $this->model->newQuery()->where('tenant_id',$tenantId)
+            ->paginate($perPage, ['*'], 'page', $page)->through(fn($m) => $this->toEntity($m));
     }
-
-    public function create(array $data): Supplier
-    {
-        $model = parent::create($data);
-        return $this->toEntity($model);
+    public function create(array $data): Supplier {
+        $m = $this->model->newQuery()->create($data);
+        return $this->toEntity($m);
     }
-
-    public function update(Supplier $supplier, array $data): Supplier
-    {
-        $model = $this->model->findOrFail($supplier->id);
-        $updated = parent::update($model, $data);
-        return $this->toEntity($updated);
+    public function update(int $id, array $data): ?Supplier {
+        $m = $this->model->newQuery()->find($id);
+        if (!$m) return null;
+        $m->update($data);
+        return $this->toEntity($m->fresh());
     }
-
-    public function delete(Supplier $supplier): bool
-    {
-        $model = $this->model->findOrFail($supplier->id);
-        return parent::delete($model);
-    }
-
-    private function toEntity(object $model): Supplier
-    {
-        return new Supplier(
-            id: $model->id,
-            tenantId: $model->tenant_id,
-            name: $model->name,
-            code: $model->code,
-            status: $model->status,
-            email: $model->email,
-            phone: $model->phone,
-            address: $model->address,
-            city: $model->city,
-            country: $model->country,
-            taxNumber: $model->tax_number,
-            currency: $model->currency,
-            notes: $model->notes,
-        );
+    public function delete(int $id): bool {
+        $m = $this->model->newQuery()->find($id);
+        return $m ? (bool)$m->delete() : false;
     }
 }

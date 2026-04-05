@@ -28,7 +28,10 @@
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/",
             "Modules\\": "app/Modules/"
-        }
+        },
+        "classmap": [
+            "app/Modules/Core/Application/DTOs/BaseDTO.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {

@@ -1,12 +1,11 @@
 <?php
+declare(strict_types=1);
 namespace Modules\User\Application\DTOs;
 
-use Modules\Core\Application\DTOs\BaseDTO;
+use Modules\Core\Application\DTOs\BaseDto;
 
-class ChangePasswordData extends BaseDTO
+class ChangePasswordData extends BaseDto
 {
-    public function __construct(
-        public readonly string $currentPassword,
-        public readonly string $newPassword,
-    ) {}
+    public string $current_password;
+    public string $new_password;
 }

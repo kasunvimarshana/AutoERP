@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Modules\Product\Domain\ValueObjects;
 
 class ProductType
@@ -9,18 +12,23 @@ class ProductType
     public const COMBO    = 'combo';
     public const VARIABLE = 'variable';
 
-    private static array $valid = [self::PHYSICAL, self::SERVICE, self::DIGITAL, self::COMBO, self::VARIABLE];
+    public const VALID = [self::PHYSICAL, self::SERVICE, self::DIGITAL, self::COMBO, self::VARIABLE];
 
-    private function __construct(public readonly string $value) {}
+    private string $value;
 
-    public static function from(string $v): self
+    public function __construct(string $value)
     {
-        if (!in_array($v, self::$valid, true)) {
-            throw new \InvalidArgumentException("Invalid product type: {$v}");
+        if (!in_array($value, self::VALID, true)) {
+            throw new \InvalidArgumentException("Invalid product type: {$value}");
         }
-        return new self($v);
+        $this->value = $value;
     }
 
-    public static function valid(): array { return self::$valid; }
+    public function getValue(): string { return $this->value; }
+    public function isPhysical(): bool { return $this->value === self::PHYSICAL; }
+    public function isService(): bool  { return $this->value === self::SERVICE; }
+    public function isDigital(): bool  { return $this->value === self::DIGITAL; }
+    public function isCombo(): bool    { return $this->value === self::COMBO; }
+    public function isVariable(): bool { return $this->value === self::VARIABLE; }
     public function __toString(): string { return $this->value; }
 }

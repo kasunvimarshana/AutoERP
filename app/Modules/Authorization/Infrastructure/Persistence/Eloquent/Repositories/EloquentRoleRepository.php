@@ -1,64 +1,73 @@
 <?php
+declare(strict_types=1);
 namespace Modules\Authorization\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Modules\Authorization\Domain\Entities\Permission;
 use Modules\Authorization\Domain\Entities\Role;
 use Modules\Authorization\Domain\RepositoryInterfaces\RoleRepositoryInterface;
+use Modules\Authorization\Infrastructure\Persistence\Eloquent\Models\PermissionModel;
 use Modules\Authorization\Infrastructure\Persistence\Eloquent\Models\RoleModel;
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 
-class EloquentRoleRepository extends EloquentRepository implements RoleRepositoryInterface
+class EloquentRoleRepository implements RoleRepositoryInterface
 {
-    public function __construct(RoleModel $model) { parent::__construct($model); }
+    public function __construct(private readonly RoleModel $model) {}
+
+    private function toEntity(RoleModel $m): Role
+    {
+        return new Role($m->id, $m->tenant_id, $m->name, $m->slug, $m->description, $m->created_at, $m->updated_at);
+    }
+
+    private function toPermissionEntity(PermissionModel $m): Permission
+    {
+        return new Permission($m->id, $m->name, $m->slug, $m->module, $m->description, $m->created_at, $m->updated_at);
+    }
 
     public function findById(int $id): ?Role
     {
-        $m = parent::findById($id);
+        $m = $this->model->newQuery()->find($id);
         return $m ? $this->toEntity($m) : null;
     }
 
-    public function findByName(int $tenantId, string $name): ?Role
+    public function findByTenant(int $tenantId, int $perPage = 15, int $page = 1): LengthAwarePaginator
     {
-        $m = $this->model->where('tenant_id', $tenantId)->where('name', $name)->first();
-        return $m ? $this->toEntity($m) : null;
-    }
-
-    public function findAll(int $tenantId, int $perPage = 50): LengthAwarePaginator
-    {
-        return $this->model->where('tenant_id', $tenantId)->paginate($perPage);
+        return $this->model->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->paginate($perPage, ['*'], 'page', $page)
+            ->through(fn($m) => $this->toEntity($m));
     }
 
     public function create(array $data): Role
     {
-        return $this->toEntity(parent::create($data));
+        $m = $this->model->newQuery()->create($data);
+        return $this->toEntity($m);
     }
 
-    public function delete(Role $role): bool
+    public function update(int $id, array $data): ?Role
     {
-        $m = $this->model->findOrFail($role->id);
-        return parent::delete($m);
+        $m = $this->model->newQuery()->find($id);
+        if (!$m) {
+            return null;
+        }
+        $m->update($data);
+        return $this->toEntity($m->fresh());
     }
 
-    public function syncPermissions(Role $role, array $permissionIds): void
+    public function delete(int $id): bool
     {
-        $m = $this->model->findOrFail($role->id);
+        $m = $this->model->newQuery()->find($id);
+        return $m ? (bool) $m->delete() : false;
+    }
+
+    public function syncPermissions(int $roleId, array $permissionIds): void
+    {
+        $m = $this->model->newQuery()->findOrFail($roleId);
         $m->permissions()->sync($permissionIds);
     }
 
-    public function getPermissionIds(Role $role): array
+    public function getPermissions(int $roleId): array
     {
-        $m = $this->model->with('permissions')->findOrFail($role->id);
-        return $m->permissions->pluck('id')->toArray();
-    }
-
-    private function toEntity(object $m): Role
-    {
-        return new Role(
-            id:          $m->id,
-            tenantId:    $m->tenant_id,
-            name:        $m->name,
-            guardName:   $m->guard_name,
-            description: $m->description ?? null,
-        );
+        $m = $this->model->newQuery()->with('permissions')->findOrFail($roleId);
+        return $m->permissions->map(fn($p) => $this->toPermissionEntity($p))->all();
     }
 }
