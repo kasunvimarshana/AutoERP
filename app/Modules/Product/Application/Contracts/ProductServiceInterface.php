@@ -4,13 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Product\Application\Contracts;
 
-use Modules\Product\Application\DTOs\ProductData;
+use Modules\Core\Application\Contracts\ServiceInterface;
 
-interface ProductServiceInterface
+interface ProductServiceInterface extends ServiceInterface
 {
-    public function create(ProductData $dto): mixed;
-    public function findBySku(string $sku, int $tenantId): mixed;
-    public function findByBarcode(string $barcode, int $tenantId): mixed;
-    public function activate(int $id): mixed;
-    public function discontinue(int $id): mixed;
+    public function createProduct(array $data): mixed;
+    public function updateProduct(string $id, array $data): mixed;
 }

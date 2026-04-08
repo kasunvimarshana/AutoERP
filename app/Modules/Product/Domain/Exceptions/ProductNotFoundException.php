@@ -6,10 +6,10 @@ namespace Modules\Product\Domain\Exceptions;
 
 use Modules\Core\Domain\Exceptions\NotFoundException;
 
-final class ProductNotFoundException extends NotFoundException
+class ProductNotFoundException extends NotFoundException
 {
-    public function __construct(mixed $identifier)
+    public function __construct(string $id)
     {
-        parent::__construct('Product', $identifier);
+        parent::__construct('Product', $id);
     }
 }

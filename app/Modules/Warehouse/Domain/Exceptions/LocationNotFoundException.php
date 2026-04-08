@@ -6,10 +6,10 @@ namespace Modules\Warehouse\Domain\Exceptions;
 
 use Modules\Core\Domain\Exceptions\NotFoundException;
 
-final class LocationNotFoundException extends NotFoundException
+class LocationNotFoundException extends NotFoundException
 {
-    public function __construct(mixed $id)
+    public function __construct(string $id)
     {
-        parent::__construct('Location', $id);
+        parent::__construct('WarehouseLocation', $id);
     }
 }

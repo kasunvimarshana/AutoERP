@@ -5,52 +5,34 @@ declare(strict_types=1);
 namespace Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Str;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasUuid;
 
 class WarehouseModel extends BaseModel
 {
-    use HasTenant, SoftDeletes;
+    use HasUuid, HasTenant;
 
     protected $table = 'warehouses';
 
     protected $fillable = [
-        'uuid',
-        'tenant_id',
-        'name',
-        'code',
-        'type',
-        'address',
-        'is_active',
-        'metadata',
+        'tenant_id', 'code', 'name', 'type', 'description',
+        'address_line1', 'address_line2', 'city', 'state', 'postal_code', 'country',
+        'contact_name', 'contact_email', 'contact_phone',
+        'is_active', 'is_default', 'metadata',
     ];
 
     protected $casts = [
-        'id'         => 'integer',
-        'tenant_id'  => 'integer',
-        'address'    => 'array',
         'is_active'  => 'boolean',
+        'is_default' => 'boolean',
         'metadata'   => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
     ];
 
-    protected static function boot(): void
-    {
-        parent::boot();
-
-        static::creating(static function (self $model): void {
-            if (empty($model->uuid)) {
-                $model->uuid = (string) Str::uuid();
-            }
-        });
-    }
-
     public function locations(): HasMany
     {
-        return $this->hasMany(LocationModel::class, 'warehouse_id');
+        return $this->hasMany(WarehouseLocationModel::class, 'warehouse_id');
     }
 }

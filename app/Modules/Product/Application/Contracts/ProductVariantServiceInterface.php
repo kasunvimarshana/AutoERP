@@ -4,11 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Product\Application\Contracts;
 
-use Illuminate\Support\Collection;
-use Modules\Product\Application\DTOs\ProductVariantData;
+use Modules\Core\Application\Contracts\ServiceInterface;
 
-interface ProductVariantServiceInterface
-{
-    public function create(ProductVariantData $dto): mixed;
-    public function getByProduct(int $productId): Collection;
-}
+interface ProductVariantServiceInterface extends ServiceInterface {}

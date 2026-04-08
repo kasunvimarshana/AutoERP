@@ -5,26 +5,33 @@ declare(strict_types=1);
 namespace Modules\Warehouse\Application\DTOs;
 
 use Modules\Core\Application\DTOs\BaseDto;
-use Modules\Warehouse\Domain\ValueObjects\WarehouseType;
 
-final class WarehouseData extends BaseDto
+class WarehouseData extends BaseDto
 {
-    public string  $name;
-    public string  $code;
-    public string  $type      = WarehouseType::STANDARD;
-    public bool    $is_active = true;
-    public ?array  $address   = null;
-    public ?array  $metadata  = null;
+    public ?string $id = null;
+    public string $code = '';
+    public string $name = '';
+    public string $type = 'standard';
+    public ?string $description = null;
+    public ?string $addressLine1 = null;
+    public ?string $addressLine2 = null;
+    public ?string $city = null;
+    public ?string $state = null;
+    public ?string $postalCode = null;
+    public ?string $country = null;
+    public ?string $contactName = null;
+    public ?string $contactEmail = null;
+    public ?string $contactPhone = null;
+    public bool $isActive = true;
+    public bool $isDefault = false;
+    public ?array $metadata = null;
 
     public function rules(): array
     {
         return [
-            'name'      => ['required', 'string', 'max:255'],
-            'code'      => ['required', 'string', 'max:50'],
-            'type'      => ['required', 'string', 'in:' . implode(',', WarehouseType::ALL)],
-            'address'   => ['nullable', 'array'],
-            'is_active' => ['boolean'],
-            'metadata'  => ['nullable', 'array'],
+            'code' => ['required', 'string', 'max:50'],
+            'name' => ['required', 'string', 'max:200'],
+            'type' => ['sometimes', 'string', 'in:standard,virtual,transit,external'],
         ];
     }
 }

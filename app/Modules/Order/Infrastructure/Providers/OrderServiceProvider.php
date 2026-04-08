@@ -4,56 +4,62 @@ declare(strict_types=1);
 
 namespace Modules\Order\Infrastructure\Providers;
 
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
-use Modules\Order\Application\Contracts\OrderServiceInterface;
-use Modules\Order\Application\Services\OrderService;
-use Modules\Order\Domain\RepositoryInterfaces\OrderRepositoryInterface;
-use Modules\Order\Infrastructure\Http\Controllers\OrderController;
-use Modules\Order\Infrastructure\Persistence\Eloquent\Models\OrderModel;
-use Modules\Order\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrderRepository;
+use Modules\Order\Application\Contracts\PurchaseOrderServiceInterface;
+use Modules\Order\Application\Contracts\ReturnOrderServiceInterface;
+use Modules\Order\Application\Contracts\SalesOrderServiceInterface;
+use Modules\Order\Application\Services\PurchaseOrderService;
+use Modules\Order\Application\Services\ReturnOrderService;
+use Modules\Order\Application\Services\SalesOrderService;
+use Modules\Order\Domain\Contracts\Repositories\PurchaseOrderRepositoryInterface;
+use Modules\Order\Domain\Contracts\Repositories\ReturnOrderRepositoryInterface;
+use Modules\Order\Domain\Contracts\Repositories\SalesOrderRepositoryInterface;
+use Modules\Order\Infrastructure\Persistence\Eloquent\Models\PurchaseOrderModel;
+use Modules\Order\Infrastructure\Persistence\Eloquent\Models\ReturnOrderModel;
+use Modules\Order\Infrastructure\Persistence\Eloquent\Models\SalesOrderModel;
+use Modules\Order\Infrastructure\Persistence\Eloquent\Repositories\EloquentPurchaseOrderRepository;
+use Modules\Order\Infrastructure\Persistence\Eloquent\Repositories\EloquentReturnOrderRepository;
+use Modules\Order\Infrastructure\Persistence\Eloquent\Repositories\EloquentSalesOrderRepository;
 
-final class OrderServiceProvider extends ServiceProvider
+class OrderServiceProvider extends ServiceProvider
 {
+    /**
+     * Register Order module bindings.
+     */
     public function register(): void
     {
-        $this->app->bind(
-            OrderRepositoryInterface::class,
-            static fn ($app) => new EloquentOrderRepository($app->make(OrderModel::class))
-        );
+        // Repositories
+        $this->app->bind(SalesOrderRepositoryInterface::class, function ($app) {
+            return new EloquentSalesOrderRepository($app->make(SalesOrderModel::class));
+        });
 
-        $this->app->singleton(
-            OrderServiceInterface::class,
-            static fn ($app) => new OrderService(
-                $app->make(OrderRepositoryInterface::class)
-            )
-        );
+        $this->app->bind(PurchaseOrderRepositoryInterface::class, function ($app) {
+            return new EloquentPurchaseOrderRepository($app->make(PurchaseOrderModel::class));
+        });
 
-        $this->mergeConfigFrom(__DIR__ . '/../../config/order.php', 'order');
+        $this->app->bind(ReturnOrderRepositoryInterface::class, function ($app) {
+            return new EloquentReturnOrderRepository($app->make(ReturnOrderModel::class));
+        });
+
+        // Services
+        $this->app->bind(SalesOrderServiceInterface::class, function ($app) {
+            return new SalesOrderService($app->make(SalesOrderRepositoryInterface::class));
+        });
+
+        $this->app->bind(PurchaseOrderServiceInterface::class, function ($app) {
+            return new PurchaseOrderService($app->make(PurchaseOrderRepositoryInterface::class));
+        });
+
+        $this->app->bind(ReturnOrderServiceInterface::class, function ($app) {
+            return new ReturnOrderService($app->make(ReturnOrderRepositoryInterface::class));
+        });
     }
 
+    /**
+     * Boot the Order service provider.
+     */
     public function boot(): void
     {
-        $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
-
-        $this->registerRoutes();
-
-        $this->publishes([
-            __DIR__ . '/../../config/order.php' => config_path('order.php'),
-        ], 'order-config');
-
-        $this->publishes([
-            __DIR__ . '/../../database/migrations' => database_path('migrations'),
-        ], 'order-migrations');
-    }
-
-    private function registerRoutes(): void
-    {
-        Route::middleware(['api', 'auth:api'])
-            ->prefix('api/order')
-            ->group(static function (): void {
-                Route::apiResource('orders', OrderController::class);
-                Route::patch('orders/{id}/status', [OrderController::class, 'updateStatus']);
-            });
+        $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
     }
 }

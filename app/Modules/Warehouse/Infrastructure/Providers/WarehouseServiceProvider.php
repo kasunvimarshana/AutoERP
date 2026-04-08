@@ -4,71 +4,62 @@ declare(strict_types=1);
 
 namespace Modules\Warehouse\Infrastructure\Providers;
 
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
-use Modules\Warehouse\Application\Contracts\LocationServiceInterface;
+use Modules\Warehouse\Application\Contracts\OrganizationUnitServiceInterface;
+use Modules\Warehouse\Application\Contracts\WarehouseLocationServiceInterface;
 use Modules\Warehouse\Application\Contracts\WarehouseServiceInterface;
-use Modules\Warehouse\Application\Services\LocationService;
+use Modules\Warehouse\Application\Services\OrganizationUnitService;
+use Modules\Warehouse\Application\Services\WarehouseLocationService;
 use Modules\Warehouse\Application\Services\WarehouseService;
-use Modules\Warehouse\Domain\RepositoryInterfaces\LocationRepositoryInterface;
-use Modules\Warehouse\Domain\RepositoryInterfaces\WarehouseRepositoryInterface;
-use Modules\Warehouse\Infrastructure\Http\Controllers\LocationController;
-use Modules\Warehouse\Infrastructure\Http\Controllers\WarehouseController;
-use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models\LocationModel;
+use Modules\Warehouse\Domain\Contracts\Repositories\OrganizationUnitRepositoryInterface;
+use Modules\Warehouse\Domain\Contracts\Repositories\WarehouseLocationRepositoryInterface;
+use Modules\Warehouse\Domain\Contracts\Repositories\WarehouseRepositoryInterface;
+use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
+use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models\WarehouseLocationModel;
 use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models\WarehouseModel;
-use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Repositories\EloquentLocationRepository;
+use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrganizationUnitRepository;
+use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Repositories\EloquentWarehouseLocationRepository;
 use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Repositories\EloquentWarehouseRepository;
 
-final class WarehouseServiceProvider extends ServiceProvider
+class WarehouseServiceProvider extends ServiceProvider
 {
+    /**
+     * Register Warehouse module bindings.
+     */
     public function register(): void
     {
-        $this->app->bind(
-            WarehouseRepositoryInterface::class,
-            static fn ($app) => new EloquentWarehouseRepository($app->make(WarehouseModel::class))
-        );
+        // Repositories
+        $this->app->bind(WarehouseRepositoryInterface::class, function ($app) {
+            return new EloquentWarehouseRepository($app->make(WarehouseModel::class));
+        });
 
-        $this->app->bind(
-            LocationRepositoryInterface::class,
-            static fn ($app) => new EloquentLocationRepository($app->make(LocationModel::class))
-        );
+        $this->app->bind(WarehouseLocationRepositoryInterface::class, function ($app) {
+            return new EloquentWarehouseLocationRepository($app->make(WarehouseLocationModel::class));
+        });
 
-        $this->app->singleton(
-            WarehouseServiceInterface::class,
-            static fn ($app) => new WarehouseService($app->make(WarehouseRepositoryInterface::class))
-        );
+        $this->app->bind(OrganizationUnitRepositoryInterface::class, function ($app) {
+            return new EloquentOrganizationUnitRepository($app->make(OrganizationUnitModel::class));
+        });
 
-        $this->app->singleton(
-            LocationServiceInterface::class,
-            static fn ($app) => new LocationService($app->make(LocationRepositoryInterface::class))
-        );
+        // Services
+        $this->app->bind(WarehouseServiceInterface::class, function ($app) {
+            return new WarehouseService($app->make(WarehouseRepositoryInterface::class));
+        });
 
-        $this->mergeConfigFrom(__DIR__ . '/../../config/warehouse.php', 'warehouse');
+        $this->app->bind(WarehouseLocationServiceInterface::class, function ($app) {
+            return new WarehouseLocationService($app->make(WarehouseLocationRepositoryInterface::class));
+        });
+
+        $this->app->bind(OrganizationUnitServiceInterface::class, function ($app) {
+            return new OrganizationUnitService($app->make(OrganizationUnitRepositoryInterface::class));
+        });
     }
 
+    /**
+     * Boot the Warehouse service provider.
+     */
     public function boot(): void
     {
-        $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
-
-        $this->registerRoutes();
-
-        $this->publishes([
-            __DIR__ . '/../../config/warehouse.php' => config_path('warehouse.php'),
-        ], 'warehouse-config');
-
-        $this->publishes([
-            __DIR__ . '/../../database/migrations' => database_path('migrations'),
-        ], 'warehouse-migrations');
-    }
-
-    private function registerRoutes(): void
-    {
-        Route::middleware(['api', 'auth:api'])
-            ->prefix('api/warehouse')
-            ->group(static function (): void {
-                Route::get('locations/{id}/tree', [LocationController::class, 'getTree']);
-                Route::apiResource('warehouses', WarehouseController::class);
-                Route::apiResource('locations', LocationController::class);
-            });
+        $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
     }
 }

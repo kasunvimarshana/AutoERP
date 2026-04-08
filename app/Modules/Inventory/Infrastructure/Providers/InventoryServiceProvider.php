@@ -4,107 +4,111 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Infrastructure\Providers;
 
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
-use Modules\Inventory\Application\Contracts\BatchLotServiceInterface;
-use Modules\Inventory\Application\Contracts\SerialNumberServiceInterface;
-use Modules\Inventory\Application\Contracts\StockServiceInterface;
-use Modules\Inventory\Application\Services\BatchLotService;
-use Modules\Inventory\Application\Services\SerialNumberService;
-use Modules\Inventory\Application\Services\StockService;
-use Modules\Inventory\Domain\RepositoryInterfaces\BatchLotRepositoryInterface;
-use Modules\Inventory\Domain\RepositoryInterfaces\SerialNumberRepositoryInterface;
-use Modules\Inventory\Domain\RepositoryInterfaces\StockItemRepositoryInterface;
-use Modules\Inventory\Domain\RepositoryInterfaces\StockMovementRepositoryInterface;
-use Modules\Inventory\Infrastructure\Http\Controllers\BatchLotController;
-use Modules\Inventory\Infrastructure\Http\Controllers\SerialNumberController;
-use Modules\Inventory\Infrastructure\Http\Controllers\StockController;
+use Modules\Inventory\Application\Contracts\AllocationServiceInterface;
+use Modules\Inventory\Application\Contracts\CycleCountServiceInterface;
+use Modules\Inventory\Application\Contracts\InventoryServiceInterface;
+use Modules\Inventory\Application\Contracts\StockReservationServiceInterface;
+use Modules\Inventory\Application\Services\Allocation\FefoAllocationStrategy;
+use Modules\Inventory\Application\Services\Allocation\FifoAllocationStrategy;
+use Modules\Inventory\Application\Services\Allocation\LifoAllocationStrategy;
+use Modules\Inventory\Application\Services\AllocationService;
+use Modules\Inventory\Application\Services\CycleCountService;
+use Modules\Inventory\Application\Services\InventoryService;
+use Modules\Inventory\Application\Services\StockReservationService;
+use Modules\Inventory\Domain\Contracts\Repositories\BatchLotRepositoryInterface;
+use Modules\Inventory\Domain\Contracts\Repositories\CycleCountRepositoryInterface;
+use Modules\Inventory\Domain\Contracts\Repositories\InventoryAdjustmentRepositoryInterface;
+use Modules\Inventory\Domain\Contracts\Repositories\InventoryItemRepositoryInterface;
+use Modules\Inventory\Domain\Contracts\Repositories\InventoryMovementRepositoryInterface;
+use Modules\Inventory\Domain\Contracts\Repositories\StockReservationRepositoryInterface;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\BatchLotModel;
-use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\SerialNumberModel;
-use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\StockItemModel;
-use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\StockMovementModel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\CycleCountModel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\InventoryAdjustmentModel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\InventoryItemModel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\InventoryMovementModel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\StockReservationModel;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentBatchLotRepository;
-use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentSerialNumberRepository;
-use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentStockItemRepository;
-use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentStockMovementRepository;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentCycleCountRepository;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentInventoryAdjustmentRepository;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentInventoryItemRepository;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentInventoryMovementRepository;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentStockReservationRepository;
 
-final class InventoryServiceProvider extends ServiceProvider
+class InventoryServiceProvider extends ServiceProvider
 {
+    /**
+     * Register Inventory module bindings.
+     */
     public function register(): void
     {
-        $this->app->bind(
-            StockItemRepositoryInterface::class,
-            static fn ($app) => new EloquentStockItemRepository($app->make(StockItemModel::class))
-        );
+        // Repositories
+        $this->app->bind(InventoryItemRepositoryInterface::class, function ($app) {
+            return new EloquentInventoryItemRepository($app->make(InventoryItemModel::class));
+        });
 
-        $this->app->bind(
-            StockMovementRepositoryInterface::class,
-            static fn ($app) => new EloquentStockMovementRepository($app->make(StockMovementModel::class))
-        );
+        $this->app->bind(InventoryMovementRepositoryInterface::class, function ($app) {
+            return new EloquentInventoryMovementRepository($app->make(InventoryMovementModel::class));
+        });
 
-        $this->app->bind(
-            BatchLotRepositoryInterface::class,
-            static fn ($app) => new EloquentBatchLotRepository($app->make(BatchLotModel::class))
-        );
+        $this->app->bind(InventoryAdjustmentRepositoryInterface::class, function ($app) {
+            return new EloquentInventoryAdjustmentRepository($app->make(InventoryAdjustmentModel::class));
+        });
 
-        $this->app->bind(
-            SerialNumberRepositoryInterface::class,
-            static fn ($app) => new EloquentSerialNumberRepository($app->make(SerialNumberModel::class))
-        );
+        $this->app->bind(BatchLotRepositoryInterface::class, function ($app) {
+            return new EloquentBatchLotRepository($app->make(BatchLotModel::class));
+        });
 
-        $this->app->singleton(
-            StockServiceInterface::class,
-            static fn ($app) => new StockService(
-                $app->make(StockItemRepositoryInterface::class),
-                $app->make(StockMovementRepositoryInterface::class)
-            )
-        );
+        $this->app->bind(CycleCountRepositoryInterface::class, function ($app) {
+            return new EloquentCycleCountRepository($app->make(CycleCountModel::class));
+        });
 
-        $this->app->singleton(
-            BatchLotServiceInterface::class,
-            static fn ($app) => new BatchLotService(
-                $app->make(BatchLotRepositoryInterface::class)
-            )
-        );
+        $this->app->bind(StockReservationRepositoryInterface::class, function ($app) {
+            return new EloquentStockReservationRepository($app->make(StockReservationModel::class));
+        });
 
-        $this->app->singleton(
-            SerialNumberServiceInterface::class,
-            static fn ($app) => new SerialNumberService(
-                $app->make(SerialNumberRepositoryInterface::class)
-            )
-        );
+        // Allocation strategies (singletons — stateless)
+        $this->app->singleton(FifoAllocationStrategy::class);
+        $this->app->singleton(FefoAllocationStrategy::class);
+        $this->app->singleton(LifoAllocationStrategy::class);
 
-        $this->mergeConfigFrom(__DIR__ . '/../../config/inventory.php', 'inventory');
+        // Services
+        $this->app->bind(InventoryServiceInterface::class, function ($app) {
+            return new InventoryService(
+                $app->make(InventoryItemRepositoryInterface::class),
+                $app->make(InventoryMovementRepositoryInterface::class),
+            );
+        });
+
+        $this->app->bind(CycleCountServiceInterface::class, function ($app) {
+            return new CycleCountService(
+                $app->make(CycleCountRepositoryInterface::class),
+                $app->make(InventoryItemRepositoryInterface::class),
+            );
+        });
+
+        $this->app->bind(AllocationServiceInterface::class, function ($app) {
+            return new AllocationService(
+                $app->make(BatchLotRepositoryInterface::class),
+                $app->make(FifoAllocationStrategy::class),
+                $app->make(FefoAllocationStrategy::class),
+                $app->make(LifoAllocationStrategy::class),
+            );
+        });
+
+        $this->app->bind(StockReservationServiceInterface::class, function ($app) {
+            return new StockReservationService(
+                $app->make(StockReservationRepositoryInterface::class),
+                $app->make(InventoryItemRepositoryInterface::class),
+            );
+        });
     }
 
+    /**
+     * Boot the Inventory service provider.
+     */
     public function boot(): void
     {
-        $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
-
-        $this->registerRoutes();
-
-        $this->publishes([
-            __DIR__ . '/../../config/inventory.php' => config_path('inventory.php'),
-        ], 'inventory-config');
-
-        $this->publishes([
-            __DIR__ . '/../../database/migrations' => database_path('migrations'),
-        ], 'inventory-migrations');
-    }
-
-    private function registerRoutes(): void
-    {
-        Route::middleware(['api', 'auth:api'])
-            ->prefix('api/inventory')
-            ->group(static function (): void {
-                Route::post('stock/adjust', [StockController::class, 'adjust']);
-                Route::post('stock/transfer', [StockController::class, 'transfer']);
-                Route::get('stock/movements', [StockController::class, 'movements']);
-                Route::get('stock', [StockController::class, 'index']);
-
-                Route::get('serial-numbers/by-serial', [SerialNumberController::class, 'findBySerial']);
-                Route::apiResource('batch-lots', BatchLotController::class);
-                Route::apiResource('serial-numbers', SerialNumberController::class);
-            });
+        $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
     }
 }

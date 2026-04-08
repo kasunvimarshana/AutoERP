@@ -6,28 +6,23 @@ namespace Modules\Product\Application\DTOs;
 
 use Modules\Core\Application\DTOs\BaseDto;
 
-final class UnitOfMeasureData extends BaseDto
+class UnitOfMeasureData extends BaseDto
 {
-    public ?string $name = null;
-    public ?string $abbreviation = null;
-    public ?int $tenant_id = null;
-    public ?string $type = null;
-    public ?int $base_unit_id = null;
-    public ?float $conversion_factor = null;
-    public ?bool $is_base = null;
-    public ?bool $is_active = null;
+    public ?string $id = null;
+    public string $code = '';
+    public string $name = '';
+    public string $type = 'piece';
+    public bool $isBaseUnit = false;
+    public float $conversionFactor = 1.0;
+    public ?array $metadata = null;
 
     public function rules(): array
     {
         return [
-            'name'              => ['required', 'string', 'max:100'],
-            'abbreviation'      => ['required', 'string', 'max:20'],
-            'tenant_id'         => ['sometimes', 'integer'],
-            'type'              => ['sometimes', 'string', 'in:length,weight,volume,area,count,time,digital,other'],
-            'base_unit_id'      => ['nullable', 'integer'],
-            'conversion_factor' => ['sometimes', 'numeric'],
-            'is_base'           => ['sometimes', 'boolean'],
-            'is_active'         => ['sometimes', 'boolean'],
+            'code' => ['required', 'string', 'max:30'],
+            'name' => ['required', 'string', 'max:100'],
+            'type' => ['sometimes', 'string', 'in:weight,volume,length,area,time,piece,custom'],
+            'conversion_factor' => ['sometimes', 'numeric', 'min:0'],
         ];
     }
 }

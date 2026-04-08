@@ -6,7 +6,7 @@ namespace Modules\Product\Infrastructure\Persistence\Eloquent\Repositories;
 
 use Illuminate\Support\Collection;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
-use Modules\Product\Domain\RepositoryInterfaces\ProductRepositoryInterface;
+use Modules\Product\Domain\Contracts\Repositories\ProductRepositoryInterface;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductModel;
 
 class EloquentProductRepository extends EloquentRepository implements ProductRepositoryInterface
@@ -16,26 +16,24 @@ class EloquentProductRepository extends EloquentRepository implements ProductRep
         parent::__construct($model);
     }
 
-    public function findBySku(string $sku, int $tenantId): mixed
+    public function findBySku(string $sku): mixed
     {
-        return $this->model->where('sku', $sku)->where('tenant_id', $tenantId)->first();
+        return $this->model->newQuery()->where('sku', $sku)->first();
     }
 
-    public function findByBarcode(string $barcode, int $tenantId): mixed
+    public function findByType(string $type): Collection
     {
-        return $this->model->where('barcode', $barcode)->where('tenant_id', $tenantId)->first();
+        return $this->model->newQuery()->where('type', $type)->get();
     }
 
-    public function findByCategory(int $categoryId): Collection
+    /**
+     * Find a product by its GS1 GTIN within a tenant.
+     */
+    public function findByGtin(int $tenantId, string $gtin): mixed
     {
-        return $this->model->where('category_id', $categoryId)->get();
-    }
-
-    public function searchByName(string $query, int $tenantId): Collection
-    {
-        return $this->model
+        return $this->model->newQuery()
             ->where('tenant_id', $tenantId)
-            ->where('name', 'like', "%{$query}%")
-            ->get();
+            ->where('gtin', $gtin)
+            ->first();
     }
 }

@@ -6,9 +6,9 @@ namespace Modules\Warehouse\Domain\Exceptions;
 
 use Modules\Core\Domain\Exceptions\NotFoundException;
 
-final class WarehouseNotFoundException extends NotFoundException
+class WarehouseNotFoundException extends NotFoundException
 {
-    public function __construct(mixed $id)
+    public function __construct(string $id)
     {
         parent::__construct('Warehouse', $id);
     }

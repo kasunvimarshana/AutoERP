@@ -4,36 +4,32 @@ declare(strict_types=1);
 
 namespace Modules\Product\Infrastructure\Persistence\Eloquent\Models;
 
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasUuid;
 
 class UnitOfMeasureModel extends BaseModel
 {
-    use HasTenant, HasUuid;
+    use HasUuid, HasTenant;
 
     protected $table = 'units_of_measure';
 
     protected $fillable = [
-        'uuid', 'tenant_id', 'name', 'abbreviation', 'type',
-        'base_unit_id', 'conversion_factor', 'is_base', 'is_active',
+        'tenant_id',
+        'code',
+        'name',
+        'type',
+        'is_base_unit',
+        'conversion_factor',
+        'metadata',
     ];
 
     protected $casts = [
-        'conversion_factor' => 'decimal:10',
-        'is_base'           => 'boolean',
-        'is_active'         => 'boolean',
+        'is_base_unit'      => 'boolean',
+        'conversion_factor' => 'decimal:6',
+        'metadata'          => 'array',
+        'created_at'        => 'datetime',
+        'updated_at'        => 'datetime',
+        'deleted_at'        => 'datetime',
     ];
-
-    public function baseUnit(): BelongsTo
-    {
-        return $this->belongsTo(self::class, 'base_unit_id');
-    }
-
-    public function derivedUnits(): HasMany
-    {
-        return $this->hasMany(self::class, 'base_unit_id');
-    }
 }

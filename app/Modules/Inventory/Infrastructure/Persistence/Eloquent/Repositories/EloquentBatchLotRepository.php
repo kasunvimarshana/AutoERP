@@ -6,43 +6,41 @@ namespace Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories;
 
 use Illuminate\Support\Collection;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
-use Modules\Inventory\Domain\RepositoryInterfaces\BatchLotRepositoryInterface;
+use Modules\Inventory\Domain\Contracts\Repositories\BatchLotRepositoryInterface;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\BatchLotModel;
 
-final class EloquentBatchLotRepository extends EloquentRepository implements BatchLotRepositoryInterface
+class EloquentBatchLotRepository extends EloquentRepository implements BatchLotRepositoryInterface
 {
     public function __construct(BatchLotModel $model)
     {
         parent::__construct($model);
     }
 
-    public function findByNumber(string $batchNumber, int $productId): mixed
+    public function findByBatchNumber(string $productId, string $batchNumber): mixed
     {
         return $this->model->newQuery()
-            ->withoutGlobalScope('tenant')
-            ->where('batch_number', $batchNumber)
             ->where('product_id', $productId)
+            ->where('batch_number', $batchNumber)
             ->first();
     }
 
-    public function findByProduct(int $productId): Collection
-    {
-        return $this->model->newQuery()
-            ->withoutGlobalScope('tenant')
+    /**
+     * Return available batch/lot records (quantity > 0) for allocation.
+     */
+    public function findAvailableForAllocation(
+        string $productId,
+        string $warehouseId,
+        ?string $variantId = null,
+    ): Collection {
+        $query = $this->model->newQuery()
             ->where('product_id', $productId)
-            ->orderBy('expiry_date')
-            ->get();
-    }
+            ->where('warehouse_id', $warehouseId)
+            ->where('quantity', '>', 0);
 
-    public function findExpiring(int $tenantId, \DateTimeInterface $before): Collection
-    {
-        return $this->model->newQuery()
-            ->withoutGlobalScope('tenant')
-            ->where('tenant_id', $tenantId)
-            ->whereNotNull('expiry_date')
-            ->where('expiry_date', '<=', $before->format('Y-m-d'))
-            ->where('remaining_quantity', '>', 0)
-            ->orderBy('expiry_date')
-            ->get();
+        if ($variantId !== null) {
+            $query->where('variant_id', $variantId);
+        }
+
+        return $query->get();
     }
 }

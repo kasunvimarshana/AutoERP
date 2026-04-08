@@ -11,23 +11,34 @@ use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasUuid;
 
 class ProductVariantModel extends BaseModel
 {
-    use HasTenant, HasUuid;
+    use HasUuid, HasTenant;
 
     protected $table = 'product_variants';
 
     protected $fillable = [
-        'uuid', 'tenant_id', 'product_id', 'sku', 'barcode', 'name',
-        'attribute_values', 'cost_price', 'selling_price', 'weight',
-        'is_active', 'images', 'metadata',
+        'tenant_id',
+        'product_id',
+        'sku',
+        'barcode',
+        'name',
+        'attributes',
+        'cost_price',
+        'selling_price',
+        'weight',
+        'image_path',
+        'is_active',
+        'metadata',
     ];
 
     protected $casts = [
-        'attribute_values' => 'array',
-        'images'           => 'array',
-        'metadata'         => 'array',
-        'is_active'        => 'boolean',
-        'cost_price'       => 'decimal:6',
-        'selling_price'    => 'decimal:6',
+        'attributes'    => 'array',
+        'cost_price'    => 'decimal:4',
+        'selling_price' => 'decimal:4',
+        'is_active'     => 'boolean',
+        'metadata'      => 'array',
+        'created_at'    => 'datetime',
+        'updated_at'    => 'datetime',
+        'deleted_at'    => 'datetime',
     ];
 
     public function product(): BelongsTo

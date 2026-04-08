@@ -8,46 +8,48 @@ use Modules\Core\Application\DTOs\BaseDto;
 
 class ProductData extends BaseDto
 {
-    public ?int $tenant_id = null;
-    public ?int $category_id = null;
-    public ?int $unit_of_measure_id = null;
+    public ?string $id = null;
+    public ?string $categoryId = null;
     public string $sku = '';
     public ?string $barcode = null;
     public string $name = '';
-    public ?string $slug = null;
-    public ?string $short_description = null;
     public ?string $description = null;
     public string $type = 'physical';
-    public string $status = 'draft';
-    public bool $is_purchasable = true;
-    public bool $is_sellable = true;
-    public bool $is_stockable = true;
-    public bool $has_variants = false;
-    public bool $has_serial_tracking = false;
-    public bool $has_batch_tracking = false;
-    public bool $has_expiry_tracking = false;
-    public float $cost_price = 0.0;
-    public float $selling_price = 0.0;
-    public ?float $min_selling_price = null;
-    public string $currency = 'USD';
-    public ?string $tax_class = null;
+    public string $status = 'active';
+    public string $unitOfMeasure = 'piece';
     public ?float $weight = null;
-    public ?string $weight_unit = null;
-    public ?array $dimensions = null;
-    public ?array $images = null;
-    public ?array $tags = null;
+    public ?string $weightUnit = null;
+    public ?float $dimensionsLength = null;
+    public ?float $dimensionsWidth = null;
+    public ?float $dimensionsHeight = null;
+    public ?string $dimensionsUnit = null;
+    public float $costPrice = 0.0;
+    public float $sellingPrice = 0.0;
+    public string $currencyCode = 'USD';
+    public ?string $taxClass = null;
+    public float $taxRate = 0.0;
+    public bool $isTaxable = true;
+    public bool $isTrackable = true;
+    public bool $isPurchasable = true;
+    public bool $isSellable = true;
+    public float $minStockLevel = 0.0;
+    public ?float $maxStockLevel = null;
+    public float $reorderPoint = 0.0;
+    public float $reorderQuantity = 0.0;
+    public int $leadTimeDays = 0;
+    public ?string $imagePath = null;
     public ?array $metadata = null;
 
     public function rules(): array
     {
         return [
-            'sku'            => 'required|string|max:100',
-            'name'           => 'required|string|max:255',
-            'type'           => 'required|in:physical,service,digital,combo,variable',
-            'status'         => 'required|in:active,inactive,draft,discontinued',
-            'cost_price'     => 'nullable|numeric|min:0',
-            'selling_price'  => 'nullable|numeric|min:0',
-            'currency'       => 'nullable|string|size:3',
+            'sku'            => ['required', 'string', 'max:100'],
+            'name'           => ['required', 'string', 'max:300'],
+            'type'           => ['sometimes', 'string', 'in:physical,service,digital,combo,variable'],
+            'status'         => ['sometimes', 'string', 'in:active,inactive,discontinued'],
+            'cost_price'     => ['sometimes', 'numeric', 'min:0'],
+            'selling_price'  => ['sometimes', 'numeric', 'min:0'],
+            'currency_code'  => ['sometimes', 'string', 'max:10'],
         ];
     }
 }
