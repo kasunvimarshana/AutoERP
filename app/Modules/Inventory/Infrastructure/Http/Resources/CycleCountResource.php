@@ -4,25 +4,23 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Infrastructure\Http\Resources;
 
-use Modules\Core\Infrastructure\Http\Resources\BaseResource;
+use Illuminate\Http\Resources\Json\JsonResource;
 
-class CycleCountResource extends BaseResource
+class CycleCountResource extends JsonResource
 {
     public function toArray($request): array
     {
         return [
-            'id'           => $this->id,
-            'count_number' => $this->count_number,
-            'warehouse_id' => $this->warehouse_id,
-            'location_id'  => $this->location_id,
-            'status'       => $this->status,
-            'counted_at'   => $this->counted_at?->toIso8601String(),
-            'completed_at' => $this->completed_at?->toIso8601String(),
-            'counted_by'   => $this->counted_by,
-            'notes'        => $this->notes,
-            'lines'        => CycleCountLineResource::collection($this->whenLoaded('lines')),
-            'created_at'   => $this->created_at?->toIso8601String(),
-            'updated_at'   => $this->updated_at?->toIso8601String(),
+            'id'           => $this->resource->id,
+            'tenant_id'    => $this->resource->tenantId,
+            'warehouse_id' => $this->resource->warehouseId,
+            'location_id'  => $this->resource->locationId,
+            'status'       => $this->resource->status,
+            'scheduled_at' => $this->resource->scheduledAt,
+            'completed_at' => $this->resource->completedAt,
+            'notes'        => $this->resource->notes,
+            'created_at'   => $this->resource->createdAt,
+            'updated_at'   => $this->resource->updatedAt,
         ];
     }
 }

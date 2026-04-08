@@ -4,28 +4,21 @@ declare(strict_types=1);
 
 namespace Modules\Warehouse\Infrastructure\Http\Resources;
 
-use Modules\Core\Infrastructure\Http\Resources\BaseResource;
+use Illuminate\Http\Resources\Json\JsonResource;
 
-class WarehouseResource extends BaseResource
+class WarehouseResource extends JsonResource
 {
     public function toArray($request): array
     {
         return [
-            'id'            => $this->id,
-            'code'          => $this->code,
-            'name'          => $this->name,
-            'type'          => $this->type,
-            'description'   => $this->description,
-            'address_line1' => $this->address_line1,
-            'city'          => $this->city,
-            'country'       => $this->country,
-            'contact_name'  => $this->contact_name,
-            'contact_email' => $this->contact_email,
-            'contact_phone' => $this->contact_phone,
-            'is_active'     => $this->is_active,
-            'is_default'    => $this->is_default,
-            'created_at'    => $this->created_at?->toIso8601String(),
-            'updated_at'    => $this->updated_at?->toIso8601String(),
+            'id'         => $this->resource->id,
+            'tenant_id'  => $this->resource->tenantId,
+            'name'       => $this->resource->name,
+            'code'       => $this->resource->code,
+            'address'    => $this->resource->address,
+            'is_active'  => $this->resource->isActive,
+            'created_at' => $this->resource->createdAt,
+            'updated_at' => $this->resource->updatedAt,
         ];
     }
 }

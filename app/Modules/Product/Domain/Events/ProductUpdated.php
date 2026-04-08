@@ -4,19 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Product\Domain\Events;
 
-use Modules\Core\Domain\Events\BaseEvent;
+use Modules\Product\Domain\Entities\Product;
 
-class ProductUpdated extends BaseEvent
+class ProductUpdated
 {
     public function __construct(
-        int $tenantId,
-        public readonly string $productId,
-    ) {
-        parent::__construct($tenantId);
-    }
-
-    public function broadcastWith(): array
-    {
-        return array_merge(parent::broadcastWith(), ['productId' => $this->productId]);
-    }
+        public readonly Product $product,
+    ) {}
 }

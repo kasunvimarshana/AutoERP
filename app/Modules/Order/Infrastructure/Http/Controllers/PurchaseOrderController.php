@@ -6,73 +6,62 @@ namespace Modules\Order\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\ResourceCollection;
-use Modules\Core\Infrastructure\Http\Controllers\BaseController;
+use Illuminate\Routing\Controller;
 use Modules\Order\Application\Contracts\PurchaseOrderServiceInterface;
-use Modules\Order\Application\DTOs\PurchaseOrderData;
 use Modules\Order\Infrastructure\Http\Resources\PurchaseOrderResource;
-use Modules\Order\Infrastructure\Persistence\Eloquent\Models\PurchaseOrderModel;
 
-class PurchaseOrderController extends BaseController
+class PurchaseOrderController extends Controller
 {
-    public function __construct(PurchaseOrderServiceInterface $service)
-    {
-        parent::__construct($service, PurchaseOrderResource::class, PurchaseOrderData::class);
-    }
+    public function __construct(
+        private readonly PurchaseOrderServiceInterface $purchaseOrderService,
+    ) {}
 
-    protected function getModelClass(): string
+    public function index(Request $request): JsonResponse
     {
-        return PurchaseOrderModel::class;
-    }
-
-    public function index(Request $request): ResourceCollection
-    {
-        $filters = array_filter($request->only(['status', 'supplier_id', 'payment_status']));
-        $paginator = $this->service->list($filters, $request->integer('per_page', 15));
-
-        return PurchaseOrderResource::collection($paginator);
+        $tenantId = $request->user()->tenant_id;
+        $orders = $this->purchaseOrderService->getAllPurchaseOrders($tenantId);
+        return response()->json(PurchaseOrderResource::collection($orders));
     }
 
     public function store(Request $request): JsonResponse
     {
-        /** @var \Modules\Order\Application\Contracts\PurchaseOrderServiceInterface $service */
-        $service = $this->service;
-        $order = $service->createPurchaseOrder($request->all());
-
-        return (new PurchaseOrderResource($order))->response()->setStatusCode(201);
+        $tenantId = $request->user()->tenant_id;
+        $order = $this->purchaseOrderService->createPurchaseOrder($tenantId, $request->all());
+        return response()->json(new PurchaseOrderResource($order), 201);
     }
 
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
-        return (new PurchaseOrderResource($this->service->find($id)))->response();
+        $tenantId = $request->user()->tenant_id;
+        $order = $this->purchaseOrderService->getPurchaseOrder($tenantId, $id);
+        return response()->json(new PurchaseOrderResource($order));
     }
 
     public function update(Request $request, string $id): JsonResponse
     {
-        return (new PurchaseOrderResource($this->service->update($id, $request->all())))->response();
+        $tenantId = $request->user()->tenant_id;
+        $order = $this->purchaseOrderService->updatePurchaseOrder($tenantId, $id, $request->all());
+        return response()->json(new PurchaseOrderResource($order));
     }
 
-    public function destroy(string $id): JsonResponse
+    public function destroy(Request $request, string $id): JsonResponse
     {
-        $this->service->delete($id);
-
+        $tenantId = $request->user()->tenant_id;
+        $this->purchaseOrderService->deletePurchaseOrder($tenantId, $id);
         return response()->json(null, 204);
     }
 
-    public function receive(Request $request, string $id): JsonResponse
+    public function confirm(Request $request, string $id): JsonResponse
     {
-        /** @var \Modules\Order\Application\Contracts\PurchaseOrderServiceInterface $service */
-        $service = $this->service;
-        $order = $service->receiveOrder($id, $request->input('receipts', []));
-
-        return (new PurchaseOrderResource($order))->response();
+        $tenantId = $request->user()->tenant_id;
+        $order = $this->purchaseOrderService->confirmPurchaseOrder($tenantId, $id);
+        return response()->json(new PurchaseOrderResource($order));
     }
 
-    public function cancel(string $id): JsonResponse
+    public function cancel(Request $request, string $id): JsonResponse
     {
-        /** @var \Modules\Order\Application\Contracts\PurchaseOrderServiceInterface $service */
-        $service = $this->service;
-
-        return (new PurchaseOrderResource($service->cancelOrder($id)))->response();
+        $tenantId = $request->user()->tenant_id;
+        $order = $this->purchaseOrderService->cancelPurchaseOrder($tenantId, $id);
+        return response()->json(new PurchaseOrderResource($order));
     }
 }

@@ -4,19 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Order\Domain\Events;
 
-use Modules\Core\Domain\Events\BaseEvent;
+use Modules\Order\Domain\Entities\PurchaseOrder;
 
-class PurchaseOrderCreated extends BaseEvent
+class PurchaseOrderCreated
 {
     public function __construct(
-        int $tenantId,
-        public readonly string $orderId,
-    ) {
-        parent::__construct($tenantId);
-    }
-
-    public function broadcastWith(): array
-    {
-        return array_merge(parent::broadcastWith(), ['orderId' => $this->orderId]);
-    }
+        public readonly PurchaseOrder $purchaseOrder,
+    ) {}
 }

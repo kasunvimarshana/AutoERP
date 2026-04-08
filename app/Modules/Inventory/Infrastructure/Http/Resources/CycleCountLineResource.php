@@ -4,22 +4,26 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Infrastructure\Http\Resources;
 
-use Modules\Core\Infrastructure\Http\Resources\BaseResource;
+use Illuminate\Http\Resources\Json\JsonResource;
 
-class CycleCountLineResource extends BaseResource
+class CycleCountLineResource extends JsonResource
 {
     public function toArray($request): array
     {
         return [
-            'id'               => $this->id,
-            'product_id'       => $this->product_id,
-            'variant_id'       => $this->variant_id,
-            'batch_lot_id'     => $this->batch_lot_id,
-            'system_quantity'  => $this->system_quantity,
-            'counted_quantity' => $this->counted_quantity,
-            'variance'         => $this->variance,
-            'status'           => $this->status,
-            'notes'            => $this->notes,
+            'id'             => $this->resource->id,
+            'tenant_id'      => $this->resource->tenantId,
+            'cycle_count_id' => $this->resource->cycleCountId,
+            'product_id'     => $this->resource->productId,
+            'variant_id'     => $this->resource->variantId,
+            'system_qty'     => $this->resource->systemQty,
+            'counted_qty'    => $this->resource->countedQty,
+            'variance'       => $this->resource->variance,
+            'batch_number'   => $this->resource->batchNumber,
+            'lot_number'     => $this->resource->lotNumber,
+            'serial_number'  => $this->resource->serialNumber,
+            'created_at'     => $this->resource->createdAt,
+            'updated_at'     => $this->resource->updatedAt,
         ];
     }
 }

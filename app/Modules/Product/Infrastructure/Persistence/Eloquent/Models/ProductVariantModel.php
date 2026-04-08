@@ -1,10 +1,8 @@
 <?php
-
 declare(strict_types=1);
 
 namespace Modules\Product\Infrastructure\Persistence\Eloquent\Models;
 
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasUuid;
@@ -16,33 +14,15 @@ class ProductVariantModel extends BaseModel
     protected $table = 'product_variants';
 
     protected $fillable = [
-        'tenant_id',
-        'product_id',
-        'sku',
-        'barcode',
-        'name',
-        'attributes',
-        'cost_price',
-        'selling_price',
-        'weight',
-        'image_path',
-        'is_active',
-        'metadata',
+        'tenant_id', 'product_id', 'name', 'sku', 'barcode',
+        'attributes', 'cost_price', 'sale_price', 'stock_quantity', 'is_active',
     ];
 
     protected $casts = [
-        'attributes'    => 'array',
-        'cost_price'    => 'decimal:4',
-        'selling_price' => 'decimal:4',
-        'is_active'     => 'boolean',
-        'metadata'      => 'array',
-        'created_at'    => 'datetime',
-        'updated_at'    => 'datetime',
-        'deleted_at'    => 'datetime',
+        'attributes'     => 'array',
+        'cost_price'     => 'float',
+        'sale_price'     => 'float',
+        'stock_quantity' => 'float',
+        'is_active'      => 'boolean',
     ];
-
-    public function product(): BelongsTo
-    {
-        return $this->belongsTo(ProductModel::class, 'product_id');
-    }
 }

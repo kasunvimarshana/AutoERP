@@ -15,16 +15,14 @@ class CycleCountLineModel extends BaseModel
     protected $table = 'cycle_count_lines';
 
     protected $fillable = [
-        'tenant_id', 'cycle_count_id', 'product_id', 'variant_id', 'batch_lot_id',
-        'system_quantity', 'counted_quantity', 'variance', 'status', 'notes',
+        'tenant_id', 'cycle_count_id', 'product_id', 'variant_id',
+        'system_qty', 'counted_qty', 'variance',
+        'batch_number', 'lot_number', 'serial_number',
     ];
 
     protected $casts = [
-        'system_quantity'  => 'decimal:4',
-        'counted_quantity' => 'decimal:4',
-        'variance'         => 'decimal:4',
-        'created_at'       => 'datetime',
-        'updated_at'       => 'datetime',
-        'deleted_at'       => 'datetime',
+        'system_qty'  => 'float',
+        'counted_qty' => 'float',
+        'variance'    => 'float',
     ];
 }

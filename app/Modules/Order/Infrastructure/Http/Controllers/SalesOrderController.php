@@ -6,72 +6,62 @@ namespace Modules\Order\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\ResourceCollection;
-use Modules\Core\Infrastructure\Http\Controllers\BaseController;
+use Illuminate\Routing\Controller;
 use Modules\Order\Application\Contracts\SalesOrderServiceInterface;
-use Modules\Order\Application\DTOs\SalesOrderData;
 use Modules\Order\Infrastructure\Http\Resources\SalesOrderResource;
-use Modules\Order\Infrastructure\Persistence\Eloquent\Models\SalesOrderModel;
 
-class SalesOrderController extends BaseController
+class SalesOrderController extends Controller
 {
-    public function __construct(SalesOrderServiceInterface $service)
-    {
-        parent::__construct($service, SalesOrderResource::class, SalesOrderData::class);
-    }
+    public function __construct(
+        private readonly SalesOrderServiceInterface $salesOrderService,
+    ) {}
 
-    protected function getModelClass(): string
+    public function index(Request $request): JsonResponse
     {
-        return SalesOrderModel::class;
-    }
-
-    public function index(Request $request): ResourceCollection
-    {
-        $filters = array_filter($request->only(['status', 'customer_id', 'payment_status']));
-        $paginator = $this->service->list($filters, $request->integer('per_page', 15));
-
-        return SalesOrderResource::collection($paginator);
+        $tenantId = $request->user()->tenant_id;
+        $orders = $this->salesOrderService->getAllSalesOrders($tenantId);
+        return response()->json(SalesOrderResource::collection($orders));
     }
 
     public function store(Request $request): JsonResponse
     {
-        /** @var \Modules\Order\Application\Contracts\SalesOrderServiceInterface $service */
-        $service = $this->service;
-        $order = $service->createSalesOrder($request->all());
-
-        return (new SalesOrderResource($order))->response()->setStatusCode(201);
+        $tenantId = $request->user()->tenant_id;
+        $order = $this->salesOrderService->createSalesOrder($tenantId, $request->all());
+        return response()->json(new SalesOrderResource($order), 201);
     }
 
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
-        return (new SalesOrderResource($this->service->find($id)))->response();
+        $tenantId = $request->user()->tenant_id;
+        $order = $this->salesOrderService->getSalesOrder($tenantId, $id);
+        return response()->json(new SalesOrderResource($order));
     }
 
     public function update(Request $request, string $id): JsonResponse
     {
-        return (new SalesOrderResource($this->service->update($id, $request->all())))->response();
+        $tenantId = $request->user()->tenant_id;
+        $order = $this->salesOrderService->updateSalesOrder($tenantId, $id, $request->all());
+        return response()->json(new SalesOrderResource($order));
     }
 
-    public function destroy(string $id): JsonResponse
+    public function destroy(Request $request, string $id): JsonResponse
     {
-        $this->service->delete($id);
-
+        $tenantId = $request->user()->tenant_id;
+        $this->salesOrderService->deleteSalesOrder($tenantId, $id);
         return response()->json(null, 204);
     }
 
-    public function confirm(string $id): JsonResponse
+    public function confirm(Request $request, string $id): JsonResponse
     {
-        /** @var \Modules\Order\Application\Contracts\SalesOrderServiceInterface $service */
-        $service = $this->service;
-
-        return (new SalesOrderResource($service->confirmOrder($id)))->response();
+        $tenantId = $request->user()->tenant_id;
+        $order = $this->salesOrderService->confirmSalesOrder($tenantId, $id);
+        return response()->json(new SalesOrderResource($order));
     }
 
-    public function cancel(string $id): JsonResponse
+    public function cancel(Request $request, string $id): JsonResponse
     {
-        /** @var \Modules\Order\Application\Contracts\SalesOrderServiceInterface $service */
-        $service = $this->service;
-
-        return (new SalesOrderResource($service->cancelOrder($id)))->response();
+        $tenantId = $request->user()->tenant_id;
+        $order = $this->salesOrderService->cancelSalesOrder($tenantId, $id);
+        return response()->json(new SalesOrderResource($order));
     }
 }

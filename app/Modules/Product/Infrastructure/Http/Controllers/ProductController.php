@@ -1,70 +1,52 @@
 <?php
-
 declare(strict_types=1);
 
 namespace Modules\Product\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\ResourceCollection;
-use Modules\Core\Infrastructure\Http\Controllers\BaseController;
+use Illuminate\Routing\Controller;
 use Modules\Product\Application\Contracts\ProductServiceInterface;
-use Modules\Product\Application\DTOs\ProductData;
 use Modules\Product\Infrastructure\Http\Resources\ProductResource;
-use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductModel;
 
-class ProductController extends BaseController
+class ProductController extends Controller
 {
-    public function __construct(ProductServiceInterface $service)
-    {
-        parent::__construct($service, ProductResource::class, ProductData::class);
-    }
+    public function __construct(
+        private readonly ProductServiceInterface $productService,
+    ) {}
 
-    protected function getModelClass(): string
+    public function index(Request $request): JsonResponse
     {
-        return ProductModel::class;
-    }
-
-    public function index(Request $request): ResourceCollection
-    {
-        $filters = array_filter($request->only(['type', 'status', 'category_id']));
-        $paginator = $this->service->list(
-            $filters,
-            $request->integer('per_page', 15),
-            $request->integer('page', 1),
-            $request->input('sort'),
-            $request->input('include'),
-        );
-
-        return ProductResource::collection($paginator);
+        $tenantId = $request->user()->tenant_id;
+        $products = $this->productService->getAllProducts($tenantId);
+        return response()->json(ProductResource::collection($products));
     }
 
     public function store(Request $request): JsonResponse
     {
-        /** @var \Modules\Product\Application\Contracts\ProductServiceInterface $service */
-        $service = $this->service;
-        $product = $service->createProduct($request->all());
-
-        return (new ProductResource($product))->response()->setStatusCode(201);
+        $tenantId = $request->user()->tenant_id;
+        $product = $this->productService->createProduct($tenantId, $request->all());
+        return response()->json(new ProductResource($product), 201);
     }
 
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
-        return (new ProductResource($this->service->find($id)))->response();
+        $tenantId = $request->user()->tenant_id;
+        $product = $this->productService->getProduct($tenantId, $id);
+        return response()->json(new ProductResource($product));
     }
 
     public function update(Request $request, string $id): JsonResponse
     {
-        /** @var \Modules\Product\Application\Contracts\ProductServiceInterface $service */
-        $service = $this->service;
-
-        return (new ProductResource($service->updateProduct($id, $request->all())))->response();
+        $tenantId = $request->user()->tenant_id;
+        $product = $this->productService->updateProduct($tenantId, $id, $request->all());
+        return response()->json(new ProductResource($product));
     }
 
-    public function destroy(string $id): JsonResponse
+    public function destroy(Request $request, string $id): JsonResponse
     {
-        $this->service->delete($id);
-
+        $tenantId = $request->user()->tenant_id;
+        $this->productService->deleteProduct($tenantId, $id);
         return response()->json(null, 204);
     }
 }

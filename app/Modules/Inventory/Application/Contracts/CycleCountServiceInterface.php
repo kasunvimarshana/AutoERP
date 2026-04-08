@@ -4,27 +4,29 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Application\Contracts;
 
-use Modules\Core\Application\Contracts\ServiceInterface;
+use Modules\Inventory\Domain\Entities\CycleCount;
+use Modules\Inventory\Domain\Entities\CycleCountLine;
 
-interface CycleCountServiceInterface extends ServiceInterface
+interface CycleCountServiceInterface
 {
-    /**
-     * Create a new cycle count with its lines.
-     */
-    public function createCycleCount(array $data): mixed;
+    public function getCycleCount(string $tenantId, string $id): CycleCount;
 
-    /**
-     * Submit counted quantities for a cycle count, computing variances.
-     */
-    public function submitCount(string $cycleCountId, array $lines): mixed;
+    /** @return CycleCount[] */
+    public function getAllCycleCounts(string $tenantId): array;
 
-    /**
-     * Approve a cycle count and post inventory adjustments for variances.
-     */
-    public function approve(string $cycleCountId): mixed;
+    public function createCycleCount(string $tenantId, array $data): CycleCount;
 
-    /**
-     * Cancel a draft cycle count.
-     */
-    public function cancel(string $cycleCountId): mixed;
+    public function startCycleCount(string $tenantId, string $id): CycleCount;
+
+    public function completeCycleCount(string $tenantId, string $id): CycleCount;
+
+    public function cancelCycleCount(string $tenantId, string $id): CycleCount;
+
+    public function updateCycleCount(string $tenantId, string $id, array $data): CycleCount;
+
+    public function deleteCycleCount(string $tenantId, string $id): void;
+
+    public function addCycleCountLine(string $tenantId, string $cycleCountId, array $data): CycleCountLine;
+
+    public function updateCycleCountLine(string $tenantId, string $lineId, float $countedQty): CycleCountLine;
 }

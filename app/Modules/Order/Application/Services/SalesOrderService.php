@@ -5,135 +5,193 @@ declare(strict_types=1);
 namespace Modules\Order\Application\Services;
 
 use Illuminate\Support\Facades\DB;
-use Modules\Core\Application\Services\BaseService;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Str;
+use Modules\Core\Domain\Exceptions\NotFoundException;
 use Modules\Order\Application\Contracts\SalesOrderServiceInterface;
-use Modules\Order\Domain\Contracts\Repositories\SalesOrderRepositoryInterface;
+use Modules\Order\Domain\Entities\OrderLine;
+use Modules\Order\Domain\Entities\SalesOrder;
 use Modules\Order\Domain\Events\SalesOrderCreated;
-use Modules\Order\Domain\Exceptions\InvalidOrderStatusException;
-use Modules\Order\Domain\Exceptions\SalesOrderNotFoundException;
+use Modules\Order\Domain\RepositoryInterfaces\OrderLineRepositoryInterface;
+use Modules\Order\Domain\RepositoryInterfaces\SalesOrderRepositoryInterface;
 
-class SalesOrderService extends BaseService implements SalesOrderServiceInterface
+class SalesOrderService implements SalesOrderServiceInterface
 {
-    public function __construct(SalesOrderRepositoryInterface $repository)
+    public function __construct(
+        private readonly SalesOrderRepositoryInterface $salesOrderRepository,
+        private readonly OrderLineRepositoryInterface $orderLineRepository,
+    ) {}
+
+    public function getSalesOrder(string $tenantId, string $id): SalesOrder
     {
-        parent::__construct($repository);
+        $order = $this->salesOrderRepository->findById($tenantId, $id);
+
+        if ($order === null) {
+            throw new NotFoundException('SalesOrder', $id);
+        }
+
+        return $order;
     }
 
-    /**
-     * Default execute handler.
-     */
-    protected function handle(array $data): mixed
+    public function getAllSalesOrders(string $tenantId): array
     {
-        return $this->createSalesOrder($data);
+        return $this->salesOrderRepository->findAll($tenantId);
     }
 
-    /**
-     * Create a new sales order with line items and calculate totals.
-     */
-    public function createSalesOrder(array $data): mixed
+    public function createSalesOrder(string $tenantId, array $data): SalesOrder
     {
-        return DB::transaction(function () use ($data) {
+        return DB::transaction(function () use ($tenantId, $data): SalesOrder {
+            $now = now();
             $lines = $data['lines'] ?? [];
-            [$subtotal, $taxAmount] = $this->calculateTotals($lines);
 
-            $orderData = array_merge(
-                array_diff_key($data, ['lines' => null]),
-                [
-                    'subtotal'        => $subtotal,
-                    'tax_amount'      => $taxAmount,
-                    'total_amount'    => $subtotal + $taxAmount
-                        + (float) ($data['shipping_amount'] ?? 0)
-                        - (float) ($data['discount_amount'] ?? 0),
-                    'balance_due'     => $subtotal + $taxAmount
-                        + (float) ($data['shipping_amount'] ?? 0)
-                        - (float) ($data['discount_amount'] ?? 0),
-                ],
-            );
-
-            $order = $this->repository->create($orderData);
-
-            // Create lines
-            foreach ($lines as $line) {
-                $lineTotal = ((float) $line['quantity_ordered'] * (float) $line['unit_price'])
-                    * (1 - ((float) ($line['discount_percent'] ?? 0) / 100));
-
-                DB::table('sales_order_lines')->insert(array_merge($line, [
-                    'id'             => \Illuminate\Support\Str::uuid(),
-                    'tenant_id'      => $order->tenant_id,
-                    'sales_order_id' => $order->id,
-                    'line_total'     => $lineTotal,
-                    'created_at'     => now(),
-                    'updated_at'     => now(),
-                ]));
+            $totalAmount = 0.0;
+            foreach ($lines as $lineData) {
+                $qty = (float) ($lineData['quantity'] ?? 0.0);
+                $price = (float) ($lineData['unit_price'] ?? 0.0);
+                $discount = (float) ($lineData['discount'] ?? 0.0);
+                $taxRate = (float) ($lineData['tax_rate'] ?? 0.0);
+                $totalAmount += round($qty * $price * (1 - $discount / 100.0) * (1 + $taxRate / 100.0), 2);
             }
 
-            $this->addEvent(new SalesOrderCreated((int) ($order->tenant_id ?? 0), $order->id));
-            $this->dispatchEvents();
+            $order = new SalesOrder(
+                id: (string) Str::uuid(),
+                tenantId: $tenantId,
+                customerId: $data['customer_id'],
+                warehouseId: $data['warehouse_id'],
+                reference: $data['reference'],
+                status: 'draft',
+                orderDate: new \DateTimeImmutable($data['order_date']),
+                expectedDate: isset($data['expected_date'])
+                    ? new \DateTimeImmutable($data['expected_date'])
+                    : null,
+                notes: $data['notes'] ?? null,
+                totalAmount: $totalAmount,
+                createdAt: $now,
+                updatedAt: $now,
+            );
+
+            $this->salesOrderRepository->save($order);
+
+            foreach ($lines as $lineData) {
+                $qty = (float) ($lineData['quantity'] ?? 0.0);
+                $price = (float) ($lineData['unit_price'] ?? 0.0);
+                $discount = (float) ($lineData['discount'] ?? 0.0);
+                $taxRate = (float) ($lineData['tax_rate'] ?? 0.0);
+                $lineTotal = round($qty * $price * (1 - $discount / 100.0) * (1 + $taxRate / 100.0), 2);
+
+                $line = new OrderLine(
+                    id: (string) Str::uuid(),
+                    tenantId: $tenantId,
+                    orderType: 'sales',
+                    orderId: $order->id,
+                    productId: $lineData['product_id'],
+                    variantId: $lineData['variant_id'] ?? null,
+                    description: $lineData['description'] ?? null,
+                    quantity: $qty,
+                    unitPrice: $price,
+                    discount: $discount,
+                    taxRate: $taxRate,
+                    lineTotal: $lineTotal,
+                    createdAt: $now,
+                    updatedAt: $now,
+                );
+
+                $this->orderLineRepository->save($line);
+            }
+
+            Event::dispatch(new SalesOrderCreated($order));
 
             return $order;
         });
     }
 
-    /**
-     * Confirm a draft sales order.
-     */
-    public function confirmOrder(string $id): mixed
+    public function confirmSalesOrder(string $tenantId, string $id): SalesOrder
     {
-        return DB::transaction(function () use ($id) {
-            $order = $this->repository->find($id);
-            if (! $order) {
-                throw new SalesOrderNotFoundException($id);
-            }
+        return DB::transaction(function () use ($tenantId, $id): SalesOrder {
+            $existing = $this->getSalesOrder($tenantId, $id);
 
-            if ($order->status !== 'draft') {
-                throw new InvalidOrderStatusException($order->status, 'confirmed');
-            }
+            $updated = new SalesOrder(
+                id: $existing->id,
+                tenantId: $existing->tenantId,
+                customerId: $existing->customerId,
+                warehouseId: $existing->warehouseId,
+                reference: $existing->reference,
+                status: 'confirmed',
+                orderDate: $existing->orderDate,
+                expectedDate: $existing->expectedDate,
+                notes: $existing->notes,
+                totalAmount: $existing->totalAmount,
+                createdAt: $existing->createdAt,
+                updatedAt: now(),
+            );
 
-            return $this->repository->update($id, ['status' => 'confirmed']);
+            $this->salesOrderRepository->save($updated);
+
+            return $updated;
         });
     }
 
-    /**
-     * Cancel a sales order.
-     */
-    public function cancelOrder(string $id): mixed
+    public function cancelSalesOrder(string $tenantId, string $id): SalesOrder
     {
-        return DB::transaction(function () use ($id) {
-            $order = $this->repository->find($id);
-            if (! $order) {
-                throw new SalesOrderNotFoundException($id);
-            }
+        return DB::transaction(function () use ($tenantId, $id): SalesOrder {
+            $existing = $this->getSalesOrder($tenantId, $id);
 
-            $cancellableStatuses = ['draft', 'confirmed'];
-            if (! in_array($order->status, $cancellableStatuses, true)) {
-                throw new InvalidOrderStatusException($order->status, 'cancelled');
-            }
+            $updated = new SalesOrder(
+                id: $existing->id,
+                tenantId: $existing->tenantId,
+                customerId: $existing->customerId,
+                warehouseId: $existing->warehouseId,
+                reference: $existing->reference,
+                status: 'cancelled',
+                orderDate: $existing->orderDate,
+                expectedDate: $existing->expectedDate,
+                notes: $existing->notes,
+                totalAmount: $existing->totalAmount,
+                createdAt: $existing->createdAt,
+                updatedAt: now(),
+            );
 
-            return $this->repository->update($id, ['status' => 'cancelled']);
+            $this->salesOrderRepository->save($updated);
+
+            return $updated;
         });
     }
 
-    /**
-     * Calculate subtotal and tax totals from order lines.
-     *
-     * @return array{float, float}
-     */
-    private function calculateTotals(array $lines): array
+    public function deleteSalesOrder(string $tenantId, string $id): void
     {
-        $subtotal  = 0.0;
-        $taxAmount = 0.0;
+        DB::transaction(function () use ($tenantId, $id): void {
+            $this->getSalesOrder($tenantId, $id);
+            $this->salesOrderRepository->delete($tenantId, $id);
+        });
+    }
 
-        foreach ($lines as $line) {
-            $qty       = (float) ($line['quantity_ordered'] ?? 0);
-            $price     = (float) ($line['unit_price'] ?? 0);
-            $discount  = (float) ($line['discount_percent'] ?? 0);
-            $taxRate   = (float) ($line['tax_rate'] ?? 0);
+    public function updateSalesOrder(string $tenantId, string $id, array $data): SalesOrder
+    {
+        return DB::transaction(function () use ($tenantId, $id, $data): SalesOrder {
+            $existing = $this->getSalesOrder($tenantId, $id);
 
-            $lineBase   = $qty * $price * (1 - $discount / 100);
-            $subtotal  += $lineBase;
-            $taxAmount += $lineBase * ($taxRate / 100);
-        }
+            $updated = new SalesOrder(
+                id: $existing->id,
+                tenantId: $existing->tenantId,
+                customerId: $data['customer_id'] ?? $existing->customerId,
+                warehouseId: $data['warehouse_id'] ?? $existing->warehouseId,
+                reference: $data['reference'] ?? $existing->reference,
+                status: $data['status'] ?? $existing->status,
+                orderDate: isset($data['order_date'])
+                    ? new \DateTimeImmutable($data['order_date'])
+                    : $existing->orderDate,
+                expectedDate: isset($data['expected_date'])
+                    ? new \DateTimeImmutable($data['expected_date'])
+                    : $existing->expectedDate,
+                notes: array_key_exists('notes', $data) ? $data['notes'] : $existing->notes,
+                totalAmount: $existing->totalAmount,
+                createdAt: $existing->createdAt,
+                updatedAt: now(),
+            );
 
-        return [$subtotal, $taxAmount];
+            $this->salesOrderRepository->save($updated);
+
+            return $updated;
+        });
     }
 }

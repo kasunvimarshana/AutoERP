@@ -4,10 +4,18 @@ declare(strict_types=1);
 
 namespace Modules\Warehouse\Application\Contracts;
 
-use Modules\Core\Application\Contracts\ServiceInterface;
+use Modules\Warehouse\Domain\Entities\Warehouse;
 
-interface WarehouseServiceInterface extends ServiceInterface
+interface WarehouseServiceInterface
 {
-    public function createWarehouse(array $data): mixed;
-    public function updateWarehouse(string $id, array $data): mixed;
+    public function getWarehouse(string $tenantId, string $id): Warehouse;
+
+    /** @return Warehouse[] */
+    public function getAllWarehouses(string $tenantId): array;
+
+    public function createWarehouse(string $tenantId, array $data): Warehouse;
+
+    public function updateWarehouse(string $tenantId, string $id, array $data): Warehouse;
+
+    public function deleteWarehouse(string $tenantId, string $id): void;
 }

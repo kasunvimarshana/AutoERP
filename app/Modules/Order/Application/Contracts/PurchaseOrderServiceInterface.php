@@ -4,11 +4,22 @@ declare(strict_types=1);
 
 namespace Modules\Order\Application\Contracts;
 
-use Modules\Core\Application\Contracts\ServiceInterface;
+use Modules\Order\Domain\Entities\PurchaseOrder;
 
-interface PurchaseOrderServiceInterface extends ServiceInterface
+interface PurchaseOrderServiceInterface
 {
-    public function createPurchaseOrder(array $data): mixed;
-    public function receiveOrder(string $id, array $receipts): mixed;
-    public function cancelOrder(string $id): mixed;
+    public function getPurchaseOrder(string $tenantId, string $id): PurchaseOrder;
+
+    /** @return PurchaseOrder[] */
+    public function getAllPurchaseOrders(string $tenantId): array;
+
+    public function createPurchaseOrder(string $tenantId, array $data): PurchaseOrder;
+
+    public function confirmPurchaseOrder(string $tenantId, string $id): PurchaseOrder;
+
+    public function cancelPurchaseOrder(string $tenantId, string $id): PurchaseOrder;
+
+    public function updatePurchaseOrder(string $tenantId, string $id, array $data): PurchaseOrder;
+
+    public function deletePurchaseOrder(string $tenantId, string $id): void;
 }

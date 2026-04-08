@@ -5,153 +5,193 @@ declare(strict_types=1);
 namespace Modules\Order\Application\Services;
 
 use Illuminate\Support\Facades\DB;
-use Modules\Core\Application\Services\BaseService;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Str;
+use Modules\Core\Domain\Exceptions\NotFoundException;
 use Modules\Order\Application\Contracts\PurchaseOrderServiceInterface;
-use Modules\Order\Domain\Contracts\Repositories\PurchaseOrderRepositoryInterface;
+use Modules\Order\Domain\Entities\OrderLine;
+use Modules\Order\Domain\Entities\PurchaseOrder;
 use Modules\Order\Domain\Events\PurchaseOrderCreated;
-use Modules\Order\Domain\Exceptions\InvalidOrderStatusException;
-use Modules\Order\Domain\Exceptions\PurchaseOrderNotFoundException;
+use Modules\Order\Domain\RepositoryInterfaces\OrderLineRepositoryInterface;
+use Modules\Order\Domain\RepositoryInterfaces\PurchaseOrderRepositoryInterface;
 
-class PurchaseOrderService extends BaseService implements PurchaseOrderServiceInterface
+class PurchaseOrderService implements PurchaseOrderServiceInterface
 {
-    public function __construct(PurchaseOrderRepositoryInterface $repository)
+    public function __construct(
+        private readonly PurchaseOrderRepositoryInterface $purchaseOrderRepository,
+        private readonly OrderLineRepositoryInterface $orderLineRepository,
+    ) {}
+
+    public function getPurchaseOrder(string $tenantId, string $id): PurchaseOrder
     {
-        parent::__construct($repository);
+        $order = $this->purchaseOrderRepository->findById($tenantId, $id);
+
+        if ($order === null) {
+            throw new NotFoundException('PurchaseOrder', $id);
+        }
+
+        return $order;
     }
 
-    /**
-     * Default execute handler.
-     */
-    protected function handle(array $data): mixed
+    public function getAllPurchaseOrders(string $tenantId): array
     {
-        return $this->createPurchaseOrder($data);
+        return $this->purchaseOrderRepository->findAll($tenantId);
     }
 
-    /**
-     * Create a new purchase order with line items and calculate totals.
-     */
-    public function createPurchaseOrder(array $data): mixed
+    public function createPurchaseOrder(string $tenantId, array $data): PurchaseOrder
     {
-        return DB::transaction(function () use ($data) {
+        return DB::transaction(function () use ($tenantId, $data): PurchaseOrder {
+            $now = now();
             $lines = $data['lines'] ?? [];
-            [$subtotal, $taxAmount] = $this->calculateTotals($lines);
 
-            $orderData = array_merge(
-                array_diff_key($data, ['lines' => null]),
-                [
-                    'subtotal'     => $subtotal,
-                    'tax_amount'   => $taxAmount,
-                    'total_amount' => $subtotal + $taxAmount
-                        + (float) ($data['shipping_amount'] ?? 0)
-                        - (float) ($data['discount_amount'] ?? 0),
-                    'balance_due'  => $subtotal + $taxAmount
-                        + (float) ($data['shipping_amount'] ?? 0)
-                        - (float) ($data['discount_amount'] ?? 0),
-                ],
-            );
-
-            $order = $this->repository->create($orderData);
-
-            foreach ($lines as $line) {
-                $lineTotal = ((float) $line['quantity_ordered'] * (float) $line['unit_cost'])
-                    * (1 - ((float) ($line['discount_percent'] ?? 0) / 100));
-
-                DB::table('purchase_order_lines')->insert(array_merge($line, [
-                    'id'                => \Illuminate\Support\Str::uuid(),
-                    'tenant_id'         => $order->tenant_id,
-                    'purchase_order_id' => $order->id,
-                    'line_total'        => $lineTotal,
-                    'created_at'        => now(),
-                    'updated_at'        => now(),
-                ]));
+            $totalAmount = 0.0;
+            foreach ($lines as $lineData) {
+                $qty = (float) ($lineData['quantity'] ?? 0.0);
+                $price = (float) ($lineData['unit_price'] ?? 0.0);
+                $discount = (float) ($lineData['discount'] ?? 0.0);
+                $taxRate = (float) ($lineData['tax_rate'] ?? 0.0);
+                $totalAmount += round($qty * $price * (1 - $discount / 100.0) * (1 + $taxRate / 100.0), 2);
             }
 
-            $this->addEvent(new PurchaseOrderCreated((int) ($order->tenant_id ?? 0), $order->id));
-            $this->dispatchEvents();
+            $order = new PurchaseOrder(
+                id: (string) Str::uuid(),
+                tenantId: $tenantId,
+                supplierId: $data['supplier_id'],
+                warehouseId: $data['warehouse_id'],
+                reference: $data['reference'],
+                status: 'draft',
+                orderDate: new \DateTimeImmutable($data['order_date']),
+                expectedDate: isset($data['expected_date'])
+                    ? new \DateTimeImmutable($data['expected_date'])
+                    : null,
+                notes: $data['notes'] ?? null,
+                totalAmount: $totalAmount,
+                createdAt: $now,
+                updatedAt: $now,
+            );
+
+            $this->purchaseOrderRepository->save($order);
+
+            foreach ($lines as $lineData) {
+                $qty = (float) ($lineData['quantity'] ?? 0.0);
+                $price = (float) ($lineData['unit_price'] ?? 0.0);
+                $discount = (float) ($lineData['discount'] ?? 0.0);
+                $taxRate = (float) ($lineData['tax_rate'] ?? 0.0);
+                $lineTotal = round($qty * $price * (1 - $discount / 100.0) * (1 + $taxRate / 100.0), 2);
+
+                $line = new OrderLine(
+                    id: (string) Str::uuid(),
+                    tenantId: $tenantId,
+                    orderType: 'purchase',
+                    orderId: $order->id,
+                    productId: $lineData['product_id'],
+                    variantId: $lineData['variant_id'] ?? null,
+                    description: $lineData['description'] ?? null,
+                    quantity: $qty,
+                    unitPrice: $price,
+                    discount: $discount,
+                    taxRate: $taxRate,
+                    lineTotal: $lineTotal,
+                    createdAt: $now,
+                    updatedAt: $now,
+                );
+
+                $this->orderLineRepository->save($line);
+            }
+
+            Event::dispatch(new PurchaseOrderCreated($order));
 
             return $order;
         });
     }
 
-    /**
-     * Record receipt of goods against a purchase order.
-     * Each receipt item contains product_id, quantity_received, unit_cost.
-     */
-    public function receiveOrder(string $id, array $receipts): mixed
+    public function confirmPurchaseOrder(string $tenantId, string $id): PurchaseOrder
     {
-        return DB::transaction(function () use ($id, $receipts) {
-            $order = $this->repository->find($id);
-            if (! $order) {
-                throw new PurchaseOrderNotFoundException($id);
-            }
+        return DB::transaction(function () use ($tenantId, $id): PurchaseOrder {
+            $existing = $this->getPurchaseOrder($tenantId, $id);
 
-            $allowedStatuses = ['sent', 'draft', 'partial_receipt'];
-            if (! in_array($order->status, $allowedStatuses, true)) {
-                throw new InvalidOrderStatusException($order->status, 'received');
-            }
+            $updated = new PurchaseOrder(
+                id: $existing->id,
+                tenantId: $existing->tenantId,
+                supplierId: $existing->supplierId,
+                warehouseId: $existing->warehouseId,
+                reference: $existing->reference,
+                status: 'confirmed',
+                orderDate: $existing->orderDate,
+                expectedDate: $existing->expectedDate,
+                notes: $existing->notes,
+                totalAmount: $existing->totalAmount,
+                createdAt: $existing->createdAt,
+                updatedAt: now(),
+            );
 
-            foreach ($receipts as $receipt) {
-                DB::table('purchase_order_lines')
-                    ->where('purchase_order_id', $id)
-                    ->where('product_id', $receipt['product_id'])
-                    ->increment('quantity_received', (float) $receipt['quantity_received']);
-            }
+            $this->purchaseOrderRepository->save($updated);
 
-            // Determine new status
-            $totalOrdered  = DB::table('purchase_order_lines')->where('purchase_order_id', $id)
-                ->sum('quantity_ordered');
-            $totalReceived = DB::table('purchase_order_lines')->where('purchase_order_id', $id)
-                ->sum('quantity_received');
-
-            $newStatus = $totalReceived >= $totalOrdered ? 'received' : 'partial_receipt';
-
-            return $this->repository->update($id, [
-                'status'        => $newStatus,
-                'received_date' => $newStatus === 'received' ? now()->toDateString() : null,
-            ]);
+            return $updated;
         });
     }
 
-    /**
-     * Cancel a purchase order.
-     */
-    public function cancelOrder(string $id): mixed
+    public function cancelPurchaseOrder(string $tenantId, string $id): PurchaseOrder
     {
-        return DB::transaction(function () use ($id) {
-            $order = $this->repository->find($id);
-            if (! $order) {
-                throw new PurchaseOrderNotFoundException($id);
-            }
+        return DB::transaction(function () use ($tenantId, $id): PurchaseOrder {
+            $existing = $this->getPurchaseOrder($tenantId, $id);
 
-            if (! in_array($order->status, ['draft', 'sent'], true)) {
-                throw new InvalidOrderStatusException($order->status, 'cancelled');
-            }
+            $updated = new PurchaseOrder(
+                id: $existing->id,
+                tenantId: $existing->tenantId,
+                supplierId: $existing->supplierId,
+                warehouseId: $existing->warehouseId,
+                reference: $existing->reference,
+                status: 'cancelled',
+                orderDate: $existing->orderDate,
+                expectedDate: $existing->expectedDate,
+                notes: $existing->notes,
+                totalAmount: $existing->totalAmount,
+                createdAt: $existing->createdAt,
+                updatedAt: now(),
+            );
 
-            return $this->repository->update($id, ['status' => 'cancelled']);
+            $this->purchaseOrderRepository->save($updated);
+
+            return $updated;
         });
     }
 
-    /**
-     * Calculate subtotal and tax from purchase order lines.
-     *
-     * @return array{float, float}
-     */
-    private function calculateTotals(array $lines): array
+    public function deletePurchaseOrder(string $tenantId, string $id): void
     {
-        $subtotal  = 0.0;
-        $taxAmount = 0.0;
+        DB::transaction(function () use ($tenantId, $id): void {
+            $this->getPurchaseOrder($tenantId, $id);
+            $this->purchaseOrderRepository->delete($tenantId, $id);
+        });
+    }
 
-        foreach ($lines as $line) {
-            $qty      = (float) ($line['quantity_ordered'] ?? 0);
-            $cost     = (float) ($line['unit_cost'] ?? 0);
-            $discount = (float) ($line['discount_percent'] ?? 0);
-            $taxRate  = (float) ($line['tax_rate'] ?? 0);
+    public function updatePurchaseOrder(string $tenantId, string $id, array $data): PurchaseOrder
+    {
+        return DB::transaction(function () use ($tenantId, $id, $data): PurchaseOrder {
+            $existing = $this->getPurchaseOrder($tenantId, $id);
 
-            $lineBase   = $qty * $cost * (1 - $discount / 100);
-            $subtotal  += $lineBase;
-            $taxAmount += $lineBase * ($taxRate / 100);
-        }
+            $updated = new PurchaseOrder(
+                id: $existing->id,
+                tenantId: $existing->tenantId,
+                supplierId: $data['supplier_id'] ?? $existing->supplierId,
+                warehouseId: $data['warehouse_id'] ?? $existing->warehouseId,
+                reference: $data['reference'] ?? $existing->reference,
+                status: $data['status'] ?? $existing->status,
+                orderDate: isset($data['order_date'])
+                    ? new \DateTimeImmutable($data['order_date'])
+                    : $existing->orderDate,
+                expectedDate: isset($data['expected_date'])
+                    ? new \DateTimeImmutable($data['expected_date'])
+                    : $existing->expectedDate,
+                notes: array_key_exists('notes', $data) ? $data['notes'] : $existing->notes,
+                totalAmount: $existing->totalAmount,
+                createdAt: $existing->createdAt,
+                updatedAt: now(),
+            );
 
-        return [$subtotal, $taxAmount];
+            $this->purchaseOrderRepository->save($updated);
+
+            return $updated;
+        });
     }
 }

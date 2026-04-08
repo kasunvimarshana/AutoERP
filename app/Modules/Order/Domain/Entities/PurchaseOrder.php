@@ -4,18 +4,22 @@ declare(strict_types=1);
 
 namespace Modules\Order\Domain\Entities;
 
+use DateTimeInterface;
+
 class PurchaseOrder
 {
     public function __construct(
         public readonly string $id,
-        public readonly int $tenantId,
-        public readonly string $orderNumber,
-        public readonly string $orderDate,
+        public readonly string $tenantId,
         public readonly string $supplierId,
+        public readonly string $warehouseId,
+        public readonly string $reference,
         public readonly string $status,
-        public readonly string $currencyCode,
+        public readonly DateTimeInterface $orderDate,
+        public readonly ?DateTimeInterface $expectedDate,
+        public readonly ?string $notes,
         public readonly float $totalAmount,
-        public readonly float $paidAmount,
-        public readonly string $paymentStatus,
+        public readonly DateTimeInterface $createdAt,
+        public readonly DateTimeInterface $updatedAt,
     ) {}
 }

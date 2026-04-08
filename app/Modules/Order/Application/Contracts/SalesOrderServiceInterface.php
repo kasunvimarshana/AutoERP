@@ -4,11 +4,22 @@ declare(strict_types=1);
 
 namespace Modules\Order\Application\Contracts;
 
-use Modules\Core\Application\Contracts\ServiceInterface;
+use Modules\Order\Domain\Entities\SalesOrder;
 
-interface SalesOrderServiceInterface extends ServiceInterface
+interface SalesOrderServiceInterface
 {
-    public function createSalesOrder(array $data): mixed;
-    public function confirmOrder(string $id): mixed;
-    public function cancelOrder(string $id): mixed;
+    public function getSalesOrder(string $tenantId, string $id): SalesOrder;
+
+    /** @return SalesOrder[] */
+    public function getAllSalesOrders(string $tenantId): array;
+
+    public function createSalesOrder(string $tenantId, array $data): SalesOrder;
+
+    public function confirmSalesOrder(string $tenantId, string $id): SalesOrder;
+
+    public function cancelSalesOrder(string $tenantId, string $id): SalesOrder;
+
+    public function updateSalesOrder(string $tenantId, string $id, array $data): SalesOrder;
+
+    public function deleteSalesOrder(string $tenantId, string $id): void;
 }
