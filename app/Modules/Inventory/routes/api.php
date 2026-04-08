@@ -3,26 +3,45 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use Modules\Inventory\Infrastructure\Http\Controllers\CycleCountController;
-use Modules\Inventory\Infrastructure\Http\Controllers\CycleCountLineController;
-use Modules\Inventory\Infrastructure\Http\Controllers\StockLevelController;
-use Modules\Inventory\Infrastructure\Http\Controllers\StockMovementController;
+use Modules\Inventory\Infrastructure\Http\Controllers\InventoryBatchController;
+use Modules\Inventory\Infrastructure\Http\Controllers\InventoryCycleCountController;
+use Modules\Inventory\Infrastructure\Http\Controllers\InventoryCycleCountLineController;
+use Modules\Inventory\Infrastructure\Http\Controllers\InventoryLevelController;
+use Modules\Inventory\Infrastructure\Http\Controllers\InventoryLocationController;
+use Modules\Inventory\Infrastructure\Http\Controllers\InventorySerialNumberController;
+use Modules\Inventory\Infrastructure\Http\Controllers\InventorySettingController;
+use Modules\Inventory\Infrastructure\Http\Controllers\InventoryValuationLayerController;
 
-Route::prefix('api')->middleware(['auth:api'])->group(function (): void {
-    Route::post('stock-levels/{id}/adjust', [StockLevelController::class, 'adjust']);
-    Route::post('stock-levels/{id}/reserve', [StockLevelController::class, 'reserve']);
-    Route::post('stock-levels/{id}/release', [StockLevelController::class, 'release']);
-    Route::apiResource('stock-levels', StockLevelController::class);
+Route::prefix('inventory')->group(function () {
+    // Settings (singleton per tenant)
+    Route::get('settings', [InventorySettingController::class, 'show']);
+    Route::post('settings', [InventorySettingController::class, 'store']);
+    Route::put('settings/{id}', [InventorySettingController::class, 'update']);
 
-    Route::get('stock-movements', [StockMovementController::class, 'index']);
-    Route::post('stock-movements', [StockMovementController::class, 'store']);
-    Route::get('stock-movements/{id}', [StockMovementController::class, 'show']);
+    // Locations
+    Route::apiResource('locations', InventoryLocationController::class);
 
-    Route::post('cycle-counts/{id}/start', [CycleCountController::class, 'start']);
-    Route::post('cycle-counts/{id}/complete', [CycleCountController::class, 'complete']);
-    Route::post('cycle-counts/{id}/cancel', [CycleCountController::class, 'cancel']);
-    Route::post('cycle-counts/{id}/lines', [CycleCountController::class, 'addLine']);
-    Route::apiResource('cycle-counts', CycleCountController::class);
+    // Batches
+    Route::apiResource('batches', InventoryBatchController::class);
 
-    Route::put('cycle-count-lines/{id}', [CycleCountLineController::class, 'update']);
+    // Serial numbers
+    Route::apiResource('serial-numbers', InventorySerialNumberController::class);
+
+    // Levels
+    Route::apiResource('levels', InventoryLevelController::class);
+    Route::post('levels/{id}/reserve', [InventoryLevelController::class, 'reserve']);
+    Route::post('levels/{id}/release', [InventoryLevelController::class, 'release']);
+    Route::post('levels/{id}/adjust', [InventoryLevelController::class, 'adjust']);
+
+    // Valuation layers (read + create only; consumed by internal services)
+    Route::get('valuation-layers', [InventoryValuationLayerController::class, 'index']);
+    Route::post('valuation-layers', [InventoryValuationLayerController::class, 'store']);
+    Route::get('valuation-layers/{id}', [InventoryValuationLayerController::class, 'show']);
+
+    // Cycle counts
+    Route::apiResource('cycle-counts', InventoryCycleCountController::class);
+    Route::post('cycle-counts/{id}/reconcile', [InventoryCycleCountController::class, 'reconcile']);
+
+    // Cycle count lines
+    Route::apiResource('cycle-count-lines', InventoryCycleCountLineController::class);
 });

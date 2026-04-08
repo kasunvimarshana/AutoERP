@@ -8,17 +8,22 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class WarehouseResource extends JsonResource
 {
-    public function toArray($request): array
+    public function toArray($request)
     {
         return [
-            'id'         => $this->resource->id,
-            'tenant_id'  => $this->resource->tenantId,
-            'name'       => $this->resource->name,
-            'code'       => $this->resource->code,
-            'address'    => $this->resource->address,
-            'is_active'  => $this->resource->isActive,
-            'created_at' => $this->resource->createdAt,
-            'updated_at' => $this->resource->updatedAt,
+            'id'          => $this->getId(),
+            'tenant_id'   => $this->getTenantId(),
+            'name'        => $this->getName()->value(),
+            'type'        => $this->getType(),
+            'code'        => $this->getCode()?->value(),
+            'description' => $this->getDescription(),
+            'address'     => $this->getAddress(),
+            'capacity'    => $this->getCapacity(),
+            'location_id' => $this->getLocationId(),
+            'metadata'    => $this->getMetadata()?->toArray() ?? [],
+            'is_active'   => $this->isActive(),
+            'created_at'  => $this->getCreatedAt()->format('c'),
+            'updated_at'  => $this->getUpdatedAt()->format('c'),
         ];
     }
 }

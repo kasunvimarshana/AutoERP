@@ -1,119 +1,189 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Modules\Product\Infrastructure\Persistence\Eloquent\Repositories;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
+use Modules\Core\Domain\ValueObjects\Money;
+use Modules\Core\Domain\ValueObjects\Sku;
+use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
+use Modules\Product\Domain\Entities\ComboItem;
 use Modules\Product\Domain\Entities\Product;
+use Modules\Product\Domain\Entities\ProductImage;
+use Modules\Product\Domain\Entities\ProductVariation;
 use Modules\Product\Domain\RepositoryInterfaces\ProductRepositoryInterface;
+use Modules\Product\Domain\ValueObjects\UnitOfMeasure;
+use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductComboItemModel;
+use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductImageModel;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductModel;
+use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductVariationModel;
 
-class EloquentProductRepository implements ProductRepositoryInterface
+class EloquentProductRepository extends EloquentRepository implements ProductRepositoryInterface
 {
-    public function findById(string $tenantId, string $id): ?Product
+    public function __construct(ProductModel $model)
     {
-        $model = ProductModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)->find($id);
-        return $model !== null ? $this->mapToEntity($model) : null;
+        parent::__construct($model);
+        $this->setDomainEntityMapper(fn (ProductModel $model): Product => $this->mapModelToDomainEntity($model));
     }
 
-    public function findBySku(string $tenantId, string $sku): ?Product
+    public function findBySku(int $tenantId, string $sku): ?Product
     {
-        $model = ProductModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)->where('sku', $sku)->first();
-        return $model !== null ? $this->mapToEntity($model) : null;
+        $model = $this->model->where('tenant_id', $tenantId)->where('sku', $sku)->first();
+
+        return $model ? $this->toDomainEntity($model) : null;
     }
 
-    public function findAll(string $tenantId): array
+    public function findByTenant(int $tenantId): Collection
     {
-        return ProductModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)->get()
-            ->map(fn(ProductModel $m) => $this->mapToEntity($m))->all();
+        return $this->toDomainCollection($this->model->where('tenant_id', $tenantId)->get());
     }
 
-    public function findByCategory(string $tenantId, string $categoryId): array
+    public function save(Product $product): Product
     {
-        return ProductModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)->where('category_id', $categoryId)->get()
-            ->map(fn(ProductModel $m) => $this->mapToEntity($m))->all();
-    }
+        $data = [
+            'tenant_id'        => $product->getTenantId(),
+            'sku'              => $product->getSku()->value(),
+            'name'             => $product->getName(),
+            'description'      => $product->getDescription(),
+            'price'            => $product->getPrice()->getAmount(),
+            'currency'         => $product->getPrice()->getCurrency(),
+            'category'         => $product->getCategory(),
+            'status'           => $product->getStatus(),
+            'type'             => $product->getType()->value(),
+            'units_of_measure' => array_map(fn (UnitOfMeasure $u) => $u->toArray(), $product->getUnitsOfMeasure()),
+            'attributes'       => $product->getAttributes(),
+            'metadata'         => $product->getMetadata(),
+        ];
 
-    public function findByType(string $tenantId, string $type): array
-    {
-        return ProductModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)->where('type', $type)->get()
-            ->map(fn(ProductModel $m) => $this->mapToEntity($m))->all();
-    }
-
-    public function save(Product $product): void
-    {
-        /** @var ProductModel $model */
-        $model = ProductModel::withoutGlobalScopes()->findOrNew($product->id);
-        $model->fill([
-            'tenant_id'         => $product->tenantId,
-            'category_id'       => $product->categoryId,
-            'name'              => $product->name,
-            'sku'               => $product->sku,
-            'barcode'           => $product->barcode,
-            'type'              => $product->type,
-            'status'            => $product->status,
-            'description'       => $product->description,
-            'short_description' => $product->shortDescription,
-            'unit'              => $product->unit,
-            'weight'            => $product->weight,
-            'weight_unit'       => $product->weightUnit,
-            'has_variants'      => $product->hasVariants,
-            'is_trackable'      => $product->isTrackable,
-            'is_serial_tracked' => $product->isSerialTracked,
-            'is_batch_tracked'  => $product->isBatchTracked,
-            'cost_price'        => $product->costPrice,
-            'sale_price'        => $product->salePrice,
-            'min_stock_level'   => $product->minStockLevel,
-            'reorder_point'     => $product->reorderPoint,
-            'tax_group_id'      => $product->taxGroupId,
-            'image_url'         => $product->imageUrl,
-            'metadata'          => $product->metadata,
-        ]);
-        if (!$model->exists) {
-            $model->id = $product->id;
+        if ($product->getId()) {
+            $model = $this->update($product->getId(), $data);
+        } else {
+            $model = $this->create($data);
         }
-        $model->save();
+
+        /** @var ProductModel $model */
+        $model->load('images');
+
+        return $this->toDomainEntity($model);
     }
 
-    public function delete(string $tenantId, string $id): void
+    public function find($id, array $columns = ['*']): ?Product
     {
-        ProductModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)->find($id)?->delete();
+        $this->with(['images', 'variations', 'comboItems']);
+
+        return parent::find($id, $columns);
     }
 
-    private function mapToEntity(ProductModel $model): Product
+    public function paginate(?int $perPage = null, array $columns = ['*'], ?string $pageName = null, ?int $page = null): LengthAwarePaginator
     {
-        return new Product(
-            id: (string) $model->id,
-            tenantId: (string) $model->tenant_id,
-            categoryId: $model->category_id !== null ? (string) $model->category_id : null,
-            name: (string) $model->name,
-            sku: (string) $model->sku,
-            barcode: $model->barcode !== null ? (string) $model->barcode : null,
-            type: (string) $model->type,
-            status: (string) $model->status,
-            description: $model->description !== null ? (string) $model->description : null,
-            shortDescription: $model->short_description !== null ? (string) $model->short_description : null,
-            unit: (string) $model->unit,
-            weight: $model->weight !== null ? (float) $model->weight : null,
-            weightUnit: $model->weight_unit !== null ? (string) $model->weight_unit : null,
-            hasVariants: (bool) $model->has_variants,
-            isTrackable: (bool) $model->is_trackable,
-            isSerialTracked: (bool) $model->is_serial_tracked,
-            isBatchTracked: (bool) $model->is_batch_tracked,
-            costPrice: (float) $model->cost_price,
-            salePrice: (float) $model->sale_price,
-            minStockLevel: (float) $model->min_stock_level,
-            reorderPoint: (float) $model->reorder_point,
-            taxGroupId: $model->tax_group_id !== null ? (string) $model->tax_group_id : null,
-            imageUrl: $model->image_url !== null ? (string) $model->image_url : null,
-            metadata: (array) ($model->metadata ?? []),
-            createdAt: $model->created_at ?? now(),
-            updatedAt: $model->updated_at ?? now(),
+        $this->with(['images', 'variations', 'comboItems']);
+
+        return parent::paginate($perPage, $columns, $pageName, $page);
+    }
+
+    private function mapModelToDomainEntity(ProductModel $model): Product
+    {
+        $unitsOfMeasure = [];
+        foreach ($model->units_of_measure ?? [] as $uomData) {
+            $unitsOfMeasure[] = UnitOfMeasure::fromArray($uomData);
+        }
+
+        $product = new Product(
+            tenantId: $model->tenant_id,
+            sku: new Sku($model->sku),
+            name: $model->name,
+            price: new Money((float) $model->price, $model->currency ?? 'USD'),
+            description: $model->description,
+            category: $model->category,
+            status: $model->status,
+            type: $model->type ?? 'physical',
+            unitsOfMeasure: $unitsOfMeasure,
+            attributes: $model->attributes,
+            metadata: $model->metadata,
+            id: $model->id,
+            createdAt: $model->created_at,
+            updatedAt: $model->updated_at,
+        );
+
+        if ($model->relationLoaded('images')) {
+            $images = $model->images->map(fn (ProductImageModel $img) => $this->mapImageModelToDomainEntity($img));
+            $product->setImages($images);
+        }
+
+        if ($model->relationLoaded('variations')) {
+            $variations = $model->variations->map(
+                fn (ProductVariationModel $v) => $this->mapVariationModelToDomainEntity($v)
+            );
+            $product->setVariations($variations);
+        }
+
+        if ($model->relationLoaded('comboItems')) {
+            $comboItems = $model->comboItems->map(
+                fn (ProductComboItemModel $c) => $this->mapComboItemModelToDomainEntity($c)
+            );
+            $product->setComboItems($comboItems);
+        }
+
+        return $product;
+    }
+
+    private function mapImageModelToDomainEntity(ProductImageModel $model): ProductImage
+    {
+        return new ProductImage(
+            tenantId: $model->tenant_id,
+            productId: $model->product_id,
+            uuid: $model->uuid,
+            name: $model->name,
+            filePath: $model->file_path,
+            mimeType: $model->mime_type,
+            size: $model->size,
+            sortOrder: $model->sort_order,
+            isPrimary: (bool) $model->is_primary,
+            metadata: $model->metadata,
+            id: $model->id,
+            createdAt: $model->created_at,
+            updatedAt: $model->updated_at,
+        );
+    }
+
+    private function mapVariationModelToDomainEntity(ProductVariationModel $model): ProductVariation
+    {
+        return new ProductVariation(
+            productId:       $model->product_id,
+            tenantId:        $model->tenant_id,
+            sku:             new Sku($model->sku),
+            name:            $model->name,
+            price:           new Money((float) $model->price, $model->currency ?? 'USD'),
+            attributeValues: $model->attribute_values ?? [],
+            status:          $model->status ?? 'active',
+            sortOrder:       (int) ($model->sort_order ?? 0),
+            metadata:        $model->metadata,
+            id:              $model->id,
+            createdAt:       $model->created_at,
+            updatedAt:       $model->updated_at,
+        );
+    }
+
+    private function mapComboItemModelToDomainEntity(ProductComboItemModel $model): ComboItem
+    {
+        $priceOverride = null;
+        if ($model->price_override !== null) {
+            $priceOverride = new Money((float) $model->price_override, $model->currency ?? 'USD');
+        }
+
+        return new ComboItem(
+            productId:          $model->product_id,
+            tenantId:           $model->tenant_id,
+            componentProductId: $model->component_product_id,
+            quantity:           (float) $model->quantity,
+            priceOverride:      $priceOverride,
+            sortOrder:          (int) ($model->sort_order ?? 0),
+            metadata:           $model->metadata,
+            id:                 $model->id,
+            createdAt:          $model->created_at,
+            updatedAt:          $model->updated_at,
         );
     }
 }

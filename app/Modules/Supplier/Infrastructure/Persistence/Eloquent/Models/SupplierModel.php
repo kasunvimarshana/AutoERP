@@ -4,31 +4,38 @@ declare(strict_types=1);
 
 namespace Modules\Supplier\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasUuid;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 
-class SupplierModel extends BaseModel
+class SupplierModel extends Model
 {
-    use HasUuid, HasTenant;
+    use HasAudit, SoftDeletes;
 
     protected $table = 'suppliers';
 
     protected $fillable = [
         'tenant_id',
+        'user_id',
         'name',
         'code',
         'email',
         'phone',
         'address',
-        'tax_number',
+        'contact_person',
+        'payment_terms',
         'currency',
-        'credit_limit',
-        'is_active',
+        'tax_number',
+        'status',
+        'type',
+        'attributes',
+        'metadata',
     ];
 
     protected $casts = [
-        'credit_limit' => 'float',
-        'is_active'    => 'boolean',
+        'address'        => 'array',
+        'contact_person' => 'array',
+        'attributes'     => 'array',
+        'metadata'       => 'array',
     ];
 }

@@ -4,72 +4,95 @@ declare(strict_types=1);
 
 namespace Modules\Warehouse\Infrastructure\Persistence\Eloquent\Repositories;
 
+use Illuminate\Support\Facades\DB;
+use Modules\Core\Domain\ValueObjects\Code;
+use Modules\Core\Domain\ValueObjects\Metadata;
+use Modules\Core\Domain\ValueObjects\Name;
+use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Warehouse\Domain\Entities\Warehouse;
 use Modules\Warehouse\Domain\RepositoryInterfaces\WarehouseRepositoryInterface;
 use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models\WarehouseModel;
 
-class EloquentWarehouseRepository implements WarehouseRepositoryInterface
+class EloquentWarehouseRepository extends EloquentRepository implements WarehouseRepositoryInterface
 {
-    public function findById(string $tenantId, string $id): ?Warehouse
+    public function __construct(WarehouseModel $model)
     {
-        $model = WarehouseModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->find($id);
-        return $model !== null ? $this->mapToEntity($model) : null;
+        parent::__construct($model);
+        $this->setDomainEntityMapper(fn (WarehouseModel $model): Warehouse => $this->mapModelToDomainEntity($model));
     }
 
-    public function findAll(string $tenantId): array
+    /**
+     * {@inheritdoc}
+     */
+    public function save(Warehouse $warehouse): Warehouse
     {
-        return WarehouseModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
+        $savedModel = null;
+
+        DB::transaction(function () use ($warehouse, &$savedModel) {
+            if ($warehouse->getId()) {
+                $data = [
+                    'tenant_id'   => $warehouse->getTenantId(),
+                    'name'        => $warehouse->getName()->value(),
+                    'type'        => $warehouse->getType(),
+                    'code'        => $warehouse->getCode()?->value(),
+                    'description' => $warehouse->getDescription(),
+                    'address'     => $warehouse->getAddress(),
+                    'capacity'    => $warehouse->getCapacity(),
+                    'location_id' => $warehouse->getLocationId(),
+                    'metadata'    => $warehouse->getMetadata()?->toArray(),
+                    'is_active'   => $warehouse->isActive(),
+                ];
+                $savedModel = $this->update($warehouse->getId(), $data);
+            } else {
+                $savedModel = $this->model->create([
+                    'tenant_id'   => $warehouse->getTenantId(),
+                    'name'        => $warehouse->getName()->value(),
+                    'type'        => $warehouse->getType(),
+                    'code'        => $warehouse->getCode()?->value(),
+                    'description' => $warehouse->getDescription(),
+                    'address'     => $warehouse->getAddress(),
+                    'capacity'    => $warehouse->getCapacity(),
+                    'location_id' => $warehouse->getLocationId(),
+                    'metadata'    => $warehouse->getMetadata()?->toArray(),
+                    'is_active'   => $warehouse->isActive(),
+                ]);
+            }
+        });
+
+        if (! $savedModel instanceof WarehouseModel) {
+            throw new \RuntimeException('Failed to save warehouse.');
+        }
+
+        return $this->mapModelToDomainEntity($savedModel);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getByLocation(int $locationId): array
+    {
+        return $this->model->where('location_id', $locationId)
             ->get()
-            ->map(fn(WarehouseModel $m) => $this->mapToEntity($m))
+            ->map(fn ($m) => $this->mapModelToDomainEntity($m))
             ->all();
     }
 
-    public function findByCode(string $tenantId, string $code): ?Warehouse
-    {
-        $model = WarehouseModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->where('code', $code)
-            ->first();
-        return $model !== null ? $this->mapToEntity($model) : null;
-    }
-
-    public function save(Warehouse $warehouse): void
-    {
-        $model = WarehouseModel::withoutGlobalScopes()->findOrNew($warehouse->id);
-        $model->fill([
-            'tenant_id' => $warehouse->tenantId,
-            'name'      => $warehouse->name,
-            'code'      => $warehouse->code,
-            'address'   => $warehouse->address,
-            'is_active' => $warehouse->isActive,
-        ]);
-        if (!$model->exists) {
-            $model->id = $warehouse->id;
-        }
-        $model->save();
-    }
-
-    public function delete(string $tenantId, string $id): void
-    {
-        WarehouseModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->find($id)?->delete();
-    }
-
-    private function mapToEntity(WarehouseModel $model): Warehouse
+    private function mapModelToDomainEntity(WarehouseModel $model): Warehouse
     {
         return new Warehouse(
-            id: $model->id,
-            tenantId: $model->tenant_id,
-            name: $model->name,
-            code: $model->code,
-            address: $model->address,
-            isActive: (bool) $model->is_active,
-            createdAt: $model->created_at,
-            updatedAt: $model->updated_at,
+            tenantId:    $model->tenant_id,
+            name:        new Name($model->name),
+            type:        $model->type,
+            code:        $model->code !== null ? new Code($model->code) : null,
+            description: $model->description,
+            address:     $model->address,
+            capacity:    isset($model->capacity) ? (float) $model->capacity : null,
+            locationId:  $model->location_id,
+            metadata:    isset($model->metadata) ? new Metadata((array) $model->metadata) : null,
+            isActive:    (bool) $model->is_active,
+            id:          $model->id,
+            createdAt:   $model->created_at,
+            updatedAt:   $model->updated_at
         );
     }
 }

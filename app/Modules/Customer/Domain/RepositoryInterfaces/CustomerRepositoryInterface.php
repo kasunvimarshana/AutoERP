@@ -4,21 +4,17 @@ declare(strict_types=1);
 
 namespace Modules\Customer\Domain\RepositoryInterfaces;
 
+use Illuminate\Support\Collection;
+use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
 use Modules\Customer\Domain\Entities\Customer;
 
-interface CustomerRepositoryInterface
+interface CustomerRepositoryInterface extends RepositoryInterface
 {
-    public function findById(string $tenantId, string $id): ?Customer;
+    public function findByCode(int $tenantId, string $code): ?Customer;
 
-    /** @return Customer[] */
-    public function findAll(string $tenantId): array;
+    public function findByTenant(int $tenantId): Collection;
 
-    public function findByCode(string $tenantId, string $code): ?Customer;
+    public function findByUserId(int $tenantId, int $userId): ?Customer;
 
-    /** @return Customer[] */
-    public function findActive(string $tenantId): array;
-
-    public function save(Customer $customer): void;
-
-    public function delete(string $tenantId, string $id): void;
+    public function save(Customer $customer): Customer;
 }

@@ -4,90 +4,87 @@ declare(strict_types=1);
 
 namespace Modules\Supplier\Infrastructure\Persistence\Eloquent\Repositories;
 
+use Illuminate\Support\Collection;
+use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Supplier\Domain\Entities\Supplier;
 use Modules\Supplier\Domain\RepositoryInterfaces\SupplierRepositoryInterface;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierModel;
 
-class EloquentSupplierRepository implements SupplierRepositoryInterface
+class EloquentSupplierRepository extends EloquentRepository implements SupplierRepositoryInterface
 {
-    public function findById(string $tenantId, string $id): ?Supplier
+    public function __construct(SupplierModel $model)
     {
-        $model = SupplierModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->find($id);
-        return $model !== null ? $this->mapToEntity($model) : null;
+        parent::__construct($model);
+        $this->setDomainEntityMapper(fn (SupplierModel $model): Supplier => $this->mapModelToDomainEntity($model));
     }
 
-    public function findAll(string $tenantId): array
+    public function findByCode(int $tenantId, string $code): ?Supplier
     {
-        return SupplierModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->get()
-            ->map(fn(SupplierModel $m) => $this->mapToEntity($m))
-            ->all();
+        $model = $this->model->where('tenant_id', $tenantId)->where('code', $code)->first();
+
+        return $model ? $this->toDomainEntity($model) : null;
     }
 
-    public function findByCode(string $tenantId, string $code): ?Supplier
+    public function findByTenant(int $tenantId): Collection
     {
-        $model = SupplierModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->where('code', $code)
-            ->first();
-        return $model !== null ? $this->mapToEntity($model) : null;
+        return $this->toDomainCollection($this->model->where('tenant_id', $tenantId)->get());
     }
 
-    public function findActive(string $tenantId): array
+    public function findByUserId(int $tenantId, int $userId): ?Supplier
     {
-        return SupplierModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
-            ->get()
-            ->map(fn(SupplierModel $m) => $this->mapToEntity($m))
-            ->all();
+        $model = $this->model->where('tenant_id', $tenantId)->where('user_id', $userId)->first();
+
+        return $model ? $this->toDomainEntity($model) : null;
     }
 
-    public function save(Supplier $supplier): void
+    public function save(Supplier $supplier): Supplier
     {
-        $model = SupplierModel::withoutGlobalScopes()->findOrNew($supplier->id);
-        $model->fill([
-            'tenant_id'    => $supplier->tenantId,
-            'name'         => $supplier->name,
-            'code'         => $supplier->code,
-            'email'        => $supplier->email,
-            'phone'        => $supplier->phone,
-            'address'      => $supplier->address,
-            'tax_number'   => $supplier->taxNumber,
-            'currency'     => $supplier->currency,
-            'credit_limit' => $supplier->creditLimit,
-            'is_active'    => $supplier->isActive,
-        ]);
-        if (!$model->exists) {
-            $model->id = $supplier->id;
+        $data = [
+            'tenant_id'      => $supplier->getTenantId(),
+            'user_id'        => $supplier->getUserId(),
+            'name'           => $supplier->getName(),
+            'code'           => $supplier->getCode(),
+            'email'          => $supplier->getEmail(),
+            'phone'          => $supplier->getPhone(),
+            'address'        => $supplier->getAddress(),
+            'contact_person' => $supplier->getContactPerson(),
+            'payment_terms'  => $supplier->getPaymentTerms(),
+            'currency'       => $supplier->getCurrency(),
+            'tax_number'     => $supplier->getTaxNumber(),
+            'status'         => $supplier->getStatus(),
+            'type'           => $supplier->getType(),
+            'attributes'     => $supplier->getAttributes(),
+            'metadata'       => $supplier->getMetadata(),
+        ];
+
+        if ($supplier->getId()) {
+            $model = $this->update($supplier->getId(), $data);
+        } else {
+            $model = $this->create($data);
         }
-        $model->save();
+
+        return $this->toDomainEntity($model);
     }
 
-    public function delete(string $tenantId, string $id): void
-    {
-        SupplierModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->find($id)?->delete();
-    }
-
-    private function mapToEntity(SupplierModel $model): Supplier
+    private function mapModelToDomainEntity(SupplierModel $model): Supplier
     {
         return new Supplier(
-            id: $model->id,
             tenantId: $model->tenant_id,
             name: $model->name,
             code: $model->code,
+            userId: $model->user_id,
             email: $model->email,
             phone: $model->phone,
             address: $model->address,
-            taxNumber: $model->tax_number,
+            contactPerson: $model->contact_person,
+            paymentTerms: $model->payment_terms,
             currency: $model->currency,
-            creditLimit: (float) $model->credit_limit,
-            isActive: (bool) $model->is_active,
+            taxNumber: $model->tax_number,
+            status: $model->status,
+            type: $model->type,
+            attributes: $model->attributes,
+            metadata: $model->metadata,
+            id: $model->id,
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,
         );

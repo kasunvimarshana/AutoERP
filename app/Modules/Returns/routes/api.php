@@ -1,34 +1,51 @@
 <?php
 
-declare(strict_types=1);
-
 use Illuminate\Support\Facades\Route;
-use Modules\Returns\Infrastructure\Http\Controllers\PurchaseReturnController;
-use Modules\Returns\Infrastructure\Http\Controllers\ReturnLineController;
-use Modules\Returns\Infrastructure\Http\Controllers\SalesReturnController;
+use Modules\Returns\Infrastructure\Http\Controllers\CreditMemoController;
+use Modules\Returns\Infrastructure\Http\Controllers\ReturnAuthorizationController;
+use Modules\Returns\Infrastructure\Http\Controllers\StockReturnController;
+use Modules\Returns\Infrastructure\Http\Controllers\StockReturnLineController;
 
-Route::prefix('api')->middleware(['auth:api'])->group(function () {
-    Route::get('purchase-returns', [PurchaseReturnController::class, 'index']);
-    Route::post('purchase-returns', [PurchaseReturnController::class, 'store']);
-    Route::get('purchase-returns/{id}', [PurchaseReturnController::class, 'show']);
-    Route::put('purchase-returns/{id}', [PurchaseReturnController::class, 'update']);
-    Route::delete('purchase-returns/{id}', [PurchaseReturnController::class, 'destroy']);
-    Route::post('purchase-returns/{id}/approve', [PurchaseReturnController::class, 'approve']);
-    Route::post('purchase-returns/{id}/complete', [PurchaseReturnController::class, 'complete']);
-    Route::post('purchase-returns/{id}/cancel', [PurchaseReturnController::class, 'cancel']);
-
-    Route::get('sales-returns', [SalesReturnController::class, 'index']);
-    Route::post('sales-returns', [SalesReturnController::class, 'store']);
-    Route::get('sales-returns/{id}', [SalesReturnController::class, 'show']);
-    Route::put('sales-returns/{id}', [SalesReturnController::class, 'update']);
-    Route::delete('sales-returns/{id}', [SalesReturnController::class, 'destroy']);
-    Route::post('sales-returns/{id}/approve', [SalesReturnController::class, 'approve']);
-    Route::post('sales-returns/{id}/complete', [SalesReturnController::class, 'complete']);
-    Route::post('sales-returns/{id}/cancel', [SalesReturnController::class, 'cancel']);
-
-    Route::get('return-lines', [ReturnLineController::class, 'index']);
-    Route::post('return-lines', [ReturnLineController::class, 'store']);
-    Route::get('return-lines/{id}', [ReturnLineController::class, 'show']);
-    Route::put('return-lines/{id}', [ReturnLineController::class, 'update']);
-    Route::delete('return-lines/{id}', [ReturnLineController::class, 'destroy']);
+Route::prefix('returns')->group(function () {
+    Route::get('/', [StockReturnController::class, 'index']);
+    Route::post('/', [StockReturnController::class, 'store']);
+    Route::get('/{id}', [StockReturnController::class, 'show']);
+    Route::put('/{id}', [StockReturnController::class, 'update']);
+    Route::delete('/{id}', [StockReturnController::class, 'destroy']);
+    Route::post('/{id}/approve', [StockReturnController::class, 'approve']);
+    Route::post('/{id}/reject', [StockReturnController::class, 'reject']);
+    Route::post('/{id}/complete', [StockReturnController::class, 'complete']);
+    Route::post('/{id}/cancel', [StockReturnController::class, 'cancel']);
+    Route::post('/{id}/issue-credit-memo', [StockReturnController::class, 'issueCreditMemo']);
 });
+
+Route::prefix('return-lines')->group(function () {
+    Route::get('/', [StockReturnLineController::class, 'index']);
+    Route::post('/', [StockReturnLineController::class, 'store']);
+    Route::get('/{id}', [StockReturnLineController::class, 'show']);
+    Route::put('/{id}', [StockReturnLineController::class, 'update']);
+    Route::delete('/{id}', [StockReturnLineController::class, 'destroy']);
+    Route::post('/{id}/pass-quality-check', [StockReturnLineController::class, 'passQualityCheck']);
+    Route::post('/{id}/fail-quality-check', [StockReturnLineController::class, 'failQualityCheck']);
+});
+
+Route::prefix('credit-memos')->group(function () {
+    Route::get('/', [CreditMemoController::class, 'index']);
+    Route::post('/', [CreditMemoController::class, 'store']);
+    Route::get('/{id}', [CreditMemoController::class, 'show']);
+    Route::delete('/{id}', [CreditMemoController::class, 'destroy']);
+    Route::post('/{id}/issue', [CreditMemoController::class, 'issue']);
+    Route::post('/{id}/apply', [CreditMemoController::class, 'apply']);
+    Route::post('/{id}/void', [CreditMemoController::class, 'void']);
+});
+
+Route::prefix('return-authorizations')->group(function () {
+    Route::get('/', [ReturnAuthorizationController::class, 'index']);
+    Route::post('/', [ReturnAuthorizationController::class, 'store']);
+    Route::get('/{id}', [ReturnAuthorizationController::class, 'show']);
+    Route::delete('/{id}', [ReturnAuthorizationController::class, 'destroy']);
+    Route::post('/{id}/approve', [ReturnAuthorizationController::class, 'approve']);
+    Route::post('/{id}/cancel', [ReturnAuthorizationController::class, 'cancel']);
+    Route::post('/{id}/expire', [ReturnAuthorizationController::class, 'expire']);
+});
+

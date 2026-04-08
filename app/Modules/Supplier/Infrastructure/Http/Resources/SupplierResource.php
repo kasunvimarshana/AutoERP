@@ -11,19 +11,25 @@ class SupplierResource extends JsonResource
     public function toArray($request): array
     {
         return [
-            'id'           => $this->resource->id,
-            'tenant_id'    => $this->resource->tenantId,
-            'name'         => $this->resource->name,
-            'code'         => $this->resource->code,
-            'email'        => $this->resource->email,
-            'phone'        => $this->resource->phone,
-            'address'      => $this->resource->address,
-            'tax_number'   => $this->resource->taxNumber,
-            'currency'     => $this->resource->currency,
-            'credit_limit' => $this->resource->creditLimit,
-            'is_active'    => $this->resource->isActive,
-            'created_at'   => $this->resource->createdAt,
-            'updated_at'   => $this->resource->updatedAt,
+            'id'             => $this->getId(),
+            'tenant_id'      => $this->getTenantId(),
+            'user_id'        => $this->getUserId(),
+            'name'           => $this->getName(),
+            'code'           => $this->getCode(),
+            'email'          => $this->getEmail(),
+            'phone'          => $this->getPhone(),
+            'address'        => $this->getAddress(),
+            'contact_person' => $this->getContactPerson(),
+            'payment_terms'  => $this->getPaymentTerms(),
+            'currency'       => $this->getCurrency(),
+            'tax_number'     => $this->getTaxNumber(),
+            'status'         => $this->getStatus(),
+            'type'           => $this->getType(),
+            'attributes'     => $this->getAttributes(),
+            'metadata'       => $this->getMetadata(),
+            'has_user_access'=> $this->hasUserAccess(),
+            'created_at'     => $this->getCreatedAt()->format('c'),
+            'updated_at'     => $this->getUpdatedAt()->format('c'),
         ];
     }
 }

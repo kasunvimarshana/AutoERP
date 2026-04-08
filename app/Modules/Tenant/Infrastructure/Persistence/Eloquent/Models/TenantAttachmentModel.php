@@ -1,0 +1,37 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+
+class TenantAttachmentModel extends Model
+{
+    use HasAudit, SoftDeletes;
+
+    protected $table = 'tenant_attachments';
+
+    protected $fillable = [
+        'tenant_id',
+        'uuid',
+        'name',
+        'file_path',
+        'mime_type',
+        'size',
+        'type',
+        'metadata',
+    ];
+
+    protected $casts = [
+        'metadata' => 'array',
+        'size' => 'integer',
+    ];
+
+    public function tenant()
+    {
+        return $this->belongsTo(TenantModel::class);
+    }
+}

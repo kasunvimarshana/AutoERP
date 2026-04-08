@@ -4,18 +4,17 @@ declare(strict_types=1);
 
 namespace Modules\Warehouse\Domain\RepositoryInterfaces;
 
+use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
 use Modules\Warehouse\Domain\Entities\Warehouse;
 
-interface WarehouseRepositoryInterface
+interface WarehouseRepositoryInterface extends RepositoryInterface
 {
-    public function findById(string $tenantId, string $id): ?Warehouse;
+    public function save(Warehouse $warehouse): Warehouse;
 
-    /** @return Warehouse[] */
-    public function findAll(string $tenantId): array;
-
-    public function findByCode(string $tenantId, string $code): ?Warehouse;
-
-    public function save(Warehouse $warehouse): void;
-
-    public function delete(string $tenantId, string $id): void;
+    /**
+     * Return all warehouses belonging to a given location.
+     *
+     * @return array<int, Warehouse>
+     */
+    public function getByLocation(int $locationId): array;
 }

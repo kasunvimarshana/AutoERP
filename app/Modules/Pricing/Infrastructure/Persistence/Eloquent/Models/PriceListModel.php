@@ -5,25 +5,30 @@ declare(strict_types=1);
 namespace Modules\Pricing\Infrastructure\Persistence\Eloquent\Models;
 
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasUuid;
 
 class PriceListModel extends BaseModel
 {
-    use HasUuid, HasTenant;
-
     protected $table = 'price_lists';
 
     protected $fillable = [
         'tenant_id',
         'name',
-        'currency',
-        'is_default',
+        'code',
+        'type',
+        'pricing_method',
+        'currency_code',
+        'start_date',
+        'end_date',
         'is_active',
+        'description',
+        'metadata',
     ];
 
     protected $casts = [
-        'is_default' => 'boolean',
-        'is_active'  => 'boolean',
+        'tenant_id' => 'integer',
+        'is_active' => 'boolean',
+        'start_date'=> 'date',
+        'end_date'  => 'date',
+        'metadata'  => 'array',
     ];
 }

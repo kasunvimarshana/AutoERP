@@ -11,14 +11,22 @@ class PriceListResource extends JsonResource
     public function toArray($request): array
     {
         return [
-            'id'         => $this->resource->id,
-            'tenant_id'  => $this->resource->tenantId,
-            'name'       => $this->resource->name,
-            'currency'   => $this->resource->currency,
-            'is_default' => $this->resource->isDefault,
-            'is_active'  => $this->resource->isActive,
-            'created_at' => $this->resource->createdAt,
-            'updated_at' => $this->resource->updatedAt,
+            'id'             => $this->getId(),
+            'tenant_id'      => $this->getTenantId(),
+            'name'           => $this->getName(),
+            'code'           => $this->getCode(),
+            'type'           => $this->getType(),
+            'pricing_method' => $this->getPricingMethod(),
+            'currency_code'  => $this->getCurrencyCode(),
+            'start_date'     => $this->getStartDate()?->format('Y-m-d'),
+            'end_date'       => $this->getEndDate()?->format('Y-m-d'),
+            'is_active'      => $this->isActive(),
+            'is_valid'       => $this->isValid(),
+            'is_expired'     => $this->isExpired(),
+            'description'    => $this->getDescription(),
+            'metadata'       => $this->getMetadata()->toArray(),
+            'created_at'     => $this->getCreatedAt()->format('c'),
+            'updated_at'     => $this->getUpdatedAt()->format('c'),
         ];
     }
 }

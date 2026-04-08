@@ -1,10 +1,8 @@
 <?php
 
-declare(strict_types=1);
-
 use Illuminate\Support\Facades\Route;
 use Modules\Customer\Infrastructure\Http\Controllers\CustomerController;
 
-Route::prefix('api')->middleware(['auth:api'])->group(function (): void {
+Route::middleware(['auth:api', 'resolve.tenant'])->group(function () {
     Route::apiResource('customers', CustomerController::class);
 });

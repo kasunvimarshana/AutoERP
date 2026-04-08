@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\Pricing\Domain\RepositoryInterfaces;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
 use Modules\Pricing\Domain\Entities\PriceList;
 
-interface PriceListRepositoryInterface
+interface PriceListRepositoryInterface extends RepositoryInterface
 {
-    public function findById(string $tenantId, string $id): ?PriceList;
+    public function save(PriceList $priceList): PriceList;
 
-    /** @return PriceList[] */
-    public function findAll(string $tenantId): array;
+    public function findById(int $id): ?PriceList;
 
-    public function findDefault(string $tenantId): ?PriceList;
+    public function findByCode(int $tenantId, string $code): ?PriceList;
 
-    public function save(PriceList $priceList): void;
+    public function findByTenantAndType(int $tenantId, string $type): array;
 
-    public function delete(string $tenantId, string $id): void;
+    public function list(array $filters, int $perPage, int $page): LengthAwarePaginator;
 }

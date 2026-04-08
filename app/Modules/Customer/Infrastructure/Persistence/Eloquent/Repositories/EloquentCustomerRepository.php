@@ -4,92 +4,93 @@ declare(strict_types=1);
 
 namespace Modules\Customer\Infrastructure\Persistence\Eloquent\Repositories;
 
+use Illuminate\Support\Collection;
+use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Customer\Domain\Entities\Customer;
 use Modules\Customer\Domain\RepositoryInterfaces\CustomerRepositoryInterface;
 use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerModel;
 
-class EloquentCustomerRepository implements CustomerRepositoryInterface
+class EloquentCustomerRepository extends EloquentRepository implements CustomerRepositoryInterface
 {
-    public function findById(string $tenantId, string $id): ?Customer
+    public function __construct(CustomerModel $model)
     {
-        $model = CustomerModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->find($id);
-        return $model !== null ? $this->mapToEntity($model) : null;
+        parent::__construct($model);
+        $this->setDomainEntityMapper(fn (CustomerModel $model): Customer => $this->mapModelToDomainEntity($model));
     }
 
-    public function findAll(string $tenantId): array
+    public function findByCode(int $tenantId, string $code): ?Customer
     {
-        return CustomerModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->get()
-            ->map(fn(CustomerModel $m) => $this->mapToEntity($m))
-            ->all();
+        $model = $this->model->where('tenant_id', $tenantId)->where('code', $code)->first();
+
+        return $model ? $this->toDomainEntity($model) : null;
     }
 
-    public function findByCode(string $tenantId, string $code): ?Customer
+    public function findByTenant(int $tenantId): Collection
     {
-        $model = CustomerModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->where('code', $code)
-            ->first();
-        return $model !== null ? $this->mapToEntity($model) : null;
+        return $this->toDomainCollection($this->model->where('tenant_id', $tenantId)->get());
     }
 
-    public function findActive(string $tenantId): array
+    public function findByUserId(int $tenantId, int $userId): ?Customer
     {
-        return CustomerModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
-            ->get()
-            ->map(fn(CustomerModel $m) => $this->mapToEntity($m))
-            ->all();
+        $model = $this->model->where('tenant_id', $tenantId)->where('user_id', $userId)->first();
+
+        return $model ? $this->toDomainEntity($model) : null;
     }
 
-    public function save(Customer $customer): void
+    public function save(Customer $customer): Customer
     {
-        $model = CustomerModel::withoutGlobalScopes()->findOrNew($customer->id);
-        $model->fill([
-            'tenant_id'    => $customer->tenantId,
-            'name'         => $customer->name,
-            'code'         => $customer->code,
-            'email'        => $customer->email,
-            'phone'        => $customer->phone,
-            'address'      => $customer->address,
-            'tax_number'   => $customer->taxNumber,
-            'currency'     => $customer->currency,
-            'credit_limit' => $customer->creditLimit,
-            'balance'      => $customer->balance,
-            'is_active'    => $customer->isActive,
-        ]);
-        if (!$model->exists) {
-            $model->id = $customer->id;
+        $data = [
+            'tenant_id'        => $customer->getTenantId(),
+            'user_id'          => $customer->getUserId(),
+            'name'             => $customer->getName(),
+            'code'             => $customer->getCode(),
+            'email'            => $customer->getEmail(),
+            'phone'            => $customer->getPhone(),
+            'billing_address'  => $customer->getBillingAddress(),
+            'shipping_address' => $customer->getShippingAddress(),
+            'date_of_birth'    => $customer->getDateOfBirth(),
+            'loyalty_tier'     => $customer->getLoyaltyTier(),
+            'credit_limit'     => $customer->getCreditLimit(),
+            'payment_terms'    => $customer->getPaymentTerms(),
+            'currency'         => $customer->getCurrency(),
+            'tax_number'       => $customer->getTaxNumber(),
+            'status'           => $customer->getStatus(),
+            'type'             => $customer->getType(),
+            'attributes'       => $customer->getAttributes(),
+            'metadata'         => $customer->getMetadata(),
+        ];
+
+        if ($customer->getId()) {
+            $model = $this->update($customer->getId(), $data);
+        } else {
+            $model = $this->create($data);
         }
-        $model->save();
+
+        return $this->toDomainEntity($model);
     }
 
-    public function delete(string $tenantId, string $id): void
-    {
-        CustomerModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->find($id)?->delete();
-    }
-
-    private function mapToEntity(CustomerModel $model): Customer
+    private function mapModelToDomainEntity(CustomerModel $model): Customer
     {
         return new Customer(
-            id: $model->id,
             tenantId: $model->tenant_id,
             name: $model->name,
             code: $model->code,
+            userId: $model->user_id,
             email: $model->email,
             phone: $model->phone,
-            address: $model->address,
-            taxNumber: $model->tax_number,
+            billingAddress: $model->billing_address,
+            shippingAddress: $model->shipping_address,
+            dateOfBirth: $model->date_of_birth,
+            loyaltyTier: $model->loyalty_tier,
+            creditLimit: $model->credit_limit,
+            paymentTerms: $model->payment_terms,
             currency: $model->currency,
-            creditLimit: (float) $model->credit_limit,
-            balance: (float) $model->balance,
-            isActive: (bool) $model->is_active,
+            taxNumber: $model->tax_number,
+            status: $model->status,
+            type: $model->type,
+            attributes: $model->attributes,
+            metadata: $model->metadata,
+            id: $model->id,
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,
         );

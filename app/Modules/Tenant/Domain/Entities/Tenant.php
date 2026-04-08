@@ -4,68 +4,190 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Domain\Entities;
 
-use DateTimeInterface;
+use Modules\Core\Domain\ValueObjects\ApiKeys;
+use Modules\Core\Domain\ValueObjects\CacheConfig;
+use Modules\Core\Domain\ValueObjects\DatabaseConfig;
+use Modules\Core\Domain\ValueObjects\FeatureFlags;
+use Modules\Core\Domain\ValueObjects\MailConfig;
+use Modules\Core\Domain\ValueObjects\QueueConfig;
 
 class Tenant
 {
+    private ?int $id;
+
+    private string $name;
+
+    private ?string $domain;
+
+    private ?string $logoPath;
+
+    private DatabaseConfig $databaseConfig;
+
+    private ?MailConfig $mailConfig;
+
+    private ?CacheConfig $cacheConfig;
+
+    private ?QueueConfig $queueConfig;
+
+    private FeatureFlags $featureFlags;
+
+    private ApiKeys $apiKeys;
+
+    private bool $active;
+
+    private \DateTimeInterface $createdAt;
+
+    private \DateTimeInterface $updatedAt;
+
     public function __construct(
-        public readonly string $id,
-        public readonly string $name,
-        public readonly string $domain,
-        public readonly string $slug,
-        public readonly string $status,
-        public readonly string $plan,
-        public readonly array $settings,
-        public readonly array $metadata,
-        public readonly DateTimeInterface $createdAt,
-        public readonly DateTimeInterface $updatedAt,
-    ) {}
+        string $name,
+        DatabaseConfig $databaseConfig,
+        ?string $domain = null,
+        ?string $logoPath = null,
+        ?MailConfig $mailConfig = null,
+        ?CacheConfig $cacheConfig = null,
+        ?QueueConfig $queueConfig = null,
+        ?FeatureFlags $featureFlags = null,
+        ?ApiKeys $apiKeys = null,
+        bool $active = true,
+        ?int $id = null,
+        ?\DateTimeInterface $createdAt = null,
+        ?\DateTimeInterface $updatedAt = null
+    ) {
+        $this->id = $id;
+        $this->name = $name;
+        $this->domain = $domain;
+        $this->logoPath = $logoPath;
+        $this->databaseConfig = $databaseConfig;
+        $this->mailConfig = $mailConfig;
+        $this->cacheConfig = $cacheConfig;
+        $this->queueConfig = $queueConfig;
+        $this->featureFlags = $featureFlags ?? new FeatureFlags([]);
+        $this->apiKeys = $apiKeys ?? new ApiKeys([]);
+        $this->active = $active;
+        $this->createdAt = $createdAt ?? new \DateTimeImmutable;
+        $this->updatedAt = $updatedAt ?? new \DateTimeImmutable;
+    }
+
+    // Getters...
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
+
+    public function getName(): string
+    {
+        return $this->name;
+    }
+
+    public function getDomain(): ?string
+    {
+        return $this->domain;
+    }
+
+    public function getLogoPath(): ?string
+    {
+        return $this->logoPath;
+    }
+
+    public function getDatabaseConfig(): DatabaseConfig
+    {
+        return $this->databaseConfig;
+    }
+
+    public function getMailConfig(): ?MailConfig
+    {
+        return $this->mailConfig;
+    }
+
+    public function getCacheConfig(): ?CacheConfig
+    {
+        return $this->cacheConfig;
+    }
+
+    public function getQueueConfig(): ?QueueConfig
+    {
+        return $this->queueConfig;
+    }
+
+    public function getFeatureFlags(): FeatureFlags
+    {
+        return $this->featureFlags;
+    }
+
+    public function getApiKeys(): ApiKeys
+    {
+        return $this->apiKeys;
+    }
 
     public function isActive(): bool
     {
-        return $this->status === 'active';
+        return $this->active;
     }
 
-    public function isSuspended(): bool
+    public function getCreatedAt(): \DateTimeInterface
     {
-        return $this->status === 'suspended';
+        return $this->createdAt;
     }
 
-    public function activate(): self
+    public function getUpdatedAt(): \DateTimeInterface
     {
-        return new self(
-            $this->id,
-            $this->name,
-            $this->domain,
-            $this->slug,
-            'active',
-            $this->plan,
-            $this->settings,
-            $this->metadata,
-            $this->createdAt,
-            $this->updatedAt,
-        );
+        return $this->updatedAt;
     }
 
-    public function suspend(): self
+    // Domain behaviour
+    public function updateConfig(array $data): void
     {
-        return new self(
-            $this->id,
-            $this->name,
-            $this->domain,
-            $this->slug,
-            'suspended',
-            $this->plan,
-            $this->settings,
-            $this->metadata,
-            $this->createdAt,
-            $this->updatedAt,
-        );
+        if (isset($data['database_config'])) {
+            $this->databaseConfig = DatabaseConfig::fromArray($data['database_config']);
+        }
+        if (isset($data['mail_config'])) {
+            $this->mailConfig = MailConfig::fromArray($data['mail_config']);
+        }
+        if (isset($data['cache_config'])) {
+            $this->cacheConfig = CacheConfig::fromArray($data['cache_config']);
+        }
+        if (isset($data['queue_config'])) {
+            $this->queueConfig = QueueConfig::fromArray($data['queue_config']);
+        }
+        if (isset($data['feature_flags'])) {
+            $this->featureFlags = new FeatureFlags($data['feature_flags']);
+        }
+        if (isset($data['api_keys'])) {
+            $this->apiKeys = new ApiKeys($data['api_keys']);
+        }
+        if (isset($data['active'])) {
+            $this->active = (bool) $data['active'];
+        }
+        $this->updatedAt = new \DateTimeImmutable;
     }
 
-    public function canAccessFeature(string $feature): bool
+    public function update(
+        string $name,
+        ?string $domain,
+        DatabaseConfig $databaseConfig,
+        ?MailConfig $mailConfig = null,
+        ?CacheConfig $cacheConfig = null,
+        ?QueueConfig $queueConfig = null,
+        ?FeatureFlags $featureFlags = null,
+        ?ApiKeys $apiKeys = null,
+        bool $active = true
+    ): void {
+        $this->name = $name;
+        $this->domain = $domain;
+        $this->databaseConfig = $databaseConfig;
+        $this->mailConfig = $mailConfig;
+        $this->cacheConfig = $cacheConfig;
+        $this->queueConfig = $queueConfig;
+        $this->featureFlags = $featureFlags ?? $this->featureFlags;
+        $this->apiKeys = $apiKeys ?? $this->apiKeys;
+        $this->active = $active;
+        $this->updatedAt = new \DateTimeImmutable;
+    }
+
+    public function setLogoPath(?string $path): void
     {
-        return isset($this->settings['features'][$feature])
-            && $this->settings['features'][$feature] === true;
+        $this->logoPath = $path;
+        $this->updatedAt = new \DateTimeImmutable;
     }
 }

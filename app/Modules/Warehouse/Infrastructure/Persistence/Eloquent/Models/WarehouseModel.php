@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasUuid;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 
-class WarehouseModel extends BaseModel
+class WarehouseModel extends Model
 {
-    use HasUuid, HasTenant;
+    use HasAudit, SoftDeletes;
 
     protected $table = 'warehouses';
 
@@ -18,11 +18,20 @@ class WarehouseModel extends BaseModel
         'tenant_id',
         'name',
         'code',
+        'type',
+        'description',
         'address',
+        'capacity',
+        'location_id',
+        'metadata',
         'is_active',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'metadata'    => 'array',
+        'tenant_id'   => 'integer',
+        'location_id' => 'integer',
+        'capacity'    => 'float',
+        'is_active'   => 'boolean',
     ];
 }

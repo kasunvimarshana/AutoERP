@@ -4,33 +4,41 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasUuid;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 
-class TenantModel extends BaseModel
+class TenantModel extends Model
 {
-    use HasUuid;
+    use HasAudit, SoftDeletes;
 
     protected $table = 'tenants';
 
     protected $fillable = [
         'name',
         'domain',
-        'slug',
-        'status',
-        'plan',
-        'settings',
-        'metadata',
+        'logo_path',
+        'database_config',
+        'mail_config',
+        'cache_config',
+        'queue_config',
+        'feature_flags',
+        'api_keys',
+        'active',
     ];
 
-    protected $hidden = [];
+    protected $casts = [
+        'database_config' => 'array',
+        'mail_config' => 'array',
+        'cache_config' => 'array',
+        'queue_config' => 'array',
+        'feature_flags' => 'array',
+        'api_keys' => 'array',
+        'active' => 'boolean',
+    ];
 
-    protected function casts(): array
+    public function attachments()
     {
-        return array_merge(parent::casts(), [
-            'id'       => 'string',
-            'settings' => 'array',
-            'metadata' => 'array',
-        ]);
+        return $this->hasMany(TenantAttachmentModel::class, 'tenant_id');
     }
 }

@@ -4,117 +4,123 @@ declare(strict_types=1);
 
 namespace Modules\Transaction\Infrastructure\Persistence\Eloquent\Repositories;
 
-use DateTimeInterface;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Modules\Core\Domain\ValueObjects\Metadata;
+use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Transaction\Domain\Entities\Transaction;
 use Modules\Transaction\Domain\RepositoryInterfaces\TransactionRepositoryInterface;
 use Modules\Transaction\Infrastructure\Persistence\Eloquent\Models\TransactionModel;
 
-class EloquentTransactionRepository implements TransactionRepositoryInterface
+class EloquentTransactionRepository extends EloquentRepository implements TransactionRepositoryInterface
 {
-    public function findById(string $tenantId, string $id): ?Transaction
+    public function __construct(TransactionModel $model)
     {
-        $model = TransactionModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->find($id);
-
-        return $model !== null ? $this->mapToEntity($model) : null;
+        parent::__construct($model);
+        $this->setDomainEntityMapper(fn (TransactionModel $m): Transaction => $this->mapModelToDomainEntity($m));
     }
 
-    public function findAll(string $tenantId): array
+    public function save(Transaction $transaction): Transaction
     {
-        return TransactionModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->get()
-            ->map(fn (TransactionModel $model): Transaction => $this->mapToEntity($model))
-            ->all();
+        $savedModel = null;
+        DB::transaction(function () use ($transaction, &$savedModel) {
+            $data = [
+                'tenant_id'        => $transaction->getTenantId(),
+                'reference_number' => $transaction->getReferenceNumber(),
+                'transaction_type' => $transaction->getTransactionType(),
+                'status'           => $transaction->getStatus(),
+                'amount'           => $transaction->getAmount(),
+                'currency_code'    => $transaction->getCurrencyCode(),
+                'exchange_rate'    => $transaction->getExchangeRate(),
+                'transaction_date' => $transaction->getTransactionDate()->format('Y-m-d'),
+                'description'      => $transaction->getDescription(),
+                'reference_type'   => $transaction->getReferenceType(),
+                'reference_id'     => $transaction->getReferenceId(),
+                'posted_at'        => $transaction->getPostedAt()?->format('Y-m-d H:i:s'),
+                'voided_at'        => $transaction->getVoidedAt()?->format('Y-m-d H:i:s'),
+                'void_reason'      => $transaction->getVoidReason(),
+                'metadata'         => $transaction->getMetadata()->toArray(),
+            ];
+            if ($transaction->getId()) {
+                $savedModel = $this->update($transaction->getId(), $data);
+            } else {
+                $savedModel = $this->model->create($data);
+            }
+        });
+
+        if (! $savedModel instanceof TransactionModel) {
+            throw new \RuntimeException('Failed to save Transaction.');
+        }
+
+        return $this->mapModelToDomainEntity($savedModel);
     }
 
-    public function findByType(string $tenantId, string $type): array
+    public function findById(int $id): ?Transaction
     {
-        return TransactionModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->where('type', $type)
-            ->get()
-            ->map(fn (TransactionModel $model): Transaction => $this->mapToEntity($model))
-            ->all();
+        $model = $this->model->newQuery()->find($id);
+
+        return $model ? $this->mapModelToDomainEntity($model) : null;
     }
 
-    public function findByStatus(string $tenantId, string $status): array
+    public function findByReference(int $tenantId, string $referenceNumber): ?Transaction
     {
-        return TransactionModel::withoutGlobalScopes()
+        $model = $this->model
             ->where('tenant_id', $tenantId)
-            ->where('status', $status)
-            ->get()
-            ->map(fn (TransactionModel $model): Transaction => $this->mapToEntity($model))
-            ->all();
+            ->where('reference_number', $referenceNumber)
+            ->first();
+
+        return $model ? $this->mapModelToDomainEntity($model) : null;
     }
 
-    public function findByReference(string $tenantId, string $referenceType, string $referenceId): array
+    public function findByReferenceEntity(int $tenantId, string $referenceType, int $referenceId): Collection
     {
-        return TransactionModel::withoutGlobalScopes()
+        return $this->model
             ->where('tenant_id', $tenantId)
             ->where('reference_type', $referenceType)
             ->where('reference_id', $referenceId)
             ->get()
-            ->map(fn (TransactionModel $model): Transaction => $this->mapToEntity($model))
-            ->all();
+            ->map(fn ($m) => $this->mapModelToDomainEntity($m));
     }
 
-    public function findByDateRange(string $tenantId, DateTimeInterface $from, DateTimeInterface $to): array
+    public function findByType(int $tenantId, string $transactionType): Collection
     {
-        return TransactionModel::withoutGlobalScopes()
+        return $this->model
             ->where('tenant_id', $tenantId)
-            ->whereDate('transaction_date', '>=', $from->format('Y-m-d'))
-            ->whereDate('transaction_date', '<=', $to->format('Y-m-d'))
+            ->where('transaction_type', $transactionType)
             ->get()
-            ->map(fn (TransactionModel $model): Transaction => $this->mapToEntity($model))
-            ->all();
+            ->map(fn ($m) => $this->mapModelToDomainEntity($m));
     }
 
-    public function save(Transaction $transaction): void
+    public function list(array $filters = [], int $perPage = 15, int $page = 1): mixed
     {
-        $model = TransactionModel::withoutGlobalScopes()->findOrNew($transaction->id);
-
-        $model->fill([
-            'tenant_id'        => $transaction->tenantId,
-            'type'             => $transaction->type,
-            'reference_type'   => $transaction->referenceType,
-            'reference_id'     => $transaction->referenceId,
-            'status'           => $transaction->status,
-            'description'      => $transaction->description,
-            'transaction_date' => $transaction->transactionDate->format('Y-m-d'),
-            'total_amount'     => $transaction->totalAmount,
-        ]);
-
-        if (! $model->exists) {
-            $model->id = $transaction->id;
-        }
-
-        $model->save();
+        return $this->model->newQuery()
+            ->when(isset($filters['tenant_id']), fn ($q) => $q->where('tenant_id', $filters['tenant_id']))
+            ->when(isset($filters['status']), fn ($q) => $q->where('status', $filters['status']))
+            ->when(isset($filters['transaction_type']), fn ($q) => $q->where('transaction_type', $filters['transaction_type']))
+            ->paginate($perPage, ['*'], 'page', $page);
     }
 
-    public function delete(string $tenantId, string $id): void
-    {
-        TransactionModel::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->find($id)
-            ?->delete();
-    }
-
-    private function mapToEntity(TransactionModel $model): Transaction
+    private function mapModelToDomainEntity(TransactionModel $model): Transaction
     {
         return new Transaction(
-            id: (string) $model->id,
-            tenantId: (string) $model->tenant_id,
-            type: (string) $model->type,
-            referenceType: $model->reference_type !== null ? (string) $model->reference_type : null,
-            referenceId: $model->reference_id !== null ? (string) $model->reference_id : null,
-            status: (string) $model->status,
-            description: $model->description !== null ? (string) $model->description : null,
-            transactionDate: $model->transaction_date ?? now(),
-            totalAmount: (float) $model->total_amount,
-            createdAt: $model->created_at ?? now(),
-            updatedAt: $model->updated_at ?? now(),
+            tenantId:        $model->tenant_id,
+            referenceNumber: $model->reference_number,
+            transactionType: $model->transaction_type,
+            amount:          (float) $model->amount,
+            transactionDate: new \DateTimeImmutable($model->transaction_date),
+            status:          $model->status,
+            currencyCode:    $model->currency_code,
+            exchangeRate:    (float) $model->exchange_rate,
+            description:     $model->description,
+            referenceType:   $model->reference_type,
+            referenceId:     $model->reference_id,
+            postedAt:        $model->posted_at ? new \DateTimeImmutable($model->posted_at->format('c')) : null,
+            voidedAt:        $model->voided_at ? new \DateTimeImmutable($model->voided_at->format('c')) : null,
+            voidReason:      $model->void_reason,
+            metadata:        isset($model->metadata) ? new Metadata((array) $model->metadata) : null,
+            id:              $model->id,
+            createdAt:       $model->created_at,
+            updatedAt:       $model->updated_at,
         );
     }
 }

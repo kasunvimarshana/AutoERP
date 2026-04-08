@@ -4,21 +4,17 @@ declare(strict_types=1);
 
 namespace Modules\Supplier\Domain\RepositoryInterfaces;
 
+use Illuminate\Support\Collection;
+use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
 use Modules\Supplier\Domain\Entities\Supplier;
 
-interface SupplierRepositoryInterface
+interface SupplierRepositoryInterface extends RepositoryInterface
 {
-    public function findById(string $tenantId, string $id): ?Supplier;
+    public function findByCode(int $tenantId, string $code): ?Supplier;
 
-    /** @return Supplier[] */
-    public function findAll(string $tenantId): array;
+    public function findByTenant(int $tenantId): Collection;
 
-    public function findByCode(string $tenantId, string $code): ?Supplier;
+    public function findByUserId(int $tenantId, int $userId): ?Supplier;
 
-    /** @return Supplier[] */
-    public function findActive(string $tenantId): array;
-
-    public function save(Supplier $supplier): void;
-
-    public function delete(string $tenantId, string $id): void;
+    public function save(Supplier $supplier): Supplier;
 }
