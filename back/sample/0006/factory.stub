@@ -1,0 +1,61 @@
+<?php
+
+namespace {{ namespace }};
+
+use App\Infrastructure\Persistence\Eloquent\{{ className }}Model;
+use Illuminate\Database\Eloquent\Factories\Factory;
+
+/**
+ * {{ className }} Factory — generates test data for the {{ className }} Eloquent model.
+ *
+ * Used in:
+ *   - Feature tests: {{ className }}Model::factory()->create()
+ *   - Database seeders: {{ className }}Model::factory()->count(10)->create()
+ *
+ * The factory works with the PERSISTENCE MODEL, not the Domain Entity.
+ * Keep domain-specific logic in the entity — factories are data-only.
+ */
+class {{ className }}Factory extends Factory
+{
+    /**
+     * The model the factory creates instances of.
+     */
+    protected $model = {{ className }}Model::class;
+
+    /**
+     * Define the model's default state.
+     * Each key must match a column in the '{{ classSnake }}s' table.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        return [
+            'id' => $this->faker->uuid(),
+            // TODO: add realistic fake values for each column.
+            //
+            // Examples:
+            // 'name'         => $this->faker->name(),
+            // 'email'        => $this->faker->unique()->safeEmail(),
+            // 'status'       => 'pending',
+            // 'amount_cents' => $this->faker->numberBetween(100, 100000),
+        ];
+    }
+
+    // -------------------------------------------------------------------------
+    // Named Factory States
+    // -------------------------------------------------------------------------
+
+    // TODO: Add named states for common scenarios.
+    //
+    // Example:
+    // public function cancelled(): static
+    // {
+    //     return $this->state(['status' => 'cancelled']);
+    // }
+    //
+    // public function paid(): static
+    // {
+    //     return $this->state(['status' => 'paid', 'paid_at' => now()]);
+    // }
+}

@@ -1,0 +1,68 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use {{ commandNamespace }}\{{ commandName }};
+
+/**
+ * {{ className }}Handler — CQRS Command Handler
+ *
+ * The Command Handler is the single use-case class responsible for executing
+ * the {{ className }}Command. It orchestrates domain objects, persists state
+ * changes via repositories, and dispatches domain events.
+ *
+ * Bounded Context: {{ contextName }}
+ * Generated:       {{ date }}
+ *
+ * -------------------------------------------------------------------------
+ * Implementation Guide
+ * -------------------------------------------------------------------------
+ *
+ * 1. Inject only what you need: repositories, domain services, event dispatcher.
+ * 2. The handle() method should be the only public method on this class.
+ * 3. Wrap the operation in a DB transaction when multiple writes are involved.
+ * 4. Return void; side effects are expressed through domain events.
+ * 5. Keep this class thin — complex logic belongs in domain entities/services.
+ *
+ * Typical flow:
+ *   a) Validate preconditions via domain services / specifications.
+ *   b) Load or create the aggregate root.
+ *   c) Call the aggregate's command method.
+ *   d) Persist via repository (which also dispatches events).
+ */
+final class {{ className }}Handler
+{
+    public function __construct(
+        // TODO: Inject repository interface and any domain services needed.
+        // Example:
+        // private readonly {{ contextName }}RepositoryInterface $repository,
+        // private readonly SomeDomainService $domainService,
+    ) {}
+
+    /**
+     * Execute the {{ className }}Command use-case.
+     *
+     * @throws \DomainException when a business rule is violated
+     * @throws \Throwable       when persistence fails (let it bubble for transaction rollback)
+     */
+    public function handle({{ commandName }} $command): void
+    {
+        // TODO: Implement the use-case.
+        //
+        // Example (create flow):
+        // $aggregate = SomeAggregate::create(
+        //     name:  $command->name,
+        //     email: Email::fromString($command->email),
+        // );
+        // $this->repository->save($aggregate);
+        //
+        // Example (update flow):
+        // $aggregate = $this->repository->findById(Uuid::fromString($command->id));
+        // $aggregate->rename($command->name);
+        // $this->repository->save($aggregate);
+
+        throw new \BadMethodCallException('{{ className }}Handler::handle() is not implemented.');
+    }
+}

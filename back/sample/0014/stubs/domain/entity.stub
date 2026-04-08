@@ -1,0 +1,104 @@
+<?php
+
+namespace {{ namespace }};
+
+use App\Domain\Shared\Contracts\EntityContract;
+use App\Domain\Shared\Contracts\AggregateRoot;
+use App\Domain\Shared\ValueObjects\Uuid;
+
+/**
+ * {{ className }} Entity.
+ *
+ * This is the core domain entity for the {{ contextName }} bounded context.
+ * Business rules and invariants belong here — never in controllers or use-cases.
+ */
+final class {{ className }} implements EntityContract, AggregateRoot
+{
+    /** @var array<\App\Domain\Shared\Events\DomainEvent> */
+    private array $domainEvents = [];
+
+    private function __construct(
+        private readonly Uuid $id,
+        // TODO: Add your domain properties here
+    ) {
+    }
+
+    // -------------------------------------------------------------------------
+    // Factory Methods
+    // -------------------------------------------------------------------------
+
+    /**
+     * Create a new {{ className }} with a freshly generated identity.
+     */
+    public static function create(
+        // TODO: Add required constructor parameters
+    ): self {
+        $entity = new self(
+            id: Uuid::generate(),
+            // TODO: pass properties
+        );
+
+        // Record the creation event
+        // $entity->recordEvent(new {{ className }}Created($entity->id));
+
+        return $entity;
+    }
+
+    /**
+     * Reconstitute a {{ className }} from persisted state (e.g. from a repository).
+     * Does NOT raise domain events.
+     */
+    public static function reconstitute(string $id /*, ...other properties */): self
+    {
+        return new self(
+            id: Uuid::from($id),
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Identity (EntityContract)
+    // -------------------------------------------------------------------------
+
+    public function id(): Uuid
+    {
+        return $this->id;
+    }
+
+    public function equals(EntityContract $other): bool
+    {
+        return $other instanceof self && $this->id->equals($other->id);
+    }
+
+    // -------------------------------------------------------------------------
+    // Domain Events (AggregateRoot)
+    // -------------------------------------------------------------------------
+
+    public function pullDomainEvents(): array
+    {
+        $events            = $this->domainEvents;
+        $this->domainEvents = [];
+        return $events;
+    }
+
+    private function recordEvent(\App\Domain\Shared\Events\DomainEvent $event): void
+    {
+        $this->domainEvents[] = $event;
+    }
+
+    // -------------------------------------------------------------------------
+    // Business Behaviour
+    // -------------------------------------------------------------------------
+
+    // TODO: Add domain methods that encode business rules.
+    // Each method should enforce invariants and record relevant domain events.
+    //
+    // Example:
+    // public function activate(): void
+    // {
+    //     if ($this->status->isActive()) {
+    //         throw {{ className }}Exception::alreadyActive();
+    //     }
+    //     $this->status = {{ className }}Status::Active;
+    //     $this->recordEvent(new {{ className }}Activated($this->id));
+    // }
+}

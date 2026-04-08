@@ -1,0 +1,63 @@
+<?php
+
+namespace {{ namespace }};
+
+use App\Application\{{ contextName }}\DTOs\{{ className }}DTO;
+use App\Domain\{{ contextName }}\Repositories\{{ contextName }}RepositoryInterface;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
+
+/**
+ * {{ className }} Use Case.
+ *
+ * Use Cases orchestrate the Domain layer to fulfil a single application
+ * operation. They:
+ *
+ *   - Accept a DTO (validated input)
+ *   - Load domain objects via repository interfaces
+ *   - Call domain methods that enforce business rules
+ *   - Persist changes via the repository
+ *   - Dispatch domain events
+ *   - Return a result DTO or primitive (never a domain entity directly)
+ *
+ * Use Cases must NOT contain business logic — that lives in the Domain layer.
+ * Use Cases must NOT depend on HTTP, queues, or other infrastructure directly.
+ */
+final class {{ className }}UseCase
+{
+    public function __construct(
+        private readonly {{ contextName }}RepositoryInterface $repository,
+        // TODO: inject additional repository interfaces or domain services as needed
+    ) {
+    }
+
+    /**
+     * Execute the use case.
+     *
+     * @throws \App\Domain\Shared\Exceptions\DomainException  On business rule violations
+     */
+    public function execute({{ className }}DTO $dto): mixed
+    {
+        return DB::transaction(function () use ($dto) {
+            // 1. Load / create the aggregate / entity from the domain
+            //    $entity = {{ contextName }}::create(...);
+            //    — or —
+            //    $entity = $this->repository->findById($dto->id)
+            //        ?? throw NotFoundException::for('{{ contextName }}', $dto->id);
+
+            // 2. Call domain methods (business logic lives HERE, in the entity)
+            //    $entity->someBusinessAction($dto->someField);
+
+            // 3. Persist
+            //    $this->repository->save($entity);
+
+            // 4. Dispatch domain events
+            //    foreach ($entity->pullDomainEvents() as $event) {
+            //        Event::dispatch($event);
+            //    }
+
+            // 5. Return result (DTO, ID, or simple primitive)
+            return null; // TODO: replace with actual return value
+        });
+    }
+}

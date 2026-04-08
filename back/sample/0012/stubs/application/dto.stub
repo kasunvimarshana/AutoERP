@@ -1,0 +1,63 @@
+<?php
+
+namespace {{ namespace }};
+
+/**
+ * {{ className }} Data Transfer Object.
+ *
+ * DTOs carry validated input data across layer boundaries.
+ * They are plain, immutable value bags — no business logic here.
+ *
+ * Construct from a Form Request, an Artisan command, or a queue job payload.
+ * Pass to a Use Case, Command, or Handler.
+ */
+final class {{ className }}DTO
+{
+    public function __construct(
+        // TODO: Add typed, readonly properties for each input field.
+        //
+        // Example:
+        // public readonly string $name,
+        // public readonly string $email,
+        // public readonly int    $amount,
+    ) {
+    }
+
+    // -------------------------------------------------------------------------
+    // Named Constructors
+    // -------------------------------------------------------------------------
+
+    /**
+     * Build from a raw associative array (e.g. $request->validated()).
+     */
+    public static function fromArray(array $data): self
+    {
+        return new self(
+            // TODO: map array keys to constructor parameters
+            // name:   $data['name'],
+            // email:  $data['email'],
+            // amount: $data['amount'],
+        );
+    }
+
+    /**
+     * Build from a Laravel Form Request.
+     *
+     * Uncomment and type-hint the specific request class.
+     */
+    // public static function fromRequest(\Illuminate\Http\Request $request): self
+    // {
+    //     return self::fromArray($request->validated());
+    // }
+
+    // -------------------------------------------------------------------------
+    // Serialisation
+    // -------------------------------------------------------------------------
+
+    public function toArray(): array
+    {
+        return [
+            // TODO: mirror the constructor parameters
+        ];
+    }
+}

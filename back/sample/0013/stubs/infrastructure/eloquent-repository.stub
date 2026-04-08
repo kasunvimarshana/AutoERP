@@ -1,0 +1,103 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use {{ interfaceNamespace }}\{{ interfaceName }};
+use App\Shared\Domain\ValueObjects\Uuid;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+
+/**
+ * Eloquent{{ className }}Repository — Infrastructure Repository Implementation
+ *
+ * Implements the domain repository contract using Laravel's Eloquent ORM.
+ * This class is responsible for translating between domain objects and
+ * Eloquent models (the Data Mapper pattern).
+ *
+ * Bounded Context: {{ contextName }}
+ * Generated:       {{ date }}
+ *
+ * -------------------------------------------------------------------------
+ * Implementation Guide
+ * -------------------------------------------------------------------------
+ *
+ * 1. Inject the Eloquent model via the constructor.
+ * 2. In fromModel(), map Eloquent attributes → domain aggregate/entity.
+ * 3. In toModel(), map domain object → Eloquent attribute array.
+ * 4. Dispatch domain events in save() after persisting:
+ *      foreach ($entity->releaseEvents() as $event) { event($event); }
+ * 5. Wrap not-found scenarios in domain exceptions, not ModelNotFoundException.
+ * 6. Register the binding in {{ contextName }}ServiceProvider:
+ *      $this->app->bind({{ interfaceName }}::class, self::class);
+ */
+final class Eloquent{{ className }}Repository implements {{ interfaceName }}
+{
+    public function __construct(
+        // TODO: Inject your Eloquent model class.
+        // private readonly {{ className }}Model $model,
+    ) {}
+
+    public function findById(Uuid $id): mixed  // TODO: replace mixed with domain type
+    {
+        // TODO: Implement.
+        // Example:
+        // $record = $this->model->newQuery()->find($id->value());
+        // if ($record === null) {
+        //     throw new \DomainException("{{ className }} [{$id->value()}] not found.");
+        // }
+        // return $this->fromModel($record);
+        throw new \BadMethodCallException('findById() not implemented.');
+    }
+
+    public function save(mixed $entity): void  // TODO: replace mixed with domain type
+    {
+        // TODO: Implement.
+        // Example:
+        // $data   = $this->toModel($entity);
+        // $record = $this->model->newQuery()->findOrNew($entity->id()->value());
+        // $record->fill($data)->save();
+        //
+        // Dispatch domain events:
+        // foreach ($entity->releaseEvents() as $event) { event($event); }
+        throw new \BadMethodCallException('save() not implemented.');
+    }
+
+    public function delete(Uuid $id): void
+    {
+        // TODO: Implement.
+        // $this->model->newQuery()->where('id', $id->value())->delete();
+        throw new \BadMethodCallException('delete() not implemented.');
+    }
+
+    public function findAll(): array
+    {
+        // TODO: Implement.
+        // return $this->model->newQuery()->get()->map(fn ($r) => $this->fromModel($r))->all();
+        throw new \BadMethodCallException('findAll() not implemented.');
+    }
+
+    // -------------------------------------------------------------------------
+    // Data Mapping (private)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Map an Eloquent model record to the domain aggregate.
+     *
+     * TODO: Call {{ className }}::reconstitute() with values from $model.
+     */
+    private function fromModel(mixed $model): mixed  // TODO: replace mixed types
+    {
+        throw new \BadMethodCallException('fromModel() not implemented.');
+    }
+
+    /**
+     * Map a domain aggregate to an attribute array for Eloquent persistence.
+     *
+     * TODO: Return ['id' => ..., 'name' => ..., ...] from domain object fields.
+     */
+    private function toModel(mixed $entity): array  // TODO: replace mixed
+    {
+        throw new \BadMethodCallException('toModel() not implemented.');
+    }
+}

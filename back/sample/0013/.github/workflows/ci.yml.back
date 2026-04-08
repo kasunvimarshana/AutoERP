@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    name: PHP ${{ matrix.php }} · Laravel ${{ matrix.laravel }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php:     ["8.1", "8.2", "8.3"]
+        laravel: ["10.*", "11.*", "12.*"]
+        exclude:
+          # Laravel 11+ requires PHP 8.2+
+          - php: "8.1"
+            laravel: "11.*"
+          - php: "8.1"
+            laravel: "12.*"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mbstring, pdo, pdo_sqlite, sqlite3
+          coverage: xdebug
+          tools: composer:v2
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-php${{ matrix.php }}-laravel${{ matrix.laravel }}-${{ hashFiles('composer.json') }}
+          restore-keys: |
+            composer-php${{ matrix.php }}-laravel${{ matrix.laravel }}-
+            composer-php${{ matrix.php }}-
+
+      - name: Require specific Laravel version
+        run: |
+          composer require "illuminate/support:${{ matrix.laravel }}" \
+                           "illuminate/console:${{ matrix.laravel }}" \
+                           "illuminate/filesystem:${{ matrix.laravel }}" \
+                           "illuminate/container:${{ matrix.laravel }}" \
+                           --no-update --no-interaction
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Run code style check (Pint)
+        run: vendor/bin/pint --test
+
+      - name: Run test suite
+        run: vendor/bin/phpunit --coverage-clover=coverage.xml
+
+      - name: Upload coverage to Codecov
+        if: matrix.php == '8.3' && matrix.laravel == '12.*'
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          tools: composer:v2
+
+      - run: composer install --no-interaction --prefer-dist
+
+      - name: Run PHPStan (if configured)
+        run: |
+          if [ -f phpstan.neon ]; then
+            vendor/bin/phpstan analyse
+          else
+            echo "PHPStan not configured — skipping."
+          fi

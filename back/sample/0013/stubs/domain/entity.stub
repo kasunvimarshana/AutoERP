@@ -1,0 +1,131 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use App\Shared\Domain\Contracts\EntityContract;
+use App\Shared\Domain\ValueObjects\Uuid;
+
+/**
+ * {{ className }} — Domain Entity
+ *
+ * An Entity is an object with a distinct identity that runs through time and
+ * different representations. Two entities are equal when their identities match,
+ * regardless of their attribute values.
+ *
+ * Bounded Context: {{ contextName }}
+ * Generated:       {{ date }}
+ *
+ * -------------------------------------------------------------------------
+ * Implementation Guide
+ * -------------------------------------------------------------------------
+ *
+ * 1. Add your domain-specific properties as private/readonly fields.
+ * 2. Implement business rules as public methods (e.g. activate(), deactivate()).
+ * 3. Raise domain events via $this->recordEvent(new SomethingHappened(...)).
+ * 4. Keep the constructor private; expose named static constructors instead.
+ * 5. Never inject infrastructure concerns (repositories, mailers) here.
+ *
+ * @see EntityContract
+ */
+final class {{ className }} implements EntityContract
+{
+    /** @var array<object> Queued domain events raised during this operation */
+    private array $domainEvents = [];
+
+    /**
+     * Private constructor — use static named constructors.
+     *
+     * TODO: Add your entity's required properties here.
+     */
+    private function __construct(
+        private readonly Uuid $id,
+        // TODO: Add additional readonly properties
+    ) {}
+
+    // -------------------------------------------------------------------------
+    // Named Constructors
+    // -------------------------------------------------------------------------
+
+    /**
+     * Create a brand-new {{ className }} with a fresh identity.
+     *
+     * TODO: Accept the value objects / primitives needed to initialise this entity.
+     */
+    public static function create(
+        // TODO: e.g. string $name, Email $email, Money $price
+    ): self {
+        $entity = new self(
+            id: Uuid::generate(),
+            // TODO: Pass remaining arguments
+        );
+
+        // TODO: Record a creation event, e.g.:
+        // $entity->recordEvent(new {{ className }}WasCreated($entity->id));
+
+        return $entity;
+    }
+
+    /**
+     * Reconstitute a {{ className }} from persistence (no events raised).
+     *
+     * TODO: Accept exactly the same fields as create() plus the persisted ID.
+     */
+    public static function reconstitute(
+        Uuid $id,
+        // TODO: remaining fields
+    ): self {
+        return new self(
+            id: $id,
+            // TODO: remaining fields
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // EntityContract
+    // -------------------------------------------------------------------------
+
+    public function id(): Uuid
+    {
+        return $this->id;
+    }
+
+    public function equals(EntityContract $other): bool
+    {
+        return $other instanceof self
+            && $this->id->equals($other->id);
+    }
+
+    // -------------------------------------------------------------------------
+    // Domain Behaviour
+    // -------------------------------------------------------------------------
+
+    // TODO: Add business methods here.
+    // Example:
+    //
+    // public function rename(string $newName): void
+    // {
+    //     Guard::notEmpty($newName, '{{ className }} name cannot be empty.');
+    //     $this->name = $newName;
+    //     $this->recordEvent(new {{ className }}WasRenamed($this->id, $newName));
+    // }
+
+    // -------------------------------------------------------------------------
+    // Domain Events
+    // -------------------------------------------------------------------------
+
+    /** @return array<object> */
+    public function releaseEvents(): array
+    {
+        $events            = $this->domainEvents;
+        $this->domainEvents = [];
+
+        return $events;
+    }
+
+    private function recordEvent(object $event): void
+    {
+        $this->domainEvents[] = $event;
+    }
+}

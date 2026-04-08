@@ -1,0 +1,24 @@
+<?php
+
+namespace {{ namespace }};
+
+/**
+ * Aggregate Root Contract.
+ *
+ * All aggregate roots must implement this interface to guarantee
+ * that domain events are recorded and accessible for dispatch.
+ */
+interface AggregateRoot
+{
+    /**
+     * Pull all recorded domain events, clearing the internal list.
+     *
+     * @return array<DomainEvent>
+     */
+    public function pullDomainEvents(): array;
+
+    /**
+     * Return the aggregate's unique identity.
+     */
+    public function id(): mixed;
+}

@@ -1,0 +1,38 @@
+<?php
+
+namespace {{ namespace }};
+
+use App\Domain\Shared\Events\DomainEvent;
+use App\Domain\Shared\ValueObjects\Uuid;
+
+/**
+ * {{ className }} Domain Event.
+ *
+ * This event is raised when [describe the business occurrence].
+ * Listeners in the Infrastructure layer handle side-effects such as
+ * sending notifications, updating read models, or queuing jobs.
+ *
+ * Events are named in past tense to describe something that has already happened.
+ */
+final class {{ className }} extends DomainEvent
+{
+    public function __construct(
+        public readonly Uuid $aggregateId,
+        // TODO: add event-specific payload properties (keep them minimal & immutable)
+    ) {
+        parent::__construct();
+    }
+
+    /**
+     * Serialise the event payload for logging, messaging, or event sourcing.
+     */
+    public function toArray(): array
+    {
+        return [
+            'event_id'     => $this->eventId,
+            'event_name'   => $this->eventName(),
+            'aggregate_id' => $this->aggregateId->value(),
+            'occurred_at'  => $this->occurredAt->format(\DateTimeInterface::ATOM),
+        ];
+    }
+}

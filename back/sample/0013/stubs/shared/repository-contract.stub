@@ -1,0 +1,35 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use App\Shared\Domain\ValueObjects\Uuid;
+
+/**
+ * RepositoryContract — Base contract for all Domain Repositories.
+ *
+ * Every domain repository interface should extend this contract to guarantee
+ * a minimum set of persistence operations across all bounded contexts.
+ *
+ * Generated: {{ date }}
+ */
+interface RepositoryContract
+{
+    /**
+     * Find an aggregate root by its identity.
+     * Return null when not found, or throw a domain exception — pick one
+     * convention and apply it consistently across your bounded context.
+     */
+    public function findById(Uuid $id): mixed;
+
+    /**
+     * Persist a new or updated aggregate root.
+     */
+    public function save(mixed $entity): void;
+
+    /**
+     * Remove an aggregate root from persistence.
+     */
+    public function delete(Uuid $id): void;
+}

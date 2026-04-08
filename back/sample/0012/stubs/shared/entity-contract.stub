@@ -1,0 +1,23 @@
+<?php
+
+namespace {{ namespace }};
+
+/**
+ * Entity Contract.
+ *
+ * Entities have a persistent unique identity and lifecycle.
+ * Two entities with the same ID are considered equal regardless of
+ * their other attribute values.
+ */
+interface EntityContract
+{
+    /**
+     * Return the entity's unique identifier.
+     */
+    public function id(): mixed;
+
+    /**
+     * Determine equality based on identity only.
+     */
+    public function equals(self $other): bool;
+}

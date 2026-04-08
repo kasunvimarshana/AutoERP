@@ -1,0 +1,40 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+/**
+ * {{ className }}Command — CQRS Write Command
+ *
+ * A Command is an immutable data transfer object that represents the intent
+ * to change system state. Commands are handled by a dedicated CommandHandler.
+ *
+ * Naming convention: <Verb><Noun>Command  →  Create{{ className }}Command
+ *
+ * Bounded Context: {{ contextName }}
+ * Generated:       {{ date }}
+ *
+ * -------------------------------------------------------------------------
+ * Implementation Guide
+ * -------------------------------------------------------------------------
+ *
+ * 1. All properties MUST be readonly — commands are immutable once created.
+ * 2. Accept primitives or value objects; avoid raw arrays where possible.
+ * 3. The corresponding handler is: {{ className }}Handler
+ * 4. Dispatch via your command bus or directly:
+ *      app({{ className }}Handler::class)->handle(new {{ className }}Command(...));
+ * 5. Validate input BEFORE constructing the command (in Form Requests / CLI).
+ */
+final class {{ className }}Command
+{
+    public function __construct(
+        // TODO: Add the properties this command carries.
+        // All must be readonly. Prefer value objects over raw strings/ints.
+        //
+        // Examples:
+        // public readonly string $name,
+        // public readonly string $email,
+        // public readonly int    $quantity,
+    ) {}
+}

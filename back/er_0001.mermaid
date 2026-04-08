@@ -1,0 +1,248 @@
+erDiagram
+    %% Party Master
+    parties {
+        bigint id PK
+        varchar name
+        enum type "supplier,customer,both"
+        varchar email
+        varchar phone
+        text address
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% Product & UoM
+    products {
+        bigint id PK
+        varchar name
+        varchar sku UK
+        enum type "physical,service,digital,combo,variable"
+        boolean track_batch_serial
+        text description
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    product_variants {
+        bigint id PK
+        bigint product_id FK
+        varchar variant_name
+        varchar sku UK
+        decimal base_price
+        bigint uom_id FK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    uoms {
+        bigint id PK
+        varchar name
+        decimal conversion_factor
+        boolean base_unit
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    product_uom_conversions {
+        bigint id PK
+        bigint product_variant_id FK
+        bigint from_uom_id FK
+        bigint to_uom_id FK
+        decimal factor
+        timestamp created_at
+    }
+
+    %% Inventory
+    inventory_locations {
+        bigint id PK
+        varchar name
+        varchar code UK
+        bigint parent_location_id FK "self-reference"
+        varchar path "materialized path"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    inventory_item_variants {
+        bigint id PK
+        bigint product_variant_id FK
+        bigint location_id FK
+        varchar batch_number
+        varchar serial_number
+        varchar barcode
+        bigint uom_id FK
+        decimal qty
+        decimal reserved_qty
+        decimal unit_cost
+        date received_date
+        date expiry_date
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    inventory_ledger {
+        bigint id PK
+        bigint inventory_item_variant_id FK
+        enum movement_type "IN,OUT,ADJUSTMENT,TRANSFER,BALANCE_CHECK"
+        decimal qty_moved
+        decimal balance_after
+        string reference_type "polymorphic"
+        bigint reference_id
+        timestamp created_at
+    }
+
+    inventory_layers {
+        bigint id PK
+        bigint product_variant_id FK
+        bigint warehouse_id FK "maps to inventory_locations"
+        date received_date
+        date expiry_date
+        decimal quantity
+        decimal remaining_quantity
+        decimal unit_cost
+        string reference_type
+        bigint reference_id
+        timestamp created_at
+    }
+
+    %% Procurement (Purchases)
+    purchases {
+        bigint id PK
+        bigint party_id FK
+        date purchase_date
+        enum source_type "PO,DIRECT"
+        enum status "draft,received,cancelled"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    purchase_lines {
+        bigint id PK
+        bigint purchase_id FK
+        bigint product_variant_id FK
+        bigint inventory_item_variant_id FK
+        bigint uom_id FK
+        decimal qty
+        decimal price
+        varchar batch_number
+        varchar serial_number
+        timestamp created_at
+    }
+
+    purchase_returns {
+        bigint id PK
+        bigint party_id FK
+        date return_date
+        enum status "draft,processed,cancelled"
+        decimal restocking_fee
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    purchase_return_lines {
+        bigint id PK
+        bigint purchase_return_id FK
+        bigint product_variant_id FK
+        bigint inventory_item_variant_id FK
+        bigint uom_id FK
+        decimal qty
+        decimal price
+        varchar batch_number
+        varchar serial_number
+        enum condition "good,damaged,expired"
+        boolean restock
+        timestamp created_at
+    }
+
+    %% Sales
+    sales {
+        bigint id PK
+        bigint party_id FK
+        date sale_date
+        enum source_type "SO,DIRECT"
+        enum status "draft,delivered,cancelled"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    sales_lines {
+        bigint id PK
+        bigint sales_id FK
+        bigint product_variant_id FK
+        bigint inventory_item_variant_id FK
+        bigint uom_id FK
+        decimal qty
+        decimal price
+        varchar batch_number
+        varchar serial_number
+        timestamp created_at
+    }
+
+    sales_returns {
+        bigint id PK
+        bigint party_id FK
+        date return_date
+        enum status "draft,processed,cancelled"
+        decimal restocking_fee
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    sales_return_lines {
+        bigint id PK
+        bigint sales_return_id FK
+        bigint product_variant_id FK
+        bigint inventory_item_variant_id FK
+        bigint uom_id FK
+        decimal qty
+        decimal price
+        varchar batch_number
+        varchar serial_number
+        enum condition "good,damaged,defective"
+        boolean restock
+        timestamp created_at
+    }
+
+    %% Accounting (Double-Entry)
+    accounts {
+        bigint id PK
+        varchar code UK
+        varchar name
+        enum type "asset,liability,equity,revenue,expense"
+        bigint parent_account_id FK "self-reference"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    journal_entries {
+        bigint id PK
+        date entry_date
+        text description
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    journal_entry_lines {
+        bigint id PK
+        bigint journal_entry_id FK
+        bigint account_id FK
+        decimal debit
+        decimal credit
+        string reference_type "polymorphic"
+        bigint reference_id
+        timestamp created_at
+    }
+
+    %% Relationships
+    product_variants ||--o{ inventory_item_variants : "has stock"
+    inventory_locations ||--o{ inventory_item_variants : "located at"
+    product_variants ||--o{ purchase_lines : "ordered"
+    product_variants ||--o{ sales_lines : "sold"
+    parties ||--o{ purchases : "supplier"
+    parties ||--o{ sales : "customer"
+    purchases ||--o{ purchase_returns : "may return"
+    sales ||--o{ sales_returns : "may return"
+    inventory_ledger ||--|| inventory_item_variants : "logs movements"
+    inventory_layers ||--|| product_variants : "valuation layers"
+    journal_entry_lines ||--|| accounts : "posts to"
+    journal_entries ||--|{ journal_entry_lines : "contains"

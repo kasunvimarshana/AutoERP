@@ -1,0 +1,37 @@
+<?php
+
+namespace {{ namespace }};
+
+use DateTimeImmutable;
+
+/**
+ * Base Domain Event.
+ *
+ * All domain events extend this class. Events are named in past tense,
+ * describing something that already happened in the domain
+ * (e.g. OrderWasPlaced, UserWasRegistered).
+ */
+abstract class DomainEvent
+{
+    public readonly DateTimeImmutable $occurredAt;
+    public readonly string $eventId;
+
+    public function __construct()
+    {
+        $this->occurredAt = new DateTimeImmutable();
+        $this->eventId    = \Illuminate\Support\Str::uuid()->toString();
+    }
+
+    /**
+     * Return the canonical event name used for routing/serialisation.
+     */
+    public function eventName(): string
+    {
+        return static::class;
+    }
+
+    /**
+     * Serialise the event payload to an array (for event store / messaging).
+     */
+    abstract public function toArray(): array;
+}

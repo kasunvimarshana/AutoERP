@@ -1,0 +1,37 @@
+<?php
+
+namespace {{ namespace }};
+
+/**
+ * Base Repository Contract.
+ *
+ * Defines the minimum interface all repository implementations must fulfil.
+ * Concrete repository interfaces in each bounded context can extend this
+ * with context-specific query methods.
+ *
+ * @template TEntity
+ */
+interface RepositoryContract
+{
+    /**
+     * Find an entity by its identity.
+     * Returns null when no entity matches the given ID.
+     *
+     * @return TEntity|null
+     */
+    public function findById(mixed $id): mixed;
+
+    /**
+     * Persist a new or updated entity.
+     *
+     * @param TEntity $entity
+     */
+    public function save(mixed $entity): void;
+
+    /**
+     * Remove an entity from the store.
+     *
+     * @param TEntity $entity
+     */
+    public function delete(mixed $entity): void;
+}

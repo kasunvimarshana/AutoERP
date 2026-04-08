@@ -1,0 +1,20 @@
+<?php
+
+namespace {{ namespace }};
+
+use RuntimeException;
+
+/**
+ * Base Domain Exception.
+ *
+ * All domain-specific exceptions extend this class so they can be
+ * caught and translated at the application boundary without leaking
+ * infrastructure concerns into the domain layer.
+ */
+abstract class DomainException extends RuntimeException
+{
+    public static function because(string $reason, int $code = 0, ?\Throwable $previous = null): static
+    {
+        return new static($reason, $code, $previous);
+    }
+}

@@ -1,0 +1,67 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use App\Shared\Domain\ValueObjects\Uuid;
+
+/**
+ * {{ className }} — Domain Event
+ *
+ * Domain Events capture something meaningful that happened in the domain.
+ * They are immutable records of the past, named in past tense.
+ *
+ * Bounded Context: {{ contextName }}
+ * Generated:       {{ date }}
+ *
+ * -------------------------------------------------------------------------
+ * Implementation Guide
+ * -------------------------------------------------------------------------
+ *
+ * 1. Name events in past tense: {{ className }}WasCreated, OrderWasPaid, etc.
+ * 2. Include only the data that listeners need — usually just IDs + changed values.
+ * 3. Events are immutable; every property should be readonly.
+ * 4. Dispatch via Laravel's event system in your Command Handler, e.g.:
+ *      event(new {{ className }}(...));
+ *    Or use a domain event dispatcher if you prefer domain-level dispatch.
+ */
+final class {{ className }}
+{
+    public readonly \DateTimeImmutable $occurredAt;
+
+    public function __construct(
+        public readonly Uuid $aggregateId,
+        // TODO: Add additional payload fields (prefer value objects over primitives)
+        // e.g.:
+        // public readonly string $name,
+        // public readonly Money  $price,
+    ) {
+        $this->occurredAt = new \DateTimeImmutable();
+    }
+
+    /**
+     * Return the aggregate ID this event belongs to.
+     * Useful for event sourcing routing and audit logs.
+     */
+    public function aggregateId(): Uuid
+    {
+        return $this->aggregateId;
+    }
+
+    /**
+     * Return a serialisable array representation of this event.
+     * Useful for storing events in an outbox or event log.
+     *
+     * TODO: Extend to include all payload fields.
+     */
+    public function toArray(): array
+    {
+        return [
+            'event'        => static::class,
+            'aggregateId'  => $this->aggregateId->value(),
+            'occurredAt'   => $this->occurredAt->format(\DateTimeInterface::ATOM),
+            // TODO: add payload fields
+        ];
+    }
+}

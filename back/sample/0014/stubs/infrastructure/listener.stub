@@ -1,0 +1,74 @@
+<?php
+
+namespace {{ namespace }};
+
+use {{ eventClass }};
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\InteractsWithQueue;
+
+/**
+ * {{ className }}Listener — Infrastructure Event Listener.
+ *
+ * Handles the {{ eventClass }} domain event.
+ * This is an Infrastructure concern — it wires the domain event
+ * to real-world side-effects (emails, notifications, external APIs, etc.).
+ *
+ * To register this listener, add it to your ServiceProvider:
+ *
+ *   Event::listen(
+ *       \{{ eventClass }}::class,
+ *       \{{ namespace }}\{{ className }}Listener::class,
+ *   );
+ *
+ * Implements ShouldQueue to process the side-effect asynchronously.
+ * Remove ShouldQueue to handle it synchronously within the transaction.
+ */
+class {{ className }}Listener implements ShouldQueue
+{
+    use InteractsWithQueue;
+
+    /**
+     * The queue this listener should be dispatched to.
+     * Set to null to use the default queue.
+     */
+    public ?string $queue = 'default';
+
+    /**
+     * The number of seconds to wait before retrying a failed job.
+     */
+    public int $backoff = 30;
+
+    public function __construct(
+        // TODO: inject infrastructure services (mailer, notifier, API client, etc.)
+    ) {
+    }
+
+    /**
+     * Handle the domain event.
+     *
+     * @param  mixed  $event  The dispatched domain event
+     */
+    public function handle(mixed $event): void
+    {
+        // TODO: Implement the side-effect triggered by this domain event.
+        //
+        // Example — send confirmation email when an order is placed:
+        // Mail::to($event->customerEmail)->send(new OrderConfirmationMail($event->orderId));
+        //
+        // Example — push to an external analytics service:
+        // $this->analyticsClient->track('order_placed', $event->toArray());
+    }
+
+    /**
+     * Handle a job failure.
+     * Called after all retry attempts are exhausted.
+     */
+    public function failed(mixed $event, \Throwable $exception): void
+    {
+        // TODO: Log, alert, or compensate on permanent failure.
+        // \Illuminate\Support\Facades\Log::error(
+        //     "{{ className }}Listener failed: " . $exception->getMessage(),
+        //     ['event' => $event->toArray()]
+        // );
+    }
+}

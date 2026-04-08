@@ -1,0 +1,478 @@
+
+<style>
+#erd-wrap { padding: 0; overflow: auto; }
+#erd-wrap svg { width: 100%; height: auto; }
+.module-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 12px 0; }
+.mod-btn {
+  font-size: 12px; padding: 4px 10px; border-radius: 20px; border: 1px solid var(--color-border-secondary);
+  background: var(--color-background-secondary); color: var(--color-text-secondary);
+  cursor: pointer; transition: all .15s;
+}
+.mod-btn.active { background: var(--color-text-primary); color: var(--color-background-primary); border-color: transparent; }
+#erd { padding: 12px; }
+</style>
+<h2 class="sr-only">Full ERP Entity Relationship Diagram covering Master Data, Inventory, Procurement, Sales, and Accounting modules</h2>
+<div class="module-tabs">
+  <button class="mod-btn active" onclick="show('all')">All modules</button>
+  <button class="mod-btn" onclick="show('master')">Master data</button>
+  <button class="mod-btn" onclick="show('inventory')">Inventory</button>
+  <button class="mod-btn" onclick="show('procurement')">Procurement</button>
+  <button class="mod-btn" onclick="show('sales')">Sales</button>
+  <button class="mod-btn" onclick="show('accounting')">Accounting</button>
+</div>
+<div id="erd-wrap"><div id="erd"></div></div>
+
+<script type="module">
+import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+await document.fonts.ready;
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  fontFamily: '"Anthropic Sans", sans-serif',
+  themeVariables: {
+    darkMode: dark,
+    fontSize: '13px',
+    fontFamily: '"Anthropic Sans", sans-serif',
+    lineColor: dark ? '#9c9a92' : '#73726c',
+    textColor: dark ? '#c2c0b6' : '#3d3d3a',
+  },
+});
+
+const diagrams = {
+  all: `erDiagram
+    parties {
+      bigint id PK
+      varchar name
+      enum type
+      varchar email
+      varchar phone
+      text address
+      timestamp created_at
+    }
+    products {
+      bigint id PK
+      varchar name
+      varchar sku
+      enum type
+      boolean track_batch_serial
+      text description
+    }
+    product_variants {
+      bigint id PK
+      bigint product_id FK
+      varchar variant_name
+      varchar sku
+      decimal base_price
+      bigint uom_id FK
+    }
+    uoms {
+      bigint id PK
+      varchar name
+      decimal conversion_factor
+      boolean base_unit
+    }
+    product_uom {
+      bigint id PK
+      bigint product_variant_id FK
+      bigint uom_id FK
+      decimal conversion_factor
+    }
+    inventory_locations {
+      bigint id PK
+      varchar name
+      varchar code
+    }
+    inventory_item_variants {
+      bigint id PK
+      bigint product_variant_id FK
+      bigint location_id FK
+      bigint uom_id FK
+      varchar batch_number
+      varchar serial_number
+      varchar barcode
+      decimal qty
+    }
+    inventory_ledger {
+      bigint id PK
+      bigint inventory_item_variant_id FK
+      enum movement_type
+      decimal qty_moved
+      decimal balance_after
+      varchar reference_type
+      bigint reference_id
+      timestamp created_at
+    }
+    purchases {
+      bigint id PK
+      bigint party_id FK
+      date purchase_date
+      enum source_type
+      enum status
+    }
+    purchase_lines {
+      bigint id PK
+      bigint purchase_id FK
+      bigint product_variant_id FK
+      bigint inventory_item_variant_id FK
+      bigint uom_id FK
+      decimal qty
+      decimal price
+      varchar batch_number
+      varchar serial_number
+    }
+    purchase_returns {
+      bigint id PK
+      bigint party_id FK
+      date return_date
+      enum status
+    }
+    purchase_return_lines {
+      bigint id PK
+      bigint purchase_return_id FK
+      bigint product_variant_id FK
+      bigint inventory_item_variant_id FK
+      bigint uom_id FK
+      decimal qty
+      decimal price
+      varchar batch_number
+    }
+    sales {
+      bigint id PK
+      bigint party_id FK
+      date sale_date
+      enum source_type
+      enum status
+    }
+    sales_lines {
+      bigint id PK
+      bigint sales_id FK
+      bigint product_variant_id FK
+      bigint inventory_item_variant_id FK
+      bigint uom_id FK
+      decimal qty
+      decimal price
+      varchar batch_number
+      varchar serial_number
+    }
+    sales_returns {
+      bigint id PK
+      bigint party_id FK
+      date return_date
+      enum status
+    }
+    sales_return_lines {
+      bigint id PK
+      bigint sales_return_id FK
+      bigint product_variant_id FK
+      bigint inventory_item_variant_id FK
+      bigint uom_id FK
+      decimal qty
+      decimal price
+      varchar batch_number
+    }
+    accounts {
+      bigint id PK
+      varchar code
+      varchar name
+      enum type
+    }
+    journal_entries {
+      bigint id PK
+      date entry_date
+      text description
+    }
+    journal_entry_lines {
+      bigint id PK
+      bigint journal_entry_id FK
+      bigint account_id FK
+      decimal debit
+      decimal credit
+      varchar reference_type
+      bigint reference_id
+    }
+    products ||--o{ product_variants : "has variants"
+    uoms ||--o{ product_variants : "default uom"
+    product_variants ||--o{ product_uom : "alternate uoms"
+    uoms ||--o{ product_uom : "uom"
+    product_variants ||--o{ inventory_item_variants : "stocked as"
+    inventory_locations ||--o{ inventory_item_variants : "located at"
+    uoms ||--o{ inventory_item_variants : "measured in"
+    inventory_item_variants ||--o{ inventory_ledger : "ledger entries"
+    parties ||--o{ purchases : "supplier"
+    purchases ||--o{ purchase_lines : "lines"
+    product_variants ||--o{ purchase_lines : "item"
+    inventory_item_variants ||--o{ purchase_lines : "stock record"
+    uoms ||--o{ purchase_lines : "uom"
+    parties ||--o{ purchase_returns : "supplier"
+    purchase_returns ||--o{ purchase_return_lines : "lines"
+    product_variants ||--o{ purchase_return_lines : "item"
+    inventory_item_variants ||--o{ purchase_return_lines : "stock record"
+    parties ||--o{ sales : "customer"
+    sales ||--o{ sales_lines : "lines"
+    product_variants ||--o{ sales_lines : "item"
+    inventory_item_variants ||--o{ sales_lines : "stock record"
+    uoms ||--o{ sales_lines : "uom"
+    parties ||--o{ sales_returns : "customer"
+    sales_returns ||--o{ sales_return_lines : "lines"
+    product_variants ||--o{ sales_return_lines : "item"
+    inventory_item_variants ||--o{ sales_return_lines : "stock record"
+    journal_entries ||--o{ journal_entry_lines : "lines"
+    accounts ||--o{ journal_entry_lines : "account"
+  `,
+
+  master: `erDiagram
+    products {
+      bigint id PK
+      varchar name
+      varchar sku
+      enum type
+      boolean track_batch_serial
+      text description
+      timestamp created_at
+    }
+    product_variants {
+      bigint id PK
+      bigint product_id FK
+      varchar variant_name
+      varchar sku
+      decimal base_price
+      bigint uom_id FK
+      timestamp created_at
+    }
+    uoms {
+      bigint id PK
+      varchar name
+      decimal conversion_factor
+      boolean base_unit
+      timestamp created_at
+    }
+    product_uom {
+      bigint id PK
+      bigint product_variant_id FK
+      bigint uom_id FK
+      decimal conversion_factor
+    }
+    parties {
+      bigint id PK
+      varchar name
+      enum type
+      varchar email
+      varchar phone
+      text address
+      timestamp created_at
+    }
+    products ||--o{ product_variants : "has variants"
+    uoms ||--o{ product_variants : "default uom"
+    product_variants ||--o{ product_uom : "alternate uoms"
+    uoms ||--o{ product_uom : "uom conversion"
+  `,
+
+  inventory: `erDiagram
+    product_variants {
+      bigint id PK
+      varchar sku
+      varchar variant_name
+    }
+    uoms {
+      bigint id PK
+      varchar name
+      decimal conversion_factor
+    }
+    inventory_locations {
+      bigint id PK
+      varchar name
+      varchar code
+      timestamp created_at
+    }
+    inventory_item_variants {
+      bigint id PK
+      bigint product_variant_id FK
+      bigint location_id FK
+      bigint uom_id FK
+      varchar batch_number
+      varchar serial_number
+      varchar barcode
+      decimal qty
+      timestamp created_at
+    }
+    inventory_ledger {
+      bigint id PK
+      bigint inventory_item_variant_id FK
+      enum movement_type
+      decimal qty_moved
+      decimal balance_after
+      varchar reference_type
+      bigint reference_id
+      timestamp created_at
+    }
+    product_variants ||--o{ inventory_item_variants : "stocked as"
+    inventory_locations ||--o{ inventory_item_variants : "located at"
+    uoms ||--o{ inventory_item_variants : "measured in"
+    inventory_item_variants ||--o{ inventory_ledger : "movement log"
+  `,
+
+  procurement: `erDiagram
+    parties {
+      bigint id PK
+      varchar name
+      enum type
+    }
+    purchases {
+      bigint id PK
+      bigint party_id FK
+      date purchase_date
+      enum source_type
+      enum status
+      timestamp created_at
+    }
+    purchase_lines {
+      bigint id PK
+      bigint purchase_id FK
+      bigint product_variant_id FK
+      bigint inventory_item_variant_id FK
+      bigint uom_id FK
+      decimal qty
+      decimal price
+      varchar batch_number
+      varchar serial_number
+    }
+    purchase_returns {
+      bigint id PK
+      bigint party_id FK
+      date return_date
+      enum status
+      timestamp created_at
+    }
+    purchase_return_lines {
+      bigint id PK
+      bigint purchase_return_id FK
+      bigint product_variant_id FK
+      bigint inventory_item_variant_id FK
+      bigint uom_id FK
+      decimal qty
+      decimal price
+      varchar batch_number
+      varchar serial_number
+    }
+    parties ||--o{ purchases : "supplier"
+    purchases ||--o{ purchase_lines : "line items"
+    parties ||--o{ purchase_returns : "supplier return"
+    purchase_returns ||--o{ purchase_return_lines : "line items"
+  `,
+
+  sales: `erDiagram
+    parties {
+      bigint id PK
+      varchar name
+      enum type
+    }
+    sales {
+      bigint id PK
+      bigint party_id FK
+      date sale_date
+      enum source_type
+      enum status
+      timestamp created_at
+    }
+    sales_lines {
+      bigint id PK
+      bigint sales_id FK
+      bigint product_variant_id FK
+      bigint inventory_item_variant_id FK
+      bigint uom_id FK
+      decimal qty
+      decimal price
+      varchar batch_number
+      varchar serial_number
+    }
+    sales_returns {
+      bigint id PK
+      bigint party_id FK
+      date return_date
+      enum status
+      timestamp created_at
+    }
+    sales_return_lines {
+      bigint id PK
+      bigint sales_return_id FK
+      bigint product_variant_id FK
+      bigint inventory_item_variant_id FK
+      bigint uom_id FK
+      decimal qty
+      decimal price
+      varchar batch_number
+      varchar serial_number
+    }
+    parties ||--o{ sales : "customer"
+    sales ||--o{ sales_lines : "line items"
+    parties ||--o{ sales_returns : "customer return"
+    sales_returns ||--o{ sales_return_lines : "line items"
+  `,
+
+  accounting: `erDiagram
+    accounts {
+      bigint id PK
+      varchar code
+      varchar name
+      enum type
+      timestamp created_at
+    }
+    journal_entries {
+      bigint id PK
+      date entry_date
+      text description
+      timestamp created_at
+    }
+    journal_entry_lines {
+      bigint id PK
+      bigint journal_entry_id FK
+      bigint account_id FK
+      decimal debit
+      decimal credit
+      varchar reference_type
+      bigint reference_id
+      timestamp created_at
+    }
+    journal_entries ||--o{ journal_entry_lines : "debit/credit lines"
+    accounts ||--o{ journal_entry_lines : "account posted"
+  `
+};
+
+let current = 'all';
+window.show = async function(mod) {
+  current = mod;
+  document.querySelectorAll('.mod-btn').forEach(b => b.classList.toggle('active', b.textContent.trim().toLowerCase().replace(' ','') === mod || (mod === 'all' && b.textContent.trim() === 'All modules')));
+  const el = document.getElementById('erd');
+  el.innerHTML = '<div style="padding:20px;color:var(--color-text-secondary);font-size:13px">Rendering…</div>';
+  try {
+    const { svg } = await mermaid.render('erd-svg-'+mod+Date.now(), diagrams[mod]);
+    el.innerHTML = svg;
+    postProcess();
+  } catch(e) { el.innerHTML = '<div style="padding:20px;color:var(--color-text-danger)">Render error: '+e.message+'</div>'; }
+};
+
+function postProcess() {
+  document.querySelectorAll('#erd svg .node').forEach(node => {
+    const firstPath = node.querySelector('path[d]');
+    if (!firstPath) return;
+    const d = firstPath.getAttribute('d');
+    const nums = d.match(/-?[\d.]+/g)?.map(Number);
+    if (!nums || nums.length < 8) return;
+    const xs = [nums[0], nums[2], nums[4], nums[6]];
+    const ys = [nums[1], nums[3], nums[5], nums[7]];
+    const x = Math.min(...xs), y = Math.min(...ys);
+    const w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+    const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    rect.setAttribute('x',x); rect.setAttribute('y',y);
+    rect.setAttribute('width',w); rect.setAttribute('height',h);
+    rect.setAttribute('rx','8');
+    for (const a of ['fill','stroke','stroke-width','class','style'])
+      if (firstPath.hasAttribute(a)) rect.setAttribute(a, firstPath.getAttribute(a));
+    firstPath.replaceWith(rect);
+  });
+  document.querySelectorAll('#erd svg .row-rect-odd path, #erd svg .row-rect-even path').forEach(p => p.setAttribute('stroke','none'));
+}
+
+show('all');
+</script>

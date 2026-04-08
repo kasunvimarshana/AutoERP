@@ -1,0 +1,93 @@
+erDiagram
+    %% ============================
+    %% IDENTIFICATION SYSTEM (Unified)
+    %% ============================
+    IDENTIFICATION_CODES {
+        bigint id PK
+        bigint tenant_id FK
+        string code_value UK
+        enum type "EAN13,UPC,CODE128,QR,DATAMATRIX,RFID_EPC,RFID_TID,NFC_NDEF"
+        enum format "GS1,CUSTOM"
+        string reference_type
+        bigint reference_id
+        string rfid_epc_scheme
+        string rfid_tid_memory
+        json rfid_user_memory
+        json gs1_application_identifiers
+        enum status "active,inactive,decommissioned"
+        timestamp last_scanned_at
+    }
+
+    RFID_READ_EVENTS {
+        bigint id PK
+        bigint tenant_id FK
+        bigint identification_code_id FK
+        string reader_id
+        bigint location_id FK
+        int rssi
+        timestamp first_seen
+        timestamp last_seen
+    }
+
+    %% Core inventory tables (previously defined)
+    PRODUCT_VARIANTS {
+        bigint id PK
+        bigint product_id FK
+        string variant_name
+        string sku UK
+    }
+
+    LOTS {
+        bigint id PK
+        bigint product_variant_id FK
+        string lot_number
+        date expiry_date
+    }
+
+    SERIALS {
+        bigint id PK
+        bigint product_variant_id FK
+        string serial_number UK
+        enum status "available,sold,returned"
+    }
+
+    INVENTORY_LOCATIONS {
+        bigint id PK
+        bigint warehouse_id FK
+        string name
+        string code UK
+    }
+
+    INVENTORY_ITEMS {
+        bigint id PK
+        bigint product_variant_id FK
+        bigint location_id FK
+        bigint lot_id FK
+        bigint serial_id FK
+        decimal quantity_on_hand
+    }
+
+    TRACE_LOGS {
+        bigint id PK
+        bigint tenant_id FK
+        bigint identification_code_id FK "nullable"
+        string action "SCAN_IN,SCAN_OUT,MOVE,ADJUST"
+        bigint source_location_id FK
+        bigint destination_location_id FK
+        decimal quantity
+        json metadata
+        timestamp created_at
+    }
+
+    %% Relationships
+    IDENTIFICATION_CODES ||--o| PRODUCT_VARIANTS : "reference_type='ProductVariant'"
+    IDENTIFICATION_CODES ||--o| LOTS : "reference_type='Lot'"
+    IDENTIFICATION_CODES ||--o| SERIALS : "reference_type='Serial'"
+    IDENTIFICATION_CODES ||--o| INVENTORY_LOCATIONS : "reference_type='Location'"
+    IDENTIFICATION_CODES ||--o{ RFID_READ_EVENTS : "triggers"
+    RFID_READ_EVENTS }o--|| INVENTORY_LOCATIONS : "reader_location"
+    INVENTORY_ITEMS }o--|| LOTS : "lot"
+    INVENTORY_ITEMS }o--|| SERIALS : "serial"
+    TRACE_LOGS }o--|| IDENTIFICATION_CODES : "scanned_code"
+    TRACE_LOGS }o--|| INVENTORY_LOCATIONS : "source"
+    TRACE_LOGS }o--|| INVENTORY_LOCATIONS : "destination"

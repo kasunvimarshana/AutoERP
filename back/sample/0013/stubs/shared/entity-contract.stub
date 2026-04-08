@@ -1,0 +1,28 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use App\Shared\Domain\ValueObjects\Uuid;
+
+/**
+ * EntityContract — Base contract for all Domain Entities.
+ *
+ * Entities have a distinct identity that persists across time and
+ * state changes. Two entities are equal when their IDs match.
+ *
+ * Generated: {{ date }}
+ */
+interface EntityContract
+{
+    /**
+     * Return the entity's unique identifier.
+     */
+    public function id(): Uuid;
+
+    /**
+     * Compare by identity — not by attribute value.
+     */
+    public function equals(self $other): bool;
+}

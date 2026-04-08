@@ -1,0 +1,47 @@
+<?php
+
+namespace {{ namespace }};
+
+use InvalidArgumentException;
+
+/**
+ * Email Value Object.
+ *
+ * Guarantees a valid email address at construction time.
+ * Use this instead of raw strings wherever an email is required.
+ */
+final class Email extends AbstractValueObject
+{
+    private string $email;
+
+    private function __construct(string $email)
+    {
+        $normalized = strtolower(trim($email));
+
+        if (! filter_var($normalized, FILTER_VALIDATE_EMAIL)) {
+            throw new InvalidArgumentException("Invalid email address: [{$email}].");
+        }
+
+        $this->email = $normalized;
+    }
+
+    public static function from(string $email): self
+    {
+        return new self($email);
+    }
+
+    public function value(): string
+    {
+        return $this->email;
+    }
+
+    public function domain(): string
+    {
+        return substr($this->email, strpos($this->email, '@') + 1);
+    }
+
+    public function equals(AbstractValueObject $other): bool
+    {
+        return $other instanceof self && $this->email === $other->email;
+    }
+}

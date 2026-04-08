@@ -1,0 +1,96 @@
+<?php
+
+namespace {{ namespace }};
+
+/**
+ * {{ className }} Specification.
+ *
+ * Specifications encapsulate a single, named business rule that can be
+ * tested against a candidate domain object.  They are composable:
+ *
+ *   $spec = new {{ className }}();
+ *   $and  = $spec->and(new AnotherSpec());
+ *   $or   = $spec->or(new YetAnotherSpec());
+ *   $not  = $spec->not();
+ *
+ * Keep each specification focused on ONE rule so they stay reusable.
+ */
+final class {{ className }}
+{
+    /**
+     * Evaluate the specification against $candidate.
+     *
+     * @param  mixed  $candidate  The domain object being tested
+     */
+    public function isSatisfiedBy(mixed $candidate): bool
+    {
+        // TODO: Implement the business rule.
+        //
+        // Example (OrderIsActive):
+        //   return $candidate->status()->equals(OrderStatus::Active);
+
+        return false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Composability Helpers
+    // -------------------------------------------------------------------------
+
+    public function and(self $other): AndSpecification
+    {
+        return new AndSpecification($this, $other);
+    }
+
+    public function or(self $other): OrSpecification
+    {
+        return new OrSpecification($this, $other);
+    }
+
+    public function not(): NotSpecification
+    {
+        return new NotSpecification($this);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Composite specifications (defined inline for convenience; move to own files
+// if they grow complex).
+// ---------------------------------------------------------------------------
+
+final class AndSpecification
+{
+    public function __construct(
+        private readonly mixed $left,
+        private readonly mixed $right,
+    ) {}
+
+    public function isSatisfiedBy(mixed $candidate): bool
+    {
+        return $this->left->isSatisfiedBy($candidate)
+            && $this->right->isSatisfiedBy($candidate);
+    }
+}
+
+final class OrSpecification
+{
+    public function __construct(
+        private readonly mixed $left,
+        private readonly mixed $right,
+    ) {}
+
+    public function isSatisfiedBy(mixed $candidate): bool
+    {
+        return $this->left->isSatisfiedBy($candidate)
+            || $this->right->isSatisfiedBy($candidate);
+    }
+}
+
+final class NotSpecification
+{
+    public function __construct(private readonly mixed $spec) {}
+
+    public function isSatisfiedBy(mixed $candidate): bool
+    {
+        return ! $this->spec->isSatisfiedBy($candidate);
+    }
+}

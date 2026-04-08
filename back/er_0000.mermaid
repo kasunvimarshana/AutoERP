@@ -1,0 +1,24 @@
+erDiagram
+  TENANTS ||--o{ USERS : has
+  TENANTS ||--o{ ACCOUNTS : has
+  USERS }o--|| ROLES : "assigned to"
+  TENANTS ||--o{ PARTNERS : has
+  PARTNERS ||--o{ PURCHASE_ORDERS : places
+  PARTNERS ||--o{ SALES_ORDERS : places
+  PRODUCTS ||--o{ VARIANTS : "has"
+  VARIANTS ||--o{ PRICE_ENTRIES : priced_by
+  UOM ||--o{ PRICE_ENTRIES : "unit"
+  VARIANTS }|--|{ INVENTORY_ITEMS : "stock of"
+  WAREHOUSES ||--o{ LOCATIONS : contains
+  LOCATIONS ||--o{ STOCK_LEVELS : "holds"
+  STOCK_LEVELS ||--o{ STOCK_MOVEMENTS : records
+  PURCHASE_ORDERS ||--o{ PURCHASE_LINES : includes
+  SALES_ORDERS ||--o{ SALES_LINES : includes
+  PURCHASE_ORDERS ||--o{ GOOD_RECEIPTS : results
+  GOOD_RECEIPTS ||--o{ RECEIPT_LINES : includes
+  SALES_ORDERS ||--o{ SHIPMENTS : results
+  SHIPMENTS ||--o{ SHIPMENT_LINES : includes
+  GOOD_RECEIPTS ||--o{ STOCK_MOVEMENTS : "in"
+  SHIPMENTS ||--o{ STOCK_MOVEMENTS : "out"
+  JOURNAL_ENTRIES ||--o{ JOURNAL_LINES : "has"
+  ACCOUNTS ||--o{ JOURNAL_LINES : "in"

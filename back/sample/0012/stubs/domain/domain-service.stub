@@ -1,0 +1,43 @@
+<?php
+
+namespace {{ namespace }};
+
+/**
+ * {{ className }} Domain Service.
+ *
+ * Domain Services encapsulate business logic that does not naturally belong
+ * to a single Entity or Aggregate. Use them when an operation involves
+ * multiple domain objects or requires collaboration between repositories.
+ *
+ * Domain services should:
+ *   - Contain only business logic (no framework or infrastructure concerns)
+ *   - Operate on domain objects (Entities, Aggregates, Value Objects)
+ *   - Be stateless
+ *   - Accept collaborators via constructor injection (using interfaces)
+ */
+final class {{ className }}
+{
+    public function __construct(
+        // TODO: inject domain repository interfaces, not concrete implementations
+        // private readonly {{ contextName }}RepositoryInterface $repository,
+    ) {
+    }
+
+    // -------------------------------------------------------------------------
+    // Domain Operations
+    // -------------------------------------------------------------------------
+
+    // TODO: Implement business operations that span multiple domain objects.
+    //
+    // Example:
+    // public function transfer(Account $from, Account $to, Money $amount): void
+    // {
+    //     if ($from->balance()->isLessThan($amount)) {
+    //         throw InsufficientFundsException::because('Not enough balance.');
+    //     }
+    //     $from->debit($amount);
+    //     $to->credit($amount);
+    //     $this->repository->save($from);
+    //     $this->repository->save($to);
+    // }
+}

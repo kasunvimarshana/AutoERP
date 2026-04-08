@@ -1,0 +1,48 @@
+<?php
+
+namespace {{ namespace }};
+
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Route;
+
+/**
+ * {{ contextName }} Context Service Provider.
+ *
+ * Acts as the public entry-point for the {{ contextName }} bounded context.
+ * Register this provider in bootstrap/providers.php (Laravel 11+) or
+ * config/app.php 'providers' (Laravel 10).
+ *
+ * Delegates infrastructure bindings to {{ contextName }}InfrastructureServiceProvider.
+ */
+class {{ contextName }}ServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        // Delegate infrastructure bindings
+        $this->app->register(
+            \App\Infrastructure\Providers\{{ contextName }}InfrastructureServiceProvider::class
+        );
+    }
+
+    public function boot(): void
+    {
+        $this->registerRoutes();
+    }
+
+    protected function registerRoutes(): void
+    {
+        $base = base_path('app/Presentation/Http/Routes');
+
+        // API routes — prefixed with /api automatically via the 'api' middleware group
+        if (file_exists($api = "{$base}/api.php")) {
+            Route::middleware('api')
+                ->group($api);
+        }
+
+        // Web routes
+        if (file_exists($web = "{$base}/web.php")) {
+            Route::middleware('web')
+                ->group($web);
+        }
+    }
+}

@@ -1,0 +1,39 @@
+erDiagram
+    PARTIES ||--o{ PURCHASES : "supplier"
+    PARTIES ||--o{ SALES : "customer"
+    PARTIES ||--o{ PURCHASE_RETURNS : ""
+    PARTIES ||--o{ SALES_RETURNS : ""
+
+    PRODUCTS ||--o{ PRODUCT_VARIANTS : "has"
+    PRODUCT_VARIANTS ||--o{ PRODUCT_UOM : "has"
+    UOMS ||--o{ PRODUCT_UOM : "defines"
+    PRODUCT_VARIANTS ||--o{ PRODUCT_COMPONENTS : "parent"
+    PRODUCT_VARIANTS ||--o{ PRODUCT_COMPONENTS : "component"
+
+    PRODUCT_VARIANTS ||--o{ INVENTORY_ITEM_VARIANTS : "tracks"
+    INVENTORY_LOCATIONS ||--o{ INVENTORY_ITEM_VARIANTS : "located_at"
+    INVENTORY_ITEM_VARIANTS ||--o{ INVENTORY_LEDGER : "history"
+
+    PURCHASES ||--o{ PURCHASE_LINES : "contains"
+    PURCHASE_LINES ||--|| INVENTORY_ITEM_VARIANTS : "creates/updates"
+    PURCHASE_RETURNS ||--o{ PURCHASE_RETURN_LINES : "contains"
+    PURCHASE_RETURN_LINES ||--|| INVENTORY_ITEM_VARIANTS : "consumes"
+
+    SALES ||--o{ SALES_LINES : "contains"
+    SALES_LINES ||--|| INVENTORY_ITEM_VARIANTS : "reserves/consumes"
+    SALES_RETURNS ||--o{ SALES_RETURN_LINES : "contains"
+    SALES_RETURN_LINES ||--|| INVENTORY_ITEM_VARIANTS : "returns"
+
+    PURCHASES ||--o{ PURCHASE_INVOICES : "billed_by"
+    SALES ||--o{ SALES_INVOICES : "bills"
+    PURCHASE_INVOICES ||--o{ PAYMENT_APPLICATIONS : "paid_by"
+    SALES_INVOICES ||--o{ PAYMENT_APPLICATIONS : "payment_for"
+    PAYMENTS ||--o{ PAYMENT_APPLICATIONS : "applied_to"
+
+    ACCOUNTS ||--o{ JOURNAL_ENTRY_LINES : "entry"
+    JOURNAL_ENTRIES ||--o{ JOURNAL_ENTRY_LINES : "contains"
+    JOURNAL_ENTRY_LINES }o--|| PURCHASE_LINES : "references"
+    JOURNAL_ENTRY_LINES }o--|| SALES_LINES : "references"
+    JOURNAL_ENTRY_LINES }o--|| PURCHASE_RETURN_LINES : "references"
+    JOURNAL_ENTRY_LINES }o--|| SALES_RETURN_LINES : "references"
+    JOURNAL_ENTRY_LINES }o--|| PAYMENT_APPLICATIONS : "references"

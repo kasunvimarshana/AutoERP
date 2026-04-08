@@ -1,0 +1,58 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+/**
+ * {{ className }}Dto — Data Transfer Object
+ *
+ * DTOs carry structured data across layer boundaries without exposing
+ * domain internals. They are plain data containers with no business logic.
+ *
+ * Bounded Context: {{ contextName }}
+ * Generated:       {{ date }}
+ *
+ * -------------------------------------------------------------------------
+ * Implementation Guide
+ * -------------------------------------------------------------------------
+ *
+ * 1. All properties should be readonly.
+ * 2. Provide a static fromArray() factory for convenient construction.
+ * 3. Provide a toArray() method for serialisation (API responses, logging).
+ * 4. DTOs flow: HTTP Request → DTO → Command/Query → Handler → Domain.
+ */
+final class {{ className }}Dto
+{
+    public function __construct(
+        // TODO: Define the data this DTO carries.
+        // Examples:
+        // public readonly string  $name,
+        // public readonly string  $email,
+        // public readonly ?string $phone = null,
+    ) {}
+
+    /**
+     * Construct from a validated array (e.g. from Form Request).
+     */
+    public static function fromArray(array $data): self
+    {
+        return new self(
+            // TODO: Map array keys to constructor parameters.
+            // e.g. name:  $data['name'],
+            //      email: $data['email'],
+        );
+    }
+
+    /**
+     * Serialise to array (e.g. for API responses or queue payloads).
+     */
+    public function toArray(): array
+    {
+        // TODO: Return all properties as an associative array.
+        return [
+            // 'name'  => $this->name,
+            // 'email' => $this->email,
+        ];
+    }
+}

@@ -1,0 +1,74 @@
+<?php
+
+namespace {{ namespace }};
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+/**
+ * {{ className }} Eloquent Model.
+ *
+ * This is a pure infrastructure persistence model.
+ * It should NOT contain business logic — keep that in the Domain entity.
+ *
+ * The corresponding Domain Entity is:
+ *   App\Domain\{{ contextName }}\Entities\{{ contextName }}
+ *
+ * Map between this model and the domain entity inside the Eloquent repository.
+ */
+class {{ className }}Model extends Model
+{
+    use HasFactory, SoftDeletes;
+
+    /**
+     * The database table for this model.
+     * Follows Laravel's snake_case plural convention by default.
+     */
+    protected $table = '{{ classSnake }}s';
+
+    /**
+     * Allow UUID primary keys (string, not auto-increment).
+     */
+    protected $keyType = 'string';
+    public    $incrementing = false;
+
+    /**
+     * The attributes that are mass assignable.
+     * List only columns your use-cases intentionally write.
+     *
+     * @var array<string>
+     */
+    protected $fillable = [
+        'id',
+        // TODO: add your column names here
+    ];
+
+    /**
+     * Attribute casting.
+     * Cast value objects, JSON columns, and timestamps appropriately.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
+        // TODO: add custom casts for Value Objects
+        // 'status' => \App\Infrastructure\Persistence\Casts\{{ contextName }}StatusCast::class,
+    ];
+
+    /**
+     * The attributes that should be hidden for serialisation.
+     *
+     * @var array<string>
+     */
+    protected $hidden = [];
+
+    // -------------------------------------------------------------------------
+    // Relationships
+    // -------------------------------------------------------------------------
+
+    // TODO: Define Eloquent relationships here.
+    // public function relatedModel(): HasMany { ... }
+}

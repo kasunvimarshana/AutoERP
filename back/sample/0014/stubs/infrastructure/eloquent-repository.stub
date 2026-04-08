@@ -1,0 +1,97 @@
+<?php
+
+namespace {{ namespace }};
+
+use App\Domain\{{ contextName }}\Entities\{{ contextName }};
+use App\Domain\{{ contextName }}\Repositories\{{ contextName }}RepositoryInterface;
+use App\Domain\Shared\ValueObjects\Uuid;
+use App\Infrastructure\Persistence\Eloquent\{{ contextName }}Model;
+
+/**
+ * Eloquent{{ contextName }}Repository — Infrastructure Repository Implementation.
+ *
+ * Bridges the Domain repository interface with Laravel's Eloquent ORM.
+ * This class handles the translation (mapping) between:
+ *   - Domain Entities  ↔  Eloquent Models (DB rows)
+ *
+ * It MUST NOT contain business logic — only persistence mechanics.
+ * Business logic belongs in Domain Entities, Aggregates, or Domain Services.
+ */
+final class Eloquent{{ contextName }}Repository implements {{ contextName }}RepositoryInterface
+{
+    public function __construct(
+        private readonly {{ contextName }}Model $model,
+    ) {
+    }
+
+    // -------------------------------------------------------------------------
+    // RepositoryContract
+    // -------------------------------------------------------------------------
+
+    public function findById(mixed $id): ?{{ contextName }}
+    {
+        $idValue = $id instanceof Uuid ? $id->value() : (string) $id;
+
+        $record = $this->model->find($idValue);
+
+        return $record ? $this->toDomain($record) : null;
+    }
+
+    public function save(mixed $entity): void
+    {
+        $data = $this->toPersistence($entity);
+
+        $this->model->newQuery()->updateOrInsert(
+            ['id' => $entity->id()->value()],
+            $data,
+        );
+    }
+
+    public function delete(mixed $entity): void
+    {
+        $this->model->newQuery()
+            ->where('id', $entity->id()->value())
+            ->delete();
+    }
+
+    // -------------------------------------------------------------------------
+    // {{ contextName }}RepositoryInterface
+    // -------------------------------------------------------------------------
+
+    public function findAll(): array
+    {
+        return $this->model->all()
+            ->map(fn ({{ contextName }}Model $record) => $this->toDomain($record))
+            ->all();
+    }
+
+    // TODO: implement additional query methods declared in the interface
+
+    // -------------------------------------------------------------------------
+    // Mapping Helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Map an Eloquent Model → Domain Entity.
+     * Only use data that was retrieved from persistence — never call
+     * static factory methods that would fire domain events.
+     */
+    private function toDomain({{ contextName }}Model $record): {{ contextName }}
+    {
+        return {{ contextName }}::reconstitute(
+            id: $record->id,
+            // TODO: map remaining columns to domain value objects / primitives
+        );
+    }
+
+    /**
+     * Map a Domain Entity → raw persistence array (for updateOrInsert / fill).
+     */
+    private function toPersistence({{ contextName }} $entity): array
+    {
+        return [
+            'id' => $entity->id()->value(),
+            // TODO: map domain properties to column values
+        ];
+    }
+}

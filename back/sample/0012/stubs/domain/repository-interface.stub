@@ -1,0 +1,51 @@
+<?php
+
+namespace {{ namespace }};
+
+use App\Domain\Shared\Contracts\RepositoryContract;
+use App\Domain\{{ contextName }}\Entities\{{ className }};
+use App\Domain\Shared\ValueObjects\Uuid;
+
+/**
+ * {{ className }} Repository Interface.
+ *
+ * Defines the persistence contract for the {{ className }} entity.
+ * This interface lives in the Domain layer — the Infrastructure layer
+ * provides the concrete Eloquent implementation.
+ *
+ * Only query methods that are driven by actual business use-cases
+ * should be added here. Avoid generic query builders.
+ *
+ * @extends RepositoryContract<{{ className }}>
+ */
+interface {{ className }}RepositoryInterface extends RepositoryContract
+{
+    /**
+     * Find a {{ className }} by its UUID identity.
+     * Returns null when not found — never throws for a missing entity.
+     */
+    public function findById(Uuid $id): ?{{ className }};
+
+    /**
+     * Persist a new or updated {{ className }}.
+     */
+    public function save({{ className }} ${{ classLower }}): void;
+
+    /**
+     * Remove a {{ className }} from the store.
+     */
+    public function delete({{ className }} ${{ classLower }}): void;
+
+    /**
+     * Return all {{ className }} records (use with care — add pagination as needed).
+     *
+     * @return array<{{ className }}>
+     */
+    public function findAll(): array;
+
+    // TODO: Add context-specific finder methods.
+    //
+    // Example:
+    // public function findByStatus({{ className }}Status $status): array;
+    // public function findByEmail(Email $email): ?{{ className }};
+}

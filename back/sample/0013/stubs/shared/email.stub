@@ -1,0 +1,83 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+/**
+ * Email — Shared Kernel Value Object
+ *
+ * Wraps a validated e-mail address string. Normalises to lowercase on
+ * construction so comparisons are always case-insensitive.
+ *
+ * Generated: {{ date }}
+ */
+final class Email
+{
+    private readonly string $value;
+
+    private function __construct(string $value)
+    {
+        $normalised = strtolower(trim($value));
+
+        if (! filter_var($normalised, FILTER_VALIDATE_EMAIL)) {
+            throw new \InvalidArgumentException(
+                "Invalid e-mail address: [{$value}]."
+            );
+        }
+
+        $this->value = $normalised;
+    }
+
+    // -------------------------------------------------------------------------
+    // Named Constructor
+    // -------------------------------------------------------------------------
+
+    public static function fromString(string $value): self
+    {
+        return new self($value);
+    }
+
+    // -------------------------------------------------------------------------
+    // Accessors
+    // -------------------------------------------------------------------------
+
+    public function value(): string
+    {
+        return $this->value;
+    }
+
+    /**
+     * Return the local part of the address (before the @).
+     */
+    public function localPart(): string
+    {
+        return explode('@', $this->value)[0];
+    }
+
+    /**
+     * Return the domain part of the address (after the @).
+     */
+    public function domain(): string
+    {
+        return explode('@', $this->value)[1];
+    }
+
+    // -------------------------------------------------------------------------
+    // Equality
+    // -------------------------------------------------------------------------
+
+    public function equals(self $other): bool
+    {
+        return $this->value === $other->value;
+    }
+
+    // -------------------------------------------------------------------------
+    // Serialisation
+    // -------------------------------------------------------------------------
+
+    public function __toString(): string
+    {
+        return $this->value;
+    }
+}

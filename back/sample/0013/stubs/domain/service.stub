@@ -1,0 +1,49 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+/**
+ * {{ className }} — Domain Service
+ *
+ * A Domain Service hosts business logic that does not naturally belong to a
+ * single entity or value object (e.g. a cross-entity calculation, an external
+ * verification, or a uniqueness check that requires repository access).
+ *
+ * Bounded Context: {{ contextName }}
+ * Generated:       {{ date }}
+ *
+ * -------------------------------------------------------------------------
+ * Implementation Guide
+ * -------------------------------------------------------------------------
+ *
+ * 1. Keep domain services stateless — no instance state between calls.
+ * 2. Accept domain objects (entities, VOs) as parameters; never raw HTTP data.
+ * 3. You MAY inject repository interfaces (from Domain\Repositories) via the
+ *    constructor — the container will resolve the correct implementation.
+ * 4. Avoid injecting infrastructure services (mailers, queues) here; raise
+ *    domain events instead and let infrastructure listeners react.
+ * 5. Name the service after what it does: PricingService, UniqueEmailChecker, etc.
+ */
+final class {{ className }}
+{
+    public function __construct(
+        // TODO: Inject domain repository interfaces or other domain services if needed.
+        // Example:
+        // private readonly {{ contextName }}RepositoryInterface $repository,
+    ) {}
+
+    /**
+     * TODO: Rename this method and implement the domain logic.
+     *
+     * @throws \DomainException when the business rule is violated
+     */
+    public function execute(/* TODO: typed domain parameters */): void
+    {
+        // TODO: Implement domain logic here.
+        // This method should operate purely on domain objects and throw
+        // domain exceptions when invariants are violated.
+        throw new \BadMethodCallException('{{ className }}::execute() is not implemented yet.');
+    }
+}

@@ -1,0 +1,99 @@
+<?php
+
+namespace {{ namespace }};
+
+use Illuminate\Http\JsonResponse;
+use Illuminate\Routing\Controller;
+use App\Application\{{ contextName }}\Commands\Create{{ contextName }}Command;
+use App\Application\{{ contextName }}\Handlers\Create{{ contextName }}Handler;
+use App\Application\{{ contextName }}\Queries\Get{{ contextName }}Query;
+use App\Application\{{ contextName }}\Handlers\Get{{ contextName }}QueryHandler;
+use App\Presentation\Http\Requests\Store{{ contextName }}Request;
+use App\Presentation\Http\Resources\{{ contextName }}Resource;
+
+/**
+ * {{ contextName }} API Controller.
+ *
+ * Thin HTTP adapter. Its only responsibilities are:
+ *   1. Extract data from the HTTP Request
+ *   2. Build a Command or Query object
+ *   3. Dispatch to the appropriate Handler
+ *   4. Transform the result into an HTTP Response
+ *
+ * NO business logic. NO domain objects in the response.
+ */
+final class {{ contextName }}Controller extends Controller
+{
+    public function __construct(
+        private readonly Create{{ contextName }}Handler   $createHandler,
+        private readonly Get{{ contextName }}QueryHandler $queryHandler,
+    ) {
+    }
+
+    /**
+     * GET /api/{{ contextKebab }}s
+     * List all resources (add pagination as needed).
+     */
+    public function index(): JsonResponse
+    {
+        $result = $this->queryHandler->handle(
+            new Get{{ contextName }}Query()
+        );
+
+        return response()->json([
+            'data' => $result, // TODO: wrap in Resource collection
+        ]);
+    }
+
+    /**
+     * POST /api/{{ contextKebab }}s
+     * Create a new resource.
+     */
+    public function store(Store{{ contextName }}Request $request): JsonResponse
+    {
+        $this->createHandler->handle(
+            Create{{ contextName }}Command::fromArray($request->validated())
+        );
+
+        return response()->json([
+            'message' => '{{ contextName }} created successfully.',
+        ], 201);
+    }
+
+    /**
+     * GET /api/{{ contextKebab }}s/{id}
+     * Show a single resource.
+     */
+    public function show(string $id): JsonResponse
+    {
+        $result = $this->queryHandler->handle(
+            new Get{{ contextName }}Query(id: $id)
+        );
+
+        if (! $result) {
+            return response()->json(['message' => '{{ contextName }} not found.'], 404);
+        }
+
+        return response()->json(['data' => $result]);
+    }
+
+    /**
+     * PUT /api/{{ contextKebab }}s/{id}
+     * Update an existing resource.
+     */
+    public function update(Store{{ contextName }}Request $request, string $id): JsonResponse
+    {
+        // TODO: create an Update{{ contextName }}Command / Handler pair
+        return response()->json(['message' => '{{ contextName }} updated successfully.']);
+    }
+
+    /**
+     * DELETE /api/{{ contextKebab }}s/{id}
+     * Remove a resource.
+     */
+    public function destroy(string $id): JsonResponse
+    {
+        // TODO: create a Delete{{ contextName }}Command / Handler pair
+        return response()->json(null, 204);
+    }
+}

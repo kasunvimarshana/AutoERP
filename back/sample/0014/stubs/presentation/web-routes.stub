@@ -1,0 +1,29 @@
+<?php
+
+use Illuminate\Support\Facades\Route;
+use App\Presentation\Http\Controllers\Web\{{ contextName }}Controller;
+
+/*
+|--------------------------------------------------------------------------
+| {{ contextName }} Web Routes
+|--------------------------------------------------------------------------
+|
+| These routes serve the web/Blade interface for the {{ contextName }} context.
+| They are loaded by {{ contextName }}InfrastructureServiceProvider.
+|
+*/
+
+Route::prefix('{{ contextKebab }}s')
+    ->name('{{ contextSnake }}s.')
+    ->middleware(['web'])
+    ->group(function () {
+
+        Route::get('/',        [{{ contextName }}Controller::class, 'index'])->name('index');
+        Route::get('/create',  [{{ contextName }}Controller::class, 'create'])->name('create');
+        Route::post('/',       [{{ contextName }}Controller::class, 'store'])->name('store');
+        Route::get('/{id}',    [{{ contextName }}Controller::class, 'show'])->name('show');
+        Route::get('/{id}/edit', [{{ contextName }}Controller::class, 'edit'])->name('edit');
+        Route::put('/{id}',    [{{ contextName }}Controller::class, 'update'])->name('update');
+        Route::delete('/{id}', [{{ contextName }}Controller::class, 'destroy'])->name('destroy');
+
+    });

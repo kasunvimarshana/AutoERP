@@ -1,0 +1,77 @@
+<?php
+
+namespace Tests\Unit\{{ contextName }};
+
+use Tests\TestCase;
+use App\Domain\{{ contextName }}\Entities\{{ contextName }};
+use App\Domain\Shared\ValueObjects\Uuid;
+
+/**
+ * {{ contextName }} Unit Test.
+ *
+ * Unit tests target the Domain layer in isolation.
+ * They MUST NOT hit the database, filesystem, or any external service.
+ * Use Mockery or PHPUnit mocks to stub collaborators.
+ */
+class {{ contextName }}Test extends TestCase
+{
+    // -------------------------------------------------------------------------
+    // Entity Creation
+    // -------------------------------------------------------------------------
+
+    /** @test */
+    public function it_can_be_created_with_valid_data(): void
+    {
+        // Arrange & Act
+        // $entity = {{ contextName }}::create(/* TODO: pass valid args */);
+
+        // Assert
+        // $this->assertInstanceOf({{ contextName }}::class, $entity);
+        // $this->assertNotNull($entity->id());
+        $this->markTestIncomplete('Implement creation test for {{ contextName }}.');
+    }
+
+    /** @test */
+    public function it_records_a_domain_event_on_creation(): void
+    {
+        // $entity = {{ contextName }}::create(/* ... */);
+        // $events = $entity->pullDomainEvents();
+        //
+        // $this->assertCount(1, $events);
+        // $this->assertInstanceOf({{ contextName }}Created::class, $events[0]);
+        $this->markTestIncomplete('Implement domain event assertion for {{ contextName }}.');
+    }
+
+    // -------------------------------------------------------------------------
+    // Identity & Equality
+    // -------------------------------------------------------------------------
+
+    /** @test */
+    public function two_entities_with_the_same_id_are_equal(): void
+    {
+        $id = Uuid::generate();
+
+        // $entityA = {{ contextName }}::reconstitute($id->value());
+        // $entityB = {{ contextName }}::reconstitute($id->value());
+        //
+        // $this->assertTrue($entityA->equals($entityB));
+        $this->markTestIncomplete('Implement equality test.');
+    }
+
+    // -------------------------------------------------------------------------
+    // Business Behaviour
+    // -------------------------------------------------------------------------
+
+    // TODO: Add a test for each business method on the entity.
+    // Keep tests small — one assertion per test where possible.
+    //
+    // Pattern:
+    // /** @test */
+    // public function it_throws_when_activated_more_than_once(): void
+    // {
+    //     $entity = {{ contextName }}::create(/* ... */);
+    //     $entity->activate();
+    //     $this->expectException({{ contextName }}Exception::class);
+    //     $entity->activate(); // should throw
+    // }
+}

@@ -1,0 +1,52 @@
+<?php
+
+namespace {{ namespace }};
+
+use App\Application\{{ contextName }}\Commands\{{ className }}Command;
+use App\Domain\{{ contextName }}\Repositories\{{ contextName }}RepositoryInterface;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
+
+/**
+ * {{ className }} Handler (CQRS Write Side).
+ *
+ * Handles the {{ className }}Command by orchestrating Domain objects.
+ * This is the Application layer's entry point for the write operation.
+ *
+ * Handlers should:
+ *   - Be thin orchestrators (no business logic)
+ *   - Wrap the operation in a DB transaction
+ *   - Dispatch domain events after committing
+ *   - Throw application or domain exceptions on failure
+ */
+final class {{ className }}Handler
+{
+    public function __construct(
+        private readonly {{ contextName }}RepositoryInterface $repository,
+        // TODO: inject additional collaborators (domain services, other repositories)
+    ) {
+    }
+
+    /**
+     * @throws \App\Domain\Shared\Exceptions\DomainException
+     */
+    public function handle({{ className }}Command $command): void
+    {
+        DB::transaction(function () use ($command) {
+            // 1. Load aggregate
+            //    $aggregate = $this->repository->findById($command->id)
+            //        ?? throw NotFoundException::for('{{ contextName }}', $command->id);
+
+            // 2. Execute domain behaviour
+            //    $aggregate->doSomething($command->someField);
+
+            // 3. Persist
+            //    $this->repository->save($aggregate);
+
+            // 4. Dispatch domain events
+            //    foreach ($aggregate->pullDomainEvents() as $event) {
+            //        Event::dispatch($event);
+            //    }
+        });
+    }
+}

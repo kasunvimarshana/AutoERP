@@ -1,0 +1,62 @@
+<?php
+
+namespace {{ namespace }};
+
+use Illuminate\Foundation\Http\FormRequest;
+
+/**
+ * Store{{ contextName }}Request — HTTP Form Request Validation.
+ *
+ * Validates incoming HTTP request data before it reaches the controller.
+ * The controller calls $request->validated() and passes the result to
+ * a Command or DTO constructor — no raw request data beyond this point.
+ */
+class Store{{ contextName }}Request extends FormRequest
+{
+    /**
+     * Determine if the authenticated user is authorised to make this request.
+     * For policy-based auth delegate to a Policy class.
+     */
+    public function authorize(): bool
+    {
+        return true; // TODO: implement authorization logic
+        // return $this->user()->can('create', \App\Domain\{{ contextName }}\Entities\{{ contextName }}::class);
+    }
+
+    /**
+     * Validation rules.
+     *
+     * @return array<string, string|array<mixed>>
+     */
+    public function rules(): array
+    {
+        return [
+            // TODO: Define validation rules.
+            //
+            // Example:
+            // 'name'   => ['required', 'string', 'max:255'],
+            // 'email'  => ['required', 'email', 'unique:users,email'],
+            // 'amount' => ['required', 'integer', 'min:1'],
+        ];
+    }
+
+    /**
+     * Custom validation error messages (optional).
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [];
+    }
+
+    /**
+     * Map request keys to friendlier attribute names in error messages (optional).
+     *
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return [];
+    }
+}

@@ -1,0 +1,115 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use App\Shared\Domain\Contracts\AggregateRootContract;
+use App\Shared\Domain\ValueObjects\Uuid;
+
+/**
+ * {{ className }} — Aggregate Root
+ *
+ * The Aggregate Root is the single entry point into an aggregate cluster.
+ * All state changes MUST go through the aggregate root's public methods.
+ * Invariants of every object within the aggregate are enforced here.
+ *
+ * Bounded Context: {{ contextName }}
+ * Generated:       {{ date }}
+ *
+ * -------------------------------------------------------------------------
+ * Implementation Guide
+ * -------------------------------------------------------------------------
+ *
+ * 1. Enforce all business invariants via Guard clauses in your public methods.
+ * 2. Raise domain events for every meaningful state change.
+ * 3. Never expose internal child entities by reference — return value types instead.
+ * 4. Keep the aggregate small: if it grows beyond ~6 methods, consider splitting.
+ * 5. Repositories only persist and retrieve aggregate roots — never child entities.
+ */
+final class {{ className }} implements AggregateRootContract
+{
+    /** @var array<object> */
+    private array $domainEvents = [];
+
+    private function __construct(
+        private readonly Uuid $id,
+        // TODO: Add child entities / value objects that belong to this aggregate
+    ) {}
+
+    // -------------------------------------------------------------------------
+    // Named Constructors
+    // -------------------------------------------------------------------------
+
+    /**
+     * TODO: Define what data is needed to initialise this aggregate.
+     */
+    public static function create(
+        // TODO: e.g., Name $name, OwnerId $ownerId
+    ): self {
+        $aggregate = new self(
+            id: Uuid::generate(),
+            // TODO: pass remaining args
+        );
+
+        // TODO: Raise creation event
+        // $aggregate->raise(new {{ className }}WasCreated($aggregate->id));
+
+        return $aggregate;
+    }
+
+    /**
+     * Reconstitute from persistence — called by the repository.
+     */
+    public static function reconstitute(Uuid $id /* TODO: add fields */): self
+    {
+        return new self(id: $id /* TODO: remaining */);
+    }
+
+    // -------------------------------------------------------------------------
+    // AggregateRootContract
+    // -------------------------------------------------------------------------
+
+    public function id(): Uuid
+    {
+        return $this->id;
+    }
+
+    /** @return array<object> */
+    public function releaseEvents(): array
+    {
+        $events            = $this->domainEvents;
+        $this->domainEvents = [];
+
+        return $events;
+    }
+
+    // -------------------------------------------------------------------------
+    // Business Behaviour
+    // -------------------------------------------------------------------------
+
+    // TODO: Add your aggregate's command methods here.
+    // Each method should:
+    //   a) validate preconditions (throw domain exception if violated)
+    //   b) mutate state
+    //   c) raise a domain event
+    //
+    // Example:
+    // public function changeStatus(Status $newStatus): void
+    // {
+    //     if ($this->status->equals($newStatus)) {
+    //         throw new \DomainException('Status is already ' . $newStatus);
+    //     }
+    //     $this->status = $newStatus;
+    //     $this->raise(new {{ className }}StatusChanged($this->id, $newStatus));
+    // }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private function raise(object $event): void
+    {
+        $this->domainEvents[] = $event;
+    }
+}

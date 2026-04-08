@@ -1,0 +1,36 @@
+<?php
+
+namespace {{ namespace }};
+
+use App\Infrastructure\Persistence\Eloquent\{{ className }}Model;
+use Illuminate\Database\Seeder;
+
+/**
+ * {{ className }} Seeder.
+ *
+ * Seeds the database with initial or test {{ className }} data.
+ * Run via: php artisan db:seed --class={{ className }}Seeder
+ * Or register in DatabaseSeeder::run() for `php artisan db:seed`.
+ */
+class {{ className }}Seeder extends Seeder
+{
+    /**
+     * Run the seeder.
+     *
+     * Use the Factory for randomised test data, or create specific
+     * records for required reference/lookup data.
+     */
+    public function run(): void
+    {
+        // Option A — use the factory for random test data
+        // {{ className }}Model::factory()->count(10)->create();
+
+        // Option B — insert specific required records
+        // {{ className }}Model::create([
+        //     'id'     => \Illuminate\Support\Str::uuid(),
+        //     // TODO: add required fields
+        // ]);
+
+        $this->command->info('{{ className }}Seeder run.');
+    }
+}

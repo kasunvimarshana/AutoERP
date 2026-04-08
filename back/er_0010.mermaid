@@ -1,0 +1,61 @@
+erDiagram
+    %% Core
+    TENANTS ||--o{ USERS : has
+    TENANTS ||--o{ ORGANIZATION_UNITS : has
+    TENANTS ||--o{ ATTACHMENTS : owns
+
+    %% Party
+    PARTIES ||--o{ PURCHASES : supplier
+    PARTIES ||--o{ SALES : customer
+    PARTIES ||--o{ PURCHASE_RETURNS : supplier
+    PARTIES ||--o{ SALES_RETURNS : customer
+    PARTIES ||--o{ PAYMENTS : payer_payee
+
+    %% Product
+    PRODUCTS ||--o{ PRODUCT_VARIANTS : has
+    PRODUCTS }o--|| PRODUCT_CATEGORIES : categorized
+    PRODUCT_VARIANTS }o--|| UOMS : base_uom
+    PRODUCT_VARIANTS ||--o{ PRODUCT_UOM : conversions
+    UOMS ||--o{ PRODUCT_UOM : ""
+
+    %% Inventory
+    INVENTORY_LOCATIONS ||--o{ INVENTORY_ITEMS : stock
+    PRODUCT_VARIANTS ||--o{ INVENTORY_ITEMS : stocked_as
+    INVENTORY_ITEMS ||--o{ INVENTORY_LEDGER : movements
+    INVENTORY_ITEMS }o--|| UOMS : stock_uom
+    INVENTORY_ITEMS }o--|| BARCODES : has
+
+    %% Procurement
+    PURCHASES ||--o{ PURCHASE_LINES : contains
+    PURCHASE_LINES }o--|| PRODUCT_VARIANTS : variant
+    PURCHASE_LINES }o--|| INVENTORY_ITEMS : received_into
+    PURCHASE_LINES }o--|| UOMS : transacted_uom
+    PURCHASE_RETURNS ||--o{ PURCHASE_RETURN_LINES : contains
+    PURCHASE_RETURN_LINES }o--|| PRODUCT_VARIANTS : variant
+    PURCHASE_RETURN_LINES }o--|| INVENTORY_ITEMS : returned_from
+
+    %% Sales
+    SALES ||--o{ SALES_LINES : contains
+    SALES_LINES }o--|| PRODUCT_VARIANTS : variant
+    SALES_LINES }o--|| INVENTORY_ITEMS : shipped_from
+    SALES_LINES }o--|| UOMS : transacted_uom
+    SALES_RETURNS ||--o{ SALES_RETURN_LINES : contains
+    SALES_RETURN_LINES }o--|| PRODUCT_VARIANTS : variant
+    SALES_RETURN_LINES }o--|| INVENTORY_ITEMS : returned_into
+
+    %% Accounting
+    CHART_OF_ACCOUNTS ||--o{ JOURNAL_ENTRY_LINES : debited_credited
+    JOURNAL_ENTRIES ||--o{ JOURNAL_ENTRY_LINES : contains
+
+    %% Finance
+    PAYMENTS ||--o{ PAYMENT_ALLOCATIONS : allocated_to
+    PAYMENT_ALLOCATIONS }o--|| PURCHASES : invoice
+    PAYMENT_ALLOCATIONS }o--|| SALES : invoice
+    BANK_CONNECTIONS ||--o{ BANK_TRANSACTIONS : imports
+    BANK_TRANSACTIONS }o--|| CHART_OF_ACCOUNTS : categorized_to
+
+    %% Polymorphic Links
+    PURCHASE_LINES }o--o| JOURNAL_ENTRY_LINES : reference
+    SALES_LINES }o--o| JOURNAL_ENTRY_LINES : reference
+    INVENTORY_LEDGER }o--o| JOURNAL_ENTRY_LINES : reference
+    INVENTORY_LEDGER }o--o| TRACE_LOGS : reference

@@ -1,0 +1,29 @@
+<?php
+
+use Illuminate\Support\Facades\Route;
+use App\Presentation\Http\Controllers\Api\{{ contextName }}Controller;
+
+/*
+|--------------------------------------------------------------------------
+| {{ contextName }} API Routes
+|--------------------------------------------------------------------------
+|
+| These routes are loaded by the {{ contextName }}InfrastructureServiceProvider
+| and are automatically prefixed with 'api/' and the context name.
+|
+| All routes are protected by the 'api' middleware group by default.
+| Add 'auth:sanctum' or other guards as required.
+|
+*/
+
+Route::prefix('{{ contextKebab }}s')
+    ->name('{{ contextSnake }}s.')
+    ->group(function () {
+
+        Route::get('/',        [{{ contextName }}Controller::class, 'index'])->name('index');
+        Route::post('/',       [{{ contextName }}Controller::class, 'store'])->name('store');
+        Route::get('/{id}',    [{{ contextName }}Controller::class, 'show'])->name('show');
+        Route::put('/{id}',    [{{ contextName }}Controller::class, 'update'])->name('update');
+        Route::delete('/{id}', [{{ contextName }}Controller::class, 'destroy'])->name('destroy');
+
+    });

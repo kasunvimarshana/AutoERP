@@ -1,0 +1,43 @@
+<?php
+
+namespace {{ namespace }};
+
+use App\Application\{{ contextName }}\Queries\{{ className }}Query;
+use App\Domain\{{ contextName }}\Repositories\{{ contextName }}RepositoryInterface;
+
+/**
+ * {{ className }} Query Handler (CQRS Read Side).
+ *
+ * Handles the {{ className }}Query and returns a read model / DTO.
+ * Query handlers may bypass the Domain layer entirely and query
+ * the read-optimised data source directly for performance.
+ *
+ * They MUST NOT change any state.
+ */
+final class {{ className }}QueryHandler
+{
+    public function __construct(
+        private readonly {{ contextName }}RepositoryInterface $repository,
+        // TODO: For complex read models you may inject a dedicated ReadModel
+        //       repository or query builder instead.
+    ) {
+    }
+
+    /**
+     * Execute the query and return a read model.
+     *
+     * @return mixed  A DTO, a collection of DTOs, or a paginated result set
+     */
+    public function handle({{ className }}Query $query): mixed
+    {
+        // TODO: Execute the read operation and map results to a DTO.
+        //
+        // Example:
+        //   $entity = $this->repository->findById($query->id)
+        //       ?? throw NotFoundException::for('{{ contextName }}', $query->id);
+        //
+        //   return {{ contextName }}ReadModel::fromEntity($entity);
+
+        return null;
+    }
+}

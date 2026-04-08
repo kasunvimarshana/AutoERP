@@ -1,0 +1,32 @@
+<?php
+
+namespace {{ namespace }};
+
+/**
+ * Abstract Value Object.
+ *
+ * Value Objects are immutable, identity-less objects defined entirely
+ * by their attribute values. Two VOs with the same attributes are equal.
+ *
+ * Extend this class and implement `equals()` and `value()`.
+ */
+abstract class AbstractValueObject
+{
+    /**
+     * Return the scalar / primitive representation of this Value Object.
+     */
+    abstract public function value(): mixed;
+
+    /**
+     * Structural equality — two VOs are equal when their values match.
+     */
+    abstract public function equals(self $other): bool;
+
+    /**
+     * Convenience string cast (delegates to value()).
+     */
+    public function __toString(): string
+    {
+        return (string) $this->value();
+    }
+}

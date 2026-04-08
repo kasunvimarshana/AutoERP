@@ -1,0 +1,60 @@
+<?php
+
+namespace {{ namespace }};
+
+use Illuminate\Support\ServiceProvider;
+use App\Domain\{{ contextName }}\Repositories\{{ contextName }}RepositoryInterface;
+use App\Infrastructure\Persistence\Repositories\Eloquent{{ contextName }}Repository;
+use App\Infrastructure\Persistence\Eloquent\{{ contextName }}Model;
+
+/**
+ * {{ contextName }} Infrastructure Service Provider.
+ *
+ * Responsibilities:
+ *   - Bind Domain Repository Interfaces → Eloquent Implementations
+ *   - Register Infrastructure-specific singleton services
+ *   - Load migrations and event listeners
+ *
+ * This provider must be registered in bootstrap/providers.php (Laravel 11+)
+ * or config/app.php providers array (Laravel 10).
+ */
+class {{ contextName }}InfrastructureServiceProvider extends ServiceProvider
+{
+    /**
+     * Register bindings in the service container.
+     * Bind interfaces to concrete implementations here.
+     */
+    public function register(): void
+    {
+        // Repository bindings
+        $this->app->bind(
+            {{ contextName }}RepositoryInterface::class,
+            fn ($app) => new Eloquent{{ contextName }}Repository(
+                new {{ contextName }}Model()
+            )
+        );
+
+        // TODO: Register additional domain service bindings
+        // $this->app->bind(
+        //     {{ contextName }}DomainServiceInterface::class,
+        //     {{ contextName }}DomainService::class
+        // );
+    }
+
+    /**
+     * Bootstrap context-specific services.
+     */
+    public function boot(): void
+    {
+        // Load migrations from this context's directory
+        $this->loadMigrationsFrom(
+            base_path('app/Infrastructure/Persistence/Migrations')
+        );
+
+        // Register event listeners
+        // \Illuminate\Support\Facades\Event::listen(
+        //     \App\Domain\{{ contextName }}\Events\{{ contextName }}Created::class,
+        //     \App\Infrastructure\Events\{{ contextName }}CreatedListener::class,
+        // );
+    }
+}

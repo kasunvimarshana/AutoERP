@@ -1,0 +1,96 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+/**
+ * Uuid — Shared Kernel Value Object
+ *
+ * Wraps a UUID v4 string with strict validation. Used as the identity
+ * type for all aggregate roots and entities in every bounded context.
+ *
+ * Generated: {{ date }}
+ */
+final class Uuid
+{
+    private const PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i';
+
+    private function __construct(
+        private readonly string $value,
+    ) {
+        if (! preg_match(self::PATTERN, $value)) {
+            throw new \InvalidArgumentException(
+                "Invalid UUID v4: [{$value}]."
+            );
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Named Constructors
+    // -------------------------------------------------------------------------
+
+    /**
+     * Generate a new random UUID v4.
+     */
+    public static function generate(): self
+    {
+        // Uses random_bytes for cryptographically secure generation (no extensions needed).
+        $bytes = random_bytes(16);
+
+        // Set version bits (v4)
+        $bytes[6] = chr((ord($bytes[6]) & 0x0f) | 0x40);
+        // Set variant bits (RFC 4122)
+        $bytes[8] = chr((ord($bytes[8]) & 0x3f) | 0x80);
+
+        $hex = bin2hex($bytes);
+
+        $uuid = sprintf(
+            '%s-%s-%s-%s-%s',
+            substr($hex, 0, 8),
+            substr($hex, 8, 4),
+            substr($hex, 12, 4),
+            substr($hex, 16, 4),
+            substr($hex, 20, 12),
+        );
+
+        return new self($uuid);
+    }
+
+    /**
+     * Reconstruct from an existing UUID string (e.g. from persistence).
+     *
+     * @throws \InvalidArgumentException on invalid format
+     */
+    public static function fromString(string $value): self
+    {
+        return new self($value);
+    }
+
+    // -------------------------------------------------------------------------
+    // Accessors
+    // -------------------------------------------------------------------------
+
+    public function value(): string
+    {
+        return $this->value;
+    }
+
+    // -------------------------------------------------------------------------
+    // Equality
+    // -------------------------------------------------------------------------
+
+    public function equals(self $other): bool
+    {
+        return strtolower($this->value) === strtolower($other->value);
+    }
+
+    // -------------------------------------------------------------------------
+    // Serialisation
+    // -------------------------------------------------------------------------
+
+    public function __toString(): string
+    {
+        return $this->value;
+    }
+}

@@ -1,0 +1,34 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use App\Shared\Domain\ValueObjects\Uuid;
+
+/**
+ * AggregateRootContract — Base contract for all Aggregate Roots.
+ *
+ * Every aggregate root in the system must implement this interface.
+ * It guarantees a consistent identity and domain-event API across all
+ * bounded contexts.
+ *
+ * Generated: {{ date }}
+ */
+interface AggregateRootContract
+{
+    /**
+     * Return the aggregate's unique identifier.
+     */
+    public function id(): Uuid;
+
+    /**
+     * Return and clear all queued domain events.
+     *
+     * Call this in your repository's save() method to dispatch events
+     * after the aggregate has been successfully persisted.
+     *
+     * @return array<object>
+     */
+    public function releaseEvents(): array;
+}

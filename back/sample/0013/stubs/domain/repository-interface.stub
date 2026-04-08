@@ -1,0 +1,64 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use App\Shared\Domain\Contracts\RepositoryContract;
+use App\Shared\Domain\ValueObjects\Uuid;
+
+/**
+ * {{ className }}RepositoryInterface — Domain Repository Contract
+ *
+ * Defines the persistence contract from the domain's perspective.
+ * Implementations live in the Infrastructure layer and are bound in the
+ * bounded context's ServiceProvider.
+ *
+ * Bounded Context: {{ contextName }}
+ * Generated:       {{ date }}
+ *
+ * -------------------------------------------------------------------------
+ * Implementation Guide
+ * -------------------------------------------------------------------------
+ *
+ * 1. Define methods in domain language — findByEmail(), findAllActive(), etc.
+ * 2. Parameter and return types MUST be domain objects (entities, VOs, collections).
+ * 3. Never reference Eloquent, DB, or any infrastructure concern here.
+ * 4. Throw domain exceptions (not Eloquent's ModelNotFoundException) when an
+ *    aggregate is expected but not found.
+ * 5. The corresponding Eloquent implementation is in:
+ *    Infrastructure/Persistence/Repositories/Eloquent{{ className }}Repository.php
+ */
+interface {{ className }}RepositoryInterface extends RepositoryContract
+{
+    /**
+     * Find a {{ className }} by its identity.
+     *
+     * @throws \DomainException when not found (or return null and handle at call site)
+     */
+    public function findById(Uuid $id): ?{{ className }};  // TODO: replace ?{{ className }} with your aggregate root
+
+    /**
+     * Persist a new or updated {{ className }}.
+     */
+    public function save(mixed $entity): void;  // TODO: replace mixed with your aggregate root type
+
+    /**
+     * Remove a {{ className }} from persistence.
+     */
+    public function delete(Uuid $id): void;
+
+    /**
+     * Return all {{ className }} records (use with care on large datasets — add pagination).
+     *
+     * TODO: Replace with paginated / filtered queries as the domain evolves.
+     *
+     * @return array<{{ className }}>
+     */
+    public function findAll(): array;
+
+    // TODO: Add domain-specific finder methods below.
+    // Example:
+    // public function findByEmail(Email $email): ?{{ className }};
+    // public function findAllActive(): array;
+}

@@ -1,0 +1,59 @@
+{
+    "name": "archify/laravel-ddd-architect",
+    "description": "A fully dynamic, customizable, and extensible Laravel package for Domain-Driven Design (DDD) with CQRS support — zero third-party module dependencies.",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Archify",
+            "email": "hello@archify.dev"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "illuminate/support": "^10.0|^11.0|^12.0",
+        "illuminate/console": "^10.0|^11.0|^12.0",
+        "illuminate/filesystem": "^10.0|^11.0|^12.0",
+        "illuminate/container": "^10.0|^11.0|^12.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^8.0|^9.0|^10.0",
+        "phpunit/phpunit": "^10.0|^11.0",
+        "laravel/pint": "^1.0",
+        "mockery/mockery": "^1.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "Archify\\DddArchitect\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Archify\\DddArchitect\\Tests\\": "tests/",
+            "App\\": "example/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Archify\\DddArchitect\\Providers\\DddArchitectServiceProvider"
+            ],
+            "aliases": {
+                "DddArchitect": "Archify\\DddArchitect\\Facades\\DddArchitect"
+            }
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit",
+        "pint": "vendor/bin/pint",
+        "test:coverage": "vendor/bin/phpunit --coverage-html coverage"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "php-http/discovery": true
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}

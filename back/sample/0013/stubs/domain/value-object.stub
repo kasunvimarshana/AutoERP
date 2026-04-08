@@ -1,0 +1,102 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+/**
+ * {{ className }} — Value Object
+ *
+ * Value Objects are immutable objects defined entirely by their attributes.
+ * Two value objects with the same attributes are considered equal.
+ * They have no identity of their own.
+ *
+ * Bounded Context: {{ contextName }}
+ * Generated:       {{ date }}
+ *
+ * -------------------------------------------------------------------------
+ * Implementation Guide
+ * -------------------------------------------------------------------------
+ *
+ * 1. Keep this class immutable — all properties must be readonly.
+ * 2. Validate invariants in the constructor; throw a domain exception on failure.
+ * 3. Implement equals() to compare by value, not by reference.
+ * 4. Add "withX()" methods that return new instances (copy-on-write).
+ * 5. Override __toString() for convenient serialisation.
+ */
+final class {{ className }}
+{
+    /**
+     * TODO: Replace this placeholder property with your actual value(s).
+     *       A value object may wrap a single primitive or multiple related fields
+     *       (e.g. Money wraps amount + currency).
+     */
+    private function __construct(
+        private readonly string $value, // TODO: change type / add fields
+    ) {
+        $this->validate($value);
+    }
+
+    // -------------------------------------------------------------------------
+    // Named Constructor
+    // -------------------------------------------------------------------------
+
+    /**
+     * TODO: Rename / add additional factory methods as needed.
+     */
+    public static function fromString(string $value): self
+    {
+        return new self($value);
+    }
+
+    // -------------------------------------------------------------------------
+    // Accessors
+    // -------------------------------------------------------------------------
+
+    public function value(): string // TODO: adjust return type
+    {
+        return $this->value;
+    }
+
+    // -------------------------------------------------------------------------
+    // Equality
+    // -------------------------------------------------------------------------
+
+    public function equals(self $other): bool
+    {
+        return $this->value === $other->value;
+    }
+
+    // -------------------------------------------------------------------------
+    // Mutation (copy-on-write)
+    // -------------------------------------------------------------------------
+
+    // TODO: Example —
+    // public function withValue(string $value): self
+    // {
+    //     return new self($value);
+    // }
+
+    // -------------------------------------------------------------------------
+    // Serialisation
+    // -------------------------------------------------------------------------
+
+    public function __toString(): string
+    {
+        return $this->value;
+    }
+
+    // -------------------------------------------------------------------------
+    // Validation (private)
+    // -------------------------------------------------------------------------
+
+    private function validate(string $value): void
+    {
+        // TODO: Implement validation logic.
+        // Throw a domain exception when the value violates invariants.
+        // Example:
+        // if (empty(trim($value))) {
+        //     throw new \InvalidArgumentException('{{ className }} cannot be empty.');
+        // }
+    }
+}

@@ -1,0 +1,305 @@
+erDiagram
+    %% ===========================
+    %% PARTIES (Suppliers / Customers)
+    %% ===========================
+    parties {
+        bigint id PK
+        varchar name
+        enum type "supplier|customer|both"
+        varchar email
+        varchar phone
+        text address
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% ===========================
+    %% PRODUCT MASTER
+    %% ===========================
+    products {
+        bigint id PK
+        varchar name
+        varchar sku UK
+        enum type "physical|service|digital|combo|variable"
+        boolean track_batch_serial
+        text description
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    product_variants {
+        bigint id PK
+        bigint product_id FK
+        varchar variant_name
+        varchar sku UK
+        decimal base_price
+        bigint base_uom_id FK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    uoms {
+        bigint id PK
+        varchar name
+        decimal conversion_factor
+        boolean base_unit
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    product_uoms {
+        bigint id PK
+        bigint product_variant_id FK
+        bigint uom_id FK
+        decimal conversion_factor
+        boolean is_base
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% ===========================
+    %% INVENTORY
+    %% ===========================
+    inventory_locations {
+        bigint id PK
+        varchar name
+        varchar code UK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    inventory_item_variants {
+        bigint id PK
+        bigint product_variant_id FK
+        bigint location_id FK
+        varchar batch_number
+        varchar serial_number
+        varchar barcode
+        bigint uom_id FK
+        decimal qty
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    inventory_ledger {
+        bigint id PK
+        bigint inventory_item_variant_id FK
+        enum movement_type "IN|OUT|ADJUSTMENT|BALANCE_CHECK"
+        decimal qty_moved
+        decimal balance_after
+        varchar reference_type
+        bigint reference_id
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% ===========================
+    %% PROCUREMENT (PURCHASES)
+    %% ===========================
+    purchases {
+        bigint id PK
+        bigint party_id FK
+        date purchase_date
+        enum source_type "PO|DIRECT"
+        enum status "draft|received|cancelled"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    purchase_lines {
+        bigint id PK
+        bigint purchase_id FK
+        bigint product_variant_id FK
+        bigint inventory_item_variant_id FK
+        bigint uom_id FK
+        decimal qty
+        decimal price
+        varchar batch_number
+        varchar serial_number
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    purchase_returns {
+        bigint id PK
+        bigint party_id FK
+        date return_date
+        enum status "draft|processed|cancelled"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    purchase_return_lines {
+        bigint id PK
+        bigint purchase_return_id FK
+        bigint product_variant_id FK
+        bigint inventory_item_variant_id FK
+        bigint uom_id FK
+        decimal qty
+        decimal price
+        varchar batch_number
+        varchar serial_number
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% ===========================
+    %% SALES
+    %% ===========================
+    sales {
+        bigint id PK
+        bigint party_id FK
+        date sale_date
+        enum source_type "SO|DIRECT"
+        enum status "draft|delivered|cancelled"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    sales_lines {
+        bigint id PK
+        bigint sales_id FK
+        bigint product_variant_id FK
+        bigint inventory_item_variant_id FK
+        bigint uom_id FK
+        decimal qty
+        decimal price
+        varchar batch_number
+        varchar serial_number
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    sales_returns {
+        bigint id PK
+        bigint party_id FK
+        date return_date
+        enum status "draft|processed|cancelled"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    sales_return_lines {
+        bigint id PK
+        bigint sales_return_id FK
+        bigint product_variant_id FK
+        bigint inventory_item_variant_id FK
+        bigint uom_id FK
+        decimal qty
+        decimal price
+        varchar batch_number
+        varchar serial_number
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% ===========================
+    %% ACCOUNTING (Double‑Entry)
+    %% ===========================
+    accounts {
+        bigint id PK
+        varchar code UK
+        varchar name
+        enum type "asset|liability|equity|revenue|expense"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    journal_entries {
+        bigint id PK
+        date entry_date
+        text description
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    journal_entry_lines {
+        bigint id PK
+        bigint journal_entry_id FK
+        bigint account_id FK
+        decimal debit
+        decimal credit
+        varchar reference_type
+        bigint reference_id
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% ===========================
+    %% PAYMENTS (Incoming / Outgoing)
+    %% ===========================
+    payments {
+        bigint id PK
+        bigint party_id FK
+        date payment_date
+        decimal amount
+        enum payment_type "incoming|outgoing"
+        enum method "cash|bank|card|cheque|other"
+        varchar reference_number
+        text notes
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    payment_allocations {
+        bigint id PK
+        bigint payment_id FK
+        varchar reference_type
+        bigint reference_id
+        decimal allocated_amount
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% ===========================
+    %% RELATIONSHIPS
+    %% ===========================
+    products ||--o{ product_variants : "has variants"
+    product_variants }o--|| uoms : "base UoM"
+    product_variants ||--o{ product_uoms : "defines alternative UoMs"
+    uoms ||--o{ product_uoms : "used in"
+    
+    product_variants ||--o{ inventory_item_variants : "stocked as"
+    inventory_locations ||--o{ inventory_item_variants : "holds"
+    uoms ||--o{ inventory_item_variants : "stock UoM"
+    inventory_item_variants ||--o{ inventory_ledger : "tracks movements"
+    
+    parties ||--o{ purchases : "supplier for"
+    purchases ||--o{ purchase_lines : "contains"
+    product_variants ||--o{ purchase_lines : "purchased as"
+    uoms ||--o{ purchase_lines : "ordered in"
+    inventory_item_variants ||--o{ purchase_lines : "receives into"
+    
+    parties ||--o{ purchase_returns : "returns from"
+    purchase_returns ||--o{ purchase_return_lines : "returns items"
+    product_variants ||--o{ purchase_return_lines : "returned"
+    uoms ||--o{ purchase_return_lines : "returned UoM"
+    inventory_item_variants ||--o{ purchase_return_lines : "returned from stock"
+    
+    parties ||--o{ sales : "customer for"
+    sales ||--o{ sales_lines : "contains"
+    product_variants ||--o{ sales_lines : "sold as"
+    uoms ||--o{ sales_lines : "sold in"
+    inventory_item_variants ||--o{ sales_lines : "shipped from"
+    
+    parties ||--o{ sales_returns : "returns to"
+    sales_returns ||--o{ sales_return_lines : "returns items"
+    product_variants ||--o{ sales_return_lines : "returned"
+    uoms ||--o{ sales_return_lines : "returned UoM"
+    inventory_item_variants ||--o{ sales_return_lines : "returned into stock"
+    
+    journal_entries ||--o{ journal_entry_lines : "has lines"
+    accounts ||--o{ journal_entry_lines : "posted to"
+    
+    %% Polymorphic links for accounting (implemented in application logic)
+    journal_entry_lines }o--o| purchase_lines : "references"
+    journal_entry_lines }o--o| sales_lines : "references"
+    journal_entry_lines }o--o| purchase_return_lines : "references"
+    journal_entry_lines }o--o| sales_return_lines : "references"
+    journal_entry_lines }o--o| inventory_ledger : "references"
+    journal_entry_lines }o--o| payments : "references"
+    
+    parties ||--o{ payments : "makes/receives"
+    payments ||--o{ payment_allocations : "allocated to"
+    payment_allocations }o--o| purchases : "settles"
+    payment_allocations }o--o| sales : "settles"

@@ -1,0 +1,63 @@
+erDiagram
+    %% Core & Tenancy
+    TENANTS ||--o{ USERS : "has"
+    TENANTS ||--o{ ORGANIZATION_UNITS : "has"
+
+    %% Party Master
+    PARTIES ||--o{ PURCHASES : "supplier"
+    PARTIES ||--o{ SALES : "customer"
+    PARTIES ||--o{ PURCHASE_RETURNS : "supplier"
+    PARTIES ||--o{ SALES_RETURNS : "customer"
+    PARTIES ||--o{ PAYMENTS : "payer/payee"
+
+    %% Product & Variant & UoM
+    PRODUCTS ||--o{ PRODUCT_VARIANTS : "has"
+    PRODUCTS ||--o{ PRODUCT_CATEGORIES : "categorised"
+    PRODUCT_VARIANTS }o--|| UOMS : "base_uom"
+    PRODUCT_VARIANTS ||--o{ PRODUCT_UOM : "conversions"
+    UOMS ||--o{ PRODUCT_UOM : ""
+
+    %% Inventory
+    INVENTORY_LOCATIONS ||--o{ INVENTORY_ITEMS : "stock"
+    PRODUCT_VARIANTS ||--o{ INVENTORY_ITEMS : "stocked as"
+    INVENTORY_ITEMS ||--o{ INVENTORY_LEDGER : "movements"
+    INVENTORY_ITEMS }o--|| UOMS : "stock_uom"
+
+    %% Procurement
+    PURCHASES ||--o{ PURCHASE_LINES : "contains"
+    PURCHASE_LINES }o--|| PRODUCT_VARIANTS : "variant"
+    PURCHASE_LINES }o--|| INVENTORY_ITEMS : "received_into"
+    PURCHASE_LINES }o--|| UOMS : "transacted_uom"
+
+    %% Sales
+    SALES ||--o{ SALES_LINES : "contains"
+    SALES_LINES }o--|| PRODUCT_VARIANTS : "variant"
+    SALES_LINES }o--|| INVENTORY_ITEMS : "shipped_from"
+    SALES_LINES }o--|| UOMS : "transacted_uom"
+
+    %% Returns (Purchase & Sales)
+    PURCHASE_RETURNS ||--o{ PURCHASE_RETURN_LINES : "contains"
+    PURCHASE_RETURN_LINES }o--|| PRODUCT_VARIANTS : "variant"
+    PURCHASE_RETURN_LINES }o--|| INVENTORY_ITEMS : "returned_from"
+    PURCHASE_RETURN_LINES }o--|| UOMS : "transacted_uom"
+
+    SALES_RETURNS ||--o{ SALES_RETURN_LINES : "contains"
+    SALES_RETURN_LINES }o--|| PRODUCT_VARIANTS : "variant"
+    SALES_RETURN_LINES }o--|| INVENTORY_ITEMS : "returned_into"
+    SALES_RETURN_LINES }o--|| UOMS : "transacted_uom"
+
+    %% Accounting (Double Entry)
+    ACCOUNTS ||--o{ JOURNAL_ENTRY_LINES : "debited/credited"
+    JOURNAL_ENTRIES ||--o{ JOURNAL_ENTRY_LINES : "contains"
+
+    %% Polymorphic links from transactions to accounting
+    PURCHASE_LINES }o--o| JOURNAL_ENTRY_LINES : "reference_type+id"
+    SALES_LINES }o--o| JOURNAL_ENTRY_LINES : ""
+    PURCHASE_RETURN_LINES }o--o| JOURNAL_ENTRY_LINES : ""
+    SALES_RETURN_LINES }o--o| JOURNAL_ENTRY_LINES : ""
+    INVENTORY_LEDGER }o--o| JOURNAL_ENTRY_LINES : ""
+
+    %% Traceability & Barcodes
+    INVENTORY_ITEMS ||--o{ TRACE_LOGS : "tracked"
+    INVENTORY_ITEMS }o--|| BARCODES : "has"
+    PRODUCT_VARIANTS }o--|| BARCODES : "default_barcode"

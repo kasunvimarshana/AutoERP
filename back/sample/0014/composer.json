@@ -1,0 +1,49 @@
+{
+    "name": "yourvendor/laravel-ddd-architect",
+    "description": "A fully dynamic, customizable, and extensible Laravel DDD package for scaffolding Domain-Driven Design module structures without third-party module libraries.",
+    "keywords": ["laravel", "ddd", "domain-driven-design", "modules", "artisan", "scaffold", "cqrs", "hexagonal"],
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Your Name",
+            "email": "your@email.com"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "illuminate/console": "^10.0|^11.0|^12.0",
+        "illuminate/filesystem": "^10.0|^11.0|^12.0",
+        "illuminate/support": "^10.0|^11.0|^12.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^8.0|^9.0|^10.0",
+        "phpunit/phpunit": "^10.0|^11.0",
+        "laravel/pint": "^1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "YourVendor\\LaravelDDDArchitect\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "YourVendor\\LaravelDDDArchitect\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "YourVendor\\LaravelDDDArchitect\\Providers\\DDDArchitectServiceProvider"
+            ],
+            "aliases": {
+                "DDDArchitect": "YourVendor\\LaravelDDDArchitect\\Facades\\DDDArchitect"
+            }
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}

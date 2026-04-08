@@ -1,0 +1,85 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Route;
+
+/**
+ * {{ contextName }}ServiceProvider — Bounded Context Service Provider
+ *
+ * Registers all infrastructure bindings, routes, and migrations for the
+ * {{ contextName }} bounded context. Auto-discovered by DddArchitectServiceProvider
+ * when config('ddd-architect.auto_discover') is true.
+ *
+ * Generated: {{ date }}
+ *
+ * -------------------------------------------------------------------------
+ * Implementation Guide
+ * -------------------------------------------------------------------------
+ *
+ * 1. In register(), bind every Domain repository interface to its Eloquent
+ *    implementation so the container can inject them automatically.
+ *
+ * 2. In boot(), load routes and migrations scoped to this context.
+ *
+ * 3. This provider is auto-discovered — you do NOT need to add it to
+ *    config/app.php providers array.
+ */
+class {{ contextName }}ServiceProvider extends ServiceProvider
+{
+    /**
+     * Bind domain interfaces to infrastructure implementations.
+     *
+     * TODO: Add a binding for every repository interface in this context.
+     *
+     * Example:
+     *   $this->app->bind(
+     *       \{{ contextNamespace }}\Domain\Repositories\{{ contextName }}RepositoryInterface::class,
+     *       \{{ contextNamespace }}\Infrastructure\Persistence\Repositories\Eloquent{{ contextName }}Repository::class,
+     *   );
+     */
+    public function register(): void
+    {
+        // TODO: Register repository bindings here.
+    }
+
+    /**
+     * Boot context-level routes and migrations.
+     */
+    public function boot(): void
+    {
+        $this->bootRoutes();
+        $this->bootMigrations();
+    }
+
+    // -------------------------------------------------------------------------
+    // Internals
+    // -------------------------------------------------------------------------
+
+    private function bootRoutes(): void
+    {
+        // TODO: Uncomment and adjust when you add routes for this context.
+        //
+        // $apiRoutes = __DIR__ . '/../Http/Routes/api.php';
+        //
+        // if (file_exists($apiRoutes)) {
+        //     Route::middleware('api')
+        //         ->prefix('api/{{ contextKebab }}')
+        //         ->group($apiRoutes);
+        // }
+    }
+
+    private function bootMigrations(): void
+    {
+        // TODO: Uncomment when you add migrations for this context.
+        //
+        // $migrationsPath = __DIR__ . '/../../Infrastructure/Persistence/Migrations';
+        //
+        // if (is_dir($migrationsPath)) {
+        //     $this->loadMigrationsFrom($migrationsPath);
+        // }
+    }
+}

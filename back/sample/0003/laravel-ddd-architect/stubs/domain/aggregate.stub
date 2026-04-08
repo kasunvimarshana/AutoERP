@@ -1,0 +1,93 @@
+<?php
+
+namespace {{ namespace }};
+
+use App\Domain\Shared\Contracts\AggregateRoot;
+use App\Domain\Shared\Events\DomainEvent;
+use App\Domain\Shared\ValueObjects\Uuid;
+
+/**
+ * {{ className }} Aggregate Root.
+ *
+ * An Aggregate Root is the consistency boundary for a cluster of objects.
+ * All changes to the aggregate must go through this root — external code
+ * should never modify internal entities or value objects directly.
+ *
+ * Invariants are enforced here, and domain events are recorded for later dispatch.
+ */
+final class {{ className }} implements AggregateRoot
+{
+    /** @var array<DomainEvent> */
+    private array $domainEvents = [];
+
+    private function __construct(
+        private readonly Uuid $id,
+        // TODO: add aggregate state properties
+    ) {
+    }
+
+    // -------------------------------------------------------------------------
+    // Factory
+    // -------------------------------------------------------------------------
+
+    public static function create(/* TODO: params */): self
+    {
+        $aggregate = new self(id: Uuid::generate());
+
+        // $aggregate->recordEvent(new {{ className }}Created($aggregate->id));
+
+        return $aggregate;
+    }
+
+    public static function reconstitute(string $id /*, ...$state */): self
+    {
+        return new self(id: Uuid::from($id));
+    }
+
+    // -------------------------------------------------------------------------
+    // Identity
+    // -------------------------------------------------------------------------
+
+    public function id(): Uuid
+    {
+        return $this->id;
+    }
+
+    // -------------------------------------------------------------------------
+    // Domain Events
+    // -------------------------------------------------------------------------
+
+    public function pullDomainEvents(): array
+    {
+        $events             = $this->domainEvents;
+        $this->domainEvents = [];
+        return $events;
+    }
+
+    private function recordEvent(DomainEvent $event): void
+    {
+        $this->domainEvents[] = $event;
+    }
+
+    // -------------------------------------------------------------------------
+    // Aggregate Behaviour
+    // -------------------------------------------------------------------------
+
+    // TODO: Add methods that enforce aggregate invariants.
+    //
+    // Example:
+    // public function addLineItem(LineItem $item): void
+    // {
+    //     $this->assertNotClosed();
+    //     $this->lineItems[] = $item;
+    //     $this->recalculateTotal();
+    //     $this->recordEvent(new LineItemAdded($this->id, $item->id()));
+    // }
+    //
+    // private function assertNotClosed(): void
+    // {
+    //     if ($this->isClosed) {
+    //         throw {{ className }}Exception::because('Aggregate is closed and cannot be modified.');
+    //     }
+    // }
+}

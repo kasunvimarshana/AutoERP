@@ -1,0 +1,407 @@
+
+<h2 class="sr-only">Enterprise ERP ER Diagram — interactive tabbed database schema with Party, Product, Inventory, Procurement, Sales, and Accounting domains</h2>
+<style>
+.erp-wrap { font-family: var(--font-sans); padding: 4px 0; }
+.erp-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
+.erp-tab { padding:7px 15px; border-radius:var(--border-radius-md); border:1px solid var(--color-border-tertiary); background:transparent; color:var(--color-text-secondary); cursor:pointer; font-size:13px; font-family:var(--font-sans); transition:all .15s; }
+.erp-tab:hover { border-color:var(--color-border-secondary); color:var(--color-text-primary); }
+.erp-tab.active { background:var(--color-background-primary); color:var(--color-text-primary); border-color:var(--color-border-primary); font-weight:500; }
+.erp-panel { display:none; overflow-x:auto; min-height:300px; }
+.erp-panel.active { display:block; }
+.erp-panel svg { max-width:100%; height:auto; }
+.ldg { color:var(--color-text-tertiary); font-size:13px; padding:40px; text-align:center; }
+.legend { display:flex; gap:18px; flex-wrap:wrap; margin-top:12px; padding-top:10px; border-top:1px solid var(--color-border-tertiary); }
+.li { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--color-text-secondary); }
+.ld { width:10px; height:10px; border-radius:2px; }
+.note { font-size:12px; color:var(--color-text-tertiary); margin-top:6px; }
+</style>
+<div class="erp-wrap">
+  <div class="erp-tabs" id="erp-tabs"></div>
+  <div id="erp-panels"></div>
+  <div class="legend">
+    <div class="li"><div class="ld" style="background:#7F77DD"></div>PK — primary key</div>
+    <div class="li"><div class="ld" style="background:#1D9E75"></div>FK — foreign key</div>
+    <div class="li"><span style="font-size:13px;font-family:var(--font-mono)">||--o{</span>one-to-many</div>
+    <div class="li"><span style="font-size:13px;font-family:var(--font-mono)">}o--||</span>many-to-one</div>
+    <div class="li"><span style="font-size:13px;font-family:var(--font-mono)">||--||</span>one-to-one</div>
+  </div>
+  <div class="note">Click a tab to explore each ERP domain. All tables are normalized to BCNF.</div>
+</div>
+
+<script type="module">
+import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+
+const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+await document.fonts.ready;
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  fontFamily: '"Anthropic Sans", sans-serif',
+  themeVariables: {
+    darkMode: dark,
+    fontSize: '13px',
+    fontFamily: '"Anthropic Sans", sans-serif',
+    lineColor: dark ? '#9c9a92' : '#73726c',
+    textColor: dark ? '#c2c0b6' : '#3d3d3a',
+    primaryColor: dark ? '#26215C' : '#EEEDFE',
+    primaryBorderColor: dark ? '#534AB7' : '#AFA9EC',
+    primaryTextColor: dark ? '#CECBF6' : '#3C3489',
+    secondaryColor: dark ? '#04342C' : '#E1F5EE',
+    tertiaryColor: dark ? '#412402' : '#FAEEDA',
+    edgeLabelBackground: dark ? '#2C2C2A' : '#F1EFE8',
+    attributeBackgroundColorEven: dark ? '#1e1e1c' : '#f8f7f4',
+    attributeBackgroundColorOdd: dark ? '#252523' : '#ffffff',
+  },
+});
+
+const tabs = [
+  { id: 'party',       label: 'Party & Product' },
+  { id: 'inventory',   label: 'Inventory' },
+  { id: 'procurement', label: 'Procurement' },
+  { id: 'sales',       label: 'Sales' },
+  { id: 'accounting',  label: 'Accounting' },
+];
+
+const diagrams = {
+party: `erDiagram
+  PARTIES {
+    bigint id PK
+    varchar name
+    enum type
+    varchar email
+    varchar phone
+    text address
+    timestamp created_at
+    timestamp updated_at
+  }
+  PRODUCTS {
+    bigint id PK
+    varchar name
+    varchar sku
+    enum type
+    boolean track_batch_serial
+    text description
+    timestamp created_at
+    timestamp updated_at
+  }
+  PRODUCT_VARIANTS {
+    bigint id PK
+    bigint product_id FK
+    varchar variant_name
+    varchar sku
+    decimal base_price
+    bigint uom_id FK
+    timestamp created_at
+    timestamp updated_at
+  }
+  UOMS {
+    bigint id PK
+    varchar name
+    varchar symbol
+    decimal conversion_factor
+    boolean base_unit
+    timestamp created_at
+    timestamp updated_at
+  }
+  PRODUCT_UOM_CONVERSIONS {
+    bigint id PK
+    bigint product_variant_id FK
+    bigint from_uom_id FK
+    bigint to_uom_id FK
+    decimal factor
+  }
+  PRODUCTS ||--o{ PRODUCT_VARIANTS : "has variants"
+  PRODUCT_VARIANTS }o--|| UOMS : "base UoM"
+  PRODUCT_VARIANTS ||--o{ PRODUCT_UOM_CONVERSIONS : "UoM conversions"
+`,
+inventory: `erDiagram
+  INVENTORY_LOCATIONS {
+    bigint id PK
+    bigint parent_id FK
+    varchar name
+    varchar code
+    enum location_type
+    boolean is_active
+    timestamp created_at
+    timestamp updated_at
+  }
+  PRODUCT_VARIANTS {
+    bigint id PK
+    varchar sku
+    varchar variant_name
+  }
+  UOMS {
+    bigint id PK
+    varchar name
+    varchar symbol
+  }
+  INVENTORY_ITEM_VARIANTS {
+    bigint id PK
+    bigint product_variant_id FK
+    bigint location_id FK
+    bigint uom_id FK
+    varchar batch_number
+    varchar lot_number
+    varchar serial_number
+    varchar barcode
+    date expiry_date
+    decimal qty
+    decimal reserved_qty
+    timestamp created_at
+    timestamp updated_at
+  }
+  INVENTORY_LEDGER {
+    bigint id PK
+    bigint inventory_item_variant_id FK
+    enum movement_type
+    decimal qty_moved
+    decimal balance_after
+    varchar reference_type
+    bigint reference_id
+    bigint user_id
+    text notes
+    timestamp created_at
+    timestamp updated_at
+  }
+  INVENTORY_LOCATIONS ||--o{ INVENTORY_LOCATIONS : "sub-location"
+  INVENTORY_LOCATIONS ||--o{ INVENTORY_ITEM_VARIANTS : "stores"
+  PRODUCT_VARIANTS ||--o{ INVENTORY_ITEM_VARIANTS : "tracked as"
+  UOMS ||--o{ INVENTORY_ITEM_VARIANTS : "measured in"
+  INVENTORY_ITEM_VARIANTS ||--o{ INVENTORY_LEDGER : "movements"
+`,
+procurement: `erDiagram
+  PARTIES {
+    bigint id PK
+    varchar name
+    enum type
+  }
+  PURCHASES {
+    bigint id PK
+    bigint party_id FK
+    date purchase_date
+    enum source_type
+    enum status
+    varchar reference_number
+    decimal subtotal
+    decimal tax_amount
+    decimal total_amount
+    timestamp created_at
+    timestamp updated_at
+  }
+  PURCHASE_LINES {
+    bigint id PK
+    bigint purchase_id FK
+    bigint product_variant_id FK
+    bigint inventory_item_variant_id FK
+    bigint uom_id FK
+    decimal qty
+    decimal unit_price
+    decimal tax_rate
+    decimal line_total
+    varchar batch_number
+    varchar lot_number
+    varchar serial_number
+    timestamp created_at
+    timestamp updated_at
+  }
+  PURCHASE_RETURNS {
+    bigint id PK
+    bigint purchase_id FK
+    bigint party_id FK
+    date return_date
+    enum status
+    text reason
+    decimal credit_amount
+    timestamp created_at
+    timestamp updated_at
+  }
+  PURCHASE_RETURN_LINES {
+    bigint id PK
+    bigint purchase_return_id FK
+    bigint purchase_line_id FK
+    bigint product_variant_id FK
+    bigint inventory_item_variant_id FK
+    bigint uom_id FK
+    decimal qty
+    decimal unit_price
+    varchar batch_number
+    varchar serial_number
+    enum condition
+    boolean restock
+    timestamp created_at
+    timestamp updated_at
+  }
+  PARTIES ||--o{ PURCHASES : "supplier"
+  PURCHASES ||--o{ PURCHASE_LINES : "contains"
+  PURCHASES ||--o{ PURCHASE_RETURNS : "returned via"
+  PURCHASE_RETURNS }o--|| PARTIES : "credited to"
+  PURCHASE_RETURNS ||--o{ PURCHASE_RETURN_LINES : "contains"
+  PURCHASE_LINES ||--o{ PURCHASE_RETURN_LINES : "returned from"
+`,
+sales: `erDiagram
+  PARTIES {
+    bigint id PK
+    varchar name
+    enum type
+  }
+  SALES {
+    bigint id PK
+    bigint party_id FK
+    date sale_date
+    enum source_type
+    enum status
+    varchar reference_number
+    decimal subtotal
+    decimal tax_amount
+    decimal discount_amount
+    decimal total_amount
+    timestamp created_at
+    timestamp updated_at
+  }
+  SALES_LINES {
+    bigint id PK
+    bigint sales_id FK
+    bigint product_variant_id FK
+    bigint inventory_item_variant_id FK
+    bigint uom_id FK
+    decimal qty
+    decimal unit_price
+    decimal tax_rate
+    decimal discount_pct
+    decimal line_total
+    varchar batch_number
+    varchar lot_number
+    varchar serial_number
+    timestamp created_at
+    timestamp updated_at
+  }
+  SALES_RETURNS {
+    bigint id PK
+    bigint sales_id FK
+    bigint party_id FK
+    date return_date
+    enum status
+    boolean restock
+    text reason
+    decimal restocking_fee
+    decimal credit_amount
+    timestamp created_at
+    timestamp updated_at
+  }
+  SALES_RETURN_LINES {
+    bigint id PK
+    bigint sales_return_id FK
+    bigint sales_line_id FK
+    bigint product_variant_id FK
+    bigint inventory_item_variant_id FK
+    bigint uom_id FK
+    decimal qty
+    decimal unit_price
+    varchar batch_number
+    varchar serial_number
+    enum condition
+    timestamp created_at
+    timestamp updated_at
+  }
+  PARTIES ||--o{ SALES : "customer"
+  SALES ||--o{ SALES_LINES : "contains"
+  SALES ||--o{ SALES_RETURNS : "returned via"
+  SALES_RETURNS }o--|| PARTIES : "credited to"
+  SALES_RETURNS ||--o{ SALES_RETURN_LINES : "contains"
+  SALES_LINES ||--o{ SALES_RETURN_LINES : "returned from"
+`,
+accounting: `erDiagram
+  ACCOUNTS {
+    bigint id PK
+    bigint parent_id FK
+    varchar code
+    varchar name
+    enum account_type
+    enum sub_type
+    boolean is_system
+    boolean allow_direct_posting
+    timestamp created_at
+    timestamp updated_at
+  }
+  JOURNAL_ENTRIES {
+    bigint id PK
+    date entry_date
+    text description
+    varchar reference_type
+    bigint reference_id
+    enum status
+    bigint created_by FK
+    bigint reversed_by FK
+    timestamp created_at
+    timestamp updated_at
+  }
+  JOURNAL_ENTRY_LINES {
+    bigint id PK
+    bigint journal_entry_id FK
+    bigint account_id FK
+    decimal debit
+    decimal credit
+    varchar reference_type
+    bigint reference_id
+    text memo
+    timestamp created_at
+    timestamp updated_at
+  }
+  ACCOUNTS ||--o{ ACCOUNTS : "parent account"
+  JOURNAL_ENTRIES ||--o{ JOURNAL_ENTRY_LINES : "double-entry lines"
+  ACCOUNTS ||--o{ JOURNAL_ENTRY_LINES : "debited or credited"
+  JOURNAL_ENTRIES ||--o| JOURNAL_ENTRIES : "reversed by"
+`
+};
+
+const tabsEl  = document.getElementById('erp-tabs');
+const panelsEl = document.getElementById('erp-panels');
+const rendered = new Set();
+
+tabs.forEach((t, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'erp-tab' + (i === 0 ? ' active' : '');
+  btn.textContent = t.label;
+  btn.onclick = () => showTab(t.id);
+  tabsEl.appendChild(btn);
+
+  const panel = document.createElement('div');
+  panel.id = 'panel-' + t.id;
+  panel.className = 'erp-panel' + (i === 0 ? ' active' : '');
+  panel.innerHTML = '<div class="ldg">Rendering diagram…</div>';
+  panelsEl.appendChild(panel);
+});
+
+function showTab(id) {
+  tabs.forEach((t, i) => {
+    document.querySelectorAll('.erp-tab')[i].classList.toggle('active', t.id === id);
+    document.getElementById('panel-' + t.id).classList.toggle('active', t.id === id);
+  });
+  renderPanel(id);
+}
+
+async function renderPanel(id) {
+  if (rendered.has(id)) return;
+  rendered.add(id);
+  const panel = document.getElementById('panel-' + id);
+  try {
+    const { svg } = await mermaid.render('erd-' + id + '-svg', diagrams[id]);
+    panel.innerHTML = svg;
+    applyRounding(panel);
+  } catch(e) {
+    panel.innerHTML = '<div class="ldg">Could not render: ' + e.message + '</div>';
+    rendered.delete(id);
+  }
+}
+
+function applyRounding(panel) {
+  panel.querySelectorAll('svg rect').forEach(r => {
+    if (!r.hasAttribute('rx')) r.setAttribute('rx', '6');
+  });
+  panel.querySelectorAll('svg .attributeBoxEven path, svg .attributeBoxOdd path, svg .attributeBoxEven rect, svg .attributeBoxOdd rect').forEach(el => {
+    el.setAttribute('stroke', 'none');
+  });
+}
+
+renderPanel('party');
+</script>

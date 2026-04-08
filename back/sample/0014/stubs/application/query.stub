@@ -1,0 +1,35 @@
+<?php
+
+namespace {{ namespace }};
+
+/**
+ * {{ className }} Query (CQRS Read Side).
+ *
+ * A Query represents the intent to read data without changing state.
+ * It carries the filter/pagination criteria required by the Query Handler.
+ *
+ * Naming convention: Get|Find|List + noun (e.g. GetOrderById, ListActiveUsers).
+ */
+final class {{ className }}Query
+{
+    public function __construct(
+        // TODO: Add typed, readonly filter/pagination properties.
+        //
+        // Example:
+        // public readonly string  $id,
+        // public readonly int     $page    = 1,
+        // public readonly int     $perPage = 15,
+        // public readonly ?string $status  = null,
+    ) {
+    }
+
+    /**
+     * Build from a raw array (e.g. $request->query()).
+     */
+    public static function fromArray(array $data): self
+    {
+        return new self(
+            // TODO: map array keys to constructor parameters
+        );
+    }
+}

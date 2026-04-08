@@ -1,0 +1,78 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+/**
+ * {{ className }} — Specification
+ *
+ * The Specification pattern encapsulates a business rule as a reusable,
+ * composable predicate. Specifications can be combined with AND, OR, NOT.
+ *
+ * Bounded Context: {{ contextName }}
+ * Generated:       {{ date }}
+ *
+ * -------------------------------------------------------------------------
+ * Implementation Guide
+ * -------------------------------------------------------------------------
+ *
+ * 1. isSatisfiedBy() should return true when the candidate meets the rule.
+ * 2. Keep each specification focused on a single business rule.
+ * 3. Compose specifications with and(), or(), not() helpers (implement below).
+ * 4. Inject repository interfaces if the check requires a DB look-up,
+ *    but prefer pure in-memory checks where possible.
+ *
+ * Usage example:
+ *   $spec = new {{ className }}();
+ *   if (! $spec->isSatisfiedBy($entity)) {
+ *       throw new DomainException('Business rule violated: ...');
+ *   }
+ */
+final class {{ className }}
+{
+    public function __construct(
+        // TODO: Inject any dependencies needed to evaluate the rule.
+    ) {}
+
+    /**
+     * Returns true when $candidate satisfies this specification.
+     *
+     * TODO: Replace the body with the actual business rule.
+     *
+     * @param  mixed  $candidate  The domain object being tested
+     */
+    public function isSatisfiedBy(mixed $candidate): bool
+    {
+        // TODO: Implement the business rule.
+        // Example:
+        // return $candidate->status()->isActive()
+        //     && $candidate->age()->isGreaterThan(Age::fromInt(18));
+        throw new \BadMethodCallException('{{ className }}::isSatisfiedBy() is not implemented.');
+    }
+
+    /**
+     * Returns a new specification that is satisfied when BOTH are satisfied.
+     */
+    public function and(self $other): self
+    {
+        // TODO: Implement composite AND specification or use a generic AndSpecification.
+        throw new \BadMethodCallException('Composite specifications not implemented.');
+    }
+
+    /**
+     * Returns a new specification that is satisfied when EITHER is satisfied.
+     */
+    public function or(self $other): self
+    {
+        throw new \BadMethodCallException('Composite specifications not implemented.');
+    }
+
+    /**
+     * Returns a new specification that inverts this one.
+     */
+    public function not(): self
+    {
+        throw new \BadMethodCallException('Composite specifications not implemented.');
+    }
+}

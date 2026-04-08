@@ -1,0 +1,585 @@
+
+<style>
+#erd-wrap { padding: 1rem 0; }
+#erd-wrap svg { max-width: 100%; height: auto; }
+</style>
+<h2 class="sr-only">Full industrial-grade ERP entity-relationship diagram covering parties, products, inventory, procurement, sales, returns, and double-entry accounting</h2>
+<div id="erd-wrap"><div id="erd"></div></div>
+<script type="module">
+import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+await document.fonts.ready;
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  fontFamily: '"Anthropic Sans", sans-serif',
+  themeVariables: {
+    darkMode: dark,
+    fontSize: '12px',
+    fontFamily: '"Anthropic Sans", sans-serif',
+    lineColor: dark ? '#9c9a92' : '#73726c',
+    textColor: dark ? '#c2c0b6' : '#3d3d3a',
+    primaryColor: dark ? '#2a2a28' : '#f1efea',
+    primaryBorderColor: dark ? '#5a5a54' : '#b4b2a9',
+    secondaryColor: dark ? '#222220' : '#e8e6e0',
+  },
+  er: { diagramPadding: 20, layoutDirection: 'TB', minEntityWidth: 100, minEntityHeight: 75 }
+});
+
+const diagram = `erDiagram
+  TENANTS {
+    bigint id PK
+    string name
+    string domain
+    string plan
+    timestamp created_at
+  }
+
+  USERS {
+    bigint id PK
+    bigint tenant_id FK
+    string name
+    string email
+    string password_hash
+    string role
+    timestamp created_at
+  }
+
+  PARTIES {
+    bigint id PK
+    bigint tenant_id FK
+    string name
+    enum type
+    string email
+    string phone
+    text address
+    string tax_number
+    bigint account_id FK
+    timestamp created_at
+  }
+
+  UOMS {
+    bigint id PK
+    bigint tenant_id FK
+    string name
+    string symbol
+    boolean is_base_unit
+    timestamp created_at
+  }
+
+  UOM_CONVERSIONS {
+    bigint id PK
+    bigint from_uom_id FK
+    bigint to_uom_id FK
+    decimal conversion_factor
+  }
+
+  PRODUCTS {
+    bigint id PK
+    bigint tenant_id FK
+    bigint category_id FK
+    string name
+    string sku
+    enum type
+    boolean track_batch
+    boolean track_serial
+    boolean track_expiry
+    text description
+    timestamp created_at
+  }
+
+  PRODUCT_CATEGORIES {
+    bigint id PK
+    bigint tenant_id FK
+    bigint parent_id FK
+    string name
+    string slug
+  }
+
+  PRODUCT_VARIANTS {
+    bigint id PK
+    bigint product_id FK
+    bigint base_uom_id FK
+    string variant_name
+    string sku
+    decimal base_price
+    decimal cost_price
+    bigint inventory_account_id FK
+    bigint cogs_account_id FK
+    bigint revenue_account_id FK
+    timestamp created_at
+  }
+
+  PRODUCT_VARIANT_ATTRIBUTES {
+    bigint id PK
+    bigint variant_id FK
+    string attribute_name
+    string attribute_value
+  }
+
+  PRODUCT_UOMS {
+    bigint id PK
+    bigint variant_id FK
+    bigint uom_id FK
+    decimal conversion_factor
+    boolean is_purchase_uom
+    boolean is_sales_uom
+  }
+
+  BARCODES {
+    bigint id PK
+    bigint tenant_id FK
+    string barcode_type
+    string entity_type
+    bigint entity_id
+    string value
+    string format
+    json metadata
+    boolean is_gs1
+    timestamp created_at
+  }
+
+  WAREHOUSES {
+    bigint id PK
+    bigint tenant_id FK
+    string name
+    string code
+    text address
+    boolean is_active
+  }
+
+  LOCATIONS {
+    bigint id PK
+    bigint warehouse_id FK
+    bigint parent_id FK
+    string name
+    string code
+    enum type
+    boolean is_active
+  }
+
+  INVENTORY_BATCHES {
+    bigint id PK
+    bigint tenant_id FK
+    bigint variant_id FK
+    string batch_number
+    string lot_number
+    date manufacture_date
+    date expiry_date
+    string supplier_batch_ref
+    timestamp created_at
+  }
+
+  INVENTORY_SERIALS {
+    bigint id PK
+    bigint tenant_id FK
+    bigint variant_id FK
+    bigint batch_id FK
+    string serial_number
+    enum status
+    bigint current_location_id FK
+    timestamp created_at
+  }
+
+  STOCK_LEDGER {
+    bigint id PK
+    bigint tenant_id FK
+    bigint variant_id FK
+    bigint location_id FK
+    bigint batch_id FK
+    bigint serial_id FK
+    bigint uom_id FK
+    enum movement_type
+    decimal qty_moved
+    decimal qty_before
+    decimal qty_after
+    decimal unit_cost
+    string ref_type
+    bigint ref_id
+    bigint user_id FK
+    timestamp created_at
+  }
+
+  STOCK_BALANCE {
+    bigint id PK
+    bigint tenant_id FK
+    bigint variant_id FK
+    bigint location_id FK
+    bigint batch_id FK
+    bigint uom_id FK
+    decimal qty_on_hand
+    decimal qty_reserved
+    decimal qty_available
+    timestamp updated_at
+  }
+
+  PURCHASES {
+    bigint id PK
+    bigint tenant_id FK
+    bigint party_id FK
+    bigint warehouse_id FK
+    string number
+    enum source_type
+    enum status
+    date purchase_date
+    date expected_date
+    decimal total_amount
+    decimal tax_amount
+    decimal paid_amount
+    bigint journal_entry_id FK
+    bigint user_id FK
+    timestamp created_at
+  }
+
+  PURCHASE_LINES {
+    bigint id PK
+    bigint purchase_id FK
+    bigint variant_id FK
+    bigint location_id FK
+    bigint batch_id FK
+    bigint serial_id FK
+    bigint uom_id FK
+    decimal qty_ordered
+    decimal qty_received
+    decimal unit_price
+    decimal tax_rate
+    decimal line_total
+    timestamp created_at
+  }
+
+  PURCHASE_RECEIPTS {
+    bigint id PK
+    bigint purchase_id FK
+    bigint warehouse_id FK
+    string grn_number
+    date receipt_date
+    enum status
+    bigint journal_entry_id FK
+    timestamp created_at
+  }
+
+  PURCHASE_RECEIPT_LINES {
+    bigint id PK
+    bigint receipt_id FK
+    bigint purchase_line_id FK
+    bigint batch_id FK
+    bigint serial_id FK
+    bigint location_id FK
+    bigint uom_id FK
+    decimal qty_received
+    decimal unit_cost
+  }
+
+  PURCHASE_RETURNS {
+    bigint id PK
+    bigint tenant_id FK
+    bigint purchase_id FK
+    bigint party_id FK
+    string number
+    enum status
+    date return_date
+    string return_reason
+    bigint journal_entry_id FK
+    timestamp created_at
+  }
+
+  PURCHASE_RETURN_LINES {
+    bigint id PK
+    bigint purchase_return_id FK
+    bigint purchase_line_id FK
+    bigint variant_id FK
+    bigint batch_id FK
+    bigint serial_id FK
+    bigint location_id FK
+    bigint uom_id FK
+    decimal qty_returned
+    decimal unit_cost
+    enum condition
+    boolean restock
+  }
+
+  SALES {
+    bigint id PK
+    bigint tenant_id FK
+    bigint party_id FK
+    bigint warehouse_id FK
+    string number
+    enum source_type
+    enum status
+    date sale_date
+    date expected_delivery
+    decimal total_amount
+    decimal tax_amount
+    decimal paid_amount
+    decimal discount_amount
+    bigint journal_entry_id FK
+    bigint user_id FK
+    timestamp created_at
+  }
+
+  SALES_LINES {
+    bigint id PK
+    bigint sale_id FK
+    bigint variant_id FK
+    bigint location_id FK
+    bigint batch_id FK
+    bigint serial_id FK
+    bigint uom_id FK
+    decimal qty_ordered
+    decimal qty_delivered
+    decimal unit_price
+    decimal discount_pct
+    decimal tax_rate
+    decimal line_total
+    timestamp created_at
+  }
+
+  SALES_DELIVERIES {
+    bigint id PK
+    bigint sale_id FK
+    bigint warehouse_id FK
+    string delivery_number
+    date delivery_date
+    enum status
+    bigint journal_entry_id FK
+    timestamp created_at
+  }
+
+  SALES_DELIVERY_LINES {
+    bigint id PK
+    bigint delivery_id FK
+    bigint sales_line_id FK
+    bigint batch_id FK
+    bigint serial_id FK
+    bigint location_id FK
+    bigint uom_id FK
+    decimal qty_delivered
+  }
+
+  SALES_RETURNS {
+    bigint id PK
+    bigint tenant_id FK
+    bigint sale_id FK
+    bigint party_id FK
+    string number
+    enum status
+    date return_date
+    string return_reason
+    decimal restocking_fee
+    boolean credit_memo_issued
+    bigint journal_entry_id FK
+    timestamp created_at
+  }
+
+  SALES_RETURN_LINES {
+    bigint id PK
+    bigint sales_return_id FK
+    bigint sales_line_id FK
+    bigint variant_id FK
+    bigint batch_id FK
+    bigint serial_id FK
+    bigint location_id FK
+    bigint uom_id FK
+    decimal qty_returned
+    decimal unit_price
+    enum condition
+    boolean restock
+  }
+
+  PAYMENTS {
+    bigint id PK
+    bigint tenant_id FK
+    bigint party_id FK
+    string ref_type
+    bigint ref_id
+    bigint account_id FK
+    enum direction
+    decimal amount
+    date payment_date
+    string method
+    string reference_number
+    bigint journal_entry_id FK
+    timestamp created_at
+  }
+
+  ACCOUNTS {
+    bigint id PK
+    bigint tenant_id FK
+    bigint parent_id FK
+    string code
+    string name
+    enum type
+    enum subtype
+    boolean is_active
+    boolean allow_manual_entry
+    timestamp created_at
+  }
+
+  JOURNAL_ENTRIES {
+    bigint id PK
+    bigint tenant_id FK
+    string number
+    date entry_date
+    text description
+    enum status
+    string ref_type
+    bigint ref_id
+    bigint created_by FK
+    timestamp created_at
+  }
+
+  JOURNAL_ENTRY_LINES {
+    bigint id PK
+    bigint journal_entry_id FK
+    bigint account_id FK
+    decimal debit
+    decimal credit
+    text memo
+    bigint party_id FK
+    string ref_type
+    bigint ref_id
+  }
+
+  TAX_RATES {
+    bigint id PK
+    bigint tenant_id FK
+    string name
+    decimal rate
+    string tax_type
+    bigint account_id FK
+    boolean is_active
+  }
+
+  TRACE_LOGS {
+    bigint id PK
+    bigint tenant_id FK
+    string entity_type
+    bigint entity_id
+    bigint barcode_id FK
+    string action_type
+    string ref_type
+    bigint ref_id
+    bigint src_location_id FK
+    bigint dst_location_id FK
+    decimal quantity
+    bigint user_id FK
+    json metadata
+    timestamp created_at
+  }
+
+  TENANTS ||--o{ USERS : has
+  TENANTS ||--o{ PARTIES : has
+  TENANTS ||--o{ PRODUCTS : has
+  TENANTS ||--o{ WAREHOUSES : has
+  TENANTS ||--o{ ACCOUNTS : has
+  TENANTS ||--o{ JOURNAL_ENTRIES : has
+
+  USERS ||--o{ PURCHASES : creates
+  USERS ||--o{ SALES : creates
+
+  PARTIES ||--o{ PURCHASES : "supplier"
+  PARTIES ||--o{ SALES : "customer"
+  PARTIES ||--o{ PAYMENTS : pays
+  PARTIES ||--o{ PURCHASE_RETURNS : returns
+  PARTIES ||--o{ SALES_RETURNS : returns
+  PARTIES }o--|| ACCOUNTS : "AP/AR account"
+
+  PRODUCTS ||--o{ PRODUCT_VARIANTS : has
+  PRODUCTS }o--|| PRODUCT_CATEGORIES : "in category"
+  PRODUCT_CATEGORIES ||--o{ PRODUCT_CATEGORIES : "parent-child"
+
+  PRODUCT_VARIANTS ||--o{ PRODUCT_UOMS : "multi-UoM"
+  PRODUCT_VARIANTS ||--o{ PRODUCT_VARIANT_ATTRIBUTES : has
+  PRODUCT_VARIANTS }o--|| UOMS : "base UoM"
+  PRODUCT_VARIANTS }o--|| ACCOUNTS : "inv account"
+
+  UOMS ||--o{ UOM_CONVERSIONS : "from"
+  UOMS ||--o{ UOM_CONVERSIONS : "to"
+
+  WAREHOUSES ||--o{ LOCATIONS : contains
+  LOCATIONS ||--o{ LOCATIONS : "parent-child"
+
+  PRODUCT_VARIANTS ||--o{ INVENTORY_BATCHES : "has batches"
+  PRODUCT_VARIANTS ||--o{ INVENTORY_SERIALS : "has serials"
+  INVENTORY_BATCHES ||--o{ INVENTORY_SERIALS : "batch serials"
+  INVENTORY_SERIALS }o--|| LOCATIONS : "at location"
+
+  PRODUCT_VARIANTS ||--o{ STOCK_LEDGER : tracks
+  LOCATIONS ||--o{ STOCK_LEDGER : at
+  INVENTORY_BATCHES ||--o{ STOCK_LEDGER : "batch ref"
+  INVENTORY_SERIALS ||--o{ STOCK_LEDGER : "serial ref"
+
+  PRODUCT_VARIANTS ||--o{ STOCK_BALANCE : aggregates
+  LOCATIONS ||--o{ STOCK_BALANCE : at
+  INVENTORY_BATCHES ||--o{ STOCK_BALANCE : "batch balance"
+
+  PURCHASES ||--o{ PURCHASE_LINES : has
+  PURCHASES ||--o{ PURCHASE_RECEIPTS : "GRN"
+  PURCHASES ||--o{ PURCHASE_RETURNS : "returns"
+  PURCHASES }o--|| WAREHOUSES : "to warehouse"
+  PURCHASE_RECEIPTS ||--o{ PURCHASE_RECEIPT_LINES : has
+  PURCHASE_LINES ||--o{ PURCHASE_RECEIPT_LINES : received
+  PURCHASE_RETURNS ||--o{ PURCHASE_RETURN_LINES : has
+
+  SALES ||--o{ SALES_LINES : has
+  SALES ||--o{ SALES_DELIVERIES : "delivery"
+  SALES ||--o{ SALES_RETURNS : "returns"
+  SALES }o--|| WAREHOUSES : "from warehouse"
+  SALES_DELIVERIES ||--o{ SALES_DELIVERY_LINES : has
+  SALES_LINES ||--o{ SALES_DELIVERY_LINES : delivered
+  SALES_RETURNS ||--o{ SALES_RETURN_LINES : has
+
+  PRODUCT_VARIANTS ||--o{ PURCHASE_LINES : ordered
+  PRODUCT_VARIANTS ||--o{ SALES_LINES : sold
+  INVENTORY_BATCHES ||--o{ PURCHASE_LINES : "batch ref"
+  INVENTORY_BATCHES ||--o{ SALES_LINES : "batch ref"
+  INVENTORY_BATCHES ||--o{ PURCHASE_RETURN_LINES : "batch ref"
+  INVENTORY_BATCHES ||--o{ SALES_RETURN_LINES : "batch ref"
+
+  ACCOUNTS ||--o{ JOURNAL_ENTRY_LINES : "credited/debited"
+  JOURNAL_ENTRIES ||--o{ JOURNAL_ENTRY_LINES : has
+  JOURNAL_ENTRIES }o--|| USERS : "created by"
+
+  PURCHASES }o--|| JOURNAL_ENTRIES : "auto-posts"
+  SALES }o--|| JOURNAL_ENTRIES : "auto-posts"
+  PURCHASE_RECEIPTS }o--|| JOURNAL_ENTRIES : "auto-posts"
+  SALES_DELIVERIES }o--|| JOURNAL_ENTRIES : "auto-posts"
+  PURCHASE_RETURNS }o--|| JOURNAL_ENTRIES : "auto-posts"
+  SALES_RETURNS }o--|| JOURNAL_ENTRIES : "auto-posts"
+  PAYMENTS }o--|| JOURNAL_ENTRIES : "auto-posts"
+  PAYMENTS }o--|| ACCOUNTS : "to account"
+
+  TAX_RATES }o--|| ACCOUNTS : "tax account"
+
+  BARCODES ||--o{ TRACE_LOGS : "traced"
+  TRACE_LOGS }o--|| LOCATIONS : "source"
+  TRACE_LOGS }o--|| LOCATIONS : "destination"
+`;
+
+const { svg } = await mermaid.render('erd-svg', diagram);
+document.getElementById('erd').innerHTML = svg;
+
+document.querySelectorAll('#erd svg .node').forEach(node => {
+  const firstPath = node.querySelector('path[d]');
+  if (!firstPath) return;
+  const d = firstPath.getAttribute('d');
+  const nums = d.match(/-?[\d.]+/g)?.map(Number);
+  if (!nums || nums.length < 8) return;
+  const xs = [nums[0], nums[2], nums[4], nums[6]];
+  const ys = [nums[1], nums[3], nums[5], nums[7]];
+  const x = Math.min(...xs), y = Math.min(...ys);
+  const w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.setAttribute('x', x); rect.setAttribute('y', y);
+  rect.setAttribute('width', w); rect.setAttribute('height', h);
+  rect.setAttribute('rx', '8');
+  for (const a of ['fill', 'stroke', 'stroke-width', 'class', 'style']) {
+    if (firstPath.hasAttribute(a)) rect.setAttribute(a, firstPath.getAttribute(a));
+  }
+  firstPath.replaceWith(rect);
+});
+
+document.querySelectorAll('#erd svg .row-rect-odd path, #erd svg .row-rect-even path').forEach(p => {
+  p.setAttribute('stroke', 'none');
+});
+</script>

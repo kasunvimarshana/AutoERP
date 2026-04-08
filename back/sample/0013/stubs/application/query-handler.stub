@@ -1,0 +1,59 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use {{ queryNamespace }}\{{ queryName }};
+
+/**
+ * {{ className }}QueryHandler — CQRS Query Handler
+ *
+ * Executes {{ queryName }} and returns a read model (array, DTO, or
+ * Eloquent Resource). Query handlers may bypass the domain model entirely
+ * and hit the read store directly for performance.
+ *
+ * Bounded Context: {{ contextName }}
+ * Generated:       {{ date }}
+ *
+ * -------------------------------------------------------------------------
+ * Implementation Guide
+ * -------------------------------------------------------------------------
+ *
+ * 1. Return a read model (DTO, array, or paginator) — NOT a domain entity.
+ * 2. For simple reads, query Eloquent directly and skip the domain layer.
+ * 3. For complex reads, use raw DB queries or dedicated read models.
+ * 4. This handler MUST NOT mutate any state — it is purely a read operation.
+ */
+final class {{ className }}QueryHandler
+{
+    public function __construct(
+        // TODO: Inject Eloquent model, read repository, or DB facade.
+        // Example:
+        // private readonly {{ contextName }}Model $model,
+    ) {}
+
+    /**
+     * Handle {{ queryName }} and return the read result.
+     *
+     * TODO: Define the return type to match your read model.
+     *
+     * @return mixed  Replace with a concrete return type (e.g. array, DTO, LengthAwarePaginator)
+     */
+    public function handle({{ queryName }} $query): mixed
+    {
+        // TODO: Implement the read logic.
+        //
+        // Examples:
+        //
+        // Single record:
+        // return $this->model->newQuery()->findOrFail($query->id);
+        //
+        // Paginated list:
+        // return $this->model->newQuery()
+        //     ->orderBy('created_at', 'desc')
+        //     ->paginate($query->perPage, ['*'], 'page', $query->page);
+
+        throw new \BadMethodCallException('{{ className }}QueryHandler::handle() is not implemented.');
+    }
+}

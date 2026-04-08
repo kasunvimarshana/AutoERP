@@ -1,0 +1,39 @@
+<?php
+
+namespace {{ namespace }};
+
+/**
+ * {{ className }} Command (CQRS Write Side).
+ *
+ * A Command represents the intent to change state.
+ * It is an immutable value object containing all data required
+ * by the corresponding {{ className }}Handler to complete the operation.
+ *
+ * Naming convention: verb + noun in imperative form (e.g. CreateOrder, CancelSubscription).
+ */
+final class {{ className }}Command
+{
+    public function __construct(
+        // TODO: Add typed, readonly properties for each required field.
+        //
+        // Example:
+        // public readonly string $name,
+        // public readonly string $email,
+        // public readonly int    $amountCents,
+    ) {
+    }
+
+    // -------------------------------------------------------------------------
+    // Named Constructors
+    // -------------------------------------------------------------------------
+
+    /**
+     * Build from a validated array (e.g. FormRequest::validated()).
+     */
+    public static function fromArray(array $data): self
+    {
+        return new self(
+            // TODO: map array keys to constructor parameters
+        );
+    }
+}

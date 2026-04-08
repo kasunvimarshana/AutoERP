@@ -1,0 +1,194 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+/**
+ * Money — Shared Kernel Value Object
+ *
+ * Represents a monetary amount with an explicit currency code (ISO 4217).
+ * Amounts are stored as integer minor units (e.g. pence, cents) to avoid
+ * floating-point rounding errors.
+ *
+ * Generated: {{ date }}
+ *
+ * -------------------------------------------------------------------------
+ * Usage
+ * -------------------------------------------------------------------------
+ *
+ *   $price    = Money::of(1999, 'USD');   // $19.99
+ *   $discount = Money::of(500,  'USD');   // $5.00
+ *   $total    = $price->subtract($discount);
+ *   echo $total->formatted();            // "$14.99"
+ */
+final class Money
+{
+    private function __construct(
+        private readonly int    $amount,   // minor units (e.g. 199 = $1.99)
+        private readonly string $currency, // ISO 4217, e.g. "USD", "EUR"
+    ) {
+        if ($amount < 0) {
+            throw new \InvalidArgumentException(
+                'Money amount cannot be negative. Use a separate sign concept if needed.'
+            );
+        }
+
+        $upper = strtoupper(trim($currency));
+
+        if (! preg_match('/^[A-Z]{3}$/', $upper)) {
+            throw new \InvalidArgumentException(
+                "Invalid ISO 4217 currency code: [{$currency}]."
+            );
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Named Constructors
+    // -------------------------------------------------------------------------
+
+    /**
+     * Construct from minor units (e.g. cents, pence).
+     * Preferred for precision — no floating-point involvement.
+     */
+    public static function of(int $amountInMinorUnits, string $currency): self
+    {
+        return new self($amountInMinorUnits, strtoupper($currency));
+    }
+
+    /**
+     * Construct from a decimal string, e.g. "19.99".
+     * The string is parsed and converted to minor units (2 decimal places assumed).
+     *
+     * @throws \InvalidArgumentException on non-numeric input
+     */
+    public static function fromDecimal(string $decimal, string $currency): self
+    {
+        if (! is_numeric($decimal)) {
+            throw new \InvalidArgumentException("Non-numeric decimal value: [{$decimal}].");
+        }
+
+        $minor = (int) round((float) $decimal * 100);
+
+        return new self($minor, strtoupper($currency));
+    }
+
+    // -------------------------------------------------------------------------
+    // Accessors
+    // -------------------------------------------------------------------------
+
+    /** Amount in minor units (e.g. 1999 for $19.99). */
+    public function amount(): int
+    {
+        return $this->amount;
+    }
+
+    /** ISO 4217 currency code. */
+    public function currency(): string
+    {
+        return $this->currency;
+    }
+
+    /** Amount as a decimal float — use only for display, never for calculation. */
+    public function toDecimal(): float
+    {
+        return $this->amount / 100;
+    }
+
+    /** Human-readable representation e.g. "USD 19.99". */
+    public function formatted(): string
+    {
+        return sprintf('%s %.2f', $this->currency, $this->toDecimal());
+    }
+
+    // -------------------------------------------------------------------------
+    // Arithmetic (returns new instances — immutable)
+    // -------------------------------------------------------------------------
+
+    /** @throws \LogicException when currencies differ */
+    public function add(self $other): self
+    {
+        $this->guardSameCurrency($other);
+
+        return new self($this->amount + $other->amount, $this->currency);
+    }
+
+    /** @throws \LogicException when currencies differ or result would be negative */
+    public function subtract(self $other): self
+    {
+        $this->guardSameCurrency($other);
+
+        if ($other->amount > $this->amount) {
+            throw new \LogicException('Subtraction would result in negative money.');
+        }
+
+        return new self($this->amount - $other->amount, $this->currency);
+    }
+
+    /** Multiply by a positive integer factor (e.g. quantity). */
+    public function multiplyBy(int $factor): self
+    {
+        if ($factor < 0) {
+            throw new \InvalidArgumentException('Multiplication factor cannot be negative.');
+        }
+
+        return new self($this->amount * $factor, $this->currency);
+    }
+
+    // -------------------------------------------------------------------------
+    // Comparison
+    // -------------------------------------------------------------------------
+
+    public function equals(self $other): bool
+    {
+        return $this->amount   === $other->amount
+            && $this->currency === $other->currency;
+    }
+
+    public function isGreaterThan(self $other): bool
+    {
+        $this->guardSameCurrency($other);
+        return $this->amount > $other->amount;
+    }
+
+    public function isLessThan(self $other): bool
+    {
+        $this->guardSameCurrency($other);
+        return $this->amount < $other->amount;
+    }
+
+    public function isZero(): bool
+    {
+        return $this->amount === 0;
+    }
+
+    // -------------------------------------------------------------------------
+    // Serialisation
+    // -------------------------------------------------------------------------
+
+    public function toArray(): array
+    {
+        return [
+            'amount'   => $this->amount,
+            'currency' => $this->currency,
+        ];
+    }
+
+    public function __toString(): string
+    {
+        return $this->formatted();
+    }
+
+    // -------------------------------------------------------------------------
+    // Guard
+    // -------------------------------------------------------------------------
+
+    private function guardSameCurrency(self $other): void
+    {
+        if ($this->currency !== $other->currency) {
+            throw new \LogicException(
+                "Currency mismatch: [{$this->currency}] vs [{$other->currency}]."
+            );
+        }
+    }
+}

@@ -1,0 +1,64 @@
+<?php
+
+namespace {{ namespace }};
+
+use App\Domain\Shared\ValueObjects\AbstractValueObject;
+use InvalidArgumentException;
+
+/**
+ * {{ className }} Value Object.
+ *
+ * Value Objects are immutable and have no identity. Two instances with
+ * the same value are considered equal. Construct only through named
+ * constructors so validation is always enforced.
+ */
+final class {{ className }} extends AbstractValueObject
+{
+    private function __construct(
+        private readonly mixed $value,
+    ) {
+        $this->validate($value);
+    }
+
+    // -------------------------------------------------------------------------
+    // Named Constructor(s)
+    // -------------------------------------------------------------------------
+
+    public static function from(mixed $value): self
+    {
+        return new self($value);
+    }
+
+    // -------------------------------------------------------------------------
+    // Value
+    // -------------------------------------------------------------------------
+
+    public function value(): mixed
+    {
+        return $this->value;
+    }
+
+    // -------------------------------------------------------------------------
+    // Equality
+    // -------------------------------------------------------------------------
+
+    public function equals(AbstractValueObject $other): bool
+    {
+        return $other instanceof self && $this->value === $other->value;
+    }
+
+    // -------------------------------------------------------------------------
+    // Validation
+    // -------------------------------------------------------------------------
+
+    private function validate(mixed $value): void
+    {
+        // TODO: Add validation rules.
+        // Throw InvalidArgumentException with a clear message on failure.
+        //
+        // Example:
+        // if (empty($value)) {
+        //     throw new InvalidArgumentException("{{ className }} cannot be empty.");
+        // }
+    }
+}

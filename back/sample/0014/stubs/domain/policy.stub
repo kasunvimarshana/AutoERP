@@ -1,0 +1,56 @@
+<?php
+
+namespace {{ namespace }};
+
+/**
+ * {{ className }}Policy — Domain-level Authorization Policy.
+ *
+ * Domain policies encode BUSINESS-LEVEL authorization rules —
+ * decisions driven by the domain model, not HTTP sessions or Gates.
+ *
+ * They answer questions like:
+ *   "Can this user cancel this order?"
+ *   "Is this account allowed to submit a withdrawal?"
+ *
+ * Keep this class free of Laravel/framework dependencies.
+ * For HTTP-level authorization (Gates, middleware), use Laravel Policies
+ * in app/Policies/ instead.
+ */
+final class {{ className }}Policy
+{
+    // -------------------------------------------------------------------------
+    // Authorization Rules
+    // -------------------------------------------------------------------------
+
+    // TODO: Implement domain authorization methods.
+    // Each method receives relevant domain objects (not HTTP request data).
+    //
+    // Naming convention: can{Action}(User $user, {{ className }} $subject): bool
+    //
+    // Example:
+    // public function canCancel(User $user, Order $order): bool
+    // {
+    //     return $user->id() === $order->customerId()
+    //         && $order->status()->equals(OrderStatus::Pending);
+    // }
+    //
+    // public function canRefund(User $user, Order $order): bool
+    // {
+    //     return $user->hasRole('admin')
+    //         || ($user->id() === $order->customerId() && $order->isRefundable());
+    // }
+
+    /**
+     * Determine if the given user can perform the given action.
+     * Use this as a catch-all when you don't need individual methods.
+     *
+     * @param  mixed  $user    The authenticated user (domain User entity, not Eloquent model)
+     * @param  string $action  The action being attempted (e.g. 'cancel', 'update')
+     * @param  mixed  $subject The domain object being acted upon
+     */
+    public function allows(mixed $user, string $action, mixed $subject): bool
+    {
+        // TODO: implement
+        return false;
+    }
+}

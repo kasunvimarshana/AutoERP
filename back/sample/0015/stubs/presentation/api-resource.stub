@@ -1,0 +1,52 @@
+<?php
+
+namespace {{ namespace }};
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+/**
+ * {{ contextName }} API Resource.
+ *
+ * Transforms the read model / DTO into a consistent JSON representation.
+ * This is the only place where the API output shape is defined.
+ *
+ * Never expose internal domain objects or Eloquent models directly
+ * in API responses — always pass through a Resource or Resource collection.
+ */
+class {{ contextName }}Resource extends JsonResource
+{
+    /**
+     * Transform the resource into an array.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(Request $request): array
+    {
+        return [
+            'id'         => $this->resource->id ?? $this->resource['id'] ?? null,
+            // TODO: map remaining fields from the read model / DTO / Eloquent model.
+            //
+            // Always use snake_case keys in JSON responses.
+            // Format dates as ISO 8601 strings.
+            //
+            // Example:
+            // 'name'       => $this->resource->name,
+            // 'email'      => $this->resource->email,
+            // 'status'     => $this->resource->status,
+            // 'created_at' => $this->resource->created_at?->toIso8601String(),
+
+            // Include related resources conditionally to avoid N+1 issues
+            // 'orders' => OrderResource::collection($this->whenLoaded('orders')),
+        ];
+    }
+
+    /**
+     * Customise the outer response envelope (optional).
+     * Uncomment to add top-level metadata to the JSON response.
+     */
+    // public function with(Request $request): array
+    // {
+    //     return ['meta' => ['api_version' => '1.0']];
+    // }
+}
