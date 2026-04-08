@@ -1,12 +1,21 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Warehouse\Application\Contracts;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Modules\Warehouse\Domain\Entities\Warehouse;
-interface WarehouseServiceInterface {
-    public function findById(int $id): Warehouse;
-    public function findByTenant(int $tenantId, int $perPage = 15, int $page = 1): LengthAwarePaginator;
-    public function create(array $data): Warehouse;
-    public function update(int $id, array $data): Warehouse;
+
+use Illuminate\Support\Collection;
+use Modules\Warehouse\Application\DTOs\WarehouseData;
+
+interface WarehouseServiceInterface
+{
+    public function create(WarehouseData $dto, int $tenantId): mixed;
+
+    public function update(int $id, WarehouseData $dto): mixed;
+
     public function delete(int $id): bool;
+
+    public function find(mixed $id): mixed;
+
+    public function list(array $filters = [], ?int $perPage = null): mixed;
 }

@@ -1,12 +1,20 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Supplier\Application\Contracts;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Modules\Supplier\Domain\Entities\Supplier;
-interface SupplierServiceInterface {
-    public function findById(int $id): Supplier;
-    public function findByTenant(int $tenantId, int $perPage = 15, int $page = 1): LengthAwarePaginator;
-    public function create(array $data): Supplier;
-    public function update(int $id, array $data): Supplier;
+
+use Modules\Supplier\Application\DTOs\SupplierData;
+
+interface SupplierServiceInterface
+{
+    public function create(SupplierData $dto, int $tenantId): mixed;
+
+    public function update(int $id, SupplierData $dto): mixed;
+
     public function delete(int $id): bool;
+
+    public function find(mixed $id): mixed;
+
+    public function list(array $filters = [], ?int $perPage = null): mixed;
 }

@@ -1,44 +1,54 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Tenant\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Modules\Tenant\Application\Contracts\CreateTenantServiceInterface;
-use Modules\Tenant\Application\Contracts\DeleteTenantServiceInterface;
-use Modules\Tenant\Application\Contracts\GetTenantServiceInterface;
-use Modules\Tenant\Application\Contracts\UpdateTenantServiceInterface;
-use Modules\Tenant\Application\Services\CreateTenantService;
-use Modules\Tenant\Application\Services\DeleteTenantService;
-use Modules\Tenant\Application\Services\GetTenantService;
-use Modules\Tenant\Application\Services\UpdateTenantService;
+use Modules\Tenant\Application\Contracts\OrgUnitServiceInterface;
+use Modules\Tenant\Application\Contracts\TenantServiceInterface;
+use Modules\Tenant\Application\Services\OrgUnitService;
+use Modules\Tenant\Application\Services\TenantService;
+use Modules\Tenant\Domain\RepositoryInterfaces\OrgUnitRepositoryInterface;
 use Modules\Tenant\Domain\RepositoryInterfaces\TenantRepositoryInterface;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\OrgUnitModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantModel;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrgUnitRepository;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Repositories\EloquentTenantRepository;
 
 class TenantServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->bind(TenantRepositoryInterface::class, fn($app) =>
-            new EloquentTenantRepository($app->make(TenantModel::class))
-        );
-        $this->app->bind(CreateTenantServiceInterface::class, fn($app) =>
-            new CreateTenantService($app->make(TenantRepositoryInterface::class))
-        );
-        $this->app->bind(UpdateTenantServiceInterface::class, fn($app) =>
-            new UpdateTenantService($app->make(TenantRepositoryInterface::class))
-        );
-        $this->app->bind(DeleteTenantServiceInterface::class, fn($app) =>
-            new DeleteTenantService($app->make(TenantRepositoryInterface::class))
-        );
-        $this->app->bind(GetTenantServiceInterface::class, fn($app) =>
-            new GetTenantService($app->make(TenantRepositoryInterface::class))
-        );
+        $this->app->bind(TenantRepositoryInterface::class, function ($app) {
+            return new EloquentTenantRepository($app->make(TenantModel::class));
+        });
+
+        $this->app->bind(OrgUnitRepositoryInterface::class, function ($app) {
+            return new EloquentOrgUnitRepository($app->make(OrgUnitModel::class));
+        });
+
+        $this->app->bind(TenantServiceInterface::class, function ($app) {
+            return new TenantService($app->make(TenantRepositoryInterface::class));
+        });
+
+        $this->app->bind(OrgUnitServiceInterface::class, function ($app) {
+            return new OrgUnitService($app->make(OrgUnitRepositoryInterface::class));
+        });
+
+        $this->mergeConfigFrom(__DIR__.'/../../config/tenant.php', 'tenant');
     }
 
     public function boot(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
-        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
+
+        $this->publishes([
+            __DIR__.'/../../config/tenant.php' => config_path('tenant.php'),
+        ], 'tenant-config');
+
+        $this->publishes([
+            __DIR__.'/../../database/migrations' => database_path('migrations'),
+        ], 'tenant-migrations');
     }
 }

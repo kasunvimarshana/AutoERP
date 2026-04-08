@@ -6,18 +6,20 @@ namespace Modules\Warehouse\Domain\Events;
 
 use Modules\Core\Domain\Events\BaseEvent;
 
-class WarehouseCreated extends BaseEvent
+final class WarehouseCreated extends BaseEvent
 {
-    public int $warehouseId;
-
-    public function __construct(int $tenantId, int $warehouseId)
-    {
-        parent::__construct($tenantId);
-        $this->warehouseId = $warehouseId;
+    public function __construct(
+        public readonly mixed $warehouse,
+        int $tenantId,
+        ?int $orgUnitId = null,
+    ) {
+        parent::__construct($tenantId, $orgUnitId);
     }
 
     public function broadcastWith(): array
     {
-        return array_merge(parent::broadcastWith(), ['warehouseId' => $this->warehouseId]);
+        return array_merge(parent::broadcastWith(), [
+            'warehouse_id' => is_object($this->warehouse) ? $this->warehouse->id : $this->warehouse,
+        ]);
     }
 }

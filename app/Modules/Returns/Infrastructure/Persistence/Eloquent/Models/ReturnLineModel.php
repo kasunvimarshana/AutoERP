@@ -1,27 +1,53 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Returns\Infrastructure\Persistence\Eloquent\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 
-class ReturnLineModel extends Model
+class ReturnLineModel extends BaseModel
 {
     protected $table = 'return_lines';
-    public $timestamps = false;
 
     protected $fillable = [
-        'return_request_id', 'product_id', 'quantity_returned', 'unit_price',
-        'batch_number', 'lot_number', 'serial_number', 'reason', 'condition',
-        'quality_status', 'restocked_to_warehouse_id', 'restocked_quantity',
+        'uuid',
+        'return_id',
+        'order_line_id',
+        'product_id',
+        'variant_id',
+        'batch_lot_id',
+        'serial_number_id',
+        'quantity_requested',
+        'quantity_approved',
+        'quantity_received',
+        'unit_price',
+        'subtotal',
+        'quality_check_result',
+        'quality_notes',
+        'condition_notes',
+        'restock_action',
     ];
 
     protected $casts = [
-        'id'                        => 'int',
-        'return_request_id'         => 'int',
-        'product_id'                => 'int',
-        'quantity_returned'         => 'float',
-        'unit_price'                => 'float',
-        'restocked_to_warehouse_id' => 'int',
-        'restocked_quantity'        => 'float',
+        'quantity_requested' => 'decimal:6',
+        'quantity_approved'  => 'decimal:6',
+        'quantity_received'  => 'decimal:6',
+        'unit_price'         => 'decimal:6',
+        'subtotal'           => 'decimal:6',
+        'created_at'         => 'datetime',
+        'updated_at'         => 'datetime',
     ];
+
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        static::creating(static function (self $model): void {
+            if (empty($model->uuid)) {
+                $model->uuid = (string) Str::uuid();
+            }
+        });
+    }
 }

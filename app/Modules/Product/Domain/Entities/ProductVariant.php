@@ -1,41 +1,35 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Product\Domain\Entities;
 
-/**
- * Represents a specific variant of a variable product.
- *
- * Example: "T-Shirt" (variable) → variants: {"size":"L","colour":"blue"}, {"size":"M","colour":"red"}
- */
-class ProductVariant
+final class ProductVariant
 {
     public function __construct(
-        private ?int $id,
-        private int $tenantId,
-        private int $productId,
-        private string $sku,
-        private array $attributes,      // e.g. ['size' => 'L', 'colour' => 'blue']
-        private ?float $priceOverride,
-        private ?float $costOverride,
-        private string $status,         // active | inactive
-        private ?\DateTimeInterface $createdAt,
-        private ?\DateTimeInterface $updatedAt,
+        public readonly int $id,
+        public readonly string $uuid,
+        public readonly int $tenantId,
+        public readonly int $productId,
+        public readonly string $sku,
+        public readonly array $attributeValues,
+        public readonly bool $isActive,
+        public readonly ?string $barcode = null,
+        public readonly ?string $name = null,
+        public readonly ?float $costPrice = null,
+        public readonly ?float $sellingPrice = null,
+        public readonly ?float $weight = null,
+        public readonly ?array $images = null,
+        public readonly ?array $metadata = null,
     ) {}
 
-    public function getId(): ?int { return $this->id; }
-    public function getTenantId(): int { return $this->tenantId; }
-    public function getProductId(): int { return $this->productId; }
-    public function getSku(): string { return $this->sku; }
-    public function getAttributes(): array { return $this->attributes; }
-    public function getPriceOverride(): ?float { return $this->priceOverride; }
-    public function getCostOverride(): ?float { return $this->costOverride; }
-    public function getStatus(): string { return $this->status; }
-    public function getCreatedAt(): ?\DateTimeInterface { return $this->createdAt; }
-    public function getUpdatedAt(): ?\DateTimeInterface { return $this->updatedAt; }
+    public function getEffectiveSellingPrice(float $parentSellingPrice): float
+    {
+        return $this->sellingPrice ?? $parentSellingPrice;
+    }
 
-    public function isActive(): bool { return $this->status === 'active'; }
-    public function activate(): void { $this->status = 'active'; }
-    public function deactivate(): void { $this->status = 'inactive'; }
-
-    public function updatePrice(float $price): void { $this->priceOverride = $price; }
+    public function getEffectiveCostPrice(float $parentCostPrice): float
+    {
+        return $this->costPrice ?? $parentCostPrice;
+    }
 }

@@ -1,12 +1,20 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Customer\Application\Contracts;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Modules\Customer\Domain\Entities\Customer;
-interface CustomerServiceInterface {
-    public function findById(int $id): Customer;
-    public function findByTenant(int $tenantId, int $perPage = 15, int $page = 1): LengthAwarePaginator;
-    public function create(array $data): Customer;
-    public function update(int $id, array $data): Customer;
+
+use Modules\Customer\Application\DTOs\CustomerData;
+
+interface CustomerServiceInterface
+{
+    public function create(CustomerData $dto, int $tenantId): mixed;
+
+    public function update(int $id, CustomerData $dto): mixed;
+
     public function delete(int $id): bool;
+
+    public function find(mixed $id): mixed;
+
+    public function list(array $filters = [], ?int $perPage = null): mixed;
 }

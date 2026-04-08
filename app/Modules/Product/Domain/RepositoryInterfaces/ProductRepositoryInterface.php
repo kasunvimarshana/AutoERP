@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace Modules\Product\Domain\RepositoryInterfaces;
 
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Modules\Product\Domain\Entities\Product;
+use Illuminate\Support\Collection;
+use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
 
-interface ProductRepositoryInterface
+interface ProductRepositoryInterface extends RepositoryInterface
 {
-    public function findById(int $id): ?Product;
-    public function findBySku(int $tenantId, string $sku): ?Product;
-    public function findByTenant(int $tenantId, array $filters = [], int $perPage = 15, int $page = 1): LengthAwarePaginator;
-    public function create(array $data): Product;
-    public function update(int $id, array $data): ?Product;
-    public function delete(int $id): bool;
+    public function findBySku(string $sku, int $tenantId): mixed;
+
+    public function findByBarcode(string $barcode, int $tenantId): mixed;
+
+    public function findByCategory(int $categoryId): Collection;
+
+    public function searchByName(string $query, int $tenantId): Collection;
+
+    public function findByTenant(int $tenantId, array $filters = []): mixed;
 }

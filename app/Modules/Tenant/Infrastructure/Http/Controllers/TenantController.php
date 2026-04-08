@@ -1,58 +1,108 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Tenant\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Routing\Controller;
-use Modules\Tenant\Application\Contracts\CreateTenantServiceInterface;
-use Modules\Tenant\Application\Contracts\DeleteTenantServiceInterface;
-use Modules\Tenant\Application\Contracts\GetTenantServiceInterface;
-use Modules\Tenant\Application\Contracts\UpdateTenantServiceInterface;
-use Modules\Tenant\Application\DTOs\CreateTenantData;
-use Modules\Tenant\Application\DTOs\UpdateTenantData;
+use Illuminate\Http\Resources\Json\ResourceCollection;
+use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
+use Modules\Tenant\Application\Contracts\TenantServiceInterface;
+use Modules\Tenant\Application\DTOs\TenantData;
+use Modules\Tenant\Infrastructure\Http\Requests\StoreTenantRequest;
+use Modules\Tenant\Infrastructure\Http\Requests\UpdateTenantRequest;
 use Modules\Tenant\Infrastructure\Http\Resources\TenantResource;
 
-class TenantController extends Controller
+/**
+ * @OA\Tag(name="Tenants", description="Tenant management endpoints")
+ */
+final class TenantController extends AuthorizedController
 {
-    public function __construct(
-        private readonly GetTenantServiceInterface $getService,
-        private readonly CreateTenantServiceInterface $createService,
-        private readonly UpdateTenantServiceInterface $updateService,
-        private readonly DeleteTenantServiceInterface $deleteService,
-    ) {}
+    public function __construct(private readonly TenantServiceInterface $service) {}
 
-    public function index(Request $request): JsonResponse
+    /**
+     * @OA\Get(
+     *     path="/api/tenants",
+     *     tags={"Tenants"},
+     *     summary="List all tenants",
+     *     @OA\Parameter(name="page", in="query", @OA\Schema(type="integer")),
+     *     @OA\Parameter(name="per_page", in="query", @OA\Schema(type="integer")),
+     *     @OA\Response(response=200, description="Paginated tenant list")
+     * )
+     */
+    public function index(): ResourceCollection
     {
-        $result = $this->getService->findAll(
-            (int) $request->get('per_page', 15),
-            (int) $request->get('page', 1)
-        );
-        return response()->json($result);
+        $paginated = $this->service->list();
+
+        return TenantResource::collection($paginated);
     }
 
-    public function show(int $id): JsonResponse
+    /**
+     * @OA\Post(
+     *     path="/api/tenants",
+     *     tags={"Tenants"},
+     *     summary="Create a new tenant",
+     *     @OA\RequestBody(required=true, @OA\JsonContent(ref="#/components/schemas/StoreTenantRequest")),
+     *     @OA\Response(response=201, description="Tenant created")
+     * )
+     */
+    public function store(StoreTenantRequest $request): JsonResponse
     {
-        return response()->json(new TenantResource($this->getService->findById($id)));
+        $dto = TenantData::fromArray($request->validated());
+        $tenant = $this->service->create($dto);
+
+        return (new TenantResource($tenant))
+            ->response()
+            ->setStatusCode(201);
     }
 
-    public function store(Request $request): JsonResponse
+    /**
+     * @OA\Get(
+     *     path="/api/tenants/{id}",
+     *     tags={"Tenants"},
+     *     summary="Get a tenant by ID",
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(response=200, description="Tenant details"),
+     *     @OA\Response(response=404, description="Not found")
+     * )
+     */
+    public function show(int $tenant): JsonResponse
     {
-        $data = CreateTenantData::fromArray($request->all());
-        $tenant = $this->createService->execute($data);
-        return response()->json(new TenantResource($tenant), 201);
+        $record = $this->service->find($tenant);
+
+        return (new TenantResource($record))->response();
     }
 
-    public function update(Request $request, int $id): JsonResponse
+    /**
+     * @OA\Put(
+     *     path="/api/tenants/{id}",
+     *     tags={"Tenants"},
+     *     summary="Update a tenant",
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\RequestBody(required=true, @OA\JsonContent(ref="#/components/schemas/UpdateTenantRequest")),
+     *     @OA\Response(response=200, description="Tenant updated")
+     * )
+     */
+    public function update(UpdateTenantRequest $request, int $tenant): JsonResponse
     {
-        $data = UpdateTenantData::fromArray($request->all());
-        $tenant = $this->updateService->execute($id, $data);
-        return response()->json(new TenantResource($tenant));
+        $record = $this->service->update($tenant, $request->validated());
+
+        return (new TenantResource($record))->response();
     }
 
-    public function destroy(int $id): JsonResponse
+    /**
+     * @OA\Delete(
+     *     path="/api/tenants/{id}",
+     *     tags={"Tenants"},
+     *     summary="Soft-delete a tenant",
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(response=204, description="Deleted")
+     * )
+     */
+    public function destroy(int $tenant): JsonResponse
     {
-        $this->deleteService->execute($id);
+        $this->service->delete($tenant);
+
         return response()->json(null, 204);
     }
 }

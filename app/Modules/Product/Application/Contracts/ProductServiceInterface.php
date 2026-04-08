@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Product\Application\Contracts;
 
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Modules\Product\Domain\Entities\Product;
+use Modules\Product\Application\DTOs\ProductData;
 
 interface ProductServiceInterface
 {
-    public function findById(int $id): Product;
-    public function findByTenant(int $tenantId, array $filters = [], int $perPage = 15, int $page = 1): LengthAwarePaginator;
-    public function create(array $data): Product;
-    public function update(int $id, array $data): Product;
-    public function delete(int $id): bool;
+    public function create(ProductData $dto): mixed;
+    public function findBySku(string $sku, int $tenantId): mixed;
+    public function findByBarcode(string $barcode, int $tenantId): mixed;
+    public function activate(int $id): mixed;
+    public function discontinue(int $id): mixed;
 }

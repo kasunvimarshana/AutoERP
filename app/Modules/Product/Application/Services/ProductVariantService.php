@@ -1,49 +1,34 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Product\Application\Services;
 
+use Illuminate\Support\Collection;
+use Modules\Core\Application\Services\BaseService;
 use Modules\Product\Application\Contracts\ProductVariantServiceInterface;
-use Modules\Product\Domain\Entities\ProductVariant;
-use Modules\Product\Domain\Exceptions\ProductNotFoundException;
-use Modules\Product\Domain\RepositoryInterfaces\ProductRepositoryInterface;
+use Modules\Product\Application\DTOs\ProductVariantData;
 use Modules\Product\Domain\RepositoryInterfaces\ProductVariantRepositoryInterface;
 
-class ProductVariantService implements ProductVariantServiceInterface
+class ProductVariantService extends BaseService implements ProductVariantServiceInterface
 {
-    public function __construct(
-        private readonly ProductVariantRepositoryInterface $variantRepo,
-        private readonly ProductRepositoryInterface $productRepo,
-    ) {}
-
-    public function listForProduct(int $tenantId, int $productId): array
+    public function __construct(ProductVariantRepositoryInterface $repository)
     {
-        return $this->variantRepo->findByProduct($tenantId, $productId);
+        parent::__construct($repository);
     }
 
-    public function create(int $tenantId, int $productId, array $data): ProductVariant
+    protected function handle(array $data): mixed
     {
-        $product = $this->productRepo->findById($productId);
-        if (!$product || $product->getTenantId() !== $tenantId) {
-            throw new ProductNotFoundException($productId);
-        }
-
-        return $this->variantRepo->create(array_merge($data, [
-            'tenant_id'  => $tenantId,
-            'product_id' => $productId,
-        ]));
+        return $this->repository->create($data);
     }
 
-    public function update(int $id, array $data): ProductVariant
+    public function create(ProductVariantData $dto): mixed
     {
-        $variant = $this->variantRepo->update($id, $data);
-        if (!$variant) {
-            throw new \DomainException("ProductVariant [{$id}] not found.");
-        }
-        return $variant;
+        return $this->execute($dto->toArray());
     }
 
-    public function delete(int $id): void
+    public function getByProduct(int $productId): Collection
     {
-        $this->variantRepo->delete($id);
+        return $this->repository->where('product_id', $productId)->get();
     }
 }

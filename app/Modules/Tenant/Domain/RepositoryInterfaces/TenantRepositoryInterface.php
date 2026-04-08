@@ -1,16 +1,20 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Tenant\Domain\RepositoryInterfaces;
 
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Modules\Tenant\Domain\Entities\Tenant;
+use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
 
-interface TenantRepositoryInterface
+interface TenantRepositoryInterface extends RepositoryInterface
 {
-    public function findById(int $id): ?Tenant;
-    public function findBySlug(string $slug): ?Tenant;
-    public function findAll(int $perPage = 15, int $page = 1): LengthAwarePaginator;
-    public function create(array $data): Tenant;
-    public function update(int $id, array $data): ?Tenant;
-    public function delete(int $id): bool;
+    /**
+     * Find a tenant by its slug.
+     */
+    public function findBySlug(string $slug): mixed;
+
+    /**
+     * Find a tenant by its custom domain.
+     */
+    public function findByDomain(string $domain): mixed;
 }

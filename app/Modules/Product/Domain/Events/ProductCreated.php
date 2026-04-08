@@ -4,20 +4,18 @@ declare(strict_types=1);
 
 namespace Modules\Product\Domain\Events;
 
-use Modules\Core\Domain\Events\BaseEvent;
+use Illuminate\Foundation\Events\Dispatchable;
+use Illuminate\Queue\SerializesModels;
 
-class ProductCreated extends BaseEvent
+final class ProductCreated
 {
-    public int $productId;
+    use Dispatchable, SerializesModels;
 
-    public function __construct(int $tenantId, int $productId)
-    {
-        parent::__construct($tenantId);
-        $this->productId = $productId;
-    }
-
-    public function broadcastWith(): array
-    {
-        return array_merge(parent::broadcastWith(), ['productId' => $this->productId]);
-    }
+    public function __construct(
+        public readonly int $productId,
+        public readonly string $productUuid,
+        public readonly int $tenantId,
+        public readonly string $sku,
+        public readonly string $type,
+    ) {}
 }

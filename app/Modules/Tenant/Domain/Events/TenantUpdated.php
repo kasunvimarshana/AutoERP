@@ -1,21 +1,18 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Tenant\Domain\Events;
 
-use Modules\Core\Domain\Events\BaseEvent;
+use Illuminate\Foundation\Events\Dispatchable;
+use Illuminate\Queue\SerializesModels;
 
-class TenantUpdated extends BaseEvent
+final class TenantUpdated
 {
-    public int $tenantEntityId;
+    use Dispatchable, SerializesModels;
 
-    public function __construct(int $tenantId, int $tenantEntityId)
-    {
-        parent::__construct($tenantId);
-        $this->tenantEntityId = $tenantEntityId;
-    }
-
-    public function broadcastWith(): array
-    {
-        return array_merge(parent::broadcastWith(), ['tenantEntityId' => $this->tenantEntityId]);
-    }
+    public function __construct(
+        public readonly int $tenantId,
+        public readonly array $changedFields,
+    ) {}
 }

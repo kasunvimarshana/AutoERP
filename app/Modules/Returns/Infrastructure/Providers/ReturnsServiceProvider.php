@@ -1,43 +1,61 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Returns\Infrastructure\Providers;
 
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
-use Modules\Returns\Application\Contracts\CompleteReturnServiceInterface;
-use Modules\Returns\Application\Contracts\ProcessReturnServiceInterface;
-use Modules\Returns\Application\Contracts\RestockReturnServiceInterface;
-use Modules\Returns\Application\Services\CompleteReturnService;
-use Modules\Returns\Application\Services\ProcessReturnService;
-use Modules\Returns\Application\Services\RestockReturnService;
-use Modules\Returns\Domain\RepositoryInterfaces\ReturnRequestRepositoryInterface;
-use Modules\Returns\Infrastructure\Persistence\Eloquent\Models\ReturnLineModel;
-use Modules\Returns\Infrastructure\Persistence\Eloquent\Models\ReturnRequestModel;
-use Modules\Returns\Infrastructure\Persistence\Eloquent\Repositories\EloquentReturnRequestRepository;
+use Modules\Returns\Application\Contracts\ReturnServiceInterface;
+use Modules\Returns\Application\Services\ReturnService;
+use Modules\Returns\Domain\RepositoryInterfaces\ReturnRepositoryInterface;
+use Modules\Returns\Infrastructure\Http\Controllers\ReturnController;
+use Modules\Returns\Infrastructure\Persistence\Eloquent\Models\ReturnModel;
+use Modules\Returns\Infrastructure\Persistence\Eloquent\Repositories\EloquentReturnRepository;
 
-class ReturnsServiceProvider extends ServiceProvider
+final class ReturnsServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->bind(ReturnRequestRepositoryInterface::class, fn($app) =>
-            new EloquentReturnRequestRepository(
-                $app->make(ReturnRequestModel::class),
-                $app->make(ReturnLineModel::class),
+        $this->app->bind(
+            ReturnRepositoryInterface::class,
+            static fn ($app) => new EloquentReturnRepository($app->make(ReturnModel::class))
+        );
+
+        $this->app->singleton(
+            ReturnServiceInterface::class,
+            static fn ($app) => new ReturnService(
+                $app->make(ReturnRepositoryInterface::class)
             )
         );
-        $this->app->bind(ProcessReturnServiceInterface::class, fn($app) =>
-            new ProcessReturnService($app->make(ReturnRequestRepositoryInterface::class))
-        );
-        $this->app->bind(RestockReturnServiceInterface::class, fn($app) =>
-            new RestockReturnService($app->make(ReturnRequestRepositoryInterface::class))
-        );
-        $this->app->bind(CompleteReturnServiceInterface::class, fn($app) =>
-            new CompleteReturnService($app->make(ReturnRequestRepositoryInterface::class))
-        );
+
+        $this->mergeConfigFrom(__DIR__ . '/../../config/returns.php', 'returns');
     }
 
     public function boot(): void
     {
-        $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
-        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
+        $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
+
+        $this->registerRoutes();
+
+        $this->publishes([
+            __DIR__ . '/../../config/returns.php' => config_path('returns.php'),
+        ], 'returns-config');
+
+        $this->publishes([
+            __DIR__ . '/../../database/migrations' => database_path('migrations'),
+        ], 'returns-migrations');
+    }
+
+    private function registerRoutes(): void
+    {
+        Route::middleware(['api', 'auth:api'])
+            ->prefix('api/return')
+            ->group(static function (): void {
+                Route::apiResource('returns', ReturnController::class);
+                Route::post('returns/{id}/approve', [ReturnController::class, 'approve']);
+                Route::post('returns/{id}/reject', [ReturnController::class, 'reject']);
+                Route::post('returns/{id}/process', [ReturnController::class, 'process']);
+            });
     }
 }

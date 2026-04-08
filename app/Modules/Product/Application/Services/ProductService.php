@@ -4,47 +4,52 @@ declare(strict_types=1);
 
 namespace Modules\Product\Application\Services;
 
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Str;
+use Modules\Core\Application\Services\BaseService;
 use Modules\Product\Application\Contracts\ProductServiceInterface;
-use Modules\Product\Domain\Entities\Product;
+use Modules\Product\Application\DTOs\ProductData;
 use Modules\Product\Domain\Events\ProductCreated;
-use Modules\Product\Domain\Exceptions\ProductNotFoundException;
 use Modules\Product\Domain\RepositoryInterfaces\ProductRepositoryInterface;
 
-class ProductService implements ProductServiceInterface
+class ProductService extends BaseService implements ProductServiceInterface
 {
-    public function __construct(private readonly ProductRepositoryInterface $repo) {}
-
-    public function findById(int $id): Product
+    public function __construct(ProductRepositoryInterface $repository)
     {
-        $p = $this->repo->findById($id);
-        if (!$p) throw new ProductNotFoundException($id);
-        return $p;
+        parent::__construct($repository);
     }
 
-    public function findByTenant(int $tenantId, array $filters = [], int $perPage = 15, int $page = 1): LengthAwarePaginator
+    protected function handle(array $data): mixed
     {
-        return $this->repo->findByTenant($tenantId, $filters, $perPage, $page);
+        if (empty($data['slug']) && ! empty($data['name'])) {
+            $data['slug'] = Str::slug($data['name']);
+        }
+        $product = $this->repository->create($data);
+        $this->addEvent(new ProductCreated((int) $product->id));
+        return $product;
     }
 
-    public function create(array $data): Product
+    public function create(ProductData $dto): mixed
     {
-        $p = $this->repo->create($data);
-        event(new ProductCreated($p->getTenantId(), $p->getId()));
-        return $p;
+        return $this->execute($dto->toArray());
     }
 
-    public function update(int $id, array $data): Product
+    public function findBySku(string $sku, int $tenantId): mixed
     {
-        $p = $this->repo->update($id, $data);
-        if (!$p) throw new ProductNotFoundException($id);
-        return $p;
+        return $this->repository->findBySku($sku, $tenantId);
     }
 
-    public function delete(int $id): bool
+    public function findByBarcode(string $barcode, int $tenantId): mixed
     {
-        $p = $this->repo->findById($id);
-        if (!$p) throw new ProductNotFoundException($id);
-        return $this->repo->delete($id);
+        return $this->repository->findByBarcode($barcode, $tenantId);
+    }
+
+    public function activate(int $id): mixed
+    {
+        return $this->update($id, ['status' => 'active']);
+    }
+
+    public function discontinue(int $id): mixed
+    {
+        return $this->update($id, ['status' => 'discontinued']);
     }
 }

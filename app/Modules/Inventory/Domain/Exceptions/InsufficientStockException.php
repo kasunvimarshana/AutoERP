@@ -6,12 +6,13 @@ namespace Modules\Inventory\Domain\Exceptions;
 
 use Modules\Core\Domain\Exceptions\DomainException;
 
-class InsufficientStockException extends DomainException
+final class InsufficientStockException extends DomainException
 {
-    public function __construct(int $productId, float $requested, float $available)
+    public function __construct(mixed $productId, float $requested, float $available)
     {
         parent::__construct(
-            "Insufficient stock for product [{$productId}]. Requested: {$requested}, Available: {$available}."
+            "Insufficient stock for product [{$productId}]: requested {$requested}, available {$available}.",
+            422
         );
     }
 }

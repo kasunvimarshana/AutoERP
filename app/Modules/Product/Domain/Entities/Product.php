@@ -4,58 +4,62 @@ declare(strict_types=1);
 
 namespace Modules\Product\Domain\Entities;
 
+use Modules\Product\Domain\ValueObjects\ProductStatus;
 use Modules\Product\Domain\ValueObjects\ProductType;
 
-class Product
+final class Product
 {
     public function __construct(
-        private ?int $id,
-        private int $tenantId,
-        private ?int $categoryId,
-        private string $name,
-        private string $slug,
-        private string $sku,
-        private ProductType $type,
-        private ?string $description,
-        private string $status,       // active|inactive|discontinued
-        private float $basePrice,
-        private float $taxRate,
-        private ?float $weight,
-        private string $unit,
-        private bool $isTrackable,
-        private bool $isSerialized,
-        private bool $isBatchTracked,
-        private ?float $minStockLevel,
-        private ?float $reorderPoint,
-        private ?array $metadata,
-        private ?\DateTimeInterface $createdAt,
-        private ?\DateTimeInterface $updatedAt,
+        public readonly int $id,
+        public readonly string $uuid,
+        public readonly int $tenantId,
+        public readonly string $sku,
+        public readonly string $name,
+        public readonly string $slug,
+        public readonly ProductType $type,
+        public readonly ProductStatus $status,
+        public readonly float $costPrice,
+        public readonly float $sellingPrice,
+        public readonly string $currency,
+        public readonly bool $isPurchasable,
+        public readonly bool $isSellable,
+        public readonly bool $isStockable,
+        public readonly bool $hasVariants,
+        public readonly bool $hasSerialTracking,
+        public readonly bool $hasBatchTracking,
+        public readonly bool $hasExpiryTracking,
+        public readonly ?int $categoryId = null,
+        public readonly ?int $unitOfMeasureId = null,
+        public readonly ?string $barcode = null,
+        public readonly ?string $shortDescription = null,
+        public readonly ?string $description = null,
+        public readonly ?float $minSellingPrice = null,
+        public readonly ?string $taxClass = null,
+        public readonly ?float $weight = null,
+        public readonly ?string $weightUnit = null,
+        public readonly ?array $dimensions = null,
+        public readonly ?array $images = null,
+        public readonly ?array $tags = null,
+        public readonly ?array $metadata = null,
     ) {}
 
-    public function getId(): ?int { return $this->id; }
-    public function getTenantId(): int { return $this->tenantId; }
-    public function getCategoryId(): ?int { return $this->categoryId; }
-    public function getName(): string { return $this->name; }
-    public function getSlug(): string { return $this->slug; }
-    public function getSku(): string { return $this->sku; }
-    public function getType(): ProductType { return $this->type; }
-    public function getDescription(): ?string { return $this->description; }
-    public function getStatus(): string { return $this->status; }
-    public function getBasePrice(): float { return $this->basePrice; }
-    public function getTaxRate(): float { return $this->taxRate; }
-    public function getWeight(): ?float { return $this->weight; }
-    public function getUnit(): string { return $this->unit; }
-    public function isTrackable(): bool { return $this->isTrackable; }
-    public function isSerialized(): bool { return $this->isSerialized; }
-    public function isBatchTracked(): bool { return $this->isBatchTracked; }
-    public function getMinStockLevel(): ?float { return $this->minStockLevel; }
-    public function getReorderPoint(): ?float { return $this->reorderPoint; }
-    public function getMetadata(): ?array { return $this->metadata; }
-    public function getCreatedAt(): ?\DateTimeInterface { return $this->createdAt; }
-    public function getUpdatedAt(): ?\DateTimeInterface { return $this->updatedAt; }
-    public function isActive(): bool { return $this->status === 'active'; }
-    public function activate(): void { $this->status = 'active'; }
-    public function deactivate(): void { $this->status = 'inactive'; }
-    public function discontinue(): void { $this->status = 'discontinued'; }
-    public function updatePrice(float $price): void { $this->basePrice = $price; }
+    public function isAvailableForSale(): bool
+    {
+        return $this->status->isActive() && $this->isSellable;
+    }
+
+    public function isAvailableForPurchase(): bool
+    {
+        return $this->status->isActive() && $this->isPurchasable;
+    }
+
+    public function isTrackedInStock(): bool
+    {
+        return $this->type->isStockable() && $this->isStockable;
+    }
+
+    public function needsVariantSelection(): bool
+    {
+        return $this->type->requiresVariants() && $this->hasVariants;
+    }
 }
