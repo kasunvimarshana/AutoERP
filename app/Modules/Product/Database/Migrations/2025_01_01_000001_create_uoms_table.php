@@ -19,6 +19,9 @@ class CreateUomsTable extends Migration
             $table->uuid('base_uom_id')->nullable();
             $table->decimal('conversion_factor', 20, 10)->default(1);
             $table->boolean('is_active')->default(true);
+            // $table->enum('type', ['reference', 'bigger', 'smaller'])->default('reference');
+            // $table->decimal('ratio', 15, 4)->default(1);
+            // $table->foreignId('category_id')->constrained('uom_categories'); // e.g., weight, length
             $table->timestamps();
             
             $table->foreign('base_uom_id')->references('id')->on('uoms');
