@@ -2,81 +2,51 @@
 
 namespace App\Modules\Product\Models;
 
-use BaseModel;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
+use App\Modules\Common\Traits\UuidTrait;
+use App\Modules\Common\Traits\AuditableTrait;
+use Illuminate\Database\Eloquent\Model;
 
-class Product extends BaseModel
+class Product extends Model
 {
-    protected $table = 'products';
+    use UuidTrait, AuditableTrait;
 
     protected $fillable = [
-        'tenant_id',
-        'category_id',
-        'brand_id',
-        'sku',
-        'name',
-        'description',
-        'type',
-        'base_uom_id',
-        'purchase_uom_id',
-        'sales_uom_id',
-        'track_inventory',
-        'track_batch',
-        'track_serial',
-        'has_expiry',
-        'min_stock_level',
-        'reorder_point',
-        'valuation_method',
-        'inventory_account_id',
-        'cogs_account_id',
-        'income_account_id',
-        'is_active',
-        'metadata',
-        'created_at',
-        'updated_at'
+        'type', 'sku', 'name', 'description', 'is_variable', 'parent_id',
+        'uom_id', 'valuation_method', 'stock_rotation_strategy', 'allocation_algorithm',
+        'created_by', 'updated_by'
     ];
 
     protected $casts = [
-        'track_inventory' => 'boolean',
-        'track_batch' => 'boolean',
-        'track_serial' => 'boolean',
-        'has_expiry' => 'boolean',
-        'is_active' => 'boolean',
-        'metadata' => 'array',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime'
+        'is_variable' => 'boolean',
     ];
 
-    public function tenant(): BelongsTo
+    public function parent()
     {
-        return $this->belongsTo(\App\Modules\Core\Models\Tenant::class, 'tenant_id');
+        return $this->belongsTo(Product::class, 'parent_id');
     }
 
-    public function category(): BelongsTo
+    public function variants()
     {
-        return $this->belongsTo(\App\Modules\Product\Models\Category::class, 'category_id');
+        return $this->hasMany(ProductVariant::class);
     }
 
-    public function brand(): BelongsTo
+    public function uom()
     {
-        return $this->belongsTo(\App\Modules\Product\Models\Brand::class, 'brand_id');
+        return $this->belongsTo(Uom::class);
     }
 
-    public function baseUom(): BelongsTo
+    public function productUoms()
     {
-        return $this->belongsTo(\App\Modules\Product\Models\UnitOfMeasure::class, 'base_uom_id');
+        return $this->hasMany(ProductUom::class);
     }
 
-    public function purchaseUom(): BelongsTo
+    public function bundles()
     {
-        return $this->belongsTo(\App\Modules\Product\Models\UnitOfMeasure::class, 'purchase_uom_id');
+        return $this->hasMany(ProductBundle::class, 'combo_product_id');
     }
 
-    public function salesUom(): BelongsTo
+    public function componentOf()
     {
-        return $this->belongsTo(\App\Modules\Product\Models\UnitOfMeasure::class, 'sales_uom_id');
+        return $this->hasMany(ProductBundle::class, 'component_product_id');
     }
 }

@@ -2,41 +2,22 @@
 
 namespace App\Modules\Warehouse\Models;
 
-use BaseModel;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
+use App\Modules\Common\Traits\UuidTrait;
+use Illuminate\Database\Eloquent\Model;
 
-class Warehouse extends BaseModel
+class Warehouse extends Model
 {
-    protected $table = 'warehouses';
+    use UuidTrait;
 
-    protected $fillable = [
-        'tenant_id',
-        'org_unit_id',
-        'code',
-        'name',
-        'type',
-        'address_line1',
-        'city',
-        'country_code',
-        'is_active',
-        'metadata'
-    ];
+    protected $fillable = ['code', 'name', 'address', 'is_active'];
 
     protected $casts = [
+        'address' => 'array',
         'is_active' => 'boolean',
-        'metadata' => 'array'
     ];
 
-    public function tenant(): BelongsTo
+    public function locations()
     {
-        return $this->belongsTo(\App\Modules\Core\Models\Tenant::class, 'tenant_id');
-    }
-
-    public function orgUnit(): BelongsTo
-    {
-        return $this->belongsTo(\App\Modules\Core\Models\Organization::class, 'org_unit_id');
+        return $this->hasMany(Location::class);
     }
 }
