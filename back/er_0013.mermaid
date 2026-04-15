@@ -1,0 +1,38 @@
+erDiagram
+    TENANT ||--o{ ORGANIZATION_UNIT : has
+    ORGANIZATION_UNIT ||--o{ WAREHOUSE : manages
+    ORGANIZATION_UNIT ||--o{ ACCOUNT : owns
+    ORGANIZATION_UNIT ||--o{ FISCAL_PERIOD : defines
+
+    PARTY ||--o{ SALE_ORDER : places
+    PARTY ||--o{ PURCHASE_ORDER : supplies
+    PARTY ||--o{ PARTY_CONTACT : has
+
+    PRODUCT ||--o{ PRODUCT_VARIANT : defines
+    PRODUCT_VARIANT ||--o{ STOCK_ITEM : tracks
+    PRODUCT_VARIANT ||--o{ PRICE_LIST_ITEM : priced_as
+
+    WAREHOUSE ||--o{ WAREHOUSE_LOCATION : contains
+    WAREHOUSE_LOCATION ||--o{ STOCK_ITEM : holds
+
+    PURCHASE_ORDER ||--o{ GOODS_RECEIPT : receives
+    PURCHASE_ORDER ||--o{ PURCHASE_INVOICE : billed_by
+    GOODS_RECEIPT ||--o{ STOCK_MOVEMENT : triggers_inbound
+
+    SALE_ORDER ||--o{ SHIPMENT : fulfills
+    SALE_ORDER ||--o{ SALE_INVOICE : bills
+    SHIPMENT ||--o{ STOCK_MOVEMENT : triggers_outbound
+
+    RETURN_ORDER ||--o{ STOCK_MOVEMENT : triggers_return
+    RETURN_ORDER ||--o{ CREDIT_MEMO : generates
+
+    STOCK_MOVEMENT }o--|| STOCK_ITEM : modifies
+
+    JOURNAL_ENTRY ||--o{ JOURNAL_ENTRY_LINE : contains
+    ACCOUNT ||--o{ JOURNAL_ENTRY_LINE : categorizes
+    FISCAL_PERIOD ||--o{ JOURNAL_ENTRY : closes
+
+    AIDC_MASTER ||--o{ AIDC_IDENTIFIER : has
+    PRODUCT_VARIANT ||--o{ AIDC_MASTER : "polymorphic target"
+    STOCK_ITEM ||--o{ AIDC_MASTER : "polymorphic target"
+    WAREHOUSE_LOCATION ||--o{ AIDC_MASTER : "polymorphic target"
