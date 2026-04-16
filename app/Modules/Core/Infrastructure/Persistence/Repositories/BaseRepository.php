@@ -200,11 +200,35 @@ abstract class BaseRepository implements RepositoryInterface
     /**
      * {@inheritdoc}
      */
+    public function resetCriteria(): static
+    {
+        $this->with = [];
+        $this->wheres = [];
+        $this->whereIns = [];
+        $this->whereBetweens = [];
+        $this->whereNulls = [];
+        $this->orders = [];
+        $this->orderByRaw = [];
+        $this->limit = null;
+        $this->offset = null;
+
+        $this->resetProvider();
+
+        return $this;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
     public function find($id, array $columns = ['*'])
     {
-        $this->applyCriteria();
+        try {
+            $this->applyCriteria();
 
-        return $this->mapToDomainEntity($this->provider->find($id, $columns));
+            return $this->mapToDomainEntity($this->provider->find($id, $columns));
+        } finally {
+            $this->resetCriteria();
+        }
     }
 
     /**
@@ -212,9 +236,13 @@ abstract class BaseRepository implements RepositoryInterface
      */
     public function get(array $columns = ['*']): Collection
     {
-        $this->applyCriteria();
+        try {
+            $this->applyCriteria();
 
-        return $this->mapCollectionToDomainEntities($this->provider->get($columns));
+            return $this->mapCollectionToDomainEntities($this->provider->get($columns));
+        } finally {
+            $this->resetCriteria();
+        }
     }
 
     /**
@@ -226,11 +254,15 @@ abstract class BaseRepository implements RepositoryInterface
         $pageName = $pageName ?? config('core.pagination.page_name', 'page');
 
         $page = $page ?: Paginator::resolveCurrentPage($pageName);
-        $this->applyCriteria();
+        try {
+            $this->applyCriteria();
 
-        return $this->mapPaginatorToDomainEntities(
-            $this->provider->paginate($perPage, $columns, $pageName, $page)
-        );
+            return $this->mapPaginatorToDomainEntities(
+                $this->provider->paginate($perPage, $columns, $pageName, $page)
+            );
+        } finally {
+            $this->resetCriteria();
+        }
     }
 
     /**

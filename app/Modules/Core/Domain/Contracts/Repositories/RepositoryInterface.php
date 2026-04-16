@@ -93,4 +93,9 @@ interface RepositoryInterface
      * Set the offset.
      */
     public function offset(int $offset): static;
+
+    /**
+     * Reset accumulated query criteria on the repository instance.
+     */
+    public function resetCriteria(): static;
 }

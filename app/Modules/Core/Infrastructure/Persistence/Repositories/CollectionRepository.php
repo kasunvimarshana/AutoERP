@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Infrastructure\Persistence\Repositories;
 
-use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\LengthAwarePaginator as LaravelLengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Collection;
 
@@ -23,13 +24,17 @@ class CollectionRepository extends BaseRepository
      */
     public function find($id, array $columns = ['*'])
     {
-        $this->applyCriteria();
-        $item = $this->provider->firstWhere('id', $id);
-        if ($item && $columns !== ['*']) {
-            return $this->mapToDomainEntity(collect($item)->only($columns)->all());
-        }
+        try {
+            $this->applyCriteria();
+            $item = $this->provider->firstWhere('id', $id);
+            if ($item && $columns !== ['*']) {
+                return $this->mapToDomainEntity(collect($item)->only($columns)->all());
+            }
 
-        return $this->mapToDomainEntity($item);
+            return $this->mapToDomainEntity($item);
+        } finally {
+            $this->resetCriteria();
+        }
     }
 
     /**
@@ -37,14 +42,18 @@ class CollectionRepository extends BaseRepository
      */
     public function get(array $columns = ['*']): Collection
     {
-        $this->applyCriteria();
-        if ($columns === ['*']) {
-            return $this->mapCollectionToDomainEntities($this->provider);
-        }
+        try {
+            $this->applyCriteria();
+            if ($columns === ['*']) {
+                return $this->mapCollectionToDomainEntities($this->provider);
+            }
 
-        return $this->mapCollectionToDomainEntities(
-            $this->provider->map(fn ($item) => collect($item)->only($columns)->all())
-        );
+            return $this->mapCollectionToDomainEntities(
+                $this->provider->map(fn ($item) => collect($item)->only($columns)->all())
+            );
+        } finally {
+            $this->resetCriteria();
+        }
     }
 
     /**
@@ -56,22 +65,26 @@ class CollectionRepository extends BaseRepository
         $pageName = $pageName ?? config('core.pagination.page_name', 'page');
 
         $page = $page ?: Paginator::resolveCurrentPage($pageName);
-        $this->applyCriteria();
-        $total = $this->provider->count();
-        $items = $this->provider->slice(($page - 1) * $perPage, $perPage)->values();
-        if ($columns !== ['*']) {
-            $items = $items->map(fn ($item) => collect($item)->only($columns)->all());
+        try {
+            $this->applyCriteria();
+            $total = $this->provider->count();
+            $items = $this->provider->slice(($page - 1) * $perPage, $perPage)->values();
+            if ($columns !== ['*']) {
+                $items = $items->map(fn ($item) => collect($item)->only($columns)->all());
+            }
+
+            $paginator = new LaravelLengthAwarePaginator(
+                $items,
+                $total,
+                $perPage,
+                $page,
+                ['path' => Paginator::resolveCurrentPath(), 'pageName' => $pageName]
+            );
+
+            return $this->mapPaginatorToDomainEntities($paginator);
+        } finally {
+            $this->resetCriteria();
         }
-
-        $paginator = new LengthAwarePaginator(
-            $items,
-            $total,
-            $perPage,
-            $page,
-            ['path' => Paginator::resolveCurrentPath(), 'pageName' => $pageName]
-        );
-
-        return $this->mapPaginatorToDomainEntities($paginator);
     }
 
     /**

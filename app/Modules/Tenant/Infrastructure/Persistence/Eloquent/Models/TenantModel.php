@@ -8,6 +8,28 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 
+/**
+ * @property int $id
+ * @property string $name
+ * @property string $slug
+ * @property string|null $domain
+ * @property string|null $logo_path
+ * @property array|null $database_config
+ * @property array|null $mail_config
+ * @property array|null $cache_config
+ * @property array|null $queue_config
+ * @property array|null $feature_flags
+ * @property array|null $api_keys
+ * @property array|null $settings
+ * @property string $plan
+ * @property int|null $tenant_plan_id
+ * @property string $status
+ * @property bool $active
+ * @property \Illuminate\Support\Carbon|null $trial_ends_at
+ * @property \Illuminate\Support\Carbon|null $subscription_ends_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ */
 class TenantModel extends Model
 {
     use HasAudit, SoftDeletes;
@@ -58,5 +80,15 @@ class TenantModel extends Model
     public function attachments()
     {
         return $this->hasMany(TenantAttachmentModel::class, 'tenant_id');
+    }
+
+    public function tenantPlan()
+    {
+        return $this->belongsTo(TenantPlanModel::class, 'tenant_plan_id');
+    }
+
+    public function settingsItems()
+    {
+        return $this->hasMany(TenantSettingModel::class, 'tenant_id');
     }
 }

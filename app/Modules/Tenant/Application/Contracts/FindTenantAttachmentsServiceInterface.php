@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Application\Contracts;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Modules\Tenant\Domain\Entities\TenantAttachment;
 
@@ -23,6 +24,8 @@ interface FindTenantAttachmentsServiceInterface
      * @return Collection<int, TenantAttachment>
      */
     public function findByTenant(int $tenantId, ?string $type = null): Collection;
+
+    public function paginateByTenant(int $tenantId, ?string $type, int $perPage, int $page): LengthAwarePaginator;
 
     /**
      * Find a single attachment by its UUID.

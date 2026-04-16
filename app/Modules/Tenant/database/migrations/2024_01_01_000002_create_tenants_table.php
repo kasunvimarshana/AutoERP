@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -22,7 +24,11 @@ return new class extends Migration
             $table->json('api_keys')->nullable();
             $table->json('settings')->nullable();
             $table->string('plan')->default('free');
-            $table->foreignId('tenant_plan_id')->nullable()->constrained('tenant_plans')->nullOnDelete();
+            $table->foreignId('tenant_plan_id')->nullable();
+            $table->foreign('tenant_plan_id', 'tenants_tenant_plan_id_fk')
+                ->references('id')
+                ->on('tenant_plans')
+                ->nullOnDelete();
             $table->enum('status', ['active', 'suspended', 'pending', 'cancelled'])
                 ->default('active')
                 ->index('idx_tenants_status');

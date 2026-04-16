@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -11,7 +13,7 @@ return new class extends Migration
         Schema::create('tenant_plans', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('slug', 127)->unique('tenant_plans_slug_uq')->index('idx_tenant_plans_slug');
+            $table->string('slug', 127)->unique('tenant_plans_slug_uq');
             $table->json('features')->nullable();
             $table->json('limits')->nullable();
             $table->decimal('price', 15, 4)->default(0);

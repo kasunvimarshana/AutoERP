@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -24,7 +26,6 @@ return new class extends Migration
             // Composite indexes for common query patterns
             $table->index(['tenant_id', 'type'], 'idx_tenant_attachments_tenant_type');
             $table->index(['tenant_id', 'created_at'], 'idx_tenant_attachments_tenant_date');
-            $table->index(['uuid'], 'idx_tenant_attachments_uuid');
         });
     }
 

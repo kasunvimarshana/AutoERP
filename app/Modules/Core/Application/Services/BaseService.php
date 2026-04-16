@@ -75,7 +75,7 @@ abstract class BaseService implements ServiceInterface
         $perPage = $perPage ?? config('core.pagination.per_page', 15);
         $pageName = config('core.pagination.page_name', 'page');
 
-        $repo = clone $this->repository;
+        $repo = $this->repository->resetCriteria();
 
         foreach ($filters as $field => $value) {
             if (is_string($value) && str_contains($value, '%')) {

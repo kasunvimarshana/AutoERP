@@ -18,7 +18,7 @@ class ListUsers
 
     public function execute(array $filters, int $perPage, int $page): LengthAwarePaginator
     {
-        $repo = clone $this->userRepo;
+        $repo = $this->userRepo->resetCriteria();
         foreach ($filters as $field => $value) {
             if (in_array($field, self::ALLOWED_FILTERS, true)) {
                 $repo->where($field, $value);

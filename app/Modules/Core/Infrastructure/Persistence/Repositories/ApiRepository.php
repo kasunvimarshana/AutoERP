@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Modules\Core\Infrastructure\Persistence\Repositories;
 
 use Illuminate\Http\Client\PendingRequest;
-use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\LengthAwarePaginator as LaravelLengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Collection;
 
@@ -30,12 +31,16 @@ class ApiRepository extends BaseRepository
      */
     public function find($id, array $columns = ['*'])
     {
-        $params = $this->buildQueryParams($columns);
-        $response = $this->http->get("{$this->endpoint}/{$id}", $params);
+        try {
+            $params = $this->buildQueryParams($columns);
+            $response = $this->http->get("{$this->endpoint}/{$id}", $params);
 
-        return $response->successful()
-            ? $this->mapToDomainEntity($response->json('data'))
-            : null;
+            return $response->successful()
+                ? $this->mapToDomainEntity($response->json('data'))
+                : null;
+        } finally {
+            $this->resetCriteria();
+        }
     }
 
     /**
@@ -43,12 +48,16 @@ class ApiRepository extends BaseRepository
      */
     public function get(array $columns = ['*']): Collection
     {
-        $params = $this->buildQueryParams($columns);
-        $response = $this->http->get($this->endpoint, $params);
+        try {
+            $params = $this->buildQueryParams($columns);
+            $response = $this->http->get($this->endpoint, $params);
 
-        $items = $response->successful() ? new Collection($response->json('data') ?? []) : new Collection;
+            $items = $response->successful() ? new Collection($response->json('data') ?? []) : new Collection;
 
-        return $this->mapCollectionToDomainEntities($items);
+            return $this->mapCollectionToDomainEntities($items);
+        } finally {
+            $this->resetCriteria();
+        }
     }
 
     /**
@@ -60,28 +69,32 @@ class ApiRepository extends BaseRepository
         $pageName = $pageName ?? config('core.pagination.page_name', 'page');
 
         $page = $page ?: Paginator::resolveCurrentPage($pageName);
-        $params = array_merge($this->buildQueryParams($columns), [
-            'per_page' => $perPage,
-            $pageName => $page,
-        ]);
+        try {
+            $params = array_merge($this->buildQueryParams($columns), [
+                'per_page' => $perPage,
+                $pageName => $page,
+            ]);
 
-        $response = $this->http->get($this->endpoint, $params);
-        $data = $response->json();
+            $response = $this->http->get($this->endpoint, $params);
+            $data = $response->json();
 
-        $items = new Collection($data['data'] ?? []);
-        $total = $data['meta']['total'] ?? 0;
-        $perPage = $data['meta']['per_page'] ?? $perPage;
-        $currentPage = $data['meta']['current_page'] ?? $page;
+            $items = new Collection($data['data'] ?? []);
+            $total = $data['meta']['total'] ?? 0;
+            $perPage = $data['meta']['per_page'] ?? $perPage;
+            $currentPage = $data['meta']['current_page'] ?? $page;
 
-        $paginator = new LengthAwarePaginator(
-            $items,
-            $total,
-            $perPage,
-            $currentPage,
-            ['path' => Paginator::resolveCurrentPath(), 'pageName' => $pageName]
-        );
+            $paginator = new LaravelLengthAwarePaginator(
+                $items,
+                $total,
+                $perPage,
+                $currentPage,
+                ['path' => Paginator::resolveCurrentPath(), 'pageName' => $pageName]
+            );
 
-        return $this->mapPaginatorToDomainEntities($paginator);
+            return $this->mapPaginatorToDomainEntities($paginator);
+        } finally {
+            $this->resetCriteria();
+        }
     }
 
     /**

@@ -5,54 +5,67 @@ declare(strict_types=1);
 namespace Modules\Tenant\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
-use Modules\Core\Domain\ValueObjects\ApiKeys;
-use Modules\Core\Domain\ValueObjects\CacheConfig;
-use Modules\Core\Domain\ValueObjects\DatabaseConfig;
-use Modules\Core\Domain\ValueObjects\FeatureFlags;
-use Modules\Core\Domain\ValueObjects\MailConfig;
-use Modules\Core\Domain\ValueObjects\QueueConfig;
 use Modules\Tenant\Application\Contracts\CreateTenantServiceInterface;
 use Modules\Tenant\Application\DTOs\TenantData;
+use Modules\Tenant\Application\Factories\TenantConfigValueObjectFactory;
 use Modules\Tenant\Domain\Entities\Tenant;
 use Modules\Tenant\Domain\Events\TenantCreated;
 use Modules\Tenant\Domain\RepositoryInterfaces\TenantRepositoryInterface;
 
 class CreateTenantService extends BaseService implements CreateTenantServiceInterface
 {
-    private TenantRepositoryInterface $tenantRepository;
-
-    public function __construct(TenantRepositoryInterface $repository)
+    public function __construct(
+        private readonly TenantRepositoryInterface $tenantRepository,
+        private readonly TenantConfigValueObjectFactory $valueObjectFactory
+    )
     {
-        parent::__construct($repository);
-        $this->tenantRepository = $repository;
+        parent::__construct($tenantRepository);
     }
 
     protected function handle(array $data): Tenant
     {
         $dto = TenantData::fromArray($data);
 
-        $databaseConfig = DatabaseConfig::fromArray($dto->database_config ?? []);
-        $mailConfig = ! empty($dto->mail_config) ? MailConfig::fromArray($dto->mail_config) : null;
-        $cacheConfig = ! empty($dto->cache_config) ? CacheConfig::fromArray($dto->cache_config) : null;
-        $queueConfig = ! empty($dto->queue_config) ? QueueConfig::fromArray($dto->queue_config) : null;
-        $featureFlags = new FeatureFlags($dto->feature_flags ?? []);
-        $apiKeys = new ApiKeys($dto->api_keys ?? []);
+        $payload = $dto->toArray();
+        $databaseConfig = $this->valueObjectFactory->databaseConfig($payload);
+        $mailConfig = $this->valueObjectFactory->mailConfig($payload);
+        $cacheConfig = $this->valueObjectFactory->cacheConfig($payload);
+        $queueConfig = $this->valueObjectFactory->queueConfig($payload);
+        $featureFlags = $this->valueObjectFactory->featureFlags($payload);
+        $apiKeys = $this->valueObjectFactory->apiKeys($payload);
 
         $tenant = new Tenant(
             name: $dto->name,
+            slug: $dto->slug,
             domain: $dto->domain,
+            logoPath: $dto->logo_path,
             databaseConfig: $databaseConfig,
             mailConfig: $mailConfig,
             cacheConfig: $cacheConfig,
             queueConfig: $queueConfig,
             featureFlags: $featureFlags,
             apiKeys: $apiKeys,
-            active: $dto->active ?? true
+            settings: $dto->settings,
+            plan: $dto->plan,
+            tenantPlanId: $dto->tenant_plan_id,
+            status: $dto->status,
+            trialEndsAt: $this->parseDateTime($dto->trial_ends_at),
+            subscriptionEndsAt: $this->parseDateTime($dto->subscription_ends_at),
+            active: $dto->active
         );
 
         $saved = $this->tenantRepository->save($tenant);
         $this->addEvent(new TenantCreated($saved));
 
         return $saved;
+    }
+
+    private function parseDateTime(?string $value): ?\DateTimeInterface
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return new \DateTimeImmutable($value);
     }
 }

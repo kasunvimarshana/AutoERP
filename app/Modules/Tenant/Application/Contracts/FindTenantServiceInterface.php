@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Application\Contracts;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Modules\Tenant\Domain\Entities\Tenant;
 
 /**
@@ -17,4 +18,9 @@ interface FindTenantServiceInterface
     public function find(int $id): ?Tenant;
 
     public function findByDomain(string $domain): ?Tenant;
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    public function list(array $filters, int $perPage, int $page, ?string $sort = null, ?string $include = null): LengthAwarePaginator;
 }

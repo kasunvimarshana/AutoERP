@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Modules\Core\Domain\ValueObjects\ApiKeys;
 use Modules\Core\Domain\ValueObjects\CacheConfig;
 use Modules\Core\Domain\ValueObjects\DatabaseConfig;
@@ -35,6 +34,7 @@ class EloquentTenantRepository extends EloquentRepository implements TenantRepos
     {
         $data = [
             'name' => $tenant->getName(),
+            'slug' => $tenant->getSlug(),
             'domain' => $tenant->getDomain(),
             'logo_path' => $tenant->getLogoPath(),
             'database_config' => $tenant->getDatabaseConfig()->toArray(),
@@ -43,6 +43,12 @@ class EloquentTenantRepository extends EloquentRepository implements TenantRepos
             'queue_config' => $tenant->getQueueConfig()?->toArray(),
             'feature_flags' => $tenant->getFeatureFlags()->toArray(),
             'api_keys' => $tenant->getApiKeys()->toArray(),
+            'settings' => $tenant->getSettings(),
+            'plan' => $tenant->getPlan(),
+            'tenant_plan_id' => $tenant->getTenantPlanId(),
+            'status' => $tenant->getStatus(),
+            'trial_ends_at' => $tenant->getTrialEndsAt(),
+            'subscription_ends_at' => $tenant->getSubscriptionEndsAt(),
             'active' => $tenant->isActive(),
         ];
 
@@ -72,20 +78,11 @@ class EloquentTenantRepository extends EloquentRepository implements TenantRepos
         return parent::find($id, $columns);
     }
 
-    /**
-     * Paginate tenants and convert each row to a domain entity.
-     *
-     * {@inheritdoc}
-     */
-    public function paginate(?int $perPage = null, array $columns = ['*'], ?string $pageName = null, ?int $page = null): LengthAwarePaginator
-    {
-        return parent::paginate($perPage, $columns, $pageName, $page);
-    }
-
     private function mapModelToDomainEntity(TenantModel $model): Tenant
     {
         return new Tenant(
             name: $model->name,
+            slug: $model->slug,
             databaseConfig: DatabaseConfig::fromArray($model->database_config ?? []),
             domain: $model->domain,
             logoPath: $model->logo_path,
@@ -94,6 +91,12 @@ class EloquentTenantRepository extends EloquentRepository implements TenantRepos
             queueConfig: ! empty($model->queue_config) ? QueueConfig::fromArray($model->queue_config) : null,
             featureFlags: new FeatureFlags($model->feature_flags ?? []),
             apiKeys: new ApiKeys($model->api_keys ?? []),
+            settings: $model->settings,
+            plan: $model->plan ?? 'free',
+            tenantPlanId: $model->tenant_plan_id,
+            status: $model->status ?? 'active',
+            trialEndsAt: $model->trial_ends_at,
+            subscriptionEndsAt: $model->subscription_ends_at,
             active: (bool) $model->active,
             id: $model->id,
             createdAt: $model->created_at,

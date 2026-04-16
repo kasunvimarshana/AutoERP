@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Application\Services;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Modules\Tenant\Application\Contracts\FindTenantAttachmentsServiceInterface;
 use Modules\Tenant\Domain\Entities\TenantAttachment;
@@ -28,6 +29,21 @@ class FindTenantAttachmentsService implements FindTenantAttachmentsServiceInterf
     public function findByTenant(int $tenantId, ?string $type = null): Collection
     {
         return $this->attachmentRepository->getByTenant($tenantId, $type);
+    }
+
+    public function paginateByTenant(int $tenantId, ?string $type, int $perPage, int $page): LengthAwarePaginator
+    {
+        $repository = $this->attachmentRepository
+            ->resetCriteria()
+            ->where('tenant_id', $tenantId);
+
+        if ($type !== null && $type !== '') {
+            $repository->where('type', $type);
+        }
+
+        return $repository
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage, ['*'], 'page', $page);
     }
 
     public function findByUuid(string $uuid): ?TenantAttachment

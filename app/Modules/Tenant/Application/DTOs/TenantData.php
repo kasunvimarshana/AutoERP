@@ -37,37 +37,37 @@ class TenantData extends BaseDto
     /**
      * Path to logo file (optional).
      */
-    public ?string $logoPath = null;
+    public ?string $logo_path = null;
 
     /**
      * Database connection configuration (required).
      */
-    public array $databaseConfig = [];
+    public array $database_config = [];
 
     /**
      * Mail service configuration (optional).
      */
-    public ?array $mailConfig = null;
+    public ?array $mail_config = null;
 
     /**
      * Cache store configuration (optional).
      */
-    public ?array $cacheConfig = null;
+    public ?array $cache_config = null;
 
     /**
      * Queue driver configuration (optional).
      */
-    public ?array $queueConfig = null;
+    public ?array $queue_config = null;
 
     /**
      * Feature flags for capability toggling (optional).
      */
-    public ?array $featureFlags = null;
+    public ?array $feature_flags = null;
 
     /**
      * API keys for third-party integrations (optional).
      */
-    public ?array $apiKeys = null;
+    public ?array $api_keys = null;
 
     /**
      * Miscellaneous tenant settings (optional).
@@ -75,14 +75,14 @@ class TenantData extends BaseDto
     public ?array $settings = null;
 
     /**
-     * Subscription plan identifier (required, defaults to 'free').
+     * Subscription plan identifier.
      */
     public string $plan = 'free';
 
     /**
      * Tenant plan relationship ID (optional foreign key).
      */
-    public ?int $tenantPlanId = null;
+    public ?int $tenant_plan_id = null;
 
     /**
      * Tenant status: active, suspended, pending, or cancelled.
@@ -97,12 +97,12 @@ class TenantData extends BaseDto
     /**
      * When free trial ends (optional).
      */
-    public ?string $trialEndsAt = null;
+    public ?string $trial_ends_at = null;
 
     /**
      * When subscription ends (optional).
      */
-    public ?string $subscriptionEndsAt = null;
+    public ?string $subscription_ends_at = null;
 
     /**
      * Validation rules for input data.
@@ -117,29 +117,57 @@ class TenantData extends BaseDto
             'name' => 'required|string|max:255',
             'slug' => "required|string|max:255|unique:tenants,slug{$excludeId}",
             'domain' => "nullable|string|max:255|unique:tenants,domain{$excludeId}",
-            'logoPath' => 'nullable|string|max:1000',
-            'databaseConfig' => 'required|array',
-            'databaseConfig.driver' => 'required|string|in:mysql,pgsql,sqlite,sqlsrv',
-            'databaseConfig.host' => 'required|string|max:255',
-            'databaseConfig.port' => 'required|integer|min:1|max:65535',
-            'databaseConfig.database' => 'required|string|max:255',
-            'databaseConfig.username' => 'required|string|max:255',
-            'databaseConfig.password' => 'required|string',
-            'mailConfig' => 'nullable|array',
-            'mailConfig.driver' => 'nullable|string|in:smtp,sendmail,mailgun,ses,log,array',
-            'mailConfig.host' => 'nullable|string|max:255',
-            'mailConfig.port' => 'nullable|integer|min:1|max:65535',
-            'cacheConfig' => 'nullable|array',
-            'queueConfig' => 'nullable|array',
-            'featureFlags' => 'nullable|array',
-            'apiKeys' => 'nullable|array',
+            'logo_path' => 'nullable|string|max:1000',
+            'database_config' => 'required|array',
+            'database_config.driver' => 'required|string|in:mysql,pgsql,sqlite,sqlsrv',
+            'database_config.host' => 'required|string|max:255',
+            'database_config.port' => 'required|integer|min:1|max:65535',
+            'database_config.database' => 'required|string|max:255',
+            'database_config.username' => 'required|string|max:255',
+            'database_config.password' => 'required|string',
+            'mail_config' => 'nullable|array',
+            'mail_config.driver' => 'nullable|string|in:smtp,sendmail,mailgun,ses,log,array',
+            'mail_config.host' => 'nullable|string|max:255',
+            'mail_config.port' => 'nullable|integer|min:1|max:65535',
+            'cache_config' => 'nullable|array',
+            'queue_config' => 'nullable|array',
+            'feature_flags' => 'nullable|array',
+            'api_keys' => 'nullable|array',
             'settings' => 'nullable|array',
             'plan' => 'required|string|max:100',
-            'tenantPlanId' => 'nullable|exists:tenant_plans,id',
+            'tenant_plan_id' => 'nullable|exists:tenant_plans,id',
             'status' => 'required|in:active,suspended,pending,cancelled',
             'active' => 'required|boolean',
-            'trialEndsAt' => 'nullable|date_format:Y-m-d H:i:s',
-            'subscriptionEndsAt' => 'nullable|date_format:Y-m-d H:i:s',
+            'trial_ends_at' => 'nullable|date_format:Y-m-d H:i:s',
+            'subscription_ends_at' => 'nullable|date_format:Y-m-d H:i:s',
+        ];
+    }
+
+    /**
+     * Return a payload suitable for persistence in the repository layer.
+     *
+     * @return array<string, mixed>
+     */
+    public function toPersistenceArray(): array
+    {
+        return [
+            'name' => $this->name,
+            'slug' => $this->slug,
+            'domain' => $this->domain,
+            'logo_path' => $this->logo_path,
+            'database_config' => $this->database_config,
+            'mail_config' => $this->mail_config,
+            'cache_config' => $this->cache_config,
+            'queue_config' => $this->queue_config,
+            'feature_flags' => $this->feature_flags ?? [],
+            'api_keys' => $this->api_keys ?? [],
+            'settings' => $this->settings,
+            'plan' => $this->plan,
+            'tenant_plan_id' => $this->tenant_plan_id,
+            'status' => $this->status,
+            'active' => $this->active,
+            'trial_ends_at' => $this->trial_ends_at,
+            'subscription_ends_at' => $this->subscription_ends_at,
         ];
     }
 }
