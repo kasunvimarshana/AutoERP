@@ -14,14 +14,14 @@ return new class extends Migration
             $table->string('reference_number');
             $table->foreignId('from_location_id')->constrained('warehouse_locations')->cascadeOnDelete();
             $table->foreignId('to_location_id')->constrained('warehouse_locations')->cascadeOnDelete();
+            // $table->boolean('is_inter_org')->default(false); // flag for cross‑OrgUnit transfers
+            // $table->foreignId('internal_sales_order_id')->nullable()->constrained('sales_orders'); // for inter‑OrgUnit trading
+            // $table->foreignId('internal_purchase_order_id')->nullable()->constrained('purchase_orders');
             $table->enum('status', ['draft', 'pending', 'in_transit', 'completed', 'cancelled'])->default('draft');
             $table->foreignId('requested_by')->constrained('users');
             $table->foreignId('approved_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('transferred_at')->nullable();
             $table->text('notes')->nullable();
-            // $table->boolean('is_inter_org')->default(false)->after('status');
-            // $table->foreignId('internal_sales_order_id')->nullable()->constrained('sales_orders');
-            // $table->foreignId('internal_purchase_order_id')->nullable()->constrained('purchase_orders');
             $table->timestamps();
 
             $table->unique(['tenant_id', 'reference_number']);
