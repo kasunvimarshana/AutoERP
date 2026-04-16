@@ -1,0 +1,54 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('grn_headers', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('supplier_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('warehouse_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('purchase_order_id')->nullable()->constrained()->nullOnDelete(); // nullable for SMB direct buy
+            $table->string('grn_number');
+            $table->enum('status', ['draft', 'partial', 'complete', 'posted'])->default('draft');
+            $table->date('received_date');
+            $table->foreignId('currency_id')->constrained('currencies');
+            $table->decimal('exchange_rate', 15, 6)->default(1);
+            $table->text('notes')->nullable();
+            $table->json('metadata')->nullable();
+            $table->foreignId('created_by')->constrained('users');
+            $table->timestamps();
+
+            $table->unique(['tenant_id', 'grn_number']);
+        });
+
+        Schema::create('grn_lines', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('grn_header_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('purchase_order_line_id')->nullable()->constrained('purchase_order_lines')->nullOnDelete();
+            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('variant_id')->nullable()->constrained('product_variants')->nullOnDelete();
+            $table->foreignId('batch_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('serial_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('location_id')->constrained('warehouse_locations')->cascadeOnDelete();
+            $table->foreignId('uom_id')->constrained('units_of_measure');
+            $table->decimal('expected_qty', 15, 4)->default(0);
+            $table->decimal('received_qty', 15, 4);
+            $table->decimal('rejected_qty', 15, 4)->default(0);
+            $table->decimal('unit_cost', 15, 4);
+            $table->decimal('line_cost', 15, 4)->storedAs('received_qty * unit_cost');
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('grn_lines');
+        Schema::dropIfExists('grn_headers');
+    }
+};
