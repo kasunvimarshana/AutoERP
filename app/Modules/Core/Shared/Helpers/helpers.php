@@ -1,0 +1,8 @@
+<?php
+
+if (! function_exists('tenant_id')) {
+    function tenant_id()
+    {
+        return app('current_tenant_id', []);
+    }
+}
