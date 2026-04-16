@@ -12,6 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
             $table->foreignId('user_id')->nullable()->unique()->constrained()->nullOnDelete(); // for portal access
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units')->nullOnDelete();
             $table->string('customer_code')->nullable();
             $table->string('name');
             $table->enum('type', ['individual', 'company'])->default('company');

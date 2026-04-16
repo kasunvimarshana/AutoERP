@@ -11,6 +11,7 @@ return new class extends Migration
         Schema::create('suppliers', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units')->nullOnDelete();
             $table->foreignId('user_id')->nullable()->unique()->constrained()->nullOnDelete(); // for portal access
             $table->string('supplier_code')->nullable();
             $table->string('name');

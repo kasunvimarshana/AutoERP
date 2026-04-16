@@ -19,6 +19,9 @@ return new class extends Migration
             $table->foreignId('approved_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('transferred_at')->nullable();
             $table->text('notes')->nullable();
+            // $table->boolean('is_inter_org')->default(false)->after('status');
+            // $table->foreignId('internal_sales_order_id')->nullable()->constrained('sales_orders');
+            // $table->foreignId('internal_purchase_order_id')->nullable()->constrained('purchase_orders');
             $table->timestamps();
 
             $table->unique(['tenant_id', 'reference_number']);
