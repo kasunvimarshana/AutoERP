@@ -30,8 +30,8 @@ return new class extends Migration
             $table->foreignId('approved_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'po_number']);
-            $table->index(['tenant_id', 'supplier_id', 'status']);
+            $table->unique(['tenant_id', 'po_number'], 'uq_purchase_orders_tenant_po');
+            $table->index(['tenant_id', 'supplier_id', 'status'], 'idx_po_tenant_supplier_status');
         });
     }
 

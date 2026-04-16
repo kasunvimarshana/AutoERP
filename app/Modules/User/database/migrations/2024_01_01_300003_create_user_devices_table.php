@@ -17,7 +17,7 @@ return new class extends Migration
             $table->timestamp('last_active_at')->nullable();
             $table->timestamps();
 
-            $table->unique(['user_id', 'device_token']);
+            $table->unique(['user_id', 'device_token'], 'uq_user_devices_user_token');
         });
     }
 

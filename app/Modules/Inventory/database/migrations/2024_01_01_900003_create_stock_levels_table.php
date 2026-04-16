@@ -24,8 +24,8 @@ return new class extends Migration
             $table->timestamp('last_movement_at')->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'product_id', 'variant_id', 'location_id', 'batch_id', 'serial_id'], 'stock_level_unique');
-            $table->index(['tenant_id', 'product_id']);
+            $table->unique(['tenant_id', 'product_id', 'variant_id', 'location_id', 'batch_id', 'serial_id'], 'uq_stock_levels_tenant_product_loc_batch_serial');
+            $table->index(['tenant_id', 'product_id'], 'idx_stock_levels_tenant_product');
         });
     }
 

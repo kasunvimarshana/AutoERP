@@ -17,38 +17,45 @@ return new class extends Migration
             $table->string('description')->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'name', 'guard_name']);
+            $table->unique(['tenant_id', 'name', 'guard_name'], 'uq_roles_tenant_name_guard');
         });
 
         // Permissions
         Schema::create('permissions', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
             $table->string('name');
             $table->string('guard_name')->default('api');
             $table->string('module')->nullable();
             $table->string('description')->nullable();
             $table->timestamps();
 
-            $table->unique(['name', 'guard_name']);
+            $table->unique(['tenant_id', 'name', 'guard_name'], 'uq_permissions_tenant_name_guard');
         });
 
         // Pivot tables
         Schema::create('role_user', function (Blueprint $table) {
+            $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
             $table->foreignId('role_id')->constrained()->cascadeOnDelete();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->primary(['role_id', 'user_id']);
+
+            $table->primary(['tenant_id', 'role_id', 'user_id'], 'pk_role_user_tenant_role_user');
         });
 
         Schema::create('permission_role', function (Blueprint $table) {
+            $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
             $table->foreignId('permission_id')->constrained()->cascadeOnDelete();
             $table->foreignId('role_id')->constrained()->cascadeOnDelete();
-            $table->primary(['permission_id', 'role_id']);
+
+            $table->primary(['tenant_id', 'permission_id', 'role_id'], 'pk_permission_role_tenant_perm_role');
         });
 
         Schema::create('permission_user', function (Blueprint $table) {
+            $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
             $table->foreignId('permission_id')->constrained()->cascadeOnDelete();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->primary(['permission_id', 'user_id']);
+
+            $table->primary(['tenant_id', 'permission_id', 'user_id'], 'pk_permission_user_tenant_perm_user');
         });
     }
 

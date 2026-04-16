@@ -25,8 +25,8 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'warehouse_id', 'code']);
-            $table->index(['tenant_id', 'parent_id']);
+            $table->unique(['tenant_id', 'warehouse_id', 'code'], 'uq_wh_locations_tenant_warehouse_code');
+            $table->index(['tenant_id', 'parent_id'], 'idx_wh_locations_tenant_parent');
         });
     }
 

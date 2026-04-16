@@ -24,7 +24,7 @@ return new class extends Migration
             $table->foreignId('created_by')->constrained('users');
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'grn_number']);
+            $table->unique(['tenant_id', 'grn_number'], 'uq_grn_headers_tenant_grn');
         });
 
         Schema::create('grn_lines', function (Blueprint $table) {

@@ -25,7 +25,7 @@ return new class extends Migration
             $table->decimal('geo_lng', 10, 7)->nullable();
             $table->timestamps();
 
-            $table->index(['customer_id', 'type']);
+            $table->index(['customer_id', 'type'], 'idx_customer_addresses_customer_type');
         });
     }
 

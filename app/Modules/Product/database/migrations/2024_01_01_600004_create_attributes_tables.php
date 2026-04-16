@@ -32,7 +32,7 @@ return new class extends Migration
             $table->unsignedInteger('sort_order')->default(0);
             $table->timestamps();
 
-            $table->unique(['attribute_id', 'value']);
+            $table->unique(['attribute_id', 'value'], 'uq_attribute_values_attribute_value');
         });
     }
 

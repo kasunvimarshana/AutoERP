@@ -24,7 +24,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'shipment_number']);
+            $table->unique(['tenant_id', 'shipment_number'], 'uq_shipments_tenant_shipment');
         });
 
         Schema::create('shipment_lines', function (Blueprint $table) {

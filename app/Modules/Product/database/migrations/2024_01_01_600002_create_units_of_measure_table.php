@@ -17,7 +17,7 @@ return new class extends Migration
             $table->boolean('is_base')->default(false);
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'symbol']);
+            $table->unique(['tenant_id', 'symbol'], 'uq_units_of_measure_tenant_symbol');
         });
     }
 

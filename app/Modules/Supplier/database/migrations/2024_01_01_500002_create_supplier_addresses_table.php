@@ -23,7 +23,7 @@ return new class extends Migration
             $table->boolean('is_default')->default(false);
             $table->timestamps();
 
-            $table->index(['supplier_id', 'type']);
+            $table->index(['supplier_id', 'type'], 'idx_supplier_addresses_supplier_type');
         });
     }
 

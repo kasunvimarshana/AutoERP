@@ -31,8 +31,8 @@ return new class extends Migration
             $table->foreignId('approved_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'so_number']);
-            $table->index(['tenant_id', 'customer_id', 'status']);
+            $table->unique(['tenant_id', 'so_number'], 'uq_sales_orders_tenant_so');
+            $table->index(['tenant_id', 'customer_id', 'status'], 'idx_so_tenant_customer_status');
         });
     }
 

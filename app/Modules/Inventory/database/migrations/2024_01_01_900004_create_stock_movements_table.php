@@ -32,8 +32,8 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->json('metadata')->nullable();
 
-            $table->index(['tenant_id', 'product_id', 'performed_at']);
-            $table->index(['tenant_id', 'reference_type', 'reference_id']);
+            $table->index(['tenant_id', 'product_id', 'performed_at'], 'idx_stock_movements_tenant_product_date');
+            $table->index(['tenant_id', 'reference_type', 'reference_id'], 'idx_stock_movements_tenant_ref');
         });
     }
 

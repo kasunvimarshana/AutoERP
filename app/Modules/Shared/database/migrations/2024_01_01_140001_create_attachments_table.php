@@ -22,7 +22,7 @@ return new class extends Migration
             $table->foreignId('uploaded_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
 
-            $table->index(['tenant_id', 'attachable_type', 'attachable_id']);
+            $table->index(['tenant_id', 'attachable_type', 'attachable_id'], 'idx_attachments_tenant_morphable');
         });
     }
 

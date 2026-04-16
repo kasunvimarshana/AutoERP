@@ -24,7 +24,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'product_id', 'variant_id', 'batch_number'], 'batch_unique');
+            $table->unique(['tenant_id', 'product_id', 'variant_id', 'batch_number'], 'uq_batches_tenant_product_batch');
         });
     }
 

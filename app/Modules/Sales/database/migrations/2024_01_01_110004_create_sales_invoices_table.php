@@ -31,7 +31,7 @@ return new class extends Migration
             $table->foreign('journal_entry_id')->references('id')->on('journal_entries')->nullOnDelete();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'invoice_number']);
+            $table->unique(['tenant_id', 'invoice_number'], 'uq_sales_invoices_tenant_invoice');
         });
 
         Schema::create('sales_invoice_lines', function (Blueprint $table) {

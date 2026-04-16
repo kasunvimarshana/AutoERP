@@ -27,8 +27,8 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->index(['tenant_id', 'identifiable_type', 'identifiable_id']);
-            $table->index(['tenant_id', 'value']);
+            $table->index(['tenant_id', 'identifiable_type', 'identifiable_id'], 'idx_prod_ident_tenant_morphable');
+            $table->index(['tenant_id', 'value'], 'idx_prod_ident_tenant_value');
         });
     }
 

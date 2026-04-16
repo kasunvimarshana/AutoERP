@@ -30,8 +30,8 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'customer_code']);
-            $table->index(['tenant_id', 'name']);
+            $table->unique(['tenant_id', 'customer_code'], 'uq_customers_tenant_code');
+            $table->index(['tenant_id', 'name'], 'idx_customers_tenant_name');
         });
     }
 

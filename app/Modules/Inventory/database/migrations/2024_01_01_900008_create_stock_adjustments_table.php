@@ -23,7 +23,7 @@ return new class extends Migration
             $table->text('reason')->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'reference_number']);
+            $table->unique(['tenant_id', 'reference_number'], 'uq_stock_adjustments_tenant_ref');
         });
 
         Schema::create('stock_adjustment_lines', function (Blueprint $table) {

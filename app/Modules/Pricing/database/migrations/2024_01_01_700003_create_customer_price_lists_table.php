@@ -15,7 +15,7 @@ return new class extends Migration
             $table->unsignedInteger('priority')->default(0);
             $table->timestamps();
 
-            $table->unique(['customer_id', 'price_list_id']);
+            $table->unique(['customer_id', 'price_list_id'], 'uq_customer_price_lists_customer_pricelist');
         });
     }
 

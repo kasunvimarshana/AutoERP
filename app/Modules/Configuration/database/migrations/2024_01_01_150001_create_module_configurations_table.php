@@ -16,7 +16,7 @@ return new class extends Migration
             $table->json('config_value');
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'module_name', 'config_key']);
+            $table->unique(['tenant_id', 'module_name', 'config_key'], 'uq_module_configurations_tenant_module_key');
         });
     }
 

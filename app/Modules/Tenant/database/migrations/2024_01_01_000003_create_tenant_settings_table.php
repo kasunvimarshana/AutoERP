@@ -11,13 +11,14 @@ return new class extends Migration
         Schema::create('tenant_settings', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
-            $table->string('key');
+            $table->string('key', 255);
             $table->json('value')->nullable();
-            $table->string('group')->default('general');
-            $table->boolean('is_public')->default(false);
+            $table->string('group')->default('general')->index('idx_tenant_settings_group');
+            $table->boolean('is_public')->default(false)->index('idx_tenant_settings_public');
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'key']);
+            $table->unique(['tenant_id', 'key'], 'tenant_settings_tenant_key_uq');
+            $table->index(['tenant_id', 'group'], 'idx_tenant_settings_tenant_group');
         });
     }
 

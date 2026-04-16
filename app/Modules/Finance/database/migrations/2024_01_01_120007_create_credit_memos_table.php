@@ -27,8 +27,8 @@ return new class extends Migration
             $table->foreign('journal_entry_id')->references('id')->on('journal_entries')->nullOnDelete();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'credit_memo_number']);
-            $table->index(['tenant_id', 'party_type', 'party_id']);
+            $table->unique(['tenant_id', 'credit_memo_number'], 'uq_credit_memos_tenant_number');
+            $table->index(['tenant_id', 'party_type', 'party_id'], 'idx_credit_memos_tenant_party');
         });
     }
 

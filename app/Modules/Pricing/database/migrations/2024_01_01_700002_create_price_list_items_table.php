@@ -21,7 +21,7 @@ return new class extends Migration
             $table->date('valid_to')->nullable();
             $table->timestamps();
 
-            $table->unique(['price_list_id', 'product_id', 'variant_id', 'uom_id', 'min_quantity'], 'pli_unique');
+            $table->unique(['price_list_id', 'product_id', 'variant_id', 'uom_id', 'min_quantity'], 'uq_price_list_items_pricelist_product_var_uom_minqty');
         });
     }
 

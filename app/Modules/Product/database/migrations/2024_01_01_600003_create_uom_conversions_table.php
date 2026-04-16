@@ -15,7 +15,7 @@ return new class extends Migration
             $table->decimal('factor', 20, 10);
             $table->timestamps();
 
-            $table->unique(['from_uom_id', 'to_uom_id']);
+            $table->unique(['from_uom_id', 'to_uom_id'], 'uq_uom_conversions_from_to');
         });
     }
 

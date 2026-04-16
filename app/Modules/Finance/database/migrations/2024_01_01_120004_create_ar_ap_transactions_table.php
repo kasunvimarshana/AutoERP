@@ -23,7 +23,7 @@ return new class extends Migration
             $table->boolean('is_reconciled')->default(false);
             $table->timestamps();
 
-            $table->index(['tenant_id', 'customer_id']);
+            $table->index(['tenant_id', 'customer_id'], 'idx_ar_trans_tenant_customer');
         });
 
         Schema::create('ap_transactions', function (Blueprint $table) {
@@ -41,7 +41,7 @@ return new class extends Migration
             $table->boolean('is_reconciled')->default(false);
             $table->timestamps();
 
-            $table->index(['tenant_id', 'supplier_id']);
+            $table->index(['tenant_id', 'supplier_id'], 'idx_ap_trans_tenant_supplier');
         });
     }
 

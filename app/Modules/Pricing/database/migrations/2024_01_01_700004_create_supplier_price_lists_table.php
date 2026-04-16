@@ -14,7 +14,7 @@ return new class extends Migration
             $table->foreignId('price_list_id')->constrained()->cascadeOnDelete();
             $table->timestamps();
 
-            $table->unique(['supplier_id', 'price_list_id']);
+            $table->unique(['supplier_id', 'price_list_id'], 'uq_supplier_price_lists_supplier_pricelist');
         });
     }
 

@@ -40,8 +40,8 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'sku']);
-            $table->index(['tenant_id', 'type']);
+            $table->unique(['tenant_id', 'sku'], 'uq_products_tenant_sku');
+            $table->index(['tenant_id', 'type'], 'idx_products_tenant_type');
         });
     }
 

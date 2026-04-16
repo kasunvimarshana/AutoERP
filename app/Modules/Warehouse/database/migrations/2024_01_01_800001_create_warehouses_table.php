@@ -21,7 +21,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'code']);
+            $table->unique(['tenant_id', 'code'], 'uq_warehouses_tenant_code');
         });
     }
 

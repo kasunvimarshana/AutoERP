@@ -11,7 +11,7 @@ return new class extends Migration
         // Countries
         Schema::create('countries', function (Blueprint $table) {
             $table->id();
-            $table->string('code', 2)->unique();
+            $table->string('code', 2)->unique('uq_countries_code');
             $table->string('name');
             $table->string('phone_code', 10)->nullable();
             $table->timestamps();
@@ -20,7 +20,7 @@ return new class extends Migration
         // Currencies
         Schema::create('currencies', function (Blueprint $table) {
             $table->id();
-            $table->string('code', 3)->unique();
+            $table->string('code', 3)->unique('uq_currencies_code');
             $table->string('name');
             $table->string('symbol', 10)->nullable();
             $table->unsignedSmallInteger('decimal_places')->default(2);
@@ -30,7 +30,7 @@ return new class extends Migration
         // Languages
         Schema::create('languages', function (Blueprint $table) {
             $table->id();
-            $table->string('code', 5)->unique();
+            $table->string('code', 5)->unique('uq_languages_code');
             $table->string('name');
             $table->timestamps();
         });
@@ -38,7 +38,7 @@ return new class extends Migration
         // Timezones
         Schema::create('timezones', function (Blueprint $table) {
             $table->id();
-            $table->string('name')->unique();
+            $table->string('name')->unique('uq_timezones_name');
             $table->string('offset', 10);
             $table->timestamps();
         });

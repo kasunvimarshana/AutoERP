@@ -19,8 +19,8 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'code']);
-            $table->index(['tenant_id', 'parent_id']);
+            $table->unique(['tenant_id', 'code'], 'uq_product_categories_tenant_code');
+            $table->index(['tenant_id', 'parent_id'], 'idx_product_categories_tenant_parent');
         });
     }
 

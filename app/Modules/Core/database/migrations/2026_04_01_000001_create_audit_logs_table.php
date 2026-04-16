@@ -10,15 +10,15 @@ return new class extends Migration
     {
         Schema::create('audit_logs', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('tenant_id')->nullable()->index();
-            $table->unsignedBigInteger('user_id')->nullable()->index();
+            $table->unsignedBigInteger('tenant_id')->nullable()->index('idx_core_audit_logs_tenant');
+            $table->unsignedBigInteger('user_id')->nullable()->index('idx_core_audit_logs_user');
 
             // The action that triggered this entry (created, updated, deleted, etc.)
-            $table->string('event', 50)->index();
+            $table->string('event', 50)->index('idx_core_audit_logs_event');
 
             // Polymorphic morph columns
-            $table->string('auditable_type')->index();
-            $table->string('auditable_id')->index();
+            $table->string('auditable_type')->index('idx_core_audit_logs_auditable_type');
+            $table->string('auditable_id')->index('idx_core_audit_logs_auditable_id');
 
             // Captured attribute snapshots
             $table->json('old_values')->nullable();
@@ -37,7 +37,7 @@ return new class extends Migration
             $table->timestamp('created_at')->useCurrent();
 
             // Composite index for common queries: all logs for a specific record
-            $table->index(['auditable_type', 'auditable_id'], 'audit_logs_auditable_index');
+            $table->index(['auditable_type', 'auditable_id'], 'idx_core_audit_logs_auditable');
         });
     }
 

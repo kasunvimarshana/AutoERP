@@ -17,7 +17,7 @@ return new class extends Migration
             $table->enum('status', ['open', 'closed'])->default('open');
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'name']);
+            $table->unique(['tenant_id', 'name'], 'uq_fiscal_years_tenant_name');
         });
 
         Schema::create('fiscal_periods', function (Blueprint $table) {
@@ -31,7 +31,7 @@ return new class extends Migration
             $table->enum('status', ['open', 'closed'])->default('open');
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'fiscal_year_id', 'period_number']);
+            $table->unique(['tenant_id', 'fiscal_year_id', 'period_number'], 'uq_fiscal_periods_tenant_year_number');
         });
     }
 

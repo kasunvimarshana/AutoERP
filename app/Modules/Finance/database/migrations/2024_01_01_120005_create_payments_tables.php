@@ -40,8 +40,8 @@ return new class extends Migration
             $table->foreign('journal_entry_id')->references('id')->on('journal_entries')->nullOnDelete();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'payment_number']);
-            $table->index(['tenant_id', 'party_type', 'party_id']);
+            $table->unique(['tenant_id', 'payment_number'], 'uq_payments_tenant_number');
+            $table->index(['tenant_id', 'party_type', 'party_id'], 'idx_payments_tenant_party');
         });
 
         Schema::create('payment_allocations', function (Blueprint $table) {

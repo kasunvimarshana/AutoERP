@@ -42,7 +42,7 @@ return new class extends Migration
             $table->foreign('category_rule_id')->references('id')->on('bank_category_rules')->nullOnDelete();
             $table->timestamps();
 
-            $table->unique(['bank_account_id', 'external_id']);
+            $table->unique(['bank_account_id', 'external_id'], 'uq_bank_trans_account_external');
         });
 
         Schema::create('bank_category_rules', function (Blueprint $table) {

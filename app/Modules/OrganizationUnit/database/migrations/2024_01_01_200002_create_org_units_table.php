@@ -24,8 +24,8 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'code'], 'org_units_code_unique');
-            $table->index(['tenant_id', 'parent_id']);
-            $table->index(['tenant_id', 'path']);
+            $table->index(['tenant_id', 'parent_id'], 'idx_org_units_tenant_parent');
+            $table->index(['tenant_id', 'path'], 'idx_org_units_tenant_path');
         });
     }
 

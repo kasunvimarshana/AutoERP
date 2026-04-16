@@ -26,8 +26,8 @@ return new class extends Migration
             $table->timestamp('posted_at')->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'entry_number']);
-            $table->index(['tenant_id', 'fiscal_period_id', 'status']);
+            $table->unique(['tenant_id', 'entry_number'], 'uq_journal_entries_tenant_number');
+            $table->index(['tenant_id', 'fiscal_period_id', 'status'], 'idx_je_tenant_period_status');
         });
 
         Schema::create('journal_entry_lines', function (Blueprint $table) {
@@ -45,7 +45,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->index(['account_id', 'journal_entry_id']);
+            $table->index(['account_id', 'journal_entry_id'], 'idx_jel_account_entry');
         });
     }
 

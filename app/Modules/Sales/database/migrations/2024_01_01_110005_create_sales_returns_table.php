@@ -32,7 +32,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'return_number']);
+            $table->unique(['tenant_id', 'return_number'], 'uq_sales_returns_tenant_return');
         });
 
         Schema::create('sales_return_lines', function (Blueprint $table) {

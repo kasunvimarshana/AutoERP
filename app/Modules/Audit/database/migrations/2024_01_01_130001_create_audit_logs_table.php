@@ -20,8 +20,8 @@ return new class extends Migration
             $table->json('new_values')->nullable();
             $table->timestamp('occurred_at')->useCurrent();
 
-            $table->index(['tenant_id', 'auditable_type', 'auditable_id']);
-            $table->index(['tenant_id', 'occurred_at']);
+            $table->index(['tenant_id', 'auditable_type', 'auditable_id'], 'idx_audit_logs_tenant_morphable');
+            $table->index(['tenant_id', 'occurred_at'], 'idx_audit_logs_tenant_occurred');
         });
     }
 

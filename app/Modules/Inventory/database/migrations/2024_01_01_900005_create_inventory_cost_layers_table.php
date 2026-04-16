@@ -25,7 +25,7 @@ return new class extends Migration
             $table->boolean('is_closed')->default(false);
             $table->timestamps();
 
-            $table->index(['tenant_id', 'product_id', 'layer_date']);
+            $table->index(['tenant_id', 'product_id', 'layer_date'], 'idx_inv_cost_layers_tenant_product_date');
         });
     }
 

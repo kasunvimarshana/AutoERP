@@ -26,8 +26,8 @@ return new class extends Migration
             $table->string('device_id')->nullable();
             $table->json('metadata')->nullable();
 
-            $table->index(['tenant_id', 'entity_type', 'entity_id']);
-            $table->index(['tenant_id', 'performed_at']);
+            $table->index(['tenant_id', 'entity_type', 'entity_id'], 'idx_trace_logs_tenant_entity');
+            $table->index(['tenant_id', 'performed_at'], 'idx_trace_logs_tenant_date');
         });
     }
 
