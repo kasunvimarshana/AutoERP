@@ -17,6 +17,8 @@ class User
 
     private int $tenantId;
 
+    private ?int $orgUnitId;
+
     private Email $email;
 
     private string $firstName;
@@ -49,6 +51,7 @@ class User
 
     public function __construct(
         int $tenantId,
+        ?int $orgUnitId,
         Email $email,
         string $firstName,
         string $lastName,
@@ -63,6 +66,7 @@ class User
     ) {
         $this->id = $id;
         $this->tenantId = $tenantId;
+        $this->orgUnitId = $orgUnitId;
         $this->email = $email;
         $this->firstName = $firstName;
         $this->lastName = $lastName;
@@ -87,6 +91,11 @@ class User
     public function getTenantId(): int
     {
         return $this->tenantId;
+    }
+
+    public function getOrgUnitId(): ?int
+    {
+        return $this->orgUnitId;
     }
 
     public function getEmail(): Email
@@ -202,6 +211,12 @@ class User
         $this->lastName = $lastName;
         $this->phone = $phone;
         $this->address = $address;
+        $this->updatedAt = new \DateTimeImmutable;
+    }
+
+    public function changeOrgUnit(?int $orgUnitId): void
+    {
+        $this->orgUnitId = $orgUnitId;
         $this->updatedAt = new \DateTimeImmutable;
     }
 

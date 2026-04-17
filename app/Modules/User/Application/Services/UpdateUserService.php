@@ -61,6 +61,11 @@ class UpdateUserService extends BaseService implements UpdateUserServiceInterfac
             ((bool) $data['active']) ? $user->activate() : $user->deactivate();
         }
 
+        if (array_key_exists('org_unit_id', $data)) {
+            $orgUnitId = isset($data['org_unit_id']) ? (int) $data['org_unit_id'] : null;
+            $user->changeOrgUnit($orgUnitId);
+        }
+
         if (array_key_exists('avatar', $data)) {
             $avatarPath = is_string($data['avatar']) && $data['avatar'] !== ''
                 ? $data['avatar']

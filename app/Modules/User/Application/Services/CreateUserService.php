@@ -40,6 +40,7 @@ class CreateUserService extends BaseService implements CreateUserServiceInterfac
 
         $user = new User(
             tenantId: $dto->tenant_id,
+            orgUnitId: $dto->org_unit_id,
             email: $email,
             firstName: $dto->first_name,
             lastName: $dto->last_name,

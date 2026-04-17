@@ -36,6 +36,7 @@ class CreateUser
 
         $user = new User(
             tenantId: $data->tenant_id,
+            orgUnitId: $data->org_unit_id,
             email: $email,
             firstName: $data->first_name,
             lastName: $data->last_name,

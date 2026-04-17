@@ -10,6 +10,8 @@ class UserData extends BaseDto
 {
     public int $tenant_id;
 
+    public ?int $org_unit_id;
+
     public string $email;
 
     public string $first_name;
@@ -32,6 +34,7 @@ class UserData extends BaseDto
     {
         return [
             'tenant_id' => 'required|integer|exists:tenants,id',
+            'org_unit_id' => 'nullable|integer|exists:org_units,id',
             'email' => 'required|email|unique:users,email',
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',

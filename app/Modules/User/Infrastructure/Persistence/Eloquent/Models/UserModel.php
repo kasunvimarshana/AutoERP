@@ -21,6 +21,7 @@ class UserModel extends Authenticatable implements OAuthenticatable
 
     protected $fillable = [
         'tenant_id',
+        'org_unit_id',
         'email',
         'password',
         'first_name',

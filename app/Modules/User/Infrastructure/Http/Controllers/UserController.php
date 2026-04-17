@@ -56,6 +56,7 @@ class UserController extends AuthorizedController
 
         $filters = array_filter([
             'tenant_id' => $validated['tenant_id'] ?? null,
+            'org_unit_id' => $validated['org_unit_id'] ?? null,
             'email' => $validated['email'] ?? null,
             'first_name' => $validated['first_name'] ?? null,
             'last_name' => $validated['last_name'] ?? null,

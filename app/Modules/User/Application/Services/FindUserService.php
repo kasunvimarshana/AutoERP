@@ -19,10 +19,10 @@ use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 class FindUserService extends BaseService implements FindUserServiceInterface
 {
     /** @var array<string> */
-    private const ALLOWED_FILTERS = ['tenant_id', 'email', 'first_name', 'last_name', 'status'];
+    private const ALLOWED_FILTERS = ['tenant_id', 'org_unit_id', 'email', 'first_name', 'last_name', 'status'];
 
     /** @var array<string> */
-    private const ALLOWED_SORTS = ['id', 'tenant_id', 'email', 'first_name', 'last_name', 'status', 'created_at', 'updated_at'];
+    private const ALLOWED_SORTS = ['id', 'tenant_id', 'org_unit_id', 'email', 'first_name', 'last_name', 'status', 'created_at', 'updated_at'];
 
     /** @var array<string> */
     private const ALLOWED_INCLUDES = ['roles', 'permissions', 'attachments', 'devices'];

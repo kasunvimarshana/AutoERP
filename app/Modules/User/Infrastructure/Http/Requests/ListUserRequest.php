@@ -20,6 +20,7 @@ class ListUserRequest extends FormRequest
     {
         return [
             'tenant_id' => 'nullable|integer|min:1',
+            'org_unit_id' => 'nullable|integer|min:1',
             'email' => 'nullable|email',
             'first_name' => 'nullable|string|max:255',
             'last_name' => 'nullable|string|max:255',

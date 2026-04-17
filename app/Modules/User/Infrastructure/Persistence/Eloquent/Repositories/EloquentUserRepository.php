@@ -42,6 +42,7 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
     {
         $data = [
             'tenant_id'   => $user->getTenantId(),
+            'org_unit_id' => $user->getOrgUnitId(),
             'email'       => $user->getEmail()->value(),
             'first_name'  => $user->getFirstName(),
             'last_name'   => $user->getLastName(),
@@ -138,6 +139,7 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
 
         $user = new User(
             tenantId: $model->tenant_id,
+            orgUnitId: $model->org_unit_id,
             email: new Email($model->email),
             firstName: $model->first_name,
             lastName: $model->last_name,

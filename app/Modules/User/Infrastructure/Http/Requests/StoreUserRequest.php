@@ -17,6 +17,7 @@ class StoreUserRequest extends FormRequest
     {
         return [
             'tenant_id' => 'required|integer|exists:tenants,id',
+            'org_unit_id' => 'nullable|integer|exists:org_units,id',
             'email' => 'required|email|unique:users,email',
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
