@@ -17,8 +17,8 @@ use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 class CreateUser
 {
     public function __construct(
-        private UserRepositoryInterface $userRepo,
-        private RoleRepositoryInterface $roleRepo
+        private readonly UserRepositoryInterface $userRepository,
+        private readonly RoleRepositoryInterface $roleRepository
     ) {}
 
     public function execute(UserData $data): User
@@ -42,21 +42,24 @@ class CreateUser
             phone: $phone,
             address: $address,
             preferences: $preferences,
-            active: $data->active
+            active: $data->active ?? true,
+            avatar: $data->avatar
         );
 
-        $saved = $this->userRepo->save($user);
+        $saved = $this->userRepository->save($user);
 
         if (! empty($data->roles)) {
             $roleIds = [];
             foreach ($data->roles as $roleId) {
-                $role = $this->roleRepo->find($roleId);
+                $role = $this->roleRepository->find((int) $roleId);
                 if ($role) {
                     $saved->assignRole($role);
-                    $roleIds[] = $role->getId();
+                    if ($role->getId() !== null) {
+                        $roleIds[] = $role->getId();
+                    }
                 }
             }
-            $this->userRepo->syncRoles($saved, $roleIds);
+            $this->userRepository->syncRoles($saved, $roleIds);
         }
 
         event(new UserCreated($saved));

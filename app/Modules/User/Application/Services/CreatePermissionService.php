@@ -11,19 +11,16 @@ use Modules\User\Domain\RepositoryInterfaces\PermissionRepositoryInterface;
 
 class CreatePermissionService extends BaseService implements CreatePermissionServiceInterface
 {
-    private PermissionRepositoryInterface $permissionRepository;
-
-    public function __construct(PermissionRepositoryInterface $repository)
+    public function __construct(private readonly PermissionRepositoryInterface $permissionRepository)
     {
-        parent::__construct($repository);
-        $this->permissionRepository = $repository;
+        parent::__construct($permissionRepository);
     }
 
     protected function handle(array $data): Permission
     {
         $permission = new Permission(
-            tenantId: $data['tenant_id'],
-            name: $data['name']
+            tenantId: (int) $data['tenant_id'],
+            name: (string) $data['name']
         );
 
         return $this->permissionRepository->save($permission);

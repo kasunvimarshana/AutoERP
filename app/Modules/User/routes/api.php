@@ -1,11 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Support\Facades\Route;
 use Modules\User\Infrastructure\Http\Controllers\PermissionController;
 use Modules\User\Infrastructure\Http\Controllers\ProfileController;
 use Modules\User\Infrastructure\Http\Controllers\RoleController;
 use Modules\User\Infrastructure\Http\Controllers\UserAttachmentController;
 use Modules\User\Infrastructure\Http\Controllers\UserController;
+use Modules\User\Infrastructure\Http\Controllers\UserDeviceController;
 
 Route::middleware(['auth:api', 'resolve.tenant'])->group(function () {
     // Profile endpoints (authenticated user managing their own profile)
@@ -14,6 +17,9 @@ Route::middleware(['auth:api', 'resolve.tenant'])->group(function () {
     Route::post('profile/change-password', [ProfileController::class, 'changePassword']);
     Route::patch('profile/preferences', [ProfileController::class, 'updatePreferences']);
     Route::post('profile/avatar', [ProfileController::class, 'uploadAvatar']);
+    Route::get('profile/devices', [ProfileController::class, 'listDevices']);
+    Route::post('profile/devices', [ProfileController::class, 'upsertDevice']);
+    Route::delete('profile/devices/{device}', [ProfileController::class, 'deleteDevice']);
 
     Route::apiResource('users', UserController::class);
     Route::post('users/{user}/assign-role', [UserController::class, 'assignRole']);
@@ -22,6 +28,9 @@ Route::middleware(['auth:api', 'resolve.tenant'])->group(function () {
     Route::get('users/{user}/attachments', [UserAttachmentController::class, 'index']);
     Route::post('users/{user}/attachments', [UserAttachmentController::class, 'store']);
     Route::delete('users/{user}/attachments/{attachment}', [UserAttachmentController::class, 'destroy']);
+    Route::get('users/{user}/devices', [UserDeviceController::class, 'index']);
+    Route::post('users/{user}/devices', [UserDeviceController::class, 'store']);
+    Route::delete('users/{user}/devices/{device}', [UserDeviceController::class, 'destroy']);
 
     Route::get('roles', [RoleController::class, 'index']);
     Route::post('roles', [RoleController::class, 'store']);

@@ -8,6 +8,7 @@ use Modules\Core\Application\Services\BaseService;
 use Modules\Core\Domain\Exceptions\DomainException;
 use Modules\User\Application\Contracts\AssignRoleServiceInterface;
 use Modules\User\Domain\Events\RoleAssigned;
+use Modules\User\Domain\Entities\Role;
 use Modules\User\Domain\Exceptions\RoleNotFoundException;
 use Modules\User\Domain\Exceptions\UserNotFoundException;
 use Modules\User\Domain\RepositoryInterfaces\RoleRepositoryInterface;
@@ -15,26 +16,23 @@ use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 
 class AssignRoleService extends BaseService implements AssignRoleServiceInterface
 {
-    private UserRepositoryInterface $userRepository;
-
     public function __construct(
-        UserRepositoryInterface $repository,
-        protected RoleRepositoryInterface $roleRepo
+        private readonly UserRepositoryInterface $userRepository,
+        private readonly RoleRepositoryInterface $roleRepository
     ) {
-        parent::__construct($repository);
-        $this->userRepository = $repository;
+        parent::__construct($userRepository);
     }
 
     protected function handle(array $data): mixed
     {
-        $userId = $data['user_id'];
-        $roleId = $data['role_id'];
+        $userId = (int) $data['user_id'];
+        $roleId = (int) $data['role_id'];
 
         $user = $this->userRepository->find($userId);
         if (! $user) {
             throw new UserNotFoundException($userId);
         }
-        $role = $this->roleRepo->find($roleId);
+        $role = $this->roleRepository->find($roleId);
         if (! $role) {
             throw new RoleNotFoundException($roleId);
         }
@@ -43,7 +41,12 @@ class AssignRoleService extends BaseService implements AssignRoleServiceInterfac
         }
 
         $user->assignRole($role);
-        $this->userRepository->syncRoles($user, $user->getRoles()->pluck('id')->toArray());
+        $roleIds = $user->getRoles()
+            ->map(static fn (Role $userRole): ?int => $userRole->getId())
+            ->filter(static fn (?int $assignedRoleId): bool => $assignedRoleId !== null)
+            ->values()
+            ->toArray();
+        $this->userRepository->syncRoles($user, $roleIds);
         $this->addEvent(new RoleAssigned($user, $role));
 
         return null;

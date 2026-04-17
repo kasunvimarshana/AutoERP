@@ -13,12 +13,12 @@ class ListUsers
     private const ALLOWED_FILTERS = ['tenant_id', 'first_name', 'last_name', 'email', 'active'];
 
     public function __construct(
-        private UserRepositoryInterface $userRepo
+        private readonly UserRepositoryInterface $userRepository
     ) {}
 
     public function execute(array $filters, int $perPage, int $page): LengthAwarePaginator
     {
-        $repo = $this->userRepo->resetCriteria();
+        $repo = $this->userRepository->resetCriteria();
         foreach ($filters as $field => $value) {
             if (in_array($field, self::ALLOWED_FILTERS, true)) {
                 $repo->where($field, $value);

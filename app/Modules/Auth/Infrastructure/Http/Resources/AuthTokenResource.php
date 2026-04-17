@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Infrastructure\Http\Resources;
 
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Modules\Auth\Domain\Entities\AccessToken;
 
@@ -15,9 +16,8 @@ class AuthTokenResource extends JsonResource
         parent::__construct($token);
     }
 
-    public function toArray($request): array
+    public function toArray(Request $request): array
     {
-        // $resource = $this->resource;
         /** @var AccessToken $token */
         $token = $this->resource;
 

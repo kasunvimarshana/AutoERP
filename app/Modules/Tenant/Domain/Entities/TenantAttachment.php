@@ -99,4 +99,14 @@ class TenantAttachment
     {
         return $this->metadata;
     }
+
+    public function getCreatedAt(): \DateTimeInterface
+    {
+        return $this->createdAt;
+    }
+
+    public function getUpdatedAt(): \DateTimeInterface
+    {
+        return $this->updatedAt;
+    }
 }

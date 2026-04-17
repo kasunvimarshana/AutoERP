@@ -19,6 +19,8 @@ use Modules\Tenant\Infrastructure\Http\Requests\ListTenantAttachmentRequest;
 use Modules\Tenant\Infrastructure\Http\Requests\UploadTenantAttachmentRequest;
 use Modules\Tenant\Infrastructure\Http\Resources\TenantAttachmentCollection;
 use Modules\Tenant\Infrastructure\Http\Resources\TenantAttachmentResource;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -26,24 +28,24 @@ class TenantAttachmentController extends AuthorizedController
 {
     public function __construct(
         protected FindTenantServiceInterface $findTenantService,
-        protected UploadTenantAttachmentServiceInterface $uploadService,
-        protected BulkUploadTenantAttachmentsServiceInterface $bulkUploadService,
-        protected DeleteTenantAttachmentServiceInterface $deleteService,
-        protected FindTenantAttachmentsServiceInterface $findAttachmentsService,
+        protected UploadTenantAttachmentServiceInterface $uploadAttachmentService,
+        protected BulkUploadTenantAttachmentsServiceInterface $bulkUploadAttachmentsService,
+        protected DeleteTenantAttachmentServiceInterface $deleteAttachmentService,
+        protected FindTenantAttachmentsServiceInterface $findTenantAttachmentsService,
         protected AttachmentStorageStrategyInterface $storageStrategy
     ) {}
 
 
-    public function index(int $tenant, ListTenantAttachmentRequest $request): TenantAttachmentCollection
+    public function index(int $tenantId, ListTenantAttachmentRequest $request): TenantAttachmentCollection
     {
-        $tenantEntity = $this->findTenantOrFail($tenant);
+        $tenantEntity = $this->findTenantOrFail($tenantId);
         $this->authorize('viewAttachments', $tenantEntity);
         $validated = $request->validated();
         $type = $validated['type'] ?? null;
         $perPage = (int) ($validated['per_page'] ?? 15);
         $page = (int) ($validated['page'] ?? 1);
-        $attachments = $this->findAttachmentsService->paginateByTenant(
-            $tenant,
+        $attachments = $this->findTenantAttachmentsService->paginateByTenant(
+            $tenantId,
             is_string($type) ? $type : null,
             $perPage,
             $page
@@ -53,14 +55,21 @@ class TenantAttachmentController extends AuthorizedController
     }
 
 
-    public function store(UploadTenantAttachmentRequest $request, int $tenant): TenantAttachmentResource
+    public function store(UploadTenantAttachmentRequest $request, int $tenantId): TenantAttachmentResource
     {
-        $tenantEntity = $this->findTenantOrFail($tenant);
+        $tenantEntity = $this->findTenantOrFail($tenantId);
         $this->authorize('uploadAttachment', $tenantEntity);
 
-        $attachment = $this->uploadService->execute([
-            'tenant_id' => $tenant,
-            'file'      => $request->file('file'),
+        $file = $request->file('file');
+        if ($file === null) {
+            throw ValidationException::withMessages([
+                'file' => ['A single file upload is required for this endpoint.'],
+            ]);
+        }
+
+        $attachment = $this->uploadAttachmentService->execute([
+            'tenant_id' => $tenantId,
+            'file'      => $file,
             'type'      => $request->input('type'),
             'metadata'  => $this->decodeMetadata($request),
         ]);
@@ -69,35 +78,42 @@ class TenantAttachmentController extends AuthorizedController
     }
 
 
-    public function storeMany(UploadTenantAttachmentRequest $request, int $tenant): JsonResponse
+    public function storeMany(UploadTenantAttachmentRequest $request, int $tenantId): JsonResponse
     {
-        $tenantEntity = $this->findTenantOrFail($tenant);
+        $tenantEntity = $this->findTenantOrFail($tenantId);
         $this->authorize('uploadAttachment', $tenantEntity);
 
-        $attachments = $this->bulkUploadService->execute([
-            'tenant_id' => $tenant,
-            'files'     => $request->file('files') ?? [],
+        $files = $request->file('files') ?? [];
+        if ($files === [] || ! is_array($files)) {
+            throw ValidationException::withMessages([
+                'files' => ['A files array upload is required for this endpoint.'],
+            ]);
+        }
+
+        $attachments = $this->bulkUploadAttachmentsService->execute([
+            'tenant_id' => $tenantId,
+            'files'     => $files,
             'type'      => $request->input('type'),
             'metadata'  => $this->decodeMetadata($request),
         ]);
 
         return TenantAttachmentResource::collection($attachments)
             ->response()
-            ->setStatusCode(201);
+            ->setStatusCode(HttpResponse::HTTP_CREATED);
     }
 
 
-    public function destroy(int $tenant, int $attachment): JsonResponse
+    public function destroy(int $tenantId, int $attachmentId): JsonResponse
     {
-        $tenantEntity = $this->findTenantOrFail($tenant);
+        $tenantEntity = $this->findTenantOrFail($tenantId);
         $this->authorize('deleteAttachment', $tenantEntity);
 
-        $attachmentEntity = $this->findAttachmentsService->find($attachment);
-        if (! $attachmentEntity || $attachmentEntity->getTenantId() !== $tenant) {
+        $attachmentEntity = $this->findTenantAttachmentsService->find($attachmentId);
+        if (! $attachmentEntity || $attachmentEntity->getTenantId() !== $tenantId) {
             throw new NotFoundHttpException('Attachment not found.');
         }
 
-        $this->deleteService->execute(['attachment_id' => $attachment]);
+        $this->deleteAttachmentService->execute(['attachment_id' => $attachmentId]);
 
         return Response::json(['message' => 'Attachment deleted successfully']);
     }
@@ -105,7 +121,7 @@ class TenantAttachmentController extends AuthorizedController
 
     public function serve(string $uuid): StreamedResponse
     {
-        $attachment = $this->findAttachmentsService->findByUuid($uuid);
+        $attachment = $this->findTenantAttachmentsService->findByUuid($uuid);
         if (! $attachment) {
             throw new NotFoundHttpException('Attachment not found.');
         }

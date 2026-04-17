@@ -12,15 +12,18 @@ use Modules\User\Application\Contracts\ChangePasswordServiceInterface;
 use Modules\User\Application\Contracts\CreatePermissionServiceInterface;
 use Modules\User\Application\Contracts\CreateRoleServiceInterface;
 use Modules\User\Application\Contracts\CreateUserServiceInterface;
+use Modules\User\Application\Contracts\DeleteUserDeviceServiceInterface;
 use Modules\User\Application\Contracts\DeletePermissionServiceInterface;
 use Modules\User\Application\Contracts\DeleteRoleServiceInterface;
 use Modules\User\Application\Contracts\DeleteUserAttachmentServiceInterface;
 use Modules\User\Application\Contracts\DeleteUserServiceInterface;
+use Modules\User\Application\Contracts\FindUserDevicesServiceInterface;
 use Modules\User\Application\Contracts\FindPermissionServiceInterface;
 use Modules\User\Application\Contracts\FindRoleServiceInterface;
 use Modules\User\Application\Contracts\FindUserAttachmentsServiceInterface;
 use Modules\User\Application\Contracts\FindUserServiceInterface;
 use Modules\User\Application\Contracts\SyncRolePermissionsServiceInterface;
+use Modules\User\Application\Contracts\UpsertUserDeviceServiceInterface;
 use Modules\User\Application\Contracts\UpdatePreferencesServiceInterface;
 use Modules\User\Application\Contracts\UpdateProfileServiceInterface;
 use Modules\User\Application\Contracts\UpdateUserServiceInterface;
@@ -31,15 +34,18 @@ use Modules\User\Application\Services\ChangePasswordService;
 use Modules\User\Application\Services\CreatePermissionService;
 use Modules\User\Application\Services\CreateRoleService;
 use Modules\User\Application\Services\CreateUserService;
+use Modules\User\Application\Services\DeleteUserDeviceService;
 use Modules\User\Application\Services\DeletePermissionService;
 use Modules\User\Application\Services\DeleteRoleService;
 use Modules\User\Application\Services\DeleteUserAttachmentService;
 use Modules\User\Application\Services\DeleteUserService;
+use Modules\User\Application\Services\FindUserDevicesService;
 use Modules\User\Application\Services\FindPermissionService;
 use Modules\User\Application\Services\FindRoleService;
 use Modules\User\Application\Services\FindUserAttachmentsService;
 use Modules\User\Application\Services\FindUserService;
 use Modules\User\Application\Services\SyncRolePermissionsService;
+use Modules\User\Application\Services\UpsertUserDeviceService;
 use Modules\User\Application\Services\UpdatePreferencesService;
 use Modules\User\Application\Services\UpdateProfileService;
 use Modules\User\Application\Services\UpdateUserService;
@@ -48,19 +54,22 @@ use Modules\User\Application\Services\UploadUserAttachmentService;
 use Modules\User\Domain\RepositoryInterfaces\PermissionRepositoryInterface;
 use Modules\User\Domain\RepositoryInterfaces\RoleRepositoryInterface;
 use Modules\User\Domain\RepositoryInterfaces\UserAttachmentRepositoryInterface;
+use Modules\User\Domain\RepositoryInterfaces\UserDeviceRepositoryInterface;
 use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\PermissionModel;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\RoleModel;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserAttachmentModel;
+use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserDeviceModel;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use Modules\User\Infrastructure\Persistence\Eloquent\Repositories\EloquentPermissionRepository;
 use Modules\User\Infrastructure\Persistence\Eloquent\Repositories\EloquentRoleRepository;
 use Modules\User\Infrastructure\Persistence\Eloquent\Repositories\EloquentUserAttachmentRepository;
+use Modules\User\Infrastructure\Persistence\Eloquent\Repositories\EloquentUserDeviceRepository;
 use Modules\User\Infrastructure\Persistence\Eloquent\Repositories\EloquentUserRepository;
 
 class UserServiceProvider extends ServiceProvider
 {
-    public function register()
+    public function register(): void
     {
         $this->app->bind(UserRepositoryInterface::class, function ($app) {
             return new EloquentUserRepository($app->make(UserModel::class));
@@ -73,6 +82,9 @@ class UserServiceProvider extends ServiceProvider
         });
         $this->app->bind(UserAttachmentRepositoryInterface::class, function ($app) {
             return new EloquentUserAttachmentRepository($app->make(UserAttachmentModel::class));
+        });
+        $this->app->bind(UserDeviceRepositoryInterface::class, function ($app) {
+            return new EloquentUserDeviceRepository($app->make(UserDeviceModel::class));
         });
 
         $this->app->bind(CreateUserServiceInterface::class, function ($app) {
@@ -130,6 +142,22 @@ class UserServiceProvider extends ServiceProvider
                 $app->make(UserAttachmentRepositoryInterface::class)
             );
         });
+        $this->app->bind(FindUserDevicesServiceInterface::class, function ($app) {
+            return new FindUserDevicesService(
+                $app->make(UserDeviceRepositoryInterface::class)
+            );
+        });
+        $this->app->bind(UpsertUserDeviceServiceInterface::class, function ($app) {
+            return new UpsertUserDeviceService(
+                $app->make(UserRepositoryInterface::class),
+                $app->make(UserDeviceRepositoryInterface::class)
+            );
+        });
+        $this->app->bind(DeleteUserDeviceServiceInterface::class, function ($app) {
+            return new DeleteUserDeviceService(
+                $app->make(UserDeviceRepositoryInterface::class)
+            );
+        });
 
         $this->app->bind(CreateRoleServiceInterface::class, function ($app) {
             return new CreateRoleService($app->make(RoleRepositoryInterface::class));
@@ -154,7 +182,7 @@ class UserServiceProvider extends ServiceProvider
         });
     }
 
-    public function boot()
+    public function boot(): void
     {
         // $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
         Route::middleware('api')

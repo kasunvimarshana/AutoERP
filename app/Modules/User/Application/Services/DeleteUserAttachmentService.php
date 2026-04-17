@@ -21,14 +21,22 @@ class DeleteUserAttachmentService extends BaseService implements DeleteUserAttac
 
     protected function handle(array $data): bool
     {
-        $attachmentId = $data['attachment_id'];
+        $attachmentId = (int) $data['attachment_id'];
         $attachment = $this->attachmentRepo->find($attachmentId);
         if (! $attachment) {
             throw new AttachmentNotFoundException($attachmentId);
         }
 
-        $this->storage->delete($attachment->getFilePath());
+        $deleted = $this->attachmentRepo->delete($attachmentId);
+        if (! $deleted) {
+            return false;
+        }
 
-        return $this->attachmentRepo->delete($attachmentId);
+        $fileDeleted = $this->storage->delete($attachment->getFilePath());
+        if (! $fileDeleted) {
+            throw new \RuntimeException('Failed to delete attachment file from storage.');
+        }
+
+        return true;
     }
 }

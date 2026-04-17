@@ -36,10 +36,13 @@ class BulkUploadTenantAttachmentsService implements BulkUploadTenantAttachmentsS
      */
     public function execute(array $data): Collection
     {
-        return DB::transaction(function () use ($data): Collection {
+        $storedPaths = [];
+
+        try {
+            return DB::transaction(function () use ($data, &$storedPaths): Collection {
             $tenantId = (int) $data['tenant_id'];
             $files    = $data['files'] ?? [];
-            $type     = $data['type'] ?? null;
+            $type     = isset($data['type']) && is_string($data['type']) ? $data['type'] : null;
             $metadata = isset($data['metadata']) && is_array($data['metadata']) ? $data['metadata'] : null;
 
             $tenant = $this->tenantRepository->find($tenantId);
@@ -53,6 +56,7 @@ class BulkUploadTenantAttachmentsService implements BulkUploadTenantAttachmentsS
                 /** @var UploadedFile $file */
                 $uuid = (string) Str::uuid();
                 $path = $this->storageStrategy->store($file, $tenantId);
+                $storedPaths[] = $path;
 
                 $attachment = new TenantAttachment(
                     tenantId: $tenantId,
@@ -69,6 +73,15 @@ class BulkUploadTenantAttachmentsService implements BulkUploadTenantAttachmentsS
             }
 
             return $saved;
-        });
+            });
+        } catch (\Throwable $exception) {
+            foreach ($storedPaths as $storedPath) {
+                if (is_string($storedPath) && $storedPath !== '') {
+                    $this->storageStrategy->delete($storedPath);
+                }
+            }
+
+            throw $exception;
+        }
     }
 }

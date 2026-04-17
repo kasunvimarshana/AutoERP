@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -20,7 +22,6 @@ return new class extends Migration
             $table->string('phone', 30)->nullable();
             $table->string('avatar')->nullable();
             $table->enum('status', ['active', 'inactive', 'suspended'])->default('active');
-            // $table->boolean('active')->default(true);
             $table->json('preferences')->nullable();
             $table->json('address')->nullable();
             $table->rememberToken();

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Tenant\Application\Services;
 
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Application\Contracts\AttachmentStorageStrategyInterface;
 use Modules\Core\Application\Services\BaseService;
@@ -36,7 +37,7 @@ class UploadTenantAttachmentService extends BaseService implements UploadTenantA
         $tenantId = (int) $data['tenant_id'];
         /** @var UploadedFile $file */
         $file     = $data['file'];
-        $type     = $data['type'] ?? null;
+        $type     = isset($data['type']) && is_string($data['type']) ? $data['type'] : null;
         $metadata = isset($data['metadata']) && is_array($data['metadata']) ? $data['metadata'] : null;
 
         $tenant = $this->tenantRepository->find($tenantId);
@@ -44,28 +45,43 @@ class UploadTenantAttachmentService extends BaseService implements UploadTenantA
             throw new TenantNotFoundException($tenantId);
         }
 
-        $uuid = (string) Str::uuid();
-        $path = $this->storageStrategy->store($file, $tenantId);
+        $storedPath = null;
 
-        $attachment = new TenantAttachment(
-            tenantId: $tenantId,
-            uuid:     $uuid,
-            name:     $file->getClientOriginalName(),
-            filePath: $path,
-            mimeType: (string) $file->getMimeType(),
-            size:     (int) $file->getSize(),
-            type:     $type,
-            metadata: $metadata,
-        );
+        try {
+            $uuid = (string) Str::uuid();
+            $storedPath = $this->storageStrategy->store($file, $tenantId);
 
-        $saved = $this->attachmentRepository->save($attachment);
+            $attachment = new TenantAttachment(
+                tenantId: $tenantId,
+                uuid:     $uuid,
+                name:     $file->getClientOriginalName(),
+                filePath: $storedPath,
+                mimeType: (string) $file->getMimeType(),
+                size:     (int) $file->getSize(),
+                type:     $type,
+                metadata: $metadata,
+            );
 
-        // If this is a logo, update the tenant's logo_path
-        if ($type === 'logo') {
-            $tenant->setLogoPath($path);
-            $this->tenantRepository->save($tenant);
+            $saved = $this->attachmentRepository->save($attachment);
+
+            // If this is a logo, update the tenant's logo_path inside the same transaction.
+            if ($type === 'logo') {
+                $previousLogoPath = $tenant->getLogoPath();
+                $tenant->setLogoPath($storedPath);
+                $this->tenantRepository->save($tenant);
+
+                if ($previousLogoPath !== null && $previousLogoPath !== '' && $previousLogoPath !== $storedPath) {
+                    DB::afterCommit(fn (): bool => $this->storageStrategy->delete($previousLogoPath));
+                }
+            }
+
+            return $saved;
+        } catch (\Throwable $exception) {
+            if (is_string($storedPath) && $storedPath !== '') {
+                $this->storageStrategy->delete($storedPath);
+            }
+
+            throw $exception;
         }
-
-        return $saved;
     }
 }

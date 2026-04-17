@@ -1,5 +1,8 @@
 <?php
 
+declare(strict_types=1);
+
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -21,8 +24,8 @@ return new class extends Migration
             $table->enum('status', ['draft', 'posted', 'reversed'])->default('draft');
             $table->boolean('is_reversed')->default(false);
             $table->foreignId('reversal_entry_id')->nullable()->constrained('journal_entries')->nullOnDelete();
-            $table->foreignId('created_by')->constrained('users');
-            $table->foreignId('posted_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('created_by');
+            $table->foreignId('posted_by')->nullable();
             $table->timestamp('posted_at')->nullable();
             $table->timestamps();
 

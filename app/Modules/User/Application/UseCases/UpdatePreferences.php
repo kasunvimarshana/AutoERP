@@ -13,12 +13,12 @@ use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 class UpdatePreferences
 {
     public function __construct(
-        private UserRepositoryInterface $userRepo
+        private readonly UserRepositoryInterface $userRepository
     ) {}
 
     public function execute(int $userId, UserPreferencesData $data): User
     {
-        $user = $this->userRepo->find($userId);
+        $user = $this->userRepository->find($userId);
         if (! $user) {
             throw new UserNotFoundException($userId);
         }
@@ -31,6 +31,6 @@ class UpdatePreferences
 
         $user->updatePreferences($preferences);
 
-        return $this->userRepo->save($user);
+        return $this->userRepository->save($user);
     }
 }

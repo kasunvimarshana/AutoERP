@@ -5,16 +5,21 @@ declare(strict_types=1);
 namespace Modules\Tenant\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
 use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Tenant\Application\Contracts\CreateTenantServiceInterface;
 use Modules\Tenant\Application\Contracts\DeleteTenantServiceInterface;
+use Modules\Tenant\Application\Contracts\FindTenantAttachmentsServiceInterface;
 use Modules\Tenant\Application\Contracts\FindTenantServiceInterface;
 use Modules\Tenant\Application\Contracts\UpdateTenantConfigServiceInterface;
 use Modules\Tenant\Application\Contracts\UpdateTenantServiceInterface;
 use Modules\Tenant\Application\Contracts\UploadTenantAttachmentServiceInterface;
 use Modules\Tenant\Application\DTOs\TenantData;
 use Modules\Tenant\Domain\Entities\Tenant;
+use Modules\User\Application\Contracts\FindUserServiceInterface;
 use Modules\Tenant\Infrastructure\Http\Requests\StoreTenantRequest;
 use Modules\Tenant\Infrastructure\Http\Requests\ListTenantRequest;
 use Modules\Tenant\Infrastructure\Http\Requests\UpdateTenantConfigRequest;
@@ -22,20 +27,37 @@ use Modules\Tenant\Infrastructure\Http\Requests\UpdateTenantRequest;
 use Modules\Tenant\Infrastructure\Http\Resources\TenantCollection;
 use Modules\Tenant\Infrastructure\Http\Resources\TenantConfigResource;
 use Modules\Tenant\Infrastructure\Http\Resources\TenantResource;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class TenantController extends AuthorizedController
 {
+    /** @var array<string> */
+    private const SUPPORTED_INCLUDES = [
+        'attachments',
+        'users',
+        'roles',
+        'permissions',
+        'devices',
+        'user_attachments',
+        'users.roles',
+        'users.roles.permissions',
+        'users.devices',
+        'users.attachments',
+    ];
+
     public function __construct(
-        protected CreateTenantServiceInterface $createService,
-        protected UpdateTenantServiceInterface $updateService,
-        protected DeleteTenantServiceInterface $deleteService,
-        protected UpdateTenantConfigServiceInterface $configService,
+        protected CreateTenantServiceInterface $createTenantService,
+        protected UpdateTenantServiceInterface $updateTenantService,
+        protected DeleteTenantServiceInterface $deleteTenantService,
+        protected UpdateTenantConfigServiceInterface $updateTenantConfigService,
         protected FindTenantServiceInterface $findTenantService,
+        protected FindTenantAttachmentsServiceInterface $findTenantAttachmentsService,
+        protected FindUserServiceInterface $findUserService,
         protected UploadTenantAttachmentServiceInterface $uploadAttachmentService
     ) {}
 
-    public function index(ListTenantRequest $request): TenantCollection
+    public function index(ListTenantRequest $request): JsonResponse
     {
         $this->authorize('viewAny', Tenant::class);
         $validated = $request->validated();
@@ -48,7 +70,7 @@ class TenantController extends AuthorizedController
         ], static fn (mixed $value): bool => $value !== null && $value !== '');
 
         if (array_key_exists('active', $validated)) {
-            $filters['active'] = $request->boolean('active');
+            $filters['active'] = (bool) $validated['active'];
         }
 
         $perPage = (int) ($validated['per_page'] ?? 15);
@@ -58,74 +80,102 @@ class TenantController extends AuthorizedController
 
         $tenants = $this->findTenantService->list($filters, $perPage, $page, $sort, $include);
 
-        return new TenantCollection($tenants);
+        $normalizedIncludes = $this->parseIncludes($include);
+        if ($normalizedIncludes !== []) {
+            $includeValue = implode(',', $normalizedIncludes);
+
+            $tenants->setCollection(
+                $tenants->getCollection()->map(
+                    fn (Tenant $tenant): TenantResource => $this->buildTenantResource($tenant, $includeValue)
+                )
+            );
+        }
+
+        return (new TenantCollection($tenants))->response();
     }
 
     public function store(StoreTenantRequest $request): JsonResponse
     {
         $this->authorize('create', Tenant::class);
-        $dto = TenantData::fromArray($request->validated());
-        $tenant = $this->createService->execute($dto->toArray());
+        $validated = $request->validated();
+        $logoFile = $request->file('logo');
 
-        if ($request->hasFile('logo')) {
-            $this->uploadAttachmentService->execute([
-                'tenant_id' => $tenant->getId(),
-                'file'      => $request->file('logo'),
-                'type'      => 'logo',
-            ]);
-            $tenant = $this->findTenantService->find($tenant->getId()) ?? $tenant;
-        }
+        $tenant = DB::transaction(function () use ($validated, $logoFile): Tenant {
+            $dto = TenantData::fromArray($validated);
+            $createdTenant = $this->createTenantService->execute($dto->toArray());
 
-        return (new TenantResource($tenant))->response()->setStatusCode(201);
+            if ($logoFile !== null && $createdTenant->getId() !== null) {
+                $this->uploadAttachmentService->execute([
+                    'tenant_id' => $createdTenant->getId(),
+                    'file' => $logoFile,
+                    'type' => 'logo',
+                ]);
+
+                return $this->findTenantService->find($createdTenant->getId()) ?? $createdTenant;
+            }
+
+            return $createdTenant;
+        });
+
+        $resource = $this->buildTenantResource($tenant, $request->query('include'));
+
+        return $resource->response()->setStatusCode(HttpResponse::HTTP_CREATED);
     }
 
-    public function show(int $tenant): TenantResource
+    public function show(Request $request, int $tenantId): TenantResource
     {
-        $tenantEntity = $this->findTenantOrFail($tenant);
+        $tenantEntity = $this->findTenantOrFail($tenantId);
         $this->authorize('view', $tenantEntity);
 
-        return new TenantResource($tenantEntity);
+        return $this->buildTenantResource($tenantEntity, $request->query('include'));
     }
 
-    public function update(UpdateTenantRequest $request, int $tenant): TenantResource
+    public function update(UpdateTenantRequest $request, int $tenantId): TenantResource
     {
-        $tenantEntity = $this->findTenantOrFail($tenant);
+        $tenantEntity = $this->findTenantOrFail($tenantId);
         $this->authorize('update', $tenantEntity);
 
-        $payload = $request->validated();
-        $payload['id'] = $tenant;
-        $updated = $this->updateService->execute($payload);
+        $validated = $request->validated();
+        $logoFile = $request->file('logo');
 
-        if ($request->hasFile('logo')) {
-            $this->uploadAttachmentService->execute([
-                'tenant_id' => $tenant,
-                'file'      => $request->file('logo'),
-                'type'      => 'logo',
-            ]);
+        $updated = DB::transaction(function () use ($validated, $logoFile, $tenantId): Tenant {
+            $payload = $validated;
+            $payload['id'] = $tenantId;
+            $updatedTenant = $this->updateTenantService->execute($payload);
 
-            $updated = $this->findTenantService->find($tenant) ?? $updated;
-        }
+            if ($logoFile !== null) {
+                $this->uploadAttachmentService->execute([
+                    'tenant_id' => $tenantId,
+                    'file' => $logoFile,
+                    'type' => 'logo',
+                ]);
 
-        return new TenantResource($updated);
+                return $this->findTenantService->find($tenantId) ?? $updatedTenant;
+            }
+
+            return $updatedTenant;
+        });
+
+        return $this->buildTenantResource($updated, $request->query('include'));
     }
 
-    public function updateConfig(UpdateTenantConfigRequest $request, int $tenant): TenantConfigResource
+    public function updateConfig(UpdateTenantConfigRequest $request, int $tenantId): TenantConfigResource
     {
-        $tenantEntity = $this->findTenantOrFail($tenant);
+        $tenantEntity = $this->findTenantOrFail($tenantId);
         $this->authorize('updateConfig', $tenantEntity);
 
         $validated = $request->validated();
-        $validated['id'] = $tenant;
-        $updated = $this->configService->execute($validated);
+        $validated['id'] = $tenantId;
+        $updated = $this->updateTenantConfigService->execute($validated);
 
         return new TenantConfigResource($updated);
     }
 
-    public function destroy(int $tenant): JsonResponse
+    public function destroy(int $tenantId): JsonResponse
     {
-        $tenantEntity = $this->findTenantOrFail($tenant);
+        $tenantEntity = $this->findTenantOrFail($tenantId);
         $this->authorize('delete', $tenantEntity);
-        $this->deleteService->execute(['id' => $tenant]);
+        $this->deleteTenantService->execute(['id' => $tenantId]);
 
         return Response::json(['message' => 'Tenant deleted successfully']);
     }
@@ -150,4 +200,90 @@ class TenantController extends AuthorizedController
         return $tenant;
     }
 
+    private function buildTenantResource(Tenant $tenant, mixed $includeValue): TenantResource
+    {
+        $includes = $this->parseIncludes($includeValue);
+        $tenantId = $tenant->getId();
+
+        $includeUsers = $tenantId !== null && (
+            in_array('users', $includes, true)
+            || in_array('roles', $includes, true)
+            || in_array('permissions', $includes, true)
+            || in_array('devices', $includes, true)
+            || in_array('user_attachments', $includes, true)
+            || in_array('users.roles', $includes, true)
+            || in_array('users.roles.permissions', $includes, true)
+            || in_array('users.devices', $includes, true)
+            || in_array('users.attachments', $includes, true)
+        );
+
+        return new TenantResource(
+            resource: $tenant,
+            attachments: in_array('attachments', $includes, true) && $tenantId !== null
+                ? $this->findTenantAttachmentsService->findByTenant($tenantId)
+                : null,
+            users: $includeUsers
+                ? $this->collectTenantUsers(
+                    tenantId: $tenantId,
+                    includeRoles: in_array('roles', $includes, true) || in_array('users.roles', $includes, true),
+                    includePermissions: in_array('permissions', $includes, true) || in_array('users.roles.permissions', $includes, true),
+                    includeDevices: in_array('devices', $includes, true) || in_array('users.devices', $includes, true),
+                    includeUserAttachments: in_array('user_attachments', $includes, true) || in_array('users.attachments', $includes, true),
+                )
+                : null
+        );
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function parseIncludes(mixed $includeValue): array
+    {
+        if (! is_string($includeValue) || trim($includeValue) === '') {
+            return [];
+        }
+
+        $requestedIncludes = array_map('trim', explode(',', $includeValue));
+
+        return array_values(array_unique(array_filter(
+            $requestedIncludes,
+            fn (string $include): bool => in_array($include, self::SUPPORTED_INCLUDES, true)
+        )));
+    }
+
+    private function collectTenantUsers(
+        ?int $tenantId,
+        bool $includeRoles,
+        bool $includePermissions,
+        bool $includeDevices,
+        bool $includeUserAttachments,
+    ): ?Collection {
+        if ($tenantId === null) {
+            return null;
+        }
+
+        $includeParts = [];
+        if ($includeRoles) {
+            $includeParts[] = 'roles';
+        }
+        if ($includePermissions) {
+            $includeParts[] = 'permissions';
+        }
+        if ($includeDevices) {
+            $includeParts[] = 'devices';
+        }
+        if ($includeUserAttachments) {
+            $includeParts[] = 'attachments';
+        }
+
+        $usersPaginator = $this->findUserService->list(
+            filters: ['tenant_id' => $tenantId],
+            perPage: 100,
+            page: 1,
+            sort: null,
+            include: empty($includeParts) ? null : implode(',', $includeParts)
+        );
+
+        return Collection::make($usersPaginator->items());
+    }
 }

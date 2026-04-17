@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Infrastructure\Http\Resources;
 
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 
 class TenantAttachmentResource extends JsonResource
 {
-    public function toArray($request): array
+    public function toArray(Request $request): array
     {
         $storage = app(FileStorageServiceInterface::class);
 

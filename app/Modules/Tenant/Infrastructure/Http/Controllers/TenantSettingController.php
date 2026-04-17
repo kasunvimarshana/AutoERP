@@ -19,6 +19,7 @@ use Modules\Tenant\Infrastructure\Http\Requests\StoreTenantSettingRequest;
 use Modules\Tenant\Infrastructure\Http\Requests\UpdateTenantSettingRequest;
 use Modules\Tenant\Infrastructure\Http\Resources\TenantSettingCollection;
 use Modules\Tenant\Infrastructure\Http\Resources\TenantSettingResource;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class TenantSettingController extends AuthorizedController
@@ -78,7 +79,7 @@ class TenantSettingController extends AuthorizedController
         $dto = TenantSettingData::fromArray($validated);
         $created = $this->createSettingService->execute($dto->toArray());
 
-        return (new TenantSettingResource($created))->response()->setStatusCode(201);
+        return (new TenantSettingResource($created))->response()->setStatusCode(HttpResponse::HTTP_CREATED);
     }
 
     public function update(int $tenant, string $key, UpdateTenantSettingRequest $request): TenantSettingResource

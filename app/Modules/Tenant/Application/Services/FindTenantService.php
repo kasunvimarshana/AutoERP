@@ -24,7 +24,20 @@ class FindTenantService implements FindTenantServiceInterface
     private const ALLOWED_SORTS = ['id', 'name', 'slug', 'domain', 'active', 'status', 'created_at', 'updated_at'];
 
     /** @var array<string> */
-    private const ALLOWED_INCLUDES = ['attachments', 'tenantPlan', 'settingsItems'];
+    private const ALLOWED_INCLUDES = [
+        'attachments',
+        'tenantPlan',
+        'settingsItems',
+        'roles',
+        'permissions',
+        'devices',
+        'user_attachments',
+        'users',
+        'users.roles',
+        'users.roles.permissions',
+        'users.devices',
+        'users.attachments',
+    ];
 
     public function __construct(
         private readonly TenantRepositoryInterface $tenantRepository
@@ -101,11 +114,25 @@ class FindTenantService implements FindTenantServiceInterface
             return [];
         }
 
-        $relations = array_map('trim', explode(',', $include));
+        $relations = array_map(
+            fn (string $relation): string => $this->normalizeInclude(trim($relation)),
+            explode(',', $include)
+        );
 
         return array_values(array_unique(array_filter(
             $relations,
             fn (string $relation): bool => in_array($relation, self::ALLOWED_INCLUDES, true)
         )));
+    }
+
+    private function normalizeInclude(string $include): string
+    {
+        return match ($include) {
+            'roles' => 'users.roles',
+            'permissions' => 'users.roles.permissions',
+            'devices' => 'users.devices',
+            'user_attachments' => 'users.attachments',
+            default => $include,
+        };
     }
 }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Models;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
@@ -36,7 +38,7 @@ class TenantAttachmentModel extends Model
     /**
      * Get the tenant that owns this attachment.
      */
-    public function tenant()
+    public function tenant(): BelongsTo
     {
         return $this->belongsTo(TenantModel::class, 'tenant_id');
     }
@@ -44,7 +46,7 @@ class TenantAttachmentModel extends Model
     /**
      * Scope to filter by attachment type.
      */
-    public function scopeByType($query, ?string $type)
+    public function scopeByType(Builder $query, ?string $type): Builder
     {
         if ($type) {
             return $query->where('type', $type);

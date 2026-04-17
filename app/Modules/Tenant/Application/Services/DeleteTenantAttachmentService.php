@@ -9,11 +9,13 @@ use Modules\Core\Application\Services\BaseService;
 use Modules\Tenant\Application\Contracts\DeleteTenantAttachmentServiceInterface;
 use Modules\Tenant\Domain\Exceptions\AttachmentNotFoundException;
 use Modules\Tenant\Domain\RepositoryInterfaces\TenantAttachmentRepositoryInterface;
+use Modules\Tenant\Domain\RepositoryInterfaces\TenantRepositoryInterface;
 
 class DeleteTenantAttachmentService extends BaseService implements DeleteTenantAttachmentServiceInterface
 {
     public function __construct(
         private readonly TenantAttachmentRepositoryInterface $attachmentRepository,
+        private readonly TenantRepositoryInterface $tenantRepository,
         private readonly AttachmentStorageStrategyInterface $storageStrategy
     ) {
         parent::__construct($attachmentRepository);
@@ -21,14 +23,34 @@ class DeleteTenantAttachmentService extends BaseService implements DeleteTenantA
 
     protected function handle(array $data): bool
     {
-        $attachmentId = $data['attachment_id'];
+        $attachmentId = (int) $data['attachment_id'];
         $attachment   = $this->attachmentRepository->find($attachmentId);
         if (! $attachment) {
             throw new AttachmentNotFoundException($attachmentId);
         }
 
-        $this->storageStrategy->delete($attachment->getFilePath());
+        $filePath = $attachment->getFilePath();
+        $attachmentType = $attachment->getType();
+        $tenantId = $attachment->getTenantId();
 
-        return $this->attachmentRepository->delete($attachmentId);
+        $deleted = $this->attachmentRepository->delete($attachmentId);
+        if (! $deleted) {
+            return false;
+        }
+
+        if ($attachmentType === 'logo') {
+            $tenant = $this->tenantRepository->find($tenantId);
+            if ($tenant && $tenant->getLogoPath() === $filePath) {
+                $tenant->setLogoPath(null);
+                $this->tenantRepository->save($tenant);
+            }
+        }
+
+        $fileDeleted = $this->storageStrategy->delete($filePath);
+        if (! $fileDeleted) {
+            throw new \RuntimeException('Failed to delete attachment file from storage.');
+        }
+
+        return true;
     }
 }

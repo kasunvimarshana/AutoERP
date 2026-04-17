@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\User\Application\Services;
 
+use Illuminate\Support\Facades\DB;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Application\Services\BaseService;
 use Modules\User\Application\Contracts\UploadAvatarServiceInterface;
@@ -14,38 +15,61 @@ use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 
 class UploadAvatarService extends BaseService implements UploadAvatarServiceInterface
 {
-    private UserRepositoryInterface $userRepository;
-
     public function __construct(
-        UserRepositoryInterface $repository,
-        protected FileStorageServiceInterface $storage
+        private readonly UserRepositoryInterface $userRepository,
+        private readonly FileStorageServiceInterface $storage
     ) {
-        parent::__construct($repository);
-        $this->userRepository = $repository;
+        parent::__construct($userRepository);
     }
 
     protected function handle(array $data): User
     {
-        $userId = $data['user_id'];
-        $fileInfo = $data['file'];
+        $userId = (int) $data['user_id'];
+        /** @var array<string, mixed> $fileInfo */
+        $fileInfo = is_array($data['file'] ?? null) ? $data['file'] : [];
+        $tmpPath = isset($fileInfo['tmp_path']) && is_string($fileInfo['tmp_path']) ? $fileInfo['tmp_path'] : null;
+        $originalName = isset($fileInfo['name']) && is_string($fileInfo['name']) ? $fileInfo['name'] : null;
+
+        if ($tmpPath === null || $tmpPath === '' || $originalName === null || $originalName === '') {
+            throw new \InvalidArgumentException('Invalid avatar file payload.');
+        }
 
         $user = $this->userRepository->find($userId);
         if (! $user) {
             throw new UserNotFoundException($userId);
         }
 
-        $path = $this->storage->store(
-            $fileInfo['tmp_path'],
-            "avatars/{$userId}",
-            $fileInfo['name']
-        );
+        $previousAvatarPath = $user->getAvatar();
+        $storedAvatarPath = null;
 
-        $this->userRepository->updateAvatar($userId, $path);
-        $user->changeAvatar($path);
+        try {
+            $storedAvatarPath = $this->storage->store(
+                $tmpPath,
+                "avatars/{$userId}",
+                $originalName
+            );
 
-        $saved = $this->userRepository->find($userId);
-        $this->addEvent(new UserAvatarUpdated($saved));
+            $this->userRepository->updateAvatar($userId, $storedAvatarPath);
+            $user->changeAvatar($storedAvatarPath);
 
-        return $saved;
+            if (
+                $previousAvatarPath !== null
+                && $previousAvatarPath !== ''
+                && $previousAvatarPath !== $storedAvatarPath
+            ) {
+                DB::afterCommit(fn (): bool => $this->storage->delete($previousAvatarPath));
+            }
+
+            $saved = $this->userRepository->find($userId);
+            $this->addEvent(new UserAvatarUpdated($saved));
+
+            return $saved;
+        } catch (\Throwable $exception) {
+            if (is_string($storedAvatarPath) && $storedAvatarPath !== '') {
+                $this->storage->delete($storedAvatarPath);
+            }
+
+            throw $exception;
+        }
     }
 }

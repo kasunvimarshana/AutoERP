@@ -1,5 +1,8 @@
 <?php
 
+declare(strict_types=1);
+
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -11,7 +14,7 @@ return new class extends Migration
         Schema::create('sales_returns', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('customer_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('customer_id');
             $table->foreignId('original_sales_order_id')->nullable()->constrained('sales_orders')->nullOnDelete();
             $table->foreignId('original_invoice_id')->nullable()->constrained('sales_invoices')->nullOnDelete();
             $table->string('return_number');
@@ -27,7 +30,6 @@ return new class extends Migration
             $table->string('credit_memo_number')->nullable();
             // Sales returns JE
             $table->foreignId('journal_entry_id')->nullable();
-            $table->foreign('journal_entry_id')->references('id')->on('journal_entries')->nullOnDelete();
             $table->text('notes')->nullable();
             $table->json('metadata')->nullable();
             $table->timestamps();
@@ -39,12 +41,12 @@ return new class extends Migration
             $table->id();
             $table->foreignId('sales_return_id')->constrained()->cascadeOnDelete();
             $table->foreignId('original_sales_order_line_id')->nullable()->constrained('sales_order_lines')->nullOnDelete();
-            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('variant_id')->nullable()->constrained('product_variants')->nullOnDelete();
-            $table->foreignId('batch_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignId('serial_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignId('to_location_id')->constrained('warehouse_locations')->cascadeOnDelete(); // where restocked
-            $table->foreignId('uom_id')->constrained('units_of_measure');
+            $table->foreignId('product_id');
+            $table->foreignId('variant_id')->nullable();
+            $table->foreignId('batch_id')->nullable();
+            $table->foreignId('serial_id')->nullable();
+            $table->foreignId('to_location_id'); // where restocked
+            $table->foreignId('uom_id');
             $table->decimal('return_qty', 15, 4);
             $table->decimal('unit_price', 15, 4);
             $table->decimal('line_total', 15, 4)->storedAs('return_qty * unit_price');

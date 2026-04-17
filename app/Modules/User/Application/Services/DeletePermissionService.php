@@ -11,17 +11,14 @@ use Modules\User\Domain\RepositoryInterfaces\PermissionRepositoryInterface;
 
 class DeletePermissionService extends BaseService implements DeletePermissionServiceInterface
 {
-    private PermissionRepositoryInterface $permissionRepository;
-
-    public function __construct(PermissionRepositoryInterface $repository)
+    public function __construct(private readonly PermissionRepositoryInterface $permissionRepository)
     {
-        parent::__construct($repository);
-        $this->permissionRepository = $repository;
+        parent::__construct($permissionRepository);
     }
 
     protected function handle(array $data): bool
     {
-        $id = $data['id'];
+        $id = (int) $data['id'];
         if (! $this->permissionRepository->find($id)) {
             throw new PermissionNotFoundException($id);
         }

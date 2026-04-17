@@ -151,6 +151,7 @@ class TenantServiceProvider extends ServiceProvider
         $this->app->bind(DeleteTenantAttachmentServiceInterface::class, function ($app) {
             return new DeleteTenantAttachmentService(
                 $app->make(TenantAttachmentRepositoryInterface::class),
+                $app->make(TenantRepositoryInterface::class),
                 $app->make(AttachmentStorageStrategyInterface::class)
             );
         });

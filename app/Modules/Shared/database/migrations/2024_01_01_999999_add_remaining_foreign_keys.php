@@ -1,102 +1,130 @@
 <?php
 
-// use Illuminate\Database\Migrations\Migration;
-// use Illuminate\Database\Schema\Blueprint;
-// use Illuminate\Support\Facades\Schema;
+declare(strict_types=1);
 
-// return new class extends Migration
-// {
-//     public function up(): void
-//     {
-//         // Customers AR account
-//         Schema::table('customers', function (Blueprint $table) {
-//             $table->foreign('ar_account_id')->references('id')->on('accounts')->nullOnDelete();
-//         });
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
-//         // Suppliers AP account
-//         Schema::table('suppliers', function (Blueprint $table) {
-//             $table->foreign('ap_account_id')->references('id')->on('accounts')->nullOnDelete();
-//         });
+return new class extends Migration
+{
+    public function up(): void
+    {
+        // Purchase
+        $this->addForeignIfPossible('purchase_orders', 'supplier_id', 'suppliers', 'cascade');
+        $this->addForeignIfPossible('purchase_orders', 'org_unit_id', 'org_units', 'null');
+        $this->addForeignIfPossible('purchase_orders', 'warehouse_id', 'warehouses', 'cascade');
+        $this->addForeignIfPossible('purchase_orders', 'created_by', 'users');
+        $this->addForeignIfPossible('purchase_orders', 'approved_by', 'users', 'null');
 
-//         // Products account references
-//         Schema::table('products', function (Blueprint $table) {
-//             $table->foreign('income_account_id')->references('id')->on('accounts')->nullOnDelete();
-//             $table->foreign('cogs_account_id')->references('id')->on('accounts')->nullOnDelete();
-//             $table->foreign('inventory_account_id')->references('id')->on('accounts')->nullOnDelete();
-//             $table->foreign('expense_account_id')->references('id')->on('accounts')->nullOnDelete();
-//         });
+        $this->addForeignIfPossible('purchase_order_lines', 'product_id', 'products', 'cascade');
+        $this->addForeignIfPossible('purchase_order_lines', 'variant_id', 'product_variants', 'null');
+        $this->addForeignIfPossible('purchase_order_lines', 'uom_id', 'units_of_measure');
+        $this->addForeignIfPossible('purchase_order_lines', 'tax_class_id', 'tax_classes', 'null');
+        $this->addForeignIfPossible('purchase_order_lines', 'account_id', 'accounts', 'null');
 
-//         // Purchase order lines account
-//         Schema::table('purchase_order_lines', function (Blueprint $table) {
-//             $table->foreign('account_id')->references('id')->on('accounts')->nullOnDelete();
-//         });
+        $this->addForeignIfPossible('grn_headers', 'supplier_id', 'suppliers', 'cascade');
+        $this->addForeignIfPossible('grn_headers', 'warehouse_id', 'warehouses', 'cascade');
+        $this->addForeignIfPossible('grn_headers', 'created_by', 'users');
 
-//         // Purchase invoices AP account & JE
-//         Schema::table('purchase_invoices', function (Blueprint $table) {
-//             $table->foreign('ap_account_id')->references('id')->on('accounts')->nullOnDelete();
-//             $table->foreign('journal_entry_id')->references('id')->on('journal_entries')->nullOnDelete();
-//         });
+        $this->addForeignIfPossible('grn_lines', 'product_id', 'products', 'cascade');
+        $this->addForeignIfPossible('grn_lines', 'variant_id', 'product_variants', 'null');
+        $this->addForeignIfPossible('grn_lines', 'batch_id', 'batches', 'null');
+        $this->addForeignIfPossible('grn_lines', 'serial_id', 'serials', 'null');
+        $this->addForeignIfPossible('grn_lines', 'location_id', 'warehouse_locations', 'cascade');
+        $this->addForeignIfPossible('grn_lines', 'uom_id', 'units_of_measure');
 
-//         // Purchase invoice lines account
-//         Schema::table('purchase_invoice_lines', function (Blueprint $table) {
-//             $table->foreign('account_id')->references('id')->on('accounts')->nullOnDelete();
-//         });
+        $this->addForeignIfPossible('purchase_invoices', 'supplier_id', 'suppliers', 'cascade');
+        $this->addForeignIfPossible('purchase_invoices', 'ap_account_id', 'accounts', 'null');
+        $this->addForeignIfPossible('purchase_invoices', 'journal_entry_id', 'journal_entries', 'null');
 
-//         // Purchase returns JE
-//         Schema::table('purchase_returns', function (Blueprint $table) {
-//             $table->foreign('journal_entry_id')->references('id')->on('journal_entries')->nullOnDelete();
-//         });
+        $this->addForeignIfPossible('purchase_invoice_lines', 'product_id', 'products', 'cascade');
+        $this->addForeignIfPossible('purchase_invoice_lines', 'variant_id', 'product_variants', 'null');
+        $this->addForeignIfPossible('purchase_invoice_lines', 'uom_id', 'units_of_measure');
+        $this->addForeignIfPossible('purchase_invoice_lines', 'account_id', 'accounts', 'null');
 
-//         // Sales order lines income account
-//         Schema::table('sales_order_lines', function (Blueprint $table) {
-//             $table->foreign('income_account_id')->references('id')->on('accounts')->nullOnDelete();
-//         });
+        $this->addForeignIfPossible('purchase_returns', 'supplier_id', 'suppliers', 'cascade');
+        $this->addForeignIfPossible('purchase_returns', 'journal_entry_id', 'journal_entries', 'null');
 
-//         // Sales invoices AR account & JE
-//         Schema::table('sales_invoices', function (Blueprint $table) {
-//             $table->foreign('ar_account_id')->references('id')->on('accounts')->nullOnDelete();
-//             $table->foreign('journal_entry_id')->references('id')->on('journal_entries')->nullOnDelete();
-//         });
+        $this->addForeignIfPossible('purchase_return_lines', 'product_id', 'products', 'cascade');
+        $this->addForeignIfPossible('purchase_return_lines', 'variant_id', 'product_variants', 'null');
+        $this->addForeignIfPossible('purchase_return_lines', 'batch_id', 'batches', 'null');
+        $this->addForeignIfPossible('purchase_return_lines', 'serial_id', 'serials', 'null');
+        $this->addForeignIfPossible('purchase_return_lines', 'from_location_id', 'warehouse_locations', 'cascade');
+        $this->addForeignIfPossible('purchase_return_lines', 'uom_id', 'units_of_measure');
 
-//         // Sales invoice lines income account
-//         Schema::table('sales_invoice_lines', function (Blueprint $table) {
-//             $table->foreign('income_account_id')->references('id')->on('accounts')->nullOnDelete();
-//         });
+        // Sales
+        $this->addForeignIfPossible('sales_orders', 'customer_id', 'customers', 'cascade');
+        $this->addForeignIfPossible('sales_orders', 'org_unit_id', 'org_units', 'null');
+        $this->addForeignIfPossible('sales_orders', 'warehouse_id', 'warehouses', 'cascade');
+        $this->addForeignIfPossible('sales_orders', 'price_list_id', 'price_lists', 'null');
+        $this->addForeignIfPossible('sales_orders', 'created_by', 'users');
+        $this->addForeignIfPossible('sales_orders', 'approved_by', 'users', 'null');
 
-//         // Sales returns JE
-//         Schema::table('sales_returns', function (Blueprint $table) {
-//             $table->foreign('journal_entry_id')->references('id')->on('journal_entries')->nullOnDelete();
-//         });
+        $this->addForeignIfPossible('sales_order_lines', 'product_id', 'products', 'cascade');
+        $this->addForeignIfPossible('sales_order_lines', 'variant_id', 'product_variants', 'null');
+        $this->addForeignIfPossible('sales_order_lines', 'uom_id', 'units_of_measure');
+        $this->addForeignIfPossible('sales_order_lines', 'tax_class_id', 'tax_classes', 'null');
+        $this->addForeignIfPossible('sales_order_lines', 'income_account_id', 'accounts', 'null');
+        $this->addForeignIfPossible('sales_order_lines', 'batch_id', 'batches', 'null');
+        $this->addForeignIfPossible('sales_order_lines', 'serial_id', 'serials', 'null');
 
-//         // Tax rates account
-//         Schema::table('tax_rates', function (Blueprint $table) {
-//             $table->foreign('account_id')->references('id')->on('accounts')->nullOnDelete();
-//         });
+        $this->addForeignIfPossible('shipments', 'customer_id', 'customers', 'cascade');
+        $this->addForeignIfPossible('shipments', 'warehouse_id', 'warehouses', 'cascade');
 
-//         // Payments JE
-//         Schema::table('payments', function (Blueprint $table) {
-//             $table->foreign('journal_entry_id')->references('id')->on('journal_entries')->nullOnDelete();
-//         });
+        $this->addForeignIfPossible('shipment_lines', 'product_id', 'products', 'cascade');
+        $this->addForeignIfPossible('shipment_lines', 'variant_id', 'product_variants', 'null');
+        $this->addForeignIfPossible('shipment_lines', 'batch_id', 'batches', 'null');
+        $this->addForeignIfPossible('shipment_lines', 'serial_id', 'serials', 'null');
+        $this->addForeignIfPossible('shipment_lines', 'from_location_id', 'warehouse_locations', 'cascade');
+        $this->addForeignIfPossible('shipment_lines', 'uom_id', 'units_of_measure');
 
-//         // Credit memos JE
-//         Schema::table('credit_memos', function (Blueprint $table) {
-//             $table->foreign('journal_entry_id')->references('id')->on('journal_entries')->nullOnDelete();
-//         });
+        $this->addForeignIfPossible('sales_invoices', 'customer_id', 'customers', 'cascade');
+        $this->addForeignIfPossible('sales_invoices', 'ar_account_id', 'accounts', 'null');
+        $this->addForeignIfPossible('sales_invoices', 'journal_entry_id', 'journal_entries', 'null');
 
-//         // Bank transactions matched JE
-//         Schema::table('bank_transactions', function (Blueprint $table) {
-//             $table->foreign('matched_journal_entry_id')->references('id')->on('journal_entries')->nullOnDelete();
-//             $table->foreign('category_rule_id')->references('id')->on('bank_category_rules')->nullOnDelete();
-//         });
+        $this->addForeignIfPossible('sales_invoice_lines', 'product_id', 'products', 'cascade');
+        $this->addForeignIfPossible('sales_invoice_lines', 'variant_id', 'product_variants', 'null');
+        $this->addForeignIfPossible('sales_invoice_lines', 'uom_id', 'units_of_measure');
+        $this->addForeignIfPossible('sales_invoice_lines', 'income_account_id', 'accounts', 'null');
 
-//         // Org units manager reference
-//         Schema::table('org_units', function (Blueprint $table) {
-//             $table->foreign('manager_user_id')->references('id')->on('users')->nullOnDelete();
-//         });
-//     }
+        $this->addForeignIfPossible('sales_returns', 'customer_id', 'customers', 'cascade');
+        $this->addForeignIfPossible('sales_returns', 'journal_entry_id', 'journal_entries', 'null');
 
-//     public function down(): void
-//     {
-//         // Drop foreign keys in reverse order
-//     }
-// };
+        $this->addForeignIfPossible('sales_return_lines', 'product_id', 'products', 'cascade');
+        $this->addForeignIfPossible('sales_return_lines', 'variant_id', 'product_variants', 'null');
+        $this->addForeignIfPossible('sales_return_lines', 'batch_id', 'batches', 'null');
+        $this->addForeignIfPossible('sales_return_lines', 'serial_id', 'serials', 'null');
+        $this->addForeignIfPossible('sales_return_lines', 'to_location_id', 'warehouse_locations', 'cascade');
+        $this->addForeignIfPossible('sales_return_lines', 'uom_id', 'units_of_measure');
+
+        // Finance
+        $this->addForeignIfPossible('journal_entries', 'created_by', 'users');
+        $this->addForeignIfPossible('journal_entries', 'posted_by', 'users', 'null');
+    }
+
+    public function down(): void
+    {
+        // No-op.
+    }
+
+    private function addForeignIfPossible(string $tableName, string $column, string $referencedTable, string $onDelete = 'none'): void
+    {
+        if (!Schema::hasTable($tableName) || !Schema::hasTable($referencedTable) || !Schema::hasColumn($tableName, $column)) {
+            return;
+        }
+
+        Schema::table($tableName, function (Blueprint $table) use ($column, $referencedTable, $onDelete): void {
+            try {
+                $foreign = $table->foreign($column)->references('id')->on($referencedTable);
+                if ($onDelete === 'cascade') {
+                    $foreign->cascadeOnDelete();
+                } elseif ($onDelete === 'null') {
+                    $foreign->nullOnDelete();
+                }
+            } catch (\Throwable) {
+                // Ignore if constraint already exists or cannot be added in current environment.
+            }
+        });
+    }
+};

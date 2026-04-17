@@ -12,17 +12,14 @@ use Modules\Tenant\Domain\RepositoryInterfaces\TenantRepositoryInterface;
 
 class DeleteTenantService extends BaseService implements DeleteTenantServiceInterface
 {
-    private TenantRepositoryInterface $tenantRepository;
-
-    public function __construct(TenantRepositoryInterface $repository)
+    public function __construct(private readonly TenantRepositoryInterface $tenantRepository)
     {
-        parent::__construct($repository);
-        $this->tenantRepository = $repository;
+        parent::__construct($tenantRepository);
     }
 
     protected function handle(array $data): bool
     {
-        $id = $data['id'];
+        $id = (int) $data['id'];
         $tenant = $this->tenantRepository->find($id);
         if (! $tenant) {
             throw new TenantNotFoundException($id);

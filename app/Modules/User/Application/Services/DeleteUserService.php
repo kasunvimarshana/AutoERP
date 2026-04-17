@@ -11,17 +11,14 @@ use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 
 class DeleteUserService extends BaseService implements DeleteUserServiceInterface
 {
-    private UserRepositoryInterface $userRepository;
-
-    public function __construct(UserRepositoryInterface $repository)
+    public function __construct(private readonly UserRepositoryInterface $userRepository)
     {
-        parent::__construct($repository);
-        $this->userRepository = $repository;
+        parent::__construct($userRepository);
     }
 
     protected function handle(array $data): bool
     {
-        $id = $data['id'];
+        $id = (int) $data['id'];
         $user = $this->userRepository->find($id);
         if (! $user) {
             throw new UserNotFoundException($id);

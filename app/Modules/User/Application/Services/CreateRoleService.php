@@ -11,19 +11,16 @@ use Modules\User\Domain\RepositoryInterfaces\RoleRepositoryInterface;
 
 class CreateRoleService extends BaseService implements CreateRoleServiceInterface
 {
-    private RoleRepositoryInterface $roleRepository;
-
-    public function __construct(RoleRepositoryInterface $repository)
+    public function __construct(private readonly RoleRepositoryInterface $roleRepository)
     {
-        parent::__construct($repository);
-        $this->roleRepository = $repository;
+        parent::__construct($roleRepository);
     }
 
     protected function handle(array $data): Role
     {
         $role = new Role(
-            tenantId: $data['tenant_id'],
-            name: $data['name']
+            tenantId: (int) $data['tenant_id'],
+            name: (string) $data['name']
         );
 
         return $this->roleRepository->save($role);

@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 
 /**
  * @property int $id
@@ -77,18 +80,23 @@ class TenantModel extends Model
         'subscription_ends_at' => 'datetime',
     ];
 
-    public function attachments()
+    public function attachments(): HasMany
     {
         return $this->hasMany(TenantAttachmentModel::class, 'tenant_id');
     }
 
-    public function tenantPlan()
+    public function tenantPlan(): BelongsTo
     {
         return $this->belongsTo(TenantPlanModel::class, 'tenant_plan_id');
     }
 
-    public function settingsItems()
+    public function settingsItems(): HasMany
     {
         return $this->hasMany(TenantSettingModel::class, 'tenant_id');
+    }
+
+    public function users(): HasMany
+    {
+        return $this->hasMany(UserModel::class, 'tenant_id');
     }
 }

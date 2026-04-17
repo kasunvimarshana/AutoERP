@@ -16,6 +16,7 @@ class UserAttachmentModel extends Model
     protected $table = 'user_attachments';
 
     protected $fillable = [
+        'tenant_id',
         'user_id',
         'uuid',
         'name',

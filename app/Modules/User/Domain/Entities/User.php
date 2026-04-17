@@ -35,6 +35,14 @@ class User
 
     private Collection $roles; // Collection of Role entities
 
+    private Collection $attachments; // Collection of UserAttachment entities
+
+    private bool $attachmentsLoaded = false;
+
+    private Collection $devices; // Collection of UserDevice entities
+
+    private bool $devicesLoaded = false;
+
     private \DateTimeInterface $createdAt;
 
     private \DateTimeInterface $updatedAt;
@@ -64,6 +72,8 @@ class User
         $this->active = $active;
         $this->avatar = $avatar;
         $this->roles = new Collection;
+        $this->attachments = new Collection;
+        $this->devices = new Collection;
         $this->createdAt = $createdAt ?? new \DateTimeImmutable;
         $this->updatedAt = $updatedAt ?? new \DateTimeImmutable;
     }
@@ -129,6 +139,26 @@ class User
         return $this->roles;
     }
 
+    public function getAttachments(): Collection
+    {
+        return $this->attachments;
+    }
+
+    public function hasLoadedAttachments(): bool
+    {
+        return $this->attachmentsLoaded;
+    }
+
+    public function getDevices(): Collection
+    {
+        return $this->devices;
+    }
+
+    public function hasLoadedDevices(): bool
+    {
+        return $this->devicesLoaded;
+    }
+
     public function getCreatedAt(): \DateTimeInterface
     {
         return $this->createdAt;
@@ -175,6 +205,12 @@ class User
         $this->updatedAt = new \DateTimeImmutable;
     }
 
+    public function changeEmail(Email $email): void
+    {
+        $this->email = $email;
+        $this->updatedAt = new \DateTimeImmutable;
+    }
+
     public function updatePreferences(UserPreferences $preferences): void
     {
         $this->preferences = $preferences;
@@ -191,6 +227,18 @@ class User
     {
         $this->avatar = $avatarPath;
         $this->updatedAt = new \DateTimeImmutable;
+    }
+
+    public function setAttachments(Collection $attachments): void
+    {
+        $this->attachments = $attachments;
+        $this->attachmentsLoaded = true;
+    }
+
+    public function setDevices(Collection $devices): void
+    {
+        $this->devices = $devices;
+        $this->devicesLoaded = true;
     }
 
     public function deactivate(): void

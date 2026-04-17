@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\User\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -26,9 +27,9 @@ class UserModel extends Authenticatable implements OAuthenticatable
         'last_name',
         'phone',
         'avatar',
+        'status',
         'address',
         'preferences',
-        'active',
     ];
 
     protected $hidden = [
@@ -39,7 +40,6 @@ class UserModel extends Authenticatable implements OAuthenticatable
     protected $casts = [
         'address' => 'array',
         'preferences' => 'array',
-        'active' => 'boolean',
     ];
 
     public function roles(): BelongsToMany
@@ -48,8 +48,13 @@ class UserModel extends Authenticatable implements OAuthenticatable
             ->withTimestamps();
     }
 
-    public function attachments()
+    public function attachments(): HasMany
     {
         return $this->hasMany(UserAttachmentModel::class, 'user_id');
+    }
+
+    public function devices(): HasMany
+    {
+        return $this->hasMany(UserDeviceModel::class, 'user_id');
     }
 }

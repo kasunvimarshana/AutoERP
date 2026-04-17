@@ -16,12 +16,12 @@ use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 class UpdateUser
 {
     public function __construct(
-        private UserRepositoryInterface $userRepo
+        private readonly UserRepositoryInterface $userRepository
     ) {}
 
     public function execute(int $id, UserData $data): User
     {
-        $user = $this->userRepo->find($id);
+        $user = $this->userRepository->find($id);
         if (! $user) {
             throw new UserNotFoundException($id);
         }
@@ -44,7 +44,7 @@ class UpdateUser
             $data->active ? $user->activate() : $user->deactivate();
         }
 
-        $saved = $this->userRepo->save($user);
+        $saved = $this->userRepository->save($user);
         event(new UserUpdated($saved));
 
         return $saved;

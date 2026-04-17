@@ -14,19 +14,16 @@ use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 
 class ChangePasswordService extends BaseService implements ChangePasswordServiceInterface
 {
-    private UserRepositoryInterface $userRepository;
-
-    public function __construct(UserRepositoryInterface $repository)
+    public function __construct(private readonly UserRepositoryInterface $userRepository)
     {
-        parent::__construct($repository);
-        $this->userRepository = $repository;
+        parent::__construct($userRepository);
     }
 
     protected function handle(array $data): mixed
     {
-        $userId = $data['user_id'];
-        $currentPassword = $data['current_password'];
-        $newPassword = $data['password'];
+        $userId = (int) $data['user_id'];
+        $currentPassword = (string) $data['current_password'];
+        $newPassword = (string) $data['password'];
 
         $user = $this->userRepository->find($userId);
         if (! $user) {

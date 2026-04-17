@@ -5,85 +5,90 @@ declare(strict_types=1);
 namespace Modules\User\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Response;
 use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\User\Application\Contracts\CreateRoleServiceInterface;
 use Modules\User\Application\Contracts\DeleteRoleServiceInterface;
 use Modules\User\Application\Contracts\FindRoleServiceInterface;
 use Modules\User\Application\Contracts\SyncRolePermissionsServiceInterface;
 use Modules\User\Domain\Entities\Role;
+use Modules\User\Infrastructure\Http\Requests\ListRoleRequest;
 use Modules\User\Infrastructure\Http\Requests\StoreRoleRequest;
 use Modules\User\Infrastructure\Http\Requests\SyncRolePermissionsRequest;
+use Modules\User\Infrastructure\Http\Resources\RoleCollection;
 use Modules\User\Infrastructure\Http\Resources\RoleResource;
-use OpenApi\Attributes as OA;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class RoleController extends AuthorizedController
 {
     public function __construct(
-        protected FindRoleServiceInterface $findService,
-        protected CreateRoleServiceInterface $createService,
-        protected DeleteRoleServiceInterface $deleteService,
+        protected FindRoleServiceInterface $findRoleService,
+        protected CreateRoleServiceInterface $createRoleService,
+        protected DeleteRoleServiceInterface $deleteRoleService,
         protected SyncRolePermissionsServiceInterface $syncPermissionsService
     ) {}
 
-    public function index(Request $request): JsonResponse
+    public function index(ListRoleRequest $request): RoleCollection
     {
         $this->authorize('viewAny', Role::class);
+        $validated = $request->validated();
         $filters = [];
-        if ($tenantId = $request->query('tenant_id')) {
-            $filters['tenant_id'] = (int) $tenantId;
+        if (array_key_exists('tenant_id', $validated)) {
+            $filters['tenant_id'] = (int) $validated['tenant_id'];
         }
-        $perPage = (int) $request->input('per_page', 15);
-        $page    = (int) $request->input('page', 1);
-        $roles   = $this->findService->list($filters, $perPage, $page);
+        $perPage = (int) ($validated['per_page'] ?? 15);
+        $page    = (int) ($validated['page'] ?? 1);
+        $roles   = $this->findRoleService->list($filters, $perPage, $page);
 
-        return response()->json(RoleResource::collection($roles));
+        return new RoleCollection($roles);
     }
 
-    public function show(int $id): RoleResource
+    public function show(int $roleId): RoleResource
     {
-        $role = $this->findService->find($id);
-        if (! $role) {
-            abort(404);
-        }
-        $this->authorize('view', $role);
+        $roleEntity = $this->findRoleOrFail($roleId);
+        $this->authorize('view', $roleEntity);
 
-        return new RoleResource($role);
+        return new RoleResource($roleEntity);
     }
 
-    public function store(StoreRoleRequest $request): \Illuminate\Http\JsonResponse
+    public function store(StoreRoleRequest $request): JsonResponse
     {
         $this->authorize('create', Role::class);
-        $role = $this->createService->execute($request->validated());
+        $role = $this->createRoleService->execute($request->validated());
 
-        return (new RoleResource($role))->response()->setStatusCode(201);
+        return (new RoleResource($role))->response()->setStatusCode(HttpResponse::HTTP_CREATED);
     }
 
-    public function destroy(int $id): JsonResponse
+    public function destroy(int $roleId): JsonResponse
     {
-        $role = $this->findService->find($id);
-        if (! $role) {
-            abort(404);
-        }
-        $this->authorize('delete', $role);
-        $this->deleteService->execute(['id' => $id]);
+        $roleEntity = $this->findRoleOrFail($roleId);
+        $this->authorize('delete', $roleEntity);
+        $this->deleteRoleService->execute(['id' => $roleId]);
 
-        return response()->json(['message' => 'Role deleted successfully']);
+        return Response::json(['message' => 'Role deleted successfully']);
     }
 
-    
-    public function syncPermissions(SyncRolePermissionsRequest $request, int $id): RoleResource
+    public function syncPermissions(SyncRolePermissionsRequest $request, int $roleId): RoleResource
     {
-        $role = $this->findService->find($id);
-        if (! $role) {
-            abort(404);
-        }
-        $this->authorize('syncPermissions', $role);
+        $roleEntity = $this->findRoleOrFail($roleId);
+        $this->authorize('syncPermissions', $roleEntity);
+        $validated = $request->validated();
         $updated = $this->syncPermissionsService->execute([
-            'role_id'        => $id,
-            'permission_ids' => $request->validated()['permission_ids'],
+            'role_id'        => $roleId,
+            'permission_ids' => $validated['permission_ids'],
         ]);
 
         return new RoleResource($updated);
+    }
+
+    private function findRoleOrFail(int $roleId): Role
+    {
+        $role = $this->findRoleService->find($roleId);
+        if (! $role) {
+            throw new NotFoundHttpException('Role not found.');
+        }
+
+        return $role;
     }
 }

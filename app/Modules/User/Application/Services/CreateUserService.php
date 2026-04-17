@@ -20,7 +20,7 @@ class CreateUserService extends BaseService implements CreateUserServiceInterfac
 {
     public function __construct(
         private readonly UserRepositoryInterface $userRepository,
-        protected RoleRepositoryInterface $roleRepo
+        protected RoleRepositoryInterface $roleRepository
     ) {
         parent::__construct($userRepository);
     }
@@ -46,7 +46,8 @@ class CreateUserService extends BaseService implements CreateUserServiceInterfac
             phone: $phone,
             address: $address,
             preferences: $preferences,
-            active: $dto->active
+            active: $dto->active ?? true,
+            avatar: $dto->avatar
         );
 
         $saved = $this->userRepository->save($user);
@@ -54,10 +55,12 @@ class CreateUserService extends BaseService implements CreateUserServiceInterfac
         if (! empty($dto->roles)) {
             $roleIds = [];
             foreach ($dto->roles as $roleId) {
-                $role = $this->roleRepo->find($roleId);
+                $role = $this->roleRepository->find((int) $roleId);
                 if ($role) {
                     $saved->assignRole($role);
-                    $roleIds[] = $role->getId();
+                    if ($role->getId() !== null) {
+                        $roleIds[] = $role->getId();
+                    }
                 }
             }
             $this->userRepository->syncRoles($saved, $roleIds);

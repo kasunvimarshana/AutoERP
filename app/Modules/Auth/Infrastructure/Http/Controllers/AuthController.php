@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Auth\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request as HttpRequest;
 use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Auth\Application\Contracts\SsoServiceInterface;
 use Modules\Auth\Application\UseCases\ForgotPassword;
@@ -40,7 +41,6 @@ class AuthController extends AuthorizedController
         private readonly FindUserServiceInterface $findUserService,
     ) {}
 
-    
     public function register(RegisterRequest $request): JsonResponse
     {
         $token = $this->registerUser->execute($request->validated());
@@ -51,7 +51,6 @@ class AuthController extends AuthorizedController
         );
     }
 
-    
     public function login(LoginRequest $request): JsonResponse
     {
         try {
@@ -67,7 +66,6 @@ class AuthController extends AuthorizedController
         return response()->json((new AuthTokenResource($token))->toArray($request));
     }
 
-    
     public function logout(): JsonResponse
     {
         $user = $this->getAuthenticatedUser->execute();
@@ -81,7 +79,6 @@ class AuthController extends AuthorizedController
         return response()->json(['message' => 'Logged out successfully']);
     }
 
-    
     public function me(): JsonResponse
     {
         $authenticatable = $this->getAuthenticatedUser->execute();
@@ -99,8 +96,7 @@ class AuthController extends AuthorizedController
         return response()->json(new UserResource($user));
     }
 
-    
-    public function refresh(): JsonResponse
+    public function refresh(HttpRequest $request): JsonResponse
     {
         $user = $this->getAuthenticatedUser->execute();
 
@@ -110,10 +106,9 @@ class AuthController extends AuthorizedController
 
         $token = $this->refreshToken->execute((int) $user->getAuthIdentifier());
 
-        return response()->json((new AuthTokenResource($token))->toArray(request()));
+        return response()->json((new AuthTokenResource($token))->toArray($request));
     }
 
-    
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
         $sent = $this->forgotPassword->execute($request->validated()['email']);
@@ -125,7 +120,6 @@ class AuthController extends AuthorizedController
         ]);
     }
 
-    
     public function resetPassword(ResetPasswordRequest $request): JsonResponse
     {
         try {
@@ -137,7 +131,6 @@ class AuthController extends AuthorizedController
         return response()->json(['message' => 'Password has been reset successfully.']);
     }
 
-    
     public function ssoExchange(string $provider, SsoRequest $request): JsonResponse
     {
         try {

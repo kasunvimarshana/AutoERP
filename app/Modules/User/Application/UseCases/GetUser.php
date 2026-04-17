@@ -10,16 +10,16 @@ use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 class GetUser
 {
     public function __construct(
-        private UserRepositoryInterface $userRepo
+        private readonly UserRepositoryInterface $userRepository
     ) {}
 
     public function execute(int $id): ?User
     {
-        return $this->userRepo->find($id);
+        return $this->userRepository->find($id);
     }
 
     public function findByEmail(int $tenantId, string $email): ?User
     {
-        return $this->userRepo->findByEmail($tenantId, $email);
+        return $this->userRepository->findByEmail($tenantId, $email);
     }
 }

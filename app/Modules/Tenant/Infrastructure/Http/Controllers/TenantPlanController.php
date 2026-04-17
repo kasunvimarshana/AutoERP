@@ -19,6 +19,7 @@ use Modules\Tenant\Infrastructure\Http\Requests\StoreTenantPlanRequest;
 use Modules\Tenant\Infrastructure\Http\Requests\UpdateTenantPlanRequest;
 use Modules\Tenant\Infrastructure\Http\Resources\TenantPlanCollection;
 use Modules\Tenant\Infrastructure\Http\Resources\TenantPlanResource;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class TenantPlanController extends AuthorizedController
@@ -60,7 +61,7 @@ class TenantPlanController extends AuthorizedController
         $dto = TenantPlanData::fromArray($request->validated());
         $created = $this->createPlanService->execute($dto->toArray());
 
-        return (new TenantPlanResource($created))->response()->setStatusCode(201);
+        return (new TenantPlanResource($created))->response()->setStatusCode(HttpResponse::HTTP_CREATED);
     }
 
     public function update(UpdateTenantPlanRequest $request, int $plan): TenantPlanResource

@@ -22,7 +22,9 @@ class UserData extends BaseDto
 
     public ?array $preferences;
 
-    public bool $active;
+    public ?bool $active;
+
+    public ?string $avatar;
 
     public ?array $roles; // role IDs
 
@@ -37,6 +39,7 @@ class UserData extends BaseDto
             'address' => 'nullable|array',
             'preferences' => 'nullable|array',
             'active' => 'boolean',
+            'avatar' => 'nullable|string|max:2048',
             'roles' => 'nullable|array',
             'roles.*' => 'integer|exists:roles,id',
         ];

@@ -10,16 +10,16 @@ use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 class DeleteUser
 {
     public function __construct(
-        private UserRepositoryInterface $userRepo
+        private readonly UserRepositoryInterface $userRepository
     ) {}
 
     public function execute(int $id): bool
     {
-        $user = $this->userRepo->find($id);
+        $user = $this->userRepository->find($id);
         if (! $user) {
             throw new UserNotFoundException($id);
         }
 
-        return $this->userRepo->delete($id);
+        return $this->userRepository->delete($id);
     }
 }

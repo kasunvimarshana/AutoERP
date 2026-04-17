@@ -11,17 +11,14 @@ use Modules\User\Domain\RepositoryInterfaces\RoleRepositoryInterface;
 
 class DeleteRoleService extends BaseService implements DeleteRoleServiceInterface
 {
-    private RoleRepositoryInterface $roleRepository;
-
-    public function __construct(RoleRepositoryInterface $repository)
+    public function __construct(private readonly RoleRepositoryInterface $roleRepository)
     {
-        parent::__construct($repository);
-        $this->roleRepository = $repository;
+        parent::__construct($roleRepository);
     }
 
     protected function handle(array $data): bool
     {
-        $id = $data['id'];
+        $id = (int) $data['id'];
         $role = $this->roleRepository->find($id);
         if (! $role) {
             throw new RoleNotFoundException($id);

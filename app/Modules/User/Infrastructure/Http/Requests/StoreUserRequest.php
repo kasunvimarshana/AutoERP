@@ -24,6 +24,8 @@ class StoreUserRequest extends FormRequest
             'address' => 'nullable|array',
             'preferences' => 'nullable|array',
             'active' => 'boolean',
+            'avatar' => 'nullable|string|max:2048',
+            'avatar_file' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'roles' => 'nullable|array',
             'roles.*' => 'integer|exists:roles,id',
         ];

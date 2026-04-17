@@ -11,18 +11,18 @@ use Modules\User\Domain\RepositoryInterfaces\RoleRepositoryInterface;
 
 class SyncRolePermissionsService extends BaseService implements SyncRolePermissionsServiceInterface
 {
-    private RoleRepositoryInterface $roleRepository;
-
-    public function __construct(RoleRepositoryInterface $repository)
+    public function __construct(private readonly RoleRepositoryInterface $roleRepository)
     {
-        parent::__construct($repository);
-        $this->roleRepository = $repository;
+        parent::__construct($roleRepository);
     }
 
     protected function handle(array $data): mixed
     {
-        $roleId = $data['role_id'];
-        $permissionIds = $data['permission_ids'] ?? [];
+        $roleId = (int) $data['role_id'];
+        $permissionIds = array_values(array_unique(array_filter(
+            array_map('intval', $data['permission_ids'] ?? []),
+            static fn (int $permissionId): bool => $permissionId > 0
+        )));
 
         $role = $this->roleRepository->find($roleId);
         if (! $role) {

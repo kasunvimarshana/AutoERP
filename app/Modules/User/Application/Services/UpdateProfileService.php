@@ -16,17 +16,14 @@ use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 
 class UpdateProfileService extends BaseService implements UpdateProfileServiceInterface
 {
-    private UserRepositoryInterface $userRepository;
-
-    public function __construct(UserRepositoryInterface $repository)
+    public function __construct(private readonly UserRepositoryInterface $userRepository)
     {
-        parent::__construct($repository);
-        $this->userRepository = $repository;
+        parent::__construct($userRepository);
     }
 
     protected function handle(array $data): User
     {
-        $userId = $data['user_id'];
+        $userId = (int) $data['user_id'];
         $dto = UpdateProfileData::fromArray($data);
 
         $user = $this->userRepository->find($userId);

@@ -14,7 +14,11 @@ use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\User\Domain\Entities\Permission;
 use Modules\User\Domain\Entities\Role;
 use Modules\User\Domain\Entities\User;
+use Modules\User\Domain\Entities\UserAttachment;
+use Modules\User\Domain\Entities\UserDevice;
 use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
+use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserAttachmentModel;
+use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserDeviceModel;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 
 class EloquentUserRepository extends EloquentRepository implements UserRepositoryInterface
@@ -44,7 +48,7 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
             'phone'       => $user->getPhone()?->value(),
             'address'     => $user->getAddress()?->toArray(),
             'preferences' => $user->getPreferences()->toArray(),
-            'active'      => $user->isActive(),
+            'status'      => $user->isActive() ? 'active' : 'inactive',
             'avatar'      => $user->getAvatar(),
         ];
 
@@ -58,7 +62,11 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
 
         // Sync roles
         if ($user->getRoles()->isNotEmpty()) {
-            $roleIds = $user->getRoles()->pluck('id')->toArray();
+            $roleIds = $user->getRoles()
+                ->map(static fn (Role $role): ?int => $role->getId())
+                ->filter(static fn (?int $roleId): bool => $roleId !== null)
+                ->values()
+                ->toArray();
             $model->roles()->sync($roleIds);
         }
 
@@ -136,7 +144,7 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
             phone: $phone,
             address: $address,
             preferences: $preferences,
-            active: $model->active,
+            active: $model->status === 'active',
             id: $model->id,
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,
@@ -152,6 +160,50 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
             $user->assignRole($role);
         }
 
+        if ($model->relationLoaded('attachments')) {
+            $user->setAttachments($model->attachments->map(
+                fn (UserAttachmentModel $attachment): UserAttachment => $this->mapAttachmentModelToDomainEntity($attachment)
+            ));
+        }
+
+        if ($model->relationLoaded('devices')) {
+            $user->setDevices($model->devices->map(
+                fn (UserDeviceModel $device): UserDevice => $this->mapDeviceModelToDomainEntity($device)
+            ));
+        }
+
         return $user;
+    }
+
+    private function mapAttachmentModelToDomainEntity(UserAttachmentModel $model): UserAttachment
+    {
+        return new UserAttachment(
+            tenantId: (int) $model->tenant_id,
+            userId: (int) $model->user_id,
+            uuid: (string) $model->uuid,
+            name: (string) $model->name,
+            filePath: (string) $model->file_path,
+            mimeType: (string) $model->mime_type,
+            size: (int) $model->size,
+            type: $model->type,
+            metadata: $model->metadata,
+            id: (int) $model->id,
+            createdAt: $model->created_at,
+            updatedAt: $model->updated_at,
+        );
+    }
+
+    private function mapDeviceModelToDomainEntity(UserDeviceModel $model): UserDevice
+    {
+        return new UserDevice(
+            userId: (int) $model->user_id,
+            deviceToken: (string) $model->device_token,
+            platform: $model->platform,
+            deviceName: $model->device_name,
+            lastActiveAt: $model->last_active_at,
+            id: (int) $model->id,
+            createdAt: $model->created_at,
+            updatedAt: $model->updated_at,
+        );
     }
 }
