@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -14,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('product_variants', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('product_id')->constrained(null, 'id', 'product_variants_product_id_fk')->cascadeOnDelete();
             $table->string('sku')->nullable();
             $table->string('name');
             $table->boolean('is_default')->default(false);
@@ -22,14 +20,14 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->unique(['product_id', 'sku'], 'uq_product_variants_product_sku');
+            $table->unique(['product_id', 'sku'], 'product_variants_product_sku_uk');
         });
 
         // Pivot for variant attributes
         Schema::create('variant_attribute_values', function (Blueprint $table) {
-            $table->foreignId('variant_id')->constrained('product_variants')->cascadeOnDelete();
-            $table->foreignId('attribute_value_id')->constrained()->cascadeOnDelete();
-            $table->primary(['variant_id', 'attribute_value_id'], 'pk_variant_attribute_values_variant_attr');
+            $table->foreignId('variant_id')->constrained('product_variants', 'id', 'variant_attribute_values_variant_id_fk')->cascadeOnDelete();
+            $table->foreignId('attribute_value_id')->constrained(null, 'id', 'variant_attribute_values_attribute_value_id_fk')->cascadeOnDelete();
+            $table->primary(['variant_id', 'attribute_value_id'], 'variant_attribute_values_variant_attr_pk');
         });
     }
 

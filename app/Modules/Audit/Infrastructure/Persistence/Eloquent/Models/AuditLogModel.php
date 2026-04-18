@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class AuditLogModel extends Model
 {
+    public const CREATED_AT = 'occurred_at';
+
     public const UPDATED_AT = null;
 
     protected $table = 'audit_logs';
@@ -29,13 +31,13 @@ class AuditLogModel extends Model
     ];
 
     protected $casts = [
-        'tenant_id'  => 'int',
-        'user_id'    => 'int',
+        'tenant_id' => 'int',
+        'user_id' => 'int',
         'old_values' => 'array',
         'new_values' => 'array',
-        'tags'       => 'array',
-        'metadata'   => 'array',
-        'created_at' => 'datetime',
+        'tags' => 'array',
+        'metadata' => 'array',
+        'occurred_at' => 'datetime',
     ];
 
     public function auditable(): MorphTo

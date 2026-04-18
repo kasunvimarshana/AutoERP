@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -13,8 +12,8 @@ return new class extends Migration
     {
         Schema::create('customer_addresses', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('customer_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained(null, 'id', 'customer_addresses_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('customer_id')->constrained(null, 'id', 'customer_addresses_customer_id_fk')->cascadeOnDelete();
             $table->enum('type', ['billing', 'shipping', 'other'])->default('billing');
             $table->string('label')->nullable();
             $table->string('address_line1');
@@ -22,13 +21,13 @@ return new class extends Migration
             $table->string('city');
             $table->string('state')->nullable();
             $table->string('postal_code');
-            $table->foreignId('country_id')->constrained('countries');
+            $table->foreignId('country_id')->constrained('countries', 'id', 'customer_addresses_country_id_fk');
             $table->boolean('is_default')->default(false);
             $table->decimal('geo_lat', 10, 7)->nullable();
             $table->decimal('geo_lng', 10, 7)->nullable();
             $table->timestamps();
 
-            $table->index(['customer_id', 'type'], 'idx_customer_addresses_customer_type');
+            $table->index(['customer_id', 'type'], 'customer_addresses_customer_type_idx');
         });
     }
 

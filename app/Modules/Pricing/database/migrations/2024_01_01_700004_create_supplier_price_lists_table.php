@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -13,11 +12,10 @@ return new class extends Migration
     {
         Schema::create('supplier_price_lists', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('supplier_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('price_list_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('supplier_id')->constrained(null, 'id', 'supplier_price_lists_supplier_id_fk')->cascadeOnDelete();
+            $table->foreignId('price_list_id')->constrained(null, 'id', 'supplier_price_lists_price_list_id_fk')->cascadeOnDelete();
             $table->timestamps();
-
-            $table->unique(['supplier_id', 'price_list_id'], 'uq_supplier_price_lists_supplier_pricelist');
+            $table->unique(['supplier_id', 'price_list_id'], 'supplier_price_lists_supplier_pricelist_uk');
         });
     }
 

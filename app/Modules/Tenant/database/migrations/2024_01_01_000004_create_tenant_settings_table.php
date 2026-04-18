@@ -12,15 +12,15 @@ return new class extends Migration
     {
         Schema::create('tenant_settings', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained(null, 'id', 'tenant_settings_tenant_id_fk')->cascadeOnDelete();
             $table->string('key', 255);
             $table->json('value')->nullable();
-            $table->string('group')->default('general')->index('idx_tenant_settings_group');
-            $table->boolean('is_public')->default(false)->index('idx_tenant_settings_public');
+            $table->string('group')->default('general')->index('tenant_settings_group_idx');
+            $table->boolean('is_public')->default(false)->index('tenant_settings_public_idx');
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'key'], 'tenant_settings_tenant_key_uq');
-            $table->index(['tenant_id', 'group'], 'idx_tenant_settings_tenant_group');
+            $table->unique(['tenant_id', 'key'], 'tenant_settings_tenant_id_key_uk');
+            $table->index(['tenant_id', 'group'], 'tenant_settings_tenant_group_idx');
         });
     }
 

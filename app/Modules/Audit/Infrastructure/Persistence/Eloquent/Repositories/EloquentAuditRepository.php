@@ -18,18 +18,18 @@ class EloquentAuditRepository implements AuditRepositoryInterface
     public function record(AuditLog $log): AuditLog
     {
         $model = $this->model->create([
-            'tenant_id'      => $log->getTenantId(),
-            'user_id'        => $log->getUserId(),
-            'event'          => $log->getEvent()->value(),
+            'tenant_id' => $log->getTenantId(),
+            'user_id' => $log->getUserId(),
+            'event' => $log->getEvent()->value(),
             'auditable_type' => $log->getAuditableType(),
-            'auditable_id'   => (string) $log->getAuditableId(),
-            'old_values'     => $log->getOldValues(),
-            'new_values'     => $log->getNewValues(),
-            'url'            => $log->getUrl(),
-            'ip_address'     => $log->getIpAddress(),
-            'user_agent'     => $log->getUserAgent(),
-            'tags'           => $log->getTags(),
-            'metadata'       => $log->getMetadata(),
+            'auditable_id' => (string) $log->getAuditableId(),
+            'old_values' => $log->getOldValues(),
+            'new_values' => $log->getNewValues(),
+            'url' => $log->getUrl(),
+            'ip_address' => $log->getIpAddress(),
+            'user_agent' => $log->getUserAgent(),
+            'tags' => $log->getTags(),
+            'metadata' => $log->getMetadata(),
         ]);
 
         return $this->mapModelToDomainEntity($model);
@@ -42,12 +42,34 @@ class EloquentAuditRepository implements AuditRepositoryInterface
         return $model ? $this->mapModelToDomainEntity($model) : null;
     }
 
+    public function list(
+        array $filters,
+        int $perPage = 15,
+        int $page = 1,
+        ?string $sortField = 'occurred_at',
+        string $sortDirection = 'desc'
+    ): LengthAwarePaginator {
+        $query = $this->model->newQuery();
+
+        foreach ($filters as $field => $value) {
+            $query->where($field, $value);
+        }
+
+        if ($sortField !== null && $sortField !== '') {
+            $query->orderBy($sortField, $sortDirection);
+        }
+
+        return $query
+            ->paginate($perPage, ['*'], 'page', $page)
+            ->through(fn (AuditLogModel $m) => $this->mapModelToDomainEntity($m));
+    }
+
     public function forAuditable(string $auditableType, int|string $auditableId): Collection
     {
         return $this->model
             ->where('auditable_type', $auditableType)
             ->where('auditable_id', (string) $auditableId)
-            ->orderByDesc('created_at')
+            ->orderByDesc('occurred_at')
             ->get()
             ->map(fn (AuditLogModel $m) => $this->mapModelToDomainEntity($m));
     }
@@ -61,7 +83,7 @@ class EloquentAuditRepository implements AuditRepositoryInterface
         return $this->model
             ->where('auditable_type', $auditableType)
             ->where('auditable_id', (string) $auditableId)
-            ->orderByDesc('created_at')
+            ->orderByDesc('occurred_at')
             ->paginate($perPage, ['*'], 'page', $page)
             ->through(fn (AuditLogModel $m) => $this->mapModelToDomainEntity($m));
     }
@@ -70,7 +92,7 @@ class EloquentAuditRepository implements AuditRepositoryInterface
     {
         return $this->model
             ->where('tenant_id', $tenantId)
-            ->orderByDesc('created_at')
+            ->orderByDesc('occurred_at')
             ->paginate($perPage, ['*'], 'page', $page)
             ->through(fn (AuditLogModel $m) => $this->mapModelToDomainEntity($m));
     }
@@ -79,7 +101,7 @@ class EloquentAuditRepository implements AuditRepositoryInterface
     {
         return $this->model
             ->where('user_id', $userId)
-            ->orderByDesc('created_at')
+            ->orderByDesc('occurred_at')
             ->paginate($perPage, ['*'], 'page', $page)
             ->through(fn (AuditLogModel $m) => $this->mapModelToDomainEntity($m));
     }
@@ -88,7 +110,7 @@ class EloquentAuditRepository implements AuditRepositoryInterface
     {
         return $this->model
             ->where('event', $event)
-            ->orderByDesc('created_at')
+            ->orderByDesc('occurred_at')
             ->paginate($perPage, ['*'], 'page', $page)
             ->through(fn (AuditLogModel $m) => $this->mapModelToDomainEntity($m));
     }
@@ -96,7 +118,7 @@ class EloquentAuditRepository implements AuditRepositoryInterface
     public function pruneOlderThan(\DateTimeInterface $before): int
     {
         return $this->model
-            ->where('created_at', '<', $before)
+            ->where('occurred_at', '<', $before)
             ->delete();
     }
 
@@ -116,7 +138,7 @@ class EloquentAuditRepository implements AuditRepositoryInterface
             userAgent: $model->user_agent,
             tags: $model->tags,
             metadata: $model->metadata,
-            createdAt: $model->created_at,
+            occurredAt: $model->occurred_at,
         );
     }
 }

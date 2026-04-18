@@ -14,7 +14,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('tenant_id');
             $table->unsignedBigInteger('user_id');
-            $table->string('uuid')->unique();
+            $table->string('uuid')->unique('user_attachments_uuid_uk');
             $table->string('name');
             $table->string('file_path');
             $table->string('mime_type');
@@ -24,8 +24,8 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->index(['tenant_id', 'user_id', 'type'], 'idx_user_attachments_tenant_user_type');
+            $table->foreign('user_id', 'user_attachments_user_id_fk')->references('id')->on('users')->onDelete('cascade');
+            $table->index(['tenant_id', 'user_id', 'type'], 'user_attachments_tenant_user_type_idx');
         });
     }
 

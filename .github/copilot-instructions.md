@@ -128,8 +128,62 @@ app/Modules/<Module>/
 - Do not modify Core module traits without considering impact on all modules.
 - Do not use `float` for monetary or quantity fields — use `DECIMAL`.
 
+## Common Code Patterns
+
+### Domain Entity
+
+```php
+declare(strict_types=1);
+
+namespace Modules\<Module>\Domain\Entities;
+
+class <Entity>
+{
+    public function __construct(
+        public readonly string $id,
+        public readonly string $tenantId,
+        // ... domain properties
+    ) {}
+
+    // Domain logic methods here
+}
+```
+
+### Repository Interface
+
+```php
+declare(strict_types=1);
+
+namespace Modules\<Module>\Domain\RepositoryInterfaces;
+
+interface <Entity>RepositoryInterface
+{
+    public function findById(string $tenantId, string $id): ?<Entity>;
+    public function findAll(string $tenantId): array;
+    public function save(<Entity> $entity): void;
+    public function delete(string $tenantId, string $id): void;
+}
+```
+
+### Service Provider Binding
+
+```php
+public function register(): void
+{
+    $this->app->bind(
+        <Entity>RepositoryInterface::class,
+        Eloquent<Entity>Repository::class
+    );
+}
+```
+
 ## Key Dependencies
 
 - **laravel/passport** — OAuth2 API authentication
 - **laravel/reverb** — Real-time WebSocket broadcasting
 - **darkaonline/l5-swagger** — OpenAPI/Swagger API documentation
+
+## Additional Reference Documentation
+
+- **`SKILL.md`** — Detailed module specifications, database design standards, and implementation rules.
+- **`AGENT_KNOWLEDGEBASE.md`** — Comprehensive domain knowledge covering ERP flows, financial accounting, inventory management, and returns processing.

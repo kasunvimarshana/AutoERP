@@ -10,9 +10,12 @@ use Modules\Audit\Application\Services\AuditService;
 use Modules\Audit\Domain\RepositoryInterfaces\AuditRepositoryInterface;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Models\AuditLogModel;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Repositories\EloquentAuditRepository;
+use Modules\Core\Infrastructure\Concerns\LoadsModuleRoutesAndMigrations;
 
 class AuditServiceProvider extends ServiceProvider
 {
+    use LoadsModuleRoutesAndMigrations;
+
     public function register(): void
     {
         $this->app->bind(AuditRepositoryInterface::class, function ($app) {
@@ -26,6 +29,9 @@ class AuditServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
+        $this->bootModule(
+            __DIR__.'/../../routes/api.php',
+            __DIR__.'/../../database/migrations',
+        );
     }
 }

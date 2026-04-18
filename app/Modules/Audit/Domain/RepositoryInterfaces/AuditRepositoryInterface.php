@@ -14,6 +14,17 @@ interface AuditRepositoryInterface
 
     public function find(int $id): ?AuditLog;
 
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    public function list(
+        array $filters,
+        int $perPage = 15,
+        int $page = 1,
+        ?string $sortField = 'occurred_at',
+        string $sortDirection = 'desc'
+    ): LengthAwarePaginator;
+
     public function forAuditable(string $auditableType, int|string $auditableId): Collection;
 
     public function forAuditablePaginated(

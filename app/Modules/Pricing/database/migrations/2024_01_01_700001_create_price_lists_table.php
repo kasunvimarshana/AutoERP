@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -13,17 +12,17 @@ return new class extends Migration
     {
         Schema::create('price_lists', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained(null, 'id', 'price_lists_tenant_id_fk')->cascadeOnDelete();
             $table->string('name');
             $table->enum('type', ['purchase', 'sales'])->default('sales');
-            $table->foreignId('currency_id')->constrained('currencies');
+            $table->foreignId('currency_id')->constrained('currencies', 'id', 'price_lists_currency_id_fk');
             $table->boolean('is_default')->default(false);
             $table->date('valid_from')->nullable();
             $table->date('valid_to')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'name'], 'uq_price_lists_tenant_name');
+            $table->unique(['tenant_id', 'name'], 'price_lists_tenant_name_uk');
         });
     }
 

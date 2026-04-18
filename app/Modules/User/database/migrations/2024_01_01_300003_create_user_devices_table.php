@@ -12,14 +12,14 @@ return new class extends Migration
     {
         Schema::create('user_devices', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained(null, 'id', 'user_devices_user_id_fk')->cascadeOnDelete();
             $table->string('device_token');
             $table->string('platform')->nullable(); // ios, android, web
             $table->string('device_name')->nullable();
             $table->timestamp('last_active_at')->nullable();
             $table->timestamps();
 
-            $table->unique(['user_id', 'device_token'], 'uq_user_devices_user_token');
+            $table->unique(['user_id', 'device_token'], 'user_devices_user_token_uk');
         });
     }
 

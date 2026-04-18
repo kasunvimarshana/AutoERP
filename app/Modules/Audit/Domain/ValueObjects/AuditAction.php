@@ -6,11 +6,15 @@ namespace Modules\Audit\Domain\ValueObjects;
 
 final class AuditAction
 {
-    public const CREATED  = 'created';
-    public const UPDATED  = 'updated';
-    public const DELETED  = 'deleted';
+    public const CREATED = 'created';
+
+    public const UPDATED = 'updated';
+
+    public const DELETED = 'deleted';
+
     public const RESTORED = 'restored';
-    public const CUSTOM   = 'custom';
+
+    public const CUSTOM = 'custom';
 
     /**
      * @var array<string>

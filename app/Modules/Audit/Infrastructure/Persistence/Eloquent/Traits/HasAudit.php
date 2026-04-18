@@ -6,12 +6,14 @@ namespace Modules\Audit\Infrastructure\Persistence\Eloquent\Traits;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Support\Facades\Auth;
-use Modules\Audit\Application\Contracts\AuditServiceInterface;
 use Modules\Audit\Domain\ValueObjects\AuditAction;
+use Modules\Audit\Infrastructure\Concerns\ResolvesAuditContext;
+use Modules\Audit\Infrastructure\Persistence\Eloquent\Models\AuditLogModel;
 
 trait HasAudit
 {
+    use ResolvesAuditContext;
+
     /**
      * @var array<int, array<string, mixed>>
      */
@@ -58,7 +60,7 @@ trait HasAudit
     public function auditLogs(): MorphMany
     {
         return $this->morphMany(
-            \Modules\Audit\Infrastructure\Persistence\Eloquent\Models\AuditLogModel::class,
+            AuditLogModel::class,
             'auditable'
         );
     }
@@ -124,18 +126,18 @@ trait HasAudit
 
         try {
             $service->record([
-                'event'          => $eventName,
+                'event' => $eventName,
                 'auditable_type' => static::class,
-                'auditable_id'   => (string) $this->getKey(),
-                'tenant_id'      => $this->getAttribute('tenant_id'),
-                'user_id'        => $this->resolveAuditUserId(),
-                'old_values'     => $oldValues,
-                'new_values'     => $newValues,
-                'url'            => $this->resolveAuditUrl(),
-                'ip_address'     => $this->resolveAuditIpAddress(),
-                'user_agent'     => $this->resolveAuditUserAgent(),
-                'tags'           => $modelTags,
-                'metadata'       => null,
+                'auditable_id' => (string) $this->getKey(),
+                'tenant_id' => $this->getAttribute('tenant_id'),
+                'user_id' => $this->resolveAuditUserId(),
+                'old_values' => $oldValues,
+                'new_values' => $newValues,
+                'url' => $this->resolveAuditUrl(),
+                'ip_address' => $this->resolveAuditIpAddress(),
+                'user_agent' => $this->resolveAuditUserAgent(),
+                'tags' => $modelTags,
+                'metadata' => null,
             ]);
         } catch (\Throwable) {
             // Audit failures must never surface to end users.
@@ -185,50 +187,5 @@ trait HasAudit
         }
 
         return [$oldValues, $newValues];
-    }
-
-    protected function resolveAuditUserId(): ?int
-    {
-        try {
-            return Auth::id();
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    protected function resolveAuditUrl(): ?string
-    {
-        try {
-            return app()->runningInConsole() ? 'console' : request()->fullUrl();
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    protected function resolveAuditIpAddress(): ?string
-    {
-        try {
-            return app()->runningInConsole() ? null : request()->ip();
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    protected function resolveAuditUserAgent(): ?string
-    {
-        try {
-            return app()->runningInConsole() ? null : request()->userAgent();
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    protected function resolveAuditService(): ?AuditServiceInterface
-    {
-        try {
-            return app(AuditServiceInterface::class);
-        } catch (\Throwable) {
-            return null;
-        }
     }
 }

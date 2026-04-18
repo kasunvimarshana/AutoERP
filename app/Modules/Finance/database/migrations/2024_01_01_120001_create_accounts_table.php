@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -13,8 +12,8 @@ return new class extends Migration
     {
         Schema::create('accounts', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('parent_id')->nullable()->constrained('accounts')->nullOnDelete();
+            $table->foreignId('tenant_id')->constrained(null, 'id', 'accounts_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('parent_id')->nullable()->constrained('accounts', 'id', 'accounts_parent_id_fk')->nullOnDelete();
             $table->string('code');
             $table->string('name');
             $table->enum('type', ['asset', 'liability', 'equity', 'revenue', 'expense']);
@@ -23,7 +22,7 @@ return new class extends Migration
             $table->boolean('is_system')->default(false);
             $table->boolean('is_bank_account')->default(false);
             $table->boolean('is_credit_card')->default(false);
-            $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete();
+            $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'accounts_currency_id_fk')->nullOnDelete();
             $table->text('description')->nullable();
             $table->boolean('is_active')->default(true);
             $table->string('path')->nullable(); // materialized path for hierarchy
@@ -31,9 +30,9 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'code'], 'uq_accounts_tenant_code');
-            $table->index(['tenant_id', 'type'], 'idx_accounts_tenant_type');
-            $table->index(['tenant_id', 'parent_id'], 'idx_accounts_tenant_parent');
+            $table->unique(['tenant_id', 'code'], 'accounts_tenant_code_uk');
+            $table->index(['tenant_id', 'type'], 'accounts_tenant_type_idx');
+            $table->index(['tenant_id', 'parent_id'], 'accounts_tenant_parent_idx');
         });
     }
 

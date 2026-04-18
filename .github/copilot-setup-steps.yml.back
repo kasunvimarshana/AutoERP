@@ -19,3 +19,8 @@ steps:
 
   - name: Build frontend assets
     run: npm run build
+
+  - name: Verify setup
+    run: |
+      php artisan --version
+      ./vendor/bin/phpunit --version

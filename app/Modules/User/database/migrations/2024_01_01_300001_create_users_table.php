@@ -12,8 +12,8 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->nullable()->constrained()->nullOnDelete(); // null for super admins
-            $table->foreignId('org_unit_id')->nullable()->constrained('org_units')->nullOnDelete();
+            $table->foreignId('tenant_id')->nullable()->constrained(null, 'id', 'users_tenant_id_fk')->nullOnDelete(); // null for super admins
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id', 'users_org_unit_id_fk')->nullOnDelete();
             $table->string('first_name');
             $table->string('last_name');
             $table->string('email');
@@ -28,8 +28,8 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'email']);
-            $table->index(['tenant_id', 'email'], 'idx_users_tenant_email');
+            $table->unique(['tenant_id', 'email'], 'users_tenant_id_email_uk');
+            $table->index(['tenant_id', 'email'], 'users_tenant_email_idx');
         });
     }
 

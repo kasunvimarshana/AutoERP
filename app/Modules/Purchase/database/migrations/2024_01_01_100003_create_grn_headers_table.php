@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -13,27 +12,27 @@ return new class extends Migration
     {
         Schema::create('grn_headers', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained(null, 'id', 'grn_headers_tenant_id_fk')->cascadeOnDelete();
             $table->foreignId('supplier_id');
             $table->foreignId('warehouse_id');
-            $table->foreignId('purchase_order_id')->nullable()->constrained()->nullOnDelete(); // nullable for SMB direct buy
+            $table->foreignId('purchase_order_id')->nullable()->constrained(null, 'id', 'grn_headers_purchase_order_id_fk')->nullOnDelete(); // nullable for SMB direct buy
             $table->string('grn_number');
             $table->enum('status', ['draft', 'partial', 'complete', 'posted'])->default('draft');
             $table->date('received_date');
-            $table->foreignId('currency_id')->constrained('currencies');
+            $table->foreignId('currency_id')->constrained('currencies', 'id', 'grn_headers_currency_id_fk');
             $table->decimal('exchange_rate', 15, 6)->default(1);
             $table->text('notes')->nullable();
             $table->json('metadata')->nullable();
             $table->foreignId('created_by');
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'grn_number'], 'uq_grn_headers_tenant_grn');
+            $table->unique(['tenant_id', 'grn_number'], 'grn_headers_tenant_grn_uk');
         });
 
         Schema::create('grn_lines', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('grn_header_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('purchase_order_line_id')->nullable()->constrained('purchase_order_lines')->nullOnDelete();
+            $table->foreignId('grn_header_id')->constrained(null, 'id', 'grn_lines_grn_header_id_fk')->cascadeOnDelete();
+            $table->foreignId('purchase_order_line_id')->nullable()->constrained('purchase_order_lines', 'id', 'grn_lines_purchase_order_line_id_fk')->nullOnDelete();
             $table->foreignId('product_id');
             $table->foreignId('variant_id')->nullable();
             $table->foreignId('batch_id')->nullable();

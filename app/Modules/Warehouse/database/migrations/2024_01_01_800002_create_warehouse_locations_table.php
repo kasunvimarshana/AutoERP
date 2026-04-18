@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -13,9 +12,9 @@ return new class extends Migration
     {
         Schema::create('warehouse_locations', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('warehouse_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('parent_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
+            $table->foreignId('tenant_id')->constrained(null, 'id', 'warehouse_locations_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('warehouse_id')->constrained(null, 'id', 'warehouse_locations_warehouse_id_fk')->cascadeOnDelete();
+            $table->foreignId('parent_id')->nullable()->constrained('warehouse_locations', 'id', 'warehouse_locations_parent_id_fk')->nullOnDelete();
             $table->string('name');
             $table->string('code')->nullable();
             $table->string('path')->nullable();
@@ -28,8 +27,8 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'warehouse_id', 'code'], 'uq_wh_locations_tenant_warehouse_code');
-            $table->index(['tenant_id', 'parent_id'], 'idx_wh_locations_tenant_parent');
+            $table->unique(['tenant_id', 'warehouse_id', 'code'], 'warehouse_locations_tenant_warehouse_code_uk');
+            $table->index(['tenant_id', 'parent_id'], 'warehouse_locations_tenant_parent_idx');
         });
     }
 

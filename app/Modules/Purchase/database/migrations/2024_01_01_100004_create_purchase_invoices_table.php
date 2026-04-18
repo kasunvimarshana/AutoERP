@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -13,16 +12,16 @@ return new class extends Migration
     {
         Schema::create('purchase_invoices', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained(null, 'id', 'purchase_invoices_tenant_id_fk')->cascadeOnDelete();
             $table->foreignId('supplier_id');
-            $table->foreignId('grn_header_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignId('purchase_order_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('grn_header_id')->nullable()->constrained(null, 'id', 'purchase_invoices_grn_header_id_fk')->nullOnDelete();
+            $table->foreignId('purchase_order_id')->nullable()->constrained(null, 'id', 'purchase_invoices_purchase_order_id_fk')->nullOnDelete();
             $table->string('invoice_number');
             $table->string('supplier_invoice_number')->nullable();
             $table->enum('status', ['draft', 'approved', 'partial_paid', 'paid', 'disputed', 'cancelled'])->default('draft');
             $table->date('invoice_date');
             $table->date('due_date');
-            $table->foreignId('currency_id')->constrained('currencies');
+            $table->foreignId('currency_id')->constrained('currencies', 'id', 'purchase_invoices_currency_id_fk');
             $table->decimal('exchange_rate', 15, 6)->default(1);
             $table->decimal('subtotal', 15, 4)->default(0);
             $table->decimal('tax_total', 15, 4)->default(0);
@@ -34,13 +33,13 @@ return new class extends Migration
             $table->foreignId('journal_entry_id')->nullable(); // will reference journal_entries
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'invoice_number'], 'uq_purchase_invoices_tenant_invoice');
+            $table->unique(['tenant_id', 'invoice_number'], 'purchase_invoices_tenant_invoice_uk');
         });
 
         Schema::create('purchase_invoice_lines', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('purchase_invoice_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('grn_line_id')->nullable()->constrained('grn_lines')->nullOnDelete();
+            $table->foreignId('purchase_invoice_id')->constrained(null, 'id', 'purchase_invoice_lines_purchase_invoice_id_fk')->cascadeOnDelete();
+            $table->foreignId('grn_line_id')->nullable()->constrained('grn_lines', 'id', 'purchase_invoice_lines_grn_line_id_fk')->nullOnDelete();
             $table->foreignId('product_id');
             $table->foreignId('variant_id')->nullable();
             $table->text('description')->nullable();

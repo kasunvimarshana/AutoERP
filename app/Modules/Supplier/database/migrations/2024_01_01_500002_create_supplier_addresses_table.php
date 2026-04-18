@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -13,8 +12,8 @@ return new class extends Migration
     {
         Schema::create('supplier_addresses', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('supplier_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained(null, 'id', 'supplier_addresses_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('supplier_id')->constrained(null, 'id', 'supplier_addresses_supplier_id_fk')->cascadeOnDelete();
             $table->enum('type', ['billing', 'shipping', 'remittance', 'other'])->default('billing');
             $table->string('label')->nullable();
             $table->string('address_line1');
@@ -22,11 +21,11 @@ return new class extends Migration
             $table->string('city');
             $table->string('state')->nullable();
             $table->string('postal_code');
-            $table->foreignId('country_id')->constrained('countries');
+            $table->foreignId('country_id')->constrained('countries', 'id', 'supplier_addresses_country_id_fk');
             $table->boolean('is_default')->default(false);
             $table->timestamps();
 
-            $table->index(['supplier_id', 'type'], 'idx_supplier_addresses_supplier_type');
+            $table->index(['supplier_id', 'type'], 'supplier_addresses_supplier_type_idx');
         });
     }
 

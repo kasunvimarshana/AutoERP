@@ -22,7 +22,7 @@ class AuditLog
         private readonly ?string $userAgent,
         private readonly ?array $tags,
         private readonly ?array $metadata,
-        private readonly \DateTimeInterface $createdAt,
+        private readonly \DateTimeInterface $occurredAt,
     ) {}
 
     public function getId(): ?int
@@ -90,9 +90,14 @@ class AuditLog
         return $this->metadata;
     }
 
+    public function getOccurredAt(): \DateTimeInterface
+    {
+        return $this->occurredAt;
+    }
+
     public function getCreatedAt(): \DateTimeInterface
     {
-        return $this->createdAt;
+        return $this->occurredAt;
     }
 
     public function hasChanges(): bool

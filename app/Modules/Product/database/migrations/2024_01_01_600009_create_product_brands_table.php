@@ -10,8 +10,8 @@ return new class extends Migration
     {
         Schema::create('product_brands', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('parent_id')->nullable()->constrained('product_brands')->nullOnDelete();
+            $table->foreignId('tenant_id')->constrained(null, 'id', 'product_brands_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('parent_id')->nullable()->constrained('product_brands', 'id', 'product_brands_parent_id_fk')->nullOnDelete();
             $table->string('name');
             $table->string('slug');
             $table->string('code')->nullable();
@@ -24,8 +24,8 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'code'], 'uq_product_brands_tenant_code');
-            $table->index(['tenant_id', 'parent_id'], 'idx_product_brands_tenant_parent');
+            $table->unique(['tenant_id', 'code'], 'product_brands_tenant_code_uk');
+            $table->index(['tenant_id', 'parent_id'], 'product_brands_tenant_parent_idx');
         });
     }
 

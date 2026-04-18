@@ -30,6 +30,8 @@ interface AuditServiceInterface
 
     public function find(int $id): ?AuditLog;
 
+    public function list(array $filters, int $perPage = 15, int $page = 1, ?string $sort = null): LengthAwarePaginator;
+
     public function forAuditable(string $auditableType, int|string $auditableId): Collection;
 
     public function forAuditablePaginated(
@@ -42,6 +44,8 @@ interface AuditServiceInterface
     public function forTenant(int $tenantId, int $perPage = 15, int $page = 1): LengthAwarePaginator;
 
     public function forUser(int $userId, int $perPage = 15, int $page = 1): LengthAwarePaginator;
+
+    public function forEvent(string $event, int $perPage = 15, int $page = 1): LengthAwarePaginator;
 
     public function pruneOlderThan(\DateTimeInterface $before): int;
 }

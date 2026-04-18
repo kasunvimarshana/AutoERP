@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -13,15 +12,15 @@ return new class extends Migration
     {
         Schema::create('sales_returns', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained(null, 'id', 'sales_returns_tenant_id_fk')->cascadeOnDelete();
             $table->foreignId('customer_id');
-            $table->foreignId('original_sales_order_id')->nullable()->constrained('sales_orders')->nullOnDelete();
-            $table->foreignId('original_invoice_id')->nullable()->constrained('sales_invoices')->nullOnDelete();
+            $table->foreignId('original_sales_order_id')->nullable()->constrained('sales_orders', 'id', 'sales_returns_original_sales_order_id_fk')->nullOnDelete();
+            $table->foreignId('original_invoice_id')->nullable()->constrained('sales_invoices', 'id', 'sales_returns_original_invoice_id_fk')->nullOnDelete();
             $table->string('return_number');
             $table->enum('status', ['draft', 'approved', 'received', 'closed', 'cancelled'])->default('draft');
             $table->date('return_date');
             $table->string('return_reason')->nullable();
-            $table->foreignId('currency_id')->constrained('currencies');
+            $table->foreignId('currency_id')->constrained('currencies', 'id', 'sales_returns_currency_id_fk');
             $table->decimal('exchange_rate', 15, 6)->default(1);
             $table->decimal('subtotal', 15, 4)->default(0);
             $table->decimal('tax_total', 15, 4)->default(0);
@@ -34,13 +33,13 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'return_number'], 'uq_sales_returns_tenant_return');
+            $table->unique(['tenant_id', 'return_number'], 'sales_returns_tenant_return_uk');
         });
 
         Schema::create('sales_return_lines', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('sales_return_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('original_sales_order_line_id')->nullable()->constrained('sales_order_lines')->nullOnDelete();
+            $table->foreignId('sales_return_id')->constrained(null, 'id', 'sales_return_lines_sales_return_id_fk')->cascadeOnDelete();
+            $table->foreignId('original_sales_order_line_id')->nullable()->constrained('sales_order_lines', 'id', 'sales_return_lines_original_sales_order_line_id_fk')->nullOnDelete();
             $table->foreignId('product_id');
             $table->foreignId('variant_id')->nullable();
             $table->foreignId('batch_id')->nullable();

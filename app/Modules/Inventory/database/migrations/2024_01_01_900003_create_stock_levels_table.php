@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -13,13 +12,13 @@ return new class extends Migration
     {
         Schema::create('stock_levels', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('variant_id')->nullable()->constrained('product_variants')->nullOnDelete();
-            $table->foreignId('location_id')->constrained('warehouse_locations')->cascadeOnDelete();
-            $table->foreignId('batch_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignId('serial_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignId('uom_id')->constrained('units_of_measure');
+            $table->foreignId('tenant_id')->constrained(null, 'id', 'stock_levels_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('product_id')->constrained(null, 'id', 'stock_levels_product_id_fk')->cascadeOnDelete();
+            $table->foreignId('variant_id')->nullable()->constrained('product_variants', 'id', 'stock_levels_variant_id_fk')->nullOnDelete();
+            $table->foreignId('location_id')->constrained('warehouse_locations', 'id', 'stock_levels_location_id_fk')->cascadeOnDelete();
+            $table->foreignId('batch_id')->nullable()->constrained(null, 'id', 'stock_levels_batch_id_fk')->nullOnDelete();
+            $table->foreignId('serial_id')->nullable()->constrained(null, 'id', 'stock_levels_serial_id_fk')->nullOnDelete();
+            $table->foreignId('uom_id')->constrained('units_of_measure', 'id', 'stock_levels_uom_id_fk');
             $table->decimal('quantity_on_hand', 15, 4)->default(0);
             $table->decimal('quantity_reserved', 15, 4)->default(0);
             $table->decimal('quantity_available', 15, 4)->storedAs('quantity_on_hand - quantity_reserved');
@@ -27,8 +26,8 @@ return new class extends Migration
             $table->timestamp('last_movement_at')->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'product_id', 'variant_id', 'location_id', 'batch_id', 'serial_id'], 'uq_stock_levels_tenant_product_loc_batch_serial');
-            $table->index(['tenant_id', 'product_id'], 'idx_stock_levels_tenant_product');
+            $table->unique(['tenant_id', 'product_id', 'variant_id', 'location_id', 'batch_id', 'serial_id'], 'stock_levels_tenant_product_loc_batch_serial_uk');
+            $table->index(['tenant_id', 'product_id'], 'stock_levels_tenant_product_idx');
         });
     }
 

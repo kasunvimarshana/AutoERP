@@ -12,16 +12,16 @@ return new class extends Migration
     {
         Schema::create('audit_logs', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('tenant_id')->nullable()->index('idx_core_audit_logs_tenant');
-            $table->unsignedBigInteger('user_id')->nullable()->index('idx_core_audit_logs_user');
+            $table->unsignedBigInteger('tenant_id')->nullable()->index('audit_logs_tenant_idx');
+            $table->unsignedBigInteger('user_id')->nullable()->index('audit_logs_user_idx');
 
             // The action that triggered this entry (created, updated, deleted, etc.)
-            $table->string('event', 50)->index('idx_core_audit_logs_event');
+            $table->string('event', 50)->index('audit_logs_event_idx');
 
             // Polymorphic morph columns
             // $table->morphs('auditable');
-            $table->string('auditable_type')->index('idx_core_audit_logs_auditable_type');
-            $table->string('auditable_id')->index('idx_core_audit_logs_auditable_id');
+            $table->string('auditable_type')->index('audit_logs_auditable_type_idx');
+            $table->string('auditable_id')->index('audit_logs_auditable_id_idx');
 
             // Captured attribute snapshots
             $table->json('old_values')->nullable();
@@ -40,8 +40,8 @@ return new class extends Migration
             // $table->timestamp('created_at')->useCurrent();
             $table->timestamp('occurred_at')->useCurrent();
 
-            $table->index(['tenant_id', 'auditable_type', 'auditable_id'], 'idx_audit_logs_tenant_morphable');
-            $table->index(['tenant_id', 'occurred_at'], 'idx_audit_logs_tenant_occurred');
+            $table->index(['tenant_id', 'auditable_type', 'auditable_id'], 'audit_logs_tenant_morphable_idx');
+            $table->index(['tenant_id', 'occurred_at'], 'audit_logs_tenant_occurred_idx');
         });
     }
 

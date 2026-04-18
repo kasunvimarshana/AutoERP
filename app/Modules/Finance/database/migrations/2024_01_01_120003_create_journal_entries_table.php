@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -13,8 +12,8 @@ return new class extends Migration
     {
         Schema::create('journal_entries', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('fiscal_period_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained(null, 'id', 'journal_entries_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('fiscal_period_id')->constrained(null, 'id', 'journal_entries_fiscal_period_id_fk')->cascadeOnDelete();
             $table->string('entry_number')->nullable();
             $table->enum('entry_type', ['manual', 'auto', 'system'])->default('manual');
             $table->nullableMorphs('reference'); // Link to source document (Invoice, purchase invoice, sales invoice, Payment, etc.)
@@ -23,34 +22,34 @@ return new class extends Migration
             $table->date('posting_date')->nullable();
             $table->enum('status', ['draft', 'posted', 'reversed'])->default('draft');
             $table->boolean('is_reversed')->default(false);
-            $table->foreignId('reversal_entry_id')->nullable()->constrained('journal_entries')->nullOnDelete();
+            $table->foreignId('reversal_entry_id')->nullable()->constrained('journal_entries', 'id', 'journal_entries_reversal_entry_id_fk')->nullOnDelete();
             $table->foreignId('created_by');
             $table->foreignId('posted_by')->nullable();
             $table->timestamp('posted_at')->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'entry_number'], 'uq_journal_entries_tenant_number');
-            $table->index(['tenant_id', 'fiscal_period_id', 'status'], 'idx_je_tenant_period_status');
+            $table->unique(['tenant_id', 'entry_number'], 'journal_entries_tenant_number_uk');
+            $table->index(['tenant_id', 'fiscal_period_id', 'status'], 'journal_entries_tenant_period_status_idx');
         });
 
         Schema::create('journal_entry_lines', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('journal_entry_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('account_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('journal_entry_id')->constrained(null, 'id', 'journal_entry_lines_journal_entry_id_fk')->cascadeOnDelete();
+            $table->foreignId('account_id')->constrained(null, 'id', 'journal_entry_lines_account_id_fk')->cascadeOnDelete();
             $table->text('description')->nullable();
             $table->decimal('debit_amount', 15, 4)->default(0);
             $table->decimal('credit_amount', 15, 4)->default(0);
-            $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete();
+            $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'journal_entry_lines_currency_id_fk')->nullOnDelete();
             $table->decimal('exchange_rate', 15, 6)->default(1);
             $table->decimal('base_debit_amount', 15, 4)->default(0);
             $table->decimal('base_credit_amount', 15, 4)->default(0);
             // $table->decimal('base_debit_amount', 15, 4)->storedAs('debit_amount * exchange_rate');
             // $table->decimal('base_credit_amount', 15, 4)->storedAs('credit_amount * exchange_rate');
-            $table->foreignId('cost_center_id')->nullable()->constrained('org_units')->nullOnDelete();
+            $table->foreignId('cost_center_id')->nullable()->constrained('org_units', 'id', 'journal_entry_lines_cost_center_id_fk')->nullOnDelete();
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->index(['account_id', 'journal_entry_id'], 'idx_jel_account_entry');
+            $table->index(['account_id', 'journal_entry_id'], 'journal_entry_lines_account_entry_idx');
         });
     }
 
