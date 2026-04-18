@@ -27,6 +27,19 @@ return new class extends Migration
             $table->timestamps();
         });
 
+        Schema::create('bank_category_rules', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('tenant_id')->constrained(null, 'id', 'bank_category_rules_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('bank_account_id')->nullable()->constrained(null, 'id', 'bank_category_rules_bank_account_id_fk')->nullOnDelete();
+            $table->string('name');
+            $table->unsignedInteger('priority')->default(0);
+            $table->json('conditions'); // e.g., {"description_contains": "AMAZON"}
+            $table->foreignId('account_id')->constrained(null, 'id', 'bank_category_rules_account_id_fk');
+            $table->string('description_template')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
+        });
+
         Schema::create('bank_transactions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('bank_account_id')->constrained(null, 'id', 'bank_transactions_bank_account_id_fk')->cascadeOnDelete();
@@ -45,19 +58,6 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['bank_account_id', 'external_id'], 'bank_transactions_account_external_uk');
-        });
-
-        Schema::create('bank_category_rules', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('tenant_id')->constrained(null, 'id', 'bank_category_rules_tenant_id_fk')->cascadeOnDelete();
-            $table->foreignId('bank_account_id')->nullable()->constrained(null, 'id', 'bank_category_rules_bank_account_id_fk')->nullOnDelete();
-            $table->string('name');
-            $table->unsignedInteger('priority')->default(0);
-            $table->json('conditions'); // e.g., {"description_contains": "AMAZON"}
-            $table->foreignId('account_id')->constrained(null, 'id', 'bank_category_rules_account_id_fk');
-            $table->string('description_template')->nullable();
-            $table->boolean('is_active')->default(true);
-            $table->timestamps();
         });
 
         Schema::create('bank_reconciliations', function (Blueprint $table) {

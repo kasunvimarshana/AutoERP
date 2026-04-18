@@ -24,7 +24,8 @@ return new class extends Migration
             $table->foreignId('base_uom_id')->constrained('units_of_measure', 'id', 'products_base_uom_id_fk');
             $table->foreignId('purchase_uom_id')->nullable()->constrained('units_of_measure', 'id', 'products_purchase_uom_id_fk');
             $table->foreignId('sales_uom_id')->nullable()->constrained('units_of_measure', 'id', 'products_sales_uom_id_fk');
-            $table->decimal('uom_conversion_factor', 20, 10)->default(1); // base ↔ purchase/sales            $table->boolean('is_batch_tracked')->default(false);
+            $table->decimal('uom_conversion_factor', 20, 10)->default(1);
+            $table->boolean('is_batch_tracked')->default(false);
             $table->boolean('is_lot_tracked')->default(false);
             $table->boolean('is_serial_tracked')->default(false);
             $table->enum('valuation_method', ['fifo', 'lifo', 'fefo', 'weighted_average', 'standard'])->default('fifo');

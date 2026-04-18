@@ -50,7 +50,8 @@ return new class extends Migration
         Schema::create('payment_allocations', function (Blueprint $table) {
             $table->id();
             $table->foreignId('payment_id')->constrained(null, 'id', 'payment_allocations_payment_id_fk')->cascadeOnDelete();
-            $table->morphs('invoice'); // purchase_invoice or sales_invoice            $table->decimal('allocated_amount', 15, 4);
+            $table->morphs('invoice'); // purchase_invoice or sales_invoice
+            $table->decimal('allocated_amount', 15, 4);
             $table->timestamps();
         });
     }

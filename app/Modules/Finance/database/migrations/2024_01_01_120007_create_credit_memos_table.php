@@ -13,7 +13,8 @@ return new class extends Migration
         Schema::create('credit_memos', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained(null, 'id', 'credit_memos_tenant_id_fk')->cascadeOnDelete();
-            $table->foreignId('party_id'); // customer or supplier            $table->string('party_type'); // customer, supplier
+            $table->foreignId('party_id'); // customer or supplier
+            $table->string('party_type'); // customer, supplier
             $table->foreignId('return_order_id')->nullable(); // polymorphic to purchase_return or sales_return
             $table->string('return_order_type')->nullable();
             $table->string('credit_memo_number');

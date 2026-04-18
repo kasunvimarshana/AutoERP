@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('ar_transactions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained(null, 'id', 'ar_transactions_tenant_id_fk')->cascadeOnDelete();
-            $table->foreignId('customer_id')->constrained(null, 'id', 'ar_transactions_customer_id_fk')->cascadeOnDelete();
+            $table->unsignedBigInteger('customer_id');
             $table->foreignId('account_id')->constrained(null, 'id', 'ar_transactions_account_id_fk')->cascadeOnDelete();
             $table->enum('transaction_type', ['invoice', 'payment', 'credit_memo', 'adjustment']);
             $table->nullableMorphs('reference');
@@ -31,7 +31,7 @@ return new class extends Migration
         Schema::create('ap_transactions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained(null, 'id', 'ap_transactions_tenant_id_fk')->cascadeOnDelete();
-            $table->foreignId('supplier_id')->constrained(null, 'id', 'ap_transactions_supplier_id_fk')->cascadeOnDelete();
+            $table->unsignedBigInteger('supplier_id');
             $table->foreignId('account_id')->constrained(null, 'id', 'ap_transactions_account_id_fk')->cascadeOnDelete();
             $table->enum('transaction_type', ['bill', 'payment', 'debit_note', 'adjustment']);
             $table->nullableMorphs('reference');
