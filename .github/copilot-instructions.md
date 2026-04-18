@@ -1,111 +1,135 @@
-# Copilot Instructions for KVAutoERP
+# Copilot Instructions
 
 ## Project Overview
 
-KVAutoERP is an enterprise-grade SaaS multi-tenant ERP/CRM platform built with Laravel, following Clean Architecture and Domain-Driven Design (DDD) principles. The codebase uses a modular architecture where each business domain is a self-contained module under `app/Modules/`.
+KVAutoERP is an enterprise-grade SaaS multi-tenant ERP/CRM platform built with **Laravel 13** and **PHP 8.3+**. It uses Clean Architecture with DDD, organized as independent modules under `app/Modules/`. The platform supports procurement, sales, inventory, finance (double-entry accounting), product management, warehouse management, pricing, and more.
 
-## Architecture
+## Build & Test Commands
 
-### Layered Structure (per module)
+Always run these commands from the repository root.
 
-Each module follows strict Clean Architecture with four layers:
+```bash
+# Install PHP dependencies (always run first)
+composer install
+
+# Install JS dependencies
+npm install --ignore-scripts
+
+# Build frontend assets
+npm run build
+
+# Run all tests (uses SQLite :memory: by default via phpunit.xml)
+./vendor/bin/phpunit
+
+# Run tests for a specific module
+./vendor/bin/phpunit --filter=<ModuleName>
+
+# Lint PHP code
+./vendor/bin/pint
+
+# Generate .env if missing
+cp .env.example .env && php artisan key:generate
+```
+
+**Important**: Always run `composer install` before running tests or any artisan command. Tests use SQLite in-memory database — no external DB is needed.
+
+## Project Layout
+
+```
+app/Modules/           # All business modules (19 modules)
+├── Core/              # Shared kernel: BaseModel, HasUuid/HasTenant/HasAudit traits
+├── Tenant/            # Multi-tenancy management
+├── OrganizationUnit/  # Hierarchical org structures (materialized path)
+├── User/              # Authentication, authorization, profiles
+├── Auth/              # OAuth2 (Laravel Passport) login/token flows
+├── Customer/          # Customer master data, AR linkage
+├── Supplier/          # Supplier master data, AP linkage
+├── Employee/          # Employee management
+├── Product/           # Product catalog, variants, categories, UoM
+├── Pricing/           # Price lists, tiered pricing, modifiers
+├── Warehouse/         # Warehouses and location hierarchies
+├── Inventory/         # Stock levels, movements, batch/lot/serial tracking
+├── Purchase/          # Procurement: POs, GRNs, purchase invoices, returns
+├── Sales/             # Order-to-cash: SOs, shipments, invoices, returns
+├── Finance/           # Double-entry accounting, chart of accounts, journal entries
+├── Tax/               # Tax groups, rates, rules
+├── Audit/             # Audit logs, compliance trails
+├── Configuration/     # System settings, org-unit config
+└── Shared/            # Cross-module contracts, DTOs, events
+bootstrap/providers.php  # All module ServiceProviders registered here
+composer.json            # PSR-4: "Modules\\" => "app/Modules/"
+phpunit.xml              # Test config (SQLite :memory:)
+```
+
+## Module Architecture
+
+Each module follows a strict layered structure:
 
 ```
 app/Modules/<Module>/
-├── Domain/                    # Business rules (no framework dependencies)
-│   ├── Entities/              # Domain entities (pure PHP classes)
-│   ├── ValueObjects/          # Immutable value types
-│   ├── Events/                # Domain events
-│   ├── Exceptions/            # Domain-specific exceptions
-│   └── RepositoryInterfaces/  # Repository contracts
-├── Application/               # Use cases and orchestration
-│   ├── Contracts/             # Service interfaces
-│   ├── Services/              # Application services
-│   ├── DTOs/                  # Data Transfer Objects
-│   └── UseCases/              # Use case implementations
-├── Infrastructure/            # Framework and external concerns
+├── Domain/                  # Entities, RepositoryInterfaces, Events, Exceptions, ValueObjects
+├── Application/             # Contracts (service interfaces), Services, DTOs, UseCases
+├── Infrastructure/
 │   ├── Persistence/Eloquent/
-│   │   ├── Models/            # Eloquent models
-│   │   ├── Repositories/      # Repository implementations
-│   │   └── Traits/            # Reusable model traits
+│   │   ├── Models/          # Eloquent models (extend BaseModel)
+│   │   ├── Repositories/    # Implements Domain interfaces
+│   │   └── Traits/
 │   ├── Http/
-│   │   ├── Controllers/       # API controllers
-│   │   ├── Middleware/         # HTTP middleware
-│   │   └── Resources/         # API resources (JSON transformers)
-│   ├── Providers/             # Service providers (DI bindings)
-│   └── Broadcasting/          # Real-time channels
-├── config/                    # Module configuration
-├── database/migrations/       # Database migrations
-└── routes/api.php             # API route definitions
+│   │   ├── Controllers/     # Thin controllers, delegate to services
+│   │   └── Resources/       # API resources
+│   └── Providers/           # ServiceProvider: binds interfaces, loads migrations/routes
+├── database/migrations/     # Module-scoped migrations
+├── routes/api.php           # Module API routes
+└── config/
 ```
 
-### Core Principles
+**Layer rules**: Domain has no framework imports. Application depends only on Domain. Infrastructure implements Domain interfaces. Cross-module communication uses events only.
 
-- **SOLID** — Strictly follow all five SOLID principles.
-- **DRY** — Extract shared behavior into traits, base classes, or services.
-- **KISS** — Prefer simple, readable solutions over clever abstractions.
-- **Interface-driven** — Code against contracts, not concrete implementations.
-- **High cohesion, loose coupling** — Modules must not depend on other modules' internals.
+## Key Conventions
 
-## Coding Conventions
+- **PHP**: `declare(strict_types=1);` in every file. Strong typing on all parameters/returns.
+- **Namespaces**: `Modules\<Module>\...` (not `App\Modules\...`).
+- **Primary keys**: UUID via `HasUuid` trait (non-incrementing string PKs).
+- **Multi-tenancy**: `HasTenant` trait applies global scope. Repositories call `withoutGlobalScopes()` and filter `tenant_id` explicitly.
+- **Auditing**: `HasAudit` trait for automatic change tracking.
+- **Models**: Extend `BaseModel`, use `HasUuid`, `HasTenant`, `HasAudit` traits.
+- **Repositories**: Interface in `Domain/RepositoryInterfaces/`, Eloquent impl in `Infrastructure/Persistence/Eloquent/Repositories/`.
+- **Services**: Contract in `Application/Contracts/`, implementation in `Application/Services/`. Wrap writes in DB transactions.
+- **Controllers**: Extend `BaseController`; stay thin — delegate to services.
+- **ServiceProviders**: Bind interfaces in `register()`. In `boot()`, load migrations from `__DIR__.'/../../database/migrations'` and routes from `__DIR__.'/../../routes/api.php'`.
+- **Float comparison**: Use `abs($value) < PHP_FLOAT_EPSILON` instead of `== 0.0`.
+- **Monetary values**: `DECIMAL(20,6)` — never `FLOAT`.
 
-### PHP
+## Creating a New Module
 
-- Use `declare(strict_types=1);` in all PHP files.
-- Target PHP 8.2+ (readonly properties, enums, named arguments, match expressions).
-- Strong typing for all method signatures (parameter types and return types).
-- Use `abs($value) < PHP_FLOAT_EPSILON` instead of `== 0.0` for float comparisons.
+1. Create directory structure under `app/Modules/<ModuleName>/` following the layout above.
+2. Create `<ModuleName>ServiceProvider` in `Infrastructure/Providers/`:
+   - Bind repository interfaces → Eloquent implementations in `register()`.
+   - Load migrations and routes in `boot()`.
+3. Register the provider in `bootstrap/providers.php`.
 
-### Models and Database
+## File Naming
 
-- All models extend `BaseModel` from `Core/Infrastructure/Persistence/Eloquent/Models/`.
-- UUID primary keys via `HasUuid` trait (non-incrementing, string key type).
-- `HasTenant` trait for tenant-scoped models.
-- `HasAudit` trait for automatic change tracking.
-- Minimum 3NF/BCNF normalization.
-- Migrations in `app/Modules/<Module>/database/migrations/`.
+| Type | Pattern | Example |
+|------|---------|---------|
+| Entity | `<Name>.php` | `Product.php` |
+| Model | `<Name>Model.php` | `ProductModel.php` |
+| Repository | `Eloquent<Name>Repository.php` | `EloquentProductRepository.php` |
+| Service | `<Name>Service.php` | `ProductService.php` |
+| Controller | `<Name>Controller.php` | `ProductController.php` |
+| Migration | `YYYY_MM_DD_NNNNNN_create_<table>_table.php` | `2026_04_01_000001_create_products_table.php` |
 
-### Repositories
+## What to Avoid
 
-- Define interfaces in `Domain/RepositoryInterfaces/`.
-- Implement in `Infrastructure/Persistence/Eloquent/Repositories/`.
-- Call `withoutGlobalScopes()` in queries, then filter by `tenant_id` explicitly.
-- Bind interfaces to implementations in the module ServiceProvider.
+- Do not create circular dependencies between modules.
+- Do not import Infrastructure classes in the Domain layer.
+- Do not bypass the repository pattern for database access.
+- Do not hardcode tenant IDs — always derive from auth context or request headers.
+- Do not modify Core module traits without considering impact on all modules.
+- Do not use `float` for monetary or quantity fields — use `DECIMAL`.
 
-### Services
+## Key Dependencies
 
-- Define contracts in `Application/Contracts/`.
-- Implement in `Application/Services/`.
-- Wrap write operations in database transactions.
-- Dispatch domain events after successful operations.
-
-### Controllers and Routes
-
-- Extend `BaseController` or `AuthorizedController` from Core.
-- Keep controllers thin — delegate logic to services.
-- Use API Resources for response formatting.
-- Define routes in `routes/api.php` per module using `Route::prefix('api')->group(...)`.
-
-### Service Providers
-
-- Located at `Infrastructure/Providers/<Module>ServiceProvider.php`.
-- Bind interfaces in `register()`.
-- Load migrations and routes in `boot()`.
-
-## Multi-Tenancy
-
-- Enforced via `HasTenant` trait (global scope using `auth()->user()->tenant_id` or `X-Tenant-ID` header).
-- Repositories bypass the global scope and filter by `tenant_id` explicitly.
-- On creating, `tenant_id` auto-fills only if empty.
-
-## Key Technologies
-
-- **Laravel Passport** — OAuth2-based API authentication.
-- **Laravel Reverb** — WebSocket real-time event broadcasting.
-- **L5 Swagger** — OpenAPI documentation for all endpoints.
-
-## Testing
-
-- PHPUnit for unit and integration tests.
-- Test domain entities, value objects, and services in isolation.
-- Test repository implementations against the database.
+- **laravel/passport** — OAuth2 API authentication
+- **laravel/reverb** — Real-time WebSocket broadcasting
+- **darkaonline/l5-swagger** — OpenAPI/Swagger API documentation

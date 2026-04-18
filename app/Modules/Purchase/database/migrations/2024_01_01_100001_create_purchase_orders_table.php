@@ -27,6 +27,7 @@ return new class extends Migration
             $table->decimal('tax_total', 15, 4)->default(0);
             $table->decimal('discount_total', 15, 4)->default(0);
             $table->decimal('grand_total', 15, 4)->default(0);
+            // $table->decimal('grand_total', 15, 4)->storedAs('subtotal + tax_total - discount_total');
             $table->text('notes')->nullable();
             $table->json('metadata')->nullable();
             $table->foreignId('created_by');

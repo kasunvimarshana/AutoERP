@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('code');
             $table->string('name');
             $table->enum('type', ['asset', 'liability', 'equity', 'revenue', 'expense']);
-            $table->string('sub_type')->nullable();
+            $table->string('sub_type')->nullable(); // current_asset, accounts_receivable, etc.
             $table->enum('normal_balance', ['debit', 'credit']);
             $table->boolean('is_system')->default(false);
             $table->boolean('is_bank_account')->default(false);
@@ -26,7 +26,7 @@ return new class extends Migration
             $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete();
             $table->text('description')->nullable();
             $table->boolean('is_active')->default(true);
-            $table->string('path')->nullable();
+            $table->string('path')->nullable(); // materialized path for hierarchy
             $table->unsignedInteger('depth')->default(0);
             $table->timestamps();
             $table->softDeletes();

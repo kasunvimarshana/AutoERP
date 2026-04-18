@@ -11,7 +11,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Passport\Contracts\OAuthenticatable;
 use Laravel\Passport\HasApiTokens;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 
 class UserModel extends Authenticatable implements OAuthenticatable
 {

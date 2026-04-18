@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Infrastructure\Providers;
 
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
+use Modules\Core\Infrastructure\Concerns\LoadsModuleRoutesAndMigrations;
 use Modules\OrganizationUnit\Application\Contracts\CreateOrganizationUnitServiceInterface;
 use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitAttachmentServiceInterface;
 use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitServiceInterface;
@@ -30,6 +30,8 @@ use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Repositories\El
 
 class OrganizationUnitServiceProvider extends ServiceProvider
 {
+    use LoadsModuleRoutesAndMigrations;
+
     public function register(): void
     {
         $this->app->bind(OrganizationUnitRepositoryInterface::class, function ($app) {
@@ -78,12 +80,9 @@ class OrganizationUnitServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        Route::middleware('api')
-            ->prefix('api')
-            ->group(function (): void {
-                $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
-            });
-
-        $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
+        $this->bootModule(
+            __DIR__.'/../../routes/api.php',
+            __DIR__.'/../../database/migrations',
+        );
     }
 }

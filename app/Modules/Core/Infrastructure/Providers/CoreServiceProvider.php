@@ -7,13 +7,9 @@ namespace Modules\Core\Infrastructure\Providers;
 use Illuminate\Contracts\Broadcasting\Factory as BroadcastingFactory;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Route;
 use L5Swagger\Generator;
-use Modules\Core\Application\Contracts\AuditServiceInterface;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
-use Modules\Core\Application\Services\AuditService;
 use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
-use Modules\Core\Domain\RepositoryInterfaces\AuditRepositoryInterface;
 use Modules\Core\Infrastructure\ApiDoc\Contracts\ApiDocServiceInterface;
 use Modules\Core\Infrastructure\ApiDoc\Services\SwaggerApiDocService;
 use Modules\Core\Infrastructure\Broadcasting\Contracts\BroadcastServiceInterface;
@@ -22,8 +18,6 @@ use Modules\Core\Infrastructure\Broadcasting\Contracts\EventBroadcasterInterface
 use Modules\Core\Infrastructure\Broadcasting\Services\BroadcastService;
 use Modules\Core\Infrastructure\Broadcasting\Services\ChannelManager;
 use Modules\Core\Infrastructure\Broadcasting\Services\EventBroadcaster;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Models\AuditLogModel;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentAuditRepository;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Core\Infrastructure\Services\FileStorageService;
 
@@ -52,15 +46,6 @@ class CoreServiceProvider extends ServiceProvider
 
         $this->app->bind(EventBroadcasterInterface::class, function ($app) {
             return new EventBroadcaster($app->make(Dispatcher::class));
-        });
-
-        // Audit
-        $this->app->bind(AuditRepositoryInterface::class, function ($app) {
-            return new EloquentAuditRepository($app->make(AuditLogModel::class));
-        });
-
-        $this->app->bind(AuditServiceInterface::class, function ($app) {
-            return new AuditService($app->make(AuditRepositoryInterface::class));
         });
 
         $this->mergeConfigFrom(__DIR__.'/../../config/core.php', 'core');

@@ -25,7 +25,7 @@ return new class extends Migration
             $table->foreignId('tax_class_id')->nullable();
             $table->decimal('line_total', 15, 4)->storedAs('(ordered_qty * unit_price) * (1 - discount_pct/100)');
             // Purchase order lines account
-            $table->foreignId('account_id')->nullable(); // expense/asset account for posting
+            $table->foreignId('account_id')->nullable()->constrained('accounts')->nullOnDelete(); // expense/asset account for posting
             $table->timestamps();
         });
     }

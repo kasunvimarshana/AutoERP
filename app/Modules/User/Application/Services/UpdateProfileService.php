@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Modules\User\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
-use Modules\Core\Domain\ValueObjects\Address;
-use Modules\Core\Domain\ValueObjects\PhoneNumber;
+use Modules\User\Domain\ValueObjects\Address;
+use Modules\User\Domain\ValueObjects\PhoneNumber;
 use Modules\User\Application\Contracts\UpdateProfileServiceInterface;
 use Modules\User\Application\DTOs\UpdateProfileData;
 use Modules\User\Domain\Entities\User;

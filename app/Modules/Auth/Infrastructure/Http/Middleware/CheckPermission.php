@@ -7,7 +7,7 @@ namespace Modules\Auth\Infrastructure\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Modules\Auth\Application\Contracts\AuthorizationServiceInterface;
-use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 /**
  * Permission middleware: verifies the authenticated user has the given permission.
@@ -25,7 +25,7 @@ class CheckPermission
         $user = $request->user();
 
         if (! $user) {
-            return response()->json(['message' => 'Unauthenticated'], 401);
+            return response()->json(['message' => 'Unauthenticated'], HttpResponse::HTTP_UNAUTHORIZED);
         }
 
         foreach ($permissions as $permission) {
@@ -34,6 +34,6 @@ class CheckPermission
             }
         }
 
-        return response()->json(['message' => 'Forbidden: insufficient permission'], 403);
+        return response()->json(['message' => 'Forbidden: insufficient permission'], HttpResponse::HTTP_FORBIDDEN);
     }
 }

@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Application\Factories;
 
-use Modules\Core\Domain\ValueObjects\ApiKeys;
-use Modules\Core\Domain\ValueObjects\CacheConfig;
-use Modules\Core\Domain\ValueObjects\DatabaseConfig;
-use Modules\Core\Domain\ValueObjects\FeatureFlags;
-use Modules\Core\Domain\ValueObjects\MailConfig;
-use Modules\Core\Domain\ValueObjects\QueueConfig;
+use Modules\Tenant\Domain\ValueObjects\ApiKeys;
+use Modules\Tenant\Domain\ValueObjects\CacheConfig;
+use Modules\Tenant\Domain\ValueObjects\DatabaseConfig;
+use Modules\Tenant\Domain\ValueObjects\FeatureFlags;
+use Modules\Tenant\Domain\ValueObjects\MailConfig;
+use Modules\Tenant\Domain\ValueObjects\QueueConfig;
 
 class TenantConfigValueObjectFactory
 {

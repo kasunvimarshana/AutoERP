@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units')->nullOnDelete();
             $table->string('first_name');
             $table->string('last_name');
-            $table->string('email')->unique(); // globally unique for login
+            $table->string('email');
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->string('phone', 30)->nullable();
@@ -28,6 +28,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
+            $table->unique(['tenant_id', 'email']);
             $table->index(['tenant_id', 'email'], 'idx_users_tenant_email');
         });
     }

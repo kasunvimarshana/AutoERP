@@ -22,14 +22,15 @@ return new class extends Migration
             $table->foreignId('to_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
             $table->enum('movement_type', [
                 'receipt', 'shipment', 'transfer', 'adjustment',
+                'adjustment_in', 'adjustment_out', 'opening',
                 'return_in', 'return_out', 'reservation', 'reservation_release',
                 'write_off', 'cycle_count'
             ]);
             $table->nullableMorphs('reference'); // link to PO line, GRN line, shipment line, etc.
             $table->foreignId('uom_id')->constrained('units_of_measure');
             $table->decimal('quantity', 15, 4);
-            $table->decimal('unit_cost', 15, 4)->nullable();
-            $table->decimal('total_cost', 15, 4)->storedAs('quantity * unit_cost');
+            $table->decimal('unit_cost', 15, 4)->nullable(); // For receipt/shipment valuation
+            $table->decimal('total_cost', 15, 4)->storedAs('quantity * unit_cost'); // Computed at application level
             $table->foreignId('performed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('performed_at')->useCurrent();
             $table->text('notes')->nullable();

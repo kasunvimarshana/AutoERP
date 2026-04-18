@@ -23,7 +23,7 @@ return new class extends Migration
             $table->string('registration_number')->nullable();
             $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete();
             $table->unsignedInteger('payment_terms_days')->default(30);
-            $table->foreignId('ap_account_id')->nullable(); // will reference accounts later
+            $table->foreignId('ap_account_id')->nullable(); // accounts_payable_account_id will reference accounts later
             $table->enum('status', ['active', 'inactive'])->default('active');
             $table->text('notes')->nullable();
             $table->json('metadata')->nullable();

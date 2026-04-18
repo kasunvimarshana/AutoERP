@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Infrastructure\Providers;
 
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Application\Contracts\AttachmentStorageStrategyInterface;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
+use Modules\Core\Infrastructure\Concerns\LoadsModuleRoutesAndMigrations;
 use Modules\Tenant\Application\Contracts\BulkUploadTenantAttachmentsServiceInterface;
 use Modules\Tenant\Application\Contracts\CreateTenantPlanServiceInterface;
 use Modules\Tenant\Application\Contracts\CreateTenantSettingServiceInterface;
@@ -59,6 +59,8 @@ use Modules\Tenant\Infrastructure\Storage\DefaultAttachmentStorageStrategy;
 
 class TenantServiceProvider extends ServiceProvider
 {
+    use LoadsModuleRoutesAndMigrations;
+
     public function register(): void
     {
         $this->app->singleton(TenantConfigValueObjectFactory::class);
@@ -159,12 +161,9 @@ class TenantServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        Route::middleware('api')
-             ->prefix('api')
-             ->group(function () {
-                 $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
-             });
-
-        $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
+        $this->bootModule(
+            __DIR__.'/../../routes/api.php',
+            __DIR__.'/../../database/migrations',
+        );
     }
 }

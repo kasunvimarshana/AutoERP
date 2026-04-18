@@ -46,14 +46,16 @@ class PassportTokenService implements TokenServiceInterface
             return false;
         }
 
+        if ((int) $user->getAuthIdentifier() !== $userId) {
+            return false;
+        }
+
         $token = $user->currentAccessToken();
         if (! $token) {
             return false;
         }
 
-        $token->revoke();
-
-        return true;
+        return $this->revokeToken($token);
     }
 
     public function revokeAllTokens(int $userId): bool
@@ -63,7 +65,20 @@ class PassportTokenService implements TokenServiceInterface
             return false;
         }
 
-        $user->tokens()->each(fn ($token) => $token->revoke());
+        $user->tokens()->each(function ($token): void {
+            $this->revokeToken($token);
+        });
+
+        return true;
+    }
+
+    private function revokeToken(mixed $token): bool
+    {
+        if (! is_object($token) || ! method_exists($token, 'revoke')) {
+            return false;
+        }
+
+        $token->revoke();
 
         return true;
     }

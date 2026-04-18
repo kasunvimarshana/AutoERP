@@ -13,11 +13,14 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
             $table->foreignId('parent_id')->nullable()->constrained('product_brands')->nullOnDelete();
             $table->string('name');
+            $table->string('slug');
             $table->string('code')->nullable();
             $table->string('path')->nullable();
             $table->unsignedInteger('depth')->default(0);
             $table->boolean('is_active')->default(true);
             $table->string('website', 255)->nullable();
+            $table->text('description')->nullable();
+            $table->json('attributes')->nullable();
             $table->json('metadata')->nullable();
             $table->timestamps();
 

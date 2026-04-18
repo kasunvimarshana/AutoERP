@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Auth\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Route;
 use Laravel\Passport\Passport;
 use Modules\Auth\Application\Contracts\AuthUserRepositoryInterface;
 use Modules\Auth\Application\Contracts\AuthenticationServiceInterface;
@@ -17,6 +16,7 @@ use Modules\Auth\Application\Contracts\RefreshTokenServiceInterface;
 use Modules\Auth\Application\Contracts\RegisterUserServiceInterface;
 use Modules\Auth\Application\Contracts\ResetPasswordServiceInterface;
 use Modules\Auth\Application\Contracts\SsoServiceInterface;
+use Modules\Auth\Application\Contracts\TenantContextResolverInterface;
 use Modules\Auth\Application\Contracts\TokenServiceInterface;
 use Modules\Auth\Application\Services\AbacAuthorizationStrategy;
 use Modules\Auth\Application\Services\AuthenticationService;
@@ -38,13 +38,27 @@ use Modules\Auth\Application\UseCases\RefreshToken;
 use Modules\Auth\Application\UseCases\RegisterUser;
 use Modules\Auth\Application\UseCases\ResetPassword;
 use Modules\Auth\Infrastructure\Persistence\EloquentAuthUserRepository;
+use Modules\Auth\Infrastructure\Services\TenantContextResolver;
+use Modules\Core\Infrastructure\Concerns\LoadsModuleRoutesAndMigrations;
+use Modules\User\Application\Contracts\CreateUserServiceInterface;
+use Modules\User\Application\Contracts\SetUserPasswordServiceInterface;
+use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 
 class AuthModuleServiceProvider extends ServiceProvider
 {
+    use LoadsModuleRoutesAndMigrations;
+
     public function register(): void
     {
+        $this->app->singleton(TenantContextResolverInterface::class, TenantContextResolver::class);
+
         // Auth user repository: decouples auth services from UserModel
-        $this->app->bind(AuthUserRepositoryInterface::class, EloquentAuthUserRepository::class);
+        $this->app->bind(AuthUserRepositoryInterface::class, function ($app) {
+            return new EloquentAuthUserRepository(
+                $app->make(UserModel::class),
+                $app->make(TenantContextResolverInterface::class),
+            );
+        });
 
         // Authorization strategies (RBAC + ABAC) — resolved via interface for DIP compliance
         $this->app->bind(RbacAuthorizationStrategy::class, function ($app) {
@@ -79,27 +93,27 @@ class AuthModuleServiceProvider extends ServiceProvider
         $this->app->bind(AuthenticationServiceInterface::class, function ($app) {
             return new AuthenticationService(
                 $app->make(TokenServiceInterface::class),
+                $app->make(TenantContextResolverInterface::class),
             );
         });
 
         // Register / Login / Logout services
         $this->app->bind(RegisterUserServiceInterface::class, function ($app) {
             return new RegisterUserService(
-                $app->make(AuthUserRepositoryInterface::class),
+                $app->make(CreateUserServiceInterface::class),
+                $app->make(SetUserPasswordServiceInterface::class),
             );
         });
 
         $this->app->bind(LoginServiceInterface::class, function ($app) {
             return new LoginService(
                 $app->make(AuthenticationServiceInterface::class),
-                $app->make(AuthUserRepositoryInterface::class),
             );
         });
 
         $this->app->bind(LogoutServiceInterface::class, function ($app) {
             return new LogoutService(
                 $app->make(AuthenticationServiceInterface::class),
-                $app->make(AuthUserRepositoryInterface::class),
             );
         });
 
@@ -164,14 +178,10 @@ class AuthModuleServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
-        Route::middleware('api')
-             ->prefix('api')
-             ->group(function () {
-                 $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
-             });
-
-        $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
+        $this->bootModule(
+            __DIR__.'/../../routes/api.php',
+            __DIR__.'/../../database/migrations',
+        );
 
         // Configure Passport token lifetime
         Passport::tokensExpireIn(now()->addDays(

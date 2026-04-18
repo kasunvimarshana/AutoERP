@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('trace_logs', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
-            $table->morphs('entity'); // product, batch, serial, etc.
+            $table->morphs('entity'); // Product, Variant, Batch, Serial, Location, etc.
             $table->foreignId('identifier_id')->nullable()->constrained('product_identifiers')->nullOnDelete();
             $table->enum('action_type', [
                 'scan', 'receive', 'transfer', 'pick', 'pack', 'ship',
@@ -27,7 +27,7 @@ return new class extends Migration
             $table->foreignId('performed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('performed_at')->useCurrent();
             $table->string('device_id')->nullable();
-            $table->json('metadata')->nullable();
+            $table->json('metadata')->nullable(); // Contains GS1 AI data, scan context
 
             $table->index(['tenant_id', 'entity_type', 'entity_id'], 'idx_trace_logs_tenant_entity');
             $table->index(['tenant_id', 'performed_at'], 'idx_trace_logs_tenant_date');

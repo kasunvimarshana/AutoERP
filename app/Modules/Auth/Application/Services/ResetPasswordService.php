@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Application\Services;
 
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Modules\Auth\Application\Contracts\ResetPasswordServiceInterface;
 use Modules\Auth\Domain\Exceptions\AuthenticationException;
+use Modules\User\Application\Contracts\SetUserPasswordServiceInterface;
 
 /**
  * Completes the password-reset flow using Laravel's built-in broker.
@@ -17,12 +17,24 @@ use Modules\Auth\Domain\Exceptions\AuthenticationException;
  */
 class ResetPasswordService implements ResetPasswordServiceInterface
 {
+    public function __construct(
+        private readonly SetUserPasswordServiceInterface $setUserPasswordService,
+    ) {}
+
     public function reset(array $data): bool
     {
         $status = Password::reset(
             $data,
-            static function ($user, string $password): void {
-                $user->forceFill(['password' => Hash::make($password)])->save();
+            function ($user, string $password): void {
+                $userId = (int) $user->getAuthIdentifier();
+                if ($userId <= 0) {
+                    throw new AuthenticationException('Unable to resolve user for password reset.');
+                }
+
+                $this->setUserPasswordService->execute([
+                    'user_id' => $userId,
+                    'password' => $password,
+                ]);
             },
         );
 

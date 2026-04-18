@@ -17,6 +17,15 @@ class RegisterUser
 
     /**
      * Register a new user and immediately issue an access token.
+        *
+        * @param  array{
+        *     tenant_id: int,
+        *     email: string,
+        *     first_name: string,
+        *     last_name: string,
+        *     password: string,
+        *     phone?: string|null
+        * }  $data
      */
     public function execute(array $data): AccessToken
     {

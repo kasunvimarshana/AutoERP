@@ -27,28 +27,12 @@ class AuthorizationService implements AuthorizationServiceInterface
 
     public function hasRole(int $userId, string $role): bool
     {
-        $roles = $this->userRepository->getRolesWithPermissions($userId);
-
-        foreach ($roles as $entry) {
-            if (strtolower($entry['name']) === strtolower($role)) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->userRepository->hasRole($userId, $role);
     }
 
     public function hasPermission(int $userId, string $permission): bool
     {
-        $roles = $this->userRepository->getRolesWithPermissions($userId);
-
-        foreach ($roles as $role) {
-            if (in_array($permission, $role['permissions'], strict: true)) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->userRepository->hasPermission($userId, $permission);
     }
 
     public function can(int $userId, string $ability, mixed $subject = null): bool

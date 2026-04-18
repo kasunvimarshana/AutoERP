@@ -6,10 +6,10 @@ namespace Modules\User\Infrastructure\Persistence\Eloquent\Repositories;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Hash;
-use Modules\Core\Domain\ValueObjects\Address;
-use Modules\Core\Domain\ValueObjects\Email;
-use Modules\Core\Domain\ValueObjects\PhoneNumber;
-use Modules\Core\Domain\ValueObjects\UserPreferences;
+use Modules\User\Domain\ValueObjects\Address;
+use Modules\User\Domain\ValueObjects\Email;
+use Modules\User\Domain\ValueObjects\PhoneNumber;
+use Modules\User\Domain\ValueObjects\UserPreferences;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\User\Domain\Entities\Permission;
 use Modules\User\Domain\Entities\Role;

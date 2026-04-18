@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Modules\User\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
-use Modules\Core\Domain\ValueObjects\Address;
-use Modules\Core\Domain\ValueObjects\Email;
-use Modules\Core\Domain\ValueObjects\PhoneNumber;
-use Modules\Core\Domain\ValueObjects\UserPreferences;
+use Modules\User\Domain\ValueObjects\Address;
+use Modules\User\Domain\ValueObjects\Email;
+use Modules\User\Domain\ValueObjects\PhoneNumber;
+use Modules\User\Domain\ValueObjects\UserPreferences;
 use Modules\User\Application\Contracts\UpdateUserServiceInterface;
 use Modules\User\Domain\Entities\User;
 use Modules\User\Domain\Events\UserUpdated;

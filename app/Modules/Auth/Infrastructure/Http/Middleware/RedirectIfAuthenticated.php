@@ -7,7 +7,7 @@ namespace Modules\Auth\Infrastructure\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 /**
  * Guest middleware: prevents already-authenticated users from accessing guest-only endpoints
@@ -23,7 +23,7 @@ class RedirectIfAuthenticated
 
         foreach ($guards as $guard) {
             if (Auth::guard($guard)->check()) {
-                return response()->json(['message' => 'Already authenticated'], 409);
+                return response()->json(['message' => 'Already authenticated'], HttpResponse::HTTP_CONFLICT);
             }
         }
 

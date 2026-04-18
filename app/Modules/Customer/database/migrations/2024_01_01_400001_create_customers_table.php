@@ -24,7 +24,7 @@ return new class extends Migration
             $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete();
             $table->decimal('credit_limit', 15, 4)->default(0);
             $table->unsignedInteger('payment_terms_days')->default(30);
-            $table->foreignId('ar_account_id')->nullable(); // will reference accounts later
+            $table->foreignId('ar_account_id')->nullable(); // accounts_receivable_account_id will reference accounts later
             $table->enum('status', ['active', 'inactive', 'blocked'])->default('active');
             $table->text('notes')->nullable();
             $table->json('metadata')->nullable();

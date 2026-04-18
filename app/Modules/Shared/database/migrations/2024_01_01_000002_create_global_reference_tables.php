@@ -23,10 +23,11 @@ return new class extends Migration
         // Currencies
         Schema::create('currencies', function (Blueprint $table) {
             $table->id();
-            $table->string('code', 3)->unique('uq_currencies_code');
+            $table->string('code', 3)->unique('uq_currencies_code'); // ISO 4217
             $table->string('name');
             $table->string('symbol', 10)->nullable();
             $table->unsignedSmallInteger('decimal_places')->default(2);
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
 

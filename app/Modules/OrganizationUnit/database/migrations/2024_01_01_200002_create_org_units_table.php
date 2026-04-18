@@ -20,7 +20,6 @@ return new class extends Migration
             $table->string('code')->nullable();
             $table->string('path')->nullable(); // materialized path for quick tree queries
             $table->unsignedInteger('depth')->default(0);
-            $table->foreignId('manager_user_id')->nullable(); // will reference users later
             $table->json('metadata')->nullable();
             $table->boolean('is_active')->default(true);
             $table->text('description')->nullable();
@@ -28,6 +27,16 @@ return new class extends Migration
             $table->integer('_rgt')->default(0);
             $table->timestamps();
             $table->softDeletes();
+
+            // Financial defaults
+            $table->foreignId('default_revenue_account_id')->nullable(); // will reference accounts later
+            $table->foreignId('default_expense_account_id')->nullable(); // will reference accounts later
+            $table->foreignId('default_asset_account_id')->nullable(); // will reference accounts later
+            $table->foreignId('default_liability_account_id')->nullable(); // will reference accounts later
+
+            // Physical links
+            $table->foreignId('warehouse_id')->nullable(); // will reference warehouses later
+            $table->foreignId('manager_user_id')->nullable(); // will reference users later
 
             $table->unique(['tenant_id', 'code'], 'org_units_code_unique');
             $table->index(['tenant_id', 'parent_id'], 'idx_org_units_tenant_parent');

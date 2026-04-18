@@ -7,7 +7,7 @@ namespace Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 
 class OrganizationUnitAttachmentModel extends Model
 {

@@ -12,7 +12,14 @@ interface RegisterUserServiceInterface
     /**
      * Register a new user account and return the created user's ID.
      *
-     * @param  array  $data  Validated registration data
+     * @param  array{
+     *     tenant_id: int,
+     *     email: string,
+     *     first_name: string,
+     *     last_name: string,
+     *     password: string,
+     *     phone?: string|null
+     * }  $data Validated registration data
      * @return int The created user's ID
      */
     public function register(array $data): int;

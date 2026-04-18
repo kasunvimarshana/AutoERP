@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 
 class OrganizationUnitModel extends Model

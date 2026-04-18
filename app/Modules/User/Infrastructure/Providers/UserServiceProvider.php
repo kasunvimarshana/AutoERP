@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Modules\User\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Route;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
+use Modules\Core\Infrastructure\Concerns\LoadsModuleRoutesAndMigrations;
 use Modules\User\Application\Contracts\AssignRoleServiceInterface;
 use Modules\User\Application\Contracts\ChangePasswordServiceInterface;
 use Modules\User\Application\Contracts\CreatePermissionServiceInterface;
@@ -22,6 +22,7 @@ use Modules\User\Application\Contracts\FindPermissionServiceInterface;
 use Modules\User\Application\Contracts\FindRoleServiceInterface;
 use Modules\User\Application\Contracts\FindUserAttachmentsServiceInterface;
 use Modules\User\Application\Contracts\FindUserServiceInterface;
+use Modules\User\Application\Contracts\SetUserPasswordServiceInterface;
 use Modules\User\Application\Contracts\SyncRolePermissionsServiceInterface;
 use Modules\User\Application\Contracts\UpsertUserDeviceServiceInterface;
 use Modules\User\Application\Contracts\UpdatePreferencesServiceInterface;
@@ -44,6 +45,7 @@ use Modules\User\Application\Services\FindPermissionService;
 use Modules\User\Application\Services\FindRoleService;
 use Modules\User\Application\Services\FindUserAttachmentsService;
 use Modules\User\Application\Services\FindUserService;
+use Modules\User\Application\Services\SetUserPasswordService;
 use Modules\User\Application\Services\SyncRolePermissionsService;
 use Modules\User\Application\Services\UpsertUserDeviceService;
 use Modules\User\Application\Services\UpdatePreferencesService;
@@ -69,6 +71,8 @@ use Modules\User\Infrastructure\Persistence\Eloquent\Repositories\EloquentUserRe
 
 class UserServiceProvider extends ServiceProvider
 {
+    use LoadsModuleRoutesAndMigrations;
+
     public function register(): void
     {
         $this->app->bind(UserRepositoryInterface::class, function ($app) {
@@ -116,6 +120,9 @@ class UserServiceProvider extends ServiceProvider
         });
         $this->app->bind(ChangePasswordServiceInterface::class, function ($app) {
             return new ChangePasswordService($app->make(UserRepositoryInterface::class));
+        });
+        $this->app->bind(SetUserPasswordServiceInterface::class, function ($app) {
+            return new SetUserPasswordService($app->make(UserRepositoryInterface::class));
         });
         $this->app->bind(UploadAvatarServiceInterface::class, function ($app) {
             return new UploadAvatarService(
@@ -184,13 +191,9 @@ class UserServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
-        Route::middleware('api')
-             ->prefix('api')
-             ->group(function () {
-                 $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
-             });
-
-        $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
+        $this->bootModule(
+            __DIR__.'/../../routes/api.php',
+            __DIR__.'/../../database/migrations',
+        );
     }
 }

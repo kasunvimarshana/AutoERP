@@ -15,9 +15,11 @@ return new class extends Migration
             $table->id();
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
             $table->foreignId('category_id')->nullable()->constrained('product_categories')->nullOnDelete();
+            $table->foreignId('brand_id')->nullable()->constrained('product_brands')->nullOnDelete();
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units')->nullOnDelete();
             $table->enum('type', ['physical', 'service', 'digital', 'combo', 'variable'])->default('physical');
             $table->string('name');
+            $table->string('slug');
             $table->string('sku')->nullable();
             $table->text('description')->nullable();
             $table->foreignId('base_uom_id')->constrained('units_of_measure');

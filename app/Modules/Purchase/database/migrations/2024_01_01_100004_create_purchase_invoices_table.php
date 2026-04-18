@@ -28,6 +28,7 @@ return new class extends Migration
             $table->decimal('tax_total', 15, 4)->default(0);
             $table->decimal('discount_total', 15, 4)->default(0);
             $table->decimal('grand_total', 15, 4)->default(0);
+            // $table->decimal('grand_total', 15, 4)->storedAs('subtotal + tax_total - discount_total');
             // Purchase invoices AP account & JE
             $table->foreignId('ap_account_id')->nullable(); // will reference accounts
             $table->foreignId('journal_entry_id')->nullable(); // will reference journal_entries
@@ -49,6 +50,7 @@ return new class extends Migration
             $table->decimal('discount_pct', 5, 2)->default(0);
             $table->decimal('tax_amount', 15, 4)->default(0);
             $table->decimal('line_total', 15, 4);
+            // $table->decimal('line_total', 15, 4)->storedAs('quantity * unit_price * (1 - discount_pct/100) + tax_amount');
             // Purchase invoice lines account
             $table->foreignId('account_id')->nullable();
             $table->timestamps();

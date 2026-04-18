@@ -6,10 +6,10 @@ namespace Modules\User\Domain\Entities;
 
 use Illuminate\Support\Collection;
 use Modules\Core\Domain\Exceptions\DomainException;
-use Modules\Core\Domain\ValueObjects\Address;
-use Modules\Core\Domain\ValueObjects\Email;
-use Modules\Core\Domain\ValueObjects\PhoneNumber;
-use Modules\Core\Domain\ValueObjects\UserPreferences;
+use Modules\User\Domain\ValueObjects\Address;
+use Modules\User\Domain\ValueObjects\Email;
+use Modules\User\Domain\ValueObjects\PhoneNumber;
+use Modules\User\Domain\ValueObjects\UserPreferences;
 
 class User
 {

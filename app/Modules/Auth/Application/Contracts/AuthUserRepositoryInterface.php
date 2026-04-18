@@ -27,18 +27,6 @@ interface AuthUserRepositoryInterface
     public function findAuthenticatable(int $userId): ?Authenticatable;
 
     /**
-     * Get the email address of a user by their ID.
-     * Used for dispatching auth events after login/logout.
-     */
-    public function getEmailById(int $userId): ?string;
-
-    /**
-     * Get the ID of a user by their email address.
-     * Used for dispatching auth events after successful authentication.
-     */
-    public function getIdByEmail(string $email): ?int;
-
-    /**
      * Get all roles (with their permissions) assigned to a user.
      *
      * Returns an array of roles, each with:
@@ -47,16 +35,12 @@ interface AuthUserRepositoryInterface
     public function getRolesWithPermissions(int $userId): array;
 
     /**
-     * Create a new user account and return the new user's ID.
-     *
-     * @param  array{
-     *     tenant_id: int,
-     *     email: string,
-     *     first_name: string,
-     *     last_name: string,
-     *     password: string,
-     *     phone?: string|null
-     * }  $data
+     * Determine if a user has the given role.
      */
-    public function createUser(array $data): int;
+    public function hasRole(int $userId, string $role): bool;
+
+    /**
+     * Determine if a user has the given permission through assigned roles.
+     */
+    public function hasPermission(int $userId, string $permission): bool;
 }

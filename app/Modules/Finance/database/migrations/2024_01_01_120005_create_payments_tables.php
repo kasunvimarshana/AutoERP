@@ -34,6 +34,7 @@ return new class extends Migration
             $table->foreignId('currency_id')->constrained('currencies');
             $table->decimal('exchange_rate', 15, 6)->default(1);
             $table->decimal('base_amount', 15, 4);
+            // $table->decimal('base_amount', 15, 4)->storedAs('amount * exchange_rate');
             $table->date('payment_date');
             $table->enum('status', ['draft', 'posted', 'reconciled', 'voided'])->default('draft');
             $table->string('reference')->nullable();

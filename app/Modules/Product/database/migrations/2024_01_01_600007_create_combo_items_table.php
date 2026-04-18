@@ -18,6 +18,8 @@ return new class extends Migration
             $table->foreignId('component_variant_id')->nullable()->constrained('product_variants')->nullOnDelete();
             $table->decimal('quantity', 15, 4);
             $table->foreignId('uom_id')->constrained('units_of_measure');
+            $table->json('metadata')->nullable();
+
             $table->timestamps();
         });
     }

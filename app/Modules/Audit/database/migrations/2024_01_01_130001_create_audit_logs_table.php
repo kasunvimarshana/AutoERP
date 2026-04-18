@@ -12,14 +12,32 @@ return new class extends Migration
     {
         Schema::create('audit_logs', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
-            $table->ipAddress('ip_address')->nullable();
-            $table->text('user_agent')->nullable();
-            $table->string('event'); // created, updated, deleted, restored, login, etc.
-            $table->morphs('auditable');
+            $table->unsignedBigInteger('tenant_id')->nullable()->index('idx_core_audit_logs_tenant');
+            $table->unsignedBigInteger('user_id')->nullable()->index('idx_core_audit_logs_user');
+
+            // The action that triggered this entry (created, updated, deleted, etc.)
+            $table->string('event', 50)->index('idx_core_audit_logs_event');
+
+            // Polymorphic morph columns
+            // $table->morphs('auditable');
+            $table->string('auditable_type')->index('idx_core_audit_logs_auditable_type');
+            $table->string('auditable_id')->index('idx_core_audit_logs_auditable_id');
+
+            // Captured attribute snapshots
             $table->json('old_values')->nullable();
             $table->json('new_values')->nullable();
+
+            // Request context
+            $table->string('url', 1000)->nullable();
+            $table->string('ip_address', 45)->nullable();
+            $table->text('user_agent')->nullable();
+
+            // Extensibility
+            $table->json('tags')->nullable();
+            $table->json('metadata')->nullable();
+
+            // Audit logs are only ever created, never updated.
+            // $table->timestamp('created_at')->useCurrent();
             $table->timestamp('occurred_at')->useCurrent();
 
             $table->index(['tenant_id', 'auditable_type', 'auditable_id'], 'idx_audit_logs_tenant_morphable');
