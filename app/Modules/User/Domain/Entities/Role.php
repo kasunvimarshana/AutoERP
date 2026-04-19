@@ -14,14 +14,20 @@ class Role
     private int $tenantId;
 
     private string $name;
+    private string $guardName;
+    private ?string $description;
 
     private Collection $permissions;
 
-    public function __construct(int $tenantId, string $name, ?int $id = null)
+    public function __construct(int $tenantId, string $name,
+        string $guardName,
+        ?string $description = null, ?int $id = null)
     {
         $this->id = $id;
         $this->tenantId = $tenantId;
         $this->name = $name;
+        $this->guardName = $guardName;
+        $this->description = $description;
         $this->permissions = new Collection;
     }
 
@@ -40,6 +46,9 @@ class Role
     {
         return $this->name;
     }
+
+    public function getGuardName(): string { return $this->guardName; }
+    public function getDescription(): ?string { return $this->description; }
 
     public function getPermissions(): Collection
     {

@@ -3,13 +3,14 @@
 declare(strict_types=1);
 
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Models;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
+
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
-use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 
 /**
  * @property int $id
@@ -33,8 +34,10 @@ use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  */
-class TenantModel extends Model
+class TenantModel extends BaseModel
 {
+
+    use HasTenant;
     use HasAudit, SoftDeletes;
 
     protected $table = 'tenants';
@@ -102,6 +105,9 @@ class TenantModel extends Model
 
     public function users(): HasMany
     {
-        return $this->hasMany(UserModel::class, 'tenant_id');
+        return $this->hasMany(
+            (string) config('auth.providers.users.model'),
+            'tenant_id'
+        );
     }
 }

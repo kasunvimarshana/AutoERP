@@ -17,6 +17,7 @@ return new class extends Migration
             $table->foreignId('to_uom_id')->constrained('units_of_measure', 'id', 'uom_conversions_to_uom_id_fk')->cascadeOnDelete();
             $table->decimal('factor', 20, 10);
             $table->timestamps();
+            $table->softDeletes();
 
             $table->unique(['tenant_id', 'from_uom_id', 'to_uom_id'], 'uom_conversions_tenant_from_to_uk');
         });

@@ -32,6 +32,7 @@ class UpdateProductCategoryService extends BaseService implements UpdateProductC
         $productCategory->update(
             name: $dto->name,
             slug: $dto->slug,
+            imagePath: $dto->image_path,
             parentId: $dto->parent_id,
             code: $dto->code,
             path: $dto->path,

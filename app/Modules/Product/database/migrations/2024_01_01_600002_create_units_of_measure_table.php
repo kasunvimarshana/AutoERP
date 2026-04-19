@@ -18,6 +18,7 @@ return new class extends Migration
             $table->enum('type', ['unit', 'mass', 'volume', 'length', 'time', 'other'])->default('unit');
             $table->boolean('is_base')->default(false);
             $table->timestamps();
+            $table->softDeletes();
 
             $table->unique(['tenant_id', 'symbol'], 'units_of_measure_tenant_symbol_uk');
         });

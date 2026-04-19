@@ -39,6 +39,7 @@ return new class extends Migration
             // Audit logs are only ever created, never updated.
             // $table->timestamp('created_at')->useCurrent();
             $table->timestamp('occurred_at')->useCurrent();
+            $table->softDeletes();
 
             $table->index(['tenant_id', 'auditable_type', 'auditable_id'], 'audit_logs_tenant_morphable_idx');
             $table->index(['tenant_id', 'occurred_at'], 'audit_logs_tenant_occurred_idx');

@@ -118,8 +118,9 @@ class EloquentAuditRepository implements AuditRepositoryInterface
     public function pruneOlderThan(\DateTimeInterface $before): int
     {
         return $this->model
+            ->withTrashed()
             ->where('occurred_at', '<', $before)
-            ->delete();
+            ->forceDelete();
     }
 
     private function mapModelToDomainEntity(AuditLogModel $model): AuditLog

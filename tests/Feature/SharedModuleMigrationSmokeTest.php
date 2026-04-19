@@ -12,7 +12,7 @@ class SharedModuleMigrationSmokeTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_shared_reference_tables_exist_after_migrations(): void
+    public function test_global_reference_tables_remain_available_after_migrations(): void
     {
         $this->assertTrue(Schema::hasTable('countries'));
         $this->assertTrue(Schema::hasTable('currencies'));

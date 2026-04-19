@@ -16,6 +16,7 @@ class ProductBrandResource extends JsonResource
             'tenant_id' => $this->getTenantId(),
             'parent_id' => $this->getParentId(),
             'name' => $this->getName(),
+            'image_path' => $this->getImagePath(),
             'slug' => $this->getSlug(),
             'code' => $this->getCode(),
             'path' => $this->getPath(),

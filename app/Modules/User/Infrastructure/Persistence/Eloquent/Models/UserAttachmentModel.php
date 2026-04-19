@@ -3,14 +3,18 @@
 declare(strict_types=1);
 
 namespace Modules\User\Infrastructure\Persistence\Eloquent\Models;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
-use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
+
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 
-class UserAttachmentModel extends Model
+class UserAttachmentModel extends BaseModel
 {
+
+    use HasTenant;
     use HasAudit, SoftDeletes;
 
     protected $table = 'user_attachments';

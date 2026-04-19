@@ -36,6 +36,7 @@ return new class extends Migration
             $table->json('format_config')->nullable();
             $table->json('metadata')->nullable();
             $table->timestamps();
+            $table->softDeletes();
 
             $table->index(['tenant_id', 'product_id', 'variant_id'], 'product_identifiers_tenant_product_variant_idx');
             $table->index(['tenant_id', 'value'], 'product_identifiers_tenant_value_idx');

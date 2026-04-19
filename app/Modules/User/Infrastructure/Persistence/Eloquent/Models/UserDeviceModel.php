@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\User\Infrastructure\Persistence\Eloquent\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
+
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
@@ -17,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  */
-class UserDeviceModel extends Model
+class UserDeviceModel extends BaseModel
 {
     protected $table = 'user_devices';
 

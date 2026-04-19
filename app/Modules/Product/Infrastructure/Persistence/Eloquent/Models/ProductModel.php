@@ -3,15 +3,17 @@
 declare(strict_types=1);
 
 namespace Modules\Product\Infrastructure\Persistence\Eloquent\Models;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
+
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 
-class ProductModel extends Model
+class ProductModel extends BaseModel
 {
+    use HasTenant;
+
     use HasAudit;
-    use SoftDeletes;
 
     protected $table = 'products';
 
@@ -22,12 +24,14 @@ class ProductModel extends Model
         'org_unit_id',
         'type',
         'name',
+        'image_path',
         'slug',
         'sku',
         'description',
         'base_uom_id',
         'purchase_uom_id',
         'sales_uom_id',
+        'tax_group_id',
         'uom_conversion_factor',
         'is_batch_tracked',
         'is_lot_tracked',

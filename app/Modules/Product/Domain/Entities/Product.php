@@ -19,6 +19,7 @@ class Product
     private string $type;
 
     private string $name;
+    private ?string $imagePath;
 
     private string $slug;
 
@@ -31,6 +32,8 @@ class Product
     private ?int $purchaseUomId;
 
     private ?int $salesUomId;
+
+    private ?int $taxGroupId;
 
     private string $uomConversionFactor;
 
@@ -70,6 +73,8 @@ class Product
         string $name,
         string $slug,
         int $baseUomId,
+        ?string $imagePath = null,
+        ?int $taxGroupId = null,
         ?int $categoryId = null,
         ?int $brandId = null,
         ?int $orgUnitId = null,
@@ -100,12 +105,14 @@ class Product
         $this->orgUnitId = $orgUnitId;
         $this->type = $type;
         $this->name = $name;
+        $this->imagePath = $imagePath;
         $this->slug = $slug;
         $this->sku = $sku;
         $this->description = $description;
         $this->baseUomId = $baseUomId;
         $this->purchaseUomId = $purchaseUomId;
         $this->salesUomId = $salesUomId;
+        $this->taxGroupId = $taxGroupId;
         $this->uomConversionFactor = $uomConversionFactor;
         $this->isBatchTracked = $isBatchTracked;
         $this->isLotTracked = $isLotTracked;
@@ -157,6 +164,8 @@ class Product
         return $this->name;
     }
 
+    public function getImagePath(): ?string { return $this->imagePath; }
+
     public function getSlug(): string
     {
         return $this->slug;
@@ -185,6 +194,11 @@ class Product
     public function getSalesUomId(): ?int
     {
         return $this->salesUomId;
+    }
+
+    public function getTaxGroupId(): ?int
+    {
+        return $this->taxGroupId;
     }
 
     public function getUomConversionFactor(): string
@@ -268,6 +282,8 @@ class Product
         string $name,
         string $slug,
         int $baseUomId,
+        ?string $imagePath = null,
+        ?int $taxGroupId = null,
         ?int $categoryId,
         ?int $brandId,
         ?int $orgUnitId,
@@ -290,6 +306,7 @@ class Product
     ): void {
         $this->type = $type;
         $this->name = $name;
+        $this->imagePath = $imagePath;
         $this->slug = $slug;
         $this->baseUomId = $baseUomId;
         $this->categoryId = $categoryId;
@@ -299,6 +316,7 @@ class Product
         $this->description = $description;
         $this->purchaseUomId = $purchaseUomId;
         $this->salesUomId = $salesUomId;
+        $this->taxGroupId = $taxGroupId;
         $this->uomConversionFactor = $uomConversionFactor;
         $this->isBatchTracked = $isBatchTracked;
         $this->isLotTracked = $isLotTracked;

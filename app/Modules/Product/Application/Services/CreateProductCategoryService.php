@@ -26,6 +26,7 @@ class CreateProductCategoryService extends BaseService implements CreateProductC
             parentId: $dto->parent_id,
             name: $dto->name,
             slug: $dto->slug,
+            imagePath: $dto->image_path,
             code: $dto->code,
             path: $dto->path,
             depth: $dto->depth,

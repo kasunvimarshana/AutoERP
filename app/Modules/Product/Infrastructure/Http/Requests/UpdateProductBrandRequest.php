@@ -23,6 +23,7 @@ class UpdateProductBrandRequest extends FormRequest
             'tenant_id' => 'required|integer|exists:tenants,id',
             'parent_id' => 'nullable|integer|exists:product_brands,id',
             'name' => 'required|string|max:255',
+            'image_path' => 'nullable|string|max:255',
             'slug' => 'required|string|max:255',
             'code' => [
                 'nullable',

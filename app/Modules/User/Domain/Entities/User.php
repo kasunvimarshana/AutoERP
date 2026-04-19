@@ -20,6 +20,10 @@ class User
     private ?int $orgUnitId;
 
     private Email $email;
+    private ?\DateTimeInterface $emailVerifiedAt;
+    private string $password;
+    private ?string $rememberToken;
+    private string $status;
 
     private string $firstName;
 
@@ -53,6 +57,10 @@ class User
         int $tenantId,
         ?int $orgUnitId,
         Email $email,
+        ?\DateTimeInterface $emailVerifiedAt,
+        string $password,
+        ?string $rememberToken,
+        string $status,
         string $firstName,
         string $lastName,
         ?PhoneNumber $phone = null,
@@ -68,6 +76,10 @@ class User
         $this->tenantId = $tenantId;
         $this->orgUnitId = $orgUnitId;
         $this->email = $email;
+        $this->emailVerifiedAt = $emailVerifiedAt;
+        $this->password = $password;
+        $this->rememberToken = $rememberToken;
+        $this->status = $status;
         $this->firstName = $firstName;
         $this->lastName = $lastName;
         $this->phone = $phone;
@@ -102,6 +114,11 @@ class User
     {
         return $this->email;
     }
+
+    public function getEmailVerifiedAt(): ?\DateTimeInterface { return $this->emailVerifiedAt; }
+    public function getPassword(): string { return $this->password; }
+    public function getRememberToken(): ?string { return $this->rememberToken; }
+    public function getStatus(): string { return $this->status; }
 
     public function getFirstName(): string
     {
@@ -223,6 +240,10 @@ class User
     public function changeEmail(Email $email): void
     {
         $this->email = $email;
+        $this->emailVerifiedAt = $emailVerifiedAt;
+        $this->password = $password;
+        $this->rememberToken = $rememberToken;
+        $this->status = $status;
         $this->updatedAt = new \DateTimeImmutable;
     }
 

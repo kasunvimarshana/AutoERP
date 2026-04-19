@@ -6,7 +6,6 @@ namespace Modules\Tenant\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Application\Contracts\AttachmentStorageStrategyInterface;
-use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Infrastructure\Concerns\LoadsModuleRoutesAndMigrations;
 use Modules\Tenant\Application\Contracts\BulkUploadTenantAttachmentsServiceInterface;
 use Modules\Tenant\Application\Contracts\CreateTenantDomainServiceInterface;
@@ -56,11 +55,6 @@ use Modules\Tenant\Domain\RepositoryInterfaces\TenantDomainRepositoryInterface;
 use Modules\Tenant\Domain\RepositoryInterfaces\TenantPlanRepositoryInterface;
 use Modules\Tenant\Domain\RepositoryInterfaces\TenantRepositoryInterface;
 use Modules\Tenant\Domain\RepositoryInterfaces\TenantSettingRepositoryInterface;
-use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantAttachmentModel;
-use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantDomainModel;
-use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantPlanModel;
-use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantModel;
-use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantSettingModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Repositories\EloquentTenantAttachmentRepository;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Repositories\EloquentTenantDomainRepository;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Repositories\EloquentTenantPlanRepository;
@@ -76,113 +70,47 @@ class TenantServiceProvider extends ServiceProvider
     {
         $this->app->singleton(TenantConfigValueObjectFactory::class);
 
-        // Repositories
-        $this->app->bind(TenantRepositoryInterface::class, function ($app) {
-            return new EloquentTenantRepository($app->make(TenantModel::class));
-        });
-        $this->app->bind(TenantAttachmentRepositoryInterface::class, function ($app) {
-            return new EloquentTenantAttachmentRepository($app->make(TenantAttachmentModel::class));
-        });
-        $this->app->bind(TenantPlanRepositoryInterface::class, function ($app) {
-            return new EloquentTenantPlanRepository($app->make(TenantPlanModel::class));
-        });
-        $this->app->bind(TenantSettingRepositoryInterface::class, function ($app) {
-            return new EloquentTenantSettingRepository($app->make(TenantSettingModel::class));
-        });
-        $this->app->bind(TenantDomainRepositoryInterface::class, function ($app) {
-            return new EloquentTenantDomainRepository($app->make(TenantDomainModel::class));
-        });
+        $repositoryBindings = [
+            TenantRepositoryInterface::class => EloquentTenantRepository::class,
+            TenantAttachmentRepositoryInterface::class => EloquentTenantAttachmentRepository::class,
+            TenantPlanRepositoryInterface::class => EloquentTenantPlanRepository::class,
+            TenantSettingRepositoryInterface::class => EloquentTenantSettingRepository::class,
+            TenantDomainRepositoryInterface::class => EloquentTenantDomainRepository::class,
+        ];
 
-        // Storage strategy (swappable)
-        $this->app->bind(AttachmentStorageStrategyInterface::class, function ($app) {
-            return new DefaultAttachmentStorageStrategy($app->make(FileStorageServiceInterface::class));
-        });
+        foreach ($repositoryBindings as $contract => $implementation) {
+            $this->app->bind($contract, $implementation);
+        }
 
-        // Core tenant services
-        $this->app->bind(CreateTenantServiceInterface::class, function ($app) {
-            return new CreateTenantService(
-                $app->make(TenantRepositoryInterface::class),
-                $app->make(TenantConfigValueObjectFactory::class)
-            );
-        });
-        $this->app->bind(UpdateTenantServiceInterface::class, function ($app) {
-            return new UpdateTenantService(
-                $app->make(TenantRepositoryInterface::class),
-                $app->make(TenantConfigValueObjectFactory::class)
-            );
-        });
-        $this->app->bind(DeleteTenantServiceInterface::class, function ($app) {
-            return new DeleteTenantService($app->make(TenantRepositoryInterface::class));
-        });
-        $this->app->bind(UpdateTenantConfigServiceInterface::class, function ($app) {
-            return new UpdateTenantConfigService($app->make(TenantRepositoryInterface::class));
-        });
+        $this->app->bind(AttachmentStorageStrategyInterface::class, DefaultAttachmentStorageStrategy::class);
 
-        $this->app->bind(FindTenantServiceInterface::class, function ($app) {
-            return new FindTenantService($app->make(TenantRepositoryInterface::class));
-        });
-        $this->app->bind(FindTenantPlansServiceInterface::class, function ($app) {
-            return new FindTenantPlansService($app->make(TenantPlanRepositoryInterface::class));
-        });
-        $this->app->bind(FindTenantSettingsServiceInterface::class, function ($app) {
-            return new FindTenantSettingsService($app->make(TenantSettingRepositoryInterface::class));
-        });
-        $this->app->bind(FindTenantDomainsServiceInterface::class, function ($app) {
-            return new FindTenantDomainsService($app->make(TenantDomainRepositoryInterface::class));
-        });
-        $this->app->bind(CreateTenantPlanServiceInterface::class, function ($app) {
-            return new CreateTenantPlanService($app->make(TenantPlanRepositoryInterface::class));
-        });
-        $this->app->bind(UpdateTenantPlanServiceInterface::class, function ($app) {
-            return new UpdateTenantPlanService($app->make(TenantPlanRepositoryInterface::class));
-        });
-        $this->app->bind(DeleteTenantPlanServiceInterface::class, function ($app) {
-            return new DeleteTenantPlanService($app->make(TenantPlanRepositoryInterface::class));
-        });
-        $this->app->bind(CreateTenantSettingServiceInterface::class, function ($app) {
-            return new CreateTenantSettingService($app->make(TenantSettingRepositoryInterface::class));
-        });
-        $this->app->bind(UpdateTenantSettingServiceInterface::class, function ($app) {
-            return new UpdateTenantSettingService($app->make(TenantSettingRepositoryInterface::class));
-        });
-        $this->app->bind(DeleteTenantSettingServiceInterface::class, function ($app) {
-            return new DeleteTenantSettingService($app->make(TenantSettingRepositoryInterface::class));
-        });
-        $this->app->bind(CreateTenantDomainServiceInterface::class, function ($app) {
-            return new CreateTenantDomainService($app->make(TenantDomainRepositoryInterface::class));
-        });
-        $this->app->bind(UpdateTenantDomainServiceInterface::class, function ($app) {
-            return new UpdateTenantDomainService($app->make(TenantDomainRepositoryInterface::class));
-        });
-        $this->app->bind(DeleteTenantDomainServiceInterface::class, function ($app) {
-            return new DeleteTenantDomainService($app->make(TenantDomainRepositoryInterface::class));
-        });
+        $serviceBindings = [
+            CreateTenantServiceInterface::class => CreateTenantService::class,
+            UpdateTenantServiceInterface::class => UpdateTenantService::class,
+            DeleteTenantServiceInterface::class => DeleteTenantService::class,
+            UpdateTenantConfigServiceInterface::class => UpdateTenantConfigService::class,
+            FindTenantServiceInterface::class => FindTenantService::class,
+            FindTenantPlansServiceInterface::class => FindTenantPlansService::class,
+            FindTenantSettingsServiceInterface::class => FindTenantSettingsService::class,
+            FindTenantDomainsServiceInterface::class => FindTenantDomainsService::class,
+            CreateTenantPlanServiceInterface::class => CreateTenantPlanService::class,
+            UpdateTenantPlanServiceInterface::class => UpdateTenantPlanService::class,
+            DeleteTenantPlanServiceInterface::class => DeleteTenantPlanService::class,
+            CreateTenantSettingServiceInterface::class => CreateTenantSettingService::class,
+            UpdateTenantSettingServiceInterface::class => UpdateTenantSettingService::class,
+            DeleteTenantSettingServiceInterface::class => DeleteTenantSettingService::class,
+            CreateTenantDomainServiceInterface::class => CreateTenantDomainService::class,
+            UpdateTenantDomainServiceInterface::class => UpdateTenantDomainService::class,
+            DeleteTenantDomainServiceInterface::class => DeleteTenantDomainService::class,
+            FindTenantAttachmentsServiceInterface::class => FindTenantAttachmentsService::class,
+            UploadTenantAttachmentServiceInterface::class => UploadTenantAttachmentService::class,
+            BulkUploadTenantAttachmentsServiceInterface::class => BulkUploadTenantAttachmentsService::class,
+            DeleteTenantAttachmentServiceInterface::class => DeleteTenantAttachmentService::class,
+        ];
 
-        // Attachment services
-        $this->app->bind(FindTenantAttachmentsServiceInterface::class, function ($app) {
-            return new FindTenantAttachmentsService($app->make(TenantAttachmentRepositoryInterface::class));
-        });
-        $this->app->bind(UploadTenantAttachmentServiceInterface::class, function ($app) {
-            return new UploadTenantAttachmentService(
-                $app->make(TenantRepositoryInterface::class),
-                $app->make(TenantAttachmentRepositoryInterface::class),
-                $app->make(AttachmentStorageStrategyInterface::class)
-            );
-        });
-        $this->app->bind(BulkUploadTenantAttachmentsServiceInterface::class, function ($app) {
-            return new BulkUploadTenantAttachmentsService(
-                $app->make(TenantRepositoryInterface::class),
-                $app->make(TenantAttachmentRepositoryInterface::class),
-                $app->make(AttachmentStorageStrategyInterface::class)
-            );
-        });
-        $this->app->bind(DeleteTenantAttachmentServiceInterface::class, function ($app) {
-            return new DeleteTenantAttachmentService(
-                $app->make(TenantAttachmentRepositoryInterface::class),
-                $app->make(TenantRepositoryInterface::class),
-                $app->make(AttachmentStorageStrategyInterface::class)
-            );
-        });
+        foreach ($serviceBindings as $contract => $implementation) {
+            $this->app->bind($contract, $implementation);
+        }
     }
 
     public function boot(): void

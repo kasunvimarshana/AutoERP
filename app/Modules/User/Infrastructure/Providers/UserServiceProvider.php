@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\User\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Infrastructure\Concerns\LoadsModuleRoutesAndMigrations;
 use Modules\User\Application\Contracts\AssignRoleServiceInterface;
 use Modules\User\Application\Contracts\ChangePasswordServiceInterface;
@@ -58,11 +57,6 @@ use Modules\User\Domain\RepositoryInterfaces\RoleRepositoryInterface;
 use Modules\User\Domain\RepositoryInterfaces\UserAttachmentRepositoryInterface;
 use Modules\User\Domain\RepositoryInterfaces\UserDeviceRepositoryInterface;
 use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
-use Modules\User\Infrastructure\Persistence\Eloquent\Models\PermissionModel;
-use Modules\User\Infrastructure\Persistence\Eloquent\Models\RoleModel;
-use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserAttachmentModel;
-use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserDeviceModel;
-use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use Modules\User\Infrastructure\Persistence\Eloquent\Repositories\EloquentPermissionRepository;
 use Modules\User\Infrastructure\Persistence\Eloquent\Repositories\EloquentRoleRepository;
 use Modules\User\Infrastructure\Persistence\Eloquent\Repositories\EloquentUserAttachmentRepository;
@@ -75,118 +69,47 @@ class UserServiceProvider extends ServiceProvider
 
     public function register(): void
     {
-        $this->app->bind(UserRepositoryInterface::class, function ($app) {
-            return new EloquentUserRepository($app->make(UserModel::class));
-        });
-        $this->app->bind(RoleRepositoryInterface::class, function ($app) {
-            return new EloquentRoleRepository($app->make(RoleModel::class));
-        });
-        $this->app->bind(PermissionRepositoryInterface::class, function ($app) {
-            return new EloquentPermissionRepository($app->make(PermissionModel::class));
-        });
-        $this->app->bind(UserAttachmentRepositoryInterface::class, function ($app) {
-            return new EloquentUserAttachmentRepository($app->make(UserAttachmentModel::class));
-        });
-        $this->app->bind(UserDeviceRepositoryInterface::class, function ($app) {
-            return new EloquentUserDeviceRepository($app->make(UserDeviceModel::class));
-        });
+        $repositoryBindings = [
+            UserRepositoryInterface::class => EloquentUserRepository::class,
+            RoleRepositoryInterface::class => EloquentRoleRepository::class,
+            PermissionRepositoryInterface::class => EloquentPermissionRepository::class,
+            UserAttachmentRepositoryInterface::class => EloquentUserAttachmentRepository::class,
+            UserDeviceRepositoryInterface::class => EloquentUserDeviceRepository::class,
+        ];
 
-        $this->app->bind(CreateUserServiceInterface::class, function ($app) {
-            return new CreateUserService(
-                $app->make(UserRepositoryInterface::class),
-                $app->make(RoleRepositoryInterface::class)
-            );
-        });
-        $this->app->bind(FindUserServiceInterface::class, function ($app) {
-            return new FindUserService($app->make(UserRepositoryInterface::class));
-        });
-        $this->app->bind(UpdateUserServiceInterface::class, function ($app) {
-            return new UpdateUserService($app->make(UserRepositoryInterface::class));
-        });
-        $this->app->bind(DeleteUserServiceInterface::class, function ($app) {
-            return new DeleteUserService($app->make(UserRepositoryInterface::class));
-        });
-        $this->app->bind(AssignRoleServiceInterface::class, function ($app) {
-            return new AssignRoleService(
-                $app->make(UserRepositoryInterface::class),
-                $app->make(RoleRepositoryInterface::class)
-            );
-        });
-        $this->app->bind(UpdatePreferencesServiceInterface::class, function ($app) {
-            return new UpdatePreferencesService($app->make(UserRepositoryInterface::class));
-        });
-        $this->app->bind(UpdateProfileServiceInterface::class, function ($app) {
-            return new UpdateProfileService($app->make(UserRepositoryInterface::class));
-        });
-        $this->app->bind(ChangePasswordServiceInterface::class, function ($app) {
-            return new ChangePasswordService($app->make(UserRepositoryInterface::class));
-        });
-        $this->app->bind(SetUserPasswordServiceInterface::class, function ($app) {
-            return new SetUserPasswordService($app->make(UserRepositoryInterface::class));
-        });
-        $this->app->bind(UploadAvatarServiceInterface::class, function ($app) {
-            return new UploadAvatarService(
-                $app->make(UserRepositoryInterface::class),
-                $app->make(FileStorageServiceInterface::class)
-            );
-        });
-        $this->app->bind(UploadUserAttachmentServiceInterface::class, function ($app) {
-            return new UploadUserAttachmentService(
-                $app->make(UserRepositoryInterface::class),
-                $app->make(UserAttachmentRepositoryInterface::class),
-                $app->make(FileStorageServiceInterface::class)
-            );
-        });
-        $this->app->bind(DeleteUserAttachmentServiceInterface::class, function ($app) {
-            return new DeleteUserAttachmentService(
-                $app->make(UserAttachmentRepositoryInterface::class),
-                $app->make(FileStorageServiceInterface::class)
-            );
-        });
+        foreach ($repositoryBindings as $contract => $implementation) {
+            $this->app->bind($contract, $implementation);
+        }
 
-        $this->app->bind(FindUserAttachmentsServiceInterface::class, function ($app) {
-            return new FindUserAttachmentsService(
-                $app->make(UserAttachmentRepositoryInterface::class)
-            );
-        });
-        $this->app->bind(FindUserDevicesServiceInterface::class, function ($app) {
-            return new FindUserDevicesService(
-                $app->make(UserDeviceRepositoryInterface::class)
-            );
-        });
-        $this->app->bind(UpsertUserDeviceServiceInterface::class, function ($app) {
-            return new UpsertUserDeviceService(
-                $app->make(UserRepositoryInterface::class),
-                $app->make(UserDeviceRepositoryInterface::class)
-            );
-        });
-        $this->app->bind(DeleteUserDeviceServiceInterface::class, function ($app) {
-            return new DeleteUserDeviceService(
-                $app->make(UserDeviceRepositoryInterface::class)
-            );
-        });
+        $serviceBindings = [
+            CreateUserServiceInterface::class => CreateUserService::class,
+            FindUserServiceInterface::class => FindUserService::class,
+            UpdateUserServiceInterface::class => UpdateUserService::class,
+            DeleteUserServiceInterface::class => DeleteUserService::class,
+            AssignRoleServiceInterface::class => AssignRoleService::class,
+            UpdatePreferencesServiceInterface::class => UpdatePreferencesService::class,
+            UpdateProfileServiceInterface::class => UpdateProfileService::class,
+            ChangePasswordServiceInterface::class => ChangePasswordService::class,
+            SetUserPasswordServiceInterface::class => SetUserPasswordService::class,
+            UploadAvatarServiceInterface::class => UploadAvatarService::class,
+            UploadUserAttachmentServiceInterface::class => UploadUserAttachmentService::class,
+            DeleteUserAttachmentServiceInterface::class => DeleteUserAttachmentService::class,
+            FindUserAttachmentsServiceInterface::class => FindUserAttachmentsService::class,
+            FindUserDevicesServiceInterface::class => FindUserDevicesService::class,
+            UpsertUserDeviceServiceInterface::class => UpsertUserDeviceService::class,
+            DeleteUserDeviceServiceInterface::class => DeleteUserDeviceService::class,
+            CreateRoleServiceInterface::class => CreateRoleService::class,
+            FindRoleServiceInterface::class => FindRoleService::class,
+            DeleteRoleServiceInterface::class => DeleteRoleService::class,
+            SyncRolePermissionsServiceInterface::class => SyncRolePermissionsService::class,
+            CreatePermissionServiceInterface::class => CreatePermissionService::class,
+            FindPermissionServiceInterface::class => FindPermissionService::class,
+            DeletePermissionServiceInterface::class => DeletePermissionService::class,
+        ];
 
-        $this->app->bind(CreateRoleServiceInterface::class, function ($app) {
-            return new CreateRoleService($app->make(RoleRepositoryInterface::class));
-        });
-        $this->app->bind(FindRoleServiceInterface::class, function ($app) {
-            return new FindRoleService($app->make(RoleRepositoryInterface::class));
-        });
-        $this->app->bind(DeleteRoleServiceInterface::class, function ($app) {
-            return new DeleteRoleService($app->make(RoleRepositoryInterface::class));
-        });
-        $this->app->bind(SyncRolePermissionsServiceInterface::class, function ($app) {
-            return new SyncRolePermissionsService($app->make(RoleRepositoryInterface::class));
-        });
-        $this->app->bind(CreatePermissionServiceInterface::class, function ($app) {
-            return new CreatePermissionService($app->make(PermissionRepositoryInterface::class));
-        });
-        $this->app->bind(FindPermissionServiceInterface::class, function ($app) {
-            return new FindPermissionService($app->make(PermissionRepositoryInterface::class));
-        });
-        $this->app->bind(DeletePermissionServiceInterface::class, function ($app) {
-            return new DeletePermissionService($app->make(PermissionRepositoryInterface::class));
-        });
+        foreach ($serviceBindings as $contract => $implementation) {
+            $this->app->bind($contract, $implementation);
+        }
     }
 
     public function boot(): void

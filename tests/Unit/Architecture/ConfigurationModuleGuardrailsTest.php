@@ -27,7 +27,7 @@ class ConfigurationModuleGuardrailsTest extends TestCase
         );
     }
 
-    public function test_configuration_module_does_not_keep_redundant_module_configurations_migration(): void
+    public function test_configuration_module_owns_reference_data_migrations(): void
     {
         $migrationDir = $this->repoRoot.'/app/Modules/Configuration/database/migrations';
         $entries = array_values(array_filter(scandir($migrationDir) ?: [], static function (string $entry): bool {
@@ -37,9 +37,14 @@ class ConfigurationModuleGuardrailsTest extends TestCase
         sort($entries);
 
         $this->assertSame(
-            [],
+            [
+                '2024_01_01_000002a_create_countries_table.php',
+                '2024_01_01_000002b_create_currencies_table.php',
+                '2024_01_01_000002c_create_languages_table.php',
+                '2024_01_01_000002d_create_timezones_table.php',
+            ],
             $entries,
-            'Configuration module must not duplicate tenant_settings persistence logic.'
+            'Configuration module should own global reference-data persistence.'
         );
     }
 

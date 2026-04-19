@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
+
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 
 /**
@@ -20,7 +21,7 @@ use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  */
-class TenantPlanModel extends Model
+class TenantPlanModel extends BaseModel
 {
     use HasAudit;
 

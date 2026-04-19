@@ -25,6 +25,7 @@ class StoreProductRequest extends FormRequest
             'org_unit_id' => 'nullable|integer|exists:org_units,id',
             'type' => 'required|string|in:physical,service,digital,combo,variable',
             'name' => 'required|string|max:255',
+            'image_path' => 'nullable|string|max:255',
             'slug' => [
                 'required',
                 'string',
@@ -41,6 +42,7 @@ class StoreProductRequest extends FormRequest
             'base_uom_id' => 'required|integer|exists:units_of_measure,id',
             'purchase_uom_id' => 'nullable|integer|exists:units_of_measure,id',
             'sales_uom_id' => 'nullable|integer|exists:units_of_measure,id',
+            'tax_group_id' => 'nullable|integer|exists:tax_groups,id',
             'uom_conversion_factor' => 'nullable|numeric|min:0.0000000001',
             'is_batch_tracked' => 'nullable|boolean',
             'is_lot_tracked' => 'nullable|boolean',

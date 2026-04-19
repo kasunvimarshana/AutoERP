@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Persistence\Eloquent\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 
-class JournalEntryLineModel extends Model
+class JournalEntryLineModel extends BaseModel
 {
     protected $table = 'journal_entry_lines';
 

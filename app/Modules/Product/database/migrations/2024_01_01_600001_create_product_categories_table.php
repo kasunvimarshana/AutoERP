@@ -25,6 +25,7 @@ return new class extends Migration
             $table->json('attributes')->nullable();
             $table->json('metadata')->nullable();
             $table->timestamps();
+            $table->softDeletes();
 
             $table->unique(['tenant_id', 'code'], 'product_categories_tenant_code_uk');
             $table->index(['tenant_id', 'parent_id'], 'product_categories_tenant_parent_idx');

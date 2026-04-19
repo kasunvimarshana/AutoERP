@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Product\Infrastructure\Persistence\Eloquent\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
+
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 
-class ProductVariantModel extends Model
+class ProductVariantModel extends BaseModel
 {
     use HasAudit;
 

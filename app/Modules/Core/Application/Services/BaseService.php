@@ -65,10 +65,26 @@ abstract class BaseService implements ServiceInterface
      */
     protected function dispatchEvents(): void
     {
-        foreach ($this->events as $event) {
+        $events = $this->events;
+        $this->events = [];
+
+        if ($events === []) {
+            return;
+        }
+
+        if (DB::transactionLevel() > 0) {
+            DB::afterCommit(static function () use ($events): void {
+                foreach ($events as $event) {
+                    Event::dispatch($event);
+                }
+            });
+
+            return;
+        }
+
+        foreach ($events as $event) {
             Event::dispatch($event);
         }
-        $this->events = [];
     }
 
     /**

@@ -69,13 +69,6 @@ use Modules\Product\Domain\RepositoryInterfaces\ProductRepositoryInterface;
 use Modules\Product\Domain\RepositoryInterfaces\ProductVariantRepositoryInterface;
 use Modules\Product\Domain\RepositoryInterfaces\UnitOfMeasureRepositoryInterface;
 use Modules\Product\Domain\RepositoryInterfaces\UomConversionRepositoryInterface;
-use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductBrandModel;
-use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductCategoryModel;
-use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductIdentifierModel;
-use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductModel;
-use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductVariantModel;
-use Modules\Product\Infrastructure\Persistence\Eloquent\Models\UnitOfMeasureModel;
-use Modules\Product\Infrastructure\Persistence\Eloquent\Models\UomConversionModel;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentProductBrandRepository;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentProductCategoryRepository;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentProductIdentifierRepository;
@@ -90,145 +83,54 @@ class ProductServiceProvider extends ServiceProvider
 
     public function register(): void
     {
-        $this->app->bind(ProductBrandRepositoryInterface::class, function ($app) {
-            return new EloquentProductBrandRepository($app->make(ProductBrandModel::class));
-        });
+        $repositoryBindings = [
+            ProductBrandRepositoryInterface::class => EloquentProductBrandRepository::class,
+            ProductCategoryRepositoryInterface::class => EloquentProductCategoryRepository::class,
+            ProductIdentifierRepositoryInterface::class => EloquentProductIdentifierRepository::class,
+            ProductRepositoryInterface::class => EloquentProductRepository::class,
+            ProductVariantRepositoryInterface::class => EloquentProductVariantRepository::class,
+            UnitOfMeasureRepositoryInterface::class => EloquentUnitOfMeasureRepository::class,
+            UomConversionRepositoryInterface::class => EloquentUomConversionRepository::class,
+        ];
 
-        $this->app->bind(ProductCategoryRepositoryInterface::class, function ($app) {
-            return new EloquentProductCategoryRepository($app->make(ProductCategoryModel::class));
-        });
+        foreach ($repositoryBindings as $contract => $implementation) {
+            $this->app->bind($contract, $implementation);
+        }
 
-        $this->app->bind(ProductIdentifierRepositoryInterface::class, function ($app) {
-            return new EloquentProductIdentifierRepository($app->make(ProductIdentifierModel::class));
-        });
+        $serviceBindings = [
+            CreateProductBrandServiceInterface::class => CreateProductBrandService::class,
+            FindProductBrandServiceInterface::class => FindProductBrandService::class,
+            UpdateProductBrandServiceInterface::class => UpdateProductBrandService::class,
+            DeleteProductBrandServiceInterface::class => DeleteProductBrandService::class,
+            CreateProductCategoryServiceInterface::class => CreateProductCategoryService::class,
+            FindProductCategoryServiceInterface::class => FindProductCategoryService::class,
+            UpdateProductCategoryServiceInterface::class => UpdateProductCategoryService::class,
+            DeleteProductCategoryServiceInterface::class => DeleteProductCategoryService::class,
+            CreateProductIdentifierServiceInterface::class => CreateProductIdentifierService::class,
+            FindProductIdentifierServiceInterface::class => FindProductIdentifierService::class,
+            UpdateProductIdentifierServiceInterface::class => UpdateProductIdentifierService::class,
+            DeleteProductIdentifierServiceInterface::class => DeleteProductIdentifierService::class,
+            CreateProductVariantServiceInterface::class => CreateProductVariantService::class,
+            FindProductVariantServiceInterface::class => FindProductVariantService::class,
+            UpdateProductVariantServiceInterface::class => UpdateProductVariantService::class,
+            DeleteProductVariantServiceInterface::class => DeleteProductVariantService::class,
+            CreateUnitOfMeasureServiceInterface::class => CreateUnitOfMeasureService::class,
+            FindUnitOfMeasureServiceInterface::class => FindUnitOfMeasureService::class,
+            UpdateUnitOfMeasureServiceInterface::class => UpdateUnitOfMeasureService::class,
+            DeleteUnitOfMeasureServiceInterface::class => DeleteUnitOfMeasureService::class,
+            CreateUomConversionServiceInterface::class => CreateUomConversionService::class,
+            FindUomConversionServiceInterface::class => FindUomConversionService::class,
+            UpdateUomConversionServiceInterface::class => UpdateUomConversionService::class,
+            DeleteUomConversionServiceInterface::class => DeleteUomConversionService::class,
+            CreateProductServiceInterface::class => CreateProductService::class,
+            FindProductServiceInterface::class => FindProductService::class,
+            UpdateProductServiceInterface::class => UpdateProductService::class,
+            DeleteProductServiceInterface::class => DeleteProductService::class,
+        ];
 
-        $this->app->bind(ProductRepositoryInterface::class, function ($app) {
-            return new EloquentProductRepository($app->make(ProductModel::class));
-        });
-
-        $this->app->bind(ProductVariantRepositoryInterface::class, function ($app) {
-            return new EloquentProductVariantRepository($app->make(ProductVariantModel::class));
-        });
-
-        $this->app->bind(UnitOfMeasureRepositoryInterface::class, function ($app) {
-            return new EloquentUnitOfMeasureRepository($app->make(UnitOfMeasureModel::class));
-        });
-
-        $this->app->bind(UomConversionRepositoryInterface::class, function ($app) {
-            return new EloquentUomConversionRepository($app->make(UomConversionModel::class));
-        });
-
-        $this->app->bind(CreateProductBrandServiceInterface::class, function ($app) {
-            return new CreateProductBrandService($app->make(ProductBrandRepositoryInterface::class));
-        });
-
-        $this->app->bind(FindProductBrandServiceInterface::class, function ($app) {
-            return new FindProductBrandService($app->make(ProductBrandRepositoryInterface::class));
-        });
-
-        $this->app->bind(UpdateProductBrandServiceInterface::class, function ($app) {
-            return new UpdateProductBrandService($app->make(ProductBrandRepositoryInterface::class));
-        });
-
-        $this->app->bind(DeleteProductBrandServiceInterface::class, function ($app) {
-            return new DeleteProductBrandService($app->make(ProductBrandRepositoryInterface::class));
-        });
-
-        $this->app->bind(CreateProductCategoryServiceInterface::class, function ($app) {
-            return new CreateProductCategoryService($app->make(ProductCategoryRepositoryInterface::class));
-        });
-
-        $this->app->bind(FindProductCategoryServiceInterface::class, function ($app) {
-            return new FindProductCategoryService($app->make(ProductCategoryRepositoryInterface::class));
-        });
-
-        $this->app->bind(UpdateProductCategoryServiceInterface::class, function ($app) {
-            return new UpdateProductCategoryService($app->make(ProductCategoryRepositoryInterface::class));
-        });
-
-        $this->app->bind(DeleteProductCategoryServiceInterface::class, function ($app) {
-            return new DeleteProductCategoryService($app->make(ProductCategoryRepositoryInterface::class));
-        });
-
-        $this->app->bind(CreateProductIdentifierServiceInterface::class, function ($app) {
-            return new CreateProductIdentifierService($app->make(ProductIdentifierRepositoryInterface::class));
-        });
-
-        $this->app->bind(FindProductIdentifierServiceInterface::class, function ($app) {
-            return new FindProductIdentifierService($app->make(ProductIdentifierRepositoryInterface::class));
-        });
-
-        $this->app->bind(UpdateProductIdentifierServiceInterface::class, function ($app) {
-            return new UpdateProductIdentifierService($app->make(ProductIdentifierRepositoryInterface::class));
-        });
-
-        $this->app->bind(DeleteProductIdentifierServiceInterface::class, function ($app) {
-            return new DeleteProductIdentifierService($app->make(ProductIdentifierRepositoryInterface::class));
-        });
-
-        $this->app->bind(CreateProductVariantServiceInterface::class, function ($app) {
-            return new CreateProductVariantService($app->make(ProductVariantRepositoryInterface::class));
-        });
-
-        $this->app->bind(FindProductVariantServiceInterface::class, function ($app) {
-            return new FindProductVariantService($app->make(ProductVariantRepositoryInterface::class));
-        });
-
-        $this->app->bind(UpdateProductVariantServiceInterface::class, function ($app) {
-            return new UpdateProductVariantService($app->make(ProductVariantRepositoryInterface::class));
-        });
-
-        $this->app->bind(DeleteProductVariantServiceInterface::class, function ($app) {
-            return new DeleteProductVariantService($app->make(ProductVariantRepositoryInterface::class));
-        });
-
-        $this->app->bind(CreateUnitOfMeasureServiceInterface::class, function ($app) {
-            return new CreateUnitOfMeasureService($app->make(UnitOfMeasureRepositoryInterface::class));
-        });
-
-        $this->app->bind(FindUnitOfMeasureServiceInterface::class, function ($app) {
-            return new FindUnitOfMeasureService($app->make(UnitOfMeasureRepositoryInterface::class));
-        });
-
-        $this->app->bind(UpdateUnitOfMeasureServiceInterface::class, function ($app) {
-            return new UpdateUnitOfMeasureService($app->make(UnitOfMeasureRepositoryInterface::class));
-        });
-
-        $this->app->bind(DeleteUnitOfMeasureServiceInterface::class, function ($app) {
-            return new DeleteUnitOfMeasureService($app->make(UnitOfMeasureRepositoryInterface::class));
-        });
-
-        $this->app->bind(CreateUomConversionServiceInterface::class, function ($app) {
-            return new CreateUomConversionService($app->make(UomConversionRepositoryInterface::class));
-        });
-
-        $this->app->bind(FindUomConversionServiceInterface::class, function ($app) {
-            return new FindUomConversionService($app->make(UomConversionRepositoryInterface::class));
-        });
-
-        $this->app->bind(UpdateUomConversionServiceInterface::class, function ($app) {
-            return new UpdateUomConversionService($app->make(UomConversionRepositoryInterface::class));
-        });
-
-        $this->app->bind(DeleteUomConversionServiceInterface::class, function ($app) {
-            return new DeleteUomConversionService($app->make(UomConversionRepositoryInterface::class));
-        });
-
-        $this->app->bind(CreateProductServiceInterface::class, function ($app) {
-            return new CreateProductService($app->make(ProductRepositoryInterface::class));
-        });
-
-        $this->app->bind(FindProductServiceInterface::class, function ($app) {
-            return new FindProductService($app->make(ProductRepositoryInterface::class));
-        });
-
-        $this->app->bind(UpdateProductServiceInterface::class, function ($app) {
-            return new UpdateProductService($app->make(ProductRepositoryInterface::class));
-        });
-
-        $this->app->bind(DeleteProductServiceInterface::class, function ($app) {
-            return new DeleteProductService($app->make(ProductRepositoryInterface::class));
-        });
+        foreach ($serviceBindings as $contract => $implementation) {
+            $this->app->bind($contract, $implementation);
+        }
     }
 
     public function boot(): void

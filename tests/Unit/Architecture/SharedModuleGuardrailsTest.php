@@ -27,7 +27,7 @@ class SharedModuleGuardrailsTest extends TestCase
         );
     }
 
-    public function test_shared_module_only_keeps_global_reference_migration(): void
+    public function test_shared_module_keeps_no_runtime_migrations(): void
     {
         $migrationDir = $this->repoRoot.'/app/Modules/Shared/database/migrations';
         $entries = array_values(array_filter(scandir($migrationDir) ?: [], static function (string $entry): bool {
@@ -36,16 +36,7 @@ class SharedModuleGuardrailsTest extends TestCase
 
         sort($entries);
 
-        $this->assertSame(
-            [
-                '2024_01_01_000002a_create_countries_table.php',
-                '2024_01_01_000002b_create_currencies_table.php',
-                '2024_01_01_000002c_create_languages_table.php',
-                '2024_01_01_000002d_create_timezones_table.php',
-            ],
-            $entries,
-            'Shared module must keep only globally reusable reference-table migrations.'
-        );
+        $this->assertSame([], $entries, 'Shared module should remain minimal and avoid domain-owned runtime migrations.');
     }
 
     public function test_shared_module_does_not_define_http_endpoints(): void

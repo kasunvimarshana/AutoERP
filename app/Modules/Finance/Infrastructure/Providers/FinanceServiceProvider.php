@@ -44,10 +44,6 @@ use Modules\Finance\Domain\RepositoryInterfaces\AccountRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\FiscalPeriodRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\FiscalYearRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\JournalEntryRepositoryInterface;
-use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\AccountModel;
-use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\FiscalPeriodModel;
-use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\FiscalYearModel;
-use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\JournalEntryModel;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentAccountRepository;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentFiscalPeriodRepository;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentFiscalYearRepository;
@@ -59,101 +55,40 @@ class FinanceServiceProvider extends ServiceProvider
 
     public function register(): void
     {
-        $this->app->bind(AccountRepositoryInterface::class, function ($app) {
-            return new EloquentAccountRepository($app->make(AccountModel::class));
-        });
+        $repositoryBindings = [
+            AccountRepositoryInterface::class => EloquentAccountRepository::class,
+            FiscalPeriodRepositoryInterface::class => EloquentFiscalPeriodRepository::class,
+            FiscalYearRepositoryInterface::class => EloquentFiscalYearRepository::class,
+            JournalEntryRepositoryInterface::class => EloquentJournalEntryRepository::class,
+        ];
 
-        $this->app->bind(FiscalPeriodRepositoryInterface::class, function ($app) {
-            return new EloquentFiscalPeriodRepository($app->make(FiscalPeriodModel::class));
-        });
+        foreach ($repositoryBindings as $contract => $implementation) {
+            $this->app->bind($contract, $implementation);
+        }
 
-        $this->app->bind(FiscalYearRepositoryInterface::class, function ($app) {
-            return new EloquentFiscalYearRepository($app->make(FiscalYearModel::class));
-        });
+        $serviceBindings = [
+            CreateAccountServiceInterface::class => CreateAccountService::class,
+            FindAccountServiceInterface::class => FindAccountService::class,
+            UpdateAccountServiceInterface::class => UpdateAccountService::class,
+            DeleteAccountServiceInterface::class => DeleteAccountService::class,
+            CreateFiscalYearServiceInterface::class => CreateFiscalYearService::class,
+            FindFiscalYearServiceInterface::class => FindFiscalYearService::class,
+            UpdateFiscalYearServiceInterface::class => UpdateFiscalYearService::class,
+            DeleteFiscalYearServiceInterface::class => DeleteFiscalYearService::class,
+            CreateFiscalPeriodServiceInterface::class => CreateFiscalPeriodService::class,
+            FindFiscalPeriodServiceInterface::class => FindFiscalPeriodService::class,
+            UpdateFiscalPeriodServiceInterface::class => UpdateFiscalPeriodService::class,
+            DeleteFiscalPeriodServiceInterface::class => DeleteFiscalPeriodService::class,
+            CreateJournalEntryServiceInterface::class => CreateJournalEntryService::class,
+            FindJournalEntryServiceInterface::class => FindJournalEntryService::class,
+            UpdateJournalEntryServiceInterface::class => UpdateJournalEntryService::class,
+            DeleteJournalEntryServiceInterface::class => DeleteJournalEntryService::class,
+            PostJournalEntryServiceInterface::class => PostJournalEntryService::class,
+        ];
 
-        $this->app->bind(JournalEntryRepositoryInterface::class, function ($app) {
-            return new EloquentJournalEntryRepository($app->make(JournalEntryModel::class));
-        });
-
-        $this->app->bind(CreateAccountServiceInterface::class, function ($app) {
-            return new CreateAccountService($app->make(AccountRepositoryInterface::class));
-        });
-
-        $this->app->bind(FindAccountServiceInterface::class, function ($app) {
-            return new FindAccountService($app->make(AccountRepositoryInterface::class));
-        });
-
-        $this->app->bind(UpdateAccountServiceInterface::class, function ($app) {
-            return new UpdateAccountService($app->make(AccountRepositoryInterface::class));
-        });
-
-        $this->app->bind(DeleteAccountServiceInterface::class, function ($app) {
-            return new DeleteAccountService($app->make(AccountRepositoryInterface::class));
-        });
-
-        $this->app->bind(CreateFiscalYearServiceInterface::class, function ($app) {
-            return new CreateFiscalYearService($app->make(FiscalYearRepositoryInterface::class));
-        });
-
-        $this->app->bind(FindFiscalYearServiceInterface::class, function ($app) {
-            return new FindFiscalYearService($app->make(FiscalYearRepositoryInterface::class));
-        });
-
-        $this->app->bind(UpdateFiscalYearServiceInterface::class, function ($app) {
-            return new UpdateFiscalYearService($app->make(FiscalYearRepositoryInterface::class));
-        });
-
-        $this->app->bind(DeleteFiscalYearServiceInterface::class, function ($app) {
-            return new DeleteFiscalYearService($app->make(FiscalYearRepositoryInterface::class));
-        });
-
-        $this->app->bind(CreateFiscalPeriodServiceInterface::class, function ($app) {
-            return new CreateFiscalPeriodService(
-                $app->make(FiscalPeriodRepositoryInterface::class),
-                $app->make(FiscalYearRepositoryInterface::class),
-            );
-        });
-
-        $this->app->bind(FindFiscalPeriodServiceInterface::class, function ($app) {
-            return new FindFiscalPeriodService($app->make(FiscalPeriodRepositoryInterface::class));
-        });
-
-        $this->app->bind(UpdateFiscalPeriodServiceInterface::class, function ($app) {
-            return new UpdateFiscalPeriodService(
-                $app->make(FiscalPeriodRepositoryInterface::class),
-                $app->make(FiscalYearRepositoryInterface::class),
-            );
-        });
-
-        $this->app->bind(DeleteFiscalPeriodServiceInterface::class, function ($app) {
-            return new DeleteFiscalPeriodService($app->make(FiscalPeriodRepositoryInterface::class));
-        });
-
-        $this->app->bind(CreateJournalEntryServiceInterface::class, function ($app) {
-            return new CreateJournalEntryService(
-                $app->make(JournalEntryRepositoryInterface::class),
-                $app->make(FiscalPeriodRepositoryInterface::class),
-            );
-        });
-
-        $this->app->bind(FindJournalEntryServiceInterface::class, function ($app) {
-            return new FindJournalEntryService($app->make(JournalEntryRepositoryInterface::class));
-        });
-
-        $this->app->bind(UpdateJournalEntryServiceInterface::class, function ($app) {
-            return new UpdateJournalEntryService(
-                $app->make(JournalEntryRepositoryInterface::class),
-                $app->make(FiscalPeriodRepositoryInterface::class),
-            );
-        });
-
-        $this->app->bind(DeleteJournalEntryServiceInterface::class, function ($app) {
-            return new DeleteJournalEntryService($app->make(JournalEntryRepositoryInterface::class));
-        });
-
-        $this->app->bind(PostJournalEntryServiceInterface::class, function ($app) {
-            return new PostJournalEntryService($app->make(JournalEntryRepositoryInterface::class));
-        });
+        foreach ($serviceBindings as $contract => $implementation) {
+            $this->app->bind($contract, $implementation);
+        }
     }
 
     public function boot(): void

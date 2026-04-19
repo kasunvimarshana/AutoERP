@@ -3,16 +3,19 @@
 declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
-use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
+
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
-use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 
-class OrganizationUnitModel extends Model
+class OrganizationUnitModel extends BaseModel
 {
+
+    use HasTenant;
     use HasAudit;
     use SoftDeletes;
 
@@ -30,6 +33,12 @@ class OrganizationUnitModel extends Model
         'metadata',
         'is_active',
         'description',
+        'image_path',
+        'default_revenue_account_id',
+        'default_expense_account_id',
+        'default_asset_account_id',
+        'default_liability_account_id',
+        'warehouse_id',
         '_lft',
         '_rgt',
     ];
@@ -64,7 +73,10 @@ class OrganizationUnitModel extends Model
 
     public function manager(): BelongsTo
     {
-        return $this->belongsTo(UserModel::class, 'manager_user_id');
+        return $this->belongsTo(
+            (string) config('auth.providers.users.model'),
+            'manager_user_id'
+        );
     }
 
     public function organizationUnitUsers(): HasMany

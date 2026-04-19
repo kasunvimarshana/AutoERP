@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\OrganizationUnit\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Infrastructure\Concerns\LoadsModuleRoutesAndMigrations;
 use Modules\OrganizationUnit\Application\Contracts\CreateOrganizationUnitServiceInterface;
 use Modules\OrganizationUnit\Application\Contracts\CreateOrganizationUnitTypeServiceInterface;
@@ -41,10 +40,6 @@ use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitAttachm
 use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitRepositoryInterface;
 use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitTypeRepositoryInterface;
 use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitUserRepositoryInterface;
-use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitAttachmentModel;
-use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
-use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitTypeModel;
-use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitUserModel;
 use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrganizationUnitAttachmentRepository;
 use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrganizationUnitRepository;
 use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrganizationUnitTypeRepository;
@@ -56,88 +51,38 @@ class OrganizationUnitServiceProvider extends ServiceProvider
 
     public function register(): void
     {
-        $this->app->bind(OrganizationUnitRepositoryInterface::class, function ($app) {
-            return new EloquentOrganizationUnitRepository($app->make(OrganizationUnitModel::class));
-        });
+        $repositoryBindings = [
+            OrganizationUnitRepositoryInterface::class => EloquentOrganizationUnitRepository::class,
+            OrganizationUnitAttachmentRepositoryInterface::class => EloquentOrganizationUnitAttachmentRepository::class,
+            OrganizationUnitTypeRepositoryInterface::class => EloquentOrganizationUnitTypeRepository::class,
+            OrganizationUnitUserRepositoryInterface::class => EloquentOrganizationUnitUserRepository::class,
+        ];
 
-        $this->app->bind(OrganizationUnitAttachmentRepositoryInterface::class, function ($app) {
-            return new EloquentOrganizationUnitAttachmentRepository($app->make(OrganizationUnitAttachmentModel::class));
-        });
+        foreach ($repositoryBindings as $contract => $implementation) {
+            $this->app->bind($contract, $implementation);
+        }
 
-        $this->app->bind(OrganizationUnitTypeRepositoryInterface::class, function ($app) {
-            return new EloquentOrganizationUnitTypeRepository($app->make(OrganizationUnitTypeModel::class));
-        });
+        $serviceBindings = [
+            CreateOrganizationUnitServiceInterface::class => CreateOrganizationUnitService::class,
+            FindOrganizationUnitServiceInterface::class => FindOrganizationUnitService::class,
+            UpdateOrganizationUnitServiceInterface::class => UpdateOrganizationUnitService::class,
+            DeleteOrganizationUnitServiceInterface::class => DeleteOrganizationUnitService::class,
+            CreateOrganizationUnitTypeServiceInterface::class => CreateOrganizationUnitTypeService::class,
+            FindOrganizationUnitTypeServiceInterface::class => FindOrganizationUnitTypeService::class,
+            UpdateOrganizationUnitTypeServiceInterface::class => UpdateOrganizationUnitTypeService::class,
+            DeleteOrganizationUnitTypeServiceInterface::class => DeleteOrganizationUnitTypeService::class,
+            CreateOrganizationUnitUserServiceInterface::class => CreateOrganizationUnitUserService::class,
+            FindOrganizationUnitUserServiceInterface::class => FindOrganizationUnitUserService::class,
+            UpdateOrganizationUnitUserServiceInterface::class => UpdateOrganizationUnitUserService::class,
+            DeleteOrganizationUnitUserServiceInterface::class => DeleteOrganizationUnitUserService::class,
+            FindOrganizationUnitAttachmentsServiceInterface::class => FindOrganizationUnitAttachmentsService::class,
+            UploadOrganizationUnitAttachmentServiceInterface::class => UploadOrganizationUnitAttachmentService::class,
+            DeleteOrganizationUnitAttachmentServiceInterface::class => DeleteOrganizationUnitAttachmentService::class,
+        ];
 
-        $this->app->bind(OrganizationUnitUserRepositoryInterface::class, function ($app) {
-            return new EloquentOrganizationUnitUserRepository($app->make(OrganizationUnitUserModel::class));
-        });
-
-        $this->app->bind(CreateOrganizationUnitServiceInterface::class, function ($app) {
-            return new CreateOrganizationUnitService($app->make(OrganizationUnitRepositoryInterface::class));
-        });
-
-        $this->app->bind(FindOrganizationUnitServiceInterface::class, function ($app) {
-            return new FindOrganizationUnitService($app->make(OrganizationUnitRepositoryInterface::class));
-        });
-
-        $this->app->bind(UpdateOrganizationUnitServiceInterface::class, function ($app) {
-            return new UpdateOrganizationUnitService($app->make(OrganizationUnitRepositoryInterface::class));
-        });
-
-        $this->app->bind(DeleteOrganizationUnitServiceInterface::class, function ($app) {
-            return new DeleteOrganizationUnitService($app->make(OrganizationUnitRepositoryInterface::class));
-        });
-
-        $this->app->bind(CreateOrganizationUnitTypeServiceInterface::class, function ($app) {
-            return new CreateOrganizationUnitTypeService($app->make(OrganizationUnitTypeRepositoryInterface::class));
-        });
-
-        $this->app->bind(FindOrganizationUnitTypeServiceInterface::class, function ($app) {
-            return new FindOrganizationUnitTypeService($app->make(OrganizationUnitTypeRepositoryInterface::class));
-        });
-
-        $this->app->bind(UpdateOrganizationUnitTypeServiceInterface::class, function ($app) {
-            return new UpdateOrganizationUnitTypeService($app->make(OrganizationUnitTypeRepositoryInterface::class));
-        });
-
-        $this->app->bind(DeleteOrganizationUnitTypeServiceInterface::class, function ($app) {
-            return new DeleteOrganizationUnitTypeService($app->make(OrganizationUnitTypeRepositoryInterface::class));
-        });
-
-        $this->app->bind(CreateOrganizationUnitUserServiceInterface::class, function ($app) {
-            return new CreateOrganizationUnitUserService($app->make(OrganizationUnitUserRepositoryInterface::class));
-        });
-
-        $this->app->bind(FindOrganizationUnitUserServiceInterface::class, function ($app) {
-            return new FindOrganizationUnitUserService($app->make(OrganizationUnitUserRepositoryInterface::class));
-        });
-
-        $this->app->bind(UpdateOrganizationUnitUserServiceInterface::class, function ($app) {
-            return new UpdateOrganizationUnitUserService($app->make(OrganizationUnitUserRepositoryInterface::class));
-        });
-
-        $this->app->bind(DeleteOrganizationUnitUserServiceInterface::class, function ($app) {
-            return new DeleteOrganizationUnitUserService($app->make(OrganizationUnitUserRepositoryInterface::class));
-        });
-
-        $this->app->bind(FindOrganizationUnitAttachmentsServiceInterface::class, function ($app) {
-            return new FindOrganizationUnitAttachmentsService($app->make(OrganizationUnitAttachmentRepositoryInterface::class));
-        });
-
-        $this->app->bind(UploadOrganizationUnitAttachmentServiceInterface::class, function ($app) {
-            return new UploadOrganizationUnitAttachmentService(
-                $app->make(OrganizationUnitRepositoryInterface::class),
-                $app->make(OrganizationUnitAttachmentRepositoryInterface::class),
-                $app->make(FileStorageServiceInterface::class),
-            );
-        });
-
-        $this->app->bind(DeleteOrganizationUnitAttachmentServiceInterface::class, function ($app) {
-            return new DeleteOrganizationUnitAttachmentService(
-                $app->make(OrganizationUnitAttachmentRepositoryInterface::class),
-                $app->make(FileStorageServiceInterface::class),
-            );
-        });
+        foreach ($serviceBindings as $contract => $implementation) {
+            $this->app->bind($contract, $implementation);
+        }
     }
 
     public function boot(): void

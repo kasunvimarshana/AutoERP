@@ -71,6 +71,13 @@ class EloquentOrganizationUnitRepository extends EloquentRepository implements O
             metadata: is_array($model->metadata) ? $model->metadata : null,
             isActive: (bool) $model->is_active,
             description: $model->description,
+
+            imagePath: $model->image_path,
+            defaultRevenueAccountId: $model->default_revenue_account_id,
+            defaultExpenseAccountId: $model->default_expense_account_id,
+            defaultAssetAccountId: $model->default_asset_account_id,
+            defaultLiabilityAccountId: $model->default_liability_account_id,
+            warehouseId: $model->warehouse_id,
             left: (int) $model->_lft,
             right: (int) $model->_rgt,
             id: (int) $model->id,

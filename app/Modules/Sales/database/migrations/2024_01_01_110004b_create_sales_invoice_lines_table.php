@@ -22,6 +22,7 @@ return new class extends Migration
             $table->decimal('quantity', 20, 6);
             $table->decimal('unit_price', 20, 6);
             $table->decimal('discount_pct', 10, 6)->default(0);
+            $table->foreignId('tax_group_id')->nullable();
             $table->decimal('tax_amount', 20, 6)->default(0);
             $table->decimal('line_total', 20, 6);
             $table->foreignId('income_account_id')->nullable();

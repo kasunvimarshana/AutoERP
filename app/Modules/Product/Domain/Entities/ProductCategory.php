@@ -13,6 +13,7 @@ class ProductCategory
     private ?int $parentId;
 
     private string $name;
+    private ?string $imagePath;
 
     private string $slug;
 
@@ -44,6 +45,7 @@ class ProductCategory
         int $tenantId,
         string $name,
         string $slug,
+        ?string $imagePath = null,
         ?int $parentId = null,
         ?string $code = null,
         ?string $path = null,
@@ -60,6 +62,7 @@ class ProductCategory
         $this->tenantId = $tenantId;
         $this->parentId = $parentId;
         $this->name = $name;
+        $this->imagePath = $imagePath;
         $this->slug = $slug;
         $this->code = $code;
         $this->path = $path;
@@ -91,6 +94,8 @@ class ProductCategory
     {
         return $this->name;
     }
+
+    public function getImagePath(): ?string { return $this->imagePath; }
 
     public function getSlug(): string
     {
@@ -155,6 +160,7 @@ class ProductCategory
     public function update(
         string $name,
         string $slug,
+        ?string $imagePath = null,
         ?int $parentId,
         ?string $code,
         ?string $path,
@@ -165,6 +171,7 @@ class ProductCategory
         ?array $metadata,
     ): void {
         $this->name = $name;
+        $this->imagePath = $imagePath;
         $this->slug = $slug;
         $this->parentId = $parentId;
         $this->code = $code;

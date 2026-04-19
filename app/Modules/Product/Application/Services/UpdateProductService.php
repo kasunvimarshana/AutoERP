@@ -34,6 +34,8 @@ class UpdateProductService extends BaseService implements UpdateProductServiceIn
             name: $dto->name,
             slug: $dto->slug,
             baseUomId: $dto->base_uom_id,
+            imagePath: $dto->image_path,
+            taxGroupId: $dto->tax_group_id,
             categoryId: $dto->category_id,
             brandId: $dto->brand_id,
             orgUnitId: $dto->org_unit_id,

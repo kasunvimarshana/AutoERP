@@ -33,11 +33,17 @@ class EloquentPermissionRepository extends EloquentRepository implements Permiss
             $model = $this->update($permission->getId(), [
                 'tenant_id' => $permission->getTenantId(),
                 'name' => $permission->getName(),
+            'guard_name' => $permission->getGuardName(),
+            'module' => $permission->getModule(),
+            'description' => $permission->getDescription(),
             ]);
         } else {
             $model = $this->create([
                 'tenant_id' => $permission->getTenantId(),
                 'name' => $permission->getName(),
+            'guard_name' => $permission->getGuardName(),
+            'module' => $permission->getModule(),
+            'description' => $permission->getDescription(),
             ]);
         }
 

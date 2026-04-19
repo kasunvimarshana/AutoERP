@@ -31,7 +31,7 @@ cp .env.example .env && php artisan key:generate
 
 ```
 app/Modules/           # All business modules (19 modules)
-├── Core/              # Shared kernel: HasAudit trait, base classes, repository abstractions
+├── Core/              # Shared kernel: base classes, repository abstractions, technical concerns
 ├── Tenant/            # Multi-tenancy management, plans, settings, config
 ├── OrganizationUnit/  # Hierarchical org structures (materialized path)
 ├── User/              # User CRUD, profiles, roles, permissions, devices
@@ -39,8 +39,8 @@ app/Modules/           # All business modules (19 modules)
 ├── Product/           # Product catalog, variants, categories, brands, UoM
 ├── Finance/           # Double-entry accounting, chart of accounts, journal entries
 ├── Audit/             # Immutable audit logs, compliance trails
-├── Configuration/     # ServiceProvider only (infrastructure-only)
-├── Shared/            # Global reference tables (countries, currencies, languages, timezones)
+├── Configuration/     # Reference data ownership (countries, currencies, languages, timezones)
+├── Shared/            # Minimal shell for truly shared cross-cutting surface only
 ├── Customer/          # Migration-only stub
 ├── Supplier/          # Migration-only stub
 ├── Employee/          # Migration-only stub
@@ -91,10 +91,10 @@ app/Modules/<Module>/
 - **`declare(strict_types=1);`** in every PHP file. Strong typing on all parameters/returns.
 - **Namespaces**: `Modules\<Module>\...` (not `App\Modules\...`).
 - **Models**: Extend `Illuminate\Database\Eloquent\Model` directly. `BaseModel` exists in Core but is unused.
-- **`HasAudit` trait**: Used by 20 models for automatic change tracking.
+- **`HasAudit` trait**: Owned by Audit module and used by 20 models for automatic change tracking.
 - **`SoftDeletes`**: Used by 8 models (Account, OrgUnit, OrgUnitAttachment, Product, Tenant, TenantAttachment, User, UserAttachment).
 - **`HasUuid` trait**: Defined in Core but currently unused. All models use integer auto-increment PKs.
-- **`HasTenant` trait**: Defined in Core but currently unused. Tenant isolation uses `resolve.tenant` middleware with `X-Tenant-ID` header.
+- **`HasTenant` trait**: Owned by Tenant module and used by tenant-scoped models. Tenant isolation uses `resolve.tenant` middleware with `X-Tenant-ID` header.
 - **Multi-tenancy**: `ResolveTenant` middleware reads `X-Tenant-ID` from request headers. Repositories filter `tenant_id` explicitly.
 - **Repositories**: Interface in `Domain/RepositoryInterfaces/`, implementation in `Infrastructure/Persistence/Eloquent/Repositories/`.
 - **Services**: Contract in `Application/Contracts/`, implementation in `Application/Services/`. Wrap writes in DB transactions.

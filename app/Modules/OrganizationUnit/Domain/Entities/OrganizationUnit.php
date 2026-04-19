@@ -31,6 +31,14 @@ class OrganizationUnit
 
     private ?string $description;
 
+    private ?string $imagePath;
+    private ?int $defaultRevenueAccountId;
+    private ?int $defaultExpenseAccountId;
+    private ?int $defaultAssetAccountId;
+    private ?int $defaultLiabilityAccountId;
+    private ?int $warehouseId;
+
+
     private int $left;
 
     private int $right;
@@ -54,6 +62,13 @@ class OrganizationUnit
         ?array $metadata = null,
         bool $isActive = true,
         ?string $description = null,
+
+        ?string $imagePath = null,
+        ?int $defaultRevenueAccountId = null,
+        ?int $defaultExpenseAccountId = null,
+        ?int $defaultAssetAccountId = null,
+        ?int $defaultLiabilityAccountId = null,
+        ?int $warehouseId = null,
         int $left = 0,
         int $right = 0,
         ?int $id = null,
@@ -72,6 +87,20 @@ class OrganizationUnit
         $this->metadata = $metadata;
         $this->isActive = $isActive;
         $this->description = $description;
+
+        $this->imagePath = $imagePath;
+        $this->defaultRevenueAccountId = $defaultRevenueAccountId;
+        $this->defaultExpenseAccountId = $defaultExpenseAccountId;
+        $this->defaultAssetAccountId = $defaultAssetAccountId;
+        $this->defaultLiabilityAccountId = $defaultLiabilityAccountId;
+        $this->warehouseId = $warehouseId;
+
+        $this->imagePath = $imagePath;
+        $this->defaultRevenueAccountId = $defaultRevenueAccountId;
+        $this->defaultExpenseAccountId = $defaultExpenseAccountId;
+        $this->defaultAssetAccountId = $defaultAssetAccountId;
+        $this->defaultLiabilityAccountId = $defaultLiabilityAccountId;
+        $this->warehouseId = $warehouseId;
         $this->left = $left;
         $this->right = $right;
         $this->createdAt = $createdAt ?? new \DateTimeImmutable;
@@ -141,6 +170,14 @@ class OrganizationUnit
         return $this->description;
     }
 
+    public function getImagePath(): ?string { return $this->imagePath; }
+    public function getDefaultRevenueAccountId(): ?int { return $this->defaultRevenueAccountId; }
+    public function getDefaultExpenseAccountId(): ?int { return $this->defaultExpenseAccountId; }
+    public function getDefaultAssetAccountId(): ?int { return $this->defaultAssetAccountId; }
+    public function getDefaultLiabilityAccountId(): ?int { return $this->defaultLiabilityAccountId; }
+    public function getWarehouseId(): ?int { return $this->warehouseId; }
+
+
     public function getLeft(): int
     {
         return $this->left;
@@ -173,6 +210,13 @@ class OrganizationUnit
         ?array $metadata,
         bool $isActive,
         ?string $description,
+
+        ?string $imagePath,
+        ?int $defaultRevenueAccountId,
+        ?int $defaultExpenseAccountId,
+        ?int $defaultAssetAccountId,
+        ?int $defaultLiabilityAccountId,
+        ?int $warehouseId,
     ): void {
         $this->name = $name;
         $this->typeId = $typeId;
@@ -182,6 +226,20 @@ class OrganizationUnit
         $this->metadata = $metadata;
         $this->isActive = $isActive;
         $this->description = $description;
+
+        $this->imagePath = $imagePath;
+        $this->defaultRevenueAccountId = $defaultRevenueAccountId;
+        $this->defaultExpenseAccountId = $defaultExpenseAccountId;
+        $this->defaultAssetAccountId = $defaultAssetAccountId;
+        $this->defaultLiabilityAccountId = $defaultLiabilityAccountId;
+        $this->warehouseId = $warehouseId;
+
+        $this->imagePath = $imagePath;
+        $this->defaultRevenueAccountId = $defaultRevenueAccountId;
+        $this->defaultExpenseAccountId = $defaultExpenseAccountId;
+        $this->defaultAssetAccountId = $defaultAssetAccountId;
+        $this->defaultLiabilityAccountId = $defaultLiabilityAccountId;
+        $this->warehouseId = $warehouseId;
         $this->updatedAt = new \DateTimeImmutable;
     }
 

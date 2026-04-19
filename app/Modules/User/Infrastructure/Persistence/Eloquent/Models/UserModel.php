@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Modules\User\Infrastructure\Persistence\Eloquent\Models;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -15,6 +16,8 @@ use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 
 class UserModel extends Authenticatable implements OAuthenticatable
 {
+
+    use HasTenant;
     use HasAudit, HasApiTokens, Notifiable, SoftDeletes;
 
     protected $table = 'users';
@@ -28,6 +31,8 @@ class UserModel extends Authenticatable implements OAuthenticatable
         'last_name',
         'phone',
         'avatar',
+        'email_verified_at',
+        'remember_token',
         'status',
         'address',
         'preferences',

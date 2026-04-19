@@ -32,6 +32,8 @@ class CreateProductService extends BaseService implements CreateProductServiceIn
             sku: $dto->sku,
             description: $dto->description,
             baseUomId: $dto->base_uom_id,
+            imagePath: $dto->image_path,
+            taxGroupId: $dto->tax_group_id,
             purchaseUomId: $dto->purchase_uom_id,
             salesUomId: $dto->sales_uom_id,
             uomConversionFactor: $dto->uom_conversion_factor,

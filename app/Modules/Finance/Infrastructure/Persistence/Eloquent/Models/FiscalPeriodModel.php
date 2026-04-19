@@ -3,12 +3,16 @@
 declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Persistence\Eloquent\Models;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
-use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
+
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class FiscalPeriodModel extends Model
+class FiscalPeriodModel extends BaseModel
 {
+
+    use HasTenant;
     use SoftDeletes;
     protected $table = 'fiscal_periods';
 

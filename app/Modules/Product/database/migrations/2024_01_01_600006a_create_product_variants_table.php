@@ -20,6 +20,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->json('metadata')->nullable();
             $table->timestamps();
+            $table->softDeletes();
 
             $table->unique(['tenant_id', 'product_id', 'sku'], 'product_variants_tenant_product_sku_uk');
         });

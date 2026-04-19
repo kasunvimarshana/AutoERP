@@ -3,12 +3,16 @@
 declare(strict_types=1);
 
 namespace Modules\Product\Infrastructure\Persistence\Eloquent\Models;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
-use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
+
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 
-class ProductBrandModel extends Model
+class ProductBrandModel extends BaseModel
 {
+    use HasTenant;
+
     use HasAudit;
 
     protected $table = 'product_brands';
@@ -22,6 +26,7 @@ class ProductBrandModel extends Model
         'path',
         'depth',
         'is_active',
+        'image_path',
         'website',
         'description',
         'attributes',

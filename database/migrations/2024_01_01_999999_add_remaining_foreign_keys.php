@@ -41,6 +41,7 @@ return new class extends Migration
         $this->addForeignIfPossible('purchase_invoice_lines', 'product_id', 'products', 'cascade');
         $this->addForeignIfPossible('purchase_invoice_lines', 'variant_id', 'product_variants', 'null');
         $this->addForeignIfPossible('purchase_invoice_lines', 'uom_id', 'units_of_measure');
+        $this->addForeignIfPossible('purchase_invoice_lines', 'tax_group_id', 'tax_groups', 'null');
         $this->addForeignIfPossible('purchase_invoice_lines', 'account_id', 'accounts', 'null');
 
         $this->addForeignIfPossible('purchase_returns', 'supplier_id', 'suppliers', 'cascade');
@@ -86,6 +87,7 @@ return new class extends Migration
         $this->addForeignIfPossible('sales_invoice_lines', 'product_id', 'products', 'cascade');
         $this->addForeignIfPossible('sales_invoice_lines', 'variant_id', 'product_variants', 'null');
         $this->addForeignIfPossible('sales_invoice_lines', 'uom_id', 'units_of_measure');
+        $this->addForeignIfPossible('sales_invoice_lines', 'tax_group_id', 'tax_groups', 'null');
         $this->addForeignIfPossible('sales_invoice_lines', 'income_account_id', 'accounts', 'null');
 
         $this->addForeignIfPossible('sales_returns', 'customer_id', 'customers', 'cascade');
@@ -113,6 +115,9 @@ return new class extends Migration
         // Attachment relationships
         $this->addForeignIfPossible('user_attachments', 'tenant_id', 'tenants', 'cascade');
         $this->addForeignIfPossible('org_unit_attachments', 'tenant_id', 'tenants', 'cascade');
+
+        // Product defaults
+        $this->addForeignIfPossible('products', 'tax_group_id', 'tax_groups', 'null');
 
         // Subledger party relationships
         $this->addForeignIfPossible('ar_transactions', 'customer_id', 'customers', 'cascade');

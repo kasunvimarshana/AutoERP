@@ -40,9 +40,6 @@ use Modules\Auth\Application\UseCases\ResetPassword;
 use Modules\Auth\Infrastructure\Persistence\EloquentAuthUserRepository;
 use Modules\Auth\Infrastructure\Services\TenantContextResolver;
 use Modules\Core\Infrastructure\Concerns\LoadsModuleRoutesAndMigrations;
-use Modules\User\Application\Contracts\CreateUserServiceInterface;
-use Modules\User\Application\Contracts\SetUserPasswordServiceInterface;
-use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 
 class AuthModuleServiceProvider extends ServiceProvider
 {
@@ -52,130 +49,46 @@ class AuthModuleServiceProvider extends ServiceProvider
     {
         $this->app->singleton(TenantContextResolverInterface::class, TenantContextResolver::class);
 
-        // Auth user repository: decouples auth services from UserModel
-        $this->app->bind(AuthUserRepositoryInterface::class, function ($app) {
-            return new EloquentAuthUserRepository(
-                $app->make(UserModel::class),
-                $app->make(TenantContextResolverInterface::class),
-            );
-        });
+        $this->app->bind(AuthUserRepositoryInterface::class, EloquentAuthUserRepository::class);
+        $this->app->when(EloquentAuthUserRepository::class)
+            ->needs('$userModelClass')
+            ->give(static fn (): string => (string) config('auth.providers.users.model'));
 
-        // Authorization strategies (RBAC + ABAC) — resolved via interface for DIP compliance
-        $this->app->bind(RbacAuthorizationStrategy::class, function ($app) {
-            return new RbacAuthorizationStrategy(
-                $app->make(AuthUserRepositoryInterface::class),
-            );
-        });
+        $this->app->bind(RbacAuthorizationStrategy::class, RbacAuthorizationStrategy::class);
+        $this->app->bind(AbacAuthorizationStrategy::class, AbacAuthorizationStrategy::class);
+        $this->app->bind(AuthorizationServiceInterface::class, AuthorizationService::class);
+        $this->app->alias(AuthorizationServiceInterface::class, 'auth.authorization');
 
-        $this->app->bind(AbacAuthorizationStrategy::class, function ($app) {
-            return new AbacAuthorizationStrategy(
-                $app->make(AuthUserRepositoryInterface::class),
-            );
-        });
+        $serviceBindings = [
+            TokenServiceInterface::class => PassportTokenService::class,
+            AuthenticationServiceInterface::class => AuthenticationService::class,
+            RegisterUserServiceInterface::class => RegisterUserService::class,
+            LoginServiceInterface::class => LoginService::class,
+            LogoutServiceInterface::class => LogoutService::class,
+            RefreshTokenServiceInterface::class => RefreshTokenService::class,
+            SsoServiceInterface::class => SsoService::class,
+        ];
 
-        // Composite authorization service (delegates to strategies via variadic DI)
-        $this->app->bind(AuthorizationServiceInterface::class, function ($app) {
-            return new AuthorizationService(
-                $app->make(AuthUserRepositoryInterface::class),
-                $app->make(RbacAuthorizationStrategy::class),
-                $app->make(AbacAuthorizationStrategy::class),
-            );
-        });
-
-        $this->app->bind('auth.authorization', function ($app) {
-            return $app->make(AuthorizationServiceInterface::class);
-        });
-
-        // Token service: swappable via binding (default: Passport)
-        $this->app->bind(TokenServiceInterface::class, function ($app) {
-            return new PassportTokenService(
-                $app->make(AuthUserRepositoryInterface::class),
-            );
-        });
-
-        // Core auth service
-        $this->app->bind(AuthenticationServiceInterface::class, function ($app) {
-            return new AuthenticationService(
-                $app->make(TokenServiceInterface::class),
-                $app->make(TenantContextResolverInterface::class),
-            );
-        });
-
-        // Register / Login / Logout services
-        $this->app->bind(RegisterUserServiceInterface::class, function ($app) {
-            return new RegisterUserService(
-                $app->make(CreateUserServiceInterface::class),
-                $app->make(SetUserPasswordServiceInterface::class),
-            );
-        });
-
-        $this->app->bind(LoginServiceInterface::class, function ($app) {
-            return new LoginService(
-                $app->make(AuthenticationServiceInterface::class),
-            );
-        });
-
-        $this->app->bind(LogoutServiceInterface::class, function ($app) {
-            return new LogoutService(
-                $app->make(AuthenticationServiceInterface::class),
-            );
-        });
-
-        // Token refresh service (token-rotation pattern)
-        $this->app->bind(RefreshTokenServiceInterface::class, function ($app) {
-            return new RefreshTokenService(
-                $app->make(TokenServiceInterface::class),
-            );
-        });
+        foreach ($serviceBindings as $contract => $implementation) {
+            $this->app->bind($contract, $implementation);
+        }
 
         // Password reset services
         $this->app->bind(ForgotPasswordServiceInterface::class, ForgotPasswordService::class);
         $this->app->bind(ResetPasswordServiceInterface::class, ResetPasswordService::class);
 
-        // SSO service
-        $this->app->bind(SsoServiceInterface::class, function ($app) {
-            return new SsoService(
-                $app->make(TokenServiceInterface::class),
-            );
-        });
+        $useCaseBindings = [
+            LoginUser::class => LoginUser::class,
+            LogoutUser::class => LogoutUser::class,
+            RegisterUser::class => RegisterUser::class,
+            RefreshToken::class => RefreshToken::class,
+            ForgotPassword::class => ForgotPassword::class,
+            ResetPassword::class => ResetPassword::class,
+        ];
 
-        // Use cases (resolved via container for proper DI in controllers)
-        $this->app->bind(LoginUser::class, function ($app) {
-            return new LoginUser(
-                $app->make(LoginServiceInterface::class),
-            );
-        });
-
-        $this->app->bind(LogoutUser::class, function ($app) {
-            return new LogoutUser(
-                $app->make(LogoutServiceInterface::class),
-            );
-        });
-
-        $this->app->bind(RegisterUser::class, function ($app) {
-            return new RegisterUser(
-                $app->make(RegisterUserServiceInterface::class),
-                $app->make(LoginServiceInterface::class),
-            );
-        });
-
-        $this->app->bind(RefreshToken::class, function ($app) {
-            return new RefreshToken(
-                $app->make(RefreshTokenServiceInterface::class),
-            );
-        });
-
-        $this->app->bind(ForgotPassword::class, function ($app) {
-            return new ForgotPassword(
-                $app->make(ForgotPasswordServiceInterface::class),
-            );
-        });
-
-        $this->app->bind(ResetPassword::class, function ($app) {
-            return new ResetPassword(
-                $app->make(ResetPasswordServiceInterface::class),
-            );
-        });
+        foreach ($useCaseBindings as $contract => $implementation) {
+            $this->app->bind($contract, $implementation);
+        }
 
         $this->app->bind(GetAuthenticatedUser::class, GetAuthenticatedUser::class);
     }

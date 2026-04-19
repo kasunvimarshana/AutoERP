@@ -32,6 +32,7 @@ class UpdateProductBrandService extends BaseService implements UpdateProductBran
         $productBrand->update(
             name: $dto->name,
             slug: $dto->slug,
+            imagePath: $dto->image_path,
             parentId: $dto->parent_id,
             code: $dto->code,
             path: $dto->path,
