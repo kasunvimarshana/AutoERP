@@ -5,17 +5,17 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use Illuminate\Routing\Route;
-use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Tests\TestCase;
 
 class FinanceRoutesTest extends TestCase
 {
     public function test_finance_endpoints_require_authentication(): void
     {
-        $this->getJson('/api/accounts')->assertStatus(Response::HTTP_UNAUTHORIZED);
-        $this->getJson('/api/fiscal-years')->assertStatus(Response::HTTP_UNAUTHORIZED);
-        $this->getJson('/api/fiscal-periods')->assertStatus(Response::HTTP_UNAUTHORIZED);
-        $this->getJson('/api/journal-entries')->assertStatus(Response::HTTP_UNAUTHORIZED);
+        $this->getJson('/api/accounts')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
+        $this->getJson('/api/fiscal-years')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
+        $this->getJson('/api/fiscal-periods')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
+        $this->getJson('/api/journal-entries')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
     }
 
     public function test_finance_routes_keep_expected_middleware_contract(): void

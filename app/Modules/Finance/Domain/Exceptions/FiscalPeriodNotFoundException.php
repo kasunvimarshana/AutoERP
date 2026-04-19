@@ -4,17 +4,22 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Domain\Exceptions;
 
-use Modules\Core\Domain\Exceptions\DomainException;
+use Modules\Core\Domain\Exceptions\NotFoundException;
 
-class FiscalPeriodNotFoundException extends DomainException
+class FiscalPeriodNotFoundException extends NotFoundException
 {
-    public function __construct(string $message = 'Fiscal period not found.')
+    public function __construct(int $id)
     {
-        parent::__construct($message, 404);
+        parent::__construct('Fiscal period', $id);
     }
 
     public static function byId(int $id): self
     {
-        return new self(sprintf('Fiscal period with id %d not found.', $id));
+        return new self($id);
+    }
+
+    public static function openPeriodForId(int $id): self
+    {
+        return new self($id);
     }
 }

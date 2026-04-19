@@ -20,7 +20,7 @@ return new class extends Migration
         $this->addForeignIfPossible('purchase_order_lines', 'product_id', 'products', 'cascade');
         $this->addForeignIfPossible('purchase_order_lines', 'variant_id', 'product_variants', 'null');
         $this->addForeignIfPossible('purchase_order_lines', 'uom_id', 'units_of_measure');
-        $this->addForeignIfPossible('purchase_order_lines', 'tax_class_id', 'tax_classes', 'null');
+        $this->addForeignIfPossible('purchase_order_lines', 'tax_group_id', 'tax_groups', 'null');
         $this->addForeignIfPossible('purchase_order_lines', 'account_id', 'accounts', 'null');
 
         $this->addForeignIfPossible('grn_headers', 'supplier_id', 'suppliers', 'cascade');
@@ -64,7 +64,7 @@ return new class extends Migration
         $this->addForeignIfPossible('sales_order_lines', 'product_id', 'products', 'cascade');
         $this->addForeignIfPossible('sales_order_lines', 'variant_id', 'product_variants', 'null');
         $this->addForeignIfPossible('sales_order_lines', 'uom_id', 'units_of_measure');
-        $this->addForeignIfPossible('sales_order_lines', 'tax_class_id', 'tax_classes', 'null');
+        $this->addForeignIfPossible('sales_order_lines', 'tax_group_id', 'tax_groups', 'null');
         $this->addForeignIfPossible('sales_order_lines', 'income_account_id', 'accounts', 'null');
         $this->addForeignIfPossible('sales_order_lines', 'batch_id', 'batches', 'null');
         $this->addForeignIfPossible('sales_order_lines', 'serial_id', 'serials', 'null');
@@ -101,6 +101,32 @@ return new class extends Migration
         // Finance
         $this->addForeignIfPossible('journal_entries', 'created_by', 'users');
         $this->addForeignIfPossible('journal_entries', 'posted_by', 'users', 'null');
+
+        // Organization unit defaults and relationships
+        $this->addForeignIfPossible('org_units', 'default_revenue_account_id', 'accounts', 'null');
+        $this->addForeignIfPossible('org_units', 'default_expense_account_id', 'accounts', 'null');
+        $this->addForeignIfPossible('org_units', 'default_asset_account_id', 'accounts', 'null');
+        $this->addForeignIfPossible('org_units', 'default_liability_account_id', 'accounts', 'null');
+        $this->addForeignIfPossible('org_units', 'warehouse_id', 'warehouses', 'null');
+        $this->addForeignIfPossible('org_units', 'manager_user_id', 'users', 'null');
+
+        // Attachment relationships
+        $this->addForeignIfPossible('user_attachments', 'tenant_id', 'tenants', 'cascade');
+        $this->addForeignIfPossible('org_unit_attachments', 'tenant_id', 'tenants', 'cascade');
+
+        // Subledger party relationships
+        $this->addForeignIfPossible('ar_transactions', 'customer_id', 'customers', 'cascade');
+        $this->addForeignIfPossible('ap_transactions', 'supplier_id', 'suppliers', 'cascade');
+
+        // Tenant FK on Purchase/Sales line tables
+        $this->addForeignIfPossible('purchase_order_lines', 'tenant_id', 'tenants', 'cascade');
+        $this->addForeignIfPossible('grn_lines', 'tenant_id', 'tenants', 'cascade');
+        $this->addForeignIfPossible('purchase_invoice_lines', 'tenant_id', 'tenants', 'cascade');
+        $this->addForeignIfPossible('purchase_return_lines', 'tenant_id', 'tenants', 'cascade');
+        $this->addForeignIfPossible('sales_order_lines', 'tenant_id', 'tenants', 'cascade');
+        $this->addForeignIfPossible('shipment_lines', 'tenant_id', 'tenants', 'cascade');
+        $this->addForeignIfPossible('sales_invoice_lines', 'tenant_id', 'tenants', 'cascade');
+        $this->addForeignIfPossible('sales_return_lines', 'tenant_id', 'tenants', 'cascade');
     }
 
     public function down(): void
@@ -114,9 +140,9 @@ return new class extends Migration
             return;
         }
 
-        Schema::table($tableName, function (Blueprint $table) use ($column, $referencedTable, $onDelete): void {
+        Schema::table($tableName, function (Blueprint $table) use ($tableName, $column, $referencedTable, $onDelete): void {
             try {
-                $foreign = $table->foreign($column)->references('id')->on($referencedTable);
+                $foreign = $table->foreign($column, "{$tableName}_{$column}_fk")->references('id')->on($referencedTable);
                 if ($onDelete === 'cascade') {
                     $foreign->cascadeOnDelete();
                 } elseif ($onDelete === 'null') {

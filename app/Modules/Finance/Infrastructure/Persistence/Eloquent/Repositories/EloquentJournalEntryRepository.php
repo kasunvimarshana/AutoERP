@@ -61,7 +61,7 @@ class EloquentJournalEntryRepository extends EloquentRepository implements Journ
         return $this->toDomainEntity($model);
     }
 
-    public function find($id, array $columns = ['*']): ?JournalEntry
+    public function find(int|string $id, array $columns = ['*']): ?JournalEntry
     {
         /** @var JournalEntryModel|null $model */
         $model = $this->model->newQuery()

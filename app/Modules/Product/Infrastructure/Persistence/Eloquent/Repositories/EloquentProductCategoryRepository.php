@@ -55,7 +55,7 @@ class EloquentProductCategoryRepository extends EloquentRepository implements Pr
         return $model ? $this->toDomainEntity($model) : null;
     }
 
-    public function find($id, array $columns = ['*']): ?ProductCategory
+    public function find(int|string $id, array $columns = ['*']): ?ProductCategory
     {
         return parent::find($id, $columns);
     }

@@ -7,6 +7,7 @@ namespace Modules\Auth\Application\Services;
 use Illuminate\Support\Facades\DB;
 use Modules\Auth\Application\Contracts\RegisterUserServiceInterface;
 use Modules\Auth\Domain\Events\UserRegistered;
+use Modules\Auth\Domain\Exceptions\RegistrationFailedException;
 use Modules\User\Application\Contracts\CreateUserServiceInterface;
 use Modules\User\Application\Contracts\SetUserPasswordServiceInterface;
 
@@ -31,7 +32,7 @@ class RegisterUserService implements RegisterUserServiceInterface
 
             $userId = $user->getId();
             if ($userId === null) {
-                throw new \RuntimeException('Failed to persist user during registration.');
+                throw new RegistrationFailedException('Failed to persist user during registration.');
             }
 
             $this->setUserPasswordService->execute([

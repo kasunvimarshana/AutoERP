@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Application\Services;
 
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Modules\Auth\Application\Contracts\ForgotPasswordServiceInterface;
 
@@ -19,6 +20,15 @@ class ForgotPasswordService implements ForgotPasswordServiceInterface
     {
         $status = Password::sendResetLink(['email' => $email]);
 
-        return $status === Password::RESET_LINK_SENT;
+        if ($status !== Password::RESET_LINK_SENT) {
+            Log::warning('Password reset link failed', [
+                'email' => $email,
+                'status' => $status,
+            ]);
+
+            return false;
+        }
+
+        return true;
     }
 }

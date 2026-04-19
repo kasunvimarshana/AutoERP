@@ -10,7 +10,6 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Str;
-use Modules\Auth\Application\Contracts\AuthorizationServiceInterface;
 
 class AuthorizedController extends Controller
 {
@@ -18,7 +17,7 @@ class AuthorizedController extends Controller
         authorize as protected laravelAuthorize;
     }
 
-    public function authorize($ability, $arguments = [])
+    public function authorize(string $ability, mixed $arguments = []): mixed
     {
         // return $this->laravelAuthorize($ability, $arguments);
         $user = auth()->guard()->user();
@@ -28,7 +27,13 @@ class AuthorizedController extends Controller
         }
 
         $subject = $this->resolveAuthorizationSubject($arguments);
-        $authorizationService = app(AuthorizationServiceInterface::class);
+        $authorizationService = app()->bound('auth.authorization')
+            ? app('auth.authorization')
+            : null;
+
+        if ($authorizationService === null) {
+            return $this->laravelAuthorize($ability, $arguments);
+        }
 
         foreach ($this->authorizationAbilities((string) $ability, $subject) as $candidateAbility) {
             if ($authorizationService->can((int) $user->getAuthIdentifier(), $candidateAbility, $subject)) {

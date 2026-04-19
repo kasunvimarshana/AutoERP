@@ -6,7 +6,7 @@ namespace Tests\Feature;
 
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Artisan;
-use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Tests\TestCase;
 
 class ProductVariantRoutesTest extends TestCase
@@ -22,8 +22,8 @@ class ProductVariantRoutesTest extends TestCase
 
     public function test_product_variant_endpoints_require_authentication(): void
     {
-        $this->getJson('/api/product-variants')->assertStatus(Response::HTTP_UNAUTHORIZED);
-        $this->getJson('/api/product-variants/1')->assertStatus(Response::HTTP_UNAUTHORIZED);
+        $this->getJson('/api/product-variants')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
+        $this->getJson('/api/product-variants/1')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
     }
 
     public function test_product_variant_routes_keep_expected_middleware_contract(): void

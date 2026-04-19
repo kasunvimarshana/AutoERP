@@ -63,7 +63,7 @@ class EloquentTenantRepository extends EloquentRepository implements TenantRepos
         return $this->mapModelToDomainEntity($model);
     }
 
-    public function delete($id): bool
+    public function delete(int|string $id): bool
     {
         return parent::delete($id);
     }
@@ -73,7 +73,7 @@ class EloquentTenantRepository extends EloquentRepository implements TenantRepos
      *
      * {@inheritdoc}
      */
-    public function find($id, array $columns = ['*']): ?Tenant
+    public function find(int|string $id, array $columns = ['*']): ?Tenant
     {
         return parent::find($id, $columns);
     }

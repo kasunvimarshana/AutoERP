@@ -21,6 +21,7 @@ return new class extends Migration
             $table->string('slug');
             $table->string('sku')->nullable();
             $table->text('description')->nullable();
+            $table->string('image_path')->nullable();
             $table->foreignId('base_uom_id')->constrained('units_of_measure', 'id', 'products_base_uom_id_fk');
             $table->foreignId('purchase_uom_id')->nullable()->constrained('units_of_measure', 'id', 'products_purchase_uom_id_fk');
             $table->foreignId('sales_uom_id')->nullable()->constrained('units_of_measure', 'id', 'products_sales_uom_id_fk');
@@ -29,7 +30,7 @@ return new class extends Migration
             $table->boolean('is_lot_tracked')->default(false);
             $table->boolean('is_serial_tracked')->default(false);
             $table->enum('valuation_method', ['fifo', 'lifo', 'fefo', 'weighted_average', 'standard'])->default('fifo');
-            $table->decimal('standard_cost', 15, 4)->nullable();
+            $table->decimal('standard_cost', 20, 6)->nullable();
             // Products account references
             $table->foreignId('income_account_id')->nullable(); // will reference accounts later
             $table->foreignId('cogs_account_id')->nullable();

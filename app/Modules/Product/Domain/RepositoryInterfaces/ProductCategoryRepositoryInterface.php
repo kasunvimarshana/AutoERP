@@ -13,5 +13,5 @@ interface ProductCategoryRepositoryInterface extends RepositoryInterface
 
     public function findByTenantAndCode(int $tenantId, string $code): ?ProductCategory;
 
-    public function find($id, array $columns = ['*']): ?ProductCategory;
+    public function find(int|string $id, array $columns = ['*']): ?ProductCategory;
 }

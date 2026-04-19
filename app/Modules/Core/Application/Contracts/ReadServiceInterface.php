@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Core\Application\Contracts;
 
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-
 interface ReadServiceInterface
 {
     /**
@@ -25,5 +23,5 @@ interface ReadServiceInterface
         int $page = 1,
         ?string $sort = null,
         ?string $include = null
-    ): LengthAwarePaginator;
+    ): mixed;
 }

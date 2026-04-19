@@ -13,5 +13,5 @@ interface UnitOfMeasureRepositoryInterface extends RepositoryInterface
 
     public function findByTenantAndSymbol(int $tenantId, string $symbol): ?UnitOfMeasure;
 
-    public function find($id, array $columns = ['*']): ?UnitOfMeasure;
+    public function find(int|string $id, array $columns = ['*']): ?UnitOfMeasure;
 }

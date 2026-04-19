@@ -22,7 +22,7 @@ return new class extends Migration
             $table->nullableMorphs('reference'); // GRN, shipment, transfer, etc.
             $table->foreignId('source_location_id')->nullable()->constrained('warehouse_locations', 'id', 'trace_logs_source_location_id_fk')->nullOnDelete();
             $table->foreignId('destination_location_id')->nullable()->constrained('warehouse_locations', 'id', 'trace_logs_destination_location_id_fk')->nullOnDelete();
-            $table->decimal('quantity', 15, 4)->nullable();
+            $table->decimal('quantity', 20, 6)->nullable();
             $table->foreignId('performed_by')->nullable()->constrained('users', 'id', 'trace_logs_performed_by_fk')->nullOnDelete();
             $table->timestamp('performed_at')->useCurrent();
             $table->string('device_id')->nullable();

@@ -29,7 +29,7 @@ class ApiRepository extends BaseRepository
     /**
      * {@inheritdoc}
      */
-    public function find($id, array $columns = ['*'])
+    public function find(int|string $id, array $columns = ['*']): mixed
     {
         try {
             $params = $this->buildQueryParams($columns);
@@ -100,7 +100,7 @@ class ApiRepository extends BaseRepository
     /**
      * {@inheritdoc}
      */
-    public function create(array $data)
+    public function create(array $data): mixed
     {
         $response = $this->http->post($this->endpoint, $data);
 
@@ -112,7 +112,7 @@ class ApiRepository extends BaseRepository
     /**
      * {@inheritdoc}
      */
-    public function update($id, array $data)
+    public function update(int|string $id, array $data): mixed
     {
         $response = $this->http->put("{$this->endpoint}/{$id}", $data);
 
@@ -124,7 +124,7 @@ class ApiRepository extends BaseRepository
     /**
      * {@inheritdoc}
      */
-    public function delete($id): bool
+    public function delete(int|string $id): bool
     {
         $response = $this->http->delete("{$this->endpoint}/{$id}");
 

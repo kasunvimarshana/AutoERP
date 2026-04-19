@@ -23,7 +23,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->boolean('is_pickable')->default(true);
             $table->boolean('is_receivable')->default(true);
-            $table->decimal('capacity', 15, 4)->nullable();
+            $table->decimal('capacity', 20, 6)->nullable();
             $table->json('metadata')->nullable();
             $table->timestamps();
 

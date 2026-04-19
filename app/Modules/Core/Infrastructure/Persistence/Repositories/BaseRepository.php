@@ -220,7 +220,7 @@ abstract class BaseRepository implements RepositoryInterface
     /**
      * {@inheritdoc}
      */
-    public function find($id, array $columns = ['*'])
+    public function find(int|string $id, array $columns = ['*']): mixed
     {
         try {
             $this->applyCriteria();

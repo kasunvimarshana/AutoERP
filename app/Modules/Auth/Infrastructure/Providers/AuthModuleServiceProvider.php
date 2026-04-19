@@ -82,6 +82,10 @@ class AuthModuleServiceProvider extends ServiceProvider
             );
         });
 
+        $this->app->bind('auth.authorization', function ($app) {
+            return $app->make(AuthorizationServiceInterface::class);
+        });
+
         // Token service: swappable via binding (default: Passport)
         $this->app->bind(TokenServiceInterface::class, function ($app) {
             return new PassportTokenService(

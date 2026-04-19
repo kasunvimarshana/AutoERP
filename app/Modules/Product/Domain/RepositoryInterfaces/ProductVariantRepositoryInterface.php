@@ -13,5 +13,5 @@ interface ProductVariantRepositoryInterface extends RepositoryInterface
 
     public function findByProductAndSku(int $productId, string $sku): ?ProductVariant;
 
-    public function find($id, array $columns = ['*']): ?ProductVariant;
+    public function find(int|string $id, array $columns = ['*']): ?ProductVariant;
 }

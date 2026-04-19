@@ -47,7 +47,7 @@ class EloquentUomConversionRepository extends EloquentRepository implements UomC
         return $model ? $this->toDomainEntity($model) : null;
     }
 
-    public function find($id, array $columns = ['*']): ?UomConversion
+    public function find(int|string $id, array $columns = ['*']): ?UomConversion
     {
         return parent::find($id, $columns);
     }

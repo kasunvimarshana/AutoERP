@@ -56,7 +56,7 @@ class EloquentPermissionRepository extends EloquentRepository implements Permiss
      *
      * {@inheritdoc}
      */
-    public function find($id, array $columns = ['*']): ?Permission
+    public function find(int|string $id, array $columns = ['*']): ?Permission
     {
         return parent::find($id, $columns);
     }

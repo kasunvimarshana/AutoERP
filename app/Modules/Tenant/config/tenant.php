@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 return [
     'tenant_service' => [
         'url' => env('TENANT_SERVICE_URL', 'http://tenant-service'),

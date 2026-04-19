@@ -49,7 +49,7 @@ class EloquentUnitOfMeasureRepository extends EloquentRepository implements Unit
         return $model ? $this->toDomainEntity($model) : null;
     }
 
-    public function find($id, array $columns = ['*']): ?UnitOfMeasure
+    public function find(int|string $id, array $columns = ['*']): ?UnitOfMeasure
     {
         return parent::find($id, $columns);
     }

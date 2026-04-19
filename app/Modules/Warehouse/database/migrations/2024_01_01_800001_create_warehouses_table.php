@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id', 'warehouses_org_unit_id_fk')->nullOnDelete();
             $table->string('name');
             $table->string('code')->nullable();
+            $table->string('image_path')->nullable();
             $table->enum('type', ['standard', 'virtual', 'transit', 'quarantine'])->default('standard');
             $table->foreignId('address_id')->nullable(); // can reference a polymorphic address later
             $table->boolean('is_active')->default(true);

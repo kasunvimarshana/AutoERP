@@ -56,7 +56,7 @@ class EloquentProductBrandRepository extends EloquentRepository implements Produ
         return $model ? $this->toDomainEntity($model) : null;
     }
 
-    public function find($id, array $columns = ['*']): ?ProductBrand
+    public function find(int|string $id, array $columns = ['*']): ?ProductBrand
     {
         return parent::find($id, $columns);
     }

@@ -58,7 +58,7 @@ class EloquentProductIdentifierRepository extends EloquentRepository implements 
         return $model ? $this->toDomainEntity($model) : null;
     }
 
-    public function find($id, array $columns = ['*']): ?ProductIdentifier
+    public function find(int|string $id, array $columns = ['*']): ?ProductIdentifier
     {
         return parent::find($id, $columns);
     }

@@ -68,7 +68,7 @@ class EloquentProductRepository extends EloquentRepository implements ProductRep
         return $model ? $this->toDomainEntity($model) : null;
     }
 
-    public function find($id, array $columns = ['*']): ?Product
+    public function find(int|string $id, array $columns = ['*']): ?Product
     {
         return parent::find($id, $columns);
     }

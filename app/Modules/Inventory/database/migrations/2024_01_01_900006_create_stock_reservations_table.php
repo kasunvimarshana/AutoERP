@@ -18,7 +18,7 @@ return new class extends Migration
             $table->foreignId('batch_id')->nullable()->constrained(null, 'id', 'stock_reservations_batch_id_fk')->nullOnDelete();
             $table->foreignId('serial_id')->nullable()->constrained(null, 'id', 'stock_reservations_serial_id_fk')->nullOnDelete();
             $table->foreignId('location_id')->constrained('warehouse_locations', 'id', 'stock_reservations_location_id_fk')->cascadeOnDelete();
-            $table->decimal('quantity', 15, 4);
+            $table->decimal('quantity', 20, 6);
             $table->nullableMorphs('reserved_for'); // e.g., sales order line
             $table->timestamp('expires_at')->nullable();
             $table->timestamps();

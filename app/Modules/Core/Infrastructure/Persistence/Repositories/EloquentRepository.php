@@ -36,7 +36,7 @@ class EloquentRepository extends BaseRepository
     /**
      * Retrieve a raw Eloquent model without applying Domain mapping.
      */
-    protected function findModel($id, array $columns = ['*']): ?Model
+    protected function findModel(int|string $id, array $columns = ['*']): ?Model
     {
         return $this->model->newQuery()->find($id, $columns);
     }
@@ -106,7 +106,7 @@ class EloquentRepository extends BaseRepository
     /**
      * {@inheritdoc}
      */
-    public function create(array $data)
+    public function create(array $data): mixed
     {
         return $this->model->create($data);
     }
@@ -114,7 +114,7 @@ class EloquentRepository extends BaseRepository
     /**
      * {@inheritdoc}
      */
-    public function update($id, array $data)
+    public function update(int|string $id, array $data): mixed
     {
         $record = $this->findModel($id);
         if ($record) {
@@ -129,7 +129,7 @@ class EloquentRepository extends BaseRepository
     /**
      * {@inheritdoc}
      */
-    public function delete($id): bool
+    public function delete(int|string $id): bool
     {
         $record = $this->findModel($id);
         if ($record) {

@@ -63,7 +63,7 @@ class EloquentTenantPlanRepository extends EloquentRepository implements TenantP
     /**
      * {@inheritdoc}
      */
-    public function find($id, array $columns = ['*']): ?TenantPlan
+    public function find(int|string $id, array $columns = ['*']): ?TenantPlan
     {
         return parent::find($id, $columns);
     }

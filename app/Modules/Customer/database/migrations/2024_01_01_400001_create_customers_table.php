@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('tax_number')->nullable();
             $table->string('registration_number')->nullable();
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'customers_currency_id_fk')->nullOnDelete();
-            $table->decimal('credit_limit', 15, 4)->default(0);
+            $table->decimal('credit_limit', 20, 6)->default(0);
             $table->unsignedInteger('payment_terms_days')->default(30);
             $table->foreignId('ar_account_id')->nullable(); // accounts_receivable_account_id will reference accounts later
             $table->enum('status', ['active', 'inactive', 'blocked'])->default('active');

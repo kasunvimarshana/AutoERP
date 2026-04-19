@@ -42,7 +42,7 @@ class UpdateJournalEntryService extends BaseService implements UpdateJournalEntr
 
         $fiscalPeriod = $this->fiscalPeriodRepository->find($dto->fiscal_period_id);
         if (! $fiscalPeriod || ! $fiscalPeriod->isOpen()) {
-            throw new FiscalPeriodNotFoundException('Open fiscal period not found for provided fiscal_period_id.');
+            throw FiscalPeriodNotFoundException::openPeriodForId($dto->fiscal_period_id);
         }
 
         $lines = [];

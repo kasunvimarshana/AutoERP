@@ -49,7 +49,7 @@ class EloquentFiscalYearRepository extends EloquentRepository implements FiscalY
         return $model ? $this->toDomainEntity($model) : null;
     }
 
-    public function find($id, array $columns = ['*']): ?FiscalYear
+    public function find(int|string $id, array $columns = ['*']): ?FiscalYear
     {
         return parent::find($id, $columns);
     }

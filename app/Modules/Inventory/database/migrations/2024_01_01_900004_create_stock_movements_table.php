@@ -26,9 +26,9 @@ return new class extends Migration
             ]);
             $table->nullableMorphs('reference'); // link to PO line, GRN line, shipment line, etc.
             $table->foreignId('uom_id')->constrained('units_of_measure', 'id', 'stock_movements_uom_id_fk');
-            $table->decimal('quantity', 15, 4);
-            $table->decimal('unit_cost', 15, 4)->nullable(); // For receipt/shipment valuation
-            $table->decimal('total_cost', 15, 4)->storedAs('quantity * unit_cost'); // Computed at application level
+            $table->decimal('quantity', 20, 6);
+            $table->decimal('unit_cost', 20, 6)->nullable(); // For receipt/shipment valuation
+            $table->decimal('total_cost', 20, 6)->storedAs('quantity * unit_cost'); // Computed at application level
             $table->foreignId('performed_by')->nullable()->constrained('users', 'id', 'stock_movements_performed_by_fk')->nullOnDelete();
             $table->timestamp('performed_at')->useCurrent();
             $table->text('notes')->nullable();

@@ -18,9 +18,9 @@ return new class extends Migration
             $table->foreignId('variant_id')->nullable()->constrained('product_variants', 'id', 'supplier_products_variant_id_fk')->nullOnDelete();
             $table->string('supplier_sku')->nullable();
             $table->unsignedInteger('lead_time_days')->nullable();
-            $table->decimal('min_order_qty', 15, 4)->default(1);
+            $table->decimal('min_order_qty', 20, 6)->default(1);
             $table->boolean('is_preferred')->default(false);
-            $table->decimal('last_purchase_price', 15, 4)->nullable();
+            $table->decimal('last_purchase_price', 20, 6)->nullable();
             $table->timestamps();
 
             $table->unique(['tenant_id', 'supplier_id', 'product_id', 'variant_id'], 'supplier_products_tenant_supplier_product_variant_uk');

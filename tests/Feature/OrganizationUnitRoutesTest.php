@@ -6,7 +6,7 @@ namespace Tests\Feature;
 
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Artisan;
-use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Tests\TestCase;
 
 class OrganizationUnitRoutesTest extends TestCase
@@ -31,20 +31,20 @@ class OrganizationUnitRoutesTest extends TestCase
 
     public function test_organization_unit_endpoints_require_authentication(): void
     {
-        $this->getJson('/api/organization-units')->assertStatus(Response::HTTP_UNAUTHORIZED);
-        $this->postJson('/api/organization-units', [])->assertStatus(Response::HTTP_UNAUTHORIZED);
-        $this->getJson('/api/organization-units/1')->assertStatus(Response::HTTP_UNAUTHORIZED);
-        $this->putJson('/api/organization-units/1', [])->assertStatus(Response::HTTP_UNAUTHORIZED);
-        $this->patchJson('/api/organization-units/1', [])->assertStatus(Response::HTTP_UNAUTHORIZED);
-        $this->deleteJson('/api/organization-units/1')->assertStatus(Response::HTTP_UNAUTHORIZED);
+        $this->getJson('/api/organization-units')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
+        $this->postJson('/api/organization-units', [])->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
+        $this->getJson('/api/organization-units/1')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
+        $this->putJson('/api/organization-units/1', [])->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
+        $this->patchJson('/api/organization-units/1', [])->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
+        $this->deleteJson('/api/organization-units/1')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
     }
 
     public function test_organization_unit_attachment_endpoints_require_authentication(): void
     {
-        $this->getJson('/api/organization-units/1/attachments')->assertStatus(Response::HTTP_UNAUTHORIZED);
-        $this->postJson('/api/organization-units/1/attachments', [])->assertStatus(Response::HTTP_UNAUTHORIZED);
-        $this->deleteJson('/api/organization-units/1/attachments/1')->assertStatus(Response::HTTP_UNAUTHORIZED);
-        $this->getJson('/api/storage/org-unit-attachments/test-uuid')->assertStatus(Response::HTTP_UNAUTHORIZED);
+        $this->getJson('/api/organization-units/1/attachments')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
+        $this->postJson('/api/organization-units/1/attachments', [])->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
+        $this->deleteJson('/api/organization-units/1/attachments/1')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
+        $this->getJson('/api/storage/org-unit-attachments/test-uuid')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
     }
 
     public function test_organization_unit_routes_keep_expected_middleware_contract(): void

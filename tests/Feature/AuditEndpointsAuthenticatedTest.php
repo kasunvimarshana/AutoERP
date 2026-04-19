@@ -14,7 +14,7 @@ use Modules\Tenant\Application\Contracts\TenantConfigClientInterface;
 use Modules\Tenant\Application\Contracts\TenantConfigManagerInterface;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use PHPUnit\Framework\MockObject\MockObject;
-use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Tests\TestCase;
 
 class AuditEndpointsAuthenticatedTest extends TestCase
@@ -84,7 +84,7 @@ class AuditEndpointsAuthenticatedTest extends TestCase
         $response = $this->withHeader('X-Tenant-ID', '3')
             ->getJson('/api/audit-logs?tenant_id=3&event=updated&sort=-occurred_at');
 
-        $response->assertStatus(Response::HTTP_OK)
+        $response->assertStatus(HttpResponse::HTTP_OK)
             ->assertJsonPath('data.0.id', 31)
             ->assertJsonPath('data.0.event', 'updated')
             ->assertJsonStructure([
@@ -120,7 +120,7 @@ class AuditEndpointsAuthenticatedTest extends TestCase
         $response = $this->withHeader('X-Tenant-ID', '3')
             ->getJson('/api/audit-logs/32');
 
-        $response->assertStatus(Response::HTTP_OK)
+        $response->assertStatus(HttpResponse::HTTP_OK)
             ->assertJsonPath('data.id', 32)
             ->assertJsonPath('data.event', 'updated')
             ->assertJsonPath('data.auditable_id', '42')
@@ -161,7 +161,7 @@ class AuditEndpointsAuthenticatedTest extends TestCase
         $response = $this->withHeader('X-Tenant-ID', '3')
             ->getJson('/api/audit-logs');
 
-        $response->assertStatus(Response::HTTP_FORBIDDEN)
+        $response->assertStatus(HttpResponse::HTTP_FORBIDDEN)
             ->assertJsonPath('message', 'This action is unauthorized.');
     }
 

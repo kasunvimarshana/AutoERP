@@ -53,7 +53,7 @@ class EloquentFiscalPeriodRepository extends EloquentRepository implements Fisca
         return $model ? $this->toDomainEntity($model) : null;
     }
 
-    public function find($id, array $columns = ['*']): ?FiscalPeriod
+    public function find(int|string $id, array $columns = ['*']): ?FiscalPeriod
     {
         return parent::find($id, $columns);
     }

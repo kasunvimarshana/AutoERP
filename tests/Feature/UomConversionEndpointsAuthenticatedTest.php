@@ -16,7 +16,7 @@ use Modules\Tenant\Application\Contracts\TenantConfigClientInterface;
 use Modules\Tenant\Application\Contracts\TenantConfigManagerInterface;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use PHPUnit\Framework\MockObject\MockObject;
-use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Tests\TestCase;
 
 class UomConversionEndpointsAuthenticatedTest extends TestCase
@@ -86,7 +86,7 @@ class UomConversionEndpointsAuthenticatedTest extends TestCase
         $response = $this->withHeader('X-Tenant-ID', '15')
             ->getJson('/api/uom-conversions?from_uom_id=11&to_uom_id=12&sort=-created_at');
 
-        $response->assertStatus(Response::HTTP_OK)
+        $response->assertStatus(HttpResponse::HTTP_OK)
             ->assertJsonPath('data.0.id', 301)
             ->assertJsonPath('data.0.from_uom_id', 11)
             ->assertJsonPath('data.0.to_uom_id', 12)
@@ -104,7 +104,7 @@ class UomConversionEndpointsAuthenticatedTest extends TestCase
         $response = $this->withHeader('X-Tenant-ID', '15')
             ->getJson('/api/uom-conversions/302');
 
-        $response->assertStatus(Response::HTTP_OK)
+        $response->assertStatus(HttpResponse::HTTP_OK)
             ->assertJsonPath('data.id', 302)
             ->assertJsonPath('data.from_uom_id', 11)
             ->assertJsonPath('data.to_uom_id', 12);
@@ -123,7 +123,7 @@ class UomConversionEndpointsAuthenticatedTest extends TestCase
         $response = $this->withHeader('X-Tenant-ID', '15')
             ->getJson('/api/uom-conversions');
 
-        $response->assertStatus(Response::HTTP_FORBIDDEN)
+        $response->assertStatus(HttpResponse::HTTP_FORBIDDEN)
             ->assertJsonPath('message', 'This action is unauthorized.');
     }
 

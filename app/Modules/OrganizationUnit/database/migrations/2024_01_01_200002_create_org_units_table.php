@@ -17,6 +17,7 @@ return new class extends Migration
             $table->foreignId('parent_id')->nullable()->constrained('org_units', 'id', 'org_units_parent_id_fk')->nullOnDelete();
             $table->string('name');
             $table->string('code')->nullable();
+            $table->string('image_path')->nullable();
             $table->string('path')->nullable(); // materialized path for quick tree queries
             $table->unsignedInteger('depth')->default(0);
             $table->json('metadata')->nullable();

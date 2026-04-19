@@ -1,0 +1,23 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Shared\Infrastructure\Http\Resources;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class CountryResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => $this->getId(),
+            'code' => $this->getCode(),
+            'name' => $this->getName(),
+            'phone_code' => $this->getPhoneCode(),
+            'created_at' => $this->getCreatedAt()?->toIso8601String(),
+            'updated_at' => $this->getUpdatedAt()?->toIso8601String(),
+        ];
+    }
+}

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Core\Application\Services;
 
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Modules\Core\Application\Contracts\ServiceInterface;
@@ -16,6 +15,27 @@ abstract class BaseService implements ServiceInterface
     protected RepositoryInterface $repository;
 
     protected array $events = [];
+
+    /**
+     * Allowed columns for sorting. Override in child classes to restrict.
+     *
+     * @var list<string>
+     */
+    protected array $allowedSortColumns = [];
+
+    /**
+     * Allowed relations for eager loading. Override in child classes to restrict.
+     *
+     * @var list<string>
+     */
+    protected array $allowedIncludes = [];
+
+    /**
+     * Allowed columns for filtering. Override in child classes to restrict.
+     *
+     * @var list<string>
+     */
+    protected array $allowedFilterFields = [];
 
     public function __construct(RepositoryInterface $repository)
     {
@@ -70,7 +90,7 @@ abstract class BaseService implements ServiceInterface
     /**
      * List records with filters and pagination.
      */
-    public function list(array $filters = [], ?int $perPage = null, int $page = 1, ?string $sort = null, ?string $include = null): LengthAwarePaginator
+    public function list(array $filters = [], ?int $perPage = null, int $page = 1, ?string $sort = null, ?string $include = null): mixed
     {
         $perPage = $perPage ?? config('core.pagination.per_page', 15);
         $pageName = config('core.pagination.page_name', 'page');
@@ -78,6 +98,10 @@ abstract class BaseService implements ServiceInterface
         $repo = $this->repository->resetCriteria();
 
         foreach ($filters as $field => $value) {
+            if ($this->allowedFilterFields !== [] && ! in_array($field, $this->allowedFilterFields, true)) {
+                continue;
+            }
+
             if (is_string($value) && str_contains($value, '%')) {
                 $repo->where($field, 'like', $value);
             } else {
@@ -85,13 +109,36 @@ abstract class BaseService implements ServiceInterface
             }
         }
 
-        if ($sort) {
-            [$column, $direction] = explode(':', $sort);
-            $repo->orderBy($column, $direction ?? 'asc');
+        if ($sort !== null && $sort !== '') {
+            // Support both "-column" (REST convention) and "column:direction" formats
+            if (str_starts_with($sort, '-')) {
+                $column = substr($sort, 1);
+                $direction = 'desc';
+            } else {
+                $parts = explode(':', $sort, 2);
+                $column = $parts[0];
+                $direction = $parts[1] ?? 'asc';
+            }
+
+            if (! in_array(strtolower($direction), ['asc', 'desc'], true)) {
+                $direction = 'asc';
+            }
+
+            if ($this->allowedSortColumns === [] || in_array($column, $this->allowedSortColumns, true)) {
+                if (preg_match('/^[a-zA-Z_][a-zA-Z0-9_.]*$/', $column) === 1) {
+                    $repo->orderBy($column, $direction);
+                }
+            }
         }
 
-        if ($include) {
-            $repo->with(explode(',', $include));
+        if ($include !== null && $include !== '') {
+            $relations = array_filter(array_map('trim', explode(',', $include)));
+            if ($this->allowedIncludes !== []) {
+                $relations = array_intersect($relations, $this->allowedIncludes);
+            }
+            if ($relations !== []) {
+                $repo->with($relations);
+            }
         }
 
         return $repo->paginate($perPage, ['*'], $pageName, $page);

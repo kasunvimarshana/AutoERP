@@ -6,7 +6,7 @@ namespace Tests\Feature;
 
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Artisan;
-use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Tests\TestCase;
 
 class UomConversionRoutesTest extends TestCase
@@ -22,8 +22,8 @@ class UomConversionRoutesTest extends TestCase
 
     public function test_uom_conversions_endpoints_require_authentication(): void
     {
-        $this->getJson('/api/uom-conversions')->assertStatus(Response::HTTP_UNAUTHORIZED);
-        $this->getJson('/api/uom-conversions/1')->assertStatus(Response::HTTP_UNAUTHORIZED);
+        $this->getJson('/api/uom-conversions')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
+        $this->getJson('/api/uom-conversions/1')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
     }
 
     public function test_uom_conversions_routes_keep_expected_middleware_contract(): void

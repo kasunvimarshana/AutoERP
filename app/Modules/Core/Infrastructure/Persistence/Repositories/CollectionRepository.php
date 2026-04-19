@@ -22,7 +22,7 @@ class CollectionRepository extends BaseRepository
     /**
      * {@inheritdoc}
      */
-    public function find($id, array $columns = ['*'])
+    public function find(int|string $id, array $columns = ['*']): mixed
     {
         try {
             $this->applyCriteria();
@@ -90,7 +90,7 @@ class CollectionRepository extends BaseRepository
     /**
      * {@inheritdoc}
      */
-    public function create(array $data)
+    public function create(array $data): mixed
     {
         $this->original->push($data);
         $this->resetProvider();
@@ -101,7 +101,7 @@ class CollectionRepository extends BaseRepository
     /**
      * {@inheritdoc}
      */
-    public function update($id, array $data)
+    public function update(int|string $id, array $data): mixed
     {
         $index = $this->original->search(fn ($item) => ($item['id'] ?? null) == $id);
         if ($index !== false) {
@@ -118,7 +118,7 @@ class CollectionRepository extends BaseRepository
     /**
      * {@inheritdoc}
      */
-    public function delete($id): bool
+    public function delete(int|string $id): bool
     {
         $index = $this->original->search(fn ($item) => ($item['id'] ?? null) == $id);
         if ($index !== false) {

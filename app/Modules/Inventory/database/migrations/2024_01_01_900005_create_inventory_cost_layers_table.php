@@ -19,10 +19,10 @@ return new class extends Migration
             $table->foreignId('location_id')->constrained('warehouse_locations', 'id', 'inventory_cost_layers_location_id_fk')->cascadeOnDelete();
             $table->enum('valuation_method', ['fifo', 'lifo', 'fefo', 'weighted_average', 'specific'])->default('fifo');
             $table->date('layer_date'); // Date of receipt
-            $table->decimal('quantity_in', 15, 4);
-            $table->decimal('quantity_remaining', 15, 4);
-            $table->decimal('unit_cost', 15, 4);
-            $table->decimal('total_cost', 15, 4)->storedAs('quantity_remaining * unit_cost');
+            $table->decimal('quantity_in', 20, 6);
+            $table->decimal('quantity_remaining', 20, 6);
+            $table->decimal('unit_cost', 20, 6);
+            $table->decimal('total_cost', 20, 6)->storedAs('quantity_remaining * unit_cost');
             $table->nullableMorphs('reference'); // link to stock_movement, GRN, etc.
             $table->boolean('is_closed')->default(false); // Layer exhausted
             $table->timestamps();

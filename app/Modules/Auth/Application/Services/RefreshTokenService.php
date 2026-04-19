@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Application\Services;
 
+use Illuminate\Support\Facades\DB;
 use Modules\Auth\Application\Contracts\RefreshTokenServiceInterface;
 use Modules\Auth\Application\Contracts\TokenServiceInterface;
 use Modules\Auth\Domain\Entities\AccessToken;
@@ -25,9 +26,11 @@ class RefreshTokenService implements RefreshTokenServiceInterface
 
     public function refresh(int $userId): AccessToken
     {
-        // Revoke the current token before issuing a replacement.
-        $this->tokenService->revokeCurrentToken($userId);
+        return DB::transaction(function () use ($userId): AccessToken {
+            // Revoke the current token before issuing a replacement.
+            $this->tokenService->revokeCurrentToken($userId);
 
-        return $this->tokenService->issueToken($userId);
+            return $this->tokenService->issueToken($userId);
+        });
     }
 }

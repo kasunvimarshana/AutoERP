@@ -61,7 +61,7 @@ class EloquentRoleRepository extends EloquentRepository implements RoleRepositor
      *
      * {@inheritdoc}
      */
-    public function find($id, array $columns = ['*']): ?Role
+    public function find(int|string $id, array $columns = ['*']): ?Role
     {
         $this->with(['permissions']);
 

@@ -59,7 +59,7 @@ class EloquentAccountRepository extends EloquentRepository implements AccountRep
         return $model ? $this->toDomainEntity($model) : null;
     }
 
-    public function find($id, array $columns = ['*']): ?Account
+    public function find(int|string $id, array $columns = ['*']): ?Account
     {
         return parent::find($id, $columns);
     }

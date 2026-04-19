@@ -79,7 +79,7 @@ class EloquentUserDeviceRepository extends EloquentRepository implements UserDev
         return $this->mapModelToDomainEntity($model);
     }
 
-    public function find($id, array $columns = ['*']): ?UserDevice
+    public function find(int|string $id, array $columns = ['*']): ?UserDevice
     {
         $tenantId = $this->resolveTenantId();
 
@@ -93,7 +93,7 @@ class EloquentUserDeviceRepository extends EloquentRepository implements UserDev
         return $model ? $this->mapModelToDomainEntity($model) : null;
     }
 
-    public function delete($id): bool
+    public function delete(int|string $id): bool
     {
         $tenantId = $this->resolveTenantId();
 

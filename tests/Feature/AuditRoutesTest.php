@@ -6,7 +6,7 @@ namespace Tests\Feature;
 
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Artisan;
-use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Tests\TestCase;
 
 class AuditRoutesTest extends TestCase
@@ -22,8 +22,8 @@ class AuditRoutesTest extends TestCase
 
     public function test_audit_log_endpoints_require_authentication(): void
     {
-        $this->getJson('/api/audit-logs')->assertStatus(Response::HTTP_UNAUTHORIZED);
-        $this->getJson('/api/audit-logs/1')->assertStatus(Response::HTTP_UNAUTHORIZED);
+        $this->getJson('/api/audit-logs')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
+        $this->getJson('/api/audit-logs/1')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
     }
 
     public function test_audit_log_routes_keep_expected_middleware_contract(): void

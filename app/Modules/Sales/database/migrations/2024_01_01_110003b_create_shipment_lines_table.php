@@ -1,0 +1,34 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('shipment_lines', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('tenant_id');
+            $table->foreignId('shipment_id')->constrained(null, 'id', 'shipment_lines_shipment_id_fk')->cascadeOnDelete();
+            $table->foreignId('sales_order_line_id')->nullable()->constrained('sales_order_lines', 'id', 'shipment_lines_sales_order_line_id_fk')->nullOnDelete();
+            $table->foreignId('product_id');
+            $table->foreignId('variant_id')->nullable();
+            $table->foreignId('batch_id')->nullable();
+            $table->foreignId('serial_id')->nullable();
+            $table->foreignId('from_location_id');
+            $table->foreignId('uom_id');
+            $table->decimal('shipped_qty', 20, 6);
+            $table->decimal('unit_cost', 20, 6)->nullable();
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('shipment_lines');
+    }
+};

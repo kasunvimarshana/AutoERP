@@ -95,6 +95,11 @@ class TenantModel extends Model
         return $this->hasMany(TenantSettingModel::class, 'tenant_id');
     }
 
+    public function domains(): HasMany
+    {
+        return $this->hasMany(TenantDomainModel::class, 'tenant_id');
+    }
+
     public function users(): HasMany
     {
         return $this->hasMany(UserModel::class, 'tenant_id');

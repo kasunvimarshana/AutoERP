@@ -67,7 +67,7 @@ class EloquentTenantSettingRepository extends EloquentRepository implements Tena
     /**
      * {@inheritdoc}
      */
-    public function find($id, array $columns = ['*']): ?TenantSetting
+    public function find(int|string $id, array $columns = ['*']): ?TenantSetting
     {
         return parent::find($id, $columns);
     }

@@ -16,7 +16,7 @@ use Modules\Tenant\Application\Contracts\TenantConfigClientInterface;
 use Modules\Tenant\Application\Contracts\TenantConfigManagerInterface;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use PHPUnit\Framework\MockObject\MockObject;
-use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Tests\TestCase;
 
 class ProductIdentifierEndpointsAuthenticatedTest extends TestCase
@@ -87,7 +87,7 @@ class ProductIdentifierEndpointsAuthenticatedTest extends TestCase
         $response = $this->withHeader('X-Tenant-ID', '9')
             ->getJson('/api/product-identifiers?tenant_id=9&technology=barcode_1d&value=ABC-123&sort=-created_at');
 
-        $response->assertStatus(Response::HTTP_OK)
+        $response->assertStatus(HttpResponse::HTTP_OK)
             ->assertJsonPath('data.0.id', 201)
             ->assertJsonPath('data.0.technology', 'barcode_1d')
             ->assertJsonPath('data.0.value', 'ABC-123');
@@ -104,7 +104,7 @@ class ProductIdentifierEndpointsAuthenticatedTest extends TestCase
         $response = $this->withHeader('X-Tenant-ID', '9')
             ->getJson('/api/product-identifiers/202');
 
-        $response->assertStatus(Response::HTTP_OK)
+        $response->assertStatus(HttpResponse::HTTP_OK)
             ->assertJsonPath('data.id', 202)
             ->assertJsonPath('data.tenant_id', 9)
             ->assertJsonPath('data.product_id', 41)
@@ -124,7 +124,7 @@ class ProductIdentifierEndpointsAuthenticatedTest extends TestCase
         $response = $this->withHeader('X-Tenant-ID', '9')
             ->getJson('/api/product-identifiers');
 
-        $response->assertStatus(Response::HTTP_FORBIDDEN)
+        $response->assertStatus(HttpResponse::HTTP_FORBIDDEN)
             ->assertJsonPath('message', 'This action is unauthorized.');
     }
 

@@ -26,7 +26,7 @@ use Modules\Tenant\Application\Contracts\TenantConfigClientInterface;
 use Modules\Tenant\Application\Contracts\TenantConfigManagerInterface;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use PHPUnit\Framework\MockObject\MockObject;
-use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Tests\TestCase;
 
 class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
@@ -118,7 +118,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
                 'status' => 'open',
             ]);
 
-        $response->assertStatus(Response::HTTP_CONFLICT)
+        $response->assertStatus(HttpResponse::HTTP_CONFLICT)
             ->assertJsonPath('message', 'Fiscal year "FY2026" already exists for tenant 9.');
     }
 
@@ -151,7 +151,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
         $response = $this->withHeader('X-Tenant-ID', '9')
             ->getJson('/api/fiscal-years?tenant_id=9&name=FY2027&status=open&sort=-created_at');
 
-        $response->assertStatus(Response::HTTP_OK)
+        $response->assertStatus(HttpResponse::HTTP_OK)
             ->assertJsonPath('data.0.id', 72)
             ->assertJsonPath('data.0.tenant_id', 9)
             ->assertJsonPath('data.0.name', 'FY2027')
@@ -171,7 +171,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
         $response = $this->withHeader('X-Tenant-ID', '9')
             ->getJson('/api/fiscal-years/72');
 
-        $response->assertStatus(Response::HTTP_OK)
+        $response->assertStatus(HttpResponse::HTTP_OK)
             ->assertJsonPath('data.id', 72)
             ->assertJsonPath('data.tenant_id', 9)
             ->assertJsonPath('data.name', 'FY2027')
@@ -191,7 +191,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
         $response = $this->withHeader('X-Tenant-ID', '9')
             ->getJson('/api/fiscal-years/999');
 
-        $response->assertStatus(Response::HTTP_NOT_FOUND)
+        $response->assertStatus(HttpResponse::HTTP_NOT_FOUND)
             ->assertJsonPath('message', 'Fiscal year not found.');
     }
 
@@ -224,7 +224,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
                 'status' => 'open',
             ]);
 
-        $response->assertStatus(Response::HTTP_CREATED)
+        $response->assertStatus(HttpResponse::HTTP_CREATED)
             ->assertJsonPath('data.id', 72)
             ->assertJsonPath('data.tenant_id', 9)
             ->assertJsonPath('data.name', 'FY2027')
@@ -258,7 +258,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
                 'status' => 'open',
             ]);
 
-        $response->assertStatus(Response::HTTP_CONFLICT)
+        $response->assertStatus(HttpResponse::HTTP_CONFLICT)
             ->assertJsonPath('message', 'Fiscal year "FY2026" already exists for tenant 9.');
     }
 
@@ -296,7 +296,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
                 'status' => 'open',
             ]);
 
-        $response->assertStatus(Response::HTTP_OK)
+        $response->assertStatus(HttpResponse::HTTP_OK)
             ->assertJsonPath('data.id', 71)
             ->assertJsonPath('data.tenant_id', 9)
             ->assertJsonPath('data.name', 'FY2026 Revised')
@@ -328,7 +328,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
                 'status' => 'open',
             ]);
 
-        $response->assertStatus(Response::HTTP_CONFLICT)
+        $response->assertStatus(HttpResponse::HTTP_CONFLICT)
             ->assertJsonPath('message', 'Fiscal period number 1 already exists for tenant 9 in fiscal year 100.');
     }
 
@@ -363,7 +363,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
         $response = $this->withHeader('X-Tenant-ID', '9')
             ->getJson('/api/fiscal-periods?tenant_id=9&fiscal_year_id=100&period_number=2&name=P2&status=open&sort=-created_at');
 
-        $response->assertStatus(Response::HTTP_OK)
+        $response->assertStatus(HttpResponse::HTTP_OK)
             ->assertJsonPath('data.0.id', 56)
             ->assertJsonPath('data.0.tenant_id', 9)
             ->assertJsonPath('data.0.fiscal_year_id', 100)
@@ -385,7 +385,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
         $response = $this->withHeader('X-Tenant-ID', '9')
             ->getJson('/api/fiscal-periods/56');
 
-        $response->assertStatus(Response::HTTP_OK)
+        $response->assertStatus(HttpResponse::HTTP_OK)
             ->assertJsonPath('data.id', 56)
             ->assertJsonPath('data.tenant_id', 9)
             ->assertJsonPath('data.fiscal_year_id', 100)
@@ -407,7 +407,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
         $response = $this->withHeader('X-Tenant-ID', '9')
             ->getJson('/api/fiscal-periods/999');
 
-        $response->assertStatus(Response::HTTP_NOT_FOUND)
+        $response->assertStatus(HttpResponse::HTTP_NOT_FOUND)
             ->assertJsonPath('message', 'Fiscal period not found.');
     }
 
@@ -443,7 +443,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
                 'status' => 'open',
             ]);
 
-        $response->assertStatus(Response::HTTP_CREATED)
+        $response->assertStatus(HttpResponse::HTTP_CREATED)
             ->assertJsonPath('data.id', 56)
             ->assertJsonPath('data.tenant_id', 9)
             ->assertJsonPath('data.fiscal_year_id', 100)
@@ -484,7 +484,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
                 'status' => 'open',
             ]);
 
-        $response->assertStatus(Response::HTTP_CONFLICT)
+        $response->assertStatus(HttpResponse::HTTP_CONFLICT)
             ->assertJsonPath('message', 'Fiscal period number 1 already exists for tenant 9 in fiscal year 100.');
     }
 
@@ -527,7 +527,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
                 'status' => 'open',
             ]);
 
-        $response->assertStatus(Response::HTTP_OK)
+        $response->assertStatus(HttpResponse::HTTP_OK)
             ->assertJsonPath('data.id', 55)
             ->assertJsonPath('data.tenant_id', 9)
             ->assertJsonPath('data.fiscal_year_id', 100)

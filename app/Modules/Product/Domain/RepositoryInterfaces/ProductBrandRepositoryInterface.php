@@ -13,5 +13,5 @@ interface ProductBrandRepositoryInterface extends RepositoryInterface
 
     public function findByTenantAndCode(int $tenantId, string $code): ?ProductBrand;
 
-    public function find($id, array $columns = ['*']): ?ProductBrand;
+    public function find(int|string $id, array $columns = ['*']): ?ProductBrand;
 }

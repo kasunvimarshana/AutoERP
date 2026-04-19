@@ -108,7 +108,7 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
      *
      * {@inheritdoc}
      */
-    public function find($id, array $columns = ['*']): ?User
+    public function find(int|string $id, array $columns = ['*']): ?User
     {
         $this->with(['roles.permissions']);
 

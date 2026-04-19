@@ -17,7 +17,7 @@ class ResolveTenant
         protected TenantConfigManagerInterface $manager
     ) {}
 
-    public function handle(Request $request, Closure $next)
+    public function handle(Request $request, Closure $next): mixed
     {
         // Resolve tenant ID
         $tenantId = $request->header('X-Tenant-ID') ?? optional($request->user())->tenant_id;
@@ -35,19 +35,12 @@ class ResolveTenant
         $request->merge(['tenant_id' => $tenantId]);
         app()->instance('current_tenant_id', $tenantId);
 
-        // Fetch tenant configuration (cached)
+        // Fetch tenant configuration (cached) and apply if available
         $config = $this->client->getConfig($tenantId);
-        // if (! $config) {
-        //     throw new BadRequestHttpException('Invalid tenant ID.');
-        // }
-
         if ($config) {
-            // Apply configuration to Laravel
             $this->manager->apply($config);
+            app()->instance('tenant.config', $config);
         }
-
-        // Bind tenant config to container for later access
-        app()->instance('tenant.config', $config);
 
         return $next($request);
     }

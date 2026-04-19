@@ -13,5 +13,5 @@ interface ProductRepositoryInterface extends RepositoryInterface
 
     public function findByTenantAndSku(int $tenantId, string $sku): ?Product;
 
-    public function find($id, array $columns = ['*']): ?Product;
+    public function find(int|string $id, array $columns = ['*']): ?Product;
 }

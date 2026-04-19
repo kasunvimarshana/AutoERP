@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Modules\User\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Response;
-use Modules\Auth\Application\UseCases\GetAuthenticatedUser;
 use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Core\Domain\Exceptions\DomainException;
 use Modules\User\Application\Contracts\ChangePasswordServiceInterface;
@@ -32,7 +32,6 @@ use Symfony\Component\HttpFoundation\Response as HttpResponse;
 class ProfileController extends AuthorizedController
 {
     public function __construct(
-        protected GetAuthenticatedUser $getAuthenticatedUser,
         protected FindUserServiceInterface $findUserService,
         protected FindUserDevicesServiceInterface $findUserDevicesService,
         protected UpsertUserDeviceServiceInterface $upsertUserDeviceService,
@@ -178,7 +177,7 @@ class ProfileController extends AuthorizedController
 
     private function authenticatedUserId(): ?int
     {
-        $authenticatable = $this->getAuthenticatedUser->execute();
+        $authenticatable = Auth::user();
         if (! $authenticatable) {
             return null;
         }

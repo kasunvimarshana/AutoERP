@@ -50,7 +50,7 @@ class EloquentProductVariantRepository extends EloquentRepository implements Pro
         return $model ? $this->toDomainEntity($model) : null;
     }
 
-    public function find($id, array $columns = ['*']): ?ProductVariant
+    public function find(int|string $id, array $columns = ['*']): ?ProductVariant
     {
         return parent::find($id, $columns);
     }

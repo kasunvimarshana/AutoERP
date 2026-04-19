@@ -13,5 +13,5 @@ interface UomConversionRepositoryInterface extends RepositoryInterface
 
     public function findByUomPair(int $fromUomId, int $toUomId): ?UomConversion;
 
-    public function find($id, array $columns = ['*']): ?UomConversion;
+    public function find(int|string $id, array $columns = ['*']): ?UomConversion;
 }

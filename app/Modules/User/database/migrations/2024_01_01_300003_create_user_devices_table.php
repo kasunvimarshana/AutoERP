@@ -12,6 +12,7 @@ return new class extends Migration
     {
         Schema::create('user_devices', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('tenant_id')->nullable()->constrained('tenants', 'id', 'user_devices_tenant_id_fk')->nullOnDelete();
             $table->foreignId('user_id')->constrained(null, 'id', 'user_devices_user_id_fk')->cascadeOnDelete();
             $table->string('device_token');
             $table->string('platform')->nullable(); // ios, android, web
@@ -19,7 +20,7 @@ return new class extends Migration
             $table->timestamp('last_active_at')->nullable();
             $table->timestamps();
 
-            $table->unique(['user_id', 'device_token'], 'user_devices_user_token_uk');
+            $table->unique(['tenant_id', 'user_id', 'device_token'], 'user_devices_tenant_user_token_uk');
         });
     }
 

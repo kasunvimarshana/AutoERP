@@ -19,10 +19,10 @@ return new class extends Migration
             $table->foreignId('batch_id')->nullable()->constrained(null, 'id', 'stock_levels_batch_id_fk')->nullOnDelete();
             $table->foreignId('serial_id')->nullable()->constrained(null, 'id', 'stock_levels_serial_id_fk')->nullOnDelete();
             $table->foreignId('uom_id')->constrained('units_of_measure', 'id', 'stock_levels_uom_id_fk');
-            $table->decimal('quantity_on_hand', 15, 4)->default(0);
-            $table->decimal('quantity_reserved', 15, 4)->default(0);
-            $table->decimal('quantity_available', 15, 4)->storedAs('quantity_on_hand - quantity_reserved');
-            $table->decimal('unit_cost', 15, 4)->nullable();
+            $table->decimal('quantity_on_hand', 20, 6)->default(0);
+            $table->decimal('quantity_reserved', 20, 6)->default(0);
+            $table->decimal('quantity_available', 20, 6)->storedAs('quantity_on_hand - quantity_reserved');
+            $table->decimal('unit_cost', 20, 6)->nullable();
             $table->timestamp('last_movement_at')->nullable();
             $table->timestamps();
 

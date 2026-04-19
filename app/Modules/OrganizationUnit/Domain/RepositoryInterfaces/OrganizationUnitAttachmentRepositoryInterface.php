@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Domain\RepositoryInterfaces;
 
-use Illuminate\Support\Collection;
 use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
 use Modules\OrganizationUnit\Domain\Entities\OrganizationUnitAttachment;
 
@@ -14,5 +13,8 @@ interface OrganizationUnitAttachmentRepositoryInterface extends RepositoryInterf
 
     public function findByUuid(string $uuid): ?OrganizationUnitAttachment;
 
-    public function getByOrganizationUnit(int $organizationUnitId, ?string $type = null): Collection;
+    /**
+     * @return iterable<int, OrganizationUnitAttachment>
+     */
+    public function getByOrganizationUnit(int $organizationUnitId, ?string $type = null): iterable;
 }

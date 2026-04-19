@@ -66,4 +66,9 @@ class OrganizationUnitModel extends Model
     {
         return $this->belongsTo(UserModel::class, 'manager_user_id');
     }
+
+    public function organizationUnitUsers(): HasMany
+    {
+        return $this->hasMany(OrganizationUnitUserModel::class, 'org_unit_id');
+    }
 }

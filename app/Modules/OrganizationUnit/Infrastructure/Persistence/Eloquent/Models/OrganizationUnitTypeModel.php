@@ -6,9 +6,12 @@ namespace Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 
 class OrganizationUnitTypeModel extends Model
 {
+    use HasAudit;
+
     protected $table = 'org_unit_types';
 
     protected $fillable = [

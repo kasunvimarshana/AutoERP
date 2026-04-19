@@ -37,7 +37,12 @@ class SharedModuleGuardrailsTest extends TestCase
         sort($entries);
 
         $this->assertSame(
-            ['2024_01_01_000002_create_global_reference_tables.php'],
+            [
+                '2024_01_01_000002a_create_countries_table.php',
+                '2024_01_01_000002b_create_currencies_table.php',
+                '2024_01_01_000002c_create_languages_table.php',
+                '2024_01_01_000002d_create_timezones_table.php',
+            ],
             $entries,
             'Shared module must keep only globally reusable reference-table migrations.'
         );

@@ -1,8 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Support\Facades\Route;
 use Modules\Tenant\Infrastructure\Http\Controllers\TenantAttachmentController;
 use Modules\Tenant\Infrastructure\Http\Controllers\TenantController;
+use Modules\Tenant\Infrastructure\Http\Controllers\TenantDomainController;
 use Modules\Tenant\Infrastructure\Http\Controllers\TenantPlanController;
 use Modules\Tenant\Infrastructure\Http\Controllers\TenantSettingController;
 
@@ -23,6 +26,15 @@ Route::middleware(['auth:api', 'resolve.tenant'])->group(function () {
     Route::put('tenant-plans/{plan}', [TenantPlanController::class, 'update']);
     Route::patch('tenant-plans/{plan}', [TenantPlanController::class, 'update']);
     Route::delete('tenant-plans/{plan}', [TenantPlanController::class, 'destroy']);
+
+    // Tenant domain management
+    Route::get('tenants/{tenant}/domains', [TenantDomainController::class, 'index']);
+    Route::get('tenants/{tenant}/domains/{domain}', [TenantDomainController::class, 'show']);
+    Route::post('tenants/{tenant}/domains', [TenantDomainController::class, 'store']);
+    Route::put('tenants/{tenant}/domains/{domain}', [TenantDomainController::class, 'update']);
+    Route::patch('tenants/{tenant}/domains/{domain}', [TenantDomainController::class, 'update']);
+    Route::delete('tenants/{tenant}/domains/{domain}', [TenantDomainController::class, 'destroy']);
+
     Route::get('tenants/{tenant}/settings', [TenantSettingController::class, 'index']);
     Route::get('tenants/{tenant}/settings/{key}', [TenantSettingController::class, 'show']);
     Route::post('tenants/{tenant}/settings', [TenantSettingController::class, 'store']);

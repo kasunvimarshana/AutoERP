@@ -13,5 +13,5 @@ interface ProductIdentifierRepositoryInterface extends RepositoryInterface
 
     public function findByTenantAndValue(int $tenantId, string $value): ?ProductIdentifier;
 
-    public function find($id, array $columns = ['*']): ?ProductIdentifier;
+    public function find(int|string $id, array $columns = ['*']): ?ProductIdentifier;
 }

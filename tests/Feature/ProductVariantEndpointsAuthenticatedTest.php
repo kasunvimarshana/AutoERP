@@ -16,7 +16,7 @@ use Modules\Tenant\Application\Contracts\TenantConfigClientInterface;
 use Modules\Tenant\Application\Contracts\TenantConfigManagerInterface;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use PHPUnit\Framework\MockObject\MockObject;
-use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Tests\TestCase;
 
 class ProductVariantEndpointsAuthenticatedTest extends TestCase
@@ -86,7 +86,7 @@ class ProductVariantEndpointsAuthenticatedTest extends TestCase
         $response = $this->withHeader('X-Tenant-ID', '9')
             ->getJson('/api/product-variants?product_id=41&name=Red&sort=-created_at');
 
-        $response->assertStatus(Response::HTTP_OK)
+        $response->assertStatus(HttpResponse::HTTP_OK)
             ->assertJsonPath('data.0.id', 101)
             ->assertJsonPath('data.0.name', 'Red Variant')
             ->assertJsonPath('data.0.product_id', 41);
@@ -103,7 +103,7 @@ class ProductVariantEndpointsAuthenticatedTest extends TestCase
         $response = $this->withHeader('X-Tenant-ID', '9')
             ->getJson('/api/product-variants/102');
 
-        $response->assertStatus(Response::HTTP_OK)
+        $response->assertStatus(HttpResponse::HTTP_OK)
             ->assertJsonPath('data.id', 102)
             ->assertJsonPath('data.product_id', 41)
             ->assertJsonPath('data.sku', 'RED-102');
@@ -122,7 +122,7 @@ class ProductVariantEndpointsAuthenticatedTest extends TestCase
         $response = $this->withHeader('X-Tenant-ID', '9')
             ->getJson('/api/product-variants');
 
-        $response->assertStatus(Response::HTTP_FORBIDDEN)
+        $response->assertStatus(HttpResponse::HTTP_FORBIDDEN)
             ->assertJsonPath('message', 'This action is unauthorized.');
     }
 

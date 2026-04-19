@@ -4,50 +4,50 @@ declare(strict_types=1);
 
 namespace Modules\Core\Domain\Contracts\Repositories;
 
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Collection;
-
+/**
+ * Domain-layer repository contract.
+ *
+ * Uses plain PHP types (iterable, array) to avoid coupling the Domain
+ * to any framework (Eloquent, Laravel pagination, etc.).
+ * Infrastructure implementations may return framework-specific types
+ * that satisfy these signatures (e.g. Collection implements iterable).
+ */
 interface RepositoryInterface
 {
     /**
      * Find a single record by its primary key.
-     *
-     * @param  mixed  $id
-     * @return mixed
      */
-    public function find($id, array $columns = ['*']);
+    public function find(int|string $id, array $columns = ['*']): mixed;
 
     /**
      * Get all records matching the current criteria.
+     *
+     * @return iterable<int, mixed>
      */
-    public function get(array $columns = ['*']): Collection;
+    public function get(array $columns = ['*']): iterable;
 
     /**
      * Paginate the results.
+     *
+     * Returns a paginated result. Concrete implementations may return
+     * framework-specific paginators that satisfy this contract.
      */
-    public function paginate(?int $perPage = null, array $columns = ['*'], ?string $pageName = null, ?int $page = null): LengthAwarePaginator;
+    public function paginate(?int $perPage = null, array $columns = ['*'], ?string $pageName = null, ?int $page = null): mixed;
 
     /**
      * Create a new record.
-     *
-     * @return mixed
      */
-    public function create(array $data);
+    public function create(array $data): mixed;
 
     /**
      * Update an existing record.
-     *
-     * @param  mixed  $id
-     * @return mixed
      */
-    public function update($id, array $data);
+    public function update(int|string $id, array $data): mixed;
 
     /**
      * Delete a record.
-     *
-     * @param  mixed  $id
      */
-    public function delete($id): bool;
+    public function delete(int|string $id): bool;
 
     /**
      * Set the relationships that should be eager loaded.
@@ -78,11 +78,6 @@ interface RepositoryInterface
      * Add an order by clause.
      */
     public function orderBy(string $column, string $direction = 'asc'): static;
-
-    /**
-     * Add a raw order by clause.
-     */
-    public function orderByRaw(string $sql, array $bindings = []): static;
 
     /**
      * Set the limit.
