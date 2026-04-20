@@ -1,0 +1,85 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Supplier\Infrastructure\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
+
+class StoreSupplierRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        $tenantId = (int) $this->input('tenant_id');
+
+        return [
+            'tenant_id' => 'required|integer|exists:tenants,id',
+            'user_id' => [
+                'nullable',
+                'integer',
+                'required_without:user',
+                Rule::exists('users', 'id')->where(fn ($query) => $query->where('tenant_id', $tenantId)),
+                Rule::unique('suppliers', 'user_id'),
+            ],
+            'user' => 'required_without:user_id|array',
+            'user.email' => [
+                'required_with:user',
+                'email',
+                Rule::unique('users', 'email')->where(fn ($query) => $query->where('tenant_id', $tenantId)),
+            ],
+            'user.first_name' => 'required_with:user|string|max:255',
+            'user.last_name' => 'required_with:user|string|max:255',
+            'user.phone' => 'nullable|string|max:30',
+            'user.address' => 'nullable|array',
+            'user.preferences' => 'nullable|array',
+            'user.active' => 'nullable|boolean',
+            'user.avatar' => 'nullable|file|max:5120|mimes:jpg,jpeg,png,gif,webp,svg',
+            'supplier_code' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::unique('suppliers', 'supplier_code')->where(
+                    fn ($query) => $query->where('tenant_id', $tenantId)
+                ),
+            ],
+            'name' => 'required|string|max:255',
+            'type' => 'nullable|in:individual,company',
+            'org_unit_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('org_units', 'id')->where(fn ($query) => $query->where('tenant_id', $tenantId)),
+            ],
+            'tax_number' => 'nullable|string|max:255',
+            'registration_number' => 'nullable|string|max:255',
+            'currency_id' => 'nullable|integer|exists:currencies,id',
+            'payment_terms_days' => 'nullable|integer|min:0|max:3650',
+            'ap_account_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('accounts', 'id')->where(fn ($query) => $query->where('tenant_id', $tenantId)),
+            ],
+            'status' => 'nullable|in:active,inactive',
+            'notes' => 'nullable|string',
+            'metadata' => 'nullable|array',
+        ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $headerTenantId = (int) $this->header('X-Tenant-ID');
+            $payloadTenantId = (int) $this->input('tenant_id');
+
+            if ($headerTenantId > 0 && $payloadTenantId > 0 && $headerTenantId !== $payloadTenantId) {
+                $validator->errors()->add('tenant_id', 'Tenant mismatch between X-Tenant-ID header and payload.');
+            }
+        });
+    }
+}
