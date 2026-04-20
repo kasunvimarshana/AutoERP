@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Configuration\Domain\Entities\Currency;
 use Modules\Configuration\Domain\RepositoryInterfaces\CurrencyRepositoryInterface;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\CurrencyModel;
+use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 
 class EloquentCurrencyRepository extends EloquentRepository implements CurrencyRepositoryInterface
 {

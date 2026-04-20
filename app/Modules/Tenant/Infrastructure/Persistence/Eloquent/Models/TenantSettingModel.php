@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Models;
-use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
-
+use Illuminate\Support\Carbon;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 /**
  * @property int $id
@@ -16,14 +16,13 @@ use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
  * @property array<string, mixed>|null $value
  * @property string $group
  * @property bool $is_public
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class TenantSettingModel extends BaseModel
 {
-
-    use HasTenant;
     use HasAudit;
+    use HasTenant;
 
     protected $table = 'tenant_settings';
 

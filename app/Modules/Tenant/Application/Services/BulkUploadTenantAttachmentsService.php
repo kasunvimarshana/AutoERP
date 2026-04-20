@@ -40,39 +40,39 @@ class BulkUploadTenantAttachmentsService implements BulkUploadTenantAttachmentsS
 
         try {
             return DB::transaction(function () use ($data, &$storedPaths): Collection {
-            $tenantId = (int) $data['tenant_id'];
-            $files    = $data['files'] ?? [];
-            $type     = isset($data['type']) && is_string($data['type']) ? $data['type'] : null;
-            $metadata = isset($data['metadata']) && is_array($data['metadata']) ? $data['metadata'] : null;
+                $tenantId = (int) $data['tenant_id'];
+                $files = $data['files'] ?? [];
+                $type = isset($data['type']) && is_string($data['type']) ? $data['type'] : null;
+                $metadata = isset($data['metadata']) && is_array($data['metadata']) ? $data['metadata'] : null;
 
-            $tenant = $this->tenantRepository->find($tenantId);
-            if (! $tenant) {
-                throw new TenantNotFoundException($tenantId);
-            }
+                $tenant = $this->tenantRepository->find($tenantId);
+                if (! $tenant) {
+                    throw new TenantNotFoundException($tenantId);
+                }
 
-            $saved = new Collection;
+                $saved = new Collection;
 
-            foreach ($files as $file) {
-                /** @var UploadedFile $file */
-                $uuid = (string) Str::uuid();
-                $path = $this->storageStrategy->store($file, $tenantId);
-                $storedPaths[] = $path;
+                foreach ($files as $file) {
+                    /** @var UploadedFile $file */
+                    $uuid = (string) Str::uuid();
+                    $path = $this->storageStrategy->store($file, $tenantId);
+                    $storedPaths[] = $path;
 
-                $attachment = new TenantAttachment(
-                    tenantId: $tenantId,
-                    uuid:     $uuid,
-                    name:     $file->getClientOriginalName(),
-                    filePath: $path,
-                    mimeType: (string) $file->getMimeType(),
-                    size:     (int) $file->getSize(),
-                    type:     $type,
-                    metadata: $metadata,
-                );
+                    $attachment = new TenantAttachment(
+                        tenantId: $tenantId,
+                        uuid: $uuid,
+                        name: $file->getClientOriginalName(),
+                        filePath: $path,
+                        mimeType: (string) $file->getMimeType(),
+                        size: (int) $file->getSize(),
+                        type: $type,
+                        metadata: $metadata,
+                    );
 
-                $saved->push($this->attachmentRepository->save($attachment));
-            }
+                    $saved->push($this->attachmentRepository->save($attachment));
+                }
 
-            return $saved;
+                return $saved;
             });
         } catch (\Throwable $exception) {
             foreach ($storedPaths as $storedPath) {

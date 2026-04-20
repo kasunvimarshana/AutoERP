@@ -7,19 +7,19 @@ namespace Modules\Tenant\Infrastructure\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Response;
+use Illuminate\Validation\ValidationException;
 use Modules\Core\Application\Contracts\AttachmentStorageStrategyInterface;
 use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Tenant\Application\Contracts\BulkUploadTenantAttachmentsServiceInterface;
 use Modules\Tenant\Application\Contracts\DeleteTenantAttachmentServiceInterface;
-use Modules\Tenant\Application\Contracts\FindTenantServiceInterface;
 use Modules\Tenant\Application\Contracts\FindTenantAttachmentsServiceInterface;
+use Modules\Tenant\Application\Contracts\FindTenantServiceInterface;
 use Modules\Tenant\Application\Contracts\UploadTenantAttachmentServiceInterface;
 use Modules\Tenant\Domain\Entities\Tenant;
 use Modules\Tenant\Infrastructure\Http\Requests\ListTenantAttachmentRequest;
 use Modules\Tenant\Infrastructure\Http\Requests\UploadTenantAttachmentRequest;
 use Modules\Tenant\Infrastructure\Http\Resources\TenantAttachmentCollection;
 use Modules\Tenant\Infrastructure\Http\Resources\TenantAttachmentResource;
-use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -34,7 +34,6 @@ class TenantAttachmentController extends AuthorizedController
         protected FindTenantAttachmentsServiceInterface $findTenantAttachmentsService,
         protected AttachmentStorageStrategyInterface $storageStrategy
     ) {}
-
 
     public function index(int $tenantId, ListTenantAttachmentRequest $request): TenantAttachmentCollection
     {
@@ -54,7 +53,6 @@ class TenantAttachmentController extends AuthorizedController
         return new TenantAttachmentCollection($attachments);
     }
 
-
     public function store(UploadTenantAttachmentRequest $request, int $tenantId): TenantAttachmentResource
     {
         $tenantEntity = $this->findTenantOrFail($tenantId);
@@ -69,14 +67,13 @@ class TenantAttachmentController extends AuthorizedController
 
         $attachment = $this->uploadAttachmentService->execute([
             'tenant_id' => $tenantId,
-            'file'      => $file,
-            'type'      => $request->input('type'),
-            'metadata'  => $this->decodeMetadata($request),
+            'file' => $file,
+            'type' => $request->input('type'),
+            'metadata' => $this->decodeMetadata($request),
         ]);
 
         return new TenantAttachmentResource($attachment);
     }
-
 
     public function storeMany(UploadTenantAttachmentRequest $request, int $tenantId): JsonResponse
     {
@@ -92,16 +89,15 @@ class TenantAttachmentController extends AuthorizedController
 
         $attachments = $this->bulkUploadAttachmentsService->execute([
             'tenant_id' => $tenantId,
-            'files'     => $files,
-            'type'      => $request->input('type'),
-            'metadata'  => $this->decodeMetadata($request),
+            'files' => $files,
+            'type' => $request->input('type'),
+            'metadata' => $this->decodeMetadata($request),
         ]);
 
         return TenantAttachmentResource::collection($attachments)
             ->response()
             ->setStatusCode(HttpResponse::HTTP_CREATED);
     }
-
 
     public function destroy(int $tenantId, int $attachmentId): JsonResponse
     {
@@ -117,7 +113,6 @@ class TenantAttachmentController extends AuthorizedController
 
         return Response::json(['message' => 'Attachment deleted successfully']);
     }
-
 
     public function serve(string $uuid): StreamedResponse
     {

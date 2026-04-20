@@ -16,7 +16,7 @@ interface BroadcastServiceInterface
      * Broadcast a payload to the given channel under the given event name.
      *
      * @param  string  $channel  Fully-qualified channel name (e.g. "private-tenant.1")
-     * @param  string  $event    Event name surfaced to WebSocket clients
+     * @param  string  $event  Event name surfaced to WebSocket clients
      * @param  array<string, mixed>  $data
      */
     public function broadcast(string $channel, string $event, array $data = []): void;

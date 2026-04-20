@@ -3,17 +3,16 @@
 declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Persistence\Eloquent\Models;
-use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
-
-use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class FiscalYearModel extends BaseModel
 {
-
     use HasTenant;
     use SoftDeletes;
+
     protected $table = 'fiscal_years';
 
     protected $fillable = [

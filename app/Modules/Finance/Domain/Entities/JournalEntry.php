@@ -7,7 +7,7 @@ namespace Modules\Finance\Domain\Entities;
 class JournalEntry
 {
     /**
-    * @param array<\Modules\Finance\Domain\Entities\JournalEntryLine> $lines
+     * @param  array<JournalEntryLine>  $lines
      */
     public function __construct(
         private int $tenantId,
@@ -115,7 +115,7 @@ class JournalEntry
     }
 
     /**
-        * @return array<\Modules\Finance\Domain\Entities\JournalEntryLine>
+     * @return array<JournalEntryLine>
      */
     public function getLines(): array
     {
@@ -133,7 +133,7 @@ class JournalEntry
     }
 
     /**
-        * @param array<\Modules\Finance\Domain\Entities\JournalEntryLine> $lines
+     * @param  array<JournalEntryLine>  $lines
      */
     public function update(
         int $fiscalPeriodId,

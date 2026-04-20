@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 namespace Modules\User\Infrastructure\Persistence\Eloquent\Models;
-use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -13,12 +12,12 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Passport\Contracts\OAuthenticatable;
 use Laravel\Passport\HasApiTokens;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class UserModel extends Authenticatable implements OAuthenticatable
 {
-
+    use HasApiTokens, HasAudit, Notifiable, SoftDeletes;
     use HasTenant;
-    use HasAudit, HasApiTokens, Notifiable, SoftDeletes;
 
     protected $table = 'users';
 

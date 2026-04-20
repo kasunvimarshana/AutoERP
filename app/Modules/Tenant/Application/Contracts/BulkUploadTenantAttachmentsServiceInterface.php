@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Tenant\Application\Contracts;
 
 use Illuminate\Support\Collection;
+use Modules\Tenant\Domain\Entities\TenantAttachment;
 
 /**
  * Contract for bulk-uploading multiple attachments for a tenant in one operation.
@@ -22,7 +23,7 @@ interface BulkUploadTenantAttachmentsServiceInterface
      *   - type      (string|null)
      *   - metadata  (array|null)
      *
-     * @return Collection<int, \Modules\Tenant\Domain\Entities\TenantAttachment>
+     * @return Collection<int, TenantAttachment>
      */
     public function execute(array $data): Collection;
 }

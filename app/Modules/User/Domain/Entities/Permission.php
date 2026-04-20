@@ -11,8 +11,11 @@ class Permission
     private int $tenantId;
 
     private string $name;
+
     private string $guardName;
+
     private string $module;
+
     private ?string $description;
 
     public function __construct(int $tenantId, string $name,
@@ -43,7 +46,18 @@ class Permission
         return $this->name;
     }
 
-    public function getGuardName(): string { return $this->guardName; }
-    public function getModule(): string { return $this->module; }
-    public function getDescription(): ?string { return $this->description; }
+    public function getGuardName(): string
+    {
+        return $this->guardName;
+    }
+
+    public function getModule(): string
+    {
+        return $this->module;
+    }
+
+    public function getDescription(): ?string
+    {
+        return $this->description;
+    }
 }

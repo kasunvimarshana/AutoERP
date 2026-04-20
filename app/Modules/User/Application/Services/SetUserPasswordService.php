@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Modules\User\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
-use Modules\User\Application\Services\Concerns\HandlesUserPasswordMutation;
 use Modules\User\Application\Contracts\SetUserPasswordServiceInterface;
+use Modules\User\Application\Services\Concerns\HandlesUserPasswordMutation;
 use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
 
 class SetUserPasswordService extends BaseService implements SetUserPasswordServiceInterface

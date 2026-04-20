@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Configuration\Domain\Entities\Country;
 use Modules\Configuration\Domain\RepositoryInterfaces\CountryRepositoryInterface;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\CountryModel;
+use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 
 class EloquentCountryRepository extends EloquentRepository implements CountryRepositoryInterface
 {

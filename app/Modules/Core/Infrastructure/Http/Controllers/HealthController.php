@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Core\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use OpenApi\Attributes as OA;
 
 /**
  * Health-check endpoint for liveness / readiness probes.

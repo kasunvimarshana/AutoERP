@@ -3,19 +3,17 @@
 declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models;
-use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
-
-use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class OrganizationUnitAttachmentModel extends BaseModel
 {
-
-    use HasTenant;
     use HasAudit;
+    use HasTenant;
     use SoftDeletes;
 
     protected $table = 'org_unit_attachments';

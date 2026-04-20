@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Configuration\Domain\Entities\Language;
 use Modules\Configuration\Domain\RepositoryInterfaces\LanguageRepositoryInterface;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\LanguageModel;
+use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 
 class EloquentLanguageRepository extends EloquentRepository implements LanguageRepositoryInterface
 {

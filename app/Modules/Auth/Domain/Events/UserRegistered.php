@@ -17,9 +17,9 @@ class UserRegistered extends UserScopedEvent
     public function __construct(int $userId, string $email, string $firstName, string $lastName)
     {
         parent::__construct($userId);
-        $this->email     = $email;
+        $this->email = $email;
         $this->firstName = $firstName;
-        $this->lastName  = $lastName;
+        $this->lastName = $lastName;
     }
 
     /**
@@ -28,9 +28,9 @@ class UserRegistered extends UserScopedEvent
     public function broadcastWith(): array
     {
         return array_merge(parent::broadcastWith(), [
-            'email'     => $this->email,
+            'email' => $this->email,
             'firstName' => $this->firstName,
-            'lastName'  => $this->lastName,
+            'lastName' => $this->lastName,
         ]);
     }
 }

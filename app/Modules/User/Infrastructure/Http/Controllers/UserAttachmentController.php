@@ -6,11 +6,12 @@ namespace Modules\User\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Response;
+use Illuminate\Validation\ValidationException;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\User\Application\Contracts\DeleteUserAttachmentServiceInterface;
-use Modules\User\Application\Contracts\FindUserServiceInterface;
 use Modules\User\Application\Contracts\FindUserAttachmentsServiceInterface;
+use Modules\User\Application\Contracts\FindUserServiceInterface;
 use Modules\User\Application\Contracts\UploadUserAttachmentServiceInterface;
 use Modules\User\Domain\Entities\User;
 use Modules\User\Domain\Entities\UserAttachment;
@@ -18,7 +19,6 @@ use Modules\User\Infrastructure\Http\Requests\ListUserAttachmentRequest;
 use Modules\User\Infrastructure\Http\Requests\UploadUserAttachmentRequest;
 use Modules\User\Infrastructure\Http\Resources\UserAttachmentCollection;
 use Modules\User\Infrastructure\Http\Resources\UserAttachmentResource;
-use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 

@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Repositories;
 
+use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
+use Modules\Tenant\Domain\Entities\Tenant;
+use Modules\Tenant\Domain\RepositoryInterfaces\TenantRepositoryInterface;
 use Modules\Tenant\Domain\ValueObjects\ApiKeys;
 use Modules\Tenant\Domain\ValueObjects\CacheConfig;
 use Modules\Tenant\Domain\ValueObjects\DatabaseConfig;
 use Modules\Tenant\Domain\ValueObjects\FeatureFlags;
 use Modules\Tenant\Domain\ValueObjects\MailConfig;
 use Modules\Tenant\Domain\ValueObjects\QueueConfig;
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
-use Modules\Tenant\Domain\Entities\Tenant;
-use Modules\Tenant\Domain\RepositoryInterfaces\TenantRepositoryInterface;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantModel;
 
 class EloquentTenantRepository extends EloquentRepository implements TenantRepositoryInterface

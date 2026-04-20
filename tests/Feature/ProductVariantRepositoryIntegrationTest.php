@@ -31,6 +31,7 @@ class ProductVariantRepositoryIntegrationTest extends TestCase
 
         $created = $repository->save(new ProductVariant(
             productId: 8001,
+            tenantId: 81,
             name: 'Blue Variant',
             sku: 'BLU-001',
             isDefault: false,
@@ -44,6 +45,7 @@ class ProductVariantRepositoryIntegrationTest extends TestCase
         $updated = $repository->save(new ProductVariant(
             id: $created->getId(),
             productId: 8001,
+            tenantId: 81,
             name: 'Blue Variant Updated',
             sku: 'BLU-001',
             isDefault: true,
@@ -58,13 +60,13 @@ class ProductVariantRepositoryIntegrationTest extends TestCase
 
     public function test_find_by_product_and_sku_returns_domain_entity(): void
     {
-        $this->insertVariantRow(id: 8501, productId: 8001, name: 'Red Variant', sku: 'RED-001');
-        $this->insertVariantRow(id: 8502, productId: 8002, name: 'Red Variant 2', sku: 'RED-001');
+        $this->insertVariantRow(id: 8501, tenantId: 81, productId: 8001, name: 'Red Variant', sku: 'RED-001');
+        $this->insertVariantRow(id: 8502, tenantId: 82, productId: 8002, name: 'Red Variant 2', sku: 'RED-001');
 
         /** @var ProductVariantRepositoryInterface $repository */
         $repository = app(ProductVariantRepositoryInterface::class);
 
-        $found = $repository->findByProductAndSku(8001, 'RED-001');
+        $found = $repository->findByProductAndSku(8001, 'RED-001', 81);
 
         $this->assertInstanceOf(ProductVariant::class, $found);
         $this->assertSame(8501, $found->getId());
@@ -73,15 +75,16 @@ class ProductVariantRepositoryIntegrationTest extends TestCase
 
     public function test_paginate_and_where_return_mapped_domain_entities(): void
     {
-        $this->insertVariantRow(id: 8601, productId: 8001, name: 'Variant C', sku: 'C-001');
-        $this->insertVariantRow(id: 8602, productId: 8001, name: 'Variant A', sku: 'A-001');
-        $this->insertVariantRow(id: 8603, productId: 8002, name: 'Variant X', sku: 'X-001');
+        $this->insertVariantRow(id: 8601, tenantId: 81, productId: 8001, name: 'Variant C', sku: 'C-001');
+        $this->insertVariantRow(id: 8602, tenantId: 81, productId: 8001, name: 'Variant A', sku: 'A-001');
+        $this->insertVariantRow(id: 8603, tenantId: 82, productId: 8002, name: 'Variant X', sku: 'X-001');
 
         /** @var ProductVariantRepositoryInterface $repository */
         $repository = app(ProductVariantRepositoryInterface::class);
 
         $paginator = $repository
             ->resetCriteria()
+            ->where('tenant_id', 81)
             ->where('product_id', 8001)
             ->orderBy('name', 'asc')
             ->paginate(15, ['*'], 'page', 1);
@@ -95,6 +98,7 @@ class ProductVariantRepositoryIntegrationTest extends TestCase
 
         $collection = $repository
             ->resetCriteria()
+            ->where('tenant_id', 81)
             ->where('product_id', 8001)
             ->get();
 
@@ -102,10 +106,11 @@ class ProductVariantRepositoryIntegrationTest extends TestCase
         $this->assertContainsOnlyInstancesOf(ProductVariant::class, $collection);
     }
 
-    private function insertVariantRow(int $id, int $productId, string $name, string $sku): void
+    private function insertVariantRow(int $id, int $tenantId, int $productId, string $name, string $sku): void
     {
         DB::table('product_variants')->insert([
             'id' => $id,
+            'tenant_id' => $tenantId,
             'product_id' => $productId,
             'sku' => $sku,
             'name' => $name,

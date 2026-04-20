@@ -3,18 +3,16 @@
 declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Persistence\Eloquent\Models;
-use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
-
-use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class JournalEntryModel extends BaseModel
 {
-
-    use HasTenant;
     use HasAudit, SoftDeletes;
+    use HasTenant;
 
     protected $table = 'journal_entries';
 
@@ -45,6 +43,6 @@ class JournalEntryModel extends BaseModel
 
     public function lines()
     {
-        return $this->hasMany(\Modules\Finance\Infrastructure\Persistence\Eloquent\Models\JournalEntryLineModel::class, 'journal_entry_id');
+        return $this->hasMany(JournalEntryLineModel::class, 'journal_entry_id');
     }
 }

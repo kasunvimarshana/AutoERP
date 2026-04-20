@@ -19,7 +19,6 @@ final class OrgUnitChannel
     /**
      * Authorize the incoming channel subscription.
      *
-     * @param  Authenticatable  $user
      * @param  int|string  $orgUnitId  Wildcard extracted from the channel name
      */
     public function join(Authenticatable $user, int|string $orgUnitId): bool

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Infrastructure\Persistence\Repositories;
 
-use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Pagination\LengthAwarePaginator as LaravelLengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Collection;

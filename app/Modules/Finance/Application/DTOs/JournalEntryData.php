@@ -7,7 +7,7 @@ namespace Modules\Finance\Application\DTOs;
 class JournalEntryData
 {
     /**
-    * @param array<\Modules\Finance\Application\DTOs\JournalEntryLineData> $lines
+     * @param  array<JournalEntryLineData>  $lines
      */
     public function __construct(
         public readonly int $tenant_id,
@@ -30,7 +30,7 @@ class JournalEntryData
     ) {}
 
     /**
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     public static function fromArray(array $data): self
     {
@@ -40,7 +40,7 @@ class JournalEntryData
                 continue;
             }
 
-            $lines[] = \Modules\Finance\Application\DTOs\JournalEntryLineData::fromArray($line);
+            $lines[] = JournalEntryLineData::fromArray($line);
         }
 
         return new self(

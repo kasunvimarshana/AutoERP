@@ -6,7 +6,6 @@ namespace Modules\Auth\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request as HttpRequest;
-use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Auth\Application\Contracts\SsoServiceInterface;
 use Modules\Auth\Application\UseCases\ForgotPassword;
 use Modules\Auth\Application\UseCases\GetAuthenticatedUser;
@@ -24,6 +23,7 @@ use Modules\Auth\Infrastructure\Http\Requests\ResetPasswordRequest;
 use Modules\Auth\Infrastructure\Http\Requests\SsoRequest;
 use Modules\Auth\Infrastructure\Http\Resources\AuthenticatedUserResource;
 use Modules\Auth\Infrastructure\Http\Resources\AuthTokenResource;
+use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class AuthController extends AuthorizedController

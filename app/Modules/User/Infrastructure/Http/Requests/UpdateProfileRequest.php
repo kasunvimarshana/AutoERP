@@ -17,9 +17,9 @@ class UpdateProfileRequest extends FormRequest
     {
         return [
             'first_name' => 'required|string|max:255',
-            'last_name'  => 'required|string|max:255',
-            'phone'      => 'nullable|string|max:20',
-            'address'    => 'nullable|array',
+            'last_name' => 'required|string|max:255',
+            'phone' => 'nullable|string|max:20',
+            'address' => 'nullable|array',
         ];
     }
 }

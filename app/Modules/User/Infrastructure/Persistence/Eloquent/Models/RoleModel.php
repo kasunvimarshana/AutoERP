@@ -3,18 +3,17 @@
 declare(strict_types=1);
 
 namespace Modules\User\Infrastructure\Persistence\Eloquent\Models;
-use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
-
-use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class RoleModel extends BaseModel
 {
-
-    use HasTenant;
     use HasAudit;
+    use HasTenant;
+
     protected $table = 'roles';
 
     protected $fillable = [

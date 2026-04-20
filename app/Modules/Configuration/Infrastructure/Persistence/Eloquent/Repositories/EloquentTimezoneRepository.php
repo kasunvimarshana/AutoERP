@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Configuration\Domain\Entities\Timezone;
 use Modules\Configuration\Domain\RepositoryInterfaces\TimezoneRepositoryInterface;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\TimezoneModel;
+use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 
 class EloquentTimezoneRepository extends EloquentRepository implements TimezoneRepositoryInterface
 {

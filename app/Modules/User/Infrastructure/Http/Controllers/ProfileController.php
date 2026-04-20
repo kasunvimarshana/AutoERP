@@ -7,23 +7,23 @@ namespace Modules\User\Infrastructure\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Response;
-use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Core\Domain\Exceptions\DomainException;
+use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\User\Application\Contracts\ChangePasswordServiceInterface;
 use Modules\User\Application\Contracts\DeleteUserDeviceServiceInterface;
 use Modules\User\Application\Contracts\FindUserDevicesServiceInterface;
 use Modules\User\Application\Contracts\FindUserServiceInterface;
-use Modules\User\Application\Contracts\UpsertUserDeviceServiceInterface;
 use Modules\User\Application\Contracts\UpdatePreferencesServiceInterface;
 use Modules\User\Application\Contracts\UpdateProfileServiceInterface;
 use Modules\User\Application\Contracts\UploadAvatarServiceInterface;
+use Modules\User\Application\Contracts\UpsertUserDeviceServiceInterface;
 use Modules\User\Application\DTOs\UserPreferencesData;
 use Modules\User\Infrastructure\Http\Requests\ChangePasswordRequest;
 use Modules\User\Infrastructure\Http\Requests\ListUserDeviceRequest;
-use Modules\User\Infrastructure\Http\Requests\UpsertUserDeviceRequest;
 use Modules\User\Infrastructure\Http\Requests\UpdatePreferencesRequest;
 use Modules\User\Infrastructure\Http\Requests\UpdateProfileRequest;
 use Modules\User\Infrastructure\Http\Requests\UploadAvatarRequest;
+use Modules\User\Infrastructure\Http\Requests\UpsertUserDeviceRequest;
 use Modules\User\Infrastructure\Http\Resources\UserDeviceCollection;
 use Modules\User\Infrastructure\Http\Resources\UserDeviceResource;
 use Modules\User\Infrastructure\Http\Resources\UserResource;
@@ -113,11 +113,11 @@ class ProfileController extends AuthorizedController
 
         $user = $this->uploadAvatarService->execute([
             'user_id' => $userId,
-            'file'    => [
-                'tmp_path'  => $file->getRealPath(),
-                'name'      => $file->getClientOriginalName(),
+            'file' => [
+                'tmp_path' => $file->getRealPath(),
+                'name' => $file->getClientOriginalName(),
                 'mime_type' => $file->getMimeType(),
-                'size'      => $file->getSize(),
+                'size' => $file->getSize(),
             ],
         ]);
 

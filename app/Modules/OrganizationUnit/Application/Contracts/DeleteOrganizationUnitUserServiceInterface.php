@@ -7,7 +7,7 @@ namespace Modules\OrganizationUnit\Application\Contracts;
 interface DeleteOrganizationUnitUserServiceInterface
 {
     /**
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     public function execute(array $data): mixed;
 }

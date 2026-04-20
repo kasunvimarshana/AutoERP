@@ -3,16 +3,15 @@
 declare(strict_types=1);
 
 namespace Modules\Audit\Infrastructure\Persistence\Eloquent\Models;
-use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
-
-use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class AuditLogModel extends BaseModel
 {
-
     use HasTenant;
+
     public const CREATED_AT = 'occurred_at';
 
     public const UPDATED_AT = null;

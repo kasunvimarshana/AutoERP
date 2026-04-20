@@ -21,8 +21,13 @@ class CreateProductVariantService extends BaseService implements CreateProductVa
     {
         $dto = ProductVariantData::fromArray($data);
 
+        if ($dto->is_default) {
+            $this->productVariantRepository->clearDefaultForProduct($dto->tenant_id, $dto->product_id);
+        }
+
         $productVariant = new ProductVariant(
             productId: $dto->product_id,
+            tenantId: $dto->tenant_id,
             name: $dto->name,
             sku: $dto->sku,
             isDefault: $dto->is_default,

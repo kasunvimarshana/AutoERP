@@ -34,8 +34,8 @@ class PermissionController extends AuthorizedController
         if (array_key_exists('tenant_id', $validated)) {
             $filters['tenant_id'] = (int) $validated['tenant_id'];
         }
-        $perPage     = (int) ($validated['per_page'] ?? 15);
-        $page        = (int) ($validated['page'] ?? 1);
+        $perPage = (int) ($validated['per_page'] ?? 15);
+        $page = (int) ($validated['page'] ?? 1);
         $permissions = $this->findPermissionService->list($filters, $perPage, $page);
 
         return new PermissionCollection($permissions);

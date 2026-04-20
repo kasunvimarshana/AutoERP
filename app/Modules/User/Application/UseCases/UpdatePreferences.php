@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\User\Application\UseCases;
 
-use Modules\User\Domain\ValueObjects\UserPreferences;
 use Modules\User\Application\DTOs\UserPreferencesData;
 use Modules\User\Domain\Entities\User;
 use Modules\User\Domain\Exceptions\UserNotFoundException;
 use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
+use Modules\User\Domain\ValueObjects\UserPreferences;
 
 class UpdatePreferences
 {

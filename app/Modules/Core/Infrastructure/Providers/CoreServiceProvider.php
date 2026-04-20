@@ -6,6 +6,7 @@ namespace Modules\Core\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
+use Modules\Core\Application\Contracts\SlugGeneratorInterface;
 use Modules\Core\Infrastructure\ApiDoc\Contracts\ApiDocServiceInterface;
 use Modules\Core\Infrastructure\ApiDoc\Services\SwaggerApiDocService;
 use Modules\Core\Infrastructure\Broadcasting\Contracts\BroadcastServiceInterface;
@@ -15,12 +16,14 @@ use Modules\Core\Infrastructure\Broadcasting\Services\BroadcastService;
 use Modules\Core\Infrastructure\Broadcasting\Services\ChannelManager;
 use Modules\Core\Infrastructure\Broadcasting\Services\EventBroadcaster;
 use Modules\Core\Infrastructure\Services\FileStorageService;
+use Modules\Core\Infrastructure\Services\SlugGenerator;
 
 class CoreServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
         $this->app->bind(FileStorageServiceInterface::class, FileStorageService::class);
+        $this->app->bind(SlugGeneratorInterface::class, SlugGenerator::class);
         $this->app->when(FileStorageService::class)
             ->needs('$defaultDisk')
             ->give(static fn (): string => (string) config('core.file_storage.default_disk', 'public'));

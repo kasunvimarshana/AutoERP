@@ -3,14 +3,14 @@
 declare(strict_types=1);
 
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Models;
-use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
-
-use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 /**
  * @property int $id
@@ -29,16 +29,15 @@ use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
  * @property int|null $tenant_plan_id
  * @property string $status
  * @property bool $active
- * @property \Illuminate\Support\Carbon|null $trial_ends_at
- * @property \Illuminate\Support\Carbon|null $subscription_ends_at
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property Carbon|null $trial_ends_at
+ * @property Carbon|null $subscription_ends_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class TenantModel extends BaseModel
 {
-
-    use HasTenant;
     use HasAudit, SoftDeletes;
+    use HasTenant;
 
     protected $table = 'tenants';
 
@@ -48,6 +47,9 @@ class TenantModel extends BaseModel
     protected $hidden = [
         'api_keys',
         'database_config',
+        'mail_config',
+        'cache_config',
+        'queue_config',
     ];
 
     protected $fillable = [
@@ -71,12 +73,12 @@ class TenantModel extends BaseModel
     ];
 
     protected $casts = [
-        'database_config' => 'array',
-        'mail_config' => 'array',
-        'cache_config' => 'array',
-        'queue_config' => 'array',
+        'database_config' => 'encrypted:array',
+        'mail_config' => 'encrypted:array',
+        'cache_config' => 'encrypted:array',
+        'queue_config' => 'encrypted:array',
         'feature_flags' => 'array',
-        'api_keys' => 'array',
+        'api_keys' => 'encrypted:array',
         'settings' => 'array',
         'active' => 'boolean',
         'trial_ends_at' => 'datetime',

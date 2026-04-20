@@ -23,7 +23,6 @@ final class PresenceOrgUnitChannel
      * Returns user metadata visible to other channel members, or false to
      * reject the subscription.
      *
-     * @param  Authenticatable  $user
      * @param  int|string  $orgUnitId  Wildcard extracted from the channel name
      * @return array<string, mixed>|false
      */
@@ -38,7 +37,7 @@ final class PresenceOrgUnitChannel
         }
 
         return [
-            'id'   => $user->getAuthIdentifier(),
+            'id' => $user->getAuthIdentifier(),
             'name' => property_exists($user, 'name') ? $user->name : '',
         ];
     }

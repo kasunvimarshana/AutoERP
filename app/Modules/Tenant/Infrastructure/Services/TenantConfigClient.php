@@ -6,8 +6,8 @@ namespace Modules\Tenant\Infrastructure\Services;
 
 use Illuminate\Support\Facades\Cache;
 use Modules\Tenant\Application\Contracts\TenantConfigClientInterface;
-use Modules\Tenant\Domain\Entities\Tenant;
 use Modules\Tenant\Domain\Contracts\TenantConfigInterface;
+use Modules\Tenant\Domain\Entities\Tenant;
 use Modules\Tenant\Domain\RepositoryInterfaces\TenantRepositoryInterface;
 
 class TenantConfigClient implements TenantConfigClientInterface

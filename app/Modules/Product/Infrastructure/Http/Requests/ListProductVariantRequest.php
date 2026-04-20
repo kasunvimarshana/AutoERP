@@ -16,6 +16,7 @@ class ListProductVariantRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'tenant_id' => 'nullable|integer|min:1',
             'product_id' => 'nullable|integer|min:1',
             'name' => 'nullable|string|max:255',
             'sku' => 'nullable|string|max:255',
@@ -24,6 +25,7 @@ class ListProductVariantRequest extends FormRequest
             'per_page' => 'nullable|integer|min:1|max:100',
             'page' => 'nullable|integer|min:1',
             'sort' => 'nullable|string|max:50',
+            'include' => 'nullable|string|max:255',
         ];
     }
 }

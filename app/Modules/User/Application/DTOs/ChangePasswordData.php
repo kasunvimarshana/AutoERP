@@ -17,8 +17,8 @@ class ChangePasswordData extends BaseDto
     public function rules(): array
     {
         return [
-            'current_password'      => 'required|string',
-            'password'              => 'required|string|min:8|confirmed',
+            'current_password' => 'required|string',
+            'password' => 'required|string|min:8|confirmed',
             'password_confirmation' => 'required|string',
         ];
     }

@@ -67,7 +67,7 @@ abstract class BaseEvent implements ShouldBroadcast
     public function broadcastWith(): array
     {
         return [
-            'tenantId'  => $this->tenantId,
+            'tenantId' => $this->tenantId,
             'orgUnitId' => $this->orgUnitId,
         ];
     }

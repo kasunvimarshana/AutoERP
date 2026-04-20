@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Modules\OrganizationUnit\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
+use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\OrganizationUnit\Application\Contracts\CreateOrganizationUnitServiceInterface;
 use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitServiceInterface;
@@ -40,6 +42,7 @@ class OrganizationUnitController extends AuthorizedController
     ];
 
     public function __construct(
+        protected FileStorageServiceInterface $storage,
         protected CreateOrganizationUnitServiceInterface $createOrganizationUnitService,
         protected UpdateOrganizationUnitServiceInterface $updateOrganizationUnitService,
         protected DeleteOrganizationUnitServiceInterface $deleteOrganizationUnitService,
@@ -47,8 +50,7 @@ class OrganizationUnitController extends AuthorizedController
         protected FindOrganizationUnitAttachmentsServiceInterface $findOrganizationUnitAttachmentsService,
         protected FindUserServiceInterface $findUserService,
         protected UploadOrganizationUnitAttachmentServiceInterface $uploadAttachmentService,
-    ) {
-    }
+    ) {}
 
     public function index(ListOrganizationUnitRequest $request): JsonResponse
     {
@@ -73,7 +75,7 @@ class OrganizationUnitController extends AuthorizedController
         $organizationUnits = $this->findOrganizationUnitService->list($filters, $perPage, $page, $sort, $include);
 
         $normalizedIncludes = $this->parseIncludes($include);
-        if ($normalizedIncludes !== []) {
+        if ($normalizedIncludes !== [] && $organizationUnits instanceof LengthAwarePaginator) {
             $organizationUnits->setCollection(
                 $organizationUnits->getCollection()->map(
                     fn (OrganizationUnit $organizationUnit): OrganizationUnitResource => $this->buildOrganizationUnitResource($organizationUnit, $normalizedIncludes)
@@ -81,7 +83,7 @@ class OrganizationUnitController extends AuthorizedController
             );
         }
 
-        return (new OrganizationUnitCollection($organizationUnits))->response();
+        return (new OrganizationUnitCollection($organizationUnits, $this->storage))->response();
     }
 
     public function store(StoreOrganizationUnitRequest $request): JsonResponse
@@ -203,7 +205,7 @@ class OrganizationUnitController extends AuthorizedController
     }
 
     /**
-     * @param array<int, string> $includes
+     * @param  array<int, string>  $includes
      */
     private function buildOrganizationUnitResource(OrganizationUnit $organizationUnit, array $includes): OrganizationUnitResource
     {
@@ -219,6 +221,7 @@ class OrganizationUnitController extends AuthorizedController
 
         return new OrganizationUnitResource(
             resource: $organizationUnit,
+            storage: $this->storage,
             attachments: in_array('attachments', $includes, true) && $organizationUnitId !== null
                 ? $this->findOrganizationUnitAttachmentsService->getByOrganizationUnit($organizationUnitId)
                 : null,

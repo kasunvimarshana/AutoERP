@@ -44,9 +44,9 @@ class ProductIdentifier
     private \DateTimeInterface $updatedAt;
 
     /**
-     * @param array<string, mixed>|null $gs1ApplicationIdentifiers
-     * @param array<string, mixed>|null $formatConfig
-     * @param array<string, mixed>|null $metadata
+     * @param  array<string, mixed>|null  $gs1ApplicationIdentifiers
+     * @param  array<string, mixed>|null  $formatConfig
+     * @param  array<string, mixed>|null  $metadata
      */
     public function __construct(
         int $tenantId,
@@ -181,9 +181,9 @@ class ProductIdentifier
     }
 
     /**
-     * @param array<string, mixed>|null $gs1ApplicationIdentifiers
-     * @param array<string, mixed>|null $formatConfig
-     * @param array<string, mixed>|null $metadata
+     * @param  array<string, mixed>|null  $gs1ApplicationIdentifiers
+     * @param  array<string, mixed>|null  $formatConfig
+     * @param  array<string, mixed>|null  $metadata
      */
     public function update(
         int $productId,

@@ -12,7 +12,7 @@ interface FindJournalEntryServiceInterface
     public function find(mixed $id): ?JournalEntry;
 
     /**
-     * @param array<string, mixed> $filters
+     * @param  array<string, mixed>  $filters
      */
     public function list(array $filters = [], ?int $perPage = null, int $page = 1, ?string $sort = null): LengthAwarePaginator;
 }

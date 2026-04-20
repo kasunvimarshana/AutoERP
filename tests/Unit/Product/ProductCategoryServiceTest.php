@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Product;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Modules\Core\Application\Contracts\SlugGeneratorInterface;
 use Modules\Product\Application\Services\CreateProductCategoryService;
 use Modules\Product\Application\Services\DeleteProductCategoryService;
 use Modules\Product\Application\Services\FindProductCategoryService;
@@ -20,16 +21,26 @@ class ProductCategoryServiceTest extends TestCase
     /** @var ProductCategoryRepositoryInterface&MockObject */
     private ProductCategoryRepositoryInterface $repository;
 
+    /** @var SlugGeneratorInterface&MockObject */
+    private SlugGeneratorInterface $slugGenerator;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->repository = $this->createMock(ProductCategoryRepositoryInterface::class);
+        $this->slugGenerator = $this->createMock(SlugGeneratorInterface::class);
     }
 
     public function test_create_product_category_service_maps_payload_and_saves(): void
     {
-        $service = new CreateProductCategoryService($this->repository);
+        $service = new CreateProductCategoryService($this->repository, $this->slugGenerator);
+
+        $this->slugGenerator
+            ->expects($this->once())
+            ->method('generate')
+            ->with(null, 'Electronics', 'category')
+            ->willReturn('electronics');
 
         $this->repository
             ->expects($this->once())
@@ -48,7 +59,6 @@ class ProductCategoryServiceTest extends TestCase
         $result = $service->execute([
             'tenant_id' => 7,
             'name' => 'Electronics',
-            'slug' => 'electronics',
             'is_active' => true,
         ]);
 
@@ -83,13 +93,17 @@ class ProductCategoryServiceTest extends TestCase
 
     public function test_update_product_category_service_throws_when_product_category_missing(): void
     {
-        $service = new UpdateProductCategoryService($this->repository);
+        $service = new UpdateProductCategoryService($this->repository, $this->slugGenerator);
 
         $this->repository
             ->expects($this->once())
             ->method('find')
             ->with(999)
             ->willReturn(null);
+
+        $this->slugGenerator
+            ->expects($this->never())
+            ->method('generate');
 
         $this->expectException(ProductCategoryNotFoundException::class);
 

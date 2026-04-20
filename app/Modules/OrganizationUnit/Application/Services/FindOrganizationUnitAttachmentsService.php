@@ -12,9 +12,7 @@ use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitAttachm
 
 class FindOrganizationUnitAttachmentsService implements FindOrganizationUnitAttachmentsServiceInterface
 {
-    public function __construct(private readonly OrganizationUnitAttachmentRepositoryInterface $attachmentRepository)
-    {
-    }
+    public function __construct(private readonly OrganizationUnitAttachmentRepositoryInterface $attachmentRepository) {}
 
     public function find(int $id): ?OrganizationUnitAttachment
     {

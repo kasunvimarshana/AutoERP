@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Modules\User\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
-use Modules\User\Domain\ValueObjects\Address;
-use Modules\User\Domain\ValueObjects\PhoneNumber;
 use Modules\User\Application\Contracts\UpdateProfileServiceInterface;
 use Modules\User\Application\DTOs\UpdateProfileData;
 use Modules\User\Domain\Entities\User;
 use Modules\User\Domain\Events\UserProfileUpdated;
 use Modules\User\Domain\Exceptions\UserNotFoundException;
 use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
+use Modules\User\Domain\ValueObjects\Address;
+use Modules\User\Domain\ValueObjects\PhoneNumber;
 
 class UpdateProfileService extends BaseService implements UpdateProfileServiceInterface
 {

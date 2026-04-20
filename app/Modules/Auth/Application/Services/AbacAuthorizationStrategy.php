@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Modules\Auth\Application\Services;
 
 use Illuminate\Support\Facades\Gate;
-use Modules\Auth\Application\Contracts\AuthUserRepositoryInterface;
 use Modules\Auth\Application\Contracts\AuthorizationStrategyInterface;
+use Modules\Auth\Application\Contracts\AuthUserRepositoryInterface;
 
 /**
  * Attribute-Based Access Control (ABAC) authorization strategy.

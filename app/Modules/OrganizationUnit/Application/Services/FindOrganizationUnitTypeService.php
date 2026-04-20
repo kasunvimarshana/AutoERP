@@ -17,9 +17,7 @@ class FindOrganizationUnitTypeService implements FindOrganizationUnitTypeService
     /** @var array<string> */
     private const ALLOWED_SORTS = ['id', 'tenant_id', 'name', 'level', 'is_active', 'created_at', 'updated_at'];
 
-    public function __construct(private readonly OrganizationUnitTypeRepositoryInterface $organizationUnitTypeRepository)
-    {
-    }
+    public function __construct(private readonly OrganizationUnitTypeRepositoryInterface $organizationUnitTypeRepository) {}
 
     public function find(int $id): ?OrganizationUnitType
     {

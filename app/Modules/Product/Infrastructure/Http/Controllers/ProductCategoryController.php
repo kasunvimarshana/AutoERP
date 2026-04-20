@@ -6,7 +6,9 @@ namespace Modules\Product\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Response;
+use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Product\Application\Contracts\CreateProductCategoryServiceInterface;
 use Modules\Product\Application\Contracts\DeleteProductCategoryServiceInterface;
@@ -24,6 +26,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 class ProductCategoryController extends AuthorizedController
 {
     public function __construct(
+        protected FileStorageServiceInterface $storage,
         protected CreateProductCategoryServiceInterface $createProductCategoryService,
         protected UpdateProductCategoryServiceInterface $updateProductCategoryService,
         protected DeleteProductCategoryServiceInterface $deleteProductCategoryService,
@@ -58,7 +61,17 @@ class ProductCategoryController extends AuthorizedController
     {
         $this->authorize('create', ProductCategory::class);
 
-        $productCategory = $this->createProductCategoryService->execute($request->validated());
+        $payload = $request->validated();
+
+        if ($request->hasFile('image_path')) {
+            $payload['image_path'] = $this->storeImage(
+                $request->file('image_path'),
+                (int) $payload['tenant_id'],
+                'product-categories'
+            );
+        }
+
+        $productCategory = $this->createProductCategoryService->execute($payload);
 
         return (new ProductCategoryResource($productCategory))
             ->response()
@@ -79,9 +92,36 @@ class ProductCategoryController extends AuthorizedController
         $this->authorize('update', $foundProductCategory);
 
         $payload = $request->validated();
+        $oldImagePath = $foundProductCategory->getImagePath();
+        $newImagePath = null;
+
+        if ($request->hasFile('image_path')) {
+            $newImagePath = $this->storeImage(
+                $request->file('image_path'),
+                (int) $payload['tenant_id'],
+                'product-categories'
+            );
+
+            $payload['image_path'] = $newImagePath;
+        }
+
         $payload['id'] = $productCategory;
 
-        return new ProductCategoryResource($this->updateProductCategoryService->execute($payload));
+        try {
+            $updatedProductCategory = $this->updateProductCategoryService->execute($payload);
+        } catch (\Throwable $exception) {
+            if ($newImagePath !== null) {
+                $this->deleteImageIfSafe($newImagePath, (int) $payload['tenant_id'], 'product-categories');
+            }
+
+            throw $exception;
+        }
+
+        if ($newImagePath !== null) {
+            $this->deleteImageIfSafe($oldImagePath, (int) $payload['tenant_id'], 'product-categories', $newImagePath);
+        }
+
+        return new ProductCategoryResource($updatedProductCategory);
     }
 
     public function destroy(int $productCategory): JsonResponse
@@ -103,5 +143,27 @@ class ProductCategoryController extends AuthorizedController
         }
 
         return $productCategory;
+    }
+
+    private function storeImage(UploadedFile $image, int $tenantId, string $baseDirectory): string
+    {
+        return $this->storage->storeFile($image, "{$baseDirectory}/{$tenantId}");
+    }
+
+    private function deleteImageIfSafe(?string $imagePath, int $tenantId, string $baseDirectory, ?string $excludePath = null): void
+    {
+        if ($imagePath === null || $imagePath === '' || $imagePath === $excludePath) {
+            return;
+        }
+
+        $expectedPrefix = "{$baseDirectory}/{$tenantId}/";
+
+        if (! str_starts_with($imagePath, $expectedPrefix)) {
+            return;
+        }
+
+        if ($this->storage->exists($imagePath)) {
+            $this->storage->delete($imagePath);
+        }
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Product\Application\Services;
 
+use Modules\Core\Application\Contracts\SlugGeneratorInterface;
 use Modules\Core\Application\Services\BaseService;
 use Modules\Product\Application\Contracts\UpdateProductBrandServiceInterface;
 use Modules\Product\Application\DTOs\ProductBrandData;
@@ -13,8 +14,10 @@ use Modules\Product\Domain\RepositoryInterfaces\ProductBrandRepositoryInterface;
 
 class UpdateProductBrandService extends BaseService implements UpdateProductBrandServiceInterface
 {
-    public function __construct(private readonly ProductBrandRepositoryInterface $productBrandRepository)
-    {
+    public function __construct(
+        private readonly ProductBrandRepositoryInterface $productBrandRepository,
+        private readonly SlugGeneratorInterface $slugGenerator,
+    ) {
         parent::__construct($productBrandRepository);
     }
 
@@ -26,6 +29,12 @@ class UpdateProductBrandService extends BaseService implements UpdateProductBran
         if (! $productBrand) {
             throw new ProductBrandNotFoundException($id);
         }
+
+        $data['slug'] = $this->slugGenerator->generate(
+            preferredValue: isset($data['slug']) ? (string) $data['slug'] : null,
+            sourceValue: isset($data['name']) ? (string) $data['name'] : $productBrand->getName(),
+            fallback: $productBrand->getSlug(),
+        );
 
         $dto = ProductBrandData::fromArray($data);
 

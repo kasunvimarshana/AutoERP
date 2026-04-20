@@ -36,6 +36,7 @@ class ProductVariantController extends AuthorizedController
         $validated = $request->validated();
 
         $filters = array_filter([
+            'tenant_id' => $validated['tenant_id'] ?? null,
             'product_id' => $validated['product_id'] ?? null,
             'name' => $validated['name'] ?? null,
             'sku' => $validated['sku'] ?? null,
@@ -48,6 +49,7 @@ class ProductVariantController extends AuthorizedController
             perPage: (int) ($validated['per_page'] ?? 15),
             page: (int) ($validated['page'] ?? 1),
             sort: $validated['sort'] ?? null,
+            include: $validated['include'] ?? null,
         );
 
         return (new ProductVariantCollection($productVariants))->response();

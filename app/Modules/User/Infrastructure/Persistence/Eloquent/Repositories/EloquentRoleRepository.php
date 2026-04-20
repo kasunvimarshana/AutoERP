@@ -34,15 +34,15 @@ class EloquentRoleRepository extends EloquentRepository implements RoleRepositor
             $model = $this->update($role->getId(), [
                 'tenant_id' => $role->getTenantId(),
                 'name' => $role->getName(),
-            'guard_name' => $role->getGuardName(),
-            'description' => $role->getDescription(),
+                'guard_name' => $role->getGuardName(),
+                'description' => $role->getDescription(),
             ]);
         } else {
             $model = $this->create([
                 'tenant_id' => $role->getTenantId(),
                 'name' => $role->getName(),
-            'guard_name' => $role->getGuardName(),
-            'description' => $role->getDescription(),
+                'guard_name' => $role->getGuardName(),
+                'description' => $role->getDescription(),
             ]);
         }
 

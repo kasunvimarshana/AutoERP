@@ -125,5 +125,4 @@ class ModuleBoundaryGuardrailsTest extends TestCase
 
         return array_values(array_map(static fn (string $statement): string => trim($statement), $matches[1] ?? []));
     }
-
 }

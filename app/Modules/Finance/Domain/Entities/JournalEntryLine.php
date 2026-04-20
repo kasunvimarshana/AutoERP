@@ -7,7 +7,7 @@ namespace Modules\Finance\Domain\Entities;
 class JournalEntryLine
 {
     /**
-     * @param array<string, mixed>|null $metadata
+     * @param  array<string, mixed>|null  $metadata
      */
     public function __construct(
         private int $accountId,

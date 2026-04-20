@@ -20,6 +20,7 @@ class EloquentProductVariantRepository extends EloquentRepository implements Pro
     public function save(ProductVariant $productVariant): ProductVariant
     {
         $data = [
+            'tenant_id' => $productVariant->getTenantId(),
             'product_id' => $productVariant->getProductId(),
             'sku' => $productVariant->getSku(),
             'name' => $productVariant->getName(),
@@ -39,15 +40,34 @@ class EloquentProductVariantRepository extends EloquentRepository implements Pro
         return $this->toDomainEntity($model);
     }
 
-    public function findByProductAndSku(int $productId, string $sku): ?ProductVariant
+    public function findByProductAndSku(int $productId, string $sku, ?int $tenantId = null): ?ProductVariant
     {
-        /** @var ProductVariantModel|null $model */
-        $model = $this->model->newQuery()
+        $query = $this->model->newQuery()
             ->where('product_id', $productId)
-            ->where('sku', $sku)
-            ->first();
+            ->where('sku', $sku);
+
+        if ($tenantId !== null) {
+            $query->where('tenant_id', $tenantId);
+        }
+
+        /** @var ProductVariantModel|null $model */
+        $model = $query->first();
 
         return $model ? $this->toDomainEntity($model) : null;
+    }
+
+    public function clearDefaultForProduct(int $tenantId, int $productId, ?int $exceptVariantId = null): void
+    {
+        $query = $this->model->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->where('product_id', $productId)
+            ->where('is_default', true);
+
+        if ($exceptVariantId !== null) {
+            $query->where('id', '!=', $exceptVariantId);
+        }
+
+        $query->update(['is_default' => false]);
     }
 
     public function find(int|string $id, array $columns = ['*']): ?ProductVariant
@@ -60,6 +80,7 @@ class EloquentProductVariantRepository extends EloquentRepository implements Pro
         return new ProductVariant(
             id: (int) $model->id,
             productId: (int) $model->product_id,
+            tenantId: $model->tenant_id !== null ? (int) $model->tenant_id : null,
             sku: $model->sku,
             name: (string) $model->name,
             isDefault: (bool) $model->is_default,

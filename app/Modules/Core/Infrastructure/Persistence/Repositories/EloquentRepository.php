@@ -41,8 +41,6 @@ class EloquentRepository extends BaseRepository
         return $this->model->newQuery()->find($id, $columns);
     }
 
-
-
     /**
      * {@inheritdoc}
      */

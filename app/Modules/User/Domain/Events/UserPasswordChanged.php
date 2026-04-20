@@ -20,7 +20,7 @@ class UserPasswordChanged extends BaseEvent
     public function broadcastWith(): array
     {
         return array_merge(parent::broadcastWith(), [
-            'id'    => $this->user->getId(),
+            'id' => $this->user->getId(),
             'email' => $this->user->getEmail()->value(),
         ]);
     }

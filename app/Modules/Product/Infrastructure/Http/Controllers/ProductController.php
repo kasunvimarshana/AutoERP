@@ -6,7 +6,9 @@ namespace Modules\Product\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Response;
+use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Product\Application\Contracts\CreateProductServiceInterface;
 use Modules\Product\Application\Contracts\DeleteProductServiceInterface;
@@ -24,6 +26,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 class ProductController extends AuthorizedController
 {
     public function __construct(
+        protected FileStorageServiceInterface $storage,
         protected CreateProductServiceInterface $createProductService,
         protected UpdateProductServiceInterface $updateProductService,
         protected DeleteProductServiceInterface $deleteProductService,
@@ -52,6 +55,7 @@ class ProductController extends AuthorizedController
             perPage: (int) ($validated['per_page'] ?? 15),
             page: (int) ($validated['page'] ?? 1),
             sort: $validated['sort'] ?? null,
+            include: $validated['include'] ?? null,
         );
 
         return (new ProductCollection($products))->response();
@@ -61,7 +65,17 @@ class ProductController extends AuthorizedController
     {
         $this->authorize('create', Product::class);
 
-        $product = $this->createProductService->execute($request->validated());
+        $payload = $request->validated();
+
+        if ($request->hasFile('image_path')) {
+            $payload['image_path'] = $this->storeImage(
+                $request->file('image_path'),
+                (int) $payload['tenant_id'],
+                'products'
+            );
+        }
+
+        $product = $this->createProductService->execute($payload);
 
         return (new ProductResource($product))
             ->response()
@@ -82,9 +96,36 @@ class ProductController extends AuthorizedController
         $this->authorize('update', $foundProduct);
 
         $payload = $request->validated();
+        $oldImagePath = $foundProduct->getImagePath();
+        $newImagePath = null;
+
+        if ($request->hasFile('image_path')) {
+            $newImagePath = $this->storeImage(
+                $request->file('image_path'),
+                (int) $payload['tenant_id'],
+                'products'
+            );
+
+            $payload['image_path'] = $newImagePath;
+        }
+
         $payload['id'] = $product;
 
-        return new ProductResource($this->updateProductService->execute($payload));
+        try {
+            $updatedProduct = $this->updateProductService->execute($payload);
+        } catch (\Throwable $exception) {
+            if ($newImagePath !== null) {
+                $this->deleteImageIfSafe($newImagePath, (int) $payload['tenant_id'], 'products');
+            }
+
+            throw $exception;
+        }
+
+        if ($newImagePath !== null) {
+            $this->deleteImageIfSafe($oldImagePath, (int) $payload['tenant_id'], 'products', $newImagePath);
+        }
+
+        return new ProductResource($updatedProduct);
     }
 
     public function destroy(int $product): JsonResponse
@@ -106,5 +147,27 @@ class ProductController extends AuthorizedController
         }
 
         return $product;
+    }
+
+    private function storeImage(UploadedFile $image, int $tenantId, string $baseDirectory): string
+    {
+        return $this->storage->storeFile($image, "{$baseDirectory}/{$tenantId}");
+    }
+
+    private function deleteImageIfSafe(?string $imagePath, int $tenantId, string $baseDirectory, ?string $excludePath = null): void
+    {
+        if ($imagePath === null || $imagePath === '' || $imagePath === $excludePath) {
+            return;
+        }
+
+        $expectedPrefix = "{$baseDirectory}/{$tenantId}/";
+
+        if (! str_starts_with($imagePath, $expectedPrefix)) {
+            return;
+        }
+
+        if ($this->storage->exists($imagePath)) {
+            $this->storage->delete($imagePath);
+        }
     }
 }

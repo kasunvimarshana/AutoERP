@@ -6,6 +6,12 @@ namespace Modules\Product\Domain\Entities;
 
 class Product
 {
+    /** @var array<string> */
+    private const SUPPORTED_TYPES = ['physical', 'service', 'digital', 'combo', 'variable'];
+
+    /** @var array<string> */
+    private const SUPPORTED_VALUATION_METHODS = ['fifo', 'lifo', 'fefo', 'weighted_average', 'standard'];
+
     private ?int $id;
 
     private int $tenantId;
@@ -19,6 +25,7 @@ class Product
     private string $type;
 
     private string $name;
+
     private ?string $imagePath;
 
     private string $slug;
@@ -65,7 +72,7 @@ class Product
     private \DateTimeInterface $updatedAt;
 
     /**
-     * @param array<string, mixed>|null $metadata
+     * @param  array<string, mixed>|null  $metadata
      */
     public function __construct(
         int $tenantId,
@@ -98,6 +105,16 @@ class Product
         ?\DateTimeInterface $createdAt = null,
         ?\DateTimeInterface $updatedAt = null,
     ) {
+        $this->assertInvariants(
+            type: $type,
+            valuationMethod: $valuationMethod,
+            uomConversionFactor: $uomConversionFactor,
+            isBatchTracked: $isBatchTracked,
+            isLotTracked: $isLotTracked,
+            isSerialTracked: $isSerialTracked,
+            standardCost: $standardCost,
+        );
+
         $this->id = $id;
         $this->tenantId = $tenantId;
         $this->categoryId = $categoryId;
@@ -164,7 +181,10 @@ class Product
         return $this->name;
     }
 
-    public function getImagePath(): ?string { return $this->imagePath; }
+    public function getImagePath(): ?string
+    {
+        return $this->imagePath;
+    }
 
     public function getSlug(): string
     {
@@ -275,15 +295,15 @@ class Product
     }
 
     /**
-     * @param array<string, mixed>|null $metadata
+     * @param  array<string, mixed>|null  $metadata
      */
     public function update(
         string $type,
         string $name,
         string $slug,
         int $baseUomId,
-        ?string $imagePath = null,
-        ?int $taxGroupId = null,
+        ?string $imagePath,
+        ?int $taxGroupId,
         ?int $categoryId,
         ?int $brandId,
         ?int $orgUnitId,
@@ -304,6 +324,16 @@ class Product
         bool $isActive,
         ?array $metadata,
     ): void {
+        $this->assertInvariants(
+            type: $type,
+            valuationMethod: $valuationMethod,
+            uomConversionFactor: $uomConversionFactor,
+            isBatchTracked: $isBatchTracked,
+            isLotTracked: $isLotTracked,
+            isSerialTracked: $isSerialTracked,
+            standardCost: $standardCost,
+        );
+
         $this->type = $type;
         $this->name = $name;
         $this->imagePath = $imagePath;
@@ -330,5 +360,35 @@ class Product
         $this->isActive = $isActive;
         $this->metadata = $metadata;
         $this->updatedAt = new \DateTimeImmutable;
+    }
+
+    private function assertInvariants(
+        string $type,
+        string $valuationMethod,
+        string $uomConversionFactor,
+        bool $isBatchTracked,
+        bool $isLotTracked,
+        bool $isSerialTracked,
+        ?string $standardCost,
+    ): void {
+        if (! in_array($type, self::SUPPORTED_TYPES, true)) {
+            throw new \InvalidArgumentException('Unsupported product type.');
+        }
+
+        if (! in_array($valuationMethod, self::SUPPORTED_VALUATION_METHODS, true)) {
+            throw new \InvalidArgumentException('Unsupported valuation method.');
+        }
+
+        if (! is_numeric($uomConversionFactor) || (float) $uomConversionFactor <= 0) {
+            throw new \InvalidArgumentException('UOM conversion factor must be greater than zero.');
+        }
+
+        if ($isSerialTracked && ($isBatchTracked || $isLotTracked)) {
+            throw new \InvalidArgumentException('Serial-tracked products cannot be batch-tracked or lot-tracked.');
+        }
+
+        if ($valuationMethod === 'standard' && $standardCost === null) {
+            throw new \InvalidArgumentException('Standard cost is required when valuation method is standard.');
+        }
     }
 }

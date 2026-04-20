@@ -6,7 +6,9 @@ namespace Modules\Product\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Response;
+use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Product\Application\Contracts\CreateProductBrandServiceInterface;
 use Modules\Product\Application\Contracts\DeleteProductBrandServiceInterface;
@@ -24,6 +26,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 class ProductBrandController extends AuthorizedController
 {
     public function __construct(
+        protected FileStorageServiceInterface $storage,
         protected CreateProductBrandServiceInterface $createProductBrandService,
         protected UpdateProductBrandServiceInterface $updateProductBrandService,
         protected DeleteProductBrandServiceInterface $deleteProductBrandService,
@@ -58,7 +61,17 @@ class ProductBrandController extends AuthorizedController
     {
         $this->authorize('create', ProductBrand::class);
 
-        $productBrand = $this->createProductBrandService->execute($request->validated());
+        $payload = $request->validated();
+
+        if ($request->hasFile('image_path')) {
+            $payload['image_path'] = $this->storeImage(
+                $request->file('image_path'),
+                (int) $payload['tenant_id'],
+                'product-brands'
+            );
+        }
+
+        $productBrand = $this->createProductBrandService->execute($payload);
 
         return (new ProductBrandResource($productBrand))
             ->response()
@@ -79,9 +92,36 @@ class ProductBrandController extends AuthorizedController
         $this->authorize('update', $foundProductBrand);
 
         $payload = $request->validated();
+        $oldImagePath = $foundProductBrand->getImagePath();
+        $newImagePath = null;
+
+        if ($request->hasFile('image_path')) {
+            $newImagePath = $this->storeImage(
+                $request->file('image_path'),
+                (int) $payload['tenant_id'],
+                'product-brands'
+            );
+
+            $payload['image_path'] = $newImagePath;
+        }
+
         $payload['id'] = $productBrand;
 
-        return new ProductBrandResource($this->updateProductBrandService->execute($payload));
+        try {
+            $updatedProductBrand = $this->updateProductBrandService->execute($payload);
+        } catch (\Throwable $exception) {
+            if ($newImagePath !== null) {
+                $this->deleteImageIfSafe($newImagePath, (int) $payload['tenant_id'], 'product-brands');
+            }
+
+            throw $exception;
+        }
+
+        if ($newImagePath !== null) {
+            $this->deleteImageIfSafe($oldImagePath, (int) $payload['tenant_id'], 'product-brands', $newImagePath);
+        }
+
+        return new ProductBrandResource($updatedProductBrand);
     }
 
     public function destroy(int $productBrand): JsonResponse
@@ -103,5 +143,27 @@ class ProductBrandController extends AuthorizedController
         }
 
         return $productBrand;
+    }
+
+    private function storeImage(UploadedFile $image, int $tenantId, string $baseDirectory): string
+    {
+        return $this->storage->storeFile($image, "{$baseDirectory}/{$tenantId}");
+    }
+
+    private function deleteImageIfSafe(?string $imagePath, int $tenantId, string $baseDirectory, ?string $excludePath = null): void
+    {
+        if ($imagePath === null || $imagePath === '' || $imagePath === $excludePath) {
+            return;
+        }
+
+        $expectedPrefix = "{$baseDirectory}/{$tenantId}/";
+
+        if (! str_starts_with($imagePath, $expectedPrefix)) {
+            return;
+        }
+
+        if ($this->storage->exists($imagePath)) {
+            $this->storage->delete($imagePath);
+        }
     }
 }

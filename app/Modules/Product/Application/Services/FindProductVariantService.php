@@ -13,6 +13,7 @@ class FindProductVariantService implements FindProductVariantServiceInterface
 {
     /** @var array<string> */
     private const ALLOWED_FILTERS = [
+        'tenant_id',
         'product_id',
         'name',
         'sku',
@@ -22,6 +23,9 @@ class FindProductVariantService implements FindProductVariantServiceInterface
 
     /** @var array<string> */
     private const ALLOWED_SORTS = ['id', 'name', 'sku', 'is_default', 'is_active', 'created_at', 'updated_at'];
+
+    /** @var array<string> */
+    private const ALLOWED_INCLUDES = ['product'];
 
     public function __construct(
         private readonly ProductVariantRepositoryInterface $productVariantRepository
@@ -55,6 +59,11 @@ class FindProductVariantService implements FindProductVariantServiceInterface
             $repository->orderBy($sortField, $sortDirection);
         }
 
+        $relations = $this->parseIncludes($include);
+        if ($relations !== []) {
+            $repository->with($relations);
+        }
+
         $perPage = $perPage ?? 15;
 
         return $repository->paginate($perPage, ['*'], 'page', $page);
@@ -83,5 +92,26 @@ class FindProductVariantService implements FindProductVariantServiceInterface
         }
 
         return [$field, $direction];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function parseIncludes(?string $include): array
+    {
+        if ($include === null) {
+            return [];
+        }
+
+        $relations = array_filter(array_map('trim', explode(',', $include)));
+
+        if ($relations === []) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $relations,
+            fn (string $relation): bool => in_array($relation, self::ALLOWED_INCLUDES, true)
+        ));
     }
 }

@@ -15,7 +15,7 @@ class AccountCollection extends ResourceCollection
     public function toArray(Request $request): array
     {
         return [
-            'data' => $this->collection->map(fn (mixed $account) => (new \Modules\Finance\Infrastructure\Http\Resources\AccountResource($account))->toArray($request)),
+            'data' => $this->collection->map(fn (mixed $account) => (new AccountResource($account))->toArray($request)),
             'meta' => [
                 'current_page' => $this->currentPage(),
                 'last_page' => $this->lastPage(),

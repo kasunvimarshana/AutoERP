@@ -24,7 +24,7 @@ class DeleteTenantAttachmentService extends BaseService implements DeleteTenantA
     protected function handle(array $data): bool
     {
         $attachmentId = (int) $data['attachment_id'];
-        $attachment   = $this->attachmentRepository->find($attachmentId);
+        $attachment = $this->attachmentRepository->find($attachmentId);
         if (! $attachment) {
             throw new AttachmentNotFoundException($attachmentId);
         }

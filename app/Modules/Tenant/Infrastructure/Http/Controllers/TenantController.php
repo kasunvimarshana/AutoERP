@@ -19,14 +19,14 @@ use Modules\Tenant\Application\Contracts\UpdateTenantServiceInterface;
 use Modules\Tenant\Application\Contracts\UploadTenantAttachmentServiceInterface;
 use Modules\Tenant\Application\DTOs\TenantData;
 use Modules\Tenant\Domain\Entities\Tenant;
-use Modules\User\Application\Contracts\FindUserServiceInterface;
-use Modules\Tenant\Infrastructure\Http\Requests\StoreTenantRequest;
 use Modules\Tenant\Infrastructure\Http\Requests\ListTenantRequest;
+use Modules\Tenant\Infrastructure\Http\Requests\StoreTenantRequest;
 use Modules\Tenant\Infrastructure\Http\Requests\UpdateTenantConfigRequest;
 use Modules\Tenant\Infrastructure\Http\Requests\UpdateTenantRequest;
 use Modules\Tenant\Infrastructure\Http\Resources\TenantCollection;
 use Modules\Tenant\Infrastructure\Http\Resources\TenantConfigResource;
 use Modules\Tenant\Infrastructure\Http\Resources\TenantResource;
+use Modules\User\Application\Contracts\FindUserServiceInterface;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -74,8 +74,8 @@ class TenantController extends AuthorizedController
         }
 
         $perPage = (int) ($validated['per_page'] ?? 15);
-        $page    = (int) ($validated['page'] ?? 1);
-        $sort    = $validated['sort'] ?? null;
+        $page = (int) ($validated['page'] ?? 1);
+        $sort = $validated['sort'] ?? null;
         $include = $validated['include'] ?? null;
 
         $tenants = $this->findTenantService->list($filters, $perPage, $page, $sort, $include);

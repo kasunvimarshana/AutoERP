@@ -18,7 +18,6 @@ final class UserChannel
     /**
      * Authorize the incoming channel subscription.
      *
-     * @param  Authenticatable  $user
      * @param  int|string  $userId  Wildcard extracted from the channel name
      */
     public function join(Authenticatable $user, int|string $userId): bool

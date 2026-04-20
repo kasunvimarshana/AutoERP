@@ -6,9 +6,9 @@ namespace Modules\Tenant\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Response;
+use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Tenant\Application\Contracts\CreateTenantSettingServiceInterface;
 use Modules\Tenant\Application\Contracts\DeleteTenantSettingServiceInterface;
-use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Tenant\Application\Contracts\FindTenantServiceInterface;
 use Modules\Tenant\Application\Contracts\FindTenantSettingsServiceInterface;
 use Modules\Tenant\Application\Contracts\UpdateTenantSettingServiceInterface;

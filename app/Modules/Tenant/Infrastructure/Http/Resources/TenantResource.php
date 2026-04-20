@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Tenant\Infrastructure\Http\Resources;
 
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Collection;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
@@ -45,11 +46,11 @@ class TenantResource extends JsonResource
             'active' => $this->isActive(),
             'attachments' => $this->when(
                 $this->attachments !== null,
-                fn (): \Illuminate\Http\Resources\Json\AnonymousResourceCollection => TenantAttachmentResource::collection($this->attachments)
+                fn (): AnonymousResourceCollection => TenantAttachmentResource::collection($this->attachments)
             ),
             'users' => $this->when(
                 $this->users !== null,
-                fn (): \Illuminate\Http\Resources\Json\AnonymousResourceCollection => UserResource::collection($this->users)
+                fn (): AnonymousResourceCollection => UserResource::collection($this->users)
             ),
             'created_at' => $this->getCreatedAt()?->format('c'),
             'updated_at' => $this->getUpdatedAt()?->format('c'),

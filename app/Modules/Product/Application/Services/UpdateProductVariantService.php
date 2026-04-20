@@ -29,6 +29,18 @@ class UpdateProductVariantService extends BaseService implements UpdateProductVa
 
         $dto = ProductVariantData::fromArray($data);
 
+        if ($productVariant->getTenantId() !== null && $productVariant->getTenantId() !== $dto->tenant_id) {
+            throw new ProductVariantNotFoundException($id);
+        }
+
+        if ($dto->is_default) {
+            $this->productVariantRepository->clearDefaultForProduct(
+                tenantId: $dto->tenant_id,
+                productId: $dto->product_id,
+                exceptVariantId: $id,
+            );
+        }
+
         $productVariant->update(
             name: $dto->name,
             sku: $dto->sku,

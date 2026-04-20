@@ -35,7 +35,7 @@ class ProductCategoryRoutesTest extends TestCase
     }
 
     /**
-     * @param array<int, string> $expectedMiddleware
+     * @param  array<int, string>  $expectedMiddleware
      */
     private function assertRouteUsesMiddleware(Route $route, array $expectedMiddleware): void
     {

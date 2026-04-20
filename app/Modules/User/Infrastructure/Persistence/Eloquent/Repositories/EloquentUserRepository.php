@@ -6,10 +6,6 @@ namespace Modules\User\Infrastructure\Persistence\Eloquent\Repositories;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Hash;
-use Modules\User\Domain\ValueObjects\Address;
-use Modules\User\Domain\ValueObjects\Email;
-use Modules\User\Domain\ValueObjects\PhoneNumber;
-use Modules\User\Domain\ValueObjects\UserPreferences;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\User\Domain\Entities\Permission;
 use Modules\User\Domain\Entities\Role;
@@ -17,6 +13,10 @@ use Modules\User\Domain\Entities\User;
 use Modules\User\Domain\Entities\UserAttachment;
 use Modules\User\Domain\Entities\UserDevice;
 use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
+use Modules\User\Domain\ValueObjects\Address;
+use Modules\User\Domain\ValueObjects\Email;
+use Modules\User\Domain\ValueObjects\PhoneNumber;
+use Modules\User\Domain\ValueObjects\UserPreferences;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserAttachmentModel;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserDeviceModel;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
@@ -38,19 +38,29 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
         return $model ? $this->toDomainEntity($model) : null;
     }
 
+    public function findByTenantAndId(int $tenantId, int $userId): ?User
+    {
+        $model = $this->model->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->where('id', $userId)
+            ->first();
+
+        return $model ? $this->toDomainEntity($model) : null;
+    }
+
     public function save(User $user): User
     {
         $data = [
-            'tenant_id'   => $user->getTenantId(),
+            'tenant_id' => $user->getTenantId(),
             'org_unit_id' => $user->getOrgUnitId(),
-            'email'       => $user->getEmail()->value(),
-            'first_name'  => $user->getFirstName(),
-            'last_name'   => $user->getLastName(),
-            'phone'       => $user->getPhone()?->value(),
-            'address'     => $user->getAddress()?->toArray(),
+            'email' => $user->getEmail()->value(),
+            'first_name' => $user->getFirstName(),
+            'last_name' => $user->getLastName(),
+            'phone' => $user->getPhone()?->value(),
+            'address' => $user->getAddress()?->toArray(),
             'preferences' => $user->getPreferences()->toArray(),
-            'status'      => $user->isActive() ? 'active' : 'inactive',
-            'avatar'      => $user->getAvatar(),
+            'status' => $user->isActive() ? 'active' : 'inactive',
+            'avatar' => $user->getAvatar(),
         ];
 
         if ($user->getId()) {
@@ -88,6 +98,28 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
     public function changePassword(int $userId, string $hashedPassword): void
     {
         $this->model->where('id', $userId)->update(['password' => $hashedPassword]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    public function createRecord(array $attributes): int
+    {
+        /** @var UserModel $model */
+        $model = $this->model->newQuery()->create($attributes);
+
+        return (int) $model->id;
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    public function updateRecord(int $tenantId, int $userId, array $attributes): void
+    {
+        $this->model->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->where('id', $userId)
+            ->update($attributes);
     }
 
     public function updateAvatar(int $userId, ?string $avatarPath): void
@@ -160,7 +192,14 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
         foreach ($model->roles as $roleModel) {
             $role = new Role($roleModel->tenant_id, $roleModel->name, $roleModel->id);
             foreach ($roleModel->permissions as $permModel) {
-                $perm = new Permission($permModel->tenant_id, $permModel->name, $permModel->id);
+                $perm = new Permission(
+                    tenantId: (int) $permModel->tenant_id,
+                    name: (string) $permModel->name,
+                    guardName: (string) $permModel->guard_name,
+                    module: (string) ($permModel->module ?? 'general'),
+                    description: $permModel->description,
+                    id: (int) $permModel->id,
+                );
                 $role->grantPermission($perm);
             }
             $user->assignRole($role);

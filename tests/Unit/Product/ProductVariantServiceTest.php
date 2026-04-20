@@ -40,12 +40,14 @@ class ProductVariantServiceTest extends TestCase
                 }
 
                 return $productVariant->getProductId() === 41
+                    && $productVariant->getTenantId() === 9
                     && $productVariant->getName() === 'Blue Variant'
                     && $productVariant->getSku() === 'BLU-001';
             }))
             ->willReturn($this->buildProductVariant(701));
 
         $result = $service->execute([
+            'tenant_id' => 9,
             'product_id' => 41,
             'name' => 'Blue Variant',
             'sku' => 'BLU-001',
@@ -64,12 +66,13 @@ class ProductVariantServiceTest extends TestCase
         $paginator = $this->createMock(LengthAwarePaginator::class);
 
         $this->repository->expects($this->once())->method('resetCriteria')->willReturn($this->repository);
-        $this->repository->expects($this->exactly(2))->method('where')->withAnyParameters()->willReturn($this->repository);
+        $this->repository->expects($this->exactly(3))->method('where')->withAnyParameters()->willReturn($this->repository);
         $this->repository->expects($this->once())->method('orderBy')->with('name', 'desc')->willReturn($this->repository);
         $this->repository->expects($this->once())->method('paginate')->with(20, ['*'], 'page', 2)->willReturn($paginator);
 
         $result = $service->list(
             filters: [
+                'tenant_id' => 9,
                 'product_id' => 41,
                 'name' => 'bl',
                 'unknown' => 'ignored',
@@ -96,6 +99,7 @@ class ProductVariantServiceTest extends TestCase
 
         $service->execute([
             'id' => 999,
+            'tenant_id' => 9,
             'product_id' => 41,
             'name' => 'Missing Variant',
             'sku' => 'MIS-999',
@@ -122,6 +126,7 @@ class ProductVariantServiceTest extends TestCase
         return new ProductVariant(
             id: $id,
             productId: 41,
+            tenantId: 9,
             sku: 'BLU-001',
             name: 'Blue Variant',
             isDefault: false,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Product;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Modules\Core\Application\Contracts\SlugGeneratorInterface;
 use Modules\Product\Application\Services\CreateProductBrandService;
 use Modules\Product\Application\Services\DeleteProductBrandService;
 use Modules\Product\Application\Services\FindProductBrandService;
@@ -20,16 +21,26 @@ class ProductBrandServiceTest extends TestCase
     /** @var ProductBrandRepositoryInterface&MockObject */
     private ProductBrandRepositoryInterface $repository;
 
+    /** @var SlugGeneratorInterface&MockObject */
+    private SlugGeneratorInterface $slugGenerator;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->repository = $this->createMock(ProductBrandRepositoryInterface::class);
+        $this->slugGenerator = $this->createMock(SlugGeneratorInterface::class);
     }
 
     public function test_create_product_brand_service_maps_payload_and_saves(): void
     {
-        $service = new CreateProductBrandService($this->repository);
+        $service = new CreateProductBrandService($this->repository, $this->slugGenerator);
+
+        $this->slugGenerator
+            ->expects($this->once())
+            ->method('generate')
+            ->with(null, 'Acme', 'brand')
+            ->willReturn('acme');
 
         $this->repository
             ->expects($this->once())
@@ -48,7 +59,6 @@ class ProductBrandServiceTest extends TestCase
         $result = $service->execute([
             'tenant_id' => 7,
             'name' => 'Acme',
-            'slug' => 'acme',
             'is_active' => true,
         ]);
 
@@ -83,13 +93,17 @@ class ProductBrandServiceTest extends TestCase
 
     public function test_update_product_brand_service_throws_when_product_brand_missing(): void
     {
-        $service = new UpdateProductBrandService($this->repository);
+        $service = new UpdateProductBrandService($this->repository, $this->slugGenerator);
 
         $this->repository
             ->expects($this->once())
             ->method('find')
             ->with(999)
             ->willReturn(null);
+
+        $this->slugGenerator
+            ->expects($this->never())
+            ->method('generate');
 
         $this->expectException(ProductBrandNotFoundException::class);
 

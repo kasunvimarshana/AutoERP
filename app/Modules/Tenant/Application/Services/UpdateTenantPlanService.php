@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Application\Services;
 
+use Modules\Core\Application\Contracts\SlugGeneratorInterface;
 use Modules\Core\Application\Services\BaseService;
 use Modules\Tenant\Application\Contracts\UpdateTenantPlanServiceInterface;
 use Modules\Tenant\Domain\Entities\TenantPlan;
@@ -14,7 +15,8 @@ use Modules\Tenant\Domain\RepositoryInterfaces\TenantPlanRepositoryInterface;
 class UpdateTenantPlanService extends BaseService implements UpdateTenantPlanServiceInterface
 {
     public function __construct(
-        private readonly TenantPlanRepositoryInterface $planRepository
+        private readonly TenantPlanRepositoryInterface $planRepository,
+        private readonly SlugGeneratorInterface $slugGenerator,
     ) {
         parent::__construct($planRepository);
     }
@@ -27,6 +29,12 @@ class UpdateTenantPlanService extends BaseService implements UpdateTenantPlanSer
         if (! $existing) {
             throw new TenantPlanNotFoundException($id);
         }
+
+        $data['slug'] = $this->slugGenerator->generate(
+            preferredValue: array_key_exists('slug', $data) ? (string) $data['slug'] : null,
+            sourceValue: array_key_exists('name', $data) ? (string) $data['name'] : $existing->getName(),
+            fallback: $existing->getSlug(),
+        );
 
         $name = array_key_exists('name', $data)
             ? (string) $data['name']

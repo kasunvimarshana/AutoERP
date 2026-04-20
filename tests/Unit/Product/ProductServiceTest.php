@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Product;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Modules\Core\Application\Contracts\SlugGeneratorInterface;
 use Modules\Product\Application\Services\CreateProductService;
 use Modules\Product\Application\Services\DeleteProductService;
 use Modules\Product\Application\Services\FindProductService;
@@ -20,16 +21,26 @@ class ProductServiceTest extends TestCase
     /** @var ProductRepositoryInterface&MockObject */
     private ProductRepositoryInterface $repository;
 
+    /** @var SlugGeneratorInterface&MockObject */
+    private SlugGeneratorInterface $slugGenerator;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->repository = $this->createMock(ProductRepositoryInterface::class);
+        $this->slugGenerator = $this->createMock(SlugGeneratorInterface::class);
     }
 
     public function test_create_product_service_maps_payload_and_saves(): void
     {
-        $service = new CreateProductService($this->repository);
+        $service = new CreateProductService($this->repository, $this->slugGenerator);
+
+        $this->slugGenerator
+            ->expects($this->once())
+            ->method('generate')
+            ->with(null, 'Widget', 'product')
+            ->willReturn('widget');
 
         $this->repository
             ->expects($this->once())
@@ -50,7 +61,6 @@ class ProductServiceTest extends TestCase
             'tenant_id' => 7,
             'type' => 'physical',
             'name' => 'Widget',
-            'slug' => 'widget',
             'base_uom_id' => 1,
             'is_active' => true,
         ]);
@@ -86,13 +96,17 @@ class ProductServiceTest extends TestCase
 
     public function test_update_product_service_throws_when_product_missing(): void
     {
-        $service = new UpdateProductService($this->repository);
+        $service = new UpdateProductService($this->repository, $this->slugGenerator);
 
         $this->repository
             ->expects($this->once())
             ->method('find')
             ->with(999)
             ->willReturn(null);
+
+        $this->slugGenerator
+            ->expects($this->never())
+            ->method('generate');
 
         $this->expectException(ProductNotFoundException::class);
 

@@ -3,17 +3,15 @@
 declare(strict_types=1);
 
 namespace Modules\Product\Infrastructure\Persistence\Eloquent\Models;
-use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
-
-use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class ProductIdentifierModel extends BaseModel
 {
-    use HasTenant;
-
     use HasAudit;
+    use HasTenant;
 
     protected $table = 'product_identifiers';
 

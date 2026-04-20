@@ -21,8 +21,8 @@ class RoleAssigned extends BaseEvent
     public function broadcastWith(): array
     {
         return array_merge(parent::broadcastWith(), [
-            'userId'   => $this->user->getId(),
-            'roleId'   => $this->role->getId(),
+            'userId' => $this->user->getId(),
+            'roleId' => $this->role->getId(),
             'roleName' => $this->role->getName(),
         ]);
     }

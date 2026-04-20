@@ -141,7 +141,7 @@ return new class extends Migration
 
     private function addForeignIfPossible(string $tableName, string $column, string $referencedTable, string $onDelete = 'none'): void
     {
-        if (!Schema::hasTable($tableName) || !Schema::hasTable($referencedTable) || !Schema::hasColumn($tableName, $column)) {
+        if (! Schema::hasTable($tableName) || ! Schema::hasTable($referencedTable) || ! Schema::hasColumn($tableName, $column)) {
             return;
         }
 
@@ -153,7 +153,7 @@ return new class extends Migration
                 } elseif ($onDelete === 'null') {
                     $foreign->nullOnDelete();
                 }
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 // Ignore if constraint already exists or cannot be added in current environment.
             }
         });

@@ -12,7 +12,7 @@ interface FindFiscalYearServiceInterface
     public function find(mixed $id): ?FiscalYear;
 
     /**
-     * @param array<string, mixed> $filters
+     * @param  array<string, mixed>  $filters
      */
     public function list(array $filters = [], ?int $perPage = null, int $page = 1, ?string $sort = null): LengthAwarePaginator;
 }

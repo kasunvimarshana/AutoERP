@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Domain\RepositoryInterfaces;
 
-use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
 use Modules\Configuration\Domain\Entities\Country;
+use Modules\Core\Domain\Contracts\Repositories\RepositoryInterface;
 
 interface CountryRepositoryInterface extends RepositoryInterface
 {

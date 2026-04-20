@@ -9,18 +9,18 @@ use Illuminate\Http\Resources\Json\ResourceCollection;
 
 class ProductCollection extends ResourceCollection
 {
-    /** @var class-string<\Modules\Product\Infrastructure\Http\Resources\ProductResource> */
-    public $collects = \Modules\Product\Infrastructure\Http\Resources\ProductResource::class;
+    /** @var class-string<ProductResource> */
+    public $collects = ProductResource::class;
 
     public function toArray(Request $request): array
     {
         return $this->collection
             ->map(static function (mixed $product) use ($request): array {
-                if ($product instanceof \Modules\Product\Infrastructure\Http\Resources\ProductResource) {
+                if ($product instanceof ProductResource) {
                     return $product->toArray($request);
                 }
 
-                return (new \Modules\Product\Infrastructure\Http\Resources\ProductResource($product))->toArray($request);
+                return (new ProductResource($product))->toArray($request);
             })
             ->all();
     }

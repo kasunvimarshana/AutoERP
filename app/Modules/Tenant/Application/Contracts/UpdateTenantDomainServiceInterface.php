@@ -7,7 +7,7 @@ namespace Modules\Tenant\Application\Contracts;
 interface UpdateTenantDomainServiceInterface
 {
     /**
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     public function execute(array $data): mixed;
 }

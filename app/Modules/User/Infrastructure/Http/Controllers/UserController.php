@@ -16,9 +16,9 @@ use Modules\User\Application\Contracts\DeleteUserServiceInterface;
 use Modules\User\Application\Contracts\FindUserAttachmentsServiceInterface;
 use Modules\User\Application\Contracts\FindUserDevicesServiceInterface;
 use Modules\User\Application\Contracts\FindUserServiceInterface;
-use Modules\User\Application\Contracts\UploadAvatarServiceInterface;
 use Modules\User\Application\Contracts\UpdatePreferencesServiceInterface;
 use Modules\User\Application\Contracts\UpdateUserServiceInterface;
+use Modules\User\Application\Contracts\UploadAvatarServiceInterface;
 use Modules\User\Application\DTOs\UserData;
 use Modules\User\Application\DTOs\UserPreferencesData;
 use Modules\User\Domain\Entities\User;
@@ -248,7 +248,7 @@ class UserController extends AuthorizedController
     }
 
     /**
-     * @param array<int, string> $includes
+     * @param  array<int, string>  $includes
      */
     private function buildIndexedUserResource(User $user, array $includes): UserResource
     {

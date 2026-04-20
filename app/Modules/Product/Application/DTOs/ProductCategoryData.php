@@ -7,8 +7,8 @@ namespace Modules\Product\Application\DTOs;
 class ProductCategoryData
 {
     /**
-     * @param array<string, mixed>|null $attributes
-     * @param array<string, mixed>|null $metadata
+     * @param  array<string, mixed>|null  $attributes
+     * @param  array<string, mixed>|null  $metadata
      */
     public function __construct(
         public readonly int $tenant_id,
@@ -27,7 +27,7 @@ class ProductCategoryData
     ) {}
 
     /**
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     public static function fromArray(array $data): self
     {

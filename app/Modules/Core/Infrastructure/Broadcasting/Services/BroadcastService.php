@@ -21,9 +21,9 @@ final class BroadcastService implements BroadcastServiceInterface
      * @var array<string, string>
      */
     private array $channelTemplates = [
-        'tenant'   => 'private-tenant.{id}',
+        'tenant' => 'private-tenant.{id}',
         'org-unit' => 'private-org.{id}',
-        'user'     => 'private-user.{id}',
+        'user' => 'private-user.{id}',
     ];
 
     public function __construct(private readonly BroadcastingFactory $broadcaster) {}

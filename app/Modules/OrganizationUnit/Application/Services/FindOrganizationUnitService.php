@@ -20,9 +20,7 @@ class FindOrganizationUnitService implements FindOrganizationUnitServiceInterfac
     /** @var array<string> */
     private const ALLOWED_INCLUDES = ['attachments'];
 
-    public function __construct(private readonly OrganizationUnitRepositoryInterface $organizationUnitRepository)
-    {
-    }
+    public function __construct(private readonly OrganizationUnitRepositoryInterface $organizationUnitRepository) {}
 
     public function find(int $id): ?OrganizationUnit
     {

@@ -28,6 +28,7 @@ class ListProductRequest extends FormRequest
             'per_page' => 'nullable|integer|min:1|max:100',
             'page' => 'nullable|integer|min:1',
             'sort' => 'nullable|string|max:50',
+            'include' => 'nullable|string|max:255',
         ];
     }
 }

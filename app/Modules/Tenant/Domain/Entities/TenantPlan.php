@@ -31,8 +31,8 @@ class TenantPlan
     private \DateTimeInterface $updatedAt;
 
     /**
-     * @param array<string, mixed>|null $features
-     * @param array<string, mixed>|null $limits
+     * @param  array<string, mixed>|null  $features
+     * @param  array<string, mixed>|null  $limits
      */
     public function __construct(
         string $name,
@@ -122,8 +122,8 @@ class TenantPlan
     }
 
     /**
-     * @param array<string, mixed>|null $features
-     * @param array<string, mixed>|null $limits
+     * @param  array<string, mixed>|null  $features
+     * @param  array<string, mixed>|null  $limits
      */
     public function update(
         string $name,

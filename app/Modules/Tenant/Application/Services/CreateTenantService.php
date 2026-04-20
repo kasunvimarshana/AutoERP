@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Application\Services;
 
+use Modules\Core\Application\Contracts\SlugGeneratorInterface;
 use Modules\Core\Application\Services\BaseService;
 use Modules\Tenant\Application\Contracts\CreateTenantServiceInterface;
 use Modules\Tenant\Application\DTOs\TenantData;
@@ -16,14 +17,20 @@ class CreateTenantService extends BaseService implements CreateTenantServiceInte
 {
     public function __construct(
         private readonly TenantRepositoryInterface $tenantRepository,
-        private readonly TenantConfigValueObjectFactory $valueObjectFactory
-    )
-    {
+        private readonly TenantConfigValueObjectFactory $valueObjectFactory,
+        private readonly SlugGeneratorInterface $slugGenerator,
+    ) {
         parent::__construct($tenantRepository);
     }
 
     protected function handle(array $data): Tenant
     {
+        $data['slug'] = $this->slugGenerator->generate(
+            preferredValue: isset($data['slug']) ? (string) $data['slug'] : null,
+            sourceValue: isset($data['name']) ? (string) $data['name'] : null,
+            fallback: 'tenant',
+        );
+
         $dto = TenantData::fromArray($data);
 
         $payload = $dto->toArray();

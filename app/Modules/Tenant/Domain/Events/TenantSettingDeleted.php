@@ -11,8 +11,7 @@ class TenantSettingDeleted extends BaseEvent
     public function __construct(
         int $tenantId,
         private readonly int $settingId
-    )
-    {
+    ) {
         parent::__construct($tenantId);
     }
 

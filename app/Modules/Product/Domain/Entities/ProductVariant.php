@@ -8,6 +8,8 @@ class ProductVariant
 {
     private ?int $id;
 
+    private ?int $tenantId;
+
     private int $productId;
 
     private ?string $sku;
@@ -26,10 +28,11 @@ class ProductVariant
     private \DateTimeInterface $updatedAt;
 
     /**
-     * @param array<string, mixed>|null $metadata
+     * @param  array<string, mixed>|null  $metadata
      */
     public function __construct(
         int $productId,
+        ?int $tenantId = null,
         string $name,
         ?string $sku = null,
         bool $isDefault = false,
@@ -40,6 +43,7 @@ class ProductVariant
         ?\DateTimeInterface $updatedAt = null,
     ) {
         $this->id = $id;
+        $this->tenantId = $tenantId;
         $this->productId = $productId;
         $this->sku = $sku;
         $this->name = $name;
@@ -58,6 +62,11 @@ class ProductVariant
     public function getProductId(): int
     {
         return $this->productId;
+    }
+
+    public function getTenantId(): ?int
+    {
+        return $this->tenantId;
     }
 
     public function getSku(): ?string
@@ -99,7 +108,7 @@ class ProductVariant
     }
 
     /**
-     * @param array<string, mixed>|null $metadata
+     * @param  array<string, mixed>|null  $metadata
      */
     public function update(
         string $name,

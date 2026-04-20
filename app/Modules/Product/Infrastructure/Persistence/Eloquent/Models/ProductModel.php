@@ -3,17 +3,17 @@
 declare(strict_types=1);
 
 namespace Modules\Product\Infrastructure\Persistence\Eloquent\Models;
-use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
-
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class ProductModel extends BaseModel
 {
-    use HasTenant;
-
     use HasAudit;
+    use HasTenant;
 
     protected $table = 'products';
 
@@ -47,12 +47,50 @@ class ProductModel extends BaseModel
     ];
 
     protected $casts = [
+        'tenant_id' => 'integer',
+        'category_id' => 'integer',
+        'brand_id' => 'integer',
+        'org_unit_id' => 'integer',
+        'base_uom_id' => 'integer',
+        'purchase_uom_id' => 'integer',
+        'sales_uom_id' => 'integer',
+        'tax_group_id' => 'integer',
         'metadata' => 'array',
         'is_batch_tracked' => 'boolean',
         'is_lot_tracked' => 'boolean',
         'is_serial_tracked' => 'boolean',
         'is_active' => 'boolean',
         'uom_conversion_factor' => 'decimal:10',
-        'standard_cost' => 'decimal:4',
+        'standard_cost' => 'decimal:6',
     ];
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(ProductCategoryModel::class, 'category_id');
+    }
+
+    public function brand(): BelongsTo
+    {
+        return $this->belongsTo(ProductBrandModel::class, 'brand_id');
+    }
+
+    public function baseUom(): BelongsTo
+    {
+        return $this->belongsTo(UnitOfMeasureModel::class, 'base_uom_id');
+    }
+
+    public function purchaseUom(): BelongsTo
+    {
+        return $this->belongsTo(UnitOfMeasureModel::class, 'purchase_uom_id');
+    }
+
+    public function salesUom(): BelongsTo
+    {
+        return $this->belongsTo(UnitOfMeasureModel::class, 'sales_uom_id');
+    }
+
+    public function variants(): HasMany
+    {
+        return $this->hasMany(ProductVariantModel::class, 'product_id');
+    }
 }

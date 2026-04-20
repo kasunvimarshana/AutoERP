@@ -74,12 +74,14 @@ class ProductVariantEndpointsAuthenticatedTest extends TestCase
             ->method('list')
             ->with(
                 [
+                    'tenant_id' => 9,
                     'product_id' => 41,
                     'name' => 'Red',
                 ],
                 15,
                 1,
-                '-created_at'
+                '-created_at',
+                null
             )
             ->willReturn($paginator);
 
@@ -88,6 +90,7 @@ class ProductVariantEndpointsAuthenticatedTest extends TestCase
 
         $response->assertStatus(HttpResponse::HTTP_OK)
             ->assertJsonPath('data.0.id', 101)
+            ->assertJsonPath('data.0.tenant_id', 9)
             ->assertJsonPath('data.0.name', 'Red Variant')
             ->assertJsonPath('data.0.product_id', 41);
     }
@@ -105,6 +108,7 @@ class ProductVariantEndpointsAuthenticatedTest extends TestCase
 
         $response->assertStatus(HttpResponse::HTTP_OK)
             ->assertJsonPath('data.id', 102)
+            ->assertJsonPath('data.tenant_id', 9)
             ->assertJsonPath('data.product_id', 41)
             ->assertJsonPath('data.sku', 'RED-102');
     }
@@ -131,6 +135,7 @@ class ProductVariantEndpointsAuthenticatedTest extends TestCase
         return new ProductVariant(
             id: $id,
             productId: 41,
+            tenantId: 9,
             sku: 'RED-102',
             name: 'Red Variant',
             isDefault: false,

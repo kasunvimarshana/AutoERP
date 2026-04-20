@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Application\Services;
 
+use Modules\Core\Application\Contracts\SlugGeneratorInterface;
 use Modules\Core\Application\Services\BaseService;
 use Modules\Tenant\Application\Contracts\UpdateTenantServiceInterface;
 use Modules\Tenant\Application\Factories\TenantConfigValueObjectFactory;
@@ -16,9 +17,9 @@ class UpdateTenantService extends BaseService implements UpdateTenantServiceInte
 {
     public function __construct(
         private readonly TenantRepositoryInterface $tenantRepository,
-        private readonly TenantConfigValueObjectFactory $valueObjectFactory
-    )
-    {
+        private readonly TenantConfigValueObjectFactory $valueObjectFactory,
+        private readonly SlugGeneratorInterface $slugGenerator,
+    ) {
         parent::__construct($tenantRepository);
     }
 
@@ -30,6 +31,12 @@ class UpdateTenantService extends BaseService implements UpdateTenantServiceInte
         if (! $tenant) {
             throw new TenantNotFoundException($tenantId);
         }
+
+        $data['slug'] = $this->slugGenerator->generate(
+            preferredValue: array_key_exists('slug', $data) ? (string) $data['slug'] : null,
+            sourceValue: array_key_exists('name', $data) ? (string) $data['name'] : $tenant->getName(),
+            fallback: $tenant->getSlug(),
+        );
 
         $name = $data['name'] ?? $tenant->getName();
         $slug = $data['slug'] ?? $tenant->getSlug();

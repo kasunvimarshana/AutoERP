@@ -17,9 +17,7 @@ class FindOrganizationUnitUserService implements FindOrganizationUnitUserService
     /** @var array<string> */
     private const ALLOWED_SORTS = ['id', 'tenant_id', 'org_unit_id', 'user_id', 'role', 'is_primary', 'created_at', 'updated_at'];
 
-    public function __construct(private readonly OrganizationUnitUserRepositoryInterface $organizationUnitUserRepository)
-    {
-    }
+    public function __construct(private readonly OrganizationUnitUserRepositoryInterface $organizationUnitUserRepository) {}
 
     public function find(int $id): ?OrganizationUnitUser
     {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Product\Application\Services;
 
+use Modules\Core\Application\Contracts\SlugGeneratorInterface;
 use Modules\Core\Application\Services\BaseService;
 use Modules\Product\Application\Contracts\UpdateProductServiceInterface;
 use Modules\Product\Application\DTOs\ProductData;
@@ -13,8 +14,10 @@ use Modules\Product\Domain\RepositoryInterfaces\ProductRepositoryInterface;
 
 class UpdateProductService extends BaseService implements UpdateProductServiceInterface
 {
-    public function __construct(private readonly ProductRepositoryInterface $productRepository)
-    {
+    public function __construct(
+        private readonly ProductRepositoryInterface $productRepository,
+        private readonly SlugGeneratorInterface $slugGenerator,
+    ) {
         parent::__construct($productRepository);
     }
 
@@ -26,6 +29,12 @@ class UpdateProductService extends BaseService implements UpdateProductServiceIn
         if (! $product) {
             throw new ProductNotFoundException($id);
         }
+
+        $data['slug'] = $this->slugGenerator->generate(
+            preferredValue: isset($data['slug']) ? (string) $data['slug'] : null,
+            sourceValue: isset($data['name']) ? (string) $data['name'] : $product->getName(),
+            fallback: $product->getSlug(),
+        );
 
         $dto = ProductData::fromArray($data);
 

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\User\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
-
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 
 /**
  * @property int $id
@@ -14,9 +14,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $device_token
  * @property string|null $platform
  * @property string|null $device_name
- * @property \Illuminate\Support\Carbon|null $last_active_at
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property Carbon|null $last_active_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class UserDeviceModel extends BaseModel
 {

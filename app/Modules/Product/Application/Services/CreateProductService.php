@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Product\Application\Services;
 
+use Modules\Core\Application\Contracts\SlugGeneratorInterface;
 use Modules\Core\Application\Services\BaseService;
 use Modules\Product\Application\Contracts\CreateProductServiceInterface;
 use Modules\Product\Application\DTOs\ProductData;
@@ -12,13 +13,21 @@ use Modules\Product\Domain\RepositoryInterfaces\ProductRepositoryInterface;
 
 class CreateProductService extends BaseService implements CreateProductServiceInterface
 {
-    public function __construct(private readonly ProductRepositoryInterface $productRepository)
-    {
+    public function __construct(
+        private readonly ProductRepositoryInterface $productRepository,
+        private readonly SlugGeneratorInterface $slugGenerator,
+    ) {
         parent::__construct($productRepository);
     }
 
     protected function handle(array $data): Product
     {
+        $data['slug'] = $this->slugGenerator->generate(
+            preferredValue: isset($data['slug']) ? (string) $data['slug'] : null,
+            sourceValue: isset($data['name']) ? (string) $data['name'] : null,
+            fallback: 'product'
+        );
+
         $dto = ProductData::fromArray($data);
 
         $product = new Product(

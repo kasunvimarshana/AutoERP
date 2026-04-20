@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\User\Infrastructure\Http\Resources;
 
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Collection;
 
@@ -47,15 +48,15 @@ class UserResource extends JsonResource
             'roles' => RoleResource::collection($this->getRoles()),
             'permissions' => $this->when(
                 $this->includePermissions,
-                fn (): \Illuminate\Http\Resources\Json\AnonymousResourceCollection => PermissionResource::collection($this->collectPermissions())
+                fn (): AnonymousResourceCollection => PermissionResource::collection($this->collectPermissions())
             ),
             'attachments' => $this->when(
                 $attachments !== null,
-                fn (): \Illuminate\Http\Resources\Json\AnonymousResourceCollection => UserAttachmentResource::collection($attachments)
+                fn (): AnonymousResourceCollection => UserAttachmentResource::collection($attachments)
             ),
             'devices' => $this->when(
                 $devices !== null,
-                fn (): \Illuminate\Http\Resources\Json\AnonymousResourceCollection => UserDeviceResource::collection($devices)
+                fn (): AnonymousResourceCollection => UserDeviceResource::collection($devices)
             ),
             'created_at' => $this->getCreatedAt()->format('c'),
             'updated_at' => $this->getUpdatedAt()->format('c'),

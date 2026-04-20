@@ -6,9 +6,9 @@ namespace Modules\Auth\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Laravel\Passport\Passport;
-use Modules\Auth\Application\Contracts\AuthUserRepositoryInterface;
 use Modules\Auth\Application\Contracts\AuthenticationServiceInterface;
 use Modules\Auth\Application\Contracts\AuthorizationServiceInterface;
+use Modules\Auth\Application\Contracts\AuthUserRepositoryInterface;
 use Modules\Auth\Application\Contracts\ForgotPasswordServiceInterface;
 use Modules\Auth\Application\Contracts\LoginServiceInterface;
 use Modules\Auth\Application\Contracts\LogoutServiceInterface;

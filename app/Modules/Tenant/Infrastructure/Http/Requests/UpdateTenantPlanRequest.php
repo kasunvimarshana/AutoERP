@@ -19,7 +19,7 @@ class UpdateTenantPlanRequest extends FormRequest
 
         return [
             'name' => 'sometimes|required|string|max:255',
-            'slug' => 'sometimes|required|string|max:127|unique:tenant_plans,slug,'.$planId,
+            'slug' => 'sometimes|nullable|string|max:127|unique:tenant_plans,slug,'.$planId,
             'features' => 'sometimes|nullable|array',
             'limits' => 'sometimes|nullable|array',
             'price' => 'sometimes|required|numeric|min:0',

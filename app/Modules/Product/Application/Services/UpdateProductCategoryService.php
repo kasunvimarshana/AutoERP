@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Product\Application\Services;
 
+use Modules\Core\Application\Contracts\SlugGeneratorInterface;
 use Modules\Core\Application\Services\BaseService;
 use Modules\Product\Application\Contracts\UpdateProductCategoryServiceInterface;
 use Modules\Product\Application\DTOs\ProductCategoryData;
@@ -13,8 +14,10 @@ use Modules\Product\Domain\RepositoryInterfaces\ProductCategoryRepositoryInterfa
 
 class UpdateProductCategoryService extends BaseService implements UpdateProductCategoryServiceInterface
 {
-    public function __construct(private readonly ProductCategoryRepositoryInterface $productCategoryRepository)
-    {
+    public function __construct(
+        private readonly ProductCategoryRepositoryInterface $productCategoryRepository,
+        private readonly SlugGeneratorInterface $slugGenerator,
+    ) {
         parent::__construct($productCategoryRepository);
     }
 
@@ -26,6 +29,12 @@ class UpdateProductCategoryService extends BaseService implements UpdateProductC
         if (! $productCategory) {
             throw new ProductCategoryNotFoundException($id);
         }
+
+        $data['slug'] = $this->slugGenerator->generate(
+            preferredValue: isset($data['slug']) ? (string) $data['slug'] : null,
+            sourceValue: isset($data['name']) ? (string) $data['name'] : $productCategory->getName(),
+            fallback: $productCategory->getSlug(),
+        );
 
         $dto = ProductCategoryData::fromArray($data);
 

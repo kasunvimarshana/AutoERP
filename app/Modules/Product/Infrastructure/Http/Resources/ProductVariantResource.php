@@ -13,6 +13,7 @@ class ProductVariantResource extends JsonResource
     {
         return [
             'id' => $this->getId(),
+            'tenant_id' => $this->getTenantId(),
             'product_id' => $this->getProductId(),
             'name' => $this->getName(),
             'sku' => $this->getSku(),

@@ -20,8 +20,8 @@ class TenantConfigChanged extends BaseEvent
     public function broadcastWith(): array
     {
         return array_merge(parent::broadcastWith(), [
-            'id'     => $this->tenant->getId(),
-            'name'   => $this->tenant->getName(),
+            'id' => $this->tenant->getId(),
+            'name' => $this->tenant->getName(),
             'active' => $this->tenant->isActive(),
         ]);
     }

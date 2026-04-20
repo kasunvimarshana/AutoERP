@@ -27,6 +27,16 @@ class FindProductService implements FindProductServiceInterface
     /** @var array<string> */
     private const ALLOWED_SORTS = ['id', 'name', 'slug', 'sku', 'type', 'created_at', 'updated_at'];
 
+    /** @var array<string> */
+    private const ALLOWED_INCLUDES = [
+        'category',
+        'brand',
+        'baseUom',
+        'purchaseUom',
+        'salesUom',
+        'variants',
+    ];
+
     public function __construct(
         private readonly ProductRepositoryInterface $productRepository
     ) {}
@@ -59,6 +69,11 @@ class FindProductService implements FindProductServiceInterface
             $repository->orderBy($sortField, $sortDirection);
         }
 
+        $relations = $this->parseIncludes($include);
+        if ($relations !== []) {
+            $repository->with($relations);
+        }
+
         $perPage = $perPage ?? 15;
 
         return $repository->paginate($perPage, ['*'], 'page', $page);
@@ -87,5 +102,26 @@ class FindProductService implements FindProductServiceInterface
         }
 
         return [$field, $direction];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function parseIncludes(?string $include): array
+    {
+        if ($include === null) {
+            return [];
+        }
+
+        $relations = array_filter(array_map('trim', explode(',', $include)));
+
+        if ($relations === []) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $relations,
+            fn (string $relation): bool => in_array($relation, self::ALLOWED_INCLUDES, true)
+        ));
     }
 }

@@ -9,18 +9,18 @@ use Illuminate\Http\Resources\Json\ResourceCollection;
 
 class UomConversionCollection extends ResourceCollection
 {
-    /** @var class-string<\Modules\Product\Infrastructure\Http\Resources\UomConversionResource> */
-    public $collects = \Modules\Product\Infrastructure\Http\Resources\UomConversionResource::class;
+    /** @var class-string<UomConversionResource> */
+    public $collects = UomConversionResource::class;
 
     public function toArray(Request $request): array
     {
         return $this->collection
             ->map(static function (mixed $uomConversion) use ($request): array {
-                if ($uomConversion instanceof \Modules\Product\Infrastructure\Http\Resources\UomConversionResource) {
+                if ($uomConversion instanceof UomConversionResource) {
                     return $uomConversion->toArray($request);
                 }
 
-                return (new \Modules\Product\Infrastructure\Http\Resources\UomConversionResource($uomConversion))->toArray($request);
+                return (new UomConversionResource($uomConversion))->toArray($request);
             })
             ->all();
     }

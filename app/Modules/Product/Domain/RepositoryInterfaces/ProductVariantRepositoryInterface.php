@@ -11,7 +11,9 @@ interface ProductVariantRepositoryInterface extends RepositoryInterface
 {
     public function save(ProductVariant $productVariant): ProductVariant;
 
-    public function findByProductAndSku(int $productId, string $sku): ?ProductVariant;
+    public function findByProductAndSku(int $productId, string $sku, ?int $tenantId = null): ?ProductVariant;
+
+    public function clearDefaultForProduct(int $tenantId, int $productId, ?int $exceptVariantId = null): void;
 
     public function find(int|string $id, array $columns = ['*']): ?ProductVariant;
 }

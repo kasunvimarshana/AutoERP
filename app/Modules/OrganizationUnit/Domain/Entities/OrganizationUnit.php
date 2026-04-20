@@ -32,12 +32,16 @@ class OrganizationUnit
     private ?string $description;
 
     private ?string $imagePath;
-    private ?int $defaultRevenueAccountId;
-    private ?int $defaultExpenseAccountId;
-    private ?int $defaultAssetAccountId;
-    private ?int $defaultLiabilityAccountId;
-    private ?int $warehouseId;
 
+    private ?int $defaultRevenueAccountId;
+
+    private ?int $defaultExpenseAccountId;
+
+    private ?int $defaultAssetAccountId;
+
+    private ?int $defaultLiabilityAccountId;
+
+    private ?int $warehouseId;
 
     private int $left;
 
@@ -48,7 +52,7 @@ class OrganizationUnit
     private \DateTimeInterface $updatedAt;
 
     /**
-     * @param array<string, mixed>|null $metadata
+     * @param  array<string, mixed>|null  $metadata
      */
     public function __construct(
         int $tenantId,
@@ -170,13 +174,35 @@ class OrganizationUnit
         return $this->description;
     }
 
-    public function getImagePath(): ?string { return $this->imagePath; }
-    public function getDefaultRevenueAccountId(): ?int { return $this->defaultRevenueAccountId; }
-    public function getDefaultExpenseAccountId(): ?int { return $this->defaultExpenseAccountId; }
-    public function getDefaultAssetAccountId(): ?int { return $this->defaultAssetAccountId; }
-    public function getDefaultLiabilityAccountId(): ?int { return $this->defaultLiabilityAccountId; }
-    public function getWarehouseId(): ?int { return $this->warehouseId; }
+    public function getImagePath(): ?string
+    {
+        return $this->imagePath;
+    }
 
+    public function getDefaultRevenueAccountId(): ?int
+    {
+        return $this->defaultRevenueAccountId;
+    }
+
+    public function getDefaultExpenseAccountId(): ?int
+    {
+        return $this->defaultExpenseAccountId;
+    }
+
+    public function getDefaultAssetAccountId(): ?int
+    {
+        return $this->defaultAssetAccountId;
+    }
+
+    public function getDefaultLiabilityAccountId(): ?int
+    {
+        return $this->defaultLiabilityAccountId;
+    }
+
+    public function getWarehouseId(): ?int
+    {
+        return $this->warehouseId;
+    }
 
     public function getLeft(): int
     {
@@ -199,7 +225,7 @@ class OrganizationUnit
     }
 
     /**
-     * @param array<string, mixed>|null $metadata
+     * @param  array<string, mixed>|null  $metadata
      */
     public function update(
         string $name,

@@ -30,8 +30,6 @@ interface ChannelManagerInterface
 
     /**
      * Resolve the authorization callback for the given channel pattern.
-     *
-     * @return callable|null
      */
     public function resolve(string $channelPattern): ?callable;
 

@@ -10,10 +10,15 @@ use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 
 class OrganizationUnitAttachmentResource extends JsonResource
 {
+    public function __construct(
+        mixed $resource,
+        private readonly FileStorageServiceInterface $storage,
+    ) {
+        parent::__construct($resource);
+    }
+
     public function toArray(Request $request): array
     {
-        $storage = app(FileStorageServiceInterface::class);
-
         return [
             'id' => $this->getId(),
             'tenant_id' => $this->getTenantId(),
@@ -21,7 +26,7 @@ class OrganizationUnitAttachmentResource extends JsonResource
             'uuid' => $this->getUuid(),
             'name' => $this->getName(),
             'file_path' => $this->getFilePath(),
-            'url' => $storage->url($this->getFilePath()),
+            'url' => $this->storage->url($this->getFilePath()),
             'mime_type' => $this->getMimeType(),
             'size' => $this->getSize(),
             'type' => $this->getType(),

@@ -17,7 +17,7 @@ class StoreTenantPlanRequest extends FormRequest
     {
         return [
             'name' => 'required|string|max:255',
-            'slug' => 'required|string|max:127|unique:tenant_plans,slug',
+            'slug' => 'nullable|string|max:127|unique:tenant_plans,slug',
             'features' => 'nullable|array',
             'limits' => 'nullable|array',
             'price' => 'required|numeric|min:0',

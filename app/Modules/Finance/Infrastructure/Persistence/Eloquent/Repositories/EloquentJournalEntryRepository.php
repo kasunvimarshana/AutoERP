@@ -79,7 +79,7 @@ class EloquentJournalEntryRepository extends EloquentRepository implements Journ
     }
 
     /**
-     * @param array<JournalEntryLine> $lines
+     * @param  array<JournalEntryLine>  $lines
      */
     private function persistLines(JournalEntryModel $model, array $lines): void
     {

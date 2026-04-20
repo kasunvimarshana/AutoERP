@@ -38,8 +38,8 @@ class RoleController extends AuthorizedController
             $filters['tenant_id'] = (int) $validated['tenant_id'];
         }
         $perPage = (int) ($validated['per_page'] ?? 15);
-        $page    = (int) ($validated['page'] ?? 1);
-        $roles   = $this->findRoleService->list($filters, $perPage, $page);
+        $page = (int) ($validated['page'] ?? 1);
+        $roles = $this->findRoleService->list($filters, $perPage, $page);
 
         return new RoleCollection($roles);
     }
@@ -75,7 +75,7 @@ class RoleController extends AuthorizedController
         $this->authorize('syncPermissions', $roleEntity);
         $validated = $request->validated();
         $updated = $this->syncPermissionsService->execute([
-            'role_id'        => $roleId,
+            'role_id' => $roleId,
             'permission_ids' => $validated['permission_ids'],
         ]);
 

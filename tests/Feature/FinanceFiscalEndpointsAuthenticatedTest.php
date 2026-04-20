@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Laravel\Passport\Passport;
@@ -104,8 +104,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
         $this->createFiscalYearService
             ->expects($this->once())
             ->method('execute')
-            ->with($this->callback(static fn (array $payload): bool =>
-                $payload['tenant_id'] === 9 && $payload['name'] === 'FY2026'
+            ->with($this->callback(static fn (array $payload): bool => $payload['tenant_id'] === 9 && $payload['name'] === 'FY2026'
             ))
             ->willThrowException(new FiscalYearAlreadyExistsException(9, 'FY2026'));
 
@@ -200,8 +199,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
         $this->createFiscalYearService
             ->expects($this->once())
             ->method('execute')
-            ->with($this->callback(static fn (array $payload): bool =>
-                $payload['tenant_id'] === 9
+            ->with($this->callback(static fn (array $payload): bool => $payload['tenant_id'] === 9
                 && $payload['name'] === 'FY2027'
                 && $payload['start_date'] === '2027-01-01'
                 && $payload['end_date'] === '2027-12-31'
@@ -244,8 +242,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
         $this->updateFiscalYearService
             ->expects($this->once())
             ->method('execute')
-            ->with($this->callback(static fn (array $payload): bool =>
-                $payload['id'] === 71 && $payload['tenant_id'] === 9 && $payload['name'] === 'FY2026'
+            ->with($this->callback(static fn (array $payload): bool => $payload['id'] === 71 && $payload['tenant_id'] === 9 && $payload['name'] === 'FY2026'
             ))
             ->willThrowException(new FiscalYearAlreadyExistsException(9, 'FY2026'));
 
@@ -273,8 +270,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
         $this->updateFiscalYearService
             ->expects($this->once())
             ->method('execute')
-            ->with($this->callback(static fn (array $payload): bool =>
-                $payload['id'] === 71
+            ->with($this->callback(static fn (array $payload): bool => $payload['id'] === 71
                 && $payload['tenant_id'] === 9
                 && $payload['name'] === 'FY2026 Revised'
             ))
@@ -310,8 +306,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
         $this->createFiscalPeriodService
             ->expects($this->once())
             ->method('execute')
-            ->with($this->callback(static fn (array $payload): bool =>
-                $payload['tenant_id'] === 9
+            ->with($this->callback(static fn (array $payload): bool => $payload['tenant_id'] === 9
                 && $payload['fiscal_year_id'] === 100
                 && $payload['period_number'] === 1
             ))
@@ -416,8 +411,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
         $this->createFiscalPeriodService
             ->expects($this->once())
             ->method('execute')
-            ->with($this->callback(static fn (array $payload): bool =>
-                $payload['tenant_id'] === 9
+            ->with($this->callback(static fn (array $payload): bool => $payload['tenant_id'] === 9
                 && $payload['fiscal_year_id'] === 100
                 && $payload['period_number'] === 2
             ))
@@ -465,8 +459,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
         $this->updateFiscalPeriodService
             ->expects($this->once())
             ->method('execute')
-            ->with($this->callback(static fn (array $payload): bool =>
-                $payload['id'] === 55
+            ->with($this->callback(static fn (array $payload): bool => $payload['id'] === 55
                 && $payload['tenant_id'] === 9
                 && $payload['fiscal_year_id'] === 100
                 && $payload['period_number'] === 1
@@ -499,8 +492,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
         $this->updateFiscalPeriodService
             ->expects($this->once())
             ->method('execute')
-            ->with($this->callback(static fn (array $payload): bool =>
-                $payload['id'] === 55
+            ->with($this->callback(static fn (array $payload): bool => $payload['id'] === 55
                 && $payload['tenant_id'] === 9
                 && $payload['fiscal_year_id'] === 100
                 && $payload['period_number'] === 2

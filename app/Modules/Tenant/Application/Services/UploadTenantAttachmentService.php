@@ -36,8 +36,8 @@ class UploadTenantAttachmentService extends BaseService implements UploadTenantA
     {
         $tenantId = (int) $data['tenant_id'];
         /** @var UploadedFile $file */
-        $file     = $data['file'];
-        $type     = isset($data['type']) && is_string($data['type']) ? $data['type'] : null;
+        $file = $data['file'];
+        $type = isset($data['type']) && is_string($data['type']) ? $data['type'] : null;
         $metadata = isset($data['metadata']) && is_array($data['metadata']) ? $data['metadata'] : null;
 
         $tenant = $this->tenantRepository->find($tenantId);
@@ -53,12 +53,12 @@ class UploadTenantAttachmentService extends BaseService implements UploadTenantA
 
             $attachment = new TenantAttachment(
                 tenantId: $tenantId,
-                uuid:     $uuid,
-                name:     $file->getClientOriginalName(),
+                uuid: $uuid,
+                name: $file->getClientOriginalName(),
                 filePath: $storedPath,
                 mimeType: (string) $file->getMimeType(),
-                size:     (int) $file->getSize(),
-                type:     $type,
+                size: (int) $file->getSize(),
+                type: $type,
                 metadata: $metadata,
             );
 

@@ -14,7 +14,9 @@ class Role
     private int $tenantId;
 
     private string $name;
+
     private string $guardName;
+
     private ?string $description;
 
     private Collection $permissions;
@@ -47,8 +49,15 @@ class Role
         return $this->name;
     }
 
-    public function getGuardName(): string { return $this->guardName; }
-    public function getDescription(): ?string { return $this->description; }
+    public function getGuardName(): string
+    {
+        return $this->guardName;
+    }
+
+    public function getDescription(): ?string
+    {
+        return $this->description;
+    }
 
     public function getPermissions(): Collection
     {

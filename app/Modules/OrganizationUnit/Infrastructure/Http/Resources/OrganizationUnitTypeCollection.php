@@ -6,7 +6,6 @@ namespace Modules\OrganizationUnit\Infrastructure\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\ResourceCollection;
-use Modules\OrganizationUnit\Infrastructure\Http\Resources\OrganizationUnitTypeResource;
 
 class OrganizationUnitTypeCollection extends ResourceCollection
 {

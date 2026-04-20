@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Infrastructure\Persistence;
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Contracts\Auth\Authenticatable;
 use Laravel\Passport\Contracts\OAuthenticatable;
 use Modules\Auth\Application\Contracts\AuthUserRepositoryInterface;
 use Modules\Auth\Application\Contracts\TenantContextResolverInterface;
@@ -84,7 +84,7 @@ class EloquentAuthUserRepository implements AuthUserRepositoryInterface
 
     private function query(): Builder
     {
-        $model = new $this->userModelClass();
+        $model = new $this->userModelClass;
         if (! $model instanceof Model) {
             throw new \InvalidArgumentException('Configured auth user model must extend Illuminate\\Database\\Eloquent\\Model.');
         }

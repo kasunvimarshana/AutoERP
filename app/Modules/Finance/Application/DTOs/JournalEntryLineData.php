@@ -7,7 +7,7 @@ namespace Modules\Finance\Application\DTOs;
 class JournalEntryLineData
 {
     /**
-     * @param array<string, mixed>|null $metadata
+     * @param  array<string, mixed>|null  $metadata
      */
     public function __construct(
         public readonly int $account_id,
@@ -23,7 +23,7 @@ class JournalEntryLineData
     ) {}
 
     /**
-     * @param array<string, mixed> $line
+     * @param  array<string, mixed>  $line
      */
     public static function fromArray(array $line): self
     {

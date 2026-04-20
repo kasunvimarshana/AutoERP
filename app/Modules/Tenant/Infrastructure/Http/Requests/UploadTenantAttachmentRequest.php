@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Tenant\Infrastructure\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class UploadTenantAttachmentRequest extends FormRequest
 {
@@ -32,23 +33,23 @@ class UploadTenantAttachmentRequest extends FormRequest
         // The request is valid when EITHER field is supplied.
         return [
             // Single upload
-            'file'                  => 'nullable|file|max:'.self::MAX_FILE_SIZE_KB.'|mimes:'.self::ALLOWED_MIMES,
+            'file' => 'nullable|file|max:'.self::MAX_FILE_SIZE_KB.'|mimes:'.self::ALLOWED_MIMES,
 
             // Bulk upload
-            'files'                 => 'nullable|array|min:1',
-            'files.*'               => 'file|max:'.self::MAX_FILE_SIZE_KB.'|mimes:'.self::ALLOWED_MIMES,
+            'files' => 'nullable|array|min:1',
+            'files.*' => 'file|max:'.self::MAX_FILE_SIZE_KB.'|mimes:'.self::ALLOWED_MIMES,
 
             // Common optional fields
-            'type'                  => 'nullable|string|max:50',
-            'metadata'              => 'nullable|string|json',
+            'type' => 'nullable|string|max:50',
+            'metadata' => 'nullable|string|json',
         ];
     }
 
-    public function withValidator(\Illuminate\Validation\Validator $validator): void
+    public function withValidator(Validator $validator): void
     {
-        $validator->after(function (\Illuminate\Validation\Validator $v): void {
+        $validator->after(function (Validator $v): void {
             $hasSingle = $this->hasFile('file');
-            $hasBulk   = $this->hasFile('files');
+            $hasBulk = $this->hasFile('files');
 
             if (! $hasSingle && ! $hasBulk) {
                 $v->errors()->add('file', 'You must provide either a single file or a files array.');
@@ -59,10 +60,10 @@ class UploadTenantAttachmentRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'file.mimes'    => 'The file must be one of the supported types: '.self::ALLOWED_MIMES.'.',
-            'file.max'      => 'The file must not exceed '.(self::MAX_FILE_SIZE_KB / 1024).' MB.',
+            'file.mimes' => 'The file must be one of the supported types: '.self::ALLOWED_MIMES.'.',
+            'file.max' => 'The file must not exceed '.(self::MAX_FILE_SIZE_KB / 1024).' MB.',
             'files.*.mimes' => 'Each file must be one of the supported types: '.self::ALLOWED_MIMES.'.',
-            'files.*.max'   => 'Each file must not exceed '.(self::MAX_FILE_SIZE_KB / 1024).' MB.',
+            'files.*.max' => 'Each file must not exceed '.(self::MAX_FILE_SIZE_KB / 1024).' MB.',
         ];
     }
 }

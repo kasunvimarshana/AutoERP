@@ -20,11 +20,11 @@ class UserCreated extends BaseEvent
     public function broadcastWith(): array
     {
         return array_merge(parent::broadcastWith(), [
-            'id'        => $this->user->getId(),
-            'email'     => $this->user->getEmail()->value(),
+            'id' => $this->user->getId(),
+            'email' => $this->user->getEmail()->value(),
             'firstName' => $this->user->getFirstName(),
-            'lastName'  => $this->user->getLastName(),
-            'active'    => $this->user->isActive(),
+            'lastName' => $this->user->getLastName(),
+            'active' => $this->user->isActive(),
         ]);
     }
 }

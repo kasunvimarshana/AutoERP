@@ -9,18 +9,18 @@ use Illuminate\Http\Resources\Json\ResourceCollection;
 
 class UnitOfMeasureCollection extends ResourceCollection
 {
-    /** @var class-string<\Modules\Product\Infrastructure\Http\Resources\UnitOfMeasureResource> */
-    public $collects = \Modules\Product\Infrastructure\Http\Resources\UnitOfMeasureResource::class;
+    /** @var class-string<UnitOfMeasureResource> */
+    public $collects = UnitOfMeasureResource::class;
 
     public function toArray(Request $request): array
     {
         return $this->collection
             ->map(static function (mixed $unitOfMeasure) use ($request): array {
-                if ($unitOfMeasure instanceof \Modules\Product\Infrastructure\Http\Resources\UnitOfMeasureResource) {
+                if ($unitOfMeasure instanceof UnitOfMeasureResource) {
                     return $unitOfMeasure->toArray($request);
                 }
 
-                return (new \Modules\Product\Infrastructure\Http\Resources\UnitOfMeasureResource($unitOfMeasure))->toArray($request);
+                return (new UnitOfMeasureResource($unitOfMeasure))->toArray($request);
             })
             ->all();
     }

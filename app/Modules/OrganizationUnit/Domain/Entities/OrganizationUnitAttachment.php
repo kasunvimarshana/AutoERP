@@ -32,7 +32,7 @@ class OrganizationUnitAttachment
     private \DateTimeInterface $updatedAt;
 
     /**
-     * @param array<string, mixed>|null $metadata
+     * @param  array<string, mixed>|null  $metadata
      */
     public function __construct(
         int $tenantId,

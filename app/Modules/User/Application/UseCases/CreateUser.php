@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Modules\User\Application\UseCases;
 
-use Modules\User\Domain\ValueObjects\Address;
-use Modules\User\Domain\ValueObjects\Email;
-use Modules\User\Domain\ValueObjects\PhoneNumber;
-use Modules\User\Domain\ValueObjects\UserPreferences;
 use Modules\User\Application\DTOs\UserData;
 use Modules\User\Domain\Entities\User;
 use Modules\User\Domain\Events\UserCreated;
 use Modules\User\Domain\RepositoryInterfaces\RoleRepositoryInterface;
 use Modules\User\Domain\RepositoryInterfaces\UserRepositoryInterface;
+use Modules\User\Domain\ValueObjects\Address;
+use Modules\User\Domain\ValueObjects\Email;
+use Modules\User\Domain\ValueObjects\PhoneNumber;
+use Modules\User\Domain\ValueObjects\UserPreferences;
 
 class CreateUser
 {

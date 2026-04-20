@@ -21,7 +21,7 @@ class UserLoggedIn extends UserScopedEvent
         string $userAgent = '',
     ) {
         parent::__construct($userId);
-        $this->email     = $email;
+        $this->email = $email;
         $this->ipAddress = $ipAddress;
         $this->userAgent = $userAgent;
     }
@@ -32,7 +32,7 @@ class UserLoggedIn extends UserScopedEvent
     public function broadcastWith(): array
     {
         return array_merge(parent::broadcastWith(), [
-            'email'     => $this->email,
+            'email' => $this->email,
             'ipAddress' => $this->ipAddress,
             // userAgent is intentionally excluded from the broadcast payload:
             // it is captured for server-side audit/logging purposes only and

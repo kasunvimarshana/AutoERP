@@ -31,8 +31,7 @@ class OrganizationUnitUserController extends AuthorizedController
         private readonly UpdateOrganizationUnitUserServiceInterface $updateOrganizationUnitUserService,
         private readonly DeleteOrganizationUnitUserServiceInterface $deleteOrganizationUnitUserService,
         private readonly FindOrganizationUnitServiceInterface $findOrganizationUnitService,
-    ) {
-    }
+    ) {}
 
     public function index(int $organizationUnitId, ListOrganizationUnitUserRequest $request): JsonResponse
     {

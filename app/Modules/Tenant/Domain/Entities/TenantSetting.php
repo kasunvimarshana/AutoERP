@@ -24,7 +24,7 @@ class TenantSetting
     private \DateTimeInterface $updatedAt;
 
     /**
-     * @param array<string, mixed>|null $value
+     * @param  array<string, mixed>|null  $value
      */
     public function __construct(
         int $tenantId,
@@ -90,7 +90,7 @@ class TenantSetting
     }
 
     /**
-     * @param array<string, mixed>|null $value
+     * @param  array<string, mixed>|null  $value
      */
     public function update(?array $value, string $group, bool $isPublic): void
     {

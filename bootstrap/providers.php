@@ -7,6 +7,7 @@ use Modules\Audit\Infrastructure\Providers\AuditServiceProvider;
 use Modules\Auth\Infrastructure\Providers\AuthModuleServiceProvider;
 use Modules\Configuration\Infrastructure\Providers\ConfigurationServiceProvider;
 use Modules\Core\Infrastructure\Providers\CoreServiceProvider;
+use Modules\Employee\Infrastructure\Providers\EmployeeServiceProvider;
 use Modules\Finance\Infrastructure\Providers\FinanceServiceProvider;
 use Modules\OrganizationUnit\Infrastructure\Providers\OrganizationUnitServiceProvider;
 use Modules\Product\Infrastructure\Providers\ProductServiceProvider;
@@ -27,5 +28,6 @@ return [
     UserServiceProvider::class,
     OrganizationUnitServiceProvider::class,
     ProductServiceProvider::class,
+    EmployeeServiceProvider::class,
     FinanceServiceProvider::class,
 ];
