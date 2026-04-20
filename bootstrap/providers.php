@@ -10,13 +10,17 @@ use Modules\Core\Infrastructure\Providers\CoreServiceProvider;
 use Modules\Customer\Infrastructure\Providers\CustomerServiceProvider;
 use Modules\Employee\Infrastructure\Providers\EmployeeServiceProvider;
 use Modules\Finance\Infrastructure\Providers\FinanceServiceProvider;
+use Modules\Inventory\Infrastructure\Providers\InventoryServiceProvider;
 use Modules\OrganizationUnit\Infrastructure\Providers\OrganizationUnitServiceProvider;
+use Modules\Pricing\Infrastructure\Providers\PricingServiceProvider;
 use Modules\Product\Infrastructure\Providers\ProductServiceProvider;
 use Modules\Shared\Infrastructure\Providers\SharedServiceProvider;
 use Modules\Supplier\Infrastructure\Providers\SupplierServiceProvider;
+use Modules\Tax\Infrastructure\Providers\TaxServiceProvider;
 use Modules\Tenant\Infrastructure\Providers\TenantConfigServiceProvider;
 use Modules\Tenant\Infrastructure\Providers\TenantServiceProvider;
 use Modules\User\Infrastructure\Providers\UserServiceProvider;
+use Modules\Warehouse\Infrastructure\Providers\WarehouseServiceProvider;
 
 return [
     AppServiceProvider::class,
@@ -30,8 +34,12 @@ return [
     UserServiceProvider::class,
     OrganizationUnitServiceProvider::class,
     ProductServiceProvider::class,
+    PricingServiceProvider::class,
     CustomerServiceProvider::class,
     EmployeeServiceProvider::class,
     SupplierServiceProvider::class,
+    TaxServiceProvider::class,
     FinanceServiceProvider::class,
+    InventoryServiceProvider::class,
+    WarehouseServiceProvider::class,
 ];
