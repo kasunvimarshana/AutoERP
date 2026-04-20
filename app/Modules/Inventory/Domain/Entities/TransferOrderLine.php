@@ -22,29 +22,68 @@ class TransferOrderLine
         private ?int $id = null,
     ) {}
 
-    public function getId(): ?int { return $this->id; }
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
 
-    public function getTenantId(): int { return $this->tenantId; }
+    public function getTenantId(): int
+    {
+        return $this->tenantId;
+    }
 
-    public function getProductId(): int { return $this->productId; }
+    public function getProductId(): int
+    {
+        return $this->productId;
+    }
 
-    public function getVariantId(): ?int { return $this->variantId; }
+    public function getVariantId(): ?int
+    {
+        return $this->variantId;
+    }
 
-    public function getBatchId(): ?int { return $this->batchId; }
+    public function getBatchId(): ?int
+    {
+        return $this->batchId;
+    }
 
-    public function getSerialId(): ?int { return $this->serialId; }
+    public function getSerialId(): ?int
+    {
+        return $this->serialId;
+    }
 
-    public function getFromLocationId(): ?int { return $this->fromLocationId; }
+    public function getFromLocationId(): ?int
+    {
+        return $this->fromLocationId;
+    }
 
-    public function getToLocationId(): ?int { return $this->toLocationId; }
+    public function getToLocationId(): ?int
+    {
+        return $this->toLocationId;
+    }
 
-    public function getUomId(): int { return $this->uomId; }
+    public function getUomId(): int
+    {
+        return $this->uomId;
+    }
 
-    public function getRequestedQty(): string { return $this->requestedQty; }
+    public function getRequestedQty(): string
+    {
+        return $this->requestedQty;
+    }
 
-    public function getShippedQty(): string { return $this->shippedQty; }
+    public function getShippedQty(): string
+    {
+        return $this->shippedQty;
+    }
 
-    public function getReceivedQty(): string { return $this->receivedQty; }
+    public function getReceivedQty(): string
+    {
+        return $this->receivedQty;
+    }
 
-    public function getUnitCost(): ?string { return $this->unitCost; }
+    public function getUnitCost(): ?string
+    {
+        return $this->unitCost;
+    }
 }

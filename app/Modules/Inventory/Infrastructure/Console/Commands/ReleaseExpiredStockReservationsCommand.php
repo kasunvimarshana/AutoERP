@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Modules\Inventory\Infrastructure\Console\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Modules\Inventory\Application\Contracts\ReleaseExpiredStockReservationsServiceInterface;
 use Modules\Inventory\Domain\Events\ExpiredStockReservationsReleased;

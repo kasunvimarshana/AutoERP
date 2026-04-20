@@ -20,25 +20,58 @@ class StockReservation
         private ?int $id = null,
     ) {}
 
-    public function getId(): ?int { return $this->id; }
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
 
-    public function getTenantId(): int { return $this->tenantId; }
+    public function getTenantId(): int
+    {
+        return $this->tenantId;
+    }
 
-    public function getProductId(): int { return $this->productId; }
+    public function getProductId(): int
+    {
+        return $this->productId;
+    }
 
-    public function getVariantId(): ?int { return $this->variantId; }
+    public function getVariantId(): ?int
+    {
+        return $this->variantId;
+    }
 
-    public function getBatchId(): ?int { return $this->batchId; }
+    public function getBatchId(): ?int
+    {
+        return $this->batchId;
+    }
 
-    public function getSerialId(): ?int { return $this->serialId; }
+    public function getSerialId(): ?int
+    {
+        return $this->serialId;
+    }
 
-    public function getLocationId(): int { return $this->locationId; }
+    public function getLocationId(): int
+    {
+        return $this->locationId;
+    }
 
-    public function getQuantity(): string { return $this->quantity; }
+    public function getQuantity(): string
+    {
+        return $this->quantity;
+    }
 
-    public function getReservedForType(): ?string { return $this->reservedForType; }
+    public function getReservedForType(): ?string
+    {
+        return $this->reservedForType;
+    }
 
-    public function getReservedForId(): ?int { return $this->reservedForId; }
+    public function getReservedForId(): ?int
+    {
+        return $this->reservedForId;
+    }
 
-    public function getExpiresAt(): ?string { return $this->expiresAt; }
+    public function getExpiresAt(): ?string
+    {
+        return $this->expiresAt;
+    }
 }

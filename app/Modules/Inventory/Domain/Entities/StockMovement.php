@@ -36,37 +36,88 @@ class StockMovement
         return $this->id;
     }
 
-    public function getTenantId(): int { return $this->tenantId; }
+    public function getTenantId(): int
+    {
+        return $this->tenantId;
+    }
 
-    public function getProductId(): int { return $this->productId; }
+    public function getProductId(): int
+    {
+        return $this->productId;
+    }
 
-    public function getVariantId(): ?int { return $this->variantId; }
+    public function getVariantId(): ?int
+    {
+        return $this->variantId;
+    }
 
-    public function getBatchId(): ?int { return $this->batchId; }
+    public function getBatchId(): ?int
+    {
+        return $this->batchId;
+    }
 
-    public function getSerialId(): ?int { return $this->serialId; }
+    public function getSerialId(): ?int
+    {
+        return $this->serialId;
+    }
 
-    public function getFromLocationId(): ?int { return $this->fromLocationId; }
+    public function getFromLocationId(): ?int
+    {
+        return $this->fromLocationId;
+    }
 
-    public function getToLocationId(): ?int { return $this->toLocationId; }
+    public function getToLocationId(): ?int
+    {
+        return $this->toLocationId;
+    }
 
-    public function getMovementType(): string { return $this->movementType; }
+    public function getMovementType(): string
+    {
+        return $this->movementType;
+    }
 
-    public function getReferenceType(): ?string { return $this->referenceType; }
+    public function getReferenceType(): ?string
+    {
+        return $this->referenceType;
+    }
 
-    public function getReferenceId(): ?int { return $this->referenceId; }
+    public function getReferenceId(): ?int
+    {
+        return $this->referenceId;
+    }
 
-    public function getUomId(): int { return $this->uomId; }
+    public function getUomId(): int
+    {
+        return $this->uomId;
+    }
 
-    public function getQuantity(): string { return $this->quantity; }
+    public function getQuantity(): string
+    {
+        return $this->quantity;
+    }
 
-    public function getUnitCost(): ?string { return $this->unitCost; }
+    public function getUnitCost(): ?string
+    {
+        return $this->unitCost;
+    }
 
-    public function getPerformedBy(): ?int { return $this->performedBy; }
+    public function getPerformedBy(): ?int
+    {
+        return $this->performedBy;
+    }
 
-    public function getPerformedAt(): ?\DateTimeInterface { return $this->performedAt; }
+    public function getPerformedAt(): ?\DateTimeInterface
+    {
+        return $this->performedAt;
+    }
 
-    public function getNotes(): ?string { return $this->notes; }
+    public function getNotes(): ?string
+    {
+        return $this->notes;
+    }
 
-    public function getMetadata(): ?array { return $this->metadata; }
+    public function getMetadata(): ?array
+    {
+        return $this->metadata;
+    }
 }

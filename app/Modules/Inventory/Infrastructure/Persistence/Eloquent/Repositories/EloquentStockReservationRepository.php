@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
-use Modules\Inventory\Domain\Exceptions\InsufficientAvailableStockException;
+use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Domain\Entities\StockReservation;
+use Modules\Inventory\Domain\Exceptions\InsufficientAvailableStockException;
 use Modules\Inventory\Domain\RepositoryInterfaces\StockReservationRepositoryInterface;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\StockReservationModel;
 
@@ -83,7 +84,7 @@ class EloquentStockReservationRepository implements StockReservationRepositoryIn
         return DB::transaction(function () use ($tenantId, $expiresBefore): int {
             $cutoff = $expiresBefore !== null ? Carbon::parse($expiresBefore) : now();
 
-            /** @var \Illuminate\Database\Eloquent\Collection<int, StockReservationModel> $reservations */
+            /** @var Collection<int, StockReservationModel> $reservations */
             $reservations = $this->stockReservationModel->newQuery()
                 ->where('tenant_id', $tenantId)
                 ->whereNotNull('expires_at')

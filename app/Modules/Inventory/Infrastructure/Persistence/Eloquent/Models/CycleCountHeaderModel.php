@@ -7,7 +7,6 @@ namespace Modules\Inventory\Infrastructure\Persistence\Eloquent\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
-use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\CycleCountLineModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class CycleCountHeaderModel extends Model

@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Domain\Entities;
 
-use Modules\Inventory\Domain\Entities\CycleCountLine;
-
 class CycleCountHeader
 {
     /**
@@ -24,26 +22,56 @@ class CycleCountHeader
         private ?int $id = null,
     ) {}
 
-    public function getId(): ?int { return $this->id; }
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
 
-    public function getTenantId(): int { return $this->tenantId; }
+    public function getTenantId(): int
+    {
+        return $this->tenantId;
+    }
 
-    public function getWarehouseId(): int { return $this->warehouseId; }
+    public function getWarehouseId(): int
+    {
+        return $this->warehouseId;
+    }
 
-    public function getLocationId(): ?int { return $this->locationId; }
+    public function getLocationId(): ?int
+    {
+        return $this->locationId;
+    }
 
-    public function getStatus(): string { return $this->status; }
+    public function getStatus(): string
+    {
+        return $this->status;
+    }
 
-    public function getCountedByUserId(): ?int { return $this->countedByUserId; }
+    public function getCountedByUserId(): ?int
+    {
+        return $this->countedByUserId;
+    }
 
-    public function getCountedAt(): ?string { return $this->countedAt; }
+    public function getCountedAt(): ?string
+    {
+        return $this->countedAt;
+    }
 
-    public function getApprovedByUserId(): ?int { return $this->approvedByUserId; }
+    public function getApprovedByUserId(): ?int
+    {
+        return $this->approvedByUserId;
+    }
 
-    public function getApprovedAt(): ?string { return $this->approvedAt; }
+    public function getApprovedAt(): ?string
+    {
+        return $this->approvedAt;
+    }
 
     /**
      * @return list<CycleCountLine>
      */
-    public function getLines(): array { return $this->lines; }
+    public function getLines(): array
+    {
+        return $this->lines;
+    }
 }

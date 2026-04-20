@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Modules\Inventory\Infrastructure\Http\Controllers\InventoryCycleCountController;
-use Modules\Inventory\Infrastructure\Http\Controllers\InventoryStockReservationController;
 use Modules\Inventory\Infrastructure\Http\Controllers\InventoryStockController;
+use Modules\Inventory\Infrastructure\Http\Controllers\InventoryStockReservationController;
 use Modules\Inventory\Infrastructure\Http\Controllers\InventoryTransferOrderController;
+use Modules\Inventory\Infrastructure\Http\Controllers\InventoryValuationController;
 
 Route::prefix('inventory')
     ->middleware(['auth:api', 'resolve.tenant'])
@@ -50,4 +51,18 @@ Route::prefix('inventory')
             ->name('inventory.stock-reservations.destroy');
         Route::post('stock-reservations/release-expired', [InventoryStockReservationController::class, 'releaseExpired'])
             ->name('inventory.stock-reservations.release-expired');
+
+        // Valuation configuration
+        Route::get('valuation-configs', [InventoryValuationController::class, 'index'])
+            ->name('inventory.valuation-configs.index');
+        Route::post('valuation-configs', [InventoryValuationController::class, 'store'])
+            ->name('inventory.valuation-configs.store');
+        Route::get('valuation-configs/resolve', [InventoryValuationController::class, 'resolve'])
+            ->name('inventory.valuation-configs.resolve');
+        Route::get('valuation-configs/{config}', [InventoryValuationController::class, 'show'])
+            ->name('inventory.valuation-configs.show');
+        Route::put('valuation-configs/{config}', [InventoryValuationController::class, 'update'])
+            ->name('inventory.valuation-configs.update');
+        Route::delete('valuation-configs/{config}', [InventoryValuationController::class, 'destroy'])
+            ->name('inventory.valuation-configs.destroy');
     });
