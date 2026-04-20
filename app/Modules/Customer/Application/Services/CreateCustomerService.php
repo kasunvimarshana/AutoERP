@@ -1,0 +1,75 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Customer\Application\Services;
+
+use Modules\Core\Application\Services\BaseService;
+use Modules\Core\Domain\Exceptions\DomainException;
+use Modules\Customer\Application\Contracts\CreateCustomerServiceInterface;
+use Modules\Customer\Application\DTOs\CustomerData;
+use Modules\Customer\Domain\Contracts\CustomerUserSynchronizerInterface;
+use Modules\Customer\Domain\Entities\Customer;
+use Modules\Customer\Domain\RepositoryInterfaces\CustomerRepositoryInterface;
+
+class CreateCustomerService extends BaseService implements CreateCustomerServiceInterface
+{
+    public function __construct(
+        private readonly CustomerRepositoryInterface $customerRepository,
+        private readonly CustomerUserSynchronizerInterface $customerUserSynchronizer,
+    ) {
+        parent::__construct($customerRepository);
+    }
+
+    protected function handle(array $data): Customer
+    {
+        $dto = CustomerData::fromArray($data);
+
+        $resolvedUserId = $this->customerUserSynchronizer->resolveUserIdForCreate(
+            tenantId: $dto->tenant_id,
+            orgUnitId: $dto->org_unit_id,
+            requestedUserId: $dto->user_id,
+            userPayload: $dto->user,
+        );
+
+        $existingCustomer = $this->customerRepository->findByTenantAndUserId($dto->tenant_id, $resolvedUserId);
+        if ($existingCustomer !== null) {
+            throw new DomainException('The user is already linked to another customer.');
+        }
+
+        $customer = new Customer(
+            tenantId: $dto->tenant_id,
+            userId: $resolvedUserId,
+            customerCode: $dto->customer_code,
+            name: $dto->name,
+            type: $dto->type,
+            orgUnitId: $dto->org_unit_id,
+            taxNumber: $dto->tax_number,
+            registrationNumber: $dto->registration_number,
+            currencyId: $dto->currency_id,
+            creditLimit: $this->normalizeDecimal($dto->credit_limit),
+            paymentTermsDays: $dto->payment_terms_days,
+            arAccountId: $dto->ar_account_id,
+            status: $dto->status,
+            notes: $dto->notes,
+            metadata: $dto->metadata,
+        );
+
+        return $this->customerRepository->save($customer);
+    }
+
+    private function normalizeDecimal(string $value): string
+    {
+        if (! is_numeric($value)) {
+            throw new DomainException('Credit limit must be numeric.');
+        }
+
+        $normalized = number_format((float) $value, 6, '.', '');
+
+        if ((float) $normalized < 0.0) {
+            throw new DomainException('Credit limit cannot be negative.');
+        }
+
+        return $normalized;
+    }
+}
