@@ -24,6 +24,8 @@ return new class extends Migration
             $table->enum('status', ['active', 'quarantine', 'expired', 'depleted'])->default('active');
             $table->text('notes')->nullable();
             $table->json('metadata')->nullable();
+            // $table->decimal('purchase_price', 20, 6)->nullable();
+            // $table->decimal('sales_price', 20, 6)->nullable();
             $table->timestamps();
 
             $table->unique(['tenant_id', 'product_id', 'variant_id', 'batch_number'], 'batches_tenant_product_batch_uk');

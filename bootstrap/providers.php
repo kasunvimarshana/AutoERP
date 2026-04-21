@@ -14,13 +14,14 @@ use Modules\Inventory\Infrastructure\Providers\InventoryServiceProvider;
 use Modules\OrganizationUnit\Infrastructure\Providers\OrganizationUnitServiceProvider;
 use Modules\Pricing\Infrastructure\Providers\PricingServiceProvider;
 use Modules\Product\Infrastructure\Providers\ProductServiceProvider;
+use Modules\Purchase\Infrastructure\Providers\PurchaseServiceProvider;
+use Modules\Sales\Infrastructure\Providers\SalesServiceProvider;
 use Modules\Shared\Infrastructure\Providers\SharedServiceProvider;
 use Modules\Supplier\Infrastructure\Providers\SupplierServiceProvider;
 use Modules\Tax\Infrastructure\Providers\TaxServiceProvider;
 use Modules\Tenant\Infrastructure\Providers\TenantConfigServiceProvider;
 use Modules\Tenant\Infrastructure\Providers\TenantServiceProvider;
 use Modules\User\Infrastructure\Providers\UserServiceProvider;
-use Modules\Purchase\Infrastructure\Providers\PurchaseServiceProvider;
 use Modules\Warehouse\Infrastructure\Providers\WarehouseServiceProvider;
 
 return [
@@ -44,4 +45,5 @@ return [
     InventoryServiceProvider::class,
     WarehouseServiceProvider::class,
     PurchaseServiceProvider::class,
+    SalesServiceProvider::class,
 ];

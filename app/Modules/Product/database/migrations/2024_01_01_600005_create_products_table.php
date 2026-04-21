@@ -43,6 +43,8 @@ return new class extends Migration
             $table->foreign('expense_account_id', 'products_expense_account_id_fk')->references('id')->on('accounts')->nullOnDelete();
             $table->boolean('is_active')->default(true);
             $table->json('metadata')->nullable();
+            // $table->decimal('purchase_price', 20, 6)->nullable();
+            // $table->decimal('sales_price', 20, 6)->nullable();
             $table->timestamps();
             $table->softDeletes();
 

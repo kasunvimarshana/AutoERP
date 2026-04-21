@@ -24,7 +24,12 @@ class StoreFiscalPeriodRequest extends FormRequest
             'period_number' => ['required', 'integer', 'min:1'],
             'name' => ['required', 'string', 'max:255'],
             'start_date' => ['required', 'date'],
-            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+            'end_date' => ['required', 'date', function (string $attribute, mixed $value, \Closure $fail): void {
+                $startDate = $this->input('start_date');
+                if ($startDate !== null && is_string($startDate) && strtotime($value) < strtotime($startDate)) {
+                    $fail("The {$attribute} must be a date after or equal to start date.");
+                }
+            }],
             'status' => ['sometimes', 'in:open,closed'],
         ];
     }
