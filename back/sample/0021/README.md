@@ -6,7 +6,7 @@ Product::whereHas('stocks', function ($q) {
 
    $q->selectRaw('SUM(quantity) as total')
 
-     ->havingRaw('total <= reorder\_level');
+     ->havingRaw('total <= reorder_level');
 
 });
 ```
@@ -31,29 +31,29 @@ class BatchQueryService
 
    {
 
-       return \\DB::table('stocks')
+       return \DB::table('stocks')
 
-           ->join('batches', 'stocks.batch\_id', '=', 'batches.id')
+           ->join('batches', 'stocks.batch_id', '=', 'batches.id')
 
-           ->where('stocks.product\_id', $productId)
+           ->where('stocks.product_id', $productId)
 
-           ->where('stocks.warehouse\_id', $warehouseId)
+           ->where('stocks.warehouse_id', $warehouseId)
 
            ->where('stocks.quantity', '>', 0)
 
-           ->whereDate('batches.expires\_at', '>', now())
+           ->whereDate('batches.expires_at', '>', now())
 
-           ->orderBy('batches.expires\_at', 'asc') // FEFO
+           ->orderBy('batches.expires_at', 'asc') // FEFO
 
            ->select(
 
-               'stocks.id as stock\_id',
+               'stocks.id as stock_id',
 
-               'stocks.batch\_id',
+               'stocks.batch_id',
 
                'stocks.quantity',
 
-               'batches.expires\_at'
+               'batches.expires_at'
 
            )
 
@@ -85,7 +85,7 @@ class StockAllocatorService
 
    {
 
-       $allocations = \[];
+       $allocations = [];
 
        $remaining = $requiredQty;
 
@@ -103,9 +103,9 @@ class StockAllocatorService
 
            if ($allocQty > 0) {
 
-               $allocations\[] = new AllocationItem(
+               $allocations[] = new AllocationItem(
 
-                   batchId: $batch->batch\_id,
+                   batchId: $batch->batch_id,
 
                    allocatedQty: $allocQty
 
@@ -123,7 +123,7 @@ class StockAllocatorService
 
        if ($remaining > 0) {
 
-           throw new \\DomainException("Insufficient stock for allocation");
+           throw new \DomainException("Insufficient stock for allocation");
 
        }
 
@@ -165,13 +165,13 @@ class StockService
 
 
 
-           $stock = \\DB::table('stocks')
+           $stock = \DB::table('stocks')
 
-               ->where('product\_id', $productId)
+               ->where('product_id', $productId)
 
-               ->where('batch\_id', $allocation->batchId)
+               ->where('batch_id', $allocation->batchId)
 
-               ->where('warehouse\_id', $warehouseId)
+               ->where('warehouse_id', $warehouseId)
 
                ->lockForUpdate()
 
@@ -181,7 +181,7 @@ class StockService
 
            if (!$stock || $stock->quantity < $allocation->allocatedQty) {
 
-               throw new \\RuntimeException("Stock inconsistency detected");
+               throw new \RuntimeException("Stock inconsistency detected");
 
            }
 
@@ -189,15 +189,15 @@ class StockService
 
            // Update stock
 
-           \\DB::table('stocks')
+           \DB::table('stocks')
 
                ->where('id', $stock->id)
 
-               ->update(\[
+               ->update([
 
                    'quantity' => $stock->quantity - $allocation->allocatedQty,
 
-                   'updated\_at' => now()
+                   'updated_at' => now()
 
                ]);
 
@@ -205,13 +205,13 @@ class StockService
 
            // Insert movement
 
-           \\DB::table('stock\_movements')->insert(\[
+           \DB::table('stock_movements')->insert([
 
-               'product\_id'   => $productId,
+               'product_id'   => $productId,
 
-               'batch\_id'     => $allocation->batchId,
+               'batch_id'     => $allocation->batchId,
 
-               'warehouse\_id' => $warehouseId,
+               'warehouse_id' => $warehouseId,
 
                'type'         => 'sale',
 
@@ -219,11 +219,11 @@ class StockService
 
                'reference'    => $reference,
 
-               'moved\_at'     => now(),
+               'moved_at'     => now(),
 
-               'created\_at'   => now(),
+               'created_at'   => now(),
 
-               'updated\_at'   => now(),
+               'updated_at'   => now(),
 
            ]);
 
@@ -247,7 +247,7 @@ class SaleService
 
 {
 
-   public function \_\_construct(
+   public function __construct(
 
        private BatchQueryService $batchQuery,
 
@@ -271,7 +271,7 @@ class SaleService
 
    ): array {
 
-       return \\DB::transaction(function () use (
+       return \DB::transaction(function () use (
 
            $productId,
 
@@ -333,13 +333,13 @@ class SaleService
 
 
 ```
-namespace App\\Http\\Controllers\\Api;
+namespace App\Http\Controllers\Api;
 
 
 
-use App\\Services\\PurchaseOrderService;
+use App\Services\PurchaseOrderService;
 
-use Illuminate\\Http\\Request;
+use Illuminate\Http\Request;
 
 
 
@@ -347,7 +347,7 @@ class PurchaseOrderController extends BaseController
 
 {
 
-   public function \_\_construct(private PurchaseOrderService $service) {}
+   public function __construct(private PurchaseOrderService $service) {}
 
 
 
@@ -355,19 +355,19 @@ class PurchaseOrderController extends BaseController
 
    {
 
-       $data = $request->validate(\[
+       $data = $request->validate([
 
-           'supplier\_id' => 'required|exists:suppliers,id',
+           'supplier_id' => 'required|exists:suppliers,id',
 
            'items' => 'required|array',
 
-           'items.\*.product\_id' => 'required',
+           'items.\*.product_id' => 'required',
 
            'items.\*.quantity' => 'required|integer',
 
-           'items.\*.batch\_number' => 'required',
+           'items.\*.batch_number' => 'required',
 
-           'items.\*.expires\_at' => 'required|date',
+           'items.\*.expires_at' => 'required|date',
 
        ]);
 
@@ -397,13 +397,13 @@ class PurchaseOrderController extends BaseController
 
 
 ```
-namespace App\\Http\\Controllers\\Api;
+namespace App\Http\Controllers\Api;
 
 
 
-use App\\Services\\SaleService;
+use App\Services\SaleService;
 
-use Illuminate\\Http\\Request;
+use Illuminate\Http\Request;
 
 
 
@@ -411,7 +411,7 @@ class SaleController extends BaseController
 
 {
 
-   public function \_\_construct(private SaleService $service) {}
+   public function __construct(private SaleService $service) {}
 
 
 
@@ -419,13 +419,13 @@ class SaleController extends BaseController
 
    {
 
-       $data = $request->validate(\[
+       $data = $request->validate([
 
-           'warehouse\_id' => 'required|exists:warehouses,id',
+           'warehouse_id' => 'required|exists:warehouses,id',
 
            'items' => 'required|array',
 
-           'items.\*.product\_id' => 'required|exists:products,id',
+           'items.\*.product_id' => 'required|exists:products,id',
 
            'items.\*.quantity' => 'required|integer|min:1',
 
@@ -453,11 +453,11 @@ class SaleController extends BaseController
 
 
 ```
-namespace App\\Services;
+namespace App\Services;
 
 
 
-use Illuminate\\Support\\Facades\\DB;
+use Illuminate\Support\Facades\DB;
 
 
 
@@ -471,19 +471,19 @@ class BatchQueryService
 
        return DB::table('stocks')
 
-           ->join('batches', 'stocks.batch\_id', '=', 'batches.id')
+           ->join('batches', 'stocks.batch_id', '=', 'batches.id')
 
-           ->where('stocks.product\_id', $productId)
+           ->where('stocks.product_id', $productId)
 
-           ->where('stocks.warehouse\_id', $warehouseId)
+           ->where('stocks.warehouse_id', $warehouseId)
 
            ->where('stocks.quantity', '>', 0)
 
-           ->whereDate('batches.expires\_at', '>', now())
+           ->whereDate('batches.expires_at', '>', now())
 
-           ->orderBy('batches.expires\_at', 'asc')
+           ->orderBy('batches.expires_at', 'asc')
 
-           ->select('stocks.\*', 'batches.expires\_at')
+           ->select('stocks.\*', 'batches.expires_at')
 
            ->lockForUpdate()
 
@@ -503,11 +503,11 @@ class BatchQueryService
 
 
 ```
-namespace App\\Services;
+namespace App\Services;
 
 
 
-use App\\Services\\Contracts\\StockAllocationStrategy;
+use App\Services\Contracts\StockAllocationStrategy;
 
 use DomainException;
 
@@ -521,7 +521,7 @@ class StockAllocatorService implements StockAllocationStrategy
 
    {
 
-       $allocations = \[];
+       $allocations = [];
 
        $remaining = $requiredQty;
 
@@ -539,9 +539,9 @@ class StockAllocatorService implements StockAllocationStrategy
 
            if ($allocQty > 0) {
 
-               $allocations\[] = \[
+               $allocations[] = [
 
-                   'batch\_id' => $batch->batch\_id,
+                   'batch_id' => $batch->batch_id,
 
                    'qty' => $allocQty
 
@@ -579,11 +579,11 @@ class StockAllocatorService implements StockAllocationStrategy
 
 
 ```
-namespace App\\Services;
+namespace App\Services;
 
 
 
-use Illuminate\\Support\\Facades\\DB;
+use Illuminate\Support\Facades\DB;
 
 
 
@@ -607,29 +607,29 @@ class StockService
 
        if ($stock) {
 
-           DB::table('stocks')->where('id', $stock->id)->update(\[
+           DB::table('stocks')->where('id', $stock->id)->update([
 
                'quantity' => $stock->quantity + $qty,
 
-               'updated\_at' => now()
+               'updated_at' => now()
 
            ]);
 
        } else {
 
-           DB::table('stocks')->insert(\[
+           DB::table('stocks')->insert([
 
-               'product\_id' => $productId,
+               'product_id' => $productId,
 
-               'batch\_id' => $batchId,
+               'batch_id' => $batchId,
 
-               'warehouse\_id' => $warehouseId,
+               'warehouse_id' => $warehouseId,
 
                'quantity' => $qty,
 
-               'created\_at' => now(),
+               'created_at' => now(),
 
-               'updated\_at' => now()
+               'updated_at' => now()
 
            ]);
 
@@ -653,13 +653,13 @@ class StockService
 
            $stock = DB::table('stocks')
 
-               ->where(\[
+               ->where([
 
-                   'product\_id' => $productId,
+                   'product_id' => $productId,
 
-                   'batch\_id' => $a\['batch\_id'],
+                   'batch_id' => $a['batch_id'],
 
-                   'warehouse\_id' => $warehouseId
+                   'warehouse_id' => $warehouseId
 
                ])
 
@@ -669,25 +669,25 @@ class StockService
 
 
 
-           if (!$stock || $stock->quantity < $a\['qty']) {
+           if (!$stock || $stock->quantity < $a['qty']) {
 
-               throw new \\RuntimeException('Stock inconsistency');
+               throw new \RuntimeException('Stock inconsistency');
 
            }
 
 
 
-           DB::table('stocks')->where('id', $stock->id)->update(\[
+           DB::table('stocks')->where('id', $stock->id)->update([
 
-               'quantity' => $stock->quantity - $a\['qty'],
+               'quantity' => $stock->quantity - $a['qty'],
 
-               'updated\_at' => now()
+               'updated_at' => now()
 
            ]);
 
 
 
-           $this->movement($productId, $a\['batch\_id'], $warehouseId, -$a\['qty'], 'sale', $ref);
+           $this->movement($productId, $a['batch_id'], $warehouseId, -$a['qty'], 'sale', $ref);
 
        }
 
@@ -699,13 +699,13 @@ class StockService
 
    {
 
-       DB::table('stock\_movements')->insert(\[
+       DB::table('stock_movements')->insert([
 
-           'product\_id' => $productId,
+           'product_id' => $productId,
 
-           'batch\_id' => $batchId,
+           'batch_id' => $batchId,
 
-           'warehouse\_id' => $warehouseId,
+           'warehouse_id' => $warehouseId,
 
            'type' => $type,
 
@@ -713,11 +713,11 @@ class StockService
 
            'reference' => $ref,
 
-           'moved\_at' => now(),
+           'moved_at' => now(),
 
-           'created\_at' => now(),
+           'created_at' => now(),
 
-           'updated\_at' => now(),
+           'updated_at' => now(),
 
        ]);
 
@@ -735,11 +735,11 @@ class StockService
 
 ```
 
-namespace App\\Services;
+namespace App\Services;
 
 
 
-use Illuminate\\Support\\Facades\\DB;
+use Illuminate\Support\Facades\DB;
 
 
 
@@ -753,7 +753,7 @@ class StockQueryService
 
        return DB::table('stocks')
 
-           ->join('products', 'stocks.product\_id', '=', 'products.id')
+           ->join('products', 'stocks.product_id', '=', 'products.id')
 
            ->select('products.name', DB::raw('SUM(stocks.quantity) as qty'))
 
@@ -771,11 +771,11 @@ class StockQueryService
 
        return DB::table('products')
 
-           ->join('stocks', 'products.id', '=', 'stocks.product\_id')
+           ->join('stocks', 'products.id', '=', 'stocks.product_id')
 
            ->groupBy('products.id')
 
-           ->havingRaw('SUM(stocks.quantity) <= products.reorder\_level')
+           ->havingRaw('SUM(stocks.quantity) <= products.reorder_level')
 
            ->select('products.name', DB::raw('SUM(stocks.quantity) as qty'))
 
@@ -791,7 +791,7 @@ class StockQueryService
 
        return DB::table('batches')
 
-           ->whereDate('expires\_at', '<=', now()->addDays($days))
+           ->whereDate('expires_at', '<=', now()->addDays($days))
 
            ->get();
 
@@ -809,11 +809,11 @@ class StockQueryService
 
 
 ```
-namespace App\\Services;
+namespace App\Services;
 
 
 
-use Illuminate\\Support\\Facades\\DB;
+use Illuminate\Support\Facades\DB;
 
 
 
@@ -821,7 +821,7 @@ class PurchaseOrderService
 
 {
 
-   public function \_\_construct(
+   public function __construct(
 
        private StockService $stockService
 
@@ -837,61 +837,61 @@ class PurchaseOrderService
 
 
 
-           $poId = DB::table('purchase\_orders')->insertGetId(\[
+           $poId = DB::table('purchase_orders')->insertGetId([
 
-               'supplier\_id' => $data\['supplier\_id'],
+               'supplier_id' => $data['supplier_id'],
 
-               'po\_number' => uniqid('PO-'),
+               'po_number' => uniqid('PO-'),
 
-               'order\_date' => now(),
+               'order_date' => now(),
 
-               'created\_at' => now(),
+               'created_at' => now(),
 
-               'updated\_at' => now(),
+               'updated_at' => now(),
 
            ]);
 
 
 
-           foreach ($data\['items'] as $item) {
+           foreach ($data['items'] as $item) {
 
 
 
-               $batchId = DB::table('batches')->insertGetId(\[
+               $batchId = DB::table('batches')->insertGetId([
 
-                   'product\_id' => $item\['product\_id'],
+                   'product_id' => $item['product_id'],
 
-                   'batch\_number' => $item\['batch\_number'],
+                   'batch_number' => $item['batch_number'],
 
-                   'expires\_at' => $item\['expires\_at'],
+                   'expires_at' => $item['expires_at'],
 
-                   'purchase\_price' => $item\['purchase\_price'] ?? 0,
+                   'purchase_price' => $item['purchase_price'] ?? 0,
 
-                   'selling\_price' => $item\['selling\_price'] ?? 0,
+                   'selling_price' => $item['selling_price'] ?? 0,
 
-                   'created\_at' => now(),
+                   'created_at' => now(),
 
-                   'updated\_at' => now(),
+                   'updated_at' => now(),
 
                ]);
 
 
 
-               DB::table('purchase\_order\_items')->insert(\[
+               DB::table('purchase_order_items')->insert([
 
-                   'purchase\_order\_id' => $poId,
+                   'purchase_order_id' => $poId,
 
-                   'product\_id' => $item\['product\_id'],
+                   'product_id' => $item['product_id'],
 
-                   'batch\_id' => $batchId,
+                   'batch_id' => $batchId,
 
-                   'quantity' => $item\['quantity'],
+                   'quantity' => $item['quantity'],
 
-                   'unit\_price' => $item\['purchase\_price'] ?? 0,
+                   'unit_price' => $item['purchase_price'] ?? 0,
 
-                   'created\_at' => now(),
+                   'created_at' => now(),
 
-                   'updated\_at' => now(),
+                   'updated_at' => now(),
 
                ]);
 
@@ -899,13 +899,13 @@ class PurchaseOrderService
 
                $this->stockService->increase(
 
-                   $item\['product\_id'],
+                   $item['product_id'],
 
                    $batchId,
 
-                   $data\['warehouse\_id'] ?? 1,
+                   $data['warehouse_id'] ?? 1,
 
-                   $item\['quantity'],
+                   $item['quantity'],
 
                    "PO:$poId"
 
@@ -933,11 +933,11 @@ class PurchaseOrderService
 
 ```
 
-namespace App\\Services;
+namespace App\Services;
 
 
 
-use Illuminate\\Support\\Facades\\DB;
+use Illuminate\Support\Facades\DB;
 
 
 
@@ -945,7 +945,7 @@ class SaleService
 
 {
 
-   public function \_\_construct(
+   public function __construct(
 
        private BatchQueryService $batchQuery,
 
@@ -965,31 +965,31 @@ class SaleService
 
 
 
-           $saleId = DB::table('sales')->insertGetId(\[
+           $saleId = DB::table('sales')->insertGetId([
 
-               'invoice\_number' => uniqid('INV-'),
+               'invoice_number' => uniqid('INV-'),
 
-               'sale\_date' => now(),
+               'sale_date' => now(),
 
-               'total\_amount' => 0,
+               'total_amount' => 0,
 
-               'created\_at' => now(),
+               'created_at' => now(),
 
-               'updated\_at' => now(),
+               'updated_at' => now(),
 
            ]);
 
 
 
-           foreach ($data\['items'] as $item) {
+           foreach ($data['items'] as $item) {
 
 
 
                $batches = $this->batchQuery->getAvailableBatches(
 
-                   $item\['product\_id'],
+                   $item['product_id'],
 
-                   $data\['warehouse\_id']
+                   $data['warehouse_id']
 
                );
 
@@ -999,7 +999,7 @@ class SaleService
 
                    $batches,
 
-                   $item\['quantity']
+                   $item['quantity']
 
                );
 
@@ -1007,9 +1007,9 @@ class SaleService
 
                $this->stockService->decrease(
 
-                   $item\['product\_id'],
+                   $item['product_id'],
 
-                   $data\['warehouse\_id'],
+                   $data['warehouse_id'],
 
                    $allocations,
 
@@ -1021,21 +1021,21 @@ class SaleService
 
                foreach ($allocations as $a) {
 
-                   DB::table('sale\_items')->insert(\[
+                   DB::table('sale_items')->insert([
 
-                       'sale\_id' => $saleId,
+                       'sale_id' => $saleId,
 
-                       'product\_id' => $item\['product\_id'],
+                       'product_id' => $item['product_id'],
 
-                       'batch\_id' => $a\['batch\_id'],
+                       'batch_id' => $a['batch_id'],
 
-                       'quantity' => $a\['qty'],
+                       'quantity' => $a['qty'],
 
-                       'unit\_price' => 0,
+                       'unit_price' => 0,
 
-                       'created\_at' => now(),
+                       'created_at' => now(),
 
-                       'updated\_at' => now(),
+                       'updated_at' => now(),
 
                    ]);
 
@@ -1045,7 +1045,7 @@ class SaleService
 
 
 
-           return \['sale\_id' => $saleId];
+           return ['sale_id' => $saleId];
 
        });
 
@@ -1063,11 +1063,11 @@ class SaleService
 
 
 ```
-namespace App\\Services;
+namespace App\Services;
 
 
 
-use Illuminate\\Support\\Facades\\DB;
+use Illuminate\Support\Facades\DB;
 
 
 
@@ -1089,7 +1089,7 @@ class BarcodeTraceService
 
        if (!$barcode) {
 
-           throw new \\DomainException('Barcode not found');
+           throw new \DomainException('Barcode not found');
 
        }
 
@@ -1117,7 +1117,7 @@ class BarcodeTraceService
 
        return DB::table('products')
 
-           ->where('id', $barcode->barcodeable\_id)
+           ->where('id', $barcode->barcodeable_id)
 
            ->first();
 
@@ -1129,17 +1129,17 @@ class BarcodeTraceService
 
    {
 
-       return \[
+       return [
 
-           'batch' => DB::table('batches')->find($barcode->barcodeable\_id),
+           'batch' => DB::table('batches')->find($barcode->barcodeable_id),
 
 
 
-           'movements' => DB::table('stock\_movements')
+           'movements' => DB::table('stock_movements')
 
-               ->where('batch\_id', $barcode->barcodeable\_id)
+               ->where('batch_id', $barcode->barcodeable_id)
 
-               ->orderBy('moved\_at', 'desc')
+               ->orderBy('moved_at', 'desc')
 
                ->get(),
 
@@ -1147,7 +1147,7 @@ class BarcodeTraceService
 
            'stock' => DB::table('stocks')
 
-               ->where('batch\_id', $barcode->barcodeable\_id)
+               ->where('batch_id', $barcode->barcodeable_id)
 
                ->get(),
 
@@ -1161,9 +1161,9 @@ class BarcodeTraceService
 
    {
 
-       return DB::table('serial\_numbers')
+       return DB::table('serial_numbers')
 
-           ->where('id', $barcode->barcodeable\_id)
+           ->where('id', $barcode->barcodeable_id)
 
            ->first();
 
@@ -1177,7 +1177,7 @@ class BarcodeTraceService
 
        return DB::table('transactions')
 
-           ->where('id', $barcode->barcodeable\_id)
+           ->where('id', $barcode->barcodeable_id)
 
            ->first();
 
@@ -1205,7 +1205,7 @@ class FIFOAllocationStrategy implements StockRotationStrategy
 
        return collect($batches)
 
-           ->sortBy('created\_at')
+           ->sortBy('created_at')
 
            ->values()
 
@@ -1231,7 +1231,7 @@ class FEFOAllocationStrategy implements StockRotationStrategy
 
        return collect($batches)
 
-           ->sortBy('expires\_at')
+           ->sortBy('expires_at')
 
            ->values()
 
@@ -1257,7 +1257,7 @@ class LIFOAllocationStrategy implements StockRotationStrategy
 
        return collect($batches)
 
-           ->sortByDesc('created\_at')
+           ->sortByDesc('created_at')
 
            ->values()
 
@@ -1287,7 +1287,7 @@ class FIFOValuationStrategy implements InventoryValuationStrategy
 
        return collect($allocations)->sum(fn($a) =>
 
-           $a\['qty'] \* $a\['purchase\_price']
+           $a['qty'] \* $a['purchase_price']
 
        );
 
@@ -1315,7 +1315,7 @@ class WeightedAverageStrategy implements InventoryValuationStrategy
 
        $totalCost = collect($allocations)->sum(fn($a) =>
 
-           $a\['qty'] \* $a\['purchase\_price']
+           $a['qty'] \* $a['purchase_price']
 
        );
 
@@ -1343,7 +1343,7 @@ class StandardCostStrategy implements InventoryValuationStrategy
 
        return collect($allocations)->sum(fn($a) =>
 
-           $a\['qty'] \* $a\['standard\_cost']
+           $a['qty'] \* $a['standard_cost']
 
        );
 
@@ -1377,7 +1377,7 @@ class InventoryStrategyFactory
 
            'fefo' => new FEFOAllocationStrategy(),
 
-           default => throw new \\Exception('Invalid rotation')
+           default => throw new \Exception('Invalid rotation')
 
        };
 
@@ -1393,11 +1393,11 @@ class InventoryStrategyFactory
 
            'fifo' => new FIFOValuationStrategy(),
 
-           'weighted\_average' => new WeightedAverageStrategy(),
+           'weighted_average' => new WeightedAverageStrategy(),
 
-           'standard\_cost' => new StandardCostStrategy(),
+           'standard_cost' => new StandardCostStrategy(),
 
-           default => throw new \\Exception('Invalid valuation')
+           default => throw new \Exception('Invalid valuation')
 
        };
 
@@ -1419,9 +1419,9 @@ $settings = $this->settingsService->resolve($productId, $warehouseId);
 
 
 
-$rotation = $this->factory->rotation($settings->rotation\_strategy);
+$rotation = $this->factory->rotation($settings->rotation_strategy);
 
-$valuation = $this->factory->valuation($settings->valuation\_method);
+$valuation = $this->factory->valuation($settings->valuation_method);
 
 
 
@@ -1445,11 +1445,11 @@ $cost = $valuation->calculateCost($allocations);
 
 
 ```
-namespace App\\Models\\Traits;
+namespace App\Models\Traits;
 
 
 
-use Illuminate\\Support\\Facades\\Auth;
+use Illuminate\Support\Facades\Auth;
 
 
 
@@ -1475,23 +1475,23 @@ trait Auditable
 
    {
 
-       \\DB::table('audit\_logs')->insert(\[
+       \DB::table('audit_logs')->insert([
 
-           'entity\_type' => get\_class($model),
+           'entity_type' => get_class($model),
 
-           'entity\_id'   => $model->id,
+           'entity_id'   => $model->id,
 
            'action'      => $action,
 
-           'old\_values'  => json\_encode($model->getOriginal()),
+           'old_values'  => json_encode($model->getOriginal()),
 
-           'new\_values'  => json\_encode($model->getAttributes()),
+           'new_values'  => json_encode($model->getAttributes()),
 
-           'user\_id'     => Auth::id(),
+           'user_id'     => Auth::id(),
 
-           'created\_at'  => now(),
+           'created_at'  => now(),
 
-           'updated\_at'  => now(),
+           'updated_at'  => now(),
 
        ]);
 
@@ -1515,23 +1515,23 @@ class StockMovement extends Model
 
 {
 
-   protected $fillable = \[
+   protected $fillable = [
 
-       'product\_id','product\_variant\_id','batch\_id',
+       'product_id','product_variant_id','batch_id',
 
-       'warehouse\_id','type','quantity',
+       'warehouse_id','type','quantity',
 
-       'reference\_type','reference\_id','meta','moved\_at'
+       'reference_type','reference_id','meta','moved_at'
 
    ];
 
 
 
-   protected $casts = \[
+   protected $casts = [
 
        'meta' => 'array',
 
-       'moved\_at' => 'datetime'
+       'moved_at' => 'datetime'
 
    ];
 
@@ -1571,7 +1571,7 @@ class StockMovement extends Model
 
    {
 
-       return $this->morphTo(\_\_FUNCTION\_\_, 'reference\_type', 'reference\_id');
+       return $this->morphTo(__FUNCTION__, 'reference_type', 'reference_id');
 
    }
 
@@ -1617,9 +1617,9 @@ class InventoryStrategyFactory
 
            'fifo' => new FIFOValuation(),
 
-           'weighted\_average' => new WeightedAverage(),
+           'weighted_average' => new WeightedAverage(),
 
-           'standard\_cost' => new StandardCost(),
+           'standard_cost' => new StandardCost(),
 
        };
 
@@ -1635,7 +1635,7 @@ class InventoryStrategyFactory
 
            'default' => new DefaultAllocator(),
 
-           'strict\_batch' => new StrictBatchAllocator(),
+           'strict_batch' => new StrictBatchAllocator(),
 
        };
 
@@ -1667,13 +1667,13 @@ class BatchQueryService
 
        return DB::table('stocks')
 
-           ->join('batches', 'stocks.batch\_id', '=', 'batches.id')
+           ->join('batches', 'stocks.batch_id', '=', 'batches.id')
 
-           ->where('stocks.product\_id', $productId)
+           ->where('stocks.product_id', $productId)
 
-           ->where('stocks.product\_variant\_id', $variantId)
+           ->where('stocks.product_variant_id', $variantId)
 
-           ->where('stocks.warehouse\_id', $warehouseId)
+           ->where('stocks.warehouse_id', $warehouseId)
 
            ->where('stocks.quantity', '>', 0)
 
@@ -1707,9 +1707,9 @@ class StockQueryService
 
    {
 
-       return Stock::selectRaw('product\_id, SUM(quantity) as qty')
+       return Stock::selectRaw('product_id, SUM(quantity) as qty')
 
-           ->groupBy('product\_id')
+           ->groupBy('product_id')
 
            ->get();
 
@@ -1735,21 +1735,21 @@ class StockService
 
    {
 
-       $stock = Stock::lockForUpdate()->firstOrCreate(\[
+       $stock = Stock::lockForUpdate()->firstOrCreate([
 
-           'product\_id' => $data\['product\_id'],
+           'product_id' => $data['product_id'],
 
-           'product\_variant\_id' => $data\['variant\_id'],
+           'product_variant_id' => $data['variant_id'],
 
-           'batch\_id' => $data\['batch\_id'],
+           'batch_id' => $data['batch_id'],
 
-           'warehouse\_id' => $data\['warehouse\_id'],
+           'warehouse_id' => $data['warehouse_id'],
 
        ]);
 
 
 
-       $stock->increment('quantity', $data\['qty']);
+       $stock->increment('quantity', $data['qty']);
 
 
 
@@ -1767,39 +1767,39 @@ class StockService
 
 
 
-           $stock = Stock::lockForUpdate()->where(\[
+           $stock = Stock::lockForUpdate()->where([
 
-               'product\_id' => $data\['product\_id'],
+               'product_id' => $data['product_id'],
 
-               'product\_variant\_id' => $data\['variant\_id'],
+               'product_variant_id' => $data['variant_id'],
 
-               'batch\_id' => $a\['batch\_id'],
+               'batch_id' => $a['batch_id'],
 
-               'warehouse\_id' => $data\['warehouse\_id'],
+               'warehouse_id' => $data['warehouse_id'],
 
            ])->first();
 
 
 
-           if (!$stock || $stock->quantity < $a\['qty']) {
+           if (!$stock || $stock->quantity < $a['qty']) {
 
-               throw new \\RuntimeException('Stock error');
+               throw new \RuntimeException('Stock error');
 
            }
 
 
 
-           $stock->decrement('quantity', $a\['qty']);
+           $stock->decrement('quantity', $a['qty']);
 
 
 
-           $this->movement(\[
+           $this->movement([
 
                ...$data,
 
-               'batch\_id' => $a\['batch\_id'],
+               'batch_id' => $a['batch_id'],
 
-               'qty' => -$a\['qty']
+               'qty' => -$a['qty']
 
            ], 'sale');
 
@@ -1813,13 +1813,13 @@ class StockService
 
    {
 
-       StockMovement::create(\[
+       StockMovement::create([
 
            ...$data,
 
            'type' => $type,
 
-           'moved\_at' => now(),
+           'moved_at' => now(),
 
        ]);
 
@@ -1841,7 +1841,7 @@ class AllocationService
 
 {
 
-   public function \_\_construct(
+   public function __construct(
 
        private InventoryStrategyFactory $factory
 
@@ -1853,9 +1853,9 @@ class AllocationService
 
    {
 
-       $rotation = $this->factory->rotation($settings->rotation\_strategy);
+       $rotation = $this->factory->rotation($settings->rotation_strategy);
 
-       $allocator = $this->factory->allocation($settings->allocation\_algorithm);
+       $allocator = $this->factory->allocation($settings->allocation_algorithm);
 
 
 
@@ -1887,13 +1887,13 @@ class ComboService
 
    {
 
-       return ProductComponent::where('parent\_product\_id', $productId)
+       return ProductComponent::where('parent_product_id', $productId)
 
            ->get()
 
-           ->map(fn($c) => \[
+           ->map(fn($c) => [
 
-               'product\_id' => $c->component\_product\_id,
+               'product_id' => $c->component_product_id,
 
                'qty' => $c->quantity \* $qty
 
@@ -1919,7 +1919,7 @@ class TransactionService
 
 {
 
-   public function \_\_construct(
+   public function __construct(
 
        private BatchQueryService $batchQuery,
 
@@ -1947,25 +1947,25 @@ class TransactionService
 
 
 
-           $transaction = Transaction::create(\[
+           $transaction = Transaction::create([
 
-               'type' => $data\['type'],
+               'type' => $data['type'],
 
-               'warehouse\_id' => $data\['warehouse\_id'],
+               'warehouse_id' => $data['warehouse_id'],
 
-               'reference\_no' => uniqid(),
+               'reference_no' => uniqid(),
 
-               'transaction\_date' => now(),
+               'transaction_date' => now(),
 
            ]);
 
 
 
-           foreach ($data\['items'] as $item) {
+           foreach ($data['items'] as $item) {
 
 
 
-               $product = Product::findOrFail($item\['product\_id']);
+               $product = Product::findOrFail($item['product_id']);
 
 
 
@@ -2019,9 +2019,9 @@ private function handleStock($transaction, $item)
 
    $settings = $this->settings->resolve(
 
-       $item\['product\_id'],
+       $item['product_id'],
 
-       $transaction->warehouse\_id
+       $transaction->warehouse_id
 
    );
 
@@ -2029,11 +2029,11 @@ private function handleStock($transaction, $item)
 
    $batches = $this->batchQuery->getAvailable(
 
-       $item\['product\_id'],
+       $item['product_id'],
 
-       $item\['variant\_id'] ?? null,
+       $item['variant_id'] ?? null,
 
-       $transaction->warehouse\_id
+       $transaction->warehouse_id
 
    );
 
@@ -2045,25 +2045,25 @@ private function handleStock($transaction, $item)
 
        $batches,
 
-       $item\['quantity']
+       $item['quantity']
 
    );
 
 
 
-   $valuation = $this->factory->valuation($settings->valuation\_method);
+   $valuation = $this->factory->valuation($settings->valuation_method);
 
    $cost = $valuation->calculate($allocations);
 
 
 
-   $this->stock->decrease(\[
+   $this->stock->decrease([
 
-       'product\_id' => $item\['product\_id'],
+       'product_id' => $item['product_id'],
 
-       'variant\_id' => $item\['variant\_id'] ?? null,
+       'variant_id' => $item['variant_id'] ?? null,
 
-       'warehouse\_id' => $transaction->warehouse\_id
+       'warehouse_id' => $transaction->warehouse_id
 
    ], $allocations);
 
@@ -2071,19 +2071,19 @@ private function handleStock($transaction, $item)
 
    foreach ($allocations as $a) {
 
-       TransactionItem::create(\[
+       TransactionItem::create([
 
-           'transaction\_id' => $transaction->id,
+           'transaction_id' => $transaction->id,
 
-           'product\_id' => $item\['product\_id'],
+           'product_id' => $item['product_id'],
 
-           'product\_variant\_id' => $item\['variant\_id'] ?? null,
+           'product_variant_id' => $item['variant_id'] ?? null,
 
-           'batch\_id' => $a\['batch\_id'],
+           'batch_id' => $a['batch_id'],
 
-           'quantity' => $a\['qty'],
+           'quantity' => $a['qty'],
 
-           'unit\_price' => $cost,
+           'unit_price' => $cost,
 
        ]);
 
@@ -2105,19 +2105,19 @@ private function handleDigital($transaction, $item)
 
 {
 
-   $asset = $this->digital->assign($item\['product\_id']);
+   $asset = $this->digital->assign($item['product_id']);
 
 
 
-   TransactionItem::create(\[
+   TransactionItem::create([
 
-       'transaction\_id' => $transaction->id,
+       'transaction_id' => $transaction->id,
 
-       'product\_id' => $item\['product\_id'],
+       'product_id' => $item['product_id'],
 
        'quantity' => 1,
 
-       'meta' => \['license' => $asset->license\_key]
+       'meta' => ['license' => $asset->license_key]
 
    ]);
 
@@ -2139,9 +2139,9 @@ private function handleCombo($transaction, $item)
 
    $components = $this->combo->explode(
 
-       $item\['product\_id'],
+       $item['product_id'],
 
-       $item\['quantity']
+       $item['quantity']
 
    );
 
@@ -2149,11 +2149,11 @@ private function handleCombo($transaction, $item)
 
    foreach ($components as $c) {
 
-       $this->handleStock($transaction, \[
+       $this->handleStock($transaction, [
 
-           'product\_id' => $c\['product\_id'],
+           'product_id' => $c['product_id'],
 
-           'quantity' => $c\['qty']
+           'quantity' => $c['qty']
 
        ]);
 
@@ -2175,15 +2175,15 @@ private function handleService($transaction, $item)
 
 {
 
-   TransactionItem::create(\[
+   TransactionItem::create([
 
-       'transaction\_id' => $transaction->id,
+       'transaction_id' => $transaction->id,
 
-       'product\_id' => $item\['product\_id'],
+       'product_id' => $item['product_id'],
 
-       'quantity' => $item\['quantity'],
+       'quantity' => $item['quantity'],
 
-       'unit\_price' => $item\['price']
+       'unit_price' => $item['price']
 
    ]);
 
@@ -2221,17 +2221,17 @@ public function handle($request, Closure $next)
 
    // Dynamically set database connection
 
-   config(\["database.connections.tenant" => \[
+   config(["database.connections.tenant" => [
 
-       'driver'   => $tenant->db\_driver,
+       'driver'   => $tenant->db_driver,
 
-       'host'     => $tenant->db\_host,
+       'host'     => $tenant->db_host,
 
-       'database' => $tenant->db\_name,
+       'database' => $tenant->db_name,
 
-       'username' => $tenant->db\_user,
+       'username' => $tenant->db_user,
 
-       'password' => decrypt($tenant->db\_password),
+       'password' => decrypt($tenant->db_password),
 
        // ...
 
@@ -2245,29 +2245,29 @@ public function handle($request, Closure $next)
 
    // Set mail, cache, queue, etc.
 
-   config(\["mail.mailers.smtp" => array\_merge(
+   config(["mail.mailers.smtp" => array_merge(
 
        config("mail.mailers.smtp"),
 
-       $tenant->mail\_config
+       $tenant->mail_config
 
    )]);
 
-   config(\["cache.default" => $tenant->cache\_driver]);
+   config(["cache.default" => $tenant->cache_driver]);
 
-   config(\["queue.default" => $tenant->queue\_driver]);
+   config(["queue.default" => $tenant->queue_driver]);
 
 
 
    // Feature flags
 
-   Feature::define('advanced-reports', fn() => $tenant->feature\_flags\['advanced-reports'] ?? false);
+   Feature::define('advanced-reports', fn() => $tenant->feature_flags['advanced-reports'] ?? false);
 
 
 
    // Bind tenant to service container
 
-   app()->instance('current\_tenant', $tenant);
+   app()->instance('current_tenant', $tenant);
 
 
 
@@ -2291,17 +2291,17 @@ class FiscalYearSeeder extends Seeder
 
    {
 
-       FiscalYear::create(\[
+       FiscalYear::create([
 
-           'tenant\_id' => 1,
+           'tenant_id' => 1,
 
            'name' => 'FY 2025',
 
-           'start\_date' => '2025-01-01',
+           'start_date' => '2025-01-01',
 
-           'end\_date' => '2025-12-31',
+           'end_date' => '2025-12-31',
 
-           'is\_closed' => false,
+           'is_closed' => false,
 
        ]);
 
@@ -2319,23 +2319,23 @@ class AccountingPeriodSeeder extends Seeder
 
    {
 
-       $months = \['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+       $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
        foreach ($months as $i => $month) {
 
-           AccountingPeriod::create(\[
+           AccountingPeriod::create([
 
-               'tenant\_id' => 1,
+               'tenant_id' => 1,
 
-               'fiscal\_year\_id' => 1,
+               'fiscal_year_id' => 1,
 
                'name' => $month . ' 2025',
 
-               'period\_number' => $i + 1,
+               'period_number' => $i + 1,
 
-               'start\_date' => "2025-" . str\_pad($i+1, 2, '0', STR\_PAD\_LEFT) . "-01",
+               'start_date' => "2025-" . str_pad($i+1, 2, '0', STR_PAD_LEFT) . "-01",
 
-               'end\_date' => date("Y-m-t", strtotime("2025-" . str\_pad($i+1, 2, '0', STR\_PAD\_LEFT) . "-01")),
+               'end_date' => date("Y-m-t", strtotime("2025-" . str_pad($i+1, 2, '0', STR_PAD_LEFT) . "-01")),
 
                'status' => 'open',
 
@@ -2357,33 +2357,33 @@ class ChartOfAccountSeeder extends Seeder
 
    {
 
-       $accounts = \[
+       $accounts = [
 
-           \['code' => '1000', 'name' => 'Cash on Hand', 'type' => 'asset', 'normal\_balance' => 'debit', 'level' => 1, 'path' => '/1000', 'is\_leaf' => true],
+           ['code' => '1000', 'name' => 'Cash on Hand', 'type' => 'asset', 'normal_balance' => 'debit', 'level' => 1, 'path' => '/1000', 'is_leaf' => true],
 
-           \['code' => '1100', 'name' => 'Main Checking', 'type' => 'asset', 'normal\_balance' => 'debit', 'is\_bank' => true, 'level' => 1, 'path' => '/1100', 'is\_leaf' => true],
+           ['code' => '1100', 'name' => 'Main Checking', 'type' => 'asset', 'normal_balance' => 'debit', 'is_bank' => true, 'level' => 1, 'path' => '/1100', 'is_leaf' => true],
 
-           \['code' => '1200', 'name' => 'Accounts Receivable', 'type' => 'asset', 'normal\_balance' => 'debit', 'level' => 1, 'path' => '/1200', 'is\_leaf' => true],
+           ['code' => '1200', 'name' => 'Accounts Receivable', 'type' => 'asset', 'normal_balance' => 'debit', 'level' => 1, 'path' => '/1200', 'is_leaf' => true],
 
-           \['code' => '1300', 'name' => 'Inventory', 'type' => 'asset', 'normal\_balance' => 'debit', 'level' => 1, 'path' => '/1300', 'is\_leaf' => true],
+           ['code' => '1300', 'name' => 'Inventory', 'type' => 'asset', 'normal_balance' => 'debit', 'level' => 1, 'path' => '/1300', 'is_leaf' => true],
 
-           \['code' => '2000', 'name' => 'Accounts Payable', 'type' => 'liability', 'normal\_balance' => 'credit', 'level' => 1, 'path' => '/2000', 'is\_leaf' => true],
+           ['code' => '2000', 'name' => 'Accounts Payable', 'type' => 'liability', 'normal_balance' => 'credit', 'level' => 1, 'path' => '/2000', 'is_leaf' => true],
 
-           \['code' => '3000', 'name' => 'Retained Earnings', 'type' => 'equity', 'normal\_balance' => 'credit', 'level' => 1, 'path' => '/3000', 'is\_leaf' => true],
+           ['code' => '3000', 'name' => 'Retained Earnings', 'type' => 'equity', 'normal_balance' => 'credit', 'level' => 1, 'path' => '/3000', 'is_leaf' => true],
 
-           \['code' => '4000', 'name' => 'Sales Revenue', 'type' => 'income', 'normal\_balance' => 'credit', 'level' => 1, 'path' => '/4000', 'is\_leaf' => true],
+           ['code' => '4000', 'name' => 'Sales Revenue', 'type' => 'income', 'normal_balance' => 'credit', 'level' => 1, 'path' => '/4000', 'is_leaf' => true],
 
-           \['code' => '5000', 'name' => 'Cost of Goods Sold', 'type' => 'expense', 'normal\_balance' => 'debit', 'level' => 1, 'path' => '/5000', 'is\_leaf' => true],
+           ['code' => '5000', 'name' => 'Cost of Goods Sold', 'type' => 'expense', 'normal_balance' => 'debit', 'level' => 1, 'path' => '/5000', 'is_leaf' => true],
 
-           \['code' => '6000', 'name' => 'Operating Expenses', 'type' => 'expense', 'normal\_balance' => 'debit', 'level' => 1, 'path' => '/6000', 'is\_leaf' => true],
+           ['code' => '6000', 'name' => 'Operating Expenses', 'type' => 'expense', 'normal_balance' => 'debit', 'level' => 1, 'path' => '/6000', 'is_leaf' => true],
 
-           \['code' => '7000', 'name' => 'Tax Expense', 'type' => 'expense', 'normal\_balance' => 'debit', 'level' => 1, 'path' => '/7000', 'is\_leaf' => true],
+           ['code' => '7000', 'name' => 'Tax Expense', 'type' => 'expense', 'normal_balance' => 'debit', 'level' => 1, 'path' => '/7000', 'is_leaf' => true],
 
        ];
 
        foreach ($accounts as $acc) {
 
-           ChartOfAccount::create(array\_merge($acc, \['tenant\_id' => 1, 'is\_active' => true]));
+           ChartOfAccount::create(array_merge($acc, ['tenant_id' => 1, 'is_active' => true]));
 
        }
 
@@ -2407,7 +2407,7 @@ class StockMovementService implements StockMovementServiceInterface
 
 
 
-   public function \_\_construct(
+   public function __construct(
 
        StockMovementRepositoryInterface $movementRepo,
 
@@ -2429,23 +2429,23 @@ class StockMovementService implements StockMovementServiceInterface
 
        return DB::transaction(function () use ($data) {
 
-           $movement = $this->movementRepo->create(array\_merge($data, \[
+           $movement = $this->movementRepo->create(array_merge($data, [
 
-               'movement\_type' => 'receipt',
+               'movement_type' => 'receipt',
 
-               'movement\_number' => $this->generateMovementNumber()
+               'movement_number' => $this->generateMovementNumber()
 
            ]));
 
            $this->updateStockBalances(
 
-               $data\['product\_id'],
+               $data['product_id'],
 
-               $data\['to\_location\_id'],
+               $data['to_location_id'],
 
-               $data\['batch\_id'] ?? null,
+               $data['batch_id'] ?? null,
 
-               $data\['quantity']
+               $data['quantity']
 
            );
 
@@ -2465,23 +2465,23 @@ class StockMovementService implements StockMovementServiceInterface
 
        return DB::transaction(function () use ($data) {
 
-           $movement = $this->movementRepo->create(array\_merge($data, \[
+           $movement = $this->movementRepo->create(array_merge($data, [
 
-               'movement\_type' => 'issue',
+               'movement_type' => 'issue',
 
-               'movement\_number' => $this->generateMovementNumber()
+               'movement_number' => $this->generateMovementNumber()
 
            ]));
 
            $this->updateStockBalances(
 
-               $data\['product\_id'],
+               $data['product_id'],
 
-               $data\['from\_location\_id'],
+               $data['from_location_id'],
 
-               $data\['batch\_id'] ?? null,
+               $data['batch_id'] ?? null,
 
-               -$data\['quantity']
+               -$data['quantity']
 
            );
 
@@ -2503,27 +2503,27 @@ class StockMovementService implements StockMovementServiceInterface
 
            // Out movement
 
-           $outMovement = $this->movementRepo->create(array\_merge($data, \[
+           $outMovement = $this->movementRepo->create(array_merge($data, [
 
-               'movement\_type' => 'transfer',
+               'movement_type' => 'transfer',
 
-               'from\_location\_id' => $data\['from\_location\_id'],
+               'from_location_id' => $data['from_location_id'],
 
-               'to\_location\_id' => null,
+               'to_location_id' => null,
 
-               'movement\_number' => $this->generateMovementNumber()
+               'movement_number' => $this->generateMovementNumber()
 
            ]));
 
            $this->updateStockBalances(
 
-               $data\['product\_id'],
+               $data['product_id'],
 
-               $data\['from\_location\_id'],
+               $data['from_location_id'],
 
-               $data\['batch\_id'] ?? null,
+               $data['batch_id'] ?? null,
 
-               -$data\['quantity']
+               -$data['quantity']
 
            );
 
@@ -2531,33 +2531,33 @@ class StockMovementService implements StockMovementServiceInterface
 
            // In movement
 
-           $inMovement = $this->movementRepo->create(array\_merge($data, \[
+           $inMovement = $this->movementRepo->create(array_merge($data, [
 
-               'movement\_type' => 'transfer',
+               'movement_type' => 'transfer',
 
-               'from\_location\_id' => null,
+               'from_location_id' => null,
 
-               'to\_location\_id' => $data\['to\_location\_id'],
+               'to_location_id' => $data['to_location_id'],
 
-               'movement\_number' => $this->generateMovementNumber()
+               'movement_number' => $this->generateMovementNumber()
 
            ]));
 
            $this->updateStockBalances(
 
-               $data\['product\_id'],
+               $data['product_id'],
 
-               $data\['to\_location\_id'],
+               $data['to_location_id'],
 
-               $data\['batch\_id'] ?? null,
+               $data['batch_id'] ?? null,
 
-               $data\['quantity']
+               $data['quantity']
 
            );
 
 
 
-           return \['out' => $outMovement, 'in' => $inMovement];
+           return ['out' => $outMovement, 'in' => $inMovement];
 
        });
 
@@ -2571,23 +2571,23 @@ class StockMovementService implements StockMovementServiceInterface
 
        return DB::transaction(function () use ($data) {
 
-           $movement = $this->movementRepo->create(array\_merge($data, \[
+           $movement = $this->movementRepo->create(array_merge($data, [
 
-               'movement\_type' => 'adjustment',
+               'movement_type' => 'adjustment',
 
-               'movement\_number' => $this->generateMovementNumber()
+               'movement_number' => $this->generateMovementNumber()
 
            ]));
 
            $this->updateStockBalances(
 
-               $data\['product\_id'],
+               $data['product_id'],
 
-               $data\['to\_location\_id'] ?? $data\['from\_location\_id'],
+               $data['to_location_id'] ?? $data['from_location_id'],
 
-               $data\['batch\_id'] ?? null,
+               $data['batch_id'] ?? null,
 
-               $data\['quantity']
+               $data['quantity']
 
            );
 
@@ -2609,37 +2609,37 @@ class StockMovementService implements StockMovementServiceInterface
 
        if ($balance) {
 
-           $newQty = $balance->qty\_on\_hand + $quantityChange;
+           $newQty = $balance->qty_on_hand + $quantityChange;
 
-           $this->balanceRepo->update($balance->id, \[
+           $this->balanceRepo->update($balance->id, [
 
-               'qty\_on\_hand' => $newQty,
+               'qty_on_hand' => $newQty,
 
-               'qty\_available' => $newQty - $balance->qty\_reserved,
+               'qty_available' => $newQty - $balance->qty_reserved,
 
-               'updated\_at' => now()
+               'updated_at' => now()
 
            ]);
 
        } else if ($quantityChange > 0) {
 
-           $this->balanceRepo->create(\[
+           $this->balanceRepo->create([
 
-               'tenant\_id' => auth()->user()->tenant\_id,
+               'tenant_id' => auth()->user()->tenant_id,
 
-               'product\_id' => $productId,
+               'product_id' => $productId,
 
-               'location\_id' => $locationId,
+               'location_id' => $locationId,
 
-               'batch\_id' => $batchId,
+               'batch_id' => $batchId,
 
-               'uom\_id' => 1, // default
+               'uom_id' => 1, // default
 
-               'qty\_on\_hand' => $quantityChange,
+               'qty_on_hand' => $quantityChange,
 
-               'qty\_available' => $quantityChange,
+               'qty_available' => $quantityChange,
 
-               'avg\_cost' => 0
+               'avg_cost' => 0
 
            ]);
 
@@ -2655,7 +2655,7 @@ class StockMovementService implements StockMovementServiceInterface
 
    {
 
-       return 'MOV-' . str\_pad(rand(1, 99999), 5, '0', STR\_PAD\_LEFT);
+       return 'MOV-' . str_pad(rand(1, 99999), 5, '0', STR_PAD_LEFT);
 
    }
 
@@ -2671,7 +2671,7 @@ class JournalEntryService implements JournalEntryServiceInterface
 
 
 
-   public function \_\_construct(JournalEntryRepositoryInterface $repository)
+   public function __construct(JournalEntryRepositoryInterface $repository)
 
    {
 
@@ -2687,21 +2687,21 @@ class JournalEntryService implements JournalEntryServiceInterface
 
        return DB::transaction(function () use ($sourceType, $sourceId, $entries) {
 
-           $totalDebit = array\_sum(array\_column($entries, 'debit'));
+           $totalDebit = array_sum(array_column($entries, 'debit'));
 
-           $totalCredit = array\_sum(array\_column($entries, 'credit'));
+           $totalCredit = array_sum(array_column($entries, 'credit'));
 
            if ($totalDebit !== $totalCredit) {
 
-               throw new \\Exception('Journal entry must balance: Debits must equal Credits');
+               throw new \Exception('Journal entry must balance: Debits must equal Credits');
 
            }
 
 
 
-           $period = AccountingPeriod::where('start\_date', '<=', now())
+           $period = AccountingPeriod::where('start_date', '<=', now())
 
-               ->where('end\_date', '>=', now())
+               ->where('end_date', '>=', now())
 
                ->where('status', 'open')
 
@@ -2709,37 +2709,37 @@ class JournalEntryService implements JournalEntryServiceInterface
 
            if (!$period) {
 
-               throw new \\Exception('No open accounting period found');
+               throw new \Exception('No open accounting period found');
 
            }
 
 
 
-           $journalEntry = $this->repository->create(\[
+           $journalEntry = $this->repository->create([
 
-               'tenant\_id' => auth()->user()->tenant\_id,
+               'tenant_id' => auth()->user()->tenant_id,
 
-               'period\_id' => $period->id,
+               'period_id' => $period->id,
 
-               'entry\_number' => $this->generateEntryNumber(),
+               'entry_number' => $this->generateEntryNumber(),
 
-               'entry\_date' => now(),
+               'entry_date' => now(),
 
-               'post\_date' => now(),
+               'post_date' => now(),
 
-               'source\_type' => $sourceType,
+               'source_type' => $sourceType,
 
-               'source\_id' => $sourceId,
+               'source_id' => $sourceId,
 
                'description' => "Auto-generated from {$sourceType} #{$sourceId}",
 
-               'currency\_id' => 1,
+               'currency_id' => 1,
 
-               'exchange\_rate' => 1,
+               'exchange_rate' => 1,
 
                'status' => 'draft',
 
-               'created\_by' => auth()->id()
+               'created_by' => auth()->id()
 
            ]);
 
@@ -2747,21 +2747,21 @@ class JournalEntryService implements JournalEntryServiceInterface
 
            foreach ($entries as $line) {
 
-               $journalEntry->lines()->create(\[
+               $journalEntry->lines()->create([
 
-                   'account\_id' => $line\['account\_id'],
+                   'account_id' => $line['account_id'],
 
-                   'debit' => $line\['debit'],
+                   'debit' => $line['debit'],
 
-                   'credit' => $line\['credit'],
+                   'credit' => $line['credit'],
 
-                   'line\_number' => $line\['line\_number'] ?? 0,
+                   'line_number' => $line['line_number'] ?? 0,
 
-                   'party\_id' => $line\['party\_id'] ?? null,
+                   'party_id' => $line['party_id'] ?? null,
 
-                   'cost\_center\_id' => $line\['cost\_center\_id'] ?? null,
+                   'cost_center_id' => $line['cost_center_id'] ?? null,
 
-                   'description' => $line\['description'] ?? null
+                   'description' => $line['description'] ?? null
 
                ]);
 
@@ -2785,17 +2785,17 @@ class JournalEntryService implements JournalEntryServiceInterface
 
        if ($entry->status !== 'draft') {
 
-           throw new \\Exception('Only draft entries can be posted');
+           throw new \Exception('Only draft entries can be posted');
 
        }
 
-       return $this->repository->update($journalEntryId, \[
+       return $this->repository->update($journalEntryId, [
 
            'status' => 'posted',
 
-           'posted\_by' => auth()->id(),
+           'posted_by' => auth()->id(),
 
-           'posted\_at' => now()
+           'posted_at' => now()
 
        ]);
 
@@ -2811,7 +2811,7 @@ class JournalEntryService implements JournalEntryServiceInterface
 
        if ($original->status !== 'posted') {
 
-           throw new \\Exception('Only posted entries can be reversed');
+           throw new \Exception('Only posted entries can be reversed');
 
        }
 
@@ -2821,23 +2821,23 @@ class JournalEntryService implements JournalEntryServiceInterface
 
            // Create reversing entry with opposite signs
 
-           $reversalLines = \[];
+           $reversalLines = [];
 
            foreach ($original->lines as $line) {
 
-               $reversalLines\[] = \[
+               $reversalLines[] = [
 
-                   'account\_id' => $line->account\_id,
+                   'account_id' => $line->account_id,
 
                    'debit' => $line->credit,
 
                    'credit' => $line->debit,
 
-                   'line\_number' => $line->line\_number,
+                   'line_number' => $line->line_number,
 
-                   'party\_id' => $line->party\_id,
+                   'party_id' => $line->party_id,
 
-                   'cost\_center\_id' => $line->cost\_center\_id,
+                   'cost_center_id' => $line->cost_center_id,
 
                    'description' => "Reversal: {$reason}"
 
@@ -2861,11 +2861,11 @@ class JournalEntryService implements JournalEntryServiceInterface
 
 
 
-           $this->repository->update($original->id, \[
+           $this->repository->update($original->id, [
 
                'status' => 'reversed',
 
-               'reversed\_by' => auth()->id()
+               'reversed_by' => auth()->id()
 
            ]);
 
@@ -2883,7 +2883,7 @@ class JournalEntryService implements JournalEntryServiceInterface
 
    {
 
-       return 'JE-' . date('Ymd') . '-' . str\_pad(rand(1, 9999), 4, '0', STR\_PAD\_LEFT);
+       return 'JE-' . date('Ymd') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
 
    }
 
@@ -2905,7 +2905,7 @@ class PurchaseOrderService implements PurchaseOrderServiceInterface
 
 
 
-   public function \_\_construct(
+   public function __construct(
 
        PurchaseOrderRepositoryInterface $poRepo,
 
@@ -2949,7 +2949,7 @@ class PurchaseOrderService implements PurchaseOrderServiceInterface
 
            if ($gr->status !== 'draft') {
 
-               throw new \\Exception('Goods receipt can only be received from draft status');
+               throw new \Exception('Goods receipt can only be received from draft status');
 
            }
 
@@ -2959,31 +2959,31 @@ class PurchaseOrderService implements PurchaseOrderServiceInterface
 
                // Record stock movement
 
-               $movement = $this->stockMovementService->recordReceipt(\[
+               $movement = $this->stockMovementService->recordReceipt([
 
-                   'tenant\_id' => $gr->tenant\_id,
+                   'tenant_id' => $gr->tenant_id,
 
-                   'product\_id' => $line\['product\_id'],
+                   'product_id' => $line['product_id'],
 
-                   'variant\_id' => $line\['variant\_id'] ?? null,
+                   'variant_id' => $line['variant_id'] ?? null,
 
-                   'batch\_id' => $line\['batch\_id'] ?? null,
+                   'batch_id' => $line['batch_id'] ?? null,
 
-                   'serial\_id' => $line\['serial\_id'] ?? null,
+                   'serial_id' => $line['serial_id'] ?? null,
 
-                   'to\_location\_id' => $line\['location\_id'],
+                   'to_location_id' => $line['location_id'],
 
-                   'uom\_id' => $line\['uom\_id'],
+                   'uom_id' => $line['uom_id'],
 
-                   'quantity' => $line\['received\_qty'],
+                   'quantity' => $line['received_qty'],
 
-                   'unit\_cost' => $line\['unit\_cost'],
+                   'unit_cost' => $line['unit_cost'],
 
-                   'source\_type' => 'goods\_receipt',
+                   'source_type' => 'goods_receipt',
 
-                   'source\_id' => $goodsReceiptId,
+                   'source_id' => $goodsReceiptId,
 
-                   'created\_by' => auth()->id()
+                   'created_by' => auth()->id()
 
                ]);
 
@@ -2991,29 +2991,29 @@ class PurchaseOrderService implements PurchaseOrderServiceInterface
 
                // Create goods receipt line
 
-               $gr->lines()->create(\[
+               $gr->lines()->create([
 
-                   'po\_line\_id' => $line\['po\_line\_id'] ?? null,
+                   'po_line_id' => $line['po_line_id'] ?? null,
 
-                   'product\_id' => $line\['product\_id'],
+                   'product_id' => $line['product_id'],
 
-                   'variant\_id' => $line\['variant\_id'] ?? null,
+                   'variant_id' => $line['variant_id'] ?? null,
 
-                   'batch\_id' => $line\['batch\_id'] ?? null,
+                   'batch_id' => $line['batch_id'] ?? null,
 
-                   'serial\_id' => $line\['serial\_id'] ?? null,
+                   'serial_id' => $line['serial_id'] ?? null,
 
-                   'location\_id' => $line\['location\_id'],
+                   'location_id' => $line['location_id'],
 
-                   'uom\_id' => $line\['uom\_id'],
+                   'uom_id' => $line['uom_id'],
 
-                   'received\_qty' => $line\['received\_qty'],
+                   'received_qty' => $line['received_qty'],
 
-                   'unit\_cost' => $line\['unit\_cost'],
+                   'unit_cost' => $line['unit_cost'],
 
-                   'total\_cost' => $line\['received\_qty'] \* $line\['unit\_cost'],
+                   'total_cost' => $line['received_qty'] \* $line['unit_cost'],
 
-                   'stock\_movement\_id' => $movement->id
+                   'stock_movement_id' => $movement->id
 
                ]);
 
@@ -3021,13 +3021,13 @@ class PurchaseOrderService implements PurchaseOrderServiceInterface
 
                // Update purchase order line received quantity
 
-               if ($line\['po\_line\_id']) {
+               if ($line['po_line_id']) {
 
-                   $poLine = $gr->purchaseOrder->lines()->find($line\['po\_line\_id']);
+                   $poLine = $gr->purchaseOrder->lines()->find($line['po_line_id']);
 
-                   $newReceived = $poLine->received\_qty + $line\['received\_qty'];
+                   $newReceived = $poLine->received_qty + $line['received_qty'];
 
-                   $poLine->update(\['received\_qty' => $newReceived]);
+                   $poLine->update(['received_qty' => $newReceived]);
 
                }
 
@@ -3035,7 +3035,7 @@ class PurchaseOrderService implements PurchaseOrderServiceInterface
 
 
 
-           $gr->update(\['status' => 'received']);
+           $gr->update(['status' => 'received']);
 
 
 
@@ -3043,17 +3043,17 @@ class PurchaseOrderService implements PurchaseOrderServiceInterface
 
            $po = $gr->purchaseOrder;
 
-           $totalOrdered = $po->lines->sum('ordered\_qty');
+           $totalOrdered = $po->lines->sum('ordered_qty');
 
-           $totalReceived = $po->lines->sum('received\_qty');
+           $totalReceived = $po->lines->sum('received_qty');
 
            if ($totalReceived >= $totalOrdered) {
 
-               $po->update(\['status' => 'received']);
+               $po->update(['status' => 'received']);
 
            } elseif ($totalReceived > 0) {
 
-               $po->update(\['status' => 'partially\_received']);
+               $po->update(['status' => 'partially_received']);
 
            }
 
@@ -3071,7 +3071,7 @@ class PurchaseOrderService implements PurchaseOrderServiceInterface
 
    {
 
-       return $this->poRepo->update($purchaseOrderId, \['status' => 'approved']);
+       return $this->poRepo->update($purchaseOrderId, ['status' => 'approved']);
 
    }
 
@@ -3093,7 +3093,7 @@ class SalesOrderService implements SalesOrderServiceInterface
 
 
 
-   public function \_\_construct(
+   public function __construct(
 
        SalesOrderRepositoryInterface $soRepo,
 
@@ -3137,7 +3137,7 @@ class SalesOrderService implements SalesOrderServiceInterface
 
            if ($do->status !== 'draft') {
 
-               throw new \\Exception('Delivery order can only be shipped from draft status');
+               throw new \Exception('Delivery order can only be shipped from draft status');
 
            }
 
@@ -3147,55 +3147,55 @@ class SalesOrderService implements SalesOrderServiceInterface
 
                // Record stock issue
 
-               $movement = $this->stockMovementService->recordIssue(\[
+               $movement = $this->stockMovementService->recordIssue([
 
-                   'tenant\_id' => $do->tenant\_id,
+                   'tenant_id' => $do->tenant_id,
 
-                   'product\_id' => $line\['product\_id'],
+                   'product_id' => $line['product_id'],
 
-                   'variant\_id' => $line\['variant\_id'] ?? null,
+                   'variant_id' => $line['variant_id'] ?? null,
 
-                   'batch\_id' => $line\['batch\_id'] ?? null,
+                   'batch_id' => $line['batch_id'] ?? null,
 
-                   'serial\_id' => $line\['serial\_id'] ?? null,
+                   'serial_id' => $line['serial_id'] ?? null,
 
-                   'from\_location\_id' => $line\['from\_location\_id'],
+                   'from_location_id' => $line['from_location_id'],
 
-                   'uom\_id' => $line\['uom\_id'],
+                   'uom_id' => $line['uom_id'],
 
-                   'quantity' => $line\['delivered\_qty'],
+                   'quantity' => $line['delivered_qty'],
 
-                   'unit\_cost' => $line\['unit\_cost'] ?? 0,
+                   'unit_cost' => $line['unit_cost'] ?? 0,
 
-                   'source\_type' => 'delivery\_order',
+                   'source_type' => 'delivery_order',
 
-                   'source\_id' => $deliveryOrderId,
+                   'source_id' => $deliveryOrderId,
 
-                   'created\_by' => auth()->id()
+                   'created_by' => auth()->id()
 
                ]);
 
 
 
-               $do->lines()->create(\[
+               $do->lines()->create([
 
-                   'so\_line\_id' => $line\['so\_line\_id'],
+                   'so_line_id' => $line['so_line_id'],
 
-                   'product\_id' => $line\['product\_id'],
+                   'product_id' => $line['product_id'],
 
-                   'variant\_id' => $line\['variant\_id'] ?? null,
+                   'variant_id' => $line['variant_id'] ?? null,
 
-                   'batch\_id' => $line\['batch\_id'] ?? null,
+                   'batch_id' => $line['batch_id'] ?? null,
 
-                   'serial\_id' => $line\['serial\_id'] ?? null,
+                   'serial_id' => $line['serial_id'] ?? null,
 
-                   'from\_location\_id' => $line\['from\_location\_id'],
+                   'from_location_id' => $line['from_location_id'],
 
-                   'uom\_id' => $line\['uom\_id'],
+                   'uom_id' => $line['uom_id'],
 
-                   'delivered\_qty' => $line\['delivered\_qty'],
+                   'delivered_qty' => $line['delivered_qty'],
 
-                   'stock\_movement\_id' => $movement->id
+                   'stock_movement_id' => $movement->id
 
                ]);
 
@@ -3203,29 +3203,29 @@ class SalesOrderService implements SalesOrderServiceInterface
 
                // Update sales order line shipped quantity
 
-               $soLine = $do->salesOrder->lines()->find($line\['so\_line\_id']);
+               $soLine = $do->salesOrder->lines()->find($line['so_line_id']);
 
-               $newShipped = $soLine->shipped\_qty + $line\['delivered\_qty'];
+               $newShipped = $soLine->shipped_qty + $line['delivered_qty'];
 
-               $soLine->update(\['shipped\_qty' => $newShipped]);
+               $soLine->update(['shipped_qty' => $newShipped]);
 
            }
 
 
 
-           $do->update(\['status' => 'shipped']);
+           $do->update(['status' => 'shipped']);
 
 
 
            $so = $do->salesOrder;
 
-           $totalOrdered = $so->lines->sum('ordered\_qty');
+           $totalOrdered = $so->lines->sum('ordered_qty');
 
-           $totalShipped = $so->lines->sum('shipped\_qty');
+           $totalShipped = $so->lines->sum('shipped_qty');
 
            if ($totalShipped >= $totalOrdered) {
 
-               $so->update(\['status' => 'shipped']);
+               $so->update(['status' => 'shipped']);
 
            }
 
@@ -3249,7 +3249,7 @@ class SalesOrderService implements SalesOrderServiceInterface
 
            if ($invoice->status !== 'draft') {
 
-               throw new \\Exception('Invoice can only be generated from draft status');
+               throw new \Exception('Invoice can only be generated from draft status');
 
            }
 
@@ -3257,33 +3257,33 @@ class SalesOrderService implements SalesOrderServiceInterface
 
            // Create journal entry for revenue recognition
 
-           $journalLines = \[
+           $journalLines = [
 
-               \[
+               [
 
-                   'account\_id' => 3, // Accounts Receivable
+                   'account_id' => 3, // Accounts Receivable
 
                    'debit' => $invoice->total,
 
                    'credit' => 0,
 
-                   'line\_number' => 1,
+                   'line_number' => 1,
 
-                   'party\_id' => $invoice->customer\_id
+                   'party_id' => $invoice->customer_id
 
                ],
 
-               \[
+               [
 
-                   'account\_id' => 7, // Sales Revenue
+                   'account_id' => 7, // Sales Revenue
 
                    'debit' => 0,
 
                    'credit' => $invoice->total,
 
-                   'line\_number' => 2,
+                   'line_number' => 2,
 
-                   'party\_id' => $invoice->customer\_id
+                   'party_id' => $invoice->customer_id
 
                ]
 
@@ -3293,7 +3293,7 @@ class SalesOrderService implements SalesOrderServiceInterface
 
            $journalEntry = $this->journalEntryService->createFromTransaction(
 
-               'customer\_invoice',
+               'customer_invoice',
 
                $customerInvoiceId,
 
@@ -3305,11 +3305,11 @@ class SalesOrderService implements SalesOrderServiceInterface
 
 
 
-           $invoice->update(\[
+           $invoice->update([
 
                'status' => 'sent',
 
-               'journal\_entry\_id' => $journalEntry->id
+               'journal_entry_id' => $journalEntry->id
 
            ]);
 
@@ -3341,25 +3341,25 @@ class SalesOrderService implements SalesOrderServiceInterface
 
 documents (
 
- id, tenant\_id, period\_id, document\_type ENUM('PO','SO','GRN','SUP\_INV','CUST\_INV','RETURN','CREDIT\_NOTE','PAYMENT'),
+ id, tenant_id, period_id, document_type ENUM('PO','SO','GRN','SUP_INV','CUST_INV','RETURN','CREDIT_NOTE','PAYMENT'),
 
- document\_number, party\_id, warehouse\_id, currency\_id, exchange\_rate,
+ document_number, party_id, warehouse_id, currency_id, exchange_rate,
 
- document\_date, accounting\_date, due\_date, status, total\_amount, paid\_amount,
+ document_date, accounting_date, due_date, status, total_amount, paid_amount,
 
- created\_by, approved\_by, journal\_entry\_id, ...
+ created_by, approved_by, journal_entry_id, ...
 
 )
 
 
 
-document\_lines (
+document_lines (
 
- id, document\_id, line\_number, product\_id, variant\_id, uom\_id, quantity,
+ id, document_id, line_number, product_id, variant_id, uom_id, quantity,
 
- unit\_price, discount\_pct, tax\_code\_id, subtotal, tax\_amount, total,
+ unit_price, discount_pct, tax_code_id, subtotal, tax_amount, total,
 
- batch\_id, serial\_id, location\_id, stock\_movement\_id, ...
+ batch_id, serial_id, location_id, stock_movement_id, ...
 
 )
 
@@ -3391,13 +3391,13 @@ class PurchaseOrderSeeder extends Seeder
 
        foreach ($tenants as $tenant) {
 
-           $supplier = Supplier::where('tenant\_id', $tenant->id)->first();
+           $supplier = Supplier::where('tenant_id', $tenant->id)->first();
 
-           $warehouse = Warehouse::where('tenant\_id', $tenant->id)->first();
+           $warehouse = Warehouse::where('tenant_id', $tenant->id)->first();
 
-           $user = User::where('tenant\_id', $tenant->id)->first();
+           $user = User::where('tenant_id', $tenant->id)->first();
 
-           $products = Product::where('tenant\_id', $tenant->id)->where('type', 'physical')->take(2)->get();
+           $products = Product::where('tenant_id', $tenant->id)->where('type', 'physical')->take(2)->get();
 
 
 
@@ -3405,33 +3405,33 @@ class PurchaseOrderSeeder extends Seeder
 
 
 
-           $po = PurchaseOrder::create(\[
+           $po = PurchaseOrder::create([
 
-               'tenant\_id' => $tenant->id,
+               'tenant_id' => $tenant->id,
 
-               'supplier\_id' => $supplier->id,
+               'supplier_id' => $supplier->id,
 
-               'org\_unit\_id' => $warehouse->org\_unit\_id,
+               'org_unit_id' => $warehouse->org_unit_id,
 
-               'warehouse\_id' => $warehouse->id,
+               'warehouse_id' => $warehouse->id,
 
-               'po\_number' => 'PO-' . date('Ymd') . '-001',
+               'po_number' => 'PO-' . date('Ymd') . '-001',
 
                'status' => 'confirmed',
 
-               'currency\_id' => $usd->id,
+               'currency_id' => $usd->id,
 
-               'exchange\_rate' => 1,
+               'exchange_rate' => 1,
 
-               'order\_date' => now()->subDays(5),
+               'order_date' => now()->subDays(5),
 
-               'expected\_date' => now()->addDays(7),
+               'expected_date' => now()->addDays(7),
 
                'subtotal' => 0,
 
-               'grand\_total' => 0,
+               'grand_total' => 0,
 
-               'created\_by' => $user->id,
+               'created_by' => $user->id,
 
            ]);
 
@@ -3451,21 +3451,21 @@ class PurchaseOrderSeeder extends Seeder
 
 
 
-               PurchaseOrderLine::create(\[
+               PurchaseOrderLine::create([
 
-                   'purchase\_order\_id' => $po->id,
+                   'purchase_order_id' => $po->id,
 
-                   'product\_id' => $product->id,
+                   'product_id' => $product->id,
 
-                   'uom\_id' => $product->base\_uom\_id,
+                   'uom_id' => $product->base_uom_id,
 
-                   'ordered\_qty' => $qty,
+                   'ordered_qty' => $qty,
 
-                   'received\_qty' => 0,
+                   'received_qty' => 0,
 
-                   'unit\_price' => $price,
+                   'unit_price' => $price,
 
-                   'line\_total' => $lineTotal,
+                   'line_total' => $lineTotal,
 
                ]);
 
@@ -3473,7 +3473,7 @@ class PurchaseOrderSeeder extends Seeder
 
 
 
-           $po->update(\['subtotal' => $subtotal, 'grand\_total' => $subtotal]);
+           $po->update(['subtotal' => $subtotal, 'grand_total' => $subtotal]);
 
        }
 
@@ -3499,31 +3499,31 @@ class GrnSeeder extends Seeder
 
        foreach ($pos as $po) {
 
-           $user = User::where('tenant\_id', $po->tenant\_id)->first();
+           $user = User::where('tenant_id', $po->tenant_id)->first();
 
-           $location = WarehouseLocation::where('warehouse\_id', $po->warehouse\_id)->where('type', 'bin')->first();
+           $location = WarehouseLocation::where('warehouse_id', $po->warehouse_id)->where('type', 'bin')->first();
 
 
 
-           $grn = GrnHeader::create(\[
+           $grn = GrnHeader::create([
 
-               'tenant\_id' => $po->tenant\_id,
+               'tenant_id' => $po->tenant_id,
 
-               'supplier\_id' => $po->supplier\_id,
+               'supplier_id' => $po->supplier_id,
 
-               'warehouse\_id' => $po->warehouse\_id,
+               'warehouse_id' => $po->warehouse_id,
 
-               'purchase\_order\_id' => $po->id,
+               'purchase_order_id' => $po->id,
 
-               'grn\_number' => 'GRN-' . date('Ymd') . '-' . $po->id,
+               'grn_number' => 'GRN-' . date('Ymd') . '-' . $po->id,
 
                'status' => 'complete',
 
-               'received\_date' => now()->subDays(2),
+               'received_date' => now()->subDays(2),
 
-               'currency\_id' => $usd->id,
+               'currency_id' => $usd->id,
 
-               'created\_by' => $user->id,
+               'created_by' => $user->id,
 
            ]);
 
@@ -3531,25 +3531,25 @@ class GrnSeeder extends Seeder
 
            foreach ($po->lines as $line) {
 
-               $grnLine = GrnLine::create(\[
+               $grnLine = GrnLine::create([
 
-                   'grn\_header\_id' => $grn->id,
+                   'grn_header_id' => $grn->id,
 
-                   'purchase\_order\_line\_id' => $line->id,
+                   'purchase_order_line_id' => $line->id,
 
-                   'product\_id' => $line->product\_id,
+                   'product_id' => $line->product_id,
 
-                   'variant\_id' => $line->variant\_id,
+                   'variant_id' => $line->variant_id,
 
-                   'location\_id' => $location?->id,
+                   'location_id' => $location?->id,
 
-                   'uom\_id' => $line->uom\_id,
+                   'uom_id' => $line->uom_id,
 
-                   'expected\_qty' => $line->ordered\_qty,
+                   'expected_qty' => $line->ordered_qty,
 
-                   'received\_qty' => $line->ordered\_qty,
+                   'received_qty' => $line->ordered_qty,
 
-                   'unit\_cost' => $line->unit\_price,
+                   'unit_cost' => $line->unit_price,
 
                ]);
 
@@ -3557,29 +3557,29 @@ class GrnSeeder extends Seeder
 
                // Record stock movement
 
-               StockMovement::create(\[
+               StockMovement::create([
 
-                   'tenant\_id' => $po->tenant\_id,
+                   'tenant_id' => $po->tenant_id,
 
-                   'product\_id' => $line->product\_id,
+                   'product_id' => $line->product_id,
 
-                   'variant\_id' => $line->variant\_id,
+                   'variant_id' => $line->variant_id,
 
-                   'to\_location\_id' => $location?->id,
+                   'to_location_id' => $location?->id,
 
-                   'movement\_type' => 'receipt',
+                   'movement_type' => 'receipt',
 
-                   'reference\_type' => GrnHeader::class,
+                   'reference_type' => GrnHeader::class,
 
-                   'reference\_id' => $grn->id,
+                   'reference_id' => $grn->id,
 
-                   'uom\_id' => $line->uom\_id,
+                   'uom_id' => $line->uom_id,
 
-                   'quantity' => $line->ordered\_qty,
+                   'quantity' => $line->ordered_qty,
 
-                   'unit\_cost' => $line->unit\_price,
+                   'unit_cost' => $line->unit_price,
 
-                   'performed\_by' => $user->id,
+                   'performed_by' => $user->id,
 
                ]);
 
@@ -3589,37 +3589,37 @@ class GrnSeeder extends Seeder
 
                StockLevel::updateOrCreate(
 
-                   \[
+                   [
 
-                       'tenant\_id' => $po->tenant\_id,
+                       'tenant_id' => $po->tenant_id,
 
-                       'product\_id' => $line->product\_id,
+                       'product_id' => $line->product_id,
 
-                       'variant\_id' => $line->variant\_id,
+                       'variant_id' => $line->variant_id,
 
-                       'location\_id' => $location?->id,
+                       'location_id' => $location?->id,
 
                    ],
 
-                   \[
+                   [
 
-                       'uom\_id' => $line->uom\_id,
+                       'uom_id' => $line->uom_id,
 
-                       'unit\_cost' => $line->unit\_price,
+                       'unit_cost' => $line->unit_price,
 
                    ]
 
-               )->increment('quantity\_on\_hand', $line->ordered\_qty);
+               )->increment('quantity_on_hand', $line->ordered_qty);
 
 
 
-               $line->update(\['received\_qty' => $line->ordered\_qty]);
+               $line->update(['received_qty' => $line->ordered_qty]);
 
            }
 
 
 
-           $po->update(\['status' => 'received']);
+           $po->update(['status' => 'received']);
 
        }
 
@@ -3653,19 +3653,19 @@ class PaymentSeeder extends Seeder
 
        foreach ($tenants as $tenant) {
 
-           $bankAccount = Account::where('tenant\_id', $tenant->id)->where('is\_bank\_account', true)->first();
+           $bankAccount = Account::where('tenant_id', $tenant->id)->where('is_bank_account', true)->first();
 
-           $cashAccount = Account::where('tenant\_id', $tenant->id)->where('code', '1000')->first();
+           $cashAccount = Account::where('tenant_id', $tenant->id)->where('code', '1000')->first();
 
-           $apAccount = Account::where('tenant\_id', $tenant->id)->where('code', '2000')->first();
+           $apAccount = Account::where('tenant_id', $tenant->id)->where('code', '2000')->first();
 
 
 
            $bankMethod = PaymentMethod::firstOrCreate(
 
-               \['tenant\_id' => $tenant->id, 'name' => 'Bank Transfer'],
+               ['tenant_id' => $tenant->id, 'name' => 'Bank Transfer'],
 
-               \['type' => 'bank\_transfer', 'account\_id' => $bankAccount?->id, 'is\_active' => true]
+               ['type' => 'bank_transfer', 'account_id' => $bankAccount?->id, 'is_active' => true]
 
            );
 
@@ -3673,41 +3673,41 @@ class PaymentSeeder extends Seeder
 
            // Pay a purchase invoice
 
-           $purchaseInvoice = PurchaseInvoice::where('tenant\_id', $tenant->id)->where('status', 'approved')->first();
+           $purchaseInvoice = PurchaseInvoice::where('tenant_id', $tenant->id)->where('status', 'approved')->first();
 
            if ($purchaseInvoice) {
 
-               Payment::create(\[
+               Payment::create([
 
-                   'tenant\_id' => $tenant->id,
+                   'tenant_id' => $tenant->id,
 
-                   'payment\_number' => 'PAY-OUT-' . date('Ymd') . '-001',
+                   'payment_number' => 'PAY-OUT-' . date('Ymd') . '-001',
 
                    'direction' => 'outbound',
 
-                   'party\_type' => 'supplier',
+                   'party_type' => 'supplier',
 
-                   'party\_id' => $purchaseInvoice->supplier\_id,
+                   'party_id' => $purchaseInvoice->supplier_id,
 
-                   'payment\_method\_id' => $bankMethod->id,
+                   'payment_method_id' => $bankMethod->id,
 
-                   'account\_id' => $bankAccount?->id ?? $cashAccount->id,
+                   'account_id' => $bankAccount?->id ?? $cashAccount->id,
 
-                   'amount' => $purchaseInvoice->grand\_total,
+                   'amount' => $purchaseInvoice->grand_total,
 
-                   'currency\_id' => $usd->id,
+                   'currency_id' => $usd->id,
 
-                   'exchange\_rate' => 1,
+                   'exchange_rate' => 1,
 
-                   'base\_amount' => $purchaseInvoice->grand\_total,
+                   'base_amount' => $purchaseInvoice->grand_total,
 
-                   'payment\_date' => now(),
+                   'payment_date' => now(),
 
                    'status' => 'posted',
 
                ]);
 
-               $purchaseInvoice->update(\['status' => 'paid']);
+               $purchaseInvoice->update(['status' => 'paid']);
 
            }
 
@@ -3715,41 +3715,41 @@ class PaymentSeeder extends Seeder
 
            // Receive payment for a sales invoice
 
-           $salesInvoice = SalesInvoice::where('tenant\_id', $tenant->id)->where('status', 'sent')->first();
+           $salesInvoice = SalesInvoice::where('tenant_id', $tenant->id)->where('status', 'sent')->first();
 
            if ($salesInvoice) {
 
-               Payment::create(\[
+               Payment::create([
 
-                   'tenant\_id' => $tenant->id,
+                   'tenant_id' => $tenant->id,
 
-                   'payment\_number' => 'PAY-IN-' . date('Ymd') . '-001',
+                   'payment_number' => 'PAY-IN-' . date('Ymd') . '-001',
 
                    'direction' => 'inbound',
 
-                   'party\_type' => 'customer',
+                   'party_type' => 'customer',
 
-                   'party\_id' => $salesInvoice->customer\_id,
+                   'party_id' => $salesInvoice->customer_id,
 
-                   'payment\_method\_id' => $bankMethod->id,
+                   'payment_method_id' => $bankMethod->id,
 
-                   'account\_id' => $bankAccount?->id ?? $cashAccount->id,
+                   'account_id' => $bankAccount?->id ?? $cashAccount->id,
 
-                   'amount' => $salesInvoice->grand\_total,
+                   'amount' => $salesInvoice->grand_total,
 
-                   'currency\_id' => $usd->id,
+                   'currency_id' => $usd->id,
 
-                   'exchange\_rate' => 1,
+                   'exchange_rate' => 1,
 
-                   'base\_amount' => $salesInvoice->grand\_total,
+                   'base_amount' => $salesInvoice->grand_total,
 
-                   'payment\_date' => now(),
+                   'payment_date' => now(),
 
                    'status' => 'posted',
 
                ]);
 
-               $salesInvoice->update(\['status' => 'paid']);
+               $salesInvoice->update(['status' => 'paid']);
 
            }
 
@@ -3781,7 +3781,7 @@ Create PO → Confirm PO → Goods Receipt (GRN) → Stock Movement (receipt) �
 
                                                         ↓
 
-                                               Purchase Return (optional) → Stock Movement (return\_out) → Journal Entry (Dr AP, Cr Inventory)
+                                               Purchase Return (optional) → Stock Movement (return_out) → Journal Entry (Dr AP, Cr Inventory)
 
 ```
 
@@ -3801,33 +3801,33 @@ class GoodsReceivedListener
 
                // 1. Stock Movement (receipt)
 
-               $movement = StockMovement::create(\[
+               $movement = StockMovement::create([
 
-                   'tenant\_id' => $grn->tenant\_id,
+                   'tenant_id' => $grn->tenant_id,
 
-                   'product\_id' => $line->product\_id,
+                   'product_id' => $line->product_id,
 
-                   'variant\_id' => $line->variant\_id,
+                   'variant_id' => $line->variant_id,
 
-                   'batch\_id' => $line->batch\_id,
+                   'batch_id' => $line->batch_id,
 
-                   'serial\_id' => $line->serial\_id,
+                   'serial_id' => $line->serial_id,
 
-                   'to\_location\_id' => $line->location\_id,
+                   'to_location_id' => $line->location_id,
 
-                   'movement\_type' => 'receipt',
+                   'movement_type' => 'receipt',
 
-                   'reference\_type' => GrnHeader::class,
+                   'reference_type' => GrnHeader::class,
 
-                   'reference\_id' => $grn->id,
+                   'reference_id' => $grn->id,
 
-                   'uom\_id' => $line->uom\_id,
+                   'uom_id' => $line->uom_id,
 
-                   'quantity' => $line->received\_qty,
+                   'quantity' => $line->received_qty,
 
-                   'unit\_cost' => $line->unit\_cost,
+                   'unit_cost' => $line->unit_cost,
 
-                   'performed\_by' => $grn->created\_by,
+                   'performed_by' => $grn->created_by,
 
                ]);
 
@@ -3835,37 +3835,37 @@ class GoodsReceivedListener
 
                // 2. Update Stock Level
 
-               StockLevel::updateOrCreate(\[...])->increment('quantity\_on\_hand', $line->received\_qty);
+               StockLevel::updateOrCreate([...])->increment('quantity_on_hand', $line->received_qty);
 
 
 
                // 3. Create Cost Layer (FIFO/LIFO/FEFO)
 
-               InventoryCostLayer::create(\[
+               InventoryCostLayer::create([
 
-                   'tenant\_id' => $grn->tenant\_id,
+                   'tenant_id' => $grn->tenant_id,
 
-                   'product\_id' => $line->product\_id,
+                   'product_id' => $line->product_id,
 
-                   'variant\_id' => $line->variant\_id,
+                   'variant_id' => $line->variant_id,
 
-                   'batch\_id' => $line->batch\_id,
+                   'batch_id' => $line->batch_id,
 
-                   'location\_id' => $line->location\_id,
+                   'location_id' => $line->location_id,
 
-                   'valuation\_method' => $line->product->valuation\_method,
+                   'valuation_method' => $line->product->valuation_method,
 
-                   'layer\_date' => $grn->received\_date,
+                   'layer_date' => $grn->received_date,
 
-                   'quantity\_in' => $line->received\_qty,
+                   'quantity_in' => $line->received_qty,
 
-                   'quantity\_remaining' => $line->received\_qty,
+                   'quantity_remaining' => $line->received_qty,
 
-                   'unit\_cost' => $line->unit\_cost,
+                   'unit_cost' => $line->unit_cost,
 
-                   'reference\_type' => StockMovement::class,
+                   'reference_type' => StockMovement::class,
 
-                   'reference\_id' => $movement->id,
+                   'reference_id' => $movement->id,
 
                ]);
 
@@ -3887,23 +3887,23 @@ class GoodsReceivedListener
 
    {
 
-       $journalEntry = JournalEntry::create(\[
+       $journalEntry = JournalEntry::create([
 
-           'tenant\_id' => $grn->tenant\_id,
+           'tenant_id' => $grn->tenant_id,
 
-           'fiscal\_period\_id' => FiscalPeriod::current()->id,
+           'fiscal_period_id' => FiscalPeriod::current()->id,
 
-           'entry\_type' => 'auto',
+           'entry_type' => 'auto',
 
-           'reference\_type' => GrnHeader::class,
+           'reference_type' => GrnHeader::class,
 
-           'reference\_id' => $grn->id,
+           'reference_id' => $grn->id,
 
-           'entry\_date' => $grn->received\_date,
+           'entry_date' => $grn->received_date,
 
            'status' => 'posted',
 
-           'created\_by' => $grn->created\_by,
+           'created_by' => $grn->created_by,
 
        ]);
 
@@ -3913,37 +3913,37 @@ class GoodsReceivedListener
 
        $apAccount = Account::where('code', '2000')->first();       // Accounts Payable
 
-       $totalCost = $grn->lines->sum('line\_cost');
+       $totalCost = $grn->lines->sum('line_cost');
 
 
 
        // Debit Inventory
 
-       JournalEntryLine::create(\[
+       JournalEntryLine::create([
 
-           'journal\_entry\_id' => $journalEntry->id,
+           'journal_entry_id' => $journalEntry->id,
 
-           'account\_id' => $inventoryAccount->id,
+           'account_id' => $inventoryAccount->id,
 
-           'debit\_amount' => $totalCost,
+           'debit_amount' => $totalCost,
 
        ]);
 
        // Credit AP
 
-       JournalEntryLine::create(\[
+       JournalEntryLine::create([
 
-           'journal\_entry\_id' => $journalEntry->id,
+           'journal_entry_id' => $journalEntry->id,
 
-           'account\_id' => $apAccount->id,
+           'account_id' => $apAccount->id,
 
-           'credit\_amount' => $totalCost,
+           'credit_amount' => $totalCost,
 
        ]);
 
 
 
-       $grn->update(\['status' => 'posted']);
+       $grn->update(['status' => 'posted']);
 
    }
 
@@ -3971,7 +3971,7 @@ Create SO → Confirm SO → Reserve Stock → Pick/Pack → Shipment → Stock 
 
                                                                     ↓
 
-                                                             Sales Return (optional) → Stock Movement (return\_in) → Journal Entry (Dr Revenue/Inventory, Cr AR)
+                                                             Sales Return (optional) → Stock Movement (return_in) → Journal Entry (Dr Revenue/Inventory, Cr AR)
 
 ```
 
@@ -3999,11 +3999,11 @@ class ShipmentShippedListener
 
                // 1. Allocate stock via FIFO/FEFO cost layers
 
-               $layers = $this->allocateLayers($line->product\_id, $line->shipped\_qty, $line->batch\_id, $line->from\_location\_id);
+               $layers = $this->allocateLayers($line->product_id, $line->shipped_qty, $line->batch_id, $line->from_location_id);
 
-               $unitCost = $layers->avg('unit\_cost');
+               $unitCost = $layers->avg('unit_cost');
 
-               $totalLineCost = $line->shipped\_qty \* $unitCost;
+               $totalLineCost = $line->shipped_qty \* $unitCost;
 
                $totalCogs += $totalLineCost;
 
@@ -4011,33 +4011,33 @@ class ShipmentShippedListener
 
                // 2. Create Stock Movement (issue)
 
-               $movement = StockMovement::create(\[
+               $movement = StockMovement::create([
 
-                   'tenant\_id' => $shipment->tenant\_id,
+                   'tenant_id' => $shipment->tenant_id,
 
-                   'product\_id' => $line->product\_id,
+                   'product_id' => $line->product_id,
 
-                   'variant\_id' => $line->variant\_id,
+                   'variant_id' => $line->variant_id,
 
-                   'batch\_id' => $line->batch\_id,
+                   'batch_id' => $line->batch_id,
 
-                   'serial\_id' => $line->serial\_id,
+                   'serial_id' => $line->serial_id,
 
-                   'from\_location\_id' => $line->from\_location\_id,
+                   'from_location_id' => $line->from_location_id,
 
-                   'movement\_type' => 'shipment',
+                   'movement_type' => 'shipment',
 
-                   'reference\_type' => Shipment::class,
+                   'reference_type' => Shipment::class,
 
-                   'reference\_id' => $shipment->id,
+                   'reference_id' => $shipment->id,
 
-                   'uom\_id' => $line->uom\_id,
+                   'uom_id' => $line->uom_id,
 
-                   'quantity' => $line->shipped\_qty,
+                   'quantity' => $line->shipped_qty,
 
-                   'unit\_cost' => $unitCost,
+                   'unit_cost' => $unitCost,
 
-                   'performed\_by' => $shipment->created\_by,
+                   'performed_by' => $shipment->created_by,
 
                ]);
 
@@ -4045,15 +4045,15 @@ class ShipmentShippedListener
 
                // 3. Update Stock Level
 
-               StockLevel::where(\[...])->decrement('quantity\_on\_hand', $line->shipped\_qty);
+               StockLevel::where([...])->decrement('quantity_on_hand', $line->shipped_qty);
 
 
 
                // 4. Release reservations
 
-               StockReservation::where('reserved\_for\_type', SalesOrderLine::class)
+               StockReservation::where('reserved_for_type', SalesOrderLine::class)
 
-                   ->where('reserved\_for\_id', $line->sales\_order\_line\_id)
+                   ->where('reserved_for_id', $line->sales_order_line_id)
 
                    ->delete();
 
@@ -4063,11 +4063,11 @@ class ShipmentShippedListener
 
            // 5. Post COGS Journal Entry
 
-           $journalEntry = JournalEntry::create(\[...]);
+           $journalEntry = JournalEntry::create([...]);
 
-           JournalEntryLine::create(\['journal\_entry\_id' => $journalEntry->id, 'account\_id' => $cogsAccount->id, 'debit\_amount' => $totalCogs]);
+           JournalEntryLine::create(['journal_entry_id' => $journalEntry->id, 'account_id' => $cogsAccount->id, 'debit_amount' => $totalCogs]);
 
-           JournalEntryLine::create(\['journal\_entry\_id' => $journalEntry->id, 'account\_id' => $inventoryAccount->id, 'credit\_amount' => $totalCogs]);
+           JournalEntryLine::create(['journal_entry_id' => $journalEntry->id, 'account_id' => $inventoryAccount->id, 'credit_amount' => $totalCogs]);
 
        });
 
@@ -4081,15 +4081,15 @@ class ShipmentShippedListener
 
        $remaining = $qty;
 
-       $layers = InventoryCostLayer::where('product\_id', $productId)
+       $layers = InventoryCostLayer::where('product_id', $productId)
 
-           ->where('location\_id', $locationId)
+           ->where('location_id', $locationId)
 
-           ->when($batchId, fn($q) => $q->where('batch\_id', $batchId))
+           ->when($batchId, fn($q) => $q->where('batch_id', $batchId))
 
-           ->where('quantity\_remaining', '>', 0)
+           ->where('quantity_remaining', '>', 0)
 
-           ->orderBy('layer\_date') // FIFO; for FEFO order by expiry\_date via batch
+           ->orderBy('layer_date') // FIFO; for FEFO order by expiry_date via batch
 
            ->get();
 
@@ -4097,11 +4097,11 @@ class ShipmentShippedListener
 
        foreach ($layers as $layer) {
 
-           $consume = min($remaining, $layer->quantity\_remaining);
+           $consume = min($remaining, $layer->quantity_remaining);
 
-           $layer->decrement('quantity\_remaining', $consume);
+           $layer->decrement('quantity_remaining', $consume);
 
-           $layer->update(\['is\_closed' => $layer->quantity\_remaining == 0]);
+           $layer->update(['is_closed' => $layer->quantity_remaining == 0]);
 
            $remaining -= $consume;
 
@@ -4151,45 +4151,45 @@ class SalesReturnApprovedListener
 
                $disposition = $line->disposition;
 
-               $originalCost = $line->original\_sales\_order\_line\_id
+               $originalCost = $line->original_sales_order_line_id
 
-                   ? $this->getOriginalCost($line->original\_sales\_order\_line\_id)
+                   ? $this->getOriginalCost($line->original_sales_order_line_id)
 
-                   : $this->getCurrentCost($line->product\_id);
+                   : $this->getCurrentCost($line->product_id);
 
 
 
                if ($disposition === 'restock') {
 
-                   // 1. Stock Movement (return\_in)
+                   // 1. Stock Movement (return_in)
 
-                   $movement = StockMovement::create(\[
+                   $movement = StockMovement::create([
 
-                       'tenant\_id' => $return->tenant\_id,
+                       'tenant_id' => $return->tenant_id,
 
-                       'product\_id' => $line->product\_id,
+                       'product_id' => $line->product_id,
 
-                       'variant\_id' => $line->variant\_id,
+                       'variant_id' => $line->variant_id,
 
-                       'batch\_id' => $line->batch\_id,
+                       'batch_id' => $line->batch_id,
 
-                       'serial\_id' => $line->serial\_id,
+                       'serial_id' => $line->serial_id,
 
-                       'to\_location\_id' => $line->to\_location\_id,
+                       'to_location_id' => $line->to_location_id,
 
-                       'movement\_type' => 'return\_in',
+                       'movement_type' => 'return_in',
 
-                       'reference\_type' => SalesReturn::class,
+                       'reference_type' => SalesReturn::class,
 
-                       'reference\_id' => $return->id,
+                       'reference_id' => $return->id,
 
-                       'uom\_id' => $line->uom\_id,
+                       'uom_id' => $line->uom_id,
 
-                       'quantity' => $line->return\_qty,
+                       'quantity' => $line->return_qty,
 
-                       'unit\_cost' => $originalCost,
+                       'unit_cost' => $originalCost,
 
-                       'performed\_by' => $return->created\_by,
+                       'performed_by' => $return->created_by,
 
                    ]);
 
@@ -4197,51 +4197,51 @@ class SalesReturnApprovedListener
 
                    // 2. Update Stock Level
 
-                   StockLevel::updateOrCreate(\[...])->increment('quantity\_on\_hand', $line->return\_qty);
+                   StockLevel::updateOrCreate([...])->increment('quantity_on_hand', $line->return_qty);
 
 
 
                    // 3. Re-insert Cost Layer (at original cost)
 
-                   InventoryCostLayer::create(\[
+                   InventoryCostLayer::create([
 
-                       'tenant\_id' => $return->tenant\_id,
+                       'tenant_id' => $return->tenant_id,
 
-                       'product\_id' => $line->product\_id,
+                       'product_id' => $line->product_id,
 
-                       'variant\_id' => $line->variant\_id,
+                       'variant_id' => $line->variant_id,
 
-                       'batch\_id' => $line->batch\_id,
+                       'batch_id' => $line->batch_id,
 
-                       'location\_id' => $line->to\_location\_id,
+                       'location_id' => $line->to_location_id,
 
-                       'valuation\_method' => $line->product->valuation\_method,
+                       'valuation_method' => $line->product->valuation_method,
 
-                       'layer\_date' => $return->return\_date,
+                       'layer_date' => $return->return_date,
 
-                       'quantity\_in' => $line->return\_qty,
+                       'quantity_in' => $line->return_qty,
 
-                       'quantity\_remaining' => $line->return\_qty,
+                       'quantity_remaining' => $line->return_qty,
 
-                       'unit\_cost' => $originalCost,
+                       'unit_cost' => $originalCost,
 
-                       'reference\_type' => StockMovement::class,
+                       'reference_type' => StockMovement::class,
 
-                       'reference\_id' => $movement->id,
+                       'reference_id' => $movement->id,
 
                    ]);
 
 
 
-                   $totalInventoryCredit += $line->return\_qty \* $originalCost;
+                   $totalInventoryCredit += $line->return_qty \* $originalCost;
 
                }
 
 
 
-               $totalRevenueDebit += $line->line\_total;
+               $totalRevenueDebit += $line->line_total;
 
-               $totalRestockingFee += $line->restocking\_fee;
+               $totalRestockingFee += $line->restocking_fee;
 
            }
 
@@ -4249,23 +4249,23 @@ class SalesReturnApprovedListener
 
            // 4. Post Journal Entry
 
-           $journalEntry = JournalEntry::create(\[...]);
+           $journalEntry = JournalEntry::create([...]);
 
            // Debit Sales Returns (Revenue contra)
 
-           JournalEntryLine::create(\['account\_id' => $salesReturnsAccount->id, 'debit\_amount' => $totalRevenueDebit]);
+           JournalEntryLine::create(['account_id' => $salesReturnsAccount->id, 'debit_amount' => $totalRevenueDebit]);
 
            // Credit Accounts Receivable
 
-           JournalEntryLine::create(\['account\_id' => $arAccount->id, 'credit\_amount' => $totalRevenueDebit + $totalRestockingFee]);
+           JournalEntryLine::create(['account_id' => $arAccount->id, 'credit_amount' => $totalRevenueDebit + $totalRestockingFee]);
 
            // If restocked, Credit Inventory (reversal of COGS) and Debit COGS reversal
 
            if ($totalInventoryCredit > 0) {
 
-               JournalEntryLine::create(\['account\_id' => $inventoryAccount->id, 'debit\_amount' => $totalInventoryCredit]);
+               JournalEntryLine::create(['account_id' => $inventoryAccount->id, 'debit_amount' => $totalInventoryCredit]);
 
-               JournalEntryLine::create(\['account\_id' => $cogsAccount->id, 'credit\_amount' => $totalInventoryCredit]);
+               JournalEntryLine::create(['account_id' => $cogsAccount->id, 'credit_amount' => $totalInventoryCredit]);
 
            }
 
@@ -4273,7 +4273,7 @@ class SalesReturnApprovedListener
 
            if ($totalRestockingFee > 0) {
 
-               JournalEntryLine::create(\['account\_id' => $restockingFeeRevenueAccount->id, 'credit\_amount' => $totalRestockingFee]);
+               JournalEntryLine::create(['account_id' => $restockingFeeRevenueAccount->id, 'credit_amount' => $totalRestockingFee]);
 
            }
 
@@ -4281,33 +4281,33 @@ class SalesReturnApprovedListener
 
            // 5. Create Credit Memo
 
-           CreditMemo::create(\[
+           CreditMemo::create([
 
-               'tenant\_id' => $return->tenant\_id,
+               'tenant_id' => $return->tenant_id,
 
-               'party\_type' => 'customer',
+               'party_type' => 'customer',
 
-               'party\_id' => $return->customer\_id,
+               'party_id' => $return->customer_id,
 
-               'return\_order\_type' => SalesReturn::class,
+               'return_order_type' => SalesReturn::class,
 
-               'return\_order\_id' => $return->id,
+               'return_order_id' => $return->id,
 
-               'credit\_memo\_number' => 'CM-' . $return->return\_number,
+               'credit_memo_number' => 'CM-' . $return->return_number,
 
                'amount' => $totalRevenueDebit + $totalRestockingFee,
 
                'status' => 'issued',
 
-               'issued\_date' => now(),
+               'issued_date' => now(),
 
-               'journal\_entry\_id' => $journalEntry->id,
+               'journal_entry_id' => $journalEntry->id,
 
            ]);
 
 
 
-           $return->update(\['status' => 'closed']);
+           $return->update(['status' => 'closed']);
 
        });
 
@@ -4377,7 +4377,7 @@ class PaymentService
 
    {
 
-       $journalEntry = JournalEntry::create(\[...]);
+       $journalEntry = JournalEntry::create([...]);
 
        $bankAccount = $payment->account; // Bank/Cash account
 
@@ -4393,17 +4393,17 @@ class PaymentService
 
            // Debit Bank, Credit AR
 
-           JournalEntryLine::create(\['account\_id' => $bankAccount->id, 'debit\_amount' => $payment->amount]);
+           JournalEntryLine::create(['account_id' => $bankAccount->id, 'debit_amount' => $payment->amount]);
 
-           JournalEntryLine::create(\['account\_id' => $partyAccount->id, 'credit\_amount' => $payment->amount]);
+           JournalEntryLine::create(['account_id' => $partyAccount->id, 'credit_amount' => $payment->amount]);
 
        } else {
 
            // Debit AP, Credit Bank
 
-           JournalEntryLine::create(\['account\_id' => $partyAccount->id, 'debit\_amount' => $payment->amount]);
+           JournalEntryLine::create(['account_id' => $partyAccount->id, 'debit_amount' => $payment->amount]);
 
-           JournalEntryLine::create(\['account\_id' => $bankAccount->id, 'credit\_amount' => $payment->amount]);
+           JournalEntryLine::create(['account_id' => $bankAccount->id, 'credit_amount' => $payment->amount]);
 
        }
 
@@ -4419,11 +4419,11 @@ class PaymentService
 
        $remaining = $payment->amount;
 
-       $invoices = $invoiceClass::where('party\_id', $payment->party\_id)
+       $invoices = $invoiceClass::where('party_id', $payment->party_id)
 
            ->where('status', '!=', 'paid')
 
-           ->orderBy('due\_date')
+           ->orderBy('due_date')
 
            ->get();
 
@@ -4431,23 +4431,23 @@ class PaymentService
 
        foreach ($invoices as $invoice) {
 
-           $allocate = min($remaining, $invoice->grand\_total - $invoice->paid\_amount);
+           $allocate = min($remaining, $invoice->grand_total - $invoice->paid_amount);
 
-           PaymentAllocation::create(\[
+           PaymentAllocation::create([
 
-               'payment\_id' => $payment->id,
+               'payment_id' => $payment->id,
 
-               'invoice\_type' => $invoiceClass,
+               'invoice_type' => $invoiceClass,
 
-               'invoice\_id' => $invoice->id,
+               'invoice_id' => $invoice->id,
 
-               'allocated\_amount' => $allocate,
+               'allocated_amount' => $allocate,
 
            ]);
 
-           $invoice->paid\_amount += $allocate;
+           $invoice->paid_amount += $allocate;
 
-           $invoice->status = ($invoice->paid\_amount >= $invoice->grand\_total) ? 'paid' : 'partial\_paid';
+           $invoice->status = ($invoice->paid_amount >= $invoice->grand_total) ? 'paid' : 'partial_paid';
 
            $invoice->save();
 
@@ -4473,27 +4473,27 @@ class PaymentService
 
 <?php
 
-namespace Modules\\Purchase\\Database\\Seeders;
+namespace Modules\Purchase\Database\Seeders;
 
 
 
-use Illuminate\\Database\\Seeder;
+use Illuminate\Database\Seeder;
 
-use Modules\\Purchase\\Infrastructure\\Persistence\\Eloquent\\PurchaseOrder;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\PurchaseOrder;
 
-use Modules\\Purchase\\Infrastructure\\Persistence\\Eloquent\\PurchaseOrderLine;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\PurchaseOrderLine;
 
-use Modules\\Supplier\\Infrastructure\\Persistence\\Eloquent\\Supplier;
+use Modules\Supplier\Infrastructure\Persistence\Eloquent\Supplier;
 
-use Modules\\Product\\Infrastructure\\Persistence\\Eloquent\\Product;
+use Modules\Product\Infrastructure\Persistence\Eloquent\Product;
 
-use Modules\\Warehouse\\Infrastructure\\Persistence\\Eloquent\\Warehouse;
+use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Warehouse;
 
-use Modules\\User\\Infrastructure\\Persistence\\Eloquent\\User;
+use Modules\User\Infrastructure\Persistence\Eloquent\User;
 
-use Modules\\Core\\Infrastructure\\Persistence\\Eloquent\\Tenant;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Tenant;
 
-use Modules\\Core\\Infrastructure\\Persistence\\Eloquent\\Currency;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Currency;
 
 
 
@@ -4513,11 +4513,11 @@ class PurchaseOrderSeeder extends Seeder
 
        foreach ($tenants as $tenant) {
 
-           $supplier = Supplier::where('tenant\_id', $tenant->id)->first();
+           $supplier = Supplier::where('tenant_id', $tenant->id)->first();
 
-           $warehouse = Warehouse::where('tenant\_id', $tenant->id)->where('is\_default', true)->first();
+           $warehouse = Warehouse::where('tenant_id', $tenant->id)->where('is_default', true)->first();
 
-           $user = User::where('tenant\_id', $tenant->id)->whereHas('roles', fn($q) => $q->where('name', 'Manager'))->first();
+           $user = User::where('tenant_id', $tenant->id)->whereHas('roles', fn($q) => $q->where('name', 'Manager'))->first();
 
            if (!$supplier || !$warehouse || !$user) continue;
 
@@ -4527,37 +4527,37 @@ class PurchaseOrderSeeder extends Seeder
 
            for ($i = 1; $i <= 2; $i++) {
 
-               $po = PurchaseOrder::create(\[
+               $po = PurchaseOrder::create([
 
-                   'tenant\_id' => $tenant->id,
+                   'tenant_id' => $tenant->id,
 
-                   'supplier\_id' => $supplier->id,
+                   'supplier_id' => $supplier->id,
 
-                   'org\_unit\_id' => $warehouse->org\_unit\_id,
+                   'org_unit_id' => $warehouse->org_unit_id,
 
-                   'warehouse\_id' => $warehouse->id,
+                   'warehouse_id' => $warehouse->id,
 
-                   'po\_number' => 'PO-' . date('Ymd') . '-' . str\_pad($i, 3, '0', STR\_PAD\_LEFT),
+                   'po_number' => 'PO-' . date('Ymd') . '-' . str_pad($i, 3, '0', STR_PAD_LEFT),
 
                    'status' => 'confirmed',
 
-                   'currency\_id' => $usd->id,
+                   'currency_id' => $usd->id,
 
-                   'exchange\_rate' => 1,
+                   'exchange_rate' => 1,
 
-                   'order\_date' => now()->subDays(10 + $i),
+                   'order_date' => now()->subDays(10 + $i),
 
-                   'expected\_date' => now()->addDays(5),
+                   'expected_date' => now()->addDays(5),
 
-                   'created\_by' => $user->id,
+                   'created_by' => $user->id,
 
-                   'approved\_by' => $user->id,
+                   'approved_by' => $user->id,
 
                ]);
 
 
 
-               $products = Product::where('tenant\_id', $tenant->id)->where('type', 'physical')->take(2)->get();
+               $products = Product::where('tenant_id', $tenant->id)->where('type', 'physical')->take(2)->get();
 
                $subtotal = 0;
 
@@ -4571,25 +4571,25 @@ class PurchaseOrderSeeder extends Seeder
 
                    $subtotal += $lineTotal;
 
-                   PurchaseOrderLine::create(\[
+                   PurchaseOrderLine::create([
 
-                       'purchase\_order\_id' => $po->id,
+                       'purchase_order_id' => $po->id,
 
-                       'product\_id' => $product->id,
+                       'product_id' => $product->id,
 
-                       'uom\_id' => $product->base\_uom\_id,
+                       'uom_id' => $product->base_uom_id,
 
-                       'ordered\_qty' => $qty,
+                       'ordered_qty' => $qty,
 
-                       'unit\_price' => $price,
+                       'unit_price' => $price,
 
-                       'line\_total' => $lineTotal,
+                       'line_total' => $lineTotal,
 
                    ]);
 
                }
 
-               $po->update(\['subtotal' => $subtotal, 'grand\_total' => $subtotal]);
+               $po->update(['subtotal' => $subtotal, 'grand_total' => $subtotal]);
 
            }
 
@@ -4611,39 +4611,39 @@ class PurchaseOrderSeeder extends Seeder
 
 <?php
 
-namespace Modules\\Purchase\\Database\\Seeders;
+namespace Modules\Purchase\Database\Seeders;
 
 
 
-use Illuminate\\Database\\Seeder;
+use Illuminate\Database\Seeder;
 
-use Modules\\Purchase\\Infrastructure\\Persistence\\Eloquent\\PurchaseOrder;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\PurchaseOrder;
 
-use Modules\\Purchase\\Infrastructure\\Persistence\\Eloquent\\GrnHeader;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\GrnHeader;
 
-use Modules\\Purchase\\Infrastructure\\Persistence\\Eloquent\\GrnLine;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\GrnLine;
 
-use Modules\\Inventory\\Infrastructure\\Persistence\\Eloquent\\StockMovement;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\StockMovement;
 
-use Modules\\Inventory\\Infrastructure\\Persistence\\Eloquent\\StockLevel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\StockLevel;
 
-use Modules\\Inventory\\Infrastructure\\Persistence\\Eloquent\\InventoryCostLayer;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\InventoryCostLayer;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\JournalEntry;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\JournalEntry;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\JournalEntryLine;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\JournalEntryLine;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\Account;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\Account;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\FiscalPeriod;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\FiscalPeriod;
 
-use Modules\\Warehouse\\Infrastructure\\Persistence\\Eloquent\\WarehouseLocation;
+use Modules\Warehouse\Infrastructure\Persistence\Eloquent\WarehouseLocation;
 
-use Modules\\User\\Infrastructure\\Persistence\\Eloquent\\User;
+use Modules\User\Infrastructure\Persistence\Eloquent\User;
 
-use Modules\\Core\\Infrastructure\\Persistence\\Eloquent\\Currency;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Currency;
 
-use Illuminate\\Support\\Facades\\DB;
+use Illuminate\Support\Facades\DB;
 
 
 
@@ -4661,7 +4661,7 @@ class GrnFromPoSeeder extends Seeder
 
        $inventoryAccount = Account::where('code', '1300')->first();
 
-       $grIrAccount = Account::firstOrCreate(\['code' => '1500', 'name' => 'GR/IR', 'type' => 'liability', 'normal\_balance' => 'credit']);
+       $grIrAccount = Account::firstOrCreate(['code' => '1500', 'name' => 'GR/IR', 'type' => 'liability', 'normal_balance' => 'credit']);
 
        $fiscalPeriod = FiscalPeriod::where('status', 'open')->first();
 
@@ -4671,9 +4671,9 @@ class GrnFromPoSeeder extends Seeder
 
            DB::transaction(function () use ($po, $usd, $inventoryAccount, $grIrAccount, $fiscalPeriod) {
 
-               $user = User::where('tenant\_id', $po->tenant\_id)->first();
+               $user = User::where('tenant_id', $po->tenant_id)->first();
 
-               $location = WarehouseLocation::where('warehouse\_id', $po->warehouse\_id)->where('type', 'bin')->first();
+               $location = WarehouseLocation::where('warehouse_id', $po->warehouse_id)->where('type', 'bin')->first();
 
                if (!$user || !$location) return;
 
@@ -4681,25 +4681,25 @@ class GrnFromPoSeeder extends Seeder
 
                // Create GRN
 
-               $grn = GrnHeader::create(\[
+               $grn = GrnHeader::create([
 
-                   'tenant\_id' => $po->tenant\_id,
+                   'tenant_id' => $po->tenant_id,
 
-                   'supplier\_id' => $po->supplier\_id,
+                   'supplier_id' => $po->supplier_id,
 
-                   'warehouse\_id' => $po->warehouse\_id,
+                   'warehouse_id' => $po->warehouse_id,
 
-                   'purchase\_order\_id' => $po->id,
+                   'purchase_order_id' => $po->id,
 
-                   'grn\_number' => 'GRN-PO-' . $po->id,
+                   'grn_number' => 'GRN-PO-' . $po->id,
 
                    'status' => 'complete',
 
-                   'received\_date' => now()->subDays(3),
+                   'received_date' => now()->subDays(3),
 
-                   'currency\_id' => $usd->id,
+                   'currency_id' => $usd->id,
 
-                   'created\_by' => $user->id,
+                   'created_by' => $user->id,
 
                ]);
 
@@ -4709,25 +4709,25 @@ class GrnFromPoSeeder extends Seeder
 
                foreach ($po->lines as $line) {
 
-                   $grnLine = GrnLine::create(\[
+                   $grnLine = GrnLine::create([
 
-                       'grn\_header\_id' => $grn->id,
+                       'grn_header_id' => $grn->id,
 
-                       'purchase\_order\_line\_id' => $line->id,
+                       'purchase_order_line_id' => $line->id,
 
-                       'product\_id' => $line->product\_id,
+                       'product_id' => $line->product_id,
 
-                       'variant\_id' => $line->variant\_id,
+                       'variant_id' => $line->variant_id,
 
-                       'location\_id' => $location->id,
+                       'location_id' => $location->id,
 
-                       'uom\_id' => $line->uom\_id,
+                       'uom_id' => $line->uom_id,
 
-                       'expected\_qty' => $line->ordered\_qty,
+                       'expected_qty' => $line->ordered_qty,
 
-                       'received\_qty' => $line->ordered\_qty,
+                       'received_qty' => $line->ordered_qty,
 
-                       'unit\_cost' => $line->unit\_price,
+                       'unit_cost' => $line->unit_price,
 
                    ]);
 
@@ -4735,27 +4735,27 @@ class GrnFromPoSeeder extends Seeder
 
                    // Stock Movement
 
-                   StockMovement::create(\[
+                   StockMovement::create([
 
-                       'tenant\_id' => $po->tenant\_id,
+                       'tenant_id' => $po->tenant_id,
 
-                       'product\_id' => $line->product\_id,
+                       'product_id' => $line->product_id,
 
-                       'to\_location\_id' => $location->id,
+                       'to_location_id' => $location->id,
 
-                       'movement\_type' => 'receipt',
+                       'movement_type' => 'receipt',
 
-                       'reference\_type' => GrnHeader::class,
+                       'reference_type' => GrnHeader::class,
 
-                       'reference\_id' => $grn->id,
+                       'reference_id' => $grn->id,
 
-                       'uom\_id' => $line->uom\_id,
+                       'uom_id' => $line->uom_id,
 
-                       'quantity' => $line->ordered\_qty,
+                       'quantity' => $line->ordered_qty,
 
-                       'unit\_cost' => $line->unit\_price,
+                       'unit_cost' => $line->unit_price,
 
-                       'performed\_by' => $user->id,
+                       'performed_by' => $user->id,
 
                    ]);
 
@@ -4763,55 +4763,55 @@ class GrnFromPoSeeder extends Seeder
 
                    // Update Stock Level
 
-                   StockLevel::updateOrCreate(\[
+                   StockLevel::updateOrCreate([
 
-                       'tenant\_id' => $po->tenant\_id,
+                       'tenant_id' => $po->tenant_id,
 
-                       'product\_id' => $line->product\_id,
+                       'product_id' => $line->product_id,
 
-                       'variant\_id' => $line->variant\_id,
+                       'variant_id' => $line->variant_id,
 
-                       'location\_id' => $location->id,
+                       'location_id' => $location->id,
 
-                   ], \[
+                   ], [
 
-                       'uom\_id' => $line->uom\_id,
+                       'uom_id' => $line->uom_id,
 
-                       'unit\_cost' => $line->unit\_price,
+                       'unit_cost' => $line->unit_price,
 
-                   ])->increment('quantity\_on\_hand', $line->ordered\_qty);
+                   ])->increment('quantity_on_hand', $line->ordered_qty);
 
 
 
                    // Cost Layer
 
-                   InventoryCostLayer::create(\[
+                   InventoryCostLayer::create([
 
-                       'tenant\_id' => $po->tenant\_id,
+                       'tenant_id' => $po->tenant_id,
 
-                       'product\_id' => $line->product\_id,
+                       'product_id' => $line->product_id,
 
-                       'location\_id' => $location->id,
+                       'location_id' => $location->id,
 
-                       'valuation\_method' => $line->product->valuation\_method,
+                       'valuation_method' => $line->product->valuation_method,
 
-                       'layer\_date' => $grn->received\_date,
+                       'layer_date' => $grn->received_date,
 
-                       'quantity\_in' => $line->ordered\_qty,
+                       'quantity_in' => $line->ordered_qty,
 
-                       'quantity\_remaining' => $line->ordered\_qty,
+                       'quantity_remaining' => $line->ordered_qty,
 
-                       'unit\_cost' => $line->unit\_price,
+                       'unit_cost' => $line->unit_price,
 
-                       'reference\_type' => StockMovement::class,
+                       'reference_type' => StockMovement::class,
 
-                       'reference\_id' => $grn->id,
+                       'reference_id' => $grn->id,
 
                    ]);
 
 
 
-                   $totalCost += $line->ordered\_qty \* $line->unit\_price;
+                   $totalCost += $line->ordered_qty \* $line->unit_price;
 
                }
 
@@ -4819,39 +4819,39 @@ class GrnFromPoSeeder extends Seeder
 
                // Journal Entry (Dr Inventory, Cr GR/IR)
 
-               $journalEntry = JournalEntry::create(\[
+               $journalEntry = JournalEntry::create([
 
-                   'tenant\_id' => $po->tenant\_id,
+                   'tenant_id' => $po->tenant_id,
 
-                   'fiscal\_period\_id' => $fiscalPeriod->id,
+                   'fiscal_period_id' => $fiscalPeriod->id,
 
-                   'entry\_type' => 'auto',
+                   'entry_type' => 'auto',
 
-                   'reference\_type' => GrnHeader::class,
+                   'reference_type' => GrnHeader::class,
 
-                   'reference\_id' => $grn->id,
+                   'reference_id' => $grn->id,
 
-                   'entry\_date' => $grn->received\_date,
+                   'entry_date' => $grn->received_date,
 
                    'status' => 'posted',
 
-                   'created\_by' => $user->id,
+                   'created_by' => $user->id,
 
-                   'posted\_by' => $user->id,
+                   'posted_by' => $user->id,
 
-                   'posted\_at' => now(),
+                   'posted_at' => now(),
 
                ]);
 
-               JournalEntryLine::create(\['journal\_entry\_id' => $journalEntry->id, 'account\_id' => $inventoryAccount->id, 'debit\_amount' => $totalCost]);
+               JournalEntryLine::create(['journal_entry_id' => $journalEntry->id, 'account_id' => $inventoryAccount->id, 'debit_amount' => $totalCost]);
 
-               JournalEntryLine::create(\['journal\_entry\_id' => $journalEntry->id, 'account\_id' => $grIrAccount->id, 'credit\_amount' => $totalCost]);
+               JournalEntryLine::create(['journal_entry_id' => $journalEntry->id, 'account_id' => $grIrAccount->id, 'credit_amount' => $totalCost]);
 
 
 
-               $po->update(\['status' => 'received']);
+               $po->update(['status' => 'received']);
 
-               $grn->update(\['status' => 'posted']);
+               $grn->update(['status' => 'posted']);
 
            });
 
@@ -4875,29 +4875,29 @@ class GrnFromPoSeeder extends Seeder
 
 <?php
 
-namespace Modules\\Purchase\\Database\\Seeders;
+namespace Modules\Purchase\Database\Seeders;
 
 
 
-use Illuminate\\Database\\Seeder;
+use Illuminate\Database\Seeder;
 
-use Modules\\Purchase\\Infrastructure\\Persistence\\Eloquent\\GrnHeader;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\GrnHeader;
 
-use Modules\\Purchase\\Infrastructure\\Persistence\\Eloquent\\PurchaseInvoice;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\PurchaseInvoice;
 
-use Modules\\Purchase\\Infrastructure\\Persistence\\Eloquent\\PurchaseInvoiceLine;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\PurchaseInvoiceLine;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\JournalEntry;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\JournalEntry;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\JournalEntryLine;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\JournalEntryLine;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\Account;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\Account;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\FiscalPeriod;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\FiscalPeriod;
 
-use Modules\\Core\\Infrastructure\\Persistence\\Eloquent\\Currency;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Currency;
 
-use Illuminate\\Support\\Facades\\DB;
+use Illuminate\Support\Facades\DB;
 
 
 
@@ -4925,37 +4925,37 @@ class PurchaseInvoiceSeeder extends Seeder
 
            DB::transaction(function () use ($grn, $usd, $apAccount, $grIrAccount, $fiscalPeriod) {
 
-               $total = $grn->lines->sum('line\_cost');
+               $total = $grn->lines->sum('line_cost');
 
 
 
-               $invoice = PurchaseInvoice::create(\[
+               $invoice = PurchaseInvoice::create([
 
-                   'tenant\_id' => $grn->tenant\_id,
+                   'tenant_id' => $grn->tenant_id,
 
-                   'supplier\_id' => $grn->supplier\_id,
+                   'supplier_id' => $grn->supplier_id,
 
-                   'grn\_header\_id' => $grn->id,
+                   'grn_header_id' => $grn->id,
 
-                   'purchase\_order\_id' => $grn->purchase\_order\_id,
+                   'purchase_order_id' => $grn->purchase_order_id,
 
-                   'invoice\_number' => 'INV-' . $grn->grn\_number,
+                   'invoice_number' => 'INV-' . $grn->grn_number,
 
-                   'supplier\_invoice\_number' => 'SUPP-INV-' . rand(1000,9999),
+                   'supplier_invoice_number' => 'SUPP-INV-' . rand(1000,9999),
 
                    'status' => 'approved',
 
-                   'invoice\_date' => now()->subDays(1),
+                   'invoice_date' => now()->subDays(1),
 
-                   'due\_date' => now()->addDays(30),
+                   'due_date' => now()->addDays(30),
 
-                   'currency\_id' => $usd->id,
+                   'currency_id' => $usd->id,
 
                    'subtotal' => $total,
 
-                   'grand\_total' => $total,
+                   'grand_total' => $total,
 
-                   'ap\_account\_id' => $apAccount->id,
+                   'ap_account_id' => $apAccount->id,
 
                ]);
 
@@ -4963,21 +4963,21 @@ class PurchaseInvoiceSeeder extends Seeder
 
                foreach ($grn->lines as $line) {
 
-                   PurchaseInvoiceLine::create(\[
+                   PurchaseInvoiceLine::create([
 
-                       'purchase\_invoice\_id' => $invoice->id,
+                       'purchase_invoice_id' => $invoice->id,
 
-                       'grn\_line\_id' => $line->id,
+                       'grn_line_id' => $line->id,
 
-                       'product\_id' => $line->product\_id,
+                       'product_id' => $line->product_id,
 
-                       'uom\_id' => $line->uom\_id,
+                       'uom_id' => $line->uom_id,
 
-                       'quantity' => $line->received\_qty,
+                       'quantity' => $line->received_qty,
 
-                       'unit\_price' => $line->unit\_cost,
+                       'unit_price' => $line->unit_cost,
 
-                       'line\_total' => $line->line\_cost,
+                       'line_total' => $line->line_cost,
 
                    ]);
 
@@ -4987,37 +4987,37 @@ class PurchaseInvoiceSeeder extends Seeder
 
                // Journal Entry: Dr GR/IR, Cr AP
 
-               $journalEntry = JournalEntry::create(\[
+               $journalEntry = JournalEntry::create([
 
-                   'tenant\_id' => $grn->tenant\_id,
+                   'tenant_id' => $grn->tenant_id,
 
-                   'fiscal\_period\_id' => $fiscalPeriod->id,
+                   'fiscal_period_id' => $fiscalPeriod->id,
 
-                   'entry\_type' => 'auto',
+                   'entry_type' => 'auto',
 
-                   'reference\_type' => PurchaseInvoice::class,
+                   'reference_type' => PurchaseInvoice::class,
 
-                   'reference\_id' => $invoice->id,
+                   'reference_id' => $invoice->id,
 
-                   'entry\_date' => $invoice->invoice\_date,
+                   'entry_date' => $invoice->invoice_date,
 
                    'status' => 'posted',
 
-                   'created\_by' => $grn->created\_by,
+                   'created_by' => $grn->created_by,
 
-                   'posted\_by' => $grn->created\_by,
+                   'posted_by' => $grn->created_by,
 
-                   'posted\_at' => now(),
+                   'posted_at' => now(),
 
                ]);
 
-               JournalEntryLine::create(\['journal\_entry\_id' => $journalEntry->id, 'account\_id' => $grIrAccount->id, 'debit\_amount' => $total]);
+               JournalEntryLine::create(['journal_entry_id' => $journalEntry->id, 'account_id' => $grIrAccount->id, 'debit_amount' => $total]);
 
-               JournalEntryLine::create(\['journal\_entry\_id' => $journalEntry->id, 'account\_id' => $apAccount->id, 'credit\_amount' => $total]);
+               JournalEntryLine::create(['journal_entry_id' => $journalEntry->id, 'account_id' => $apAccount->id, 'credit_amount' => $total]);
 
 
 
-               $invoice->update(\['journal\_entry\_id' => $journalEntry->id]);
+               $invoice->update(['journal_entry_id' => $journalEntry->id]);
 
            });
 
@@ -5039,31 +5039,31 @@ class PurchaseInvoiceSeeder extends Seeder
 
 <?php
 
-namespace Modules\\Purchase\\Database\\Seeders;
+namespace Modules\Purchase\Database\Seeders;
 
 
 
-use Illuminate\\Database\\Seeder;
+use Illuminate\Database\Seeder;
 
-use Modules\\Purchase\\Infrastructure\\Persistence\\Eloquent\\PurchaseInvoice;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\PurchaseInvoice;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\Payment;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\Payment;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\PaymentMethod;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\PaymentMethod;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\PaymentAllocation;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\PaymentAllocation;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\JournalEntry;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\JournalEntry;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\JournalEntryLine;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\JournalEntryLine;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\Account;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\Account;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\FiscalPeriod;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\FiscalPeriod;
 
-use Modules\\Core\\Infrastructure\\Persistence\\Eloquent\\Currency;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Currency;
 
-use Modules\\User\\Infrastructure\\Persistence\\Eloquent\\User;
+use Modules\User\Infrastructure\Persistence\Eloquent\User;
 
 
 
@@ -5079,7 +5079,7 @@ class PurchasePaymentSeeder extends Seeder
 
        $usd = Currency::where('code', 'USD')->first();
 
-       $bankAccount = Account::where('is\_bank\_account', true)->first();
+       $bankAccount = Account::where('is_bank_account', true)->first();
 
        $apAccount = Account::where('code', '2000')->first();
 
@@ -5089,37 +5089,37 @@ class PurchasePaymentSeeder extends Seeder
 
        foreach ($invoices as $invoice) {
 
-           $user = User::where('tenant\_id', $invoice->tenant\_id)->first();
+           $user = User::where('tenant_id', $invoice->tenant_id)->first();
 
-           $method = PaymentMethod::firstOrCreate(\['tenant\_id' => $invoice->tenant\_id, 'name' => 'Bank Transfer'], \['type' => 'bank\_transfer', 'account\_id' => $bankAccount->id, 'is\_active' => true]);
+           $method = PaymentMethod::firstOrCreate(['tenant_id' => $invoice->tenant_id, 'name' => 'Bank Transfer'], ['type' => 'bank_transfer', 'account_id' => $bankAccount->id, 'is_active' => true]);
 
 
 
-           $payment = Payment::create(\[
+           $payment = Payment::create([
 
-               'tenant\_id' => $invoice->tenant\_id,
+               'tenant_id' => $invoice->tenant_id,
 
-               'payment\_number' => 'PAY-OUT-' . date('Ymd') . '-' . $invoice->id,
+               'payment_number' => 'PAY-OUT-' . date('Ymd') . '-' . $invoice->id,
 
                'direction' => 'outbound',
 
-               'party\_type' => 'supplier',
+               'party_type' => 'supplier',
 
-               'party\_id' => $invoice->supplier\_id,
+               'party_id' => $invoice->supplier_id,
 
-               'payment\_method\_id' => $method->id,
+               'payment_method_id' => $method->id,
 
-               'account\_id' => $bankAccount->id,
+               'account_id' => $bankAccount->id,
 
-               'amount' => $invoice->grand\_total,
+               'amount' => $invoice->grand_total,
 
-               'currency\_id' => $usd->id,
+               'currency_id' => $usd->id,
 
-               'exchange\_rate' => 1,
+               'exchange_rate' => 1,
 
-               'base\_amount' => $invoice->grand\_total,
+               'base_amount' => $invoice->grand_total,
 
-               'payment\_date' => now(),
+               'payment_date' => now(),
 
                'status' => 'posted',
 
@@ -5127,15 +5127,15 @@ class PurchasePaymentSeeder extends Seeder
 
 
 
-           PaymentAllocation::create(\[
+           PaymentAllocation::create([
 
-               'payment\_id' => $payment->id,
+               'payment_id' => $payment->id,
 
-               'invoice\_type' => PurchaseInvoice::class,
+               'invoice_type' => PurchaseInvoice::class,
 
-               'invoice\_id' => $invoice->id,
+               'invoice_id' => $invoice->id,
 
-               'allocated\_amount' => $invoice->grand\_total,
+               'allocated_amount' => $invoice->grand_total,
 
            ]);
 
@@ -5143,39 +5143,39 @@ class PurchasePaymentSeeder extends Seeder
 
            // Journal Entry: Dr AP, Cr Bank
 
-           $journalEntry = JournalEntry::create(\[
+           $journalEntry = JournalEntry::create([
 
-               'tenant\_id' => $invoice->tenant\_id,
+               'tenant_id' => $invoice->tenant_id,
 
-               'fiscal\_period\_id' => $fiscalPeriod->id,
+               'fiscal_period_id' => $fiscalPeriod->id,
 
-               'entry\_type' => 'auto',
+               'entry_type' => 'auto',
 
-               'reference\_type' => Payment::class,
+               'reference_type' => Payment::class,
 
-               'reference\_id' => $payment->id,
+               'reference_id' => $payment->id,
 
-               'entry\_date' => $payment->payment\_date,
+               'entry_date' => $payment->payment_date,
 
                'status' => 'posted',
 
-               'created\_by' => $user->id,
+               'created_by' => $user->id,
 
-               'posted\_by' => $user->id,
+               'posted_by' => $user->id,
 
-               'posted\_at' => now(),
+               'posted_at' => now(),
 
            ]);
 
-           JournalEntryLine::create(\['journal\_entry\_id' => $journalEntry->id, 'account\_id' => $apAccount->id, 'debit\_amount' => $payment->amount]);
+           JournalEntryLine::create(['journal_entry_id' => $journalEntry->id, 'account_id' => $apAccount->id, 'debit_amount' => $payment->amount]);
 
-           JournalEntryLine::create(\['journal\_entry\_id' => $journalEntry->id, 'account\_id' => $bankAccount->id, 'credit\_amount' => $payment->amount]);
+           JournalEntryLine::create(['journal_entry_id' => $journalEntry->id, 'account_id' => $bankAccount->id, 'credit_amount' => $payment->amount]);
 
 
 
-           $payment->update(\['journal\_entry\_id' => $journalEntry->id]);
+           $payment->update(['journal_entry_id' => $journalEntry->id]);
 
-           $invoice->update(\['status' => 'paid', 'paid\_amount' => $invoice->grand\_total]);
+           $invoice->update(['status' => 'paid', 'paid_amount' => $invoice->grand_total]);
 
        }
 
@@ -5195,41 +5195,41 @@ class PurchasePaymentSeeder extends Seeder
 
 <?php
 
-namespace Modules\\Purchase\\Database\\Seeders;
+namespace Modules\Purchase\Database\Seeders;
 
 
 
-use Illuminate\\Database\\Seeder;
+use Illuminate\Database\Seeder;
 
-use Modules\\Purchase\\Infrastructure\\Persistence\\Eloquent\\GrnHeader;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\GrnHeader;
 
-use Modules\\Purchase\\Infrastructure\\Persistence\\Eloquent\\PurchaseReturn;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\PurchaseReturn;
 
-use Modules\\Purchase\\Infrastructure\\Persistence\\Eloquent\\PurchaseReturnLine;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\PurchaseReturnLine;
 
-use Modules\\Inventory\\Infrastructure\\Persistence\\Eloquent\\StockMovement;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\StockMovement;
 
-use Modules\\Inventory\\Infrastructure\\Persistence\\Eloquent\\StockLevel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\StockLevel;
 
-use Modules\\Inventory\\Infrastructure\\Persistence\\Eloquent\\InventoryCostLayer;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\InventoryCostLayer;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\JournalEntry;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\JournalEntry;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\JournalEntryLine;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\JournalEntryLine;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\Account;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\Account;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\FiscalPeriod;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\FiscalPeriod;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\CreditMemo;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\CreditMemo;
 
-use Modules\\Warehouse\\Infrastructure\\Persistence\\Eloquent\\WarehouseLocation;
+use Modules\Warehouse\Infrastructure\Persistence\Eloquent\WarehouseLocation;
 
-use Modules\\User\\Infrastructure\\Persistence\\Eloquent\\User;
+use Modules\User\Infrastructure\Persistence\Eloquent\User;
 
-use Modules\\Core\\Infrastructure\\Persistence\\Eloquent\\Currency;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Currency;
 
-use Illuminate\\Support\\Facades\\DB;
+use Illuminate\Support\Facades\DB;
 
 
 
@@ -5257,29 +5257,29 @@ class PurchaseReturnWithOriginalSeeder extends Seeder
 
            DB::transaction(function () use ($grn, $usd, $apAccount, $inventoryAccount, $fiscalPeriod) {
 
-               $user = User::where('tenant\_id', $grn->tenant\_id)->first();
+               $user = User::where('tenant_id', $grn->tenant_id)->first();
 
-               $returnLocation = WarehouseLocation::where('warehouse\_id', $grn->warehouse\_id)->where('type', 'bin')->first();
+               $returnLocation = WarehouseLocation::where('warehouse_id', $grn->warehouse_id)->where('type', 'bin')->first();
 
 
 
-               $purchaseReturn = PurchaseReturn::create(\[
+               $purchaseReturn = PurchaseReturn::create([
 
-                   'tenant\_id' => $grn->tenant\_id,
+                   'tenant_id' => $grn->tenant_id,
 
-                   'supplier\_id' => $grn->supplier\_id,
+                   'supplier_id' => $grn->supplier_id,
 
-                   'original\_grn\_id' => $grn->id,
+                   'original_grn_id' => $grn->id,
 
-                   'return\_number' => 'PR-' . date('Ymd') . '-001',
+                   'return_number' => 'PR-' . date('Ymd') . '-001',
 
                    'status' => 'approved',
 
-                   'return\_date' => now(),
+                   'return_date' => now(),
 
-                   'return\_reason' => 'Damaged items',
+                   'return_reason' => 'Damaged items',
 
-                   'currency\_id' => $usd->id,
+                   'currency_id' => $usd->id,
 
                ]);
 
@@ -5289,61 +5289,61 @@ class PurchaseReturnWithOriginalSeeder extends Seeder
 
                foreach ($grn->lines->take(1) as $line) { // Return part of first line
 
-                   $returnQty = ceil($line->received\_qty \* 0.2); // 20% return
+                   $returnQty = ceil($line->received_qty \* 0.2); // 20% return
 
-                   $lineCost = $returnQty \* $line->unit\_cost;
+                   $lineCost = $returnQty \* $line->unit_cost;
 
                    $totalReturnCost += $lineCost;
 
 
 
-                   $returnLine = PurchaseReturnLine::create(\[
+                   $returnLine = PurchaseReturnLine::create([
 
-                       'purchase\_return\_id' => $purchaseReturn->id,
+                       'purchase_return_id' => $purchaseReturn->id,
 
-                       'original\_grn\_line\_id' => $line->id,
+                       'original_grn_line_id' => $line->id,
 
-                       'product\_id' => $line->product\_id,
+                       'product_id' => $line->product_id,
 
-                       'from\_location\_id' => $line->location\_id,
+                       'from_location_id' => $line->location_id,
 
-                       'uom\_id' => $line->uom\_id,
+                       'uom_id' => $line->uom_id,
 
-                       'return\_qty' => $returnQty,
+                       'return_qty' => $returnQty,
 
-                       'unit\_cost' => $line->unit\_cost,
+                       'unit_cost' => $line->unit_cost,
 
                        'condition' => 'damaged',
 
-                       'disposition' => 'return\_to\_vendor',
+                       'disposition' => 'return_to_vendor',
 
                    ]);
 
 
 
-                   // Stock Movement (return\_out)
+                   // Stock Movement (return_out)
 
-                   StockMovement::create(\[
+                   StockMovement::create([
 
-                       'tenant\_id' => $grn->tenant\_id,
+                       'tenant_id' => $grn->tenant_id,
 
-                       'product\_id' => $line->product\_id,
+                       'product_id' => $line->product_id,
 
-                       'from\_location\_id' => $line->location\_id,
+                       'from_location_id' => $line->location_id,
 
-                       'movement\_type' => 'return\_out',
+                       'movement_type' => 'return_out',
 
-                       'reference\_type' => PurchaseReturn::class,
+                       'reference_type' => PurchaseReturn::class,
 
-                       'reference\_id' => $purchaseReturn->id,
+                       'reference_id' => $purchaseReturn->id,
 
-                       'uom\_id' => $line->uom\_id,
+                       'uom_id' => $line->uom_id,
 
                        'quantity' => $returnQty,
 
-                       'unit\_cost' => $line->unit\_cost,
+                       'unit_cost' => $line->unit_cost,
 
-                       'performed\_by' => $user->id,
+                       'performed_by' => $user->id,
 
                    ]);
 
@@ -5351,31 +5351,31 @@ class PurchaseReturnWithOriginalSeeder extends Seeder
 
                    // Reduce stock level
 
-                   StockLevel::where(\[
+                   StockLevel::where([
 
-                       'tenant\_id' => $grn->tenant\_id,
+                       'tenant_id' => $grn->tenant_id,
 
-                       'product\_id' => $line->product\_id,
+                       'product_id' => $line->product_id,
 
-                       'location\_id' => $line->location\_id,
+                       'location_id' => $line->location_id,
 
-                   ])->decrement('quantity\_on\_hand', $returnQty);
+                   ])->decrement('quantity_on_hand', $returnQty);
 
 
 
                    // Adjust cost layer (remove from original layer)
 
-                   $layer = InventoryCostLayer::where('reference\_id', $grn->id)
+                   $layer = InventoryCostLayer::where('reference_id', $grn->id)
 
-                       ->where('product\_id', $line->product\_id)
+                       ->where('product_id', $line->product_id)
 
-                       ->where('quantity\_remaining', '>', 0)
+                       ->where('quantity_remaining', '>', 0)
 
                        ->first();
 
                    if ($layer) {
 
-                       $layer->decrement('quantity\_remaining', $returnQty);
+                       $layer->decrement('quantity_remaining', $returnQty);
 
                    }
 
@@ -5383,69 +5383,69 @@ class PurchaseReturnWithOriginalSeeder extends Seeder
 
 
 
-               $purchaseReturn->update(\['subtotal' => $totalReturnCost, 'grand\_total' => $totalReturnCost]);
+               $purchaseReturn->update(['subtotal' => $totalReturnCost, 'grand_total' => $totalReturnCost]);
 
 
 
                // Journal Entry: Dr AP, Cr Inventory
 
-               $journalEntry = JournalEntry::create(\[
+               $journalEntry = JournalEntry::create([
 
-                   'tenant\_id' => $grn->tenant\_id,
+                   'tenant_id' => $grn->tenant_id,
 
-                   'fiscal\_period\_id' => $fiscalPeriod->id,
+                   'fiscal_period_id' => $fiscalPeriod->id,
 
-                   'entry\_type' => 'auto',
+                   'entry_type' => 'auto',
 
-                   'reference\_type' => PurchaseReturn::class,
+                   'reference_type' => PurchaseReturn::class,
 
-                   'reference\_id' => $purchaseReturn->id,
+                   'reference_id' => $purchaseReturn->id,
 
-                   'entry\_date' => $purchaseReturn->return\_date,
+                   'entry_date' => $purchaseReturn->return_date,
 
                    'status' => 'posted',
 
-                   'created\_by' => $user->id,
+                   'created_by' => $user->id,
 
-                   'posted\_by' => $user->id,
+                   'posted_by' => $user->id,
 
-                   'posted\_at' => now(),
+                   'posted_at' => now(),
 
                ]);
 
-               JournalEntryLine::create(\['journal\_entry\_id' => $journalEntry->id, 'account\_id' => $apAccount->id, 'debit\_amount' => $totalReturnCost]);
+               JournalEntryLine::create(['journal_entry_id' => $journalEntry->id, 'account_id' => $apAccount->id, 'debit_amount' => $totalReturnCost]);
 
-               JournalEntryLine::create(\['journal\_entry\_id' => $journalEntry->id, 'account\_id' => $inventoryAccount->id, 'credit\_amount' => $totalReturnCost]);
+               JournalEntryLine::create(['journal_entry_id' => $journalEntry->id, 'account_id' => $inventoryAccount->id, 'credit_amount' => $totalReturnCost]);
 
 
 
-               $purchaseReturn->update(\['journal\_entry\_id' => $journalEntry->id]);
+               $purchaseReturn->update(['journal_entry_id' => $journalEntry->id]);
 
 
 
                // Debit Note / Credit Memo
 
-               CreditMemo::create(\[
+               CreditMemo::create([
 
-                   'tenant\_id' => $grn->tenant\_id,
+                   'tenant_id' => $grn->tenant_id,
 
-                   'party\_type' => 'supplier',
+                   'party_type' => 'supplier',
 
-                   'party\_id' => $grn->supplier\_id,
+                   'party_id' => $grn->supplier_id,
 
-                   'return\_order\_type' => PurchaseReturn::class,
+                   'return_order_type' => PurchaseReturn::class,
 
-                   'return\_order\_id' => $purchaseReturn->id,
+                   'return_order_id' => $purchaseReturn->id,
 
-                   'credit\_memo\_number' => 'DN-' . $purchaseReturn->return\_number,
+                   'credit_memo_number' => 'DN-' . $purchaseReturn->return_number,
 
                    'amount' => $totalReturnCost,
 
                    'status' => 'issued',
 
-                   'issued\_date' => now(),
+                   'issued_date' => now(),
 
-                   'journal\_entry\_id' => $journalEntry->id,
+                   'journal_entry_id' => $journalEntry->id,
 
                ]);
 
@@ -5469,45 +5469,45 @@ class PurchaseReturnWithOriginalSeeder extends Seeder
 
 <?php
 
-namespace Modules\\Purchase\\Database\\Seeders;
+namespace Modules\Purchase\Database\Seeders;
 
 
 
-use Illuminate\\Database\\Seeder;
+use Illuminate\Database\Seeder;
 
-use Modules\\Purchase\\Infrastructure\\Persistence\\Eloquent\\GrnHeader;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\GrnHeader;
 
-use Modules\\Purchase\\Infrastructure\\Persistence\\Eloquent\\GrnLine;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\GrnLine;
 
-use Modules\\Inventory\\Infrastructure\\Persistence\\Eloquent\\StockMovement;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\StockMovement;
 
-use Modules\\Inventory\\Infrastructure\\Persistence\\Eloquent\\StockLevel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\StockLevel;
 
-use Modules\\Inventory\\Infrastructure\\Persistence\\Eloquent\\InventoryCostLayer;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\InventoryCostLayer;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\JournalEntry;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\JournalEntry;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\JournalEntryLine;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\JournalEntryLine;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\Account;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\Account;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\FiscalPeriod;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\FiscalPeriod;
 
-use Modules\\Supplier\\Infrastructure\\Persistence\\Eloquent\\Supplier;
+use Modules\Supplier\Infrastructure\Persistence\Eloquent\Supplier;
 
-use Modules\\Product\\Infrastructure\\Persistence\\Eloquent\\Product;
+use Modules\Product\Infrastructure\Persistence\Eloquent\Product;
 
-use Modules\\Warehouse\\Infrastructure\\Persistence\\Eloquent\\Warehouse;
+use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Warehouse;
 
-use Modules\\Warehouse\\Infrastructure\\Persistence\\Eloquent\\WarehouseLocation;
+use Modules\Warehouse\Infrastructure\Persistence\Eloquent\WarehouseLocation;
 
-use Modules\\User\\Infrastructure\\Persistence\\Eloquent\\User;
+use Modules\User\Infrastructure\Persistence\Eloquent\User;
 
-use Modules\\Core\\Infrastructure\\Persistence\\Eloquent\\Tenant;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Tenant;
 
-use Modules\\Core\\Infrastructure\\Persistence\\Eloquent\\Currency;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Currency;
 
-use Illuminate\\Support\\Facades\\DB;
+use Illuminate\Support\Facades\DB;
 
 
 
@@ -5535,15 +5535,15 @@ class DirectGrnSeeder extends Seeder
 
            DB::transaction(function () use ($tenant, $usd, $inventoryAccount, $apAccount, $fiscalPeriod) {
 
-               $supplier = Supplier::where('tenant\_id', $tenant->id)->first();
+               $supplier = Supplier::where('tenant_id', $tenant->id)->first();
 
-               $warehouse = Warehouse::where('tenant\_id', $tenant->id)->where('is\_default', true)->first();
+               $warehouse = Warehouse::where('tenant_id', $tenant->id)->where('is_default', true)->first();
 
-               $user = User::where('tenant\_id', $tenant->id)->first();
+               $user = User::where('tenant_id', $tenant->id)->first();
 
-               $product = Product::where('tenant\_id', $tenant->id)->where('type', 'physical')->first();
+               $product = Product::where('tenant_id', $tenant->id)->where('type', 'physical')->first();
 
-               $location = WarehouseLocation::where('warehouse\_id', $warehouse->id)->where('type', 'bin')->first();
+               $location = WarehouseLocation::where('warehouse_id', $warehouse->id)->where('type', 'bin')->first();
 
                if (!$supplier || !$warehouse || !$user || !$product || !$location) return;
 
@@ -5551,25 +5551,25 @@ class DirectGrnSeeder extends Seeder
 
                // Direct GRN (no PO)
 
-               $grn = GrnHeader::create(\[
+               $grn = GrnHeader::create([
 
-                   'tenant\_id' => $tenant->id,
+                   'tenant_id' => $tenant->id,
 
-                   'supplier\_id' => $supplier->id,
+                   'supplier_id' => $supplier->id,
 
-                   'warehouse\_id' => $warehouse->id,
+                   'warehouse_id' => $warehouse->id,
 
-                   'purchase\_order\_id' => null,
+                   'purchase_order_id' => null,
 
-                   'grn\_number' => 'GRN-DIRECT-' . date('Ymd'),
+                   'grn_number' => 'GRN-DIRECT-' . date('Ymd'),
 
                    'status' => 'complete',
 
-                   'received\_date' => now()->subDays(2),
+                   'received_date' => now()->subDays(2),
 
-                   'currency\_id' => $usd->id,
+                   'currency_id' => $usd->id,
 
-                   'created\_by' => $user->id,
+                   'created_by' => $user->id,
 
                ]);
 
@@ -5579,19 +5579,19 @@ class DirectGrnSeeder extends Seeder
 
                $unitCost = 8.75;
 
-               GrnLine::create(\[
+               GrnLine::create([
 
-                   'grn\_header\_id' => $grn->id,
+                   'grn_header_id' => $grn->id,
 
-                   'product\_id' => $product->id,
+                   'product_id' => $product->id,
 
-                   'location\_id' => $location->id,
+                   'location_id' => $location->id,
 
-                   'uom\_id' => $product->base\_uom\_id,
+                   'uom_id' => $product->base_uom_id,
 
-                   'received\_qty' => $qty,
+                   'received_qty' => $qty,
 
-                   'unit\_cost' => $unitCost,
+                   'unit_cost' => $unitCost,
 
                ]);
 
@@ -5599,11 +5599,11 @@ class DirectGrnSeeder extends Seeder
 
                // Stock Movement \& Level
 
-               StockMovement::create(\[...]); // similar to above
+               StockMovement::create([...]); // similar to above
 
-               StockLevel::updateOrCreate(\[...])->increment('quantity\_on\_hand', $qty);
+               StockLevel::updateOrCreate([...])->increment('quantity_on_hand', $qty);
 
-               InventoryCostLayer::create(\[...]);
+               InventoryCostLayer::create([...]);
 
 
 
@@ -5611,11 +5611,11 @@ class DirectGrnSeeder extends Seeder
 
                $total = $qty \* $unitCost;
 
-               $journalEntry = JournalEntry::create(\[...]);
+               $journalEntry = JournalEntry::create([...]);
 
-               JournalEntryLine::create(\['journal\_entry\_id' => $journalEntry->id, 'account\_id' => $inventoryAccount->id, 'debit\_amount' => $total]);
+               JournalEntryLine::create(['journal_entry_id' => $journalEntry->id, 'account_id' => $inventoryAccount->id, 'debit_amount' => $total]);
 
-               JournalEntryLine::create(\['journal\_entry\_id' => $journalEntry->id, 'account\_id' => $apAccount->id, 'credit\_amount' => $total]);
+               JournalEntryLine::create(['journal_entry_id' => $journalEntry->id, 'account_id' => $apAccount->id, 'credit_amount' => $total]);
 
            });
 
@@ -5637,27 +5637,27 @@ class DirectGrnSeeder extends Seeder
 
 <?php
 
-namespace Modules\\Sales\\Database\\Seeders;
+namespace Modules\Sales\Database\Seeders;
 
 
 
-use Illuminate\\Database\\Seeder;
+use Illuminate\Database\Seeder;
 
-use Modules\\Sales\\Infrastructure\\Persistence\\Eloquent\\SalesOrder;
+use Modules\Sales\Infrastructure\Persistence\Eloquent\SalesOrder;
 
-use Modules\\Sales\\Infrastructure\\Persistence\\Eloquent\\SalesOrderLine;
+use Modules\Sales\Infrastructure\Persistence\Eloquent\SalesOrderLine;
 
-use Modules\\Customer\\Infrastructure\\Persistence\\Eloquent\\Customer;
+use Modules\Customer\Infrastructure\Persistence\Eloquent\Customer;
 
-use Modules\\Product\\Infrastructure\\Persistence\\Eloquent\\Product;
+use Modules\Product\Infrastructure\Persistence\Eloquent\Product;
 
-use Modules\\Warehouse\\Infrastructure\\Persistence\\Eloquent\\Warehouse;
+use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Warehouse;
 
-use Modules\\User\\Infrastructure\\Persistence\\Eloquent\\User;
+use Modules\User\Infrastructure\Persistence\Eloquent\User;
 
-use Modules\\Core\\Infrastructure\\Persistence\\Eloquent\\Tenant;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Tenant;
 
-use Modules\\Core\\Infrastructure\\Persistence\\Eloquent\\Currency;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Currency;
 
 
 
@@ -5677,43 +5677,43 @@ class SalesOrderSeeder extends Seeder
 
        foreach ($tenants as $tenant) {
 
-           $customer = Customer::where('tenant\_id', $tenant->id)->first();
+           $customer = Customer::where('tenant_id', $tenant->id)->first();
 
-           $warehouse = Warehouse::where('tenant\_id', $tenant->id)->where('is\_default', true)->first();
+           $warehouse = Warehouse::where('tenant_id', $tenant->id)->where('is_default', true)->first();
 
-           $user = User::where('tenant\_id', $tenant->id)->first();
+           $user = User::where('tenant_id', $tenant->id)->first();
 
            if (!$customer || !$warehouse || !$user) continue;
 
 
 
-           $so = SalesOrder::create(\[
+           $so = SalesOrder::create([
 
-               'tenant\_id' => $tenant->id,
+               'tenant_id' => $tenant->id,
 
-               'customer\_id' => $customer->id,
+               'customer_id' => $customer->id,
 
-               'org\_unit\_id' => $warehouse->org\_unit\_id,
+               'org_unit_id' => $warehouse->org_unit_id,
 
-               'warehouse\_id' => $warehouse->id,
+               'warehouse_id' => $warehouse->id,
 
-               'so\_number' => 'SO-' . date('Ymd') . '-001',
+               'so_number' => 'SO-' . date('Ymd') . '-001',
 
                'status' => 'confirmed',
 
-               'currency\_id' => $usd->id,
+               'currency_id' => $usd->id,
 
-               'order\_date' => now()->subDays(5),
+               'order_date' => now()->subDays(5),
 
-               'created\_by' => $user->id,
+               'created_by' => $user->id,
 
-               'approved\_by' => $user->id,
+               'approved_by' => $user->id,
 
            ]);
 
 
 
-           $products = Product::where('tenant\_id', $tenant->id)->where('type', 'physical')->take(2)->get();
+           $products = Product::where('tenant_id', $tenant->id)->where('type', 'physical')->take(2)->get();
 
            $subtotal = 0;
 
@@ -5727,27 +5727,27 @@ class SalesOrderSeeder extends Seeder
 
                $subtotal += $lineTotal;
 
-               SalesOrderLine::create(\[
+               SalesOrderLine::create([
 
-                   'sales\_order\_id' => $so->id,
+                   'sales_order_id' => $so->id,
 
-                   'product\_id' => $product->id,
+                   'product_id' => $product->id,
 
-                   'uom\_id' => $product->base\_uom\_id,
+                   'uom_id' => $product->base_uom_id,
 
-                   'ordered\_qty' => $qty,
+                   'ordered_qty' => $qty,
 
-                   'unit\_price' => $price,
+                   'unit_price' => $price,
 
-                   'line\_total' => $lineTotal,
+                   'line_total' => $lineTotal,
 
-                   'reserved\_qty' => $qty,
+                   'reserved_qty' => $qty,
 
                ]);
 
            }
 
-           $so->update(\['subtotal' => $subtotal, 'grand\_total' => $subtotal]);
+           $so->update(['subtotal' => $subtotal, 'grand_total' => $subtotal]);
 
        }
 
@@ -5767,39 +5767,39 @@ class SalesOrderSeeder extends Seeder
 
 <?php
 
-namespace Modules\\Sales\\Database\\Seeders;
+namespace Modules\Sales\Database\Seeders;
 
 
 
-use Illuminate\\Database\\Seeder;
+use Illuminate\Database\Seeder;
 
-use Modules\\Sales\\Infrastructure\\Persistence\\Eloquent\\SalesOrder;
+use Modules\Sales\Infrastructure\Persistence\Eloquent\SalesOrder;
 
-use Modules\\Sales\\Infrastructure\\Persistence\\Eloquent\\Shipment;
+use Modules\Sales\Infrastructure\Persistence\Eloquent\Shipment;
 
-use Modules\\Sales\\Infrastructure\\Persistence\\Eloquent\\ShipmentLine;
+use Modules\Sales\Infrastructure\Persistence\Eloquent\ShipmentLine;
 
-use Modules\\Inventory\\Infrastructure\\Persistence\\Eloquent\\StockMovement;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\StockMovement;
 
-use Modules\\Inventory\\Infrastructure\\Persistence\\Eloquent\\StockLevel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\StockLevel;
 
-use Modules\\Inventory\\Infrastructure\\Persistence\\Eloquent\\InventoryCostLayer;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\InventoryCostLayer;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\JournalEntry;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\JournalEntry;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\JournalEntryLine;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\JournalEntryLine;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\Account;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\Account;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\FiscalPeriod;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\FiscalPeriod;
 
-use Modules\\Warehouse\\Infrastructure\\Persistence\\Eloquent\\WarehouseLocation;
+use Modules\Warehouse\Infrastructure\Persistence\Eloquent\WarehouseLocation;
 
-use Modules\\User\\Infrastructure\\Persistence\\Eloquent\\User;
+use Modules\User\Infrastructure\Persistence\Eloquent\User;
 
-use Modules\\Core\\Infrastructure\\Persistence\\Eloquent\\Currency;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Currency;
 
-use Illuminate\\Support\\Facades\\DB;
+use Illuminate\Support\Facades\DB;
 
 
 
@@ -5827,31 +5827,31 @@ class ShipmentFromSoSeeder extends Seeder
 
            DB::transaction(function () use ($so, $usd, $cogsAccount, $inventoryAccount, $fiscalPeriod) {
 
-               $user = User::where('tenant\_id', $so->tenant\_id)->first();
+               $user = User::where('tenant_id', $so->tenant_id)->first();
 
-               $location = WarehouseLocation::where('warehouse\_id', $so->warehouse\_id)->where('type', 'bin')->first();
+               $location = WarehouseLocation::where('warehouse_id', $so->warehouse_id)->where('type', 'bin')->first();
 
                if (!$user || !$location) return;
 
 
 
-               $shipment = Shipment::create(\[
+               $shipment = Shipment::create([
 
-                   'tenant\_id' => $so->tenant\_id,
+                   'tenant_id' => $so->tenant_id,
 
-                   'customer\_id' => $so->customer\_id,
+                   'customer_id' => $so->customer_id,
 
-                   'sales\_order\_id' => $so->id,
+                   'sales_order_id' => $so->id,
 
-                   'warehouse\_id' => $so->warehouse\_id,
+                   'warehouse_id' => $so->warehouse_id,
 
-                   'shipment\_number' => 'SHIP-' . $so->so\_number,
+                   'shipment_number' => 'SHIP-' . $so->so_number,
 
                    'status' => 'shipped',
 
-                   'shipped\_date' => now()->subDays(1),
+                   'shipped_date' => now()->subDays(1),
 
-                   'currency\_id' => $usd->id,
+                   'currency_id' => $usd->id,
 
                ]);
 
@@ -5861,19 +5861,19 @@ class ShipmentFromSoSeeder extends Seeder
 
                foreach ($so->lines as $line) {
 
-                   $shipmentLine = ShipmentLine::create(\[
+                   $shipmentLine = ShipmentLine::create([
 
-                       'shipment\_id' => $shipment->id,
+                       'shipment_id' => $shipment->id,
 
-                       'sales\_order\_line\_id' => $line->id,
+                       'sales_order_line_id' => $line->id,
 
-                       'product\_id' => $line->product\_id,
+                       'product_id' => $line->product_id,
 
-                       'from\_location\_id' => $location->id,
+                       'from_location_id' => $location->id,
 
-                       'uom\_id' => $line->uom\_id,
+                       'uom_id' => $line->uom_id,
 
-                       'shipped\_qty' => $line->ordered\_qty,
+                       'shipped_qty' => $line->ordered_qty,
 
                    ]);
 
@@ -5881,19 +5881,19 @@ class ShipmentFromSoSeeder extends Seeder
 
                    // Allocate cost layer (FIFO)
 
-                   $layer = InventoryCostLayer::where('product\_id', $line->product\_id)
+                   $layer = InventoryCostLayer::where('product_id', $line->product_id)
 
-                       ->where('location\_id', $location->id)
+                       ->where('location_id', $location->id)
 
-                       ->where('quantity\_remaining', '>', 0)
+                       ->where('quantity_remaining', '>', 0)
 
-                       ->orderBy('layer\_date')
+                       ->orderBy('layer_date')
 
                        ->first();
 
-                   $unitCost = $layer ? $layer->unit\_cost : 10.00;
+                   $unitCost = $layer ? $layer->unit_cost : 10.00;
 
-                   $cogs = $line->ordered\_qty \* $unitCost;
+                   $cogs = $line->ordered_qty \* $unitCost;
 
                    $totalCogs += $cogs;
 
@@ -5901,27 +5901,27 @@ class ShipmentFromSoSeeder extends Seeder
 
                    // Stock Movement
 
-                   StockMovement::create(\[
+                   StockMovement::create([
 
-                       'tenant\_id' => $so->tenant\_id,
+                       'tenant_id' => $so->tenant_id,
 
-                       'product\_id' => $line->product\_id,
+                       'product_id' => $line->product_id,
 
-                       'from\_location\_id' => $location->id,
+                       'from_location_id' => $location->id,
 
-                       'movement\_type' => 'shipment',
+                       'movement_type' => 'shipment',
 
-                       'reference\_type' => Shipment::class,
+                       'reference_type' => Shipment::class,
 
-                       'reference\_id' => $shipment->id,
+                       'reference_id' => $shipment->id,
 
-                       'uom\_id' => $line->uom\_id,
+                       'uom_id' => $line->uom_id,
 
-                       'quantity' => $line->ordered\_qty,
+                       'quantity' => $line->ordered_qty,
 
-                       'unit\_cost' => $unitCost,
+                       'unit_cost' => $unitCost,
 
-                       'performed\_by' => $user->id,
+                       'performed_by' => $user->id,
 
                    ]);
 
@@ -5929,9 +5929,9 @@ class ShipmentFromSoSeeder extends Seeder
 
                    // Reduce stock
 
-                   StockLevel::where(\['product\_id' => $line->product\_id, 'location\_id' => $location->id])
+                   StockLevel::where(['product_id' => $line->product_id, 'location_id' => $location->id])
 
-                       ->decrement('quantity\_on\_hand', $line->ordered\_qty);
+                       ->decrement('quantity_on_hand', $line->ordered_qty);
 
 
 
@@ -5939,13 +5939,13 @@ class ShipmentFromSoSeeder extends Seeder
 
                    if ($layer) {
 
-                       $layer->decrement('quantity\_remaining', $line->ordered\_qty);
+                       $layer->decrement('quantity_remaining', $line->ordered_qty);
 
                    }
 
 
 
-                   $line->update(\['shipped\_qty' => $line->ordered\_qty]);
+                   $line->update(['shipped_qty' => $line->ordered_qty]);
 
                }
 
@@ -5953,15 +5953,15 @@ class ShipmentFromSoSeeder extends Seeder
 
                // COGS Journal Entry
 
-               $journalEntry = JournalEntry::create(\[...]);
+               $journalEntry = JournalEntry::create([...]);
 
-               JournalEntryLine::create(\['journal\_entry\_id' => $journalEntry->id, 'account\_id' => $cogsAccount->id, 'debit\_amount' => $totalCogs]);
+               JournalEntryLine::create(['journal_entry_id' => $journalEntry->id, 'account_id' => $cogsAccount->id, 'debit_amount' => $totalCogs]);
 
-               JournalEntryLine::create(\['journal\_entry\_id' => $journalEntry->id, 'account\_id' => $inventoryAccount->id, 'credit\_amount' => $totalCogs]);
+               JournalEntryLine::create(['journal_entry_id' => $journalEntry->id, 'account_id' => $inventoryAccount->id, 'credit_amount' => $totalCogs]);
 
 
 
-               $so->update(\['status' => 'shipped']);
+               $so->update(['status' => 'shipped']);
 
            });
 
@@ -5995,7 +5995,7 @@ class ShipmentFromSoSeeder extends Seeder
 
 
 
-// Create shipment with sales\_order\_id = null, directly issue stock, create invoice optionally.
+// Create shipment with sales_order_id = null, directly issue stock, create invoice optionally.
 
 
 
@@ -6009,41 +6009,41 @@ class ShipmentFromSoSeeder extends Seeder
 
 <?php
 
-namespace Modules\\Sales\\Database\\Seeders;
+namespace Modules\Sales\Database\Seeders;
 
 
 
-use Illuminate\\Database\\Seeder;
+use Illuminate\Database\Seeder;
 
-use Modules\\Sales\\Infrastructure\\Persistence\\Eloquent\\SalesOrder;
+use Modules\Sales\Infrastructure\Persistence\Eloquent\SalesOrder;
 
-use Modules\\Sales\\Infrastructure\\Persistence\\Eloquent\\SalesReturn;
+use Modules\Sales\Infrastructure\Persistence\Eloquent\SalesReturn;
 
-use Modules\\Sales\\Infrastructure\\Persistence\\Eloquent\\SalesReturnLine;
+use Modules\Sales\Infrastructure\Persistence\Eloquent\SalesReturnLine;
 
-use Modules\\Inventory\\Infrastructure\\Persistence\\Eloquent\\StockMovement;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\StockMovement;
 
-use Modules\\Inventory\\Infrastructure\\Persistence\\Eloquent\\StockLevel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\StockLevel;
 
-use Modules\\Inventory\\Infrastructure\\Persistence\\Eloquent\\InventoryCostLayer;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\InventoryCostLayer;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\JournalEntry;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\JournalEntry;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\JournalEntryLine;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\JournalEntryLine;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\Account;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\Account;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\FiscalPeriod;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\FiscalPeriod;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\CreditMemo;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\CreditMemo;
 
-use Modules\\Warehouse\\Infrastructure\\Persistence\\Eloquent\\WarehouseLocation;
+use Modules\Warehouse\Infrastructure\Persistence\Eloquent\WarehouseLocation;
 
-use Modules\\User\\Infrastructure\\Persistence\\Eloquent\\User;
+use Modules\User\Infrastructure\Persistence\Eloquent\User;
 
-use Modules\\Core\\Infrastructure\\Persistence\\Eloquent\\Currency;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Currency;
 
-use Illuminate\\Support\\Facades\\DB;
+use Illuminate\Support\Facades\DB;
 
 
 
@@ -6059,7 +6059,7 @@ class SalesReturnWithOriginalSeeder extends Seeder
 
        $usd = Currency::where('code', 'USD')->first();
 
-       $salesReturnsAccount = Account::firstOrCreate(\['code' => '4100', 'name' => 'Sales Returns', 'type' => 'revenue', 'normal\_balance' => 'debit']);
+       $salesReturnsAccount = Account::firstOrCreate(['code' => '4100', 'name' => 'Sales Returns', 'type' => 'revenue', 'normal_balance' => 'debit']);
 
        $arAccount = Account::where('code', '1200')->first();
 
@@ -6075,29 +6075,29 @@ class SalesReturnWithOriginalSeeder extends Seeder
 
            DB::transaction(function () use ($so, $usd, $salesReturnsAccount, $arAccount, $inventoryAccount, $cogsAccount, $fiscalPeriod) {
 
-               $user = User::where('tenant\_id', $so->tenant\_id)->first();
+               $user = User::where('tenant_id', $so->tenant_id)->first();
 
-               $restockLocation = WarehouseLocation::where('warehouse\_id', $so->warehouse\_id)->where('type', 'bin')->first();
+               $restockLocation = WarehouseLocation::where('warehouse_id', $so->warehouse_id)->where('type', 'bin')->first();
 
 
 
-               $salesReturn = SalesReturn::create(\[
+               $salesReturn = SalesReturn::create([
 
-                   'tenant\_id' => $so->tenant\_id,
+                   'tenant_id' => $so->tenant_id,
 
-                   'customer\_id' => $so->customer\_id,
+                   'customer_id' => $so->customer_id,
 
-                   'original\_sales\_order\_id' => $so->id,
+                   'original_sales_order_id' => $so->id,
 
-                   'return\_number' => 'SR-' . date('Ymd') . '-001',
+                   'return_number' => 'SR-' . date('Ymd') . '-001',
 
                    'status' => 'approved',
 
-                   'return\_date' => now(),
+                   'return_date' => now(),
 
-                   'return\_reason' => 'Wrong size',
+                   'return_reason' => 'Wrong size',
 
-                   'currency\_id' => $usd->id,
+                   'currency_id' => $usd->id,
 
                ]);
 
@@ -6111,9 +6111,9 @@ class SalesReturnWithOriginalSeeder extends Seeder
 
                foreach ($so->lines->take(1) as $line) {
 
-                   $returnQty = ceil($line->ordered\_qty \* 0.3); // 30% return
+                   $returnQty = ceil($line->ordered_qty \* 0.3); // 30% return
 
-                   $revenueDebit = $returnQty \* $line->unit\_price;
+                   $revenueDebit = $returnQty \* $line->unit_price;
 
                    $totalRevenueDebit += $revenueDebit;
 
@@ -6121,15 +6121,15 @@ class SalesReturnWithOriginalSeeder extends Seeder
 
                    // Original cost from shipment movement
 
-                   $shipMovement = StockMovement::where('reference\_type', Shipment::class)
+                   $shipMovement = StockMovement::where('reference_type', Shipment::class)
 
-                       ->where('product\_id', $line->product\_id)
+                       ->where('product_id', $line->product_id)
 
-                       ->orderBy('performed\_at', 'desc')
+                       ->orderBy('performed_at', 'desc')
 
                        ->first();
 
-                   $originalCost = $shipMovement ? $shipMovement->unit\_cost : 10.00;
+                   $originalCost = $shipMovement ? $shipMovement->unit_cost : 10.00;
 
                    $inventoryCredit = $returnQty \* $originalCost;
 
@@ -6137,21 +6137,21 @@ class SalesReturnWithOriginalSeeder extends Seeder
 
 
 
-                   $returnLine = SalesReturnLine::create(\[
+                   $returnLine = SalesReturnLine::create([
 
-                       'sales\_return\_id' => $salesReturn->id,
+                       'sales_return_id' => $salesReturn->id,
 
-                       'original\_sales\_order\_line\_id' => $line->id,
+                       'original_sales_order_line_id' => $line->id,
 
-                       'product\_id' => $line->product\_id,
+                       'product_id' => $line->product_id,
 
-                       'to\_location\_id' => $restockLocation->id,
+                       'to_location_id' => $restockLocation->id,
 
-                       'uom\_id' => $line->uom\_id,
+                       'uom_id' => $line->uom_id,
 
-                       'return\_qty' => $returnQty,
+                       'return_qty' => $returnQty,
 
-                       'unit\_price' => $line->unit\_price,
+                       'unit_price' => $line->unit_price,
 
                        'condition' => 'good',
 
@@ -6161,29 +6161,29 @@ class SalesReturnWithOriginalSeeder extends Seeder
 
 
 
-                   // Stock Movement (return\_in)
+                   // Stock Movement (return_in)
 
-                   StockMovement::create(\[
+                   StockMovement::create([
 
-                       'tenant\_id' => $so->tenant\_id,
+                       'tenant_id' => $so->tenant_id,
 
-                       'product\_id' => $line->product\_id,
+                       'product_id' => $line->product_id,
 
-                       'to\_location\_id' => $restockLocation->id,
+                       'to_location_id' => $restockLocation->id,
 
-                       'movement\_type' => 'return\_in',
+                       'movement_type' => 'return_in',
 
-                       'reference\_type' => SalesReturn::class,
+                       'reference_type' => SalesReturn::class,
 
-                       'reference\_id' => $salesReturn->id,
+                       'reference_id' => $salesReturn->id,
 
-                       'uom\_id' => $line->uom\_id,
+                       'uom_id' => $line->uom_id,
 
                        'quantity' => $returnQty,
 
-                       'unit\_cost' => $originalCost,
+                       'unit_cost' => $originalCost,
 
-                       'performed\_by' => $user->id,
+                       'performed_by' => $user->id,
 
                    ]);
 
@@ -6191,41 +6191,41 @@ class SalesReturnWithOriginalSeeder extends Seeder
 
                    // Increase stock
 
-                   StockLevel::updateOrCreate(\[
+                   StockLevel::updateOrCreate([
 
-                       'tenant\_id' => $so->tenant\_id,
+                       'tenant_id' => $so->tenant_id,
 
-                       'product\_id' => $line->product\_id,
+                       'product_id' => $line->product_id,
 
-                       'location\_id' => $restockLocation->id,
+                       'location_id' => $restockLocation->id,
 
-                   ], \['uom\_id' => $line->uom\_id])->increment('quantity\_on\_hand', $returnQty);
+                   ], ['uom_id' => $line->uom_id])->increment('quantity_on_hand', $returnQty);
 
 
 
                    // Re-insert cost layer
 
-                   InventoryCostLayer::create(\[
+                   InventoryCostLayer::create([
 
-                       'tenant\_id' => $so->tenant\_id,
+                       'tenant_id' => $so->tenant_id,
 
-                       'product\_id' => $line->product\_id,
+                       'product_id' => $line->product_id,
 
-                       'location\_id' => $restockLocation->id,
+                       'location_id' => $restockLocation->id,
 
-                       'valuation\_method' => $line->product->valuation\_method,
+                       'valuation_method' => $line->product->valuation_method,
 
-                       'layer\_date' => now(),
+                       'layer_date' => now(),
 
-                       'quantity\_in' => $returnQty,
+                       'quantity_in' => $returnQty,
 
-                       'quantity\_remaining' => $returnQty,
+                       'quantity_remaining' => $returnQty,
 
-                       'unit\_cost' => $originalCost,
+                       'unit_cost' => $originalCost,
 
-                       'reference\_type' => SalesReturn::class,
+                       'reference_type' => SalesReturn::class,
 
-                       'reference\_id' => $salesReturn->id,
+                       'reference_id' => $salesReturn->id,
 
                    ]);
 
@@ -6233,55 +6233,55 @@ class SalesReturnWithOriginalSeeder extends Seeder
 
 
 
-               $salesReturn->update(\['subtotal' => $totalRevenueDebit, 'grand\_total' => $totalRevenueDebit]);
+               $salesReturn->update(['subtotal' => $totalRevenueDebit, 'grand_total' => $totalRevenueDebit]);
 
 
 
                // Journal Entry
 
-               $journalEntry = JournalEntry::create(\[...]);
+               $journalEntry = JournalEntry::create([...]);
 
                // Dr Sales Returns, Cr AR
 
-               JournalEntryLine::create(\['journal\_entry\_id' => $journalEntry->id, 'account\_id' => $salesReturnsAccount->id, 'debit\_amount' => $totalRevenueDebit]);
+               JournalEntryLine::create(['journal_entry_id' => $journalEntry->id, 'account_id' => $salesReturnsAccount->id, 'debit_amount' => $totalRevenueDebit]);
 
-               JournalEntryLine::create(\['journal\_entry\_id' => $journalEntry->id, 'account\_id' => $arAccount->id, 'credit\_amount' => $totalRevenueDebit]);
+               JournalEntryLine::create(['journal_entry_id' => $journalEntry->id, 'account_id' => $arAccount->id, 'credit_amount' => $totalRevenueDebit]);
 
                // Dr Inventory, Cr COGS (reversal)
 
-               JournalEntryLine::create(\['journal\_entry\_id' => $journalEntry->id, 'account\_id' => $inventoryAccount->id, 'debit\_amount' => $totalInventoryCredit]);
+               JournalEntryLine::create(['journal_entry_id' => $journalEntry->id, 'account_id' => $inventoryAccount->id, 'debit_amount' => $totalInventoryCredit]);
 
-               JournalEntryLine::create(\['journal\_entry\_id' => $journalEntry->id, 'account\_id' => $cogsAccount->id, 'credit\_amount' => $totalInventoryCredit]);
+               JournalEntryLine::create(['journal_entry_id' => $journalEntry->id, 'account_id' => $cogsAccount->id, 'credit_amount' => $totalInventoryCredit]);
 
 
 
-               $salesReturn->update(\['journal\_entry\_id' => $journalEntry->id]);
+               $salesReturn->update(['journal_entry_id' => $journalEntry->id]);
 
 
 
                // Credit Memo
 
-               CreditMemo::create(\[
+               CreditMemo::create([
 
-                   'tenant\_id' => $so->tenant\_id,
+                   'tenant_id' => $so->tenant_id,
 
-                   'party\_type' => 'customer',
+                   'party_type' => 'customer',
 
-                   'party\_id' => $so->customer\_id,
+                   'party_id' => $so->customer_id,
 
-                   'return\_order\_type' => SalesReturn::class,
+                   'return_order_type' => SalesReturn::class,
 
-                   'return\_order\_id' => $salesReturn->id,
+                   'return_order_id' => $salesReturn->id,
 
-                   'credit\_memo\_number' => 'CM-' . $salesReturn->return\_number,
+                   'credit_memo_number' => 'CM-' . $salesReturn->return_number,
 
                    'amount' => $totalRevenueDebit,
 
                    'status' => 'issued',
 
-                   'issued\_date' => now(),
+                   'issued_date' => now(),
 
-                   'journal\_entry\_id' => $journalEntry->id,
+                   'journal_entry_id' => $journalEntry->id,
 
                ]);
 
@@ -6303,7 +6303,7 @@ class SalesReturnWithOriginalSeeder extends Seeder
 
 
 
-// Similar to above but adds restocking\_fee to line and separate revenue account.
+// Similar to above but adds restocking_fee to line and separate revenue account.
 
 // Journal entry includes restocking fee as credit to Restocking Fee Revenue.
 
@@ -6331,7 +6331,7 @@ class SalesReturnWithOriginalSeeder extends Seeder
 
 
 
-// No original\_sales\_order\_id; uses current average cost for inventory restock.
+// No original_sales_order_id; uses current average cost for inventory restock.
 
 
 
@@ -6345,27 +6345,27 @@ class SalesReturnWithOriginalSeeder extends Seeder
 
 <?php
 
-namespace Modules\\Purchase\\Database\\Seeders;
+namespace Modules\Purchase\Database\Seeders;
 
 
 
-use Illuminate\\Database\\Seeder;
+use Illuminate\Database\Seeder;
 
-use Modules\\Purchase\\Infrastructure\\Persistence\\Eloquent\\PurchaseOrder;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\PurchaseOrder;
 
-use Modules\\Purchase\\Infrastructure\\Persistence\\Eloquent\\PurchaseOrderLine;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\PurchaseOrderLine;
 
-use Modules\\Supplier\\Infrastructure\\Persistence\\Eloquent\\Supplier;
+use Modules\Supplier\Infrastructure\Persistence\Eloquent\Supplier;
 
-use Modules\\Product\\Infrastructure\\Persistence\\Eloquent\\Product;
+use Modules\Product\Infrastructure\Persistence\Eloquent\Product;
 
-use Modules\\Warehouse\\Infrastructure\\Persistence\\Eloquent\\Warehouse;
+use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Warehouse;
 
-use Modules\\User\\Infrastructure\\Persistence\\Eloquent\\User;
+use Modules\User\Infrastructure\Persistence\Eloquent\User;
 
-use Modules\\Core\\Infrastructure\\Persistence\\Eloquent\\Tenant;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Tenant;
 
-use Modules\\Core\\Infrastructure\\Persistence\\Eloquent\\Currency;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Currency;
 
 
 
@@ -6379,13 +6379,13 @@ class PurchaseOrderLifecycleSeeder extends Seeder
 
        $tenant = Tenant::first();
 
-       $supplier = Supplier::where('tenant\_id', $tenant->id)->first();
+       $supplier = Supplier::where('tenant_id', $tenant->id)->first();
 
-       $warehouse = Warehouse::where('tenant\_id', $tenant->id)->first();
+       $warehouse = Warehouse::where('tenant_id', $tenant->id)->first();
 
-       $user = User::where('tenant\_id', $tenant->id)->first();
+       $user = User::where('tenant_id', $tenant->id)->first();
 
-       $product = Product::where('tenant\_id', $tenant->id)->first();
+       $product = Product::where('tenant_id', $tenant->id)->first();
 
        $usd = Currency::where('code', 'USD')->first();
 
@@ -6397,37 +6397,37 @@ class PurchaseOrderLifecycleSeeder extends Seeder
 
        // 1. CREATE Draft PO
 
-       $draftPo = PurchaseOrder::create(\[
+       $draftPo = PurchaseOrder::create([
 
-           'tenant\_id' => $tenant->id,
+           'tenant_id' => $tenant->id,
 
-           'supplier\_id' => $supplier->id,
+           'supplier_id' => $supplier->id,
 
-           'warehouse\_id' => $warehouse->id,
+           'warehouse_id' => $warehouse->id,
 
-           'po\_number' => 'PO-DRAFT-001',
+           'po_number' => 'PO-DRAFT-001',
 
            'status' => 'draft',
 
-           'currency\_id' => $usd->id,
+           'currency_id' => $usd->id,
 
-           'order\_date' => now(),
+           'order_date' => now(),
 
-           'created\_by' => $user->id,
+           'created_by' => $user->id,
 
        ]);
 
-       PurchaseOrderLine::create(\[
+       PurchaseOrderLine::create([
 
-           'purchase\_order\_id' => $draftPo->id,
+           'purchase_order_id' => $draftPo->id,
 
-           'product\_id' => $product->id,
+           'product_id' => $product->id,
 
-           'uom\_id' => $product->base\_uom\_id,
+           'uom_id' => $product->base_uom_id,
 
-           'ordered\_qty' => 10,
+           'ordered_qty' => 10,
 
-           'unit\_price' => 15.00,
+           'unit_price' => 15.00,
 
        ]);
 
@@ -6435,7 +6435,7 @@ class PurchaseOrderLifecycleSeeder extends Seeder
 
        // 2. UPDATE to Cancelled (soft delete demonstration)
 
-       $draftPo->update(\['status' => 'cancelled']);
+       $draftPo->update(['status' => 'cancelled']);
 
        $draftPo->delete(); // soft delete
 
@@ -6443,37 +6443,37 @@ class PurchaseOrderLifecycleSeeder extends Seeder
 
        // 3. CREATE another PO that goes through full flow
 
-       $activePo = PurchaseOrder::create(\[
+       $activePo = PurchaseOrder::create([
 
-           'tenant\_id' => $tenant->id,
+           'tenant_id' => $tenant->id,
 
-           'supplier\_id' => $supplier->id,
+           'supplier_id' => $supplier->id,
 
-           'warehouse\_id' => $warehouse->id,
+           'warehouse_id' => $warehouse->id,
 
-           'po\_number' => 'PO-ACTIVE-001',
+           'po_number' => 'PO-ACTIVE-001',
 
            'status' => 'draft',
 
-           'currency\_id' => $usd->id,
+           'currency_id' => $usd->id,
 
-           'order\_date' => now()->subDays(2),
+           'order_date' => now()->subDays(2),
 
-           'created\_by' => $user->id,
+           'created_by' => $user->id,
 
        ]);
 
-       PurchaseOrderLine::create(\[
+       PurchaseOrderLine::create([
 
-           'purchase\_order\_id' => $activePo->id,
+           'purchase_order_id' => $activePo->id,
 
-           'product\_id' => $product->id,
+           'product_id' => $product->id,
 
-           'uom\_id' => $product->base\_uom\_id,
+           'uom_id' => $product->base_uom_id,
 
-           'ordered\_qty' => 20,
+           'ordered_qty' => 20,
 
-           'unit\_price' => 15.00,
+           'unit_price' => 15.00,
 
        ]);
 
@@ -6481,11 +6481,11 @@ class PurchaseOrderLifecycleSeeder extends Seeder
 
        // UPDATE to confirmed
 
-       $activePo->update(\[
+       $activePo->update([
 
            'status' => 'confirmed',
 
-           'approved\_by' => $user->id,
+           'approved_by' => $user->id,
 
        ]);
 
@@ -6505,27 +6505,27 @@ class PurchaseOrderLifecycleSeeder extends Seeder
 
 <?php
 
-namespace Modules\\Sales\\Database\\Seeders;
+namespace Modules\Sales\Database\Seeders;
 
 
 
-use Illuminate\\Database\\Seeder;
+use Illuminate\Database\Seeder;
 
-use Modules\\Sales\\Infrastructure\\Persistence\\Eloquent\\SalesOrder;
+use Modules\Sales\Infrastructure\Persistence\Eloquent\SalesOrder;
 
-use Modules\\Sales\\Infrastructure\\Persistence\\Eloquent\\SalesOrderLine;
+use Modules\Sales\Infrastructure\Persistence\Eloquent\SalesOrderLine;
 
-use Modules\\Customer\\Infrastructure\\Persistence\\Eloquent\\Customer;
+use Modules\Customer\Infrastructure\Persistence\Eloquent\Customer;
 
-use Modules\\Product\\Infrastructure\\Persistence\\Eloquent\\Product;
+use Modules\Product\Infrastructure\Persistence\Eloquent\Product;
 
-use Modules\\Warehouse\\Infrastructure\\Persistence\\Eloquent\\Warehouse;
+use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Warehouse;
 
-use Modules\\User\\Infrastructure\\Persistence\\Eloquent\\User;
+use Modules\User\Infrastructure\Persistence\Eloquent\User;
 
-use Modules\\Core\\Infrastructure\\Persistence\\Eloquent\\Tenant;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Tenant;
 
-use Modules\\Core\\Infrastructure\\Persistence\\Eloquent\\Currency;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Currency;
 
 
 
@@ -6539,13 +6539,13 @@ class SalesOrderLifecycleSeeder extends Seeder
 
        $tenant = Tenant::first();
 
-       $customer = Customer::where('tenant\_id', $tenant->id)->first();
+       $customer = Customer::where('tenant_id', $tenant->id)->first();
 
-       $warehouse = Warehouse::where('tenant\_id', $tenant->id)->first();
+       $warehouse = Warehouse::where('tenant_id', $tenant->id)->first();
 
-       $user = User::where('tenant\_id', $tenant->id)->first();
+       $user = User::where('tenant_id', $tenant->id)->first();
 
-       $product = Product::where('tenant\_id', $tenant->id)->first();
+       $product = Product::where('tenant_id', $tenant->id)->first();
 
        $usd = Currency::where('code', 'USD')->first();
 
@@ -6557,37 +6557,37 @@ class SalesOrderLifecycleSeeder extends Seeder
 
        // CREATE draft SO
 
-       $draftSo = SalesOrder::create(\[
+       $draftSo = SalesOrder::create([
 
-           'tenant\_id' => $tenant->id,
+           'tenant_id' => $tenant->id,
 
-           'customer\_id' => $customer->id,
+           'customer_id' => $customer->id,
 
-           'warehouse\_id' => $warehouse->id,
+           'warehouse_id' => $warehouse->id,
 
-           'so\_number' => 'SO-DRAFT-001',
+           'so_number' => 'SO-DRAFT-001',
 
            'status' => 'draft',
 
-           'currency\_id' => $usd->id,
+           'currency_id' => $usd->id,
 
-           'order\_date' => now(),
+           'order_date' => now(),
 
-           'created\_by' => $user->id,
+           'created_by' => $user->id,
 
        ]);
 
-       SalesOrderLine::create(\[
+       SalesOrderLine::create([
 
-           'sales\_order\_id' => $draftSo->id,
+           'sales_order_id' => $draftSo->id,
 
-           'product\_id' => $product->id,
+           'product_id' => $product->id,
 
-           'uom\_id' => $product->base\_uom\_id,
+           'uom_id' => $product->base_uom_id,
 
-           'ordered\_qty' => 5,
+           'ordered_qty' => 5,
 
-           'unit\_price' => 49.99,
+           'unit_price' => 49.99,
 
        ]);
 
@@ -6595,7 +6595,7 @@ class SalesOrderLifecycleSeeder extends Seeder
 
        // UPDATE to Cancelled \& soft delete
 
-       $draftSo->update(\['status' => 'cancelled']);
+       $draftSo->update(['status' => 'cancelled']);
 
        $draftSo->delete();
 
@@ -6603,37 +6603,37 @@ class SalesOrderLifecycleSeeder extends Seeder
 
        // CREATE another SO for full flow
 
-       $activeSo = SalesOrder::create(\[
+       $activeSo = SalesOrder::create([
 
-           'tenant\_id' => $tenant->id,
+           'tenant_id' => $tenant->id,
 
-           'customer\_id' => $customer->id,
+           'customer_id' => $customer->id,
 
-           'warehouse\_id' => $warehouse->id,
+           'warehouse_id' => $warehouse->id,
 
-           'so\_number' => 'SO-ACTIVE-001',
+           'so_number' => 'SO-ACTIVE-001',
 
            'status' => 'draft',
 
-           'currency\_id' => $usd->id,
+           'currency_id' => $usd->id,
 
-           'order\_date' => now()->subDays(3),
+           'order_date' => now()->subDays(3),
 
-           'created\_by' => $user->id,
+           'created_by' => $user->id,
 
        ]);
 
-       SalesOrderLine::create(\[
+       SalesOrderLine::create([
 
-           'sales\_order\_id' => $activeSo->id,
+           'sales_order_id' => $activeSo->id,
 
-           'product\_id' => $product->id,
+           'product_id' => $product->id,
 
-           'uom\_id' => $product->base\_uom\_id,
+           'uom_id' => $product->base_uom_id,
 
-           'ordered\_qty' => 8,
+           'ordered_qty' => 8,
 
-           'unit\_price' => 49.99,
+           'unit_price' => 49.99,
 
        ]);
 
@@ -6641,11 +6641,11 @@ class SalesOrderLifecycleSeeder extends Seeder
 
        // UPDATE to confirmed
 
-       $activeSo->update(\[
+       $activeSo->update([
 
            'status' => 'confirmed',
 
-           'approved\_by' => $user->id,
+           'approved_by' => $user->id,
 
        ]);
 
@@ -6665,27 +6665,27 @@ class SalesOrderLifecycleSeeder extends Seeder
 
 <?php
 
-namespace Modules\\Purchase\\Database\\Seeders;
+namespace Modules\Purchase\Database\Seeders;
 
 
 
-use Illuminate\\Database\\Seeder;
+use Illuminate\Database\Seeder;
 
-use Modules\\Purchase\\Infrastructure\\Persistence\\Eloquent\\PurchaseInvoice;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\PurchaseInvoice;
 
-use Modules\\Purchase\\Infrastructure\\Persistence\\Eloquent\\PurchaseInvoiceLine;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\PurchaseInvoiceLine;
 
-use Modules\\Purchase\\Infrastructure\\Persistence\\Eloquent\\GrnHeader;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\GrnHeader;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\JournalEntry;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\JournalEntry;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\JournalEntryLine;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\JournalEntryLine;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\Account;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\Account;
 
-use Modules\\Finance\\Infrastructure\\Persistence\\Eloquent\\FiscalPeriod;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\FiscalPeriod;
 
-use Modules\\User\\Infrastructure\\Persistence\\Eloquent\\User;
+use Modules\User\Infrastructure\Persistence\Eloquent\User;
 
 
 
@@ -6703,7 +6703,7 @@ class PurchaseInvoiceLifecycleSeeder extends Seeder
 
 
 
-       $user = User::where('tenant\_id', $grn->tenant\_id)->first();
+       $user = User::where('tenant_id', $grn->tenant_id)->first();
 
        $apAccount = Account::where('code', '2000')->first();
 
@@ -6715,27 +6715,27 @@ class PurchaseInvoiceLifecycleSeeder extends Seeder
 
        // CREATE draft invoice
 
-       $invoice = PurchaseInvoice::create(\[
+       $invoice = PurchaseInvoice::create([
 
-           'tenant\_id' => $grn->tenant\_id,
+           'tenant_id' => $grn->tenant_id,
 
-           'supplier\_id' => $grn->supplier\_id,
+           'supplier_id' => $grn->supplier_id,
 
-           'grn\_header\_id' => $grn->id,
+           'grn_header_id' => $grn->id,
 
-           'invoice\_number' => 'INV-DRAFT-001',
+           'invoice_number' => 'INV-DRAFT-001',
 
            'status' => 'draft',
 
-           'invoice\_date' => now(),
+           'invoice_date' => now(),
 
-           'due\_date' => now()->addDays(30),
+           'due_date' => now()->addDays(30),
 
-           'currency\_id' => $grn->currency\_id,
+           'currency_id' => $grn->currency_id,
 
            'subtotal' => 1000.00,
 
-           'grand\_total' => 1000.00,
+           'grand_total' => 1000.00,
 
        ]);
 
@@ -6745,21 +6745,21 @@ class PurchaseInvoiceLifecycleSeeder extends Seeder
 
        $line = $grn->lines->first();
 
-       PurchaseInvoiceLine::create(\[
+       PurchaseInvoiceLine::create([
 
-           'purchase\_invoice\_id' => $invoice->id,
+           'purchase_invoice_id' => $invoice->id,
 
-           'grn\_line\_id' => $line->id,
+           'grn_line_id' => $line->id,
 
-           'product\_id' => $line->product\_id,
+           'product_id' => $line->product_id,
 
-           'uom\_id' => $line->uom\_id,
+           'uom_id' => $line->uom_id,
 
-           'quantity' => $line->received\_qty,
+           'quantity' => $line->received_qty,
 
-           'unit\_price' => $line->unit\_cost,
+           'unit_price' => $line->unit_cost,
 
-           'line\_total' => $line->line\_cost,
+           'line_total' => $line->line_cost,
 
        ]);
 
@@ -6767,61 +6767,61 @@ class PurchaseInvoiceLifecycleSeeder extends Seeder
 
        // UPDATE to approved (with journal entry)
 
-       $invoice->update(\['status' => 'approved']);
+       $invoice->update(['status' => 'approved']);
 
-       $journalEntry = JournalEntry::create(\[
+       $journalEntry = JournalEntry::create([
 
-           'tenant\_id' => $grn->tenant\_id,
+           'tenant_id' => $grn->tenant_id,
 
-           'fiscal\_period\_id' => $fiscalPeriod->id,
+           'fiscal_period_id' => $fiscalPeriod->id,
 
-           'entry\_type' => 'auto',
+           'entry_type' => 'auto',
 
-           'reference\_type' => PurchaseInvoice::class,
+           'reference_type' => PurchaseInvoice::class,
 
-           'reference\_id' => $invoice->id,
+           'reference_id' => $invoice->id,
 
-           'entry\_date' => $invoice->invoice\_date,
+           'entry_date' => $invoice->invoice_date,
 
            'status' => 'posted',
 
-           'created\_by' => $user->id,
+           'created_by' => $user->id,
 
-           'posted\_by' => $user->id,
+           'posted_by' => $user->id,
 
-           'posted\_at' => now(),
+           'posted_at' => now(),
 
        ]);
 
-       JournalEntryLine::create(\['journal\_entry\_id' => $journalEntry->id, 'account\_id' => $grIrAccount->id, 'debit\_amount' => 1000.00]);
+       JournalEntryLine::create(['journal_entry_id' => $journalEntry->id, 'account_id' => $grIrAccount->id, 'debit_amount' => 1000.00]);
 
-       JournalEntryLine::create(\['journal\_entry\_id' => $journalEntry->id, 'account\_id' => $apAccount->id, 'credit\_amount' => 1000.00]);
+       JournalEntryLine::create(['journal_entry_id' => $journalEntry->id, 'account_id' => $apAccount->id, 'credit_amount' => 1000.00]);
 
-       $invoice->update(\['journal\_entry\_id' => $journalEntry->id]);
+       $invoice->update(['journal_entry_id' => $journalEntry->id]);
 
 
 
        // CREATE another invoice that will be voided (soft delete)
 
-       $voidInvoice = PurchaseInvoice::create(\[
+       $voidInvoice = PurchaseInvoice::create([
 
-           'tenant\_id' => $grn->tenant\_id,
+           'tenant_id' => $grn->tenant_id,
 
-           'supplier\_id' => $grn->supplier\_id,
+           'supplier_id' => $grn->supplier_id,
 
-           'invoice\_number' => 'INV-VOID-001',
+           'invoice_number' => 'INV-VOID-001',
 
            'status' => 'cancelled',
 
-           'invoice\_date' => now(),
+           'invoice_date' => now(),
 
-           'due\_date' => now()->addDays(30),
+           'due_date' => now()->addDays(30),
 
-           'currency\_id' => $grn->currency\_id,
+           'currency_id' => $grn->currency_id,
 
            'subtotal' => 500.00,
 
-           'grand\_total' => 500.00,
+           'grand_total' => 500.00,
 
        ]);
 
@@ -6843,51 +6843,51 @@ class PurchaseInvoiceLifecycleSeeder extends Seeder
 
 <?php
 
-namespace Database\\Seeders\\Purchase;
+namespace Database\Seeders\Purchase;
 
 
 
-use Illuminate\\Database\\Seeder;
+use Illuminate\Database\Seeder;
 
-use Modules\\Purchase\\Models\\PurchaseOrder;
+use Modules\Purchase\Models\PurchaseOrder;
 
-use Modules\\Purchase\\Models\\PurchaseOrderLine;
+use Modules\Purchase\Models\PurchaseOrderLine;
 
-use Modules\\Purchase\\Models\\GrnHeader;
+use Modules\Purchase\Models\GrnHeader;
 
-use Modules\\Purchase\\Models\\GrnLine;
+use Modules\Purchase\Models\GrnLine;
 
-use Modules\\Purchase\\Models\\PurchaseInvoice;
+use Modules\Purchase\Models\PurchaseInvoice;
 
-use Modules\\Purchase\\Models\\PurchaseInvoiceLine;
+use Modules\Purchase\Models\PurchaseInvoiceLine;
 
-use Modules\\Supplier\\Models\\Supplier;
+use Modules\Supplier\Models\Supplier;
 
-use Modules\\Product\\Models\\Product;
+use Modules\Product\Models\Product;
 
-use Modules\\Warehouse\\Models\\Warehouse;
+use Modules\Warehouse\Models\Warehouse;
 
-use Modules\\Warehouse\\Models\\WarehouseLocation;
+use Modules\Warehouse\Models\WarehouseLocation;
 
-use Modules\\User\\Models\\User;
+use Modules\User\Models\User;
 
-use Modules\\Core\\Models\\Tenant;
+use Modules\Core\Models\Tenant;
 
-use Modules\\Finance\\Models\\Account;
+use Modules\Finance\Models\Account;
 
-use Modules\\Finance\\Models\\FiscalPeriod;
+use Modules\Finance\Models\FiscalPeriod;
 
-use Modules\\Finance\\Models\\JournalEntry;
+use Modules\Finance\Models\JournalEntry;
 
-use Modules\\Finance\\Models\\JournalEntryLine;
+use Modules\Finance\Models\JournalEntryLine;
 
-use Modules\\Inventory\\Models\\StockMovement;
+use Modules\Inventory\Models\StockMovement;
 
-use Modules\\Inventory\\Models\\StockLevel;
+use Modules\Inventory\Models\StockLevel;
 
-use Modules\\Inventory\\Models\\InventoryCostLayer;
+use Modules\Inventory\Models\InventoryCostLayer;
 
-use Illuminate\\Support\\Facades\\DB;
+use Illuminate\Support\Facades\DB;
 
 
 
@@ -6901,17 +6901,17 @@ class PurchaseCreateSeeder extends Seeder
 
        $tenant = Tenant::first();
 
-       $supplier = Supplier::where('tenant\_id', $tenant->id)->first();
+       $supplier = Supplier::where('tenant_id', $tenant->id)->first();
 
-       $warehouse = Warehouse::where('tenant\_id', $tenant->id)->first();
+       $warehouse = Warehouse::where('tenant_id', $tenant->id)->first();
 
-       $user = User::where('tenant\_id', $tenant->id)->first();
+       $user = User::where('tenant_id', $tenant->id)->first();
 
-       $product = Product::where('tenant\_id', $tenant->id)->first();
+       $product = Product::where('tenant_id', $tenant->id)->first();
 
-       $location = WarehouseLocation::where('warehouse\_id', $warehouse->id)->first();
+       $location = WarehouseLocation::where('warehouse_id', $warehouse->id)->first();
 
-       $usd = \\Modules\\Core\\Models\\Currency::where('code', 'USD')->first();
+       $usd = \Modules\Core\Models\Currency::where('code', 'USD')->first();
 
        $inventoryAccount = Account::where('code', '1300')->first();
 
@@ -6927,43 +6927,43 @@ class PurchaseCreateSeeder extends Seeder
 
            // CREATE Purchase Order
 
-           $po = PurchaseOrder::create(\[
+           $po = PurchaseOrder::create([
 
-               'tenant\_id' => $tenant->id,
+               'tenant_id' => $tenant->id,
 
-               'supplier\_id' => $supplier->id,
+               'supplier_id' => $supplier->id,
 
-               'warehouse\_id' => $warehouse->id,
+               'warehouse_id' => $warehouse->id,
 
-               'po\_number' => 'PO-CREATE-001',
+               'po_number' => 'PO-CREATE-001',
 
                'status' => 'draft',
 
-               'currency\_id' => $usd->id,
+               'currency_id' => $usd->id,
 
-               'order\_date' => now(),
+               'order_date' => now(),
 
-               'expected\_date' => now()->addDays(7),
+               'expected_date' => now()->addDays(7),
 
-               'created\_by' => $user->id,
+               'created_by' => $user->id,
 
            ]);
 
 
 
-           PurchaseOrderLine::create(\[
+           PurchaseOrderLine::create([
 
-               'purchase\_order\_id' => $po->id,
+               'purchase_order_id' => $po->id,
 
-               'product\_id' => $product->id,
+               'product_id' => $product->id,
 
-               'uom\_id' => $product->base\_uom\_id,
+               'uom_id' => $product->base_uom_id,
 
-               'ordered\_qty' => 25,
+               'ordered_qty' => 25,
 
-               'unit\_price' => 12.50,
+               'unit_price' => 12.50,
 
-               'line\_total' => 312.50,
+               'line_total' => 312.50,
 
            ]);
 
@@ -6971,31 +6971,31 @@ class PurchaseCreateSeeder extends Seeder
 
            // UPDATE: Confirm PO
 
-           $po->update(\['status' => 'confirmed', 'approved\_by' => $user->id]);
+           $po->update(['status' => 'confirmed', 'approved_by' => $user->id]);
 
 
 
            // CREATE Goods Receipt (GRN)
 
-           $grn = GrnHeader::create(\[
+           $grn = GrnHeader::create([
 
-               'tenant\_id' => $tenant->id,
+               'tenant_id' => $tenant->id,
 
-               'supplier\_id' => $supplier->id,
+               'supplier_id' => $supplier->id,
 
-               'warehouse\_id' => $warehouse->id,
+               'warehouse_id' => $warehouse->id,
 
-               'purchase\_order\_id' => $po->id,
+               'purchase_order_id' => $po->id,
 
-               'grn\_number' => 'GRN-CREATE-001',
+               'grn_number' => 'GRN-CREATE-001',
 
                'status' => 'complete',
 
-               'received\_date' => now(),
+               'received_date' => now(),
 
-               'currency\_id' => $usd->id,
+               'currency_id' => $usd->id,
 
-               'created\_by' => $user->id,
+               'created_by' => $user->id,
 
            ]);
 
@@ -7003,25 +7003,25 @@ class PurchaseCreateSeeder extends Seeder
 
            $line = $po->lines->first();
 
-           GrnLine::create(\[
+           GrnLine::create([
 
-               'grn\_header\_id' => $grn->id,
+               'grn_header_id' => $grn->id,
 
-               'purchase\_order\_line\_id' => $line->id,
+               'purchase_order_line_id' => $line->id,
 
-               'product\_id' => $line->product\_id,
+               'product_id' => $line->product_id,
 
-               'location\_id' => $location->id,
+               'location_id' => $location->id,
 
-               'uom\_id' => $line->uom\_id,
+               'uom_id' => $line->uom_id,
 
-               'expected\_qty' => $line->ordered\_qty,
+               'expected_qty' => $line->ordered_qty,
 
-               'received\_qty' => $line->ordered\_qty,
+               'received_qty' => $line->ordered_qty,
 
-               'unit\_cost' => $line->unit\_price,
+               'unit_cost' => $line->unit_price,
 
-               'line\_cost' => $line->ordered\_qty \* $line->unit\_price,
+               'line_cost' => $line->ordered_qty \* $line->unit_price,
 
            ]);
 
@@ -7029,27 +7029,27 @@ class PurchaseCreateSeeder extends Seeder
 
            // Stock Movement (receipt)
 
-           StockMovement::create(\[
+           StockMovement::create([
 
-               'tenant\_id' => $tenant->id,
+               'tenant_id' => $tenant->id,
 
-               'product\_id' => $product->id,
+               'product_id' => $product->id,
 
-               'to\_location\_id' => $location->id,
+               'to_location_id' => $location->id,
 
-               'movement\_type' => 'receipt',
+               'movement_type' => 'receipt',
 
-               'reference\_type' => GrnHeader::class,
+               'reference_type' => GrnHeader::class,
 
-               'reference\_id' => $grn->id,
+               'reference_id' => $grn->id,
 
-               'uom\_id' => $product->base\_uom\_id,
+               'uom_id' => $product->base_uom_id,
 
                'quantity' => 25,
 
-               'unit\_cost' => 12.50,
+               'unit_cost' => 12.50,
 
-               'performed\_by' => $user->id,
+               'performed_by' => $user->id,
 
            ]);
 
@@ -7057,43 +7057,43 @@ class PurchaseCreateSeeder extends Seeder
 
            // Update Stock Level
 
-           StockLevel::updateOrCreate(\[
+           StockLevel::updateOrCreate([
 
-               'tenant\_id' => $tenant->id,
+               'tenant_id' => $tenant->id,
 
-               'product\_id' => $product->id,
+               'product_id' => $product->id,
 
-               'location\_id' => $location->id,
+               'location_id' => $location->id,
 
-           ], \['uom\_id' => $product->base\_uom\_id])
+           ], ['uom_id' => $product->base_uom_id])
 
-               ->increment('quantity\_on\_hand', 25);
+               ->increment('quantity_on_hand', 25);
 
 
 
            // Cost Layer
 
-           InventoryCostLayer::create(\[
+           InventoryCostLayer::create([
 
-               'tenant\_id' => $tenant->id,
+               'tenant_id' => $tenant->id,
 
-               'product\_id' => $product->id,
+               'product_id' => $product->id,
 
-               'location\_id' => $location->id,
+               'location_id' => $location->id,
 
-               'valuation\_method' => 'fifo',
+               'valuation_method' => 'fifo',
 
-               'layer\_date' => now(),
+               'layer_date' => now(),
 
-               'quantity\_in' => 25,
+               'quantity_in' => 25,
 
-               'quantity\_remaining' => 25,
+               'quantity_remaining' => 25,
 
-               'unit\_cost' => 12.50,
+               'unit_cost' => 12.50,
 
-               'reference\_type' => GrnHeader::class,
+               'reference_type' => GrnHeader::class,
 
-               'reference\_id' => $grn->id,
+               'reference_id' => $grn->id,
 
            ]);
 
@@ -7101,79 +7101,79 @@ class PurchaseCreateSeeder extends Seeder
 
            // Journal Entry: Dr Inventory, Cr GR/IR
 
-           $je = JournalEntry::create(\[
+           $je = JournalEntry::create([
 
-               'tenant\_id' => $tenant->id,
+               'tenant_id' => $tenant->id,
 
-               'fiscal\_period\_id' => $fiscalPeriod->id,
+               'fiscal_period_id' => $fiscalPeriod->id,
 
-               'entry\_type' => 'auto',
+               'entry_type' => 'auto',
 
-               'reference\_type' => GrnHeader::class,
+               'reference_type' => GrnHeader::class,
 
-               'reference\_id' => $grn->id,
+               'reference_id' => $grn->id,
 
-               'entry\_date' => now(),
+               'entry_date' => now(),
 
                'status' => 'posted',
 
-               'created\_by' => $user->id,
+               'created_by' => $user->id,
 
-               'posted\_by' => $user->id,
+               'posted_by' => $user->id,
 
-               'posted\_at' => now(),
+               'posted_at' => now(),
 
            ]);
 
-           JournalEntryLine::create(\['journal\_entry\_id' => $je->id, 'account\_id' => $inventoryAccount->id, 'debit\_amount' => 312.50]);
+           JournalEntryLine::create(['journal_entry_id' => $je->id, 'account_id' => $inventoryAccount->id, 'debit_amount' => 312.50]);
 
-           JournalEntryLine::create(\['journal\_entry\_id' => $je->id, 'account\_id' => $grIrAccount->id, 'credit\_amount' => 312.50]);
+           JournalEntryLine::create(['journal_entry_id' => $je->id, 'account_id' => $grIrAccount->id, 'credit_amount' => 312.50]);
 
 
 
            // CREATE Purchase Invoice
 
-           $invoice = PurchaseInvoice::create(\[
+           $invoice = PurchaseInvoice::create([
 
-               'tenant\_id' => $tenant->id,
+               'tenant_id' => $tenant->id,
 
-               'supplier\_id' => $supplier->id,
+               'supplier_id' => $supplier->id,
 
-               'grn\_header\_id' => $grn->id,
+               'grn_header_id' => $grn->id,
 
-               'invoice\_number' => 'INV-CREATE-001',
+               'invoice_number' => 'INV-CREATE-001',
 
                'status' => 'approved',
 
-               'invoice\_date' => now(),
+               'invoice_date' => now(),
 
-               'due\_date' => now()->addDays(30),
+               'due_date' => now()->addDays(30),
 
-               'currency\_id' => $usd->id,
+               'currency_id' => $usd->id,
 
                'subtotal' => 312.50,
 
-               'grand\_total' => 312.50,
+               'grand_total' => 312.50,
 
-               'ap\_account\_id' => $apAccount->id,
+               'ap_account_id' => $apAccount->id,
 
            ]);
 
-           PurchaseInvoiceLine::create(\[
+           PurchaseInvoiceLine::create([
 
-               'purchase\_invoice\_id' => $invoice->id,
+               'purchase_invoice_id' => $invoice->id,
 
-               'grn\_line\_id' => $grn->lines->first()->id,
+               'grn_line_id' => $grn->lines->first()->id,
 
-               'product\_id' => $product->id,
+               'product_id' => $product->id,
 
-               'uom\_id' => $product->base\_uom\_id,
+               'uom_id' => $product->base_uom_id,
 
                'quantity' => 25,
 
-               'unit\_price' => 12.50,
+               'unit_price' => 12.50,
 
-               'line\_total' => 312.50,
+               'line_total' => 312.50,
 
            ]);
 
@@ -7181,13 +7181,13 @@ class PurchaseCreateSeeder extends Seeder
 
            // Journal Entry: Dr GR/IR, Cr AP
 
-           $je2 = JournalEntry::create(\[...]);
+           $je2 = JournalEntry::create([...]);
 
-           JournalEntryLine::create(\['journal\_entry\_id' => $je2->id, 'account\_id' => $grIrAccount->id, 'debit\_amount' => 312.50]);
+           JournalEntryLine::create(['journal_entry_id' => $je2->id, 'account_id' => $grIrAccount->id, 'debit_amount' => 312.50]);
 
-           JournalEntryLine::create(\['journal\_entry\_id' => $je2->id, 'account\_id' => $apAccount->id, 'credit\_amount' => 312.50]);
+           JournalEntryLine::create(['journal_entry_id' => $je2->id, 'account_id' => $apAccount->id, 'credit_amount' => 312.50]);
 
-           $invoice->update(\['journal\_entry\_id' => $je2->id]);
+           $invoice->update(['journal_entry_id' => $je2->id]);
 
        });
 
@@ -7213,7 +7213,7 @@ public function run(): void
 
 {
 
-   $po = PurchaseOrder::where('po\_number', 'PO-CREATE-001')->first();
+   $po = PurchaseOrder::where('po_number', 'PO-CREATE-001')->first();
 
    if ($po) {
 
@@ -7221,19 +7221,19 @@ public function run(): void
 
        $line = $po->lines->first();
 
-       $line->update(\['ordered\_qty' => 30, 'line\_total' => 30 \* $line->unit\_price]);
+       $line->update(['ordered_qty' => 30, 'line_total' => 30 \* $line->unit_price]);
 
-       $po->update(\['subtotal' => 30 \* $line->unit\_price, 'grand\_total' => 30 \* $line->unit\_price]);
+       $po->update(['subtotal' => 30 \* $line->unit_price, 'grand_total' => 30 \* $line->unit_price]);
 
 
 
        // UPDATE invoice to paid (via payment)
 
-       $invoice = PurchaseInvoice::where('invoice\_number', 'INV-CREATE-001')->first();
+       $invoice = PurchaseInvoice::where('invoice_number', 'INV-CREATE-001')->first();
 
        // Create payment and allocate...
 
-       $invoice->update(\['status' => 'paid']);
+       $invoice->update(['status' => 'paid']);
 
    }
 
@@ -7251,37 +7251,37 @@ public function run(): void
 
 <?php
 
-namespace Database\\Seeders\\Returns;
+namespace Database\Seeders\Returns;
 
 
 
-use Illuminate\\Database\\Seeder;
+use Illuminate\Database\Seeder;
 
-use Modules\\Sales\\Models\\SalesOrder;
+use Modules\Sales\Models\SalesOrder;
 
-use Modules\\Sales\\Models\\SalesReturn;
+use Modules\Sales\Models\SalesReturn;
 
-use Modules\\Sales\\Models\\SalesReturnLine;
+use Modules\Sales\Models\SalesReturnLine;
 
-use Modules\\Inventory\\Models\\StockMovement;
+use Modules\Inventory\Models\StockMovement;
 
-use Modules\\Inventory\\Models\\StockLevel;
+use Modules\Inventory\Models\StockLevel;
 
-use Modules\\Inventory\\Models\\InventoryCostLayer;
+use Modules\Inventory\Models\InventoryCostLayer;
 
-use Modules\\Finance\\Models\\JournalEntry;
+use Modules\Finance\Models\JournalEntry;
 
-use Modules\\Finance\\Models\\JournalEntryLine;
+use Modules\Finance\Models\JournalEntryLine;
 
-use Modules\\Finance\\Models\\CreditMemo;
+use Modules\Finance\Models\CreditMemo;
 
-use Modules\\Finance\\Models\\Account;
+use Modules\Finance\Models\Account;
 
-use Modules\\Warehouse\\Models\\WarehouseLocation;
+use Modules\Warehouse\Models\WarehouseLocation;
 
-use Modules\\User\\Models\\User;
+use Modules\User\Models\User;
 
-use Illuminate\\Support\\Facades\\DB;
+use Illuminate\Support\Facades\DB;
 
 
 
@@ -7301,9 +7301,9 @@ class SalesReturnCreateSeeder extends Seeder
 
        DB::transaction(function () use ($so) {
 
-           $user = User::where('tenant\_id', $so->tenant\_id)->first();
+           $user = User::where('tenant_id', $so->tenant_id)->first();
 
-           $restockLocation = WarehouseLocation::where('warehouse\_id', $so->warehouse\_id)->first();
+           $restockLocation = WarehouseLocation::where('warehouse_id', $so->warehouse_id)->first();
 
            $salesReturnsAccount = Account::where('code', '4100')->first();
 
@@ -7315,23 +7315,23 @@ class SalesReturnCreateSeeder extends Seeder
 
 
 
-           $salesReturn = SalesReturn::create(\[
+           $salesReturn = SalesReturn::create([
 
-               'tenant\_id' => $so->tenant\_id,
+               'tenant_id' => $so->tenant_id,
 
-               'customer\_id' => $so->customer\_id,
+               'customer_id' => $so->customer_id,
 
-               'original\_sales\_order\_id' => $so->id,
+               'original_sales_order_id' => $so->id,
 
-               'return\_number' => 'SR-CREATE-001',
+               'return_number' => 'SR-CREATE-001',
 
                'status' => 'draft',
 
-               'return\_date' => now(),
+               'return_date' => now(),
 
-               'return\_reason' => 'Defective',
+               'return_reason' => 'Defective',
 
-               'currency\_id' => $so->currency\_id,
+               'currency_id' => $so->currency_id,
 
            ]);
 
@@ -7341,31 +7341,31 @@ class SalesReturnCreateSeeder extends Seeder
 
            $returnQty = 2;
 
-           $revenueDebit = $returnQty \* $line->unit\_price;
+           $revenueDebit = $returnQty \* $line->unit_price;
 
 
 
-           $returnLine = SalesReturnLine::create(\[
+           $returnLine = SalesReturnLine::create([
 
-               'sales\_return\_id' => $salesReturn->id,
+               'sales_return_id' => $salesReturn->id,
 
-               'original\_sales\_order\_line\_id' => $line->id,
+               'original_sales_order_line_id' => $line->id,
 
-               'product\_id' => $line->product\_id,
+               'product_id' => $line->product_id,
 
-               'to\_location\_id' => $restockLocation->id,
+               'to_location_id' => $restockLocation->id,
 
-               'uom\_id' => $line->uom\_id,
+               'uom_id' => $line->uom_id,
 
-               'return\_qty' => $returnQty,
+               'return_qty' => $returnQty,
 
-               'unit\_price' => $line->unit\_price,
+               'unit_price' => $line->unit_price,
 
                'condition' => 'defective',
 
                'disposition' => 'restock',
 
-               'restocking\_fee' => 5.00,
+               'restocking_fee' => 5.00,
 
            ]);
 
@@ -7373,49 +7373,49 @@ class SalesReturnCreateSeeder extends Seeder
 
            // Approve return
 
-           $salesReturn->update(\['status' => 'approved']);
+           $salesReturn->update(['status' => 'approved']);
 
 
 
-           // Stock Movement (return\_in)
+           // Stock Movement (return_in)
 
-           StockMovement::create(\[... 'movement\_type' => 'return\_in', 'quantity' => $returnQty, 'unit\_cost' => 10.00]);
+           StockMovement::create([... 'movement_type' => 'return_in', 'quantity' => $returnQty, 'unit_cost' => 10.00]);
 
 
 
            // Update stock level
 
-           StockLevel::updateOrCreate(\[...])->increment('quantity\_on\_hand', $returnQty);
+           StockLevel::updateOrCreate([...])->increment('quantity_on_hand', $returnQty);
 
 
 
            // Re-insert cost layer
 
-           InventoryCostLayer::create(\[... 'quantity\_in' => $returnQty, 'unit\_cost' => 10.00]);
+           InventoryCostLayer::create([... 'quantity_in' => $returnQty, 'unit_cost' => 10.00]);
 
 
 
            // Journal Entry
 
-           $je = JournalEntry::create(\[...]);
+           $je = JournalEntry::create([...]);
 
-           JournalEntryLine::create(\['journal\_entry\_id' => $je->id, 'account\_id' => $salesReturnsAccount->id, 'debit\_amount' => $revenueDebit]);
+           JournalEntryLine::create(['journal_entry_id' => $je->id, 'account_id' => $salesReturnsAccount->id, 'debit_amount' => $revenueDebit]);
 
-           JournalEntryLine::create(\['journal\_entry\_id' => $je->id, 'account\_id' => $arAccount->id, 'credit\_amount' => $revenueDebit + 5.00]);
+           JournalEntryLine::create(['journal_entry_id' => $je->id, 'account_id' => $arAccount->id, 'credit_amount' => $revenueDebit + 5.00]);
 
-           JournalEntryLine::create(\['journal\_entry\_id' => $je->id, 'account\_id' => $inventoryAccount->id, 'debit\_amount' => $returnQty \* 10.00]);
+           JournalEntryLine::create(['journal_entry_id' => $je->id, 'account_id' => $inventoryAccount->id, 'debit_amount' => $returnQty \* 10.00]);
 
-           JournalEntryLine::create(\['journal\_entry\_id' => $je->id, 'account\_id' => $cogsAccount->id, 'credit\_amount' => $returnQty \* 10.00]);
+           JournalEntryLine::create(['journal_entry_id' => $je->id, 'account_id' => $cogsAccount->id, 'credit_amount' => $returnQty \* 10.00]);
 
 
 
            // Credit Memo
 
-           CreditMemo::create(\[... 'amount' => $revenueDebit + 5.00, 'status' => 'issued']);
+           CreditMemo::create([... 'amount' => $revenueDebit + 5.00, 'status' => 'issued']);
 
 
 
-           $salesReturn->update(\['status' => 'closed']);
+           $salesReturn->update(['status' => 'closed']);
 
        });
 
@@ -7439,11 +7439,11 @@ Schema::create('parties', function (Blueprint $table) {
 
    $table->id();
 
-   $table->enum('party\_type', \['supplier', 'customer', 'both']);
+   $table->enum('party_type', ['supplier', 'customer', 'both']);
 
    $table->string('name');
 
-   $table->string('tax\_id')->nullable();
+   $table->string('tax_id')->nullable();
 
    $table->string('email')->nullable();
 
@@ -7451,7 +7451,7 @@ Schema::create('parties', function (Blueprint $table) {
 
    $table->string('website')->nullable();
 
-   $table->boolean('is\_active')->default(true);
+   $table->boolean('is_active')->default(true);
 
    $table->timestamps();
 
@@ -7463,13 +7463,13 @@ Schema::create('parties', function (Blueprint $table) {
 
 // 2. Party addresses
 
-Schema::create('party\_addresses', function (Blueprint $table) {
+Schema::create('party_addresses', function (Blueprint $table) {
 
    $table->id();
 
-   $table->foreignId('party\_id')->constrained('parties')->restrictOnDelete();
+   $table->foreignId('party_id')->constrained('parties')->restrictOnDelete();
 
-   $table->enum('address\_type', \['billing', 'shipping', 'legal']);
+   $table->enum('address_type', ['billing', 'shipping', 'legal']);
 
    $table->string('line1');
 
@@ -7479,11 +7479,11 @@ Schema::create('party\_addresses', function (Blueprint $table) {
 
    $table->string('state')->nullable();
 
-   $table->string('postal\_code')->nullable();
+   $table->string('postal_code')->nullable();
 
    $table->string('country');
 
-   $table->boolean('is\_default')->default(false);
+   $table->boolean('is_default')->default(false);
 
    $table->timestamps();
 
@@ -7511,11 +7511,11 @@ Schema::create('uoms', function (Blueprint $table) {
 
 // 4. Product categories
 
-Schema::create('product\_categories', function (Blueprint $table) {
+Schema::create('product_categories', function (Blueprint $table) {
 
    $table->id();
 
-   $table->foreignId('parent\_id')->nullable()->constrained('product\_categories')->nullOnDelete();
+   $table->foreignId('parent_id')->nullable()->constrained('product_categories')->nullOnDelete();
 
    $table->string('name');
 
@@ -7539,19 +7539,19 @@ Schema::create('products', function (Blueprint $table) {
 
    $table->text('description')->nullable();
 
-   $table->enum('product\_type', \['simple', 'variant\_parent', 'bundle', 'digital', 'service']);
+   $table->enum('product_type', ['simple', 'variant_parent', 'bundle', 'digital', 'service']);
 
-   $table->boolean('is\_stockable')->default(true);
+   $table->boolean('is_stockable')->default(true);
 
-   $table->boolean('is\_tracked\_batch')->default(false);
+   $table->boolean('is_tracked_batch')->default(false);
 
-   $table->boolean('is\_tracked\_serial')->default(false);
+   $table->boolean('is_tracked_serial')->default(false);
 
    $table->decimal('weight', 12, 4)->nullable();
 
-   $table->foreignId('weight\_uom\_id')->nullable()->constrained('uoms')->nullOnDelete();
+   $table->foreignId('weight_uom_id')->nullable()->constrained('uoms')->nullOnDelete();
 
-   $table->foreignId('category\_id')->nullable()->constrained('product\_categories')->nullOnDelete();
+   $table->foreignId('category_id')->nullable()->constrained('product_categories')->nullOnDelete();
 
    $table->timestamps();
 
@@ -7563,11 +7563,11 @@ Schema::create('products', function (Blueprint $table) {
 
 // 6. Product variants
 
-Schema::create('product\_variants', function (Blueprint $table) {
+Schema::create('product_variants', function (Blueprint $table) {
 
    $table->id();
 
-   $table->foreignId('product\_id')->constrained('products')->cascadeOnDelete();
+   $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
 
    $table->string('sku')->unique();
 
@@ -7575,7 +7575,7 @@ Schema::create('product\_variants', function (Blueprint $table) {
 
    $table->string('barcode', 100)->nullable()->unique();
 
-   $table->boolean('is\_active')->default(true);
+   $table->boolean('is_active')->default(true);
 
    $table->timestamps();
 
@@ -7585,19 +7585,19 @@ Schema::create('product\_variants', function (Blueprint $table) {
 
 // 7. Product UOM conversions
 
-Schema::create('product\_uom\_conversions', function (Blueprint $table) {
+Schema::create('product_uom_conversions', function (Blueprint $table) {
 
    $table->id();
 
-   $table->foreignId('product\_id')->constrained('products')->cascadeOnDelete();
+   $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
 
-   $table->foreignId('from\_uom\_id')->constrained('uoms')->restrictOnDelete();
+   $table->foreignId('from_uom_id')->constrained('uoms')->restrictOnDelete();
 
-   $table->foreignId('to\_uom\_id')->constrained('uoms')->restrictOnDelete();
+   $table->foreignId('to_uom_id')->constrained('uoms')->restrictOnDelete();
 
    $table->decimal('factor', 20, 10);
 
-   $table->unique(\['product\_id', 'from\_uom\_id', 'to\_uom\_id']);
+   $table->unique(['product_id', 'from_uom_id', 'to_uom_id']);
 
    $table->timestamps();
 
@@ -7617,7 +7617,7 @@ Schema::create('warehouses', function (Blueprint $table) {
 
    $table->text('address')->nullable();
 
-   $table->boolean('is\_active')->default(true);
+   $table->boolean('is_active')->default(true);
 
    $table->timestamps();
 
@@ -7625,11 +7625,11 @@ Schema::create('warehouses', function (Blueprint $table) {
 
 
 
-Schema::create('storage\_locations', function (Blueprint $table) {
+Schema::create('storage_locations', function (Blueprint $table) {
 
    $table->id();
 
-   $table->foreignId('warehouse\_id')->constrained('warehouses')->cascadeOnDelete();
+   $table->foreignId('warehouse_id')->constrained('warehouses')->cascadeOnDelete();
 
    $table->string('code', 100);
 
@@ -7637,7 +7637,7 @@ Schema::create('storage\_locations', function (Blueprint $table) {
 
    $table->timestamps();
 
-   $table->unique(\['warehouse\_id', 'code']);
+   $table->unique(['warehouse_id', 'code']);
 
 });
 
@@ -7649,43 +7649,43 @@ Schema::create('batches', function (Blueprint $table) {
 
    $table->id();
 
-   $table->foreignId('product\_id')->constrained('products')->restrictOnDelete();
+   $table->foreignId('product_id')->constrained('products')->restrictOnDelete();
 
-   $table->string('batch\_number', 100);
+   $table->string('batch_number', 100);
 
-   $table->string('manufacturer\_batch', 100)->nullable();
+   $table->string('manufacturer_batch', 100)->nullable();
 
-   $table->date('expiry\_date')->nullable();
+   $table->date('expiry_date')->nullable();
 
-   $table->date('manufacture\_date')->nullable();
+   $table->date('manufacture_date')->nullable();
 
    $table->string('barcode', 100)->nullable();
 
-   $table->boolean('is\_active')->default(true);
+   $table->boolean('is_active')->default(true);
 
    $table->timestamps();
 
-   $table->unique(\['product\_id', 'batch\_number']);
+   $table->unique(['product_id', 'batch_number']);
 
 });
 
 
 
-Schema::create('serial\_numbers', function (Blueprint $table) {
+Schema::create('serial_numbers', function (Blueprint $table) {
 
    $table->id();
 
-   $table->foreignId('product\_id')->constrained('products')->restrictOnDelete();
+   $table->foreignId('product_id')->constrained('products')->restrictOnDelete();
 
-   $table->foreignId('variant\_id')->nullable()->constrained('product\_variants')->nullOnDelete();
+   $table->foreignId('variant_id')->nullable()->constrained('product_variants')->nullOnDelete();
 
-   $table->foreignId('batch\_id')->nullable()->constrained('batches')->nullOnDelete();
+   $table->foreignId('batch_id')->nullable()->constrained('batches')->nullOnDelete();
 
-   $table->string('serial\_number', 100)->unique();
+   $table->string('serial_number', 100)->unique();
 
-   $table->enum('status', \['in\_stock', 'sold', 'returned', 'scrapped'])->default('in\_stock');
+   $table->enum('status', ['in_stock', 'sold', 'returned', 'scrapped'])->default('in_stock');
 
-   $table->foreignId('current\_location\_id')->nullable()->constrained('storage\_locations')->nullOnDelete();
+   $table->foreignId('current_location_id')->nullable()->constrained('storage_locations')->nullOnDelete();
 
    $table->timestamps();
 
@@ -7695,21 +7695,21 @@ Schema::create('serial\_numbers', function (Blueprint $table) {
 
 // 10. Purchase side
 
-Schema::create('purchase\_orders', function (Blueprint $table) {
+Schema::create('purchase_orders', function (Blueprint $table) {
 
    $table->id();
 
-   $table->string('po\_number', 50)->unique();
+   $table->string('po_number', 50)->unique();
 
-   $table->foreignId('supplier\_id')->constrained('parties')->restrictOnDelete();
+   $table->foreignId('supplier_id')->constrained('parties')->restrictOnDelete();
 
-   $table->date('order\_date');
+   $table->date('order_date');
 
-   $table->date('expected\_date')->nullable();
+   $table->date('expected_date')->nullable();
 
-   $table->enum('status', \['draft', 'confirmed', 'partially\_received', 'received', 'cancelled'])->default('draft');
+   $table->enum('status', ['draft', 'confirmed', 'partially_received', 'received', 'cancelled'])->default('draft');
 
-   $table->decimal('total\_amount', 15, 2);
+   $table->decimal('total_amount', 15, 2);
 
    $table->char('currency', 3)->default('USD');
 
@@ -7721,27 +7721,27 @@ Schema::create('purchase\_orders', function (Blueprint $table) {
 
 
 
-Schema::create('purchase\_order\_lines', function (Blueprint $table) {
+Schema::create('purchase_order_lines', function (Blueprint $table) {
 
    $table->id();
 
-   $table->foreignId('purchase\_order\_id')->constrained('purchase\_orders')->cascadeOnDelete();
+   $table->foreignId('purchase_order_id')->constrained('purchase_orders')->cascadeOnDelete();
 
-   $table->foreignId('product\_id')->constrained('products')->restrictOnDelete();
+   $table->foreignId('product_id')->constrained('products')->restrictOnDelete();
 
-   $table->foreignId('variant\_id')->nullable()->constrained('product\_variants')->nullOnDelete();
+   $table->foreignId('variant_id')->nullable()->constrained('product_variants')->nullOnDelete();
 
-   $table->foreignId('uom\_id')->constrained('uoms')->restrictOnDelete();
+   $table->foreignId('uom_id')->constrained('uoms')->restrictOnDelete();
 
    $table->decimal('quantity', 15, 5);
 
-   $table->decimal('unit\_price', 15, 5);
+   $table->decimal('unit_price', 15, 5);
 
-   $table->decimal('discount\_percent', 8, 2)->default(0);
+   $table->decimal('discount_percent', 8, 2)->default(0);
 
-   $table->decimal('tax\_rate', 8, 4)->default(0);
+   $table->decimal('tax_rate', 8, 4)->default(0);
 
-   $table->decimal('total\_line', 15, 2);
+   $table->decimal('total_line', 15, 2);
 
    $table->timestamps();
 
@@ -7749,21 +7749,21 @@ Schema::create('purchase\_order\_lines', function (Blueprint $table) {
 
 
 
-Schema::create('purchase\_receipts', function (Blueprint $table) {
+Schema::create('purchase_receipts', function (Blueprint $table) {
 
    $table->id();
 
-   $table->string('receipt\_number', 50)->unique();
+   $table->string('receipt_number', 50)->unique();
 
-   $table->foreignId('purchase\_order\_id')->nullable()->constrained('purchase\_orders')->nullOnDelete();
+   $table->foreignId('purchase_order_id')->nullable()->constrained('purchase_orders')->nullOnDelete();
 
-   $table->foreignId('supplier\_id')->constrained('parties')->restrictOnDelete();
+   $table->foreignId('supplier_id')->constrained('parties')->restrictOnDelete();
 
-   $table->dateTime('receipt\_date');
+   $table->dateTime('receipt_date');
 
-   $table->foreignId('warehouse\_id')->constrained('warehouses')->restrictOnDelete();
+   $table->foreignId('warehouse_id')->constrained('warehouses')->restrictOnDelete();
 
-   $table->enum('status', \['draft', 'completed', 'cancelled'])->default('draft');
+   $table->enum('status', ['draft', 'completed', 'cancelled'])->default('draft');
 
    $table->text('notes')->nullable();
 
@@ -7773,27 +7773,27 @@ Schema::create('purchase\_receipts', function (Blueprint $table) {
 
 
 
-Schema::create('purchase\_receipt\_lines', function (Blueprint $table) {
+Schema::create('purchase_receipt_lines', function (Blueprint $table) {
 
    $table->id();
 
-   $table->foreignId('receipt\_id')->constrained('purchase\_receipts')->cascadeOnDelete();
+   $table->foreignId('receipt_id')->constrained('purchase_receipts')->cascadeOnDelete();
 
-   $table->foreignId('po\_line\_id')->nullable()->constrained('purchase\_order\_lines')->nullOnDelete();
+   $table->foreignId('po_line_id')->nullable()->constrained('purchase_order_lines')->nullOnDelete();
 
-   $table->foreignId('product\_id')->constrained('products')->restrictOnDelete();
+   $table->foreignId('product_id')->constrained('products')->restrictOnDelete();
 
-   $table->foreignId('variant\_id')->nullable()->constrained('product\_variants')->nullOnDelete();
+   $table->foreignId('variant_id')->nullable()->constrained('product_variants')->nullOnDelete();
 
-   $table->foreignId('uom\_id')->constrained('uoms')->restrictOnDelete();
+   $table->foreignId('uom_id')->constrained('uoms')->restrictOnDelete();
 
    $table->decimal('quantity', 15, 5);
 
-   $table->foreignId('batch\_id')->nullable()->constrained('batches')->nullOnDelete();
+   $table->foreignId('batch_id')->nullable()->constrained('batches')->nullOnDelete();
 
-   $table->text('serial\_numbers')->nullable(); // comma separated
+   $table->text('serial_numbers')->nullable(); // comma separated
 
-   $table->foreignId('storage\_location\_id')->nullable()->constrained('storage\_locations')->nullOnDelete();
+   $table->foreignId('storage_location_id')->nullable()->constrained('storage_locations')->nullOnDelete();
 
    $table->timestamps();
 
@@ -7803,21 +7803,21 @@ Schema::create('purchase\_receipt\_lines', function (Blueprint $table) {
 
 // 11. Sales side (mirror structure)
 
-Schema::create('sales\_orders', function (Blueprint $table) {
+Schema::create('sales_orders', function (Blueprint $table) {
 
    $table->id();
 
-   $table->string('so\_number', 50)->unique();
+   $table->string('so_number', 50)->unique();
 
-   $table->foreignId('customer\_id')->constrained('parties')->restrictOnDelete();
+   $table->foreignId('customer_id')->constrained('parties')->restrictOnDelete();
 
-   $table->date('order\_date');
+   $table->date('order_date');
 
-   $table->date('requested\_date')->nullable();
+   $table->date('requested_date')->nullable();
 
-   $table->enum('status', \['draft', 'confirmed', 'partially\_delivered', 'delivered', 'cancelled'])->default('draft');
+   $table->enum('status', ['draft', 'confirmed', 'partially_delivered', 'delivered', 'cancelled'])->default('draft');
 
-   $table->decimal('total\_amount', 15, 2);
+   $table->decimal('total_amount', 15, 2);
 
    $table->char('currency', 3)->default('USD');
 
@@ -7827,27 +7827,27 @@ Schema::create('sales\_orders', function (Blueprint $table) {
 
 
 
-Schema::create('sales\_order\_lines', function (Blueprint $table) {
+Schema::create('sales_order_lines', function (Blueprint $table) {
 
    $table->id();
 
-   $table->foreignId('sales\_order\_id')->constrained('sales\_orders')->cascadeOnDelete();
+   $table->foreignId('sales_order_id')->constrained('sales_orders')->cascadeOnDelete();
 
-   $table->foreignId('product\_id')->constrained('products');
+   $table->foreignId('product_id')->constrained('products');
 
-   $table->foreignId('variant\_id')->nullable()->constrained('product\_variants');
+   $table->foreignId('variant_id')->nullable()->constrained('product_variants');
 
-   $table->foreignId('uom\_id')->constrained('uoms');
+   $table->foreignId('uom_id')->constrained('uoms');
 
    $table->decimal('quantity', 15, 5);
 
-   $table->decimal('unit\_price', 15, 5);
+   $table->decimal('unit_price', 15, 5);
 
-   $table->decimal('discount\_percent', 8, 2)->default(0);
+   $table->decimal('discount_percent', 8, 2)->default(0);
 
-   $table->decimal('tax\_rate', 8, 4)->default(0);
+   $table->decimal('tax_rate', 8, 4)->default(0);
 
-   $table->decimal('total\_line', 15, 2);
+   $table->decimal('total_line', 15, 2);
 
    $table->timestamps();
 
@@ -7855,21 +7855,21 @@ Schema::create('sales\_order\_lines', function (Blueprint $table) {
 
 
 
-Schema::create('sales\_deliveries', function (Blueprint $table) {
+Schema::create('sales_deliveries', function (Blueprint $table) {
 
    $table->id();
 
-   $table->string('delivery\_number', 50)->unique();
+   $table->string('delivery_number', 50)->unique();
 
-   $table->foreignId('sales\_order\_id')->nullable()->constrained('sales\_orders')->nullOnDelete();
+   $table->foreignId('sales_order_id')->nullable()->constrained('sales_orders')->nullOnDelete();
 
-   $table->foreignId('customer\_id')->constrained('parties');
+   $table->foreignId('customer_id')->constrained('parties');
 
-   $table->dateTime('delivery\_date');
+   $table->dateTime('delivery_date');
 
-   $table->foreignId('warehouse\_id')->constrained('warehouses');
+   $table->foreignId('warehouse_id')->constrained('warehouses');
 
-   $table->enum('status', \['draft', 'shipped', 'delivered', 'cancelled'])->default('draft');
+   $table->enum('status', ['draft', 'shipped', 'delivered', 'cancelled'])->default('draft');
 
    $table->timestamps();
 
@@ -7877,27 +7877,27 @@ Schema::create('sales\_deliveries', function (Blueprint $table) {
 
 
 
-Schema::create('sales\_delivery\_lines', function (Blueprint $table) {
+Schema::create('sales_delivery_lines', function (Blueprint $table) {
 
    $table->id();
 
-   $table->foreignId('delivery\_id')->constrained('sales\_deliveries')->cascadeOnDelete();
+   $table->foreignId('delivery_id')->constrained('sales_deliveries')->cascadeOnDelete();
 
-   $table->foreignId('so\_line\_id')->nullable()->constrained('sales\_order\_lines')->nullOnDelete();
+   $table->foreignId('so_line_id')->nullable()->constrained('sales_order_lines')->nullOnDelete();
 
-   $table->foreignId('product\_id')->constrained('products');
+   $table->foreignId('product_id')->constrained('products');
 
-   $table->foreignId('variant\_id')->nullable()->constrained('product\_variants');
+   $table->foreignId('variant_id')->nullable()->constrained('product_variants');
 
-   $table->foreignId('uom\_id')->constrained('uoms');
+   $table->foreignId('uom_id')->constrained('uoms');
 
    $table->decimal('quantity', 15, 5);
 
-   $table->foreignId('batch\_id')->nullable()->constrained('batches');
+   $table->foreignId('batch_id')->nullable()->constrained('batches');
 
-   $table->text('serial\_numbers')->nullable();
+   $table->text('serial_numbers')->nullable();
 
-   $table->foreignId('storage\_location\_id')->nullable()->constrained('storage\_locations');
+   $table->foreignId('storage_location_id')->nullable()->constrained('storage_locations');
 
    $table->timestamps();
 
@@ -7911,41 +7911,41 @@ Schema::create('sales\_delivery\_lines', function (Blueprint $table) {
 
 // 13. Stock movements (core inventory)
 
-Schema::create('stock\_movements', function (Blueprint $table) {
+Schema::create('stock_movements', function (Blueprint $table) {
 
    $table->id();
 
-   $table->enum('movement\_type', \['purchase\_receipt', 'sales\_delivery', 'purchase\_return', 'sales\_return', 'adjustment', 'transfer']);
+   $table->enum('movement_type', ['purchase_receipt', 'sales_delivery', 'purchase_return', 'sales_return', 'adjustment', 'transfer']);
 
-   $table->string('reference\_type', 50); // polymorphic
+   $table->string('reference_type', 50); // polymorphic
 
-   $table->unsignedBigInteger('reference\_id');
+   $table->unsignedBigInteger('reference_id');
 
-   $table->foreignId('product\_id')->constrained('products');
+   $table->foreignId('product_id')->constrained('products');
 
-   $table->foreignId('variant\_id')->nullable()->constrained('product\_variants');
+   $table->foreignId('variant_id')->nullable()->constrained('product_variants');
 
-   $table->foreignId('from\_location\_id')->nullable()->constrained('storage\_locations');
+   $table->foreignId('from_location_id')->nullable()->constrained('storage_locations');
 
-   $table->foreignId('to\_location\_id')->nullable()->constrained('storage\_locations');
+   $table->foreignId('to_location_id')->nullable()->constrained('storage_locations');
 
-   $table->foreignId('batch\_id')->nullable()->constrained('batches');
+   $table->foreignId('batch_id')->nullable()->constrained('batches');
 
-   $table->foreignId('serial\_id')->nullable()->constrained('serial\_numbers');
+   $table->foreignId('serial_id')->nullable()->constrained('serial_numbers');
 
    $table->decimal('quantity', 15, 5);
 
-   $table->foreignId('uom\_id')->constrained('uoms');
+   $table->foreignId('uom_id')->constrained('uoms');
 
-   $table->dateTime('movement\_date');
+   $table->dateTime('movement_date');
 
-   $table->foreignId('created\_by')->nullable()->constrained('users');
+   $table->foreignId('created_by')->nullable()->constrained('users');
 
    $table->timestamps();
 
 
 
-   $table->index(\['reference\_type', 'reference\_id']);
+   $table->index(['reference_type', 'reference_id']);
 
 });
 
@@ -7961,13 +7961,13 @@ Schema::create('accounts', function (Blueprint $table) {
 
    $table->string('name');
 
-   $table->enum('account\_type', \['asset', 'liability', 'equity', 'revenue', 'expense']);
+   $table->enum('account_type', ['asset', 'liability', 'equity', 'revenue', 'expense']);
 
-   $table->foreignId('parent\_id')->nullable()->constrained('accounts')->nullOnDelete();
+   $table->foreignId('parent_id')->nullable()->constrained('accounts')->nullOnDelete();
 
-   $table->boolean('is\_control')->default(false);
+   $table->boolean('is_control')->default(false);
 
-   $table->boolean('is\_active')->default(true);
+   $table->boolean('is_active')->default(true);
 
    $table->timestamps();
 
@@ -7975,41 +7975,41 @@ Schema::create('accounts', function (Blueprint $table) {
 
 
 
-Schema::create('journal\_entries', function (Blueprint $table) {
+Schema::create('journal_entries', function (Blueprint $table) {
 
    $table->id();
 
-   $table->string('entry\_number', 50)->unique();
+   $table->string('entry_number', 50)->unique();
 
-   $table->date('entry\_date');
+   $table->date('entry_date');
 
-   $table->string('reference\_type', 50); // polymorphic
+   $table->string('reference_type', 50); // polymorphic
 
-   $table->unsignedBigInteger('reference\_id')->nullable();
+   $table->unsignedBigInteger('reference_id')->nullable();
 
    $table->text('description')->nullable();
 
-   $table->boolean('is\_posted')->default(false);
+   $table->boolean('is_posted')->default(false);
 
-   $table->timestamp('posted\_at')->nullable();
+   $table->timestamp('posted_at')->nullable();
 
    $table->timestamps();
 
 
 
-   $table->index(\['reference\_type', 'reference\_id']);
+   $table->index(['reference_type', 'reference_id']);
 
 });
 
 
 
-Schema::create('journal\_entry\_lines', function (Blueprint $table) {
+Schema::create('journal_entry_lines', function (Blueprint $table) {
 
    $table->id();
 
-   $table->foreignId('journal\_entry\_id')->constrained('journal\_entries')->cascadeOnDelete();
+   $table->foreignId('journal_entry_id')->constrained('journal_entries')->cascadeOnDelete();
 
-   $table->foreignId('account\_id')->constrained('accounts')->restrictOnDelete();
+   $table->foreignId('account_id')->constrained('accounts')->restrictOnDelete();
 
    $table->decimal('debit', 15, 2)->default(0);
 
@@ -8031,21 +8031,21 @@ Schema::create('payments', function (Blueprint $table) {
 
    $table->id();
 
-   $table->string('payment\_number', 50)->unique();
+   $table->string('payment_number', 50)->unique();
 
-   $table->foreignId('party\_id')->constrained('parties');
+   $table->foreignId('party_id')->constrained('parties');
 
-   $table->enum('payment\_type', \['supplier\_payment', 'customer\_receipt']);
+   $table->enum('payment_type', ['supplier_payment', 'customer_receipt']);
 
    $table->decimal('amount', 15, 2);
 
-   $table->date('payment\_date');
+   $table->date('payment_date');
 
    $table->string('reference', 255)->nullable();
 
-   $table->enum('status', \['pending', 'completed', 'failed'])->default('pending');
+   $table->enum('status', ['pending', 'completed', 'failed'])->default('pending');
 
-   $table->foreignId('journal\_entry\_id')->nullable()->constrained('journal\_entries')->nullOnDelete();
+   $table->foreignId('journal_entry_id')->nullable()->constrained('journal_entries')->nullOnDelete();
 
    $table->timestamps();
 
@@ -8055,27 +8055,27 @@ Schema::create('payments', function (Blueprint $table) {
 
 // 15. Current stock balances (for performance)
 
-Schema::create('current\_stock\_balances', function (Blueprint $table) {
+Schema::create('current_stock_balances', function (Blueprint $table) {
 
    $table->id();
 
-   $table->foreignId('product\_id')->constrained('products');
+   $table->foreignId('product_id')->constrained('products');
 
-   $table->foreignId('variant\_id')->nullable()->constrained('product\_variants');
+   $table->foreignId('variant_id')->nullable()->constrained('product_variants');
 
-   $table->foreignId('warehouse\_id')->constrained('warehouses');
+   $table->foreignId('warehouse_id')->constrained('warehouses');
 
-   $table->foreignId('storage\_location\_id')->nullable()->constrained('storage\_locations');
+   $table->foreignId('storage_location_id')->nullable()->constrained('storage_locations');
 
-   $table->foreignId('batch\_id')->nullable()->constrained('batches');
+   $table->foreignId('batch_id')->nullable()->constrained('batches');
 
-   $table->decimal('quantity\_on\_hand', 15, 5)->default(0);
+   $table->decimal('quantity_on_hand', 15, 5)->default(0);
 
-   $table->decimal('quantity\_reserved', 15, 5)->default(0);
+   $table->decimal('quantity_reserved', 15, 5)->default(0);
 
-   $table->timestamp('last\_updated')->useCurrent();
+   $table->timestamp('last_updated')->useCurrent();
 
-   $table->unique(\['product\_id', 'variant\_id', 'warehouse\_id', 'storage\_location\_id', 'batch\_id'], 'stock\_balance\_unique');
+   $table->unique(['product_id', 'variant_id', 'warehouse_id', 'storage_location_id', 'batch_id'], 'stock_balance_unique');
 
 });
 
@@ -8175,7 +8175,7 @@ enum TenantStatus: string
 
    {
 
-       return array\_column(self::cases(), 'value');
+       return array_column(self::cases(), 'value');
 
    }
 
@@ -8201,7 +8201,7 @@ enum PartyType: string
 
    {
 
-       return array\_column(self::cases(), 'value');
+       return array_column(self::cases(), 'value');
 
    }
 
@@ -8229,7 +8229,7 @@ enum PartyStatus: string
 
    {
 
-       return array\_column(self::cases(), 'value');
+       return array_column(self::cases(), 'value');
 
    }
 
@@ -8261,7 +8261,7 @@ enum ContactType: string
 
    {
 
-       return array\_column(self::cases(), 'value');
+       return array_column(self::cases(), 'value');
 
    }
 
@@ -8293,7 +8293,7 @@ enum AddressType: string
 
    {
 
-       return array\_column(self::cases(), 'value');
+       return array_column(self::cases(), 'value');
 
    }
 
@@ -8319,9 +8319,9 @@ enum OrganizationUnitType: string
 
    case STORE = 'store';
 
-   case COST\_CENTER = 'cost\_center';
+   case COST_CENTER = 'cost_center';
 
-   case PROFIT\_CENTER = 'profit\_center';
+   case PROFIT_CENTER = 'profit_center';
 
 
 
@@ -8329,7 +8329,7 @@ enum OrganizationUnitType: string
 
    {
 
-       return array\_column(self::cases(), 'value');
+       return array_column(self::cases(), 'value');
 
    }
 
@@ -8361,7 +8361,7 @@ enum ProductType: string
 
    {
 
-       return array\_column(self::cases(), 'value');
+       return array_column(self::cases(), 'value');
 
    }
 
@@ -8391,7 +8391,7 @@ enum ValuationMethod: string
 
    {
 
-       return array\_column(self::cases(), 'value');
+       return array_column(self::cases(), 'value');
 
    }
 
@@ -8425,7 +8425,7 @@ enum UomType: string
 
    {
 
-       return array\_column(self::cases(), 'value');
+       return array_column(self::cases(), 'value');
 
    }
 
@@ -8449,7 +8449,7 @@ enum InventoryItemStatus: string
 
    case DAMAGED = 'damaged';
 
-   case IN\_TRANSIT = 'in\_transit';
+   case IN_TRANSIT = 'in_transit';
 
 
 
@@ -8457,7 +8457,7 @@ enum InventoryItemStatus: string
 
    {
 
-       return array\_column(self::cases(), 'value');
+       return array_column(self::cases(), 'value');
 
    }
 
@@ -8477,9 +8477,9 @@ enum InventoryMovementType: string
 
    case ISSUE = 'issue';
 
-   case TRANSFER\_IN = 'transfer\_in';
+   case TRANSFER_IN = 'transfer_in';
 
-   case TRANSFER\_OUT = 'transfer\_out';
+   case TRANSFER_OUT = 'transfer_out';
 
    case ADJUSTMENT = 'adjustment';
 
@@ -8489,7 +8489,7 @@ enum InventoryMovementType: string
 
    case UNRESERVE = 'unreserve';
 
-   case CYCLE\_COUNT = 'cycle\_count';
+   case CYCLE_COUNT = 'cycle_count';
 
 
 
@@ -8497,7 +8497,7 @@ enum InventoryMovementType: string
 
    {
 
-       return array\_column(self::cases(), 'value');
+       return array_column(self::cases(), 'value');
 
    }
 
@@ -8533,7 +8533,7 @@ enum LocationType: string
 
    {
 
-       return array\_column(self::cases(), 'value');
+       return array_column(self::cases(), 'value');
 
    }
 
@@ -8561,7 +8561,7 @@ enum DocumentDirection: string
 
    {
 
-       return array\_column(self::cases(), 'value');
+       return array_column(self::cases(), 'value');
 
    }
 
@@ -8585,11 +8585,11 @@ enum DocumentStatus: string
 
    case POSTED = 'posted';
 
-   case PARTIALLY\_RECEIVED = 'partially\_received';
+   case PARTIALLY_RECEIVED = 'partially_received';
 
    case RECEIVED = 'received';
 
-   case PARTIALLY\_INVOICED = 'partially\_invoiced';
+   case PARTIALLY_INVOICED = 'partially_invoiced';
 
    case INVOICED = 'invoiced';
 
@@ -8603,7 +8603,7 @@ enum DocumentStatus: string
 
    {
 
-       return array\_column(self::cases(), 'value');
+       return array_column(self::cases(), 'value');
 
    }
 
@@ -8629,13 +8629,13 @@ enum AccountType: string
 
    case EXPENSE = 'expense';
 
-   case CONTRA\_ASSET = 'contra\_asset';
+   case CONTRA_ASSET = 'contra_asset';
 
-   case CONTRA\_LIABILITY = 'contra\_liability';
+   case CONTRA_LIABILITY = 'contra_liability';
 
-   case OTHER\_INCOME = 'other\_income';
+   case OTHER_INCOME = 'other_income';
 
-   case OTHER\_EXPENSE = 'other\_expense';
+   case OTHER_EXPENSE = 'other_expense';
 
 
 
@@ -8643,7 +8643,7 @@ enum AccountType: string
 
    {
 
-       return array\_column(self::cases(), 'value');
+       return array_column(self::cases(), 'value');
 
    }
 
@@ -8669,7 +8669,7 @@ enum NormalBalance: string
 
    {
 
-       return array\_column(self::cases(), 'value');
+       return array_column(self::cases(), 'value');
 
    }
 
@@ -8685,19 +8685,19 @@ enum AidcTagType: string
 
 {
 
-   case BARCODE\_1D = 'barcode\_1d';
+   case BARCODE_1D = 'barcode_1d';
 
-   case BARCODE\_2D = 'barcode\_2d';
+   case BARCODE_2D = 'barcode_2d';
 
    case QR = 'qr';
 
-   case RFID\_HF = 'rfid\_hf';
+   case RFID_HF = 'rfid_hf';
 
-   case RFID\_UHF = 'rfid\_uhf';
+   case RFID_UHF = 'rfid_uhf';
 
    case NFC = 'nfc';
 
-   case GS1\_EPC = 'gs1\_epc';
+   case GS1_EPC = 'gs1_epc';
 
 
 
@@ -8705,7 +8705,7 @@ enum AidcTagType: string
 
    {
 
-       return array\_column(self::cases(), 'value');
+       return array_column(self::cases(), 'value');
 
    }
 
@@ -8721,9 +8721,9 @@ enum AidcEntityType: string
 
 {
 
-   case PRODUCT\_VARIANT = 'product\_variant';
+   case PRODUCT_VARIANT = 'product_variant';
 
-   case INVENTORY\_ITEM = 'inventory\_item';
+   case INVENTORY_ITEM = 'inventory_item';
 
    case LOCATION = 'location';
 
@@ -8739,7 +8739,7 @@ enum AidcEntityType: string
 
    {
 
-       return array\_column(self::cases(), 'value');
+       return array_column(self::cases(), 'value');
 
    }
 
@@ -8747,7 +8747,7 @@ enum AidcEntityType: string
 
 
 
-use App\\Enums\\TenantStatus;
+use App\Enums\TenantStatus;
 
 
 
@@ -8757,13 +8757,13 @@ $table->enum('status', TenantStatus::values())->default(TenantStatus::ACTIVE->va
 
 
 
-use App\\Enums\\PartyType;
+use App\Enums\PartyType;
 
-use App\\Enums\\PartyStatus;
+use App\Enums\PartyStatus;
 
 
 
-$table->enum('party\_type', PartyType::values());
+$table->enum('party_type', PartyType::values());
 
 $table->enum('status', PartyStatus::values())->default(PartyStatus::ACTIVE->value);
 
