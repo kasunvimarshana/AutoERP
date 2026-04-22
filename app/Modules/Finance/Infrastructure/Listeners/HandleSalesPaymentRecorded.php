@@ -1,0 +1,124 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Finance\Infrastructure\Listeners;
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Modules\Finance\Application\Contracts\CreateArTransactionServiceInterface;
+use Modules\Finance\Application\Contracts\CreateJournalEntryServiceInterface;
+use Modules\Finance\Domain\RepositoryInterfaces\ArTransactionRepositoryInterface;
+use Modules\Finance\Domain\RepositoryInterfaces\FiscalPeriodRepositoryInterface;
+use Modules\Sales\Domain\Events\SalesPaymentRecorded;
+
+class HandleSalesPaymentRecorded
+{
+    public function __construct(
+        private readonly FiscalPeriodRepositoryInterface $fiscalPeriodRepository,
+        private readonly CreateJournalEntryServiceInterface $createJournalEntryService,
+        private readonly CreateArTransactionServiceInterface $createArTransactionService,
+        private readonly ArTransactionRepositoryInterface $arTransactionRepository,
+    ) {}
+
+    public function handle(SalesPaymentRecorded $event): void
+    {
+        if ($event->arAccountId === null) {
+            Log::warning('HandleSalesPaymentRecorded: AR account not configured; skipping journal entry', [
+                'sales_invoice_id' => $event->salesInvoiceId,
+                'payment_id' => $event->paymentId,
+                'tenant_id' => $event->tenantId,
+            ]);
+
+            return;
+        }
+
+        if (bccomp($event->amount, '0.000000', 6) <= 0) {
+            Log::warning('HandleSalesPaymentRecorded: zero or negative payment amount; skipping journal entry', [
+                'sales_invoice_id' => $event->salesInvoiceId,
+                'payment_id' => $event->paymentId,
+            ]);
+
+            return;
+        }
+
+        $paymentDate = $event->paymentDate !== ''
+            ? new \DateTimeImmutable($event->paymentDate)
+            : new \DateTimeImmutable;
+
+        $period = $this->fiscalPeriodRepository->findOpenPeriodForDate($event->tenantId, $paymentDate);
+        if ($period === null) {
+            Log::warning('HandleSalesPaymentRecorded: no open fiscal period for payment date; skipping journal entry', [
+                'sales_invoice_id' => $event->salesInvoiceId,
+                'payment_id' => $event->paymentId,
+                'payment_date' => $event->paymentDate,
+                'tenant_id' => $event->tenantId,
+            ]);
+
+            return;
+        }
+
+        $amount = $event->amount;
+        $exchangeRate = $event->exchangeRate;
+        $baseAmount = bcmul($amount, $exchangeRate, 6);
+        $description = 'Payment received for Sales Invoice #'.$event->salesInvoiceId.' (Payment #'.$event->paymentId.')';
+
+        $jeLines = [
+            // DR: Cash / Bank Account — increases the bank balance
+            [
+                'account_id' => $event->cashAccountId,
+                'debit_amount' => $amount,
+                'credit_amount' => '0.000000',
+                'description' => $description,
+                'currency_id' => $event->currencyId,
+                'exchange_rate' => (float) $exchangeRate,
+                'base_debit_amount' => $baseAmount,
+                'base_credit_amount' => '0.000000',
+            ],
+            // CR: Accounts Receivable — reduces the amount owed by the customer
+            [
+                'account_id' => $event->arAccountId,
+                'debit_amount' => '0.000000',
+                'credit_amount' => $amount,
+                'description' => $description,
+                'currency_id' => $event->currencyId,
+                'exchange_rate' => (float) $exchangeRate,
+                'base_debit_amount' => '0.000000',
+                'base_credit_amount' => $baseAmount,
+            ],
+        ];
+
+        DB::transaction(function () use ($event, $period, $paymentDate, $description, $jeLines, $amount): void {
+            $this->createJournalEntryService->execute([
+                'tenant_id' => $event->tenantId,
+                'fiscal_period_id' => $period->getId(),
+                'entry_date' => $paymentDate->format('Y-m-d'),
+                'created_by' => $event->createdBy ?: 1,
+                'entry_type' => 'system',
+                'reference_type' => 'sales_payment',
+                'reference_id' => $event->paymentId,
+                'description' => $description,
+                'lines' => $jeLines,
+            ]);
+
+            // Record AR payment transaction (reduces customer receivable balance)
+            $currentBalance = $this->arTransactionRepository
+                ->getCustomerBalance($event->tenantId, $event->customerId);
+
+            $newBalance = bcsub($currentBalance, $amount, 6);
+
+            $this->createArTransactionService->execute([
+                'tenant_id' => $event->tenantId,
+                'customer_id' => $event->customerId,
+                'account_id' => $event->arAccountId,
+                'transaction_type' => 'payment',
+                'amount' => -1 * (float) $amount,
+                'balance_after' => (float) $newBalance,
+                'transaction_date' => $paymentDate->format('Y-m-d'),
+                'currency_id' => $event->currencyId,
+                'reference_type' => 'sales_payment',
+                'reference_id' => $event->paymentId,
+            ]);
+        });
+    }
+}

@@ -31,6 +31,8 @@ class SalesInvoiceResource extends JsonResource
             'tax_total' => $entity->getTaxTotal(),
             'discount_total' => $entity->getDiscountTotal(),
             'grand_total' => $entity->getGrandTotal(),
+            'paid_amount' => $entity->getPaidAmount(),
+            'balance_due' => $entity->getBalanceDue(),
             'ar_account_id' => $entity->getArAccountId(),
             'journal_entry_id' => $entity->getJournalEntryId(),
             'notes' => $entity->getNotes(),

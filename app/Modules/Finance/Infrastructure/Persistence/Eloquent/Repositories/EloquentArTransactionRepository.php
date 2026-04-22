@@ -40,6 +40,17 @@ class EloquentArTransactionRepository extends EloquentRepository implements ArTr
         return $this->toDomainEntity($model);
     }
 
+    public function getCustomerBalance(int $tenantId, int $customerId): string
+    {
+        $latest = ArTransactionModel::query()
+            ->where('tenant_id', $tenantId)
+            ->where('customer_id', $customerId)
+            ->orderByDesc('id')
+            ->first();
+
+        return $latest !== null ? (string) $latest->balance_after : '0.000000';
+    }
+
     private function mapToDomain(ArTransactionModel $m): ArTransaction
     {
         return new ArTransaction(

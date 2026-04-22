@@ -5,13 +5,18 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use Illuminate\Routing\Route;
+use Illuminate\Support\Facades\Artisan;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Tests\TestCase;
 
 class SalesRoutesTest extends TestCase
 {
+    private static bool $passportKeysPrepared = false;
+
     public function test_sales_order_endpoints_require_authentication(): void
     {
+        $this->preparePassportKeys();
+
         $this->getJson('/api/sales-orders')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->postJson('/api/sales-orders', [])->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->getJson('/api/sales-orders/1')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
@@ -23,6 +28,8 @@ class SalesRoutesTest extends TestCase
 
     public function test_shipment_endpoints_require_authentication(): void
     {
+        $this->preparePassportKeys();
+
         $this->getJson('/api/shipments')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->postJson('/api/shipments', [])->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->getJson('/api/shipments/1')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
@@ -33,16 +40,21 @@ class SalesRoutesTest extends TestCase
 
     public function test_sales_invoice_endpoints_require_authentication(): void
     {
+        $this->preparePassportKeys();
+
         $this->getJson('/api/sales-invoices')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->postJson('/api/sales-invoices', [])->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->getJson('/api/sales-invoices/1')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->putJson('/api/sales-invoices/1', [])->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->deleteJson('/api/sales-invoices/1')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->postJson('/api/sales-invoices/1/post')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
+        $this->postJson('/api/sales-invoices/1/record-payment', [])->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
     }
 
     public function test_sales_return_endpoints_require_authentication(): void
     {
+        $this->preparePassportKeys();
+
         $this->getJson('/api/sales-returns')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->postJson('/api/sales-returns', [])->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->getJson('/api/sales-returns/1')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
@@ -82,6 +94,10 @@ class SalesRoutesTest extends TestCase
         );
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/sales-invoices/{salesInvoice}/post', 'POST'),
+            ['auth:api', 'resolve.tenant']
+        );
+        $this->assertRouteUsesMiddleware(
+            $this->findRoute($routes, 'api/sales-invoices/{salesInvoice}/record-payment', 'POST'),
             ['auth:api', 'resolve.tenant']
         );
         $this->assertRouteUsesMiddleware(
@@ -126,5 +142,16 @@ class SalesRoutesTest extends TestCase
         }
 
         $this->fail(sprintf('Route %s %s was not registered.', $method, $uri));
+    }
+
+    private function preparePassportKeys(): void
+    {
+        if (self::$passportKeysPrepared) {
+            return;
+        }
+
+        Artisan::call('passport:keys', ['--force' => true]);
+
+        self::$passportKeysPrepared = true;
     }
 }

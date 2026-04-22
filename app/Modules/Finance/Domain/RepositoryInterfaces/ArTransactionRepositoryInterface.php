@@ -10,4 +10,6 @@ use Modules\Finance\Domain\Entities\ArTransaction;
 interface ArTransactionRepositoryInterface extends RepositoryInterface
 {
     public function save(ArTransaction $arTransaction): ArTransaction;
+
+    public function getCustomerBalance(int $tenantId, int $customerId): string;
 }

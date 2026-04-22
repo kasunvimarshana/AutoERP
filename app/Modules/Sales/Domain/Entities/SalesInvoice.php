@@ -40,6 +40,8 @@ class SalesInvoice
 
     private ?int $journalEntryId;
 
+    private string $paidAmount;
+
     private ?string $notes;
 
     /** @var array<string, mixed>|null */
@@ -74,6 +76,7 @@ class SalesInvoice
         string $grandTotal = '0.000000',
         ?int $arAccountId = null,
         ?int $journalEntryId = null,
+        string $paidAmount = '0.000000',
         ?string $notes = null,
         ?array $metadata = null,
         ?int $id = null,
@@ -99,6 +102,7 @@ class SalesInvoice
         $this->grandTotal = $grandTotal;
         $this->arAccountId = $arAccountId;
         $this->journalEntryId = $journalEntryId;
+        $this->paidAmount = $paidAmount;
         $this->notes = $notes;
         $this->metadata = $metadata;
         $this->createdAt = $createdAt ?? new \DateTimeImmutable;
@@ -190,6 +194,16 @@ class SalesInvoice
         return $this->journalEntryId;
     }
 
+    public function getPaidAmount(): string
+    {
+        return $this->paidAmount;
+    }
+
+    public function getBalanceDue(): string
+    {
+        return bcsub($this->grandTotal, $this->paidAmount, 6);
+    }
+
     public function getNotes(): ?string
     {
         return $this->notes;
@@ -262,6 +276,20 @@ class SalesInvoice
         $this->journalEntryId = $journalEntryId;
         $this->notes = $notes;
         $this->metadata = $metadata;
+        $this->updatedAt = new \DateTimeImmutable;
+    }
+
+    public function recordPayment(string $amount): void
+    {
+        $newPaid = bcadd($this->paidAmount, $amount, 6);
+        $this->paidAmount = $newPaid;
+
+        if (bccomp($newPaid, $this->grandTotal, 6) >= 0) {
+            $this->status = 'paid';
+        } elseif (bccomp($newPaid, '0.000000', 6) > 0) {
+            $this->status = 'partial_paid';
+        }
+
         $this->updatedAt = new \DateTimeImmutable;
     }
 

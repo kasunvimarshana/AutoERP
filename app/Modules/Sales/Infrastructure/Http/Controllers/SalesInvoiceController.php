@@ -11,10 +11,12 @@ use Modules\Sales\Application\Contracts\CreateSalesInvoiceServiceInterface;
 use Modules\Sales\Application\Contracts\DeleteSalesInvoiceServiceInterface;
 use Modules\Sales\Application\Contracts\FindSalesInvoiceServiceInterface;
 use Modules\Sales\Application\Contracts\PostSalesInvoiceServiceInterface;
+use Modules\Sales\Application\Contracts\RecordSalesPaymentServiceInterface;
 use Modules\Sales\Application\Contracts\UpdateSalesInvoiceServiceInterface;
 use Modules\Sales\Domain\Entities\SalesInvoice;
 use Modules\Sales\Infrastructure\Http\Requests\ListSalesInvoiceRequest;
 use Modules\Sales\Infrastructure\Http\Requests\PostSalesInvoiceRequest;
+use Modules\Sales\Infrastructure\Http\Requests\RecordSalesPaymentRequest;
 use Modules\Sales\Infrastructure\Http\Requests\StoreSalesInvoiceRequest;
 use Modules\Sales\Infrastructure\Http\Requests\UpdateSalesInvoiceRequest;
 use Modules\Sales\Infrastructure\Http\Resources\SalesInvoiceCollection;
@@ -29,6 +31,7 @@ class SalesInvoiceController extends AuthorizedController
         protected DeleteSalesInvoiceServiceInterface $deleteService,
         protected FindSalesInvoiceServiceInterface $findService,
         protected PostSalesInvoiceServiceInterface $postService,
+        protected RecordSalesPaymentServiceInterface $recordPaymentService,
     ) {}
 
     public function index(ListSalesInvoiceRequest $request): JsonResponse
@@ -95,6 +98,18 @@ class SalesInvoiceController extends AuthorizedController
         $posted = $this->postService->execute(['id' => $salesInvoice]);
 
         return new SalesInvoiceResource($posted);
+    }
+
+    public function recordPayment(RecordSalesPaymentRequest $request, int $salesInvoice): SalesInvoiceResource
+    {
+        $entity = $this->findOrFail($salesInvoice);
+        $this->authorize('update', $entity);
+        $payload = $request->validated();
+        $payload['invoice_id'] = $salesInvoice;
+        $payload['tenant_id'] = $entity->getTenantId();
+        $updated = $this->recordPaymentService->execute($payload);
+
+        return new SalesInvoiceResource($updated);
     }
 
     private function findOrFail(int $id): SalesInvoice

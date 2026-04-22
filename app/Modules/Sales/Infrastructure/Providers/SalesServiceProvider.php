@@ -24,6 +24,7 @@ use Modules\Sales\Application\Contracts\FindShipmentServiceInterface;
 use Modules\Sales\Application\Contracts\PostSalesInvoiceServiceInterface;
 use Modules\Sales\Application\Contracts\ProcessShipmentServiceInterface;
 use Modules\Sales\Application\Contracts\ReceiveSalesReturnServiceInterface;
+use Modules\Sales\Application\Contracts\RecordSalesPaymentServiceInterface;
 use Modules\Sales\Application\Contracts\UpdateSalesInvoiceServiceInterface;
 use Modules\Sales\Application\Contracts\UpdateSalesOrderServiceInterface;
 use Modules\Sales\Application\Contracts\UpdateSalesReturnServiceInterface;
@@ -46,6 +47,7 @@ use Modules\Sales\Application\Services\FindShipmentService;
 use Modules\Sales\Application\Services\PostSalesInvoiceService;
 use Modules\Sales\Application\Services\ProcessShipmentService;
 use Modules\Sales\Application\Services\ReceiveSalesReturnService;
+use Modules\Sales\Application\Services\RecordSalesPaymentService;
 use Modules\Sales\Application\Services\UpdateSalesInvoiceService;
 use Modules\Sales\Application\Services\UpdateSalesOrderService;
 use Modules\Sales\Application\Services\UpdateSalesReturnService;
@@ -99,6 +101,7 @@ class SalesServiceProvider extends ServiceProvider
             DeleteSalesReturnServiceInterface::class => DeleteSalesReturnService::class,
             ApproveSalesReturnServiceInterface::class => ApproveSalesReturnService::class,
             ReceiveSalesReturnServiceInterface::class => ReceiveSalesReturnService::class,
+            RecordSalesPaymentServiceInterface::class => RecordSalesPaymentService::class,
         ];
 
         foreach ($serviceBindings as $contract => $impl) {
