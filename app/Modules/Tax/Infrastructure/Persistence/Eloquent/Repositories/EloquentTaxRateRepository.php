@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Tax\Infrastructure\Persistence\Eloquent\Repositories;
 
+use Illuminate\Support\Collection;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Tax\Domain\Entities\TaxRate;
 use Modules\Tax\Domain\RepositoryInterfaces\TaxRateRepositoryInterface;
@@ -59,7 +60,7 @@ class EloquentTaxRateRepository extends EloquentRepository implements TaxRateRep
     {
         $date = $onDate->format('Y-m-d');
 
-        /** @var \Illuminate\Support\Collection<int, TaxRateModel> $models */
+        /** @var Collection<int, TaxRateModel> $models */
         $models = $this->model->newQuery()
             ->where('tenant_id', $tenantId)
             ->where('tax_group_id', $taxGroupId)

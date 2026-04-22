@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Modules\OrganizationUnit\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;

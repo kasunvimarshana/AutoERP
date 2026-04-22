@@ -25,6 +25,7 @@ return new class extends Migration
             $table->foreignId('cost_center_id')->nullable()->constrained('org_units', 'id', 'journal_entry_lines_cost_center_id_fk')->nullOnDelete();
             $table->json('metadata')->nullable();
             $table->timestamps();
+            $table->softDeletes();
 
             $table->index(['account_id', 'journal_entry_id'], 'journal_entry_lines_account_entry_idx');
         });

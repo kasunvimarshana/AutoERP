@@ -9,18 +9,18 @@ use Illuminate\Http\Resources\Json\ResourceCollection;
 
 class PriceListCollection extends ResourceCollection
 {
-    /** @var class-string<\Modules\Pricing\Infrastructure\Http\Resources\PriceListResource> */
-    public $collects = \Modules\Pricing\Infrastructure\Http\Resources\PriceListResource::class;
+    /** @var class-string<PriceListResource> */
+    public $collects = PriceListResource::class;
 
     public function toArray(Request $request): array
     {
         return $this->collection
             ->map(static function (mixed $priceList) use ($request): array {
-                if ($priceList instanceof \Modules\Pricing\Infrastructure\Http\Resources\PriceListResource) {
+                if ($priceList instanceof PriceListResource) {
                     return $priceList->toArray($request);
                 }
 
-                return (new \Modules\Pricing\Infrastructure\Http\Resources\PriceListResource($priceList))->toArray($request);
+                return (new PriceListResource($priceList))->toArray($request);
             })
             ->all();
     }

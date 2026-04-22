@@ -50,6 +50,16 @@ class EloquentPurchaseInvoiceLineRepository extends EloquentRepository implement
         return parent::find($id, $columns);
     }
 
+    /** @return PurchaseInvoiceLine[] */
+    public function findByInvoiceId(int $invoiceId): array
+    {
+        return $this->model->newQuery()
+            ->where('purchase_invoice_id', $invoiceId)
+            ->get()
+            ->map(fn (PurchaseInvoiceLineModel $m): PurchaseInvoiceLine => $this->mapToDomain($m))
+            ->all();
+    }
+
     private function mapToDomain(PurchaseInvoiceLineModel $m): PurchaseInvoiceLine
     {
         return new PurchaseInvoiceLine(

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Tax\Infrastructure\Persistence\Eloquent\Repositories;
 
+use Illuminate\Support\Collection;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Tax\Domain\Entities\TaxRule;
 use Modules\Tax\Domain\RepositoryInterfaces\TaxRuleRepositoryInterface;
@@ -41,7 +42,7 @@ class EloquentTaxRuleRepository extends EloquentRepository implements TaxRuleRep
 
     public function findBestMatch(int $tenantId, ?int $productCategoryId, ?string $partyType, ?string $region): ?TaxRule
     {
-        /** @var \Illuminate\Support\Collection<int, TaxRuleModel> $candidates */
+        /** @var Collection<int, TaxRuleModel> $candidates */
         $candidates = $this->model->newQuery()
             ->where('tenant_id', $tenantId)
             ->orderByDesc('priority')

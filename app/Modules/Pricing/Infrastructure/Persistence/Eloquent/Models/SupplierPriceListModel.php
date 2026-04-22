@@ -7,7 +7,6 @@ namespace Modules\Pricing\Infrastructure\Persistence\Eloquent\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
-use Modules\Pricing\Infrastructure\Persistence\Eloquent\Models\PriceListModel;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 

@@ -65,7 +65,7 @@ class InventoryStockReservationEndpointsAuthenticatedTest extends TestCase
         $this->createStockReservationService
             ->expects($this->once())
             ->method('execute')
-            ->willThrowException(new InsufficientAvailableStockException());
+            ->willThrowException(new InsufficientAvailableStockException);
 
         $response = $this->withHeader('X-Tenant-ID', '9')
             ->postJson('/api/inventory/stock-reservations', [

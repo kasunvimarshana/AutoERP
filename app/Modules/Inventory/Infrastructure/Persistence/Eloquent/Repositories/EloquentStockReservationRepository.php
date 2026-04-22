@@ -131,7 +131,7 @@ class EloquentStockReservationRepository implements StockReservationRepositoryIn
         if ($op === '+') {
             $availableQty = bcsub($currentOnHand, $currentReserved, 6);
             if (bccomp($quantity, $availableQty, 6) === 1) {
-                throw new InsufficientAvailableStockException();
+                throw new InsufficientAvailableStockException;
             }
         }
 

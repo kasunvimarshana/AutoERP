@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Tax\Infrastructure\Persistence\Eloquent\Repositories;
 
+use Illuminate\Support\Collection;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Tax\Domain\Entities\TransactionTax;
 use Modules\Tax\Domain\RepositoryInterfaces\TransactionTaxRepositoryInterface;
@@ -50,7 +51,7 @@ class EloquentTransactionTaxRepository extends EloquentRepository implements Tra
 
     public function listByReference(int $tenantId, string $referenceType, int $referenceId): array
     {
-        /** @var \Illuminate\Support\Collection<int, TransactionTaxModel> $models */
+        /** @var Collection<int, TransactionTaxModel> $models */
         $models = $this->model->newQuery()
             ->where('tenant_id', $tenantId)
             ->where('reference_type', $referenceType)

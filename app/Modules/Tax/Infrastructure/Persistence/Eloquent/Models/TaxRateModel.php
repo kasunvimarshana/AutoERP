@@ -10,8 +10,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\AccountModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
-use Modules\Tax\Infrastructure\Persistence\Eloquent\Models\TaxGroupModel;
-use Modules\Tax\Infrastructure\Persistence\Eloquent\Models\TransactionTaxModel;
 
 class TaxRateModel extends Model
 {

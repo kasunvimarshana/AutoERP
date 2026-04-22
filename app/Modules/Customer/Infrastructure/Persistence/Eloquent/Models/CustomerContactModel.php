@@ -7,7 +7,6 @@ namespace Modules\Customer\Infrastructure\Persistence\Eloquent\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
-use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class CustomerContactModel extends Model

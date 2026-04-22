@@ -12,7 +12,7 @@ class WarehouseLocationCollection extends ResourceCollection
     public function toArray(Request $request): array
     {
         return [
-            'data' => \Modules\Warehouse\Infrastructure\Http\Resources\WarehouseLocationResource::collection($this->collection),
+            'data' => WarehouseLocationResource::collection($this->collection),
         ];
     }
 }

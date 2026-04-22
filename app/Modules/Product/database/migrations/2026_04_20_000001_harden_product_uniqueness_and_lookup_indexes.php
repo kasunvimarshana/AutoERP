@@ -30,7 +30,7 @@ return new class extends Migration
                 )
                 ->implode('; ');
 
-            throw new \RuntimeException(
+            throw new RuntimeException(
                 'Cannot add products_tenant_slug_uk because duplicate tenant/slug pairs already exist. '
                 .'Resolve duplicates first. Examples: '.$duplicateSummary
             );

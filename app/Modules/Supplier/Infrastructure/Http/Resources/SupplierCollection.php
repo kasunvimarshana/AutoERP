@@ -9,18 +9,18 @@ use Illuminate\Http\Resources\Json\ResourceCollection;
 
 class SupplierCollection extends ResourceCollection
 {
-    /** @var class-string<\Modules\Supplier\Infrastructure\Http\Resources\SupplierResource> */
-    public $collects = \Modules\Supplier\Infrastructure\Http\Resources\SupplierResource::class;
+    /** @var class-string<SupplierResource> */
+    public $collects = SupplierResource::class;
 
     public function toArray(Request $request): array
     {
         return $this->collection
             ->map(static function (mixed $supplier) use ($request): array {
-                if ($supplier instanceof \Modules\Supplier\Infrastructure\Http\Resources\SupplierResource) {
+                if ($supplier instanceof SupplierResource) {
                     return $supplier->toArray($request);
                 }
 
-                return (new \Modules\Supplier\Infrastructure\Http\Resources\SupplierResource($supplier))->toArray($request);
+                return (new SupplierResource($supplier))->toArray($request);
             })
             ->all();
     }

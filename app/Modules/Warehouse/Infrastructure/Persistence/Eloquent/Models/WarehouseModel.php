@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
-use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models\WarehouseLocationModel;
 
 class WarehouseModel extends Model
 {

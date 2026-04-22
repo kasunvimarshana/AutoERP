@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Providers;
 
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Infrastructure\Concerns\LoadsModuleRoutesAndMigrations;
 use Modules\Finance\Application\Contracts\ApplyCreditMemoServiceInterface;
@@ -205,6 +206,8 @@ use Modules\Finance\Domain\RepositoryInterfaces\PaymentAllocationRepositoryInter
 use Modules\Finance\Domain\RepositoryInterfaces\PaymentMethodRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\PaymentRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\PaymentTermRepositoryInterface;
+use Modules\Finance\Infrastructure\Listeners\HandlePurchaseInvoiceApproved;
+use Modules\Finance\Infrastructure\Listeners\HandleSalesInvoicePosted;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentAccountRepository;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentApprovalRequestRepository;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentApprovalWorkflowConfigRepository;
@@ -224,6 +227,8 @@ use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentPay
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentPaymentMethodRepository;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentPaymentRepository;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentPaymentTermRepository;
+use Modules\Purchase\Domain\Events\PurchaseInvoiceApproved;
+use Modules\Sales\Domain\Events\SalesInvoicePosted;
 
 class FinanceServiceProvider extends ServiceProvider
 {
@@ -357,6 +362,9 @@ class FinanceServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Event::listen(PurchaseInvoiceApproved::class, HandlePurchaseInvoiceApproved::class);
+        Event::listen(SalesInvoicePosted::class, HandleSalesInvoicePosted::class);
+
         $this->bootModule(
             __DIR__.'/../../routes/api.php',
             __DIR__.'/../../database/migrations',

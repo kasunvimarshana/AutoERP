@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Modules\Supplier\Infrastructure\Http\Controllers\SupplierAddressController;
-use Modules\Supplier\Infrastructure\Http\Controllers\SupplierController;
 use Modules\Supplier\Infrastructure\Http\Controllers\SupplierContactController;
+use Modules\Supplier\Infrastructure\Http\Controllers\SupplierController;
 use Modules\Supplier\Infrastructure\Http\Controllers\SupplierProductController;
 
 Route::middleware(['auth:api', 'resolve.tenant'])->group(function (): void {

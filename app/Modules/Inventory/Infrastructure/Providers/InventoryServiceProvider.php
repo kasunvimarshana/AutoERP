@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Infrastructure\Providers;
 
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Infrastructure\Concerns\LoadsModuleRoutesAndMigrations;
 use Modules\Inventory\Application\Contracts\AllocationEngineServiceInterface;
@@ -50,6 +51,10 @@ use Modules\Inventory\Domain\RepositoryInterfaces\TraceLogRepositoryInterface;
 use Modules\Inventory\Domain\RepositoryInterfaces\TransferOrderRepositoryInterface;
 use Modules\Inventory\Domain\RepositoryInterfaces\ValuationConfigRepositoryInterface;
 use Modules\Inventory\Infrastructure\Console\Commands\ReleaseExpiredStockReservationsCommand;
+use Modules\Inventory\Infrastructure\Listeners\HandleGoodsReceiptPosted;
+use Modules\Inventory\Infrastructure\Listeners\HandlePurchaseReturnPosted;
+use Modules\Inventory\Infrastructure\Listeners\HandleSalesReturnReceived;
+use Modules\Inventory\Infrastructure\Listeners\HandleShipmentProcessed;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentCostLayerRepository;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentCycleCountRepository;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentInventoryStockRepository;
@@ -57,6 +62,10 @@ use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentS
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentTraceLogRepository;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentTransferOrderRepository;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentValuationConfigRepository;
+use Modules\Purchase\Domain\Events\GoodsReceiptPosted;
+use Modules\Purchase\Domain\Events\PurchaseReturnPosted;
+use Modules\Sales\Domain\Events\SalesReturnReceived;
+use Modules\Sales\Domain\Events\ShipmentProcessed;
 
 class InventoryServiceProvider extends ServiceProvider
 {
@@ -101,6 +110,11 @@ class InventoryServiceProvider extends ServiceProvider
         $this->commands([
             ReleaseExpiredStockReservationsCommand::class,
         ]);
+
+        Event::listen(GoodsReceiptPosted::class, HandleGoodsReceiptPosted::class);
+        Event::listen(ShipmentProcessed::class, HandleShipmentProcessed::class);
+        Event::listen(PurchaseReturnPosted::class, HandlePurchaseReturnPosted::class);
+        Event::listen(SalesReturnReceived::class, HandleSalesReturnReceived::class);
 
         $this->bootModule(
             __DIR__.'/../../routes/api.php',

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories;
 
+use Illuminate\Support\Collection;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Purchase\Domain\Entities\PurchaseReturnLine;
 use Modules\Purchase\Domain\RepositoryInterfaces\PurchaseReturnLineRepositoryInterface;
@@ -49,6 +50,13 @@ class EloquentPurchaseReturnLineRepository extends EloquentRepository implements
     public function find(int|string $id, array $columns = ['*']): ?PurchaseReturnLine
     {
         return parent::find($id, $columns);
+    }
+
+    public function findByPurchaseReturnId(int $purchaseReturnId): Collection
+    {
+        $models = $this->model->newQuery()->where('purchase_return_id', $purchaseReturnId)->get();
+
+        return $this->toDomainCollection($models);
     }
 
     private function mapToDomain(PurchaseReturnLineModel $m): PurchaseReturnLine

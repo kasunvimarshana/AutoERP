@@ -8,8 +8,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
-use Modules\Tax\Infrastructure\Persistence\Eloquent\Models\TaxRateModel;
-use Modules\Tax\Infrastructure\Persistence\Eloquent\Models\TaxRuleModel;
 
 class TaxGroupModel extends Model
 {

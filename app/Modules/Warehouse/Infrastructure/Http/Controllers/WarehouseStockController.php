@@ -10,10 +10,10 @@ use Modules\Inventory\Application\Contracts\FindStockLevelServiceInterface;
 use Modules\Inventory\Application\Contracts\FindStockMovementServiceInterface;
 use Modules\Inventory\Application\Contracts\RecordStockMovementServiceInterface;
 use Modules\Inventory\Domain\Entities\StockMovement;
+use Modules\Inventory\Infrastructure\Http\Resources\StockMovementResource;
 use Modules\Warehouse\Infrastructure\Http\Requests\ListWarehouseStockLevelRequest;
 use Modules\Warehouse\Infrastructure\Http\Requests\ListWarehouseStockMovementRequest;
 use Modules\Warehouse\Infrastructure\Http\Requests\StoreWarehouseStockMovementRequest;
-use Modules\Inventory\Infrastructure\Http\Resources\StockMovementResource;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class WarehouseStockController extends AuthorizedController

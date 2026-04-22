@@ -9,9 +9,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\CurrencyModel;
-use Modules\Pricing\Infrastructure\Persistence\Eloquent\Models\CustomerPriceListModel;
-use Modules\Pricing\Infrastructure\Persistence\Eloquent\Models\PriceListItemModel;
-use Modules\Pricing\Infrastructure\Persistence\Eloquent\Models\SupplierPriceListModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class PriceListModel extends Model

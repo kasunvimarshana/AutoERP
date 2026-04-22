@@ -9,18 +9,18 @@ use Illuminate\Http\Resources\Json\ResourceCollection;
 
 class EmployeeCollection extends ResourceCollection
 {
-    /** @var class-string<\Modules\Employee\Infrastructure\Http\Resources\EmployeeResource> */
-    public $collects = \Modules\Employee\Infrastructure\Http\Resources\EmployeeResource::class;
+    /** @var class-string<EmployeeResource> */
+    public $collects = EmployeeResource::class;
 
     public function toArray(Request $request): array
     {
         return $this->collection
             ->map(static function (mixed $employee) use ($request): array {
-                if ($employee instanceof \Modules\Employee\Infrastructure\Http\Resources\EmployeeResource) {
+                if ($employee instanceof EmployeeResource) {
                     return $employee->toArray($request);
                 }
 
-                return (new \Modules\Employee\Infrastructure\Http\Resources\EmployeeResource($employee))->toArray($request);
+                return (new EmployeeResource($employee))->toArray($request);
             })
             ->all();
     }

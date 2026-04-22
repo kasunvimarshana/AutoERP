@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Warehouse\Infrastructure\Persistence\Eloquent\Repositories;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Warehouse\Domain\Entities\WarehouseLocation;
@@ -64,7 +65,7 @@ class EloquentWarehouseLocationRepository extends EloquentRepository implements 
 
     public function listByWarehouse(int $tenantId, int $warehouseId): array
     {
-        /** @var \Illuminate\Support\Collection<int, WarehouseLocation> $locations */
+        /** @var Collection<int, WarehouseLocation> $locations */
         $locations = $this->warehouseLocationModel->newQuery()
             ->where('tenant_id', $tenantId)
             ->where('warehouse_id', $warehouseId)

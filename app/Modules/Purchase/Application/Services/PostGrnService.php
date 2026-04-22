@@ -63,7 +63,13 @@ class PostGrnService extends BaseService implements PostGrnServiceInterface
             lines: $lines->map(fn ($l) => [
                 'id' => $l->getId(),
                 'product_id' => $l->getProductId(),
+                'location_id' => $l->getLocationId(),
+                'uom_id' => $l->getUomId(),
                 'received_qty' => $l->getReceivedQty(),
+                'unit_cost' => $l->getUnitCost(),
+                'variant_id' => $l->getVariantId(),
+                'batch_id' => $l->getBatchId(),
+                'serial_id' => $l->getSerialId(),
             ])->values()->all(),
         ));
 

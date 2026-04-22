@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Employee\Application\Services;
 
-use Modules\Core\Domain\Exceptions\DomainException;
 use Modules\Core\Application\Services\BaseService;
+use Modules\Core\Domain\Exceptions\DomainException;
 use Modules\Employee\Application\Contracts\CreateEmployeeServiceInterface;
 use Modules\Employee\Application\DTOs\EmployeeData;
 use Modules\Employee\Domain\Contracts\EmployeeUserSynchronizerInterface;

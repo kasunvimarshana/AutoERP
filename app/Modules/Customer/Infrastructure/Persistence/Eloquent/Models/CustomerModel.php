@@ -10,8 +10,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\CurrencyModel;
-use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerAddressModel;
-use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerContactModel;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\AccountModel;
 use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;

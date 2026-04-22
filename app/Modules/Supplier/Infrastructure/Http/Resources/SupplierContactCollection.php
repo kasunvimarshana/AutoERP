@@ -9,18 +9,18 @@ use Illuminate\Http\Resources\Json\ResourceCollection;
 
 class SupplierContactCollection extends ResourceCollection
 {
-    /** @var class-string<\Modules\Supplier\Infrastructure\Http\Resources\SupplierContactResource> */
-    public $collects = \Modules\Supplier\Infrastructure\Http\Resources\SupplierContactResource::class;
+    /** @var class-string<SupplierContactResource> */
+    public $collects = SupplierContactResource::class;
 
     public function toArray(Request $request): array
     {
         return $this->collection
             ->map(static function (mixed $contact) use ($request): array {
-                if ($contact instanceof \Modules\Supplier\Infrastructure\Http\Resources\SupplierContactResource) {
+                if ($contact instanceof SupplierContactResource) {
                     return $contact->toArray($request);
                 }
 
-                return (new \Modules\Supplier\Infrastructure\Http\Resources\SupplierContactResource($contact))->toArray($request);
+                return (new SupplierContactResource($contact))->toArray($request);
             })
             ->all();
     }
