@@ -5,13 +5,18 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use Illuminate\Routing\Route;
+use Illuminate\Support\Facades\Artisan;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Tests\TestCase;
 
 class PurchaseRoutesTest extends TestCase
 {
+    private static bool $passportKeysPrepared = false;
+
     public function test_purchase_order_endpoints_require_authentication(): void
     {
+        $this->preparePassportKeys();
+
         $this->getJson('/api/purchase-orders')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->postJson('/api/purchase-orders', [])->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->getJson('/api/purchase-orders/1')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
@@ -22,6 +27,8 @@ class PurchaseRoutesTest extends TestCase
 
     public function test_grn_endpoints_require_authentication(): void
     {
+        $this->preparePassportKeys();
+
         $this->getJson('/api/grns')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->postJson('/api/grns', [])->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->getJson('/api/grns/1')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
@@ -32,6 +39,8 @@ class PurchaseRoutesTest extends TestCase
 
     public function test_purchase_invoice_endpoints_require_authentication(): void
     {
+        $this->preparePassportKeys();
+
         $this->getJson('/api/purchase-invoices')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->postJson('/api/purchase-invoices', [])->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->getJson('/api/purchase-invoices/1')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
@@ -42,6 +51,8 @@ class PurchaseRoutesTest extends TestCase
 
     public function test_purchase_return_endpoints_require_authentication(): void
     {
+        $this->preparePassportKeys();
+
         $this->getJson('/api/purchase-returns')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->postJson('/api/purchase-returns', [])->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->getJson('/api/purchase-returns/1')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
@@ -116,5 +127,16 @@ class PurchaseRoutesTest extends TestCase
         }
 
         $this->fail(sprintf('Route %s %s was not registered.', $method, $uri));
+    }
+
+    private function preparePassportKeys(): void
+    {
+        if (self::$passportKeysPrepared) {
+            return;
+        }
+
+        Artisan::call('passport:keys', ['--force' => true]);
+
+        self::$passportKeysPrepared = true;
     }
 }

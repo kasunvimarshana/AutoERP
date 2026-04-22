@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Application\Services;
 
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Application\Services\BaseService;
 use Modules\Finance\Application\Contracts\CreatePaymentAllocationServiceInterface;
@@ -11,6 +12,7 @@ use Modules\Finance\Application\Contracts\CreatePaymentServiceInterface;
 use Modules\Purchase\Application\Contracts\RecordPurchasePaymentServiceInterface;
 use Modules\Purchase\Application\DTOs\RecordPurchasePaymentData;
 use Modules\Purchase\Domain\Entities\PurchaseInvoice;
+use Modules\Purchase\Domain\Events\PurchasePaymentRecorded;
 use Modules\Purchase\Domain\Exceptions\PurchaseInvoiceNotFoundException;
 use Modules\Purchase\Domain\RepositoryInterfaces\PurchaseInvoiceRepositoryInterface;
 
@@ -77,7 +79,23 @@ class RecordPurchasePaymentService extends BaseService implements RecordPurchase
 
             $invoice->recordPayment((string) $dto->amount);
 
-            return $this->invoiceRepository->save($invoice);
+            $saved = $this->invoiceRepository->save($invoice);
+
+            $this->addEvent(new PurchasePaymentRecorded(
+                tenantId: $dto->tenant_id,
+                purchaseInvoiceId: (int) $saved->getId(),
+                supplierId: $saved->getSupplierId(),
+                paymentId: (int) $payment->getId(),
+                apAccountId: $saved->getApAccountId(),
+                cashAccountId: $dto->account_id,
+                amount: (string) $dto->amount,
+                currencyId: $dto->currency_id,
+                exchangeRate: (string) $dto->exchange_rate,
+                paymentDate: $dto->payment_date,
+                createdBy: (int) (Auth::id() ?? 0),
+            ));
+
+            return $saved;
         });
     }
 }

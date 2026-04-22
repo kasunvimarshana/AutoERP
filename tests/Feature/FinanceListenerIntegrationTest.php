@@ -11,8 +11,10 @@ use Modules\Finance\Application\Contracts\CreateJournalEntryServiceInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\ApTransactionRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\FiscalPeriodRepositoryInterface;
 use Modules\Finance\Infrastructure\Listeners\HandlePurchaseInvoiceApproved;
+use Modules\Finance\Infrastructure\Listeners\HandlePurchasePaymentRecorded;
 use Modules\Finance\Infrastructure\Listeners\HandleSalesInvoicePosted;
 use Modules\Purchase\Domain\Events\PurchaseInvoiceApproved;
+use Modules\Purchase\Domain\Events\PurchasePaymentRecorded;
 use Modules\Sales\Domain\Events\SalesInvoicePosted;
 use Tests\TestCase;
 
@@ -29,6 +31,8 @@ class FinanceListenerIntegrationTest extends TestCase
     private int $arAccountId = 3;
 
     private int $revenueAccountId = 4;
+
+    private int $cashAccountId = 5;
 
     private int $fiscalYearId = 1;
 
@@ -304,6 +308,179 @@ class FinanceListenerIntegrationTest extends TestCase
         $this->assertSame(0, DB::table('journal_entries')->count());
     }
 
+    // ──────────────────────────────────────────────────────────────────
+    // HandlePurchasePaymentRecorded
+    // ──────────────────────────────────────────────────────────────────
+
+    public function test_handle_purchase_payment_recorded_creates_journal_entry_and_ap_transaction(): void
+    {
+        $event = new PurchasePaymentRecorded(
+            tenantId: $this->tenantId,
+            purchaseInvoiceId: 50,
+            supplierId: 1,
+            paymentId: 10,
+            apAccountId: $this->apAccountId,
+            cashAccountId: $this->cashAccountId,
+            amount: '500.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            paymentDate: '2026-01-20',
+        );
+
+        $this->makePaymentListener()->handle($event);
+
+        // One journal entry created
+        $this->assertSame(1, DB::table('journal_entries')->count());
+
+        $je = DB::table('journal_entries')->first();
+        $this->assertSame('system', $je->entry_type);
+        $this->assertSame('purchase_payment', $je->reference_type);
+        $this->assertSame(10, (int) $je->reference_id);
+
+        $lines = DB::table('journal_entry_lines')
+            ->where('journal_entry_id', $je->id)
+            ->orderBy('debit_amount', 'desc')
+            ->get();
+
+        $this->assertCount(2, $lines);
+
+        // DR: AP account
+        $debitLine = $lines[0];
+        $this->assertSame($this->apAccountId, (int) $debitLine->account_id);
+        $this->assertEqualsWithDelta(500.0, (float) $debitLine->debit_amount, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $debitLine->credit_amount, 0.001);
+
+        // CR: Cash/Bank account
+        $creditLine = $lines[1];
+        $this->assertSame($this->cashAccountId, (int) $creditLine->account_id);
+        $this->assertEqualsWithDelta(0.0, (float) $creditLine->debit_amount, 0.001);
+        $this->assertEqualsWithDelta(500.0, (float) $creditLine->credit_amount, 0.001);
+
+        // AP transaction recorded with type 'payment'
+        $this->assertSame(1, DB::table('ap_transactions')->count());
+        $ap = DB::table('ap_transactions')->first();
+        $this->assertSame('payment', $ap->transaction_type);
+        $this->assertSame('purchase_payment', $ap->reference_type);
+        $this->assertSame(10, (int) $ap->reference_id);
+        $this->assertEqualsWithDelta(-500.0, (float) $ap->amount, 0.001);
+    }
+
+    public function test_handle_purchase_payment_recorded_reduces_supplier_ap_balance(): void
+    {
+        // First seed an existing AP balance by inserting a bill transaction
+        DB::table('ap_transactions')->insert([
+            'tenant_id' => $this->tenantId,
+            'supplier_id' => 1,
+            'account_id' => $this->apAccountId,
+            'transaction_type' => 'bill',
+            'amount' => '1000.000000',
+            'balance_after' => '1000.000000',
+            'transaction_date' => '2026-01-10',
+            'currency_id' => 1,
+            'is_reconciled' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $event = new PurchasePaymentRecorded(
+            tenantId: $this->tenantId,
+            purchaseInvoiceId: 55,
+            supplierId: 1,
+            paymentId: 11,
+            apAccountId: $this->apAccountId,
+            cashAccountId: $this->cashAccountId,
+            amount: '400.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            paymentDate: '2026-01-20',
+        );
+
+        $this->makePaymentListener()->handle($event);
+
+        $apTransaction = DB::table('ap_transactions')
+            ->where('transaction_type', 'payment')
+            ->first();
+
+        $this->assertNotNull($apTransaction);
+        // Balance after = 1000 - 400 = 600
+        $this->assertEqualsWithDelta(600.0, (float) $apTransaction->balance_after, 0.001);
+    }
+
+    public function test_handle_purchase_payment_recorded_skips_when_ap_account_is_null(): void
+    {
+        $event = new PurchasePaymentRecorded(
+            tenantId: $this->tenantId,
+            purchaseInvoiceId: 56,
+            supplierId: 1,
+            paymentId: 12,
+            apAccountId: null,
+            cashAccountId: $this->cashAccountId,
+            amount: '200.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            paymentDate: '2026-01-20',
+        );
+
+        $this->makePaymentListener()->handle($event);
+
+        $this->assertSame(0, DB::table('journal_entries')->count());
+        $this->assertSame(0, DB::table('ap_transactions')->count());
+    }
+
+    public function test_handle_purchase_payment_recorded_skips_when_amount_is_zero(): void
+    {
+        $event = new PurchasePaymentRecorded(
+            tenantId: $this->tenantId,
+            purchaseInvoiceId: 57,
+            supplierId: 1,
+            paymentId: 13,
+            apAccountId: $this->apAccountId,
+            cashAccountId: $this->cashAccountId,
+            amount: '0.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            paymentDate: '2026-01-20',
+        );
+
+        $this->makePaymentListener()->handle($event);
+
+        $this->assertSame(0, DB::table('journal_entries')->count());
+        $this->assertSame(0, DB::table('ap_transactions')->count());
+    }
+
+    public function test_handle_purchase_payment_recorded_skips_when_no_open_fiscal_period(): void
+    {
+        DB::table('fiscal_periods')->update(['status' => 'closed']);
+
+        $event = new PurchasePaymentRecorded(
+            tenantId: $this->tenantId,
+            purchaseInvoiceId: 58,
+            supplierId: 1,
+            paymentId: 14,
+            apAccountId: $this->apAccountId,
+            cashAccountId: $this->cashAccountId,
+            amount: '300.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            paymentDate: '2026-01-20',
+        );
+
+        $this->makePaymentListener()->handle($event);
+
+        $this->assertSame(0, DB::table('journal_entries')->count());
+        $this->assertSame(0, DB::table('ap_transactions')->count());
+    }
+
+    private function makePaymentListener(): HandlePurchasePaymentRecorded
+    {
+        return new HandlePurchasePaymentRecorded(
+            fiscalPeriodRepository: app(FiscalPeriodRepositoryInterface::class),
+            createJournalEntryService: app(CreateJournalEntryServiceInterface::class),
+            createApTransactionService: app(CreateApTransactionServiceInterface::class),
+            apTransactionRepository: app(ApTransactionRepositoryInterface::class),
+        );
+    }
+
     private function makeApListener(): HandlePurchaseInvoiceApproved
     {
         return new HandlePurchaseInvoiceApproved(
@@ -422,6 +599,7 @@ class FinanceListenerIntegrationTest extends TestCase
             ['id' => $this->inventoryAccountId, 'code' => '1500', 'name' => 'Inventory', 'type' => 'asset', 'normal_balance' => 'debit'],
             ['id' => $this->arAccountId, 'code' => '1200', 'name' => 'Accounts Receivable', 'type' => 'asset', 'normal_balance' => 'debit'],
             ['id' => $this->revenueAccountId, 'code' => '4000', 'name' => 'Revenue', 'type' => 'revenue', 'normal_balance' => 'credit'],
+            ['id' => $this->cashAccountId, 'code' => '1000', 'name' => 'Cash and Bank', 'type' => 'asset', 'normal_balance' => 'debit'],
         ];
 
         foreach ($accounts as $account) {

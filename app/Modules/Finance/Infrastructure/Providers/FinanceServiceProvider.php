@@ -207,6 +207,7 @@ use Modules\Finance\Domain\RepositoryInterfaces\PaymentMethodRepositoryInterface
 use Modules\Finance\Domain\RepositoryInterfaces\PaymentRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\PaymentTermRepositoryInterface;
 use Modules\Finance\Infrastructure\Listeners\HandlePurchaseInvoiceApproved;
+use Modules\Finance\Infrastructure\Listeners\HandlePurchasePaymentRecorded;
 use Modules\Finance\Infrastructure\Listeners\HandlePurchaseReturnPosted;
 use Modules\Finance\Infrastructure\Listeners\HandleSalesInvoicePosted;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentAccountRepository;
@@ -229,6 +230,7 @@ use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentPay
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentPaymentRepository;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentPaymentTermRepository;
 use Modules\Purchase\Domain\Events\PurchaseInvoiceApproved;
+use Modules\Purchase\Domain\Events\PurchasePaymentRecorded;
 use Modules\Purchase\Domain\Events\PurchaseReturnPosted;
 use Modules\Sales\Domain\Events\SalesInvoicePosted;
 
@@ -365,6 +367,7 @@ class FinanceServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Event::listen(PurchaseInvoiceApproved::class, HandlePurchaseInvoiceApproved::class);
+        Event::listen(PurchasePaymentRecorded::class, HandlePurchasePaymentRecorded::class);
         Event::listen(PurchaseReturnPosted::class, HandlePurchaseReturnPosted::class);
         Event::listen(SalesInvoicePosted::class, HandleSalesInvoicePosted::class);
 
