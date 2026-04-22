@@ -6,7 +6,9 @@ namespace Modules\Finance\Infrastructure\Listeners;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Modules\Finance\Application\Contracts\CreateApTransactionServiceInterface;
 use Modules\Finance\Application\Contracts\CreateJournalEntryServiceInterface;
+use Modules\Finance\Domain\RepositoryInterfaces\ApTransactionRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\FiscalPeriodRepositoryInterface;
 use Modules\Purchase\Domain\Events\PurchaseInvoiceApproved;
 
@@ -15,6 +17,8 @@ class HandlePurchaseInvoiceApproved
     public function __construct(
         private readonly FiscalPeriodRepositoryInterface $fiscalPeriodRepository,
         private readonly CreateJournalEntryServiceInterface $createJournalEntryService,
+        private readonly CreateApTransactionServiceInterface $createApTransactionService,
+        private readonly ApTransactionRepositoryInterface $apTransactionRepository,
     ) {}
 
     public function handle(PurchaseInvoiceApproved $event): void
@@ -123,6 +127,26 @@ class HandlePurchaseInvoiceApproved
                 'reference_id' => $event->purchaseInvoiceId,
                 'description' => $description,
                 'lines' => $jeLines,
+            ]);
+
+            // Record AP debit transaction (increases amount owed to supplier)
+            $currentBalance = (float) $this->apTransactionRepository
+                ->getSupplierBalance($event->tenantId, $event->supplierId ?? 0);
+
+            $newBalance = (float) bcadd((string) $currentBalance, $event->grandTotal, 6);
+
+            $this->createApTransactionService->execute([
+                'tenant_id' => $event->tenantId,
+                'supplier_id' => $event->supplierId ?? 0,
+                'account_id' => $event->apAccountId,
+                'transaction_type' => 'bill',
+                'amount' => (float) $event->grandTotal,
+                'balance_after' => $newBalance,
+                'transaction_date' => $invoiceDate->format('Y-m-d'),
+                'currency_id' => $event->currencyId,
+                'reference_type' => 'purchase_invoice',
+                'reference_id' => $event->purchaseInvoiceId,
+                'due_date' => $event->dueDate !== '' ? $event->dueDate : null,
             ]);
         });
     }

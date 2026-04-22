@@ -7,6 +7,7 @@ namespace Modules\Purchase\Infrastructure\Providers;
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Infrastructure\Concerns\LoadsModuleRoutesAndMigrations;
 use Modules\Purchase\Application\Contracts\ApprovePurchaseInvoiceServiceInterface;
+use Modules\Purchase\Application\Contracts\CancelPurchaseOrderServiceInterface;
 use Modules\Purchase\Application\Contracts\ConfirmPurchaseOrderServiceInterface;
 use Modules\Purchase\Application\Contracts\CreateGrnServiceInterface;
 use Modules\Purchase\Application\Contracts\CreatePurchaseInvoiceServiceInterface;
@@ -22,11 +23,14 @@ use Modules\Purchase\Application\Contracts\FindPurchaseOrderServiceInterface;
 use Modules\Purchase\Application\Contracts\FindPurchaseReturnServiceInterface;
 use Modules\Purchase\Application\Contracts\PostGrnServiceInterface;
 use Modules\Purchase\Application\Contracts\PostPurchaseReturnServiceInterface;
+use Modules\Purchase\Application\Contracts\RecordPurchasePaymentServiceInterface;
+use Modules\Purchase\Application\Contracts\SendPurchaseOrderServiceInterface;
 use Modules\Purchase\Application\Contracts\UpdateGrnServiceInterface;
 use Modules\Purchase\Application\Contracts\UpdatePurchaseInvoiceServiceInterface;
 use Modules\Purchase\Application\Contracts\UpdatePurchaseOrderServiceInterface;
 use Modules\Purchase\Application\Contracts\UpdatePurchaseReturnServiceInterface;
 use Modules\Purchase\Application\Services\ApprovePurchaseInvoiceService;
+use Modules\Purchase\Application\Services\CancelPurchaseOrderService;
 use Modules\Purchase\Application\Services\ConfirmPurchaseOrderService;
 use Modules\Purchase\Application\Services\CreateGrnService;
 use Modules\Purchase\Application\Services\CreatePurchaseInvoiceService;
@@ -42,6 +46,8 @@ use Modules\Purchase\Application\Services\FindPurchaseOrderService;
 use Modules\Purchase\Application\Services\FindPurchaseReturnService;
 use Modules\Purchase\Application\Services\PostGrnService;
 use Modules\Purchase\Application\Services\PostPurchaseReturnService;
+use Modules\Purchase\Application\Services\RecordPurchasePaymentService;
+use Modules\Purchase\Application\Services\SendPurchaseOrderService;
 use Modules\Purchase\Application\Services\UpdateGrnService;
 use Modules\Purchase\Application\Services\UpdatePurchaseInvoiceService;
 use Modules\Purchase\Application\Services\UpdatePurchaseOrderService;
@@ -90,6 +96,8 @@ class PurchaseServiceProvider extends ServiceProvider
             UpdatePurchaseOrderServiceInterface::class => UpdatePurchaseOrderService::class,
             DeletePurchaseOrderServiceInterface::class => DeletePurchaseOrderService::class,
             ConfirmPurchaseOrderServiceInterface::class => ConfirmPurchaseOrderService::class,
+            SendPurchaseOrderServiceInterface::class => SendPurchaseOrderService::class,
+            CancelPurchaseOrderServiceInterface::class => CancelPurchaseOrderService::class,
             CreateGrnServiceInterface::class => CreateGrnService::class,
             FindGrnServiceInterface::class => FindGrnService::class,
             UpdateGrnServiceInterface::class => UpdateGrnService::class,
@@ -100,6 +108,7 @@ class PurchaseServiceProvider extends ServiceProvider
             UpdatePurchaseInvoiceServiceInterface::class => UpdatePurchaseInvoiceService::class,
             DeletePurchaseInvoiceServiceInterface::class => DeletePurchaseInvoiceService::class,
             ApprovePurchaseInvoiceServiceInterface::class => ApprovePurchaseInvoiceService::class,
+            RecordPurchasePaymentServiceInterface::class => RecordPurchasePaymentService::class,
             CreatePurchaseReturnServiceInterface::class => CreatePurchaseReturnService::class,
             FindPurchaseReturnServiceInterface::class => FindPurchaseReturnService::class,
             UpdatePurchaseReturnServiceInterface::class => UpdatePurchaseReturnService::class,

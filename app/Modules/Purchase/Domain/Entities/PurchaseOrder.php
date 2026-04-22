@@ -240,6 +240,12 @@ class PurchaseOrder
         $this->updatedAt = new \DateTimeImmutable;
     }
 
+    public function send(): void
+    {
+        $this->status = 'sent';
+        $this->updatedAt = new \DateTimeImmutable;
+    }
+
     public function close(): void
     {
         $this->status = 'closed';

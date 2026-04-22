@@ -230,4 +230,10 @@ class PurchaseReturn
         $this->status = 'approved';
         $this->updatedAt = new \DateTimeImmutable;
     }
+
+    public function setJournalEntryId(int $journalEntryId): void
+    {
+        $this->journalEntryId = $journalEntryId;
+        $this->updatedAt = new \DateTimeImmutable;
+    }
 }

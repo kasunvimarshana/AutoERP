@@ -7,14 +7,18 @@ namespace Modules\Purchase\Infrastructure\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Response;
 use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
+use Modules\Purchase\Application\Contracts\CancelPurchaseOrderServiceInterface;
 use Modules\Purchase\Application\Contracts\ConfirmPurchaseOrderServiceInterface;
 use Modules\Purchase\Application\Contracts\CreatePurchaseOrderServiceInterface;
 use Modules\Purchase\Application\Contracts\DeletePurchaseOrderServiceInterface;
 use Modules\Purchase\Application\Contracts\FindPurchaseOrderServiceInterface;
+use Modules\Purchase\Application\Contracts\SendPurchaseOrderServiceInterface;
 use Modules\Purchase\Application\Contracts\UpdatePurchaseOrderServiceInterface;
 use Modules\Purchase\Domain\Entities\PurchaseOrder;
+use Modules\Purchase\Infrastructure\Http\Requests\CancelPurchaseOrderRequest;
 use Modules\Purchase\Infrastructure\Http\Requests\ConfirmPurchaseOrderRequest;
 use Modules\Purchase\Infrastructure\Http\Requests\ListPurchaseOrderRequest;
+use Modules\Purchase\Infrastructure\Http\Requests\SendPurchaseOrderRequest;
 use Modules\Purchase\Infrastructure\Http\Requests\StorePurchaseOrderRequest;
 use Modules\Purchase\Infrastructure\Http\Requests\UpdatePurchaseOrderRequest;
 use Modules\Purchase\Infrastructure\Http\Resources\PurchaseOrderCollection;
@@ -29,6 +33,8 @@ class PurchaseOrderController extends AuthorizedController
         protected DeletePurchaseOrderServiceInterface $deleteService,
         protected FindPurchaseOrderServiceInterface $findService,
         protected ConfirmPurchaseOrderServiceInterface $confirmService,
+        protected SendPurchaseOrderServiceInterface $sendService,
+        protected CancelPurchaseOrderServiceInterface $cancelService,
     ) {}
 
     public function index(ListPurchaseOrderRequest $request): JsonResponse
@@ -95,6 +101,24 @@ class PurchaseOrderController extends AuthorizedController
         $confirmed = $this->confirmService->execute(['id' => $purchaseOrder]);
 
         return new PurchaseOrderResource($confirmed);
+    }
+
+    public function send(SendPurchaseOrderRequest $request, int $purchaseOrder): PurchaseOrderResource
+    {
+        $entity = $this->findOrFail($purchaseOrder);
+        $this->authorize('update', $entity);
+        $sent = $this->sendService->execute(['id' => $purchaseOrder]);
+
+        return new PurchaseOrderResource($sent);
+    }
+
+    public function cancel(CancelPurchaseOrderRequest $request, int $purchaseOrder): PurchaseOrderResource
+    {
+        $entity = $this->findOrFail($purchaseOrder);
+        $this->authorize('update', $entity);
+        $cancelled = $this->cancelService->execute(['id' => $purchaseOrder]);
+
+        return new PurchaseOrderResource($cancelled);
     }
 
     private function findOrFail(int $id): PurchaseOrder

@@ -42,6 +42,8 @@ class PurchaseInvoice
 
     private ?int $journalEntryId;
 
+    private string $paidAmount;
+
     private \DateTimeInterface $createdAt;
 
     private \DateTimeInterface $updatedAt;
@@ -64,6 +66,7 @@ class PurchaseInvoice
         string $grandTotal = '0',
         ?int $apAccountId = null,
         ?int $journalEntryId = null,
+        string $paidAmount = '0',
         ?int $id = null,
         ?\DateTimeInterface $createdAt = null,
         ?\DateTimeInterface $updatedAt = null,
@@ -85,6 +88,7 @@ class PurchaseInvoice
         $this->grandTotal = $grandTotal;
         $this->apAccountId = $apAccountId;
         $this->journalEntryId = $journalEntryId;
+        $this->paidAmount = $paidAmount;
         $this->id = $id;
         $this->createdAt = $createdAt ?? new \DateTimeImmutable;
         $this->updatedAt = $updatedAt ?? new \DateTimeImmutable;
@@ -178,6 +182,36 @@ class PurchaseInvoice
     public function getJournalEntryId(): ?int
     {
         return $this->journalEntryId;
+    }
+
+    public function getPaidAmount(): string
+    {
+        return $this->paidAmount;
+    }
+
+    public function getBalanceDue(): string
+    {
+        return bcsub($this->grandTotal, $this->paidAmount, 6);
+    }
+
+    public function setJournalEntryId(int $journalEntryId): void
+    {
+        $this->journalEntryId = $journalEntryId;
+        $this->updatedAt = new \DateTimeImmutable;
+    }
+
+    public function recordPayment(string $amount): void
+    {
+        $newPaid = bcadd($this->paidAmount, $amount, 6);
+        $this->paidAmount = $newPaid;
+
+        if (bccomp($newPaid, $this->grandTotal, 6) >= 0) {
+            $this->status = 'paid';
+        } elseif (bccomp($newPaid, '0.000000', 6) > 0) {
+            $this->status = 'partial_paid';
+        }
+
+        $this->updatedAt = new \DateTimeImmutable;
     }
 
     public function getCreatedAt(): \DateTimeInterface

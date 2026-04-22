@@ -10,4 +10,6 @@ use Modules\Finance\Domain\Entities\ApTransaction;
 interface ApTransactionRepositoryInterface extends RepositoryInterface
 {
     public function save(ApTransaction $apTransaction): ApTransaction;
+
+    public function getSupplierBalance(int $tenantId, int $supplierId): string;
 }

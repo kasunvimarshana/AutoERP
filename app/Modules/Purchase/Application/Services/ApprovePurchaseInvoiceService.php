@@ -55,6 +55,7 @@ class ApprovePurchaseInvoiceService extends BaseService implements ApprovePurcha
             currencyId: $saved->getCurrencyId(),
             exchangeRate: $saved->getExchangeRate(),
             invoiceDate: $saved->getInvoiceDate()->format('Y-m-d'),
+            dueDate: $saved->getDueDate()->format('Y-m-d'),
             lines: $lines,
             createdBy: (int) ($data['approved_by'] ?? Auth::id() ?? 0),
         ));

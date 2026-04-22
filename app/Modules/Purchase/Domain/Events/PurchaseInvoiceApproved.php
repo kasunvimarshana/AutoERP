@@ -18,6 +18,7 @@ class PurchaseInvoiceApproved
         public readonly int $currencyId = 1,
         public readonly string $exchangeRate = '1.000000',
         public readonly string $invoiceDate = '',
+        public readonly string $dueDate = '',
         public readonly array $lines = [],
         public readonly int $createdBy = 0,
     ) {}

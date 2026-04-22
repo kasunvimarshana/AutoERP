@@ -11,10 +11,12 @@ use Modules\Purchase\Application\Contracts\ApprovePurchaseInvoiceServiceInterfac
 use Modules\Purchase\Application\Contracts\CreatePurchaseInvoiceServiceInterface;
 use Modules\Purchase\Application\Contracts\DeletePurchaseInvoiceServiceInterface;
 use Modules\Purchase\Application\Contracts\FindPurchaseInvoiceServiceInterface;
+use Modules\Purchase\Application\Contracts\RecordPurchasePaymentServiceInterface;
 use Modules\Purchase\Application\Contracts\UpdatePurchaseInvoiceServiceInterface;
 use Modules\Purchase\Domain\Entities\PurchaseInvoice;
 use Modules\Purchase\Infrastructure\Http\Requests\ApprovePurchaseInvoiceRequest;
 use Modules\Purchase\Infrastructure\Http\Requests\ListPurchaseInvoiceRequest;
+use Modules\Purchase\Infrastructure\Http\Requests\RecordPurchasePaymentRequest;
 use Modules\Purchase\Infrastructure\Http\Requests\StorePurchaseInvoiceRequest;
 use Modules\Purchase\Infrastructure\Http\Requests\UpdatePurchaseInvoiceRequest;
 use Modules\Purchase\Infrastructure\Http\Resources\PurchaseInvoiceCollection;
@@ -29,6 +31,7 @@ class PurchaseInvoiceController extends AuthorizedController
         protected DeletePurchaseInvoiceServiceInterface $deleteService,
         protected FindPurchaseInvoiceServiceInterface $findService,
         protected ApprovePurchaseInvoiceServiceInterface $approveService,
+        protected RecordPurchasePaymentServiceInterface $recordPaymentService,
     ) {}
 
     public function index(ListPurchaseInvoiceRequest $request): JsonResponse
@@ -96,6 +99,18 @@ class PurchaseInvoiceController extends AuthorizedController
         $approved = $this->approveService->execute(['id' => $invoice]);
 
         return new PurchaseInvoiceResource($approved);
+    }
+
+    public function recordPayment(RecordPurchasePaymentRequest $request, int $invoice): PurchaseInvoiceResource
+    {
+        $entity = $this->findOrFail($invoice);
+        $this->authorize('update', $entity);
+        $payload = $request->validated();
+        $payload['invoice_id'] = $invoice;
+        $payload['tenant_id'] = $entity->getTenantId();
+        $updated = $this->recordPaymentService->execute($payload);
+
+        return new PurchaseInvoiceResource($updated);
     }
 
     private function findOrFail(int $id): PurchaseInvoice

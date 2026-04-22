@@ -6,7 +6,9 @@ namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Modules\Finance\Application\Contracts\CreateApTransactionServiceInterface;
 use Modules\Finance\Application\Contracts\CreateJournalEntryServiceInterface;
+use Modules\Finance\Domain\RepositoryInterfaces\ApTransactionRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\FiscalPeriodRepositoryInterface;
 use Modules\Finance\Infrastructure\Listeners\HandlePurchaseInvoiceApproved;
 use Modules\Finance\Infrastructure\Listeners\HandleSalesInvoicePosted;
@@ -307,6 +309,8 @@ class FinanceListenerIntegrationTest extends TestCase
         return new HandlePurchaseInvoiceApproved(
             fiscalPeriodRepository: app(FiscalPeriodRepositoryInterface::class),
             createJournalEntryService: app(CreateJournalEntryServiceInterface::class),
+            createApTransactionService: app(CreateApTransactionServiceInterface::class),
+            apTransactionRepository: app(ApTransactionRepositoryInterface::class),
         );
     }
 
@@ -350,6 +354,26 @@ class FinanceListenerIntegrationTest extends TestCase
             'symbol' => '$',
             'decimal_places' => 2,
             'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('suppliers')->insert([
+            'id' => 1,
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'user_id' => null,
+            'supplier_code' => 'SUP001',
+            'name' => 'Test Supplier',
+            'type' => 'company',
+            'tax_number' => null,
+            'registration_number' => null,
+            'currency_id' => 1,
+            'payment_terms_days' => 30,
+            'ap_account_id' => null,
+            'status' => 'active',
+            'notes' => null,
+            'metadata' => null,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

@@ -34,6 +34,8 @@ class PurchaseInvoiceResource extends JsonResource
             'grand_total' => $entity->getGrandTotal(),
             'ap_account_id' => $entity->getApAccountId(),
             'journal_entry_id' => $entity->getJournalEntryId(),
+            'paid_amount' => $entity->getPaidAmount(),
+            'balance_due' => $entity->getBalanceDue(),
             'created_at' => $entity->getCreatedAt()->format('c'),
             'updated_at' => $entity->getUpdatedAt()->format('c'),
         ];

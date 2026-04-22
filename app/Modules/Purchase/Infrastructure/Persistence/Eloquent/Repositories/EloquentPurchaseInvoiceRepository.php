@@ -35,6 +35,7 @@ class EloquentPurchaseInvoiceRepository extends EloquentRepository implements Pu
             'tax_total' => $entity->getTaxTotal(),
             'discount_total' => $entity->getDiscountTotal(),
             'grand_total' => $entity->getGrandTotal(),
+            'paid_amount' => $entity->getPaidAmount(),
             'ap_account_id' => $entity->getApAccountId(),
             'journal_entry_id' => $entity->getJournalEntryId(),
         ];
@@ -73,6 +74,7 @@ class EloquentPurchaseInvoiceRepository extends EloquentRepository implements Pu
             grandTotal: (string) $m->grand_total,
             apAccountId: $m->ap_account_id !== null ? (int) $m->ap_account_id : null,
             journalEntryId: $m->journal_entry_id !== null ? (int) $m->journal_entry_id : null,
+            paidAmount: $m->paid_amount !== null ? (string) $m->paid_amount : '0',
             id: (int) $m->id,
             createdAt: $m->created_at,
             updatedAt: $m->updated_at,

@@ -31,6 +31,7 @@ class PurchaseInvoiceModel extends Model
         'tax_total',
         'discount_total',
         'grand_total',
+        'paid_amount',
         'ap_account_id',
         'journal_entry_id',
     ];
@@ -48,6 +49,7 @@ class PurchaseInvoiceModel extends Model
         'tax_total' => 'decimal:6',
         'discount_total' => 'decimal:6',
         'grand_total' => 'decimal:6',
+        'paid_amount' => 'decimal:6',
         'invoice_date' => 'date',
         'due_date' => 'date',
     ];

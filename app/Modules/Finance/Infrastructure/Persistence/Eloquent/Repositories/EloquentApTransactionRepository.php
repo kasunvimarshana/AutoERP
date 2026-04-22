@@ -40,6 +40,17 @@ class EloquentApTransactionRepository extends EloquentRepository implements ApTr
         return $this->toDomainEntity($model);
     }
 
+    public function getSupplierBalance(int $tenantId, int $supplierId): string
+    {
+        $latest = ApTransactionModel::query()
+            ->where('tenant_id', $tenantId)
+            ->where('supplier_id', $supplierId)
+            ->orderByDesc('id')
+            ->first();
+
+        return $latest !== null ? (string) $latest->balance_after : '0.000000';
+    }
+
     private function mapToDomain(ApTransactionModel $m): ApTransaction
     {
         return new ApTransaction(
