@@ -56,6 +56,7 @@ class CreateProductService extends BaseService implements CreateProductServiceIn
             inventoryAccountId: $dto->inventory_account_id,
             expenseAccountId: $dto->expense_account_id,
             isActive: $dto->is_active,
+            status: $dto->status,
             metadata: $dto->metadata,
         );
 

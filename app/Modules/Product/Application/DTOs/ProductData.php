@@ -35,6 +35,7 @@ class ProductData
         public readonly ?int $inventory_account_id = null,
         public readonly ?int $expense_account_id = null,
         public readonly bool $is_active = true,
+        public readonly string $status = 'draft',
         public readonly ?array $metadata = null,
         public readonly ?int $id = null,
     ) {}
@@ -70,6 +71,7 @@ class ProductData
             inventory_account_id: isset($data['inventory_account_id']) ? (int) $data['inventory_account_id'] : null,
             expense_account_id: isset($data['expense_account_id']) ? (int) $data['expense_account_id'] : null,
             is_active: (bool) ($data['is_active'] ?? true),
+            status: (string) ($data['status'] ?? 'draft'),
             metadata: isset($data['metadata']) && is_array($data['metadata']) ? $data['metadata'] : null,
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
@@ -107,6 +109,7 @@ class ProductData
             'inventory_account_id' => $this->inventory_account_id,
             'expense_account_id' => $this->expense_account_id,
             'is_active' => $this->is_active,
+            'status' => $this->status,
             'metadata' => $this->metadata,
         ];
     }

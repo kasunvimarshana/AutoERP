@@ -66,6 +66,10 @@ class UpdateProductService extends BaseService implements UpdateProductServiceIn
             metadata: $dto->metadata,
         );
 
+        if (isset($data['status'])) {
+            $product->setStatus((string) $data['status']);
+        }
+
         return $this->productRepository->save($product);
     }
 }

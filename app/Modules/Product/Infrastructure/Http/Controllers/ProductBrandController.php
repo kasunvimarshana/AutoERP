@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace Modules\Product\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Response;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
+use Modules\Core\Infrastructure\Http\Traits\HasImageStorage;
 use Modules\Product\Application\Contracts\CreateProductBrandServiceInterface;
 use Modules\Product\Application\Contracts\DeleteProductBrandServiceInterface;
 use Modules\Product\Application\Contracts\FindProductBrandServiceInterface;
@@ -25,6 +24,8 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class ProductBrandController extends AuthorizedController
 {
+    use HasImageStorage;
+
     public function __construct(
         protected FileStorageServiceInterface $storage,
         protected CreateProductBrandServiceInterface $createProductBrandService,
@@ -78,7 +79,7 @@ class ProductBrandController extends AuthorizedController
             ->setStatusCode(HttpResponse::HTTP_CREATED);
     }
 
-    public function show(Request $request, int $productBrand): ProductBrandResource
+    public function show(int $productBrand): ProductBrandResource
     {
         $foundProductBrand = $this->findProductBrandOrFail($productBrand);
         $this->authorize('view', $foundProductBrand);
@@ -143,27 +144,5 @@ class ProductBrandController extends AuthorizedController
         }
 
         return $productBrand;
-    }
-
-    private function storeImage(UploadedFile $image, int $tenantId, string $baseDirectory): string
-    {
-        return $this->storage->storeFile($image, "{$baseDirectory}/{$tenantId}");
-    }
-
-    private function deleteImageIfSafe(?string $imagePath, int $tenantId, string $baseDirectory, ?string $excludePath = null): void
-    {
-        if ($imagePath === null || $imagePath === '' || $imagePath === $excludePath) {
-            return;
-        }
-
-        $expectedPrefix = "{$baseDirectory}/{$tenantId}/";
-
-        if (! str_starts_with($imagePath, $expectedPrefix)) {
-            return;
-        }
-
-        if ($this->storage->exists($imagePath)) {
-            $this->storage->delete($imagePath);
-        }
     }
 }

@@ -10,6 +10,9 @@ class Product
     private const SUPPORTED_TYPES = ['physical', 'service', 'digital', 'combo', 'variable'];
 
     /** @var array<string> */
+    private const SUPPORTED_STATUSES = ['draft', 'published', 'archived', 'discontinued'];
+
+    /** @var array<string> */
     private const SUPPORTED_VALUATION_METHODS = ['fifo', 'lifo', 'fefo', 'weighted_average', 'standard'];
 
     private ?int $id;
@@ -64,6 +67,8 @@ class Product
 
     private bool $isActive;
 
+    private string $status;
+
     /** @var array<string, mixed>|null */
     private ?array $metadata;
 
@@ -100,6 +105,7 @@ class Product
         ?int $inventoryAccountId = null,
         ?int $expenseAccountId = null,
         bool $isActive = true,
+        string $status = 'draft',
         ?array $metadata = null,
         ?int $id = null,
         ?\DateTimeInterface $createdAt = null,
@@ -141,6 +147,7 @@ class Product
         $this->inventoryAccountId = $inventoryAccountId;
         $this->expenseAccountId = $expenseAccountId;
         $this->isActive = $isActive;
+        $this->status = $status;
         $this->metadata = $metadata;
         $this->createdAt = $createdAt ?? new \DateTimeImmutable;
         $this->updatedAt = $updatedAt ?? new \DateTimeImmutable;
@@ -276,6 +283,20 @@ class Product
         return $this->isActive;
     }
 
+    public function getStatus(): string
+    {
+        return $this->status;
+    }
+
+    public function setStatus(string $status): void
+    {
+        if (! in_array($status, self::SUPPORTED_STATUSES, true)) {
+            throw new \InvalidArgumentException('Unsupported product status.');
+        }
+
+        $this->status = $status;
+    }
+
     /**
      * @return array<string, mixed>|null
      */
@@ -370,6 +391,7 @@ class Product
         bool $isLotTracked,
         bool $isSerialTracked,
         ?string $standardCost,
+        string $status = 'draft',
     ): void {
         if (! in_array($type, self::SUPPORTED_TYPES, true)) {
             throw new \InvalidArgumentException('Unsupported product type.');
@@ -389,6 +411,10 @@ class Product
 
         if ($valuationMethod === 'standard' && $standardCost === null) {
             throw new \InvalidArgumentException('Standard cost is required when valuation method is standard.');
+        }
+
+        if (! in_array($status, self::SUPPORTED_STATUSES, true)) {
+            throw new \InvalidArgumentException('Unsupported product status.');
         }
     }
 }
