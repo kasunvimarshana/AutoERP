@@ -15,6 +15,7 @@ use Modules\OrganizationUnit\Infrastructure\Providers\OrganizationUnitServicePro
 use Modules\Pricing\Infrastructure\Providers\PricingServiceProvider;
 use Modules\Product\Infrastructure\Providers\ProductServiceProvider;
 use Modules\Purchase\Infrastructure\Providers\PurchaseServiceProvider;
+use Modules\HR\Infrastructure\Providers\HRServiceProvider;
 use Modules\Sales\Infrastructure\Providers\SalesServiceProvider;
 use Modules\Shared\Infrastructure\Providers\SharedServiceProvider;
 use Modules\Supplier\Infrastructure\Providers\SupplierServiceProvider;
@@ -46,4 +47,5 @@ return [
     WarehouseServiceProvider::class,
     PurchaseServiceProvider::class,
     SalesServiceProvider::class,
+    HRServiceProvider::class,
 ];

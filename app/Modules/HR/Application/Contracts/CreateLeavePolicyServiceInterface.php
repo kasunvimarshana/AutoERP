@@ -1,0 +1,12 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\HR\Application\Contracts;
+
+use Modules\Core\Application\Contracts\ServiceInterface;
+
+/**
+ * @method \Modules\HR\Domain\Entities\LeavePolicy execute(array $data = [])
+ */
+interface CreateLeavePolicyServiceInterface extends ServiceInterface {}
