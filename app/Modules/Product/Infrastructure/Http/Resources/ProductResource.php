@@ -38,7 +38,6 @@ class ProductResource extends JsonResource
             'inventory_account_id' => $this->getInventoryAccountId(),
             'expense_account_id' => $this->getExpenseAccountId(),
             'is_active' => $this->isActive(),
-            'status' => $this->getStatus(),
             'metadata' => $this->getMetadata(),
             'created_at' => $this->getCreatedAt()->format('c'),
             'updated_at' => $this->getUpdatedAt()->format('c'),

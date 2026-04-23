@@ -43,7 +43,6 @@ class ProductModel extends BaseModel
         'inventory_account_id',
         'expense_account_id',
         'is_active',
-        'status',
         'metadata',
     ];
 

@@ -5,17 +5,14 @@ declare(strict_types=1);
 namespace Modules\Product\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Response;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
-use Modules\Core\Infrastructure\Http\Traits\HasImageStorage;
-use Modules\Product\Application\Contracts\ArchiveProductServiceInterface;
 use Modules\Product\Application\Contracts\CreateProductServiceInterface;
 use Modules\Product\Application\Contracts\DeleteProductServiceInterface;
-use Modules\Product\Application\Contracts\DiscontinueProductServiceInterface;
-use Modules\Product\Application\Contracts\DraftProductServiceInterface;
 use Modules\Product\Application\Contracts\FindProductServiceInterface;
-use Modules\Product\Application\Contracts\PublishProductServiceInterface;
 use Modules\Product\Application\Contracts\UpdateProductServiceInterface;
 use Modules\Product\Domain\Entities\Product;
 use Modules\Product\Infrastructure\Http\Requests\ListProductRequest;
@@ -28,18 +25,12 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class ProductController extends AuthorizedController
 {
-    use HasImageStorage;
-
     public function __construct(
         protected FileStorageServiceInterface $storage,
         protected CreateProductServiceInterface $createProductService,
         protected UpdateProductServiceInterface $updateProductService,
         protected DeleteProductServiceInterface $deleteProductService,
         protected FindProductServiceInterface $findProductService,
-        protected PublishProductServiceInterface $publishProductService,
-        protected ArchiveProductServiceInterface $archiveProductService,
-        protected DiscontinueProductServiceInterface $discontinueProductService,
-        protected DraftProductServiceInterface $draftProductService,
     ) {}
 
     public function index(ListProductRequest $request): JsonResponse
@@ -91,7 +82,7 @@ class ProductController extends AuthorizedController
             ->setStatusCode(HttpResponse::HTTP_CREATED);
     }
 
-    public function show(int $product): ProductResource
+    public function show(Request $request, int $product): ProductResource
     {
         $foundProduct = $this->findProductOrFail($product);
         $this->authorize('view', $foundProduct);
@@ -147,38 +138,6 @@ class ProductController extends AuthorizedController
         return Response::json(['message' => 'Product deleted successfully']);
     }
 
-    public function publish(int $product): ProductResource
-    {
-        $foundProduct = $this->findProductOrFail($product);
-        $this->authorize('update', $foundProduct);
-
-        return new ProductResource($this->publishProductService->execute(['id' => $product]));
-    }
-
-    public function archive(int $product): ProductResource
-    {
-        $foundProduct = $this->findProductOrFail($product);
-        $this->authorize('update', $foundProduct);
-
-        return new ProductResource($this->archiveProductService->execute(['id' => $product]));
-    }
-
-    public function discontinue(int $product): ProductResource
-    {
-        $foundProduct = $this->findProductOrFail($product);
-        $this->authorize('update', $foundProduct);
-
-        return new ProductResource($this->discontinueProductService->execute(['id' => $product]));
-    }
-
-    public function draft(int $product): ProductResource
-    {
-        $foundProduct = $this->findProductOrFail($product);
-        $this->authorize('update', $foundProduct);
-
-        return new ProductResource($this->draftProductService->execute(['id' => $product]));
-    }
-
     private function findProductOrFail(int $productId): Product
     {
         $product = $this->findProductService->find($productId);
@@ -188,5 +147,27 @@ class ProductController extends AuthorizedController
         }
 
         return $product;
+    }
+
+    private function storeImage(UploadedFile $image, int $tenantId, string $baseDirectory): string
+    {
+        return $this->storage->storeFile($image, "{$baseDirectory}/{$tenantId}");
+    }
+
+    private function deleteImageIfSafe(?string $imagePath, int $tenantId, string $baseDirectory, ?string $excludePath = null): void
+    {
+        if ($imagePath === null || $imagePath === '' || $imagePath === $excludePath) {
+            return;
+        }
+
+        $expectedPrefix = "{$baseDirectory}/{$tenantId}/";
+
+        if (! str_starts_with($imagePath, $expectedPrefix)) {
+            return;
+        }
+
+        if ($this->storage->exists($imagePath)) {
+            $this->storage->delete($imagePath);
+        }
     }
 }

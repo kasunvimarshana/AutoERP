@@ -45,7 +45,6 @@ class EloquentProductRepository extends EloquentRepository implements ProductRep
             'inventory_account_id' => $product->getInventoryAccountId(),
             'expense_account_id' => $product->getExpenseAccountId(),
             'is_active' => $product->isActive(),
-            'status' => $product->getStatus(),
             'metadata' => $product->getMetadata(),
         ];
 
@@ -104,7 +103,6 @@ class EloquentProductRepository extends EloquentRepository implements ProductRep
             inventoryAccountId: $model->inventory_account_id !== null ? (int) $model->inventory_account_id : null,
             expenseAccountId: $model->expense_account_id !== null ? (int) $model->expense_account_id : null,
             isActive: (bool) $model->is_active,
-            status: (string) ($model->status ?? 'draft'),
             metadata: is_array($model->metadata) ? $model->metadata : null,
             id: (int) $model->id,
             createdAt: $model->created_at,

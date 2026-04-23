@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Product\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Response;
 use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Product\Application\Contracts\CreateProductIdentifierServiceInterface;
@@ -66,7 +67,7 @@ class ProductIdentifierController extends AuthorizedController
             ->setStatusCode(HttpResponse::HTTP_CREATED);
     }
 
-    public function show(int $productIdentifier): ProductIdentifierResource
+    public function show(Request $request, int $productIdentifier): ProductIdentifierResource
     {
         $foundProductIdentifier = $this->findProductIdentifierOrFail($productIdentifier);
         $this->authorize('view', $foundProductIdentifier);
