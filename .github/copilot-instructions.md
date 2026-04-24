@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-KVAutoERP is a modular SaaS multi-tenant ERP/CRM platform built with **Laravel 13** and **PHP 8.3+**. It uses Clean Architecture organized as independent modules under `app/Modules/`. Currently 8 modules are fully implemented, 2 are infrastructure-only, and 9 have only migration schemas.
+KVAutoERP is a modular SaaS multi-tenant ERP/CRM platform built with **Laravel 12** and **PHP 8.2+**. It uses Clean Architecture organized as independent modules under `app/Modules/`. Currently 9 modules are fully implemented, 1 is infrastructure-only, and 9 have only migration schemas.
 
 ## Build & Test Commands
 
@@ -38,19 +38,19 @@ app/Modules/           # All business modules (19 modules)
 ├── Auth/              # OAuth2 (Laravel Passport) login/token/SSO flows
 ├── Product/           # Product catalog, variants, categories, brands, UoM
 ├── Finance/           # Double-entry accounting, chart of accounts, journal entries
+├── HR/                # Human resources, leave, attendance, payroll, performance
 ├── Audit/             # Immutable audit logs, compliance trails
 ├── Configuration/     # Reference data ownership (countries, currencies, languages, timezones)
 ├── Shared/            # Minimal shell for truly shared cross-cutting surface only
 ├── Customer/          # Migration-only stub
 ├── Supplier/          # Migration-only stub
-├── Employee/          # Migration-only stub
 ├── Pricing/           # Migration-only stub
 ├── Warehouse/         # Migration-only stub
 ├── Inventory/         # Migration-only stub
 ├── Purchase/          # Migration-only stub
 ├── Sales/             # Migration-only stub
 └── Tax/               # Migration-only stub
-bootstrap/providers.php  # 12 ServiceProviders registered
+bootstrap/providers.php  # 13 ServiceProviders registered
 composer.json            # PSR-4: "Modules\\" => "app/Modules/"
 phpunit.xml              # Test config (SQLite :memory:)
 ```
@@ -104,7 +104,7 @@ app/Modules/<Module>/
 
 ## Registered Providers (bootstrap/providers.php)
 
-AppServiceProvider, CoreServiceProvider, ConfigurationServiceProvider, SharedServiceProvider, AuditServiceProvider, AuthModuleServiceProvider, TenantServiceProvider, TenantConfigServiceProvider, UserServiceProvider, OrganizationUnitServiceProvider, ProductServiceProvider, FinanceServiceProvider
+AppServiceProvider, CoreServiceProvider, ConfigurationServiceProvider, SharedServiceProvider, AuditServiceProvider, AuthModuleServiceProvider, TenantServiceProvider, TenantConfigServiceProvider, UserServiceProvider, OrganizationUnitServiceProvider, ProductServiceProvider, FinanceServiceProvider, HRServiceProvider
 
 ## File Naming
 

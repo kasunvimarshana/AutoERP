@@ -10,6 +10,7 @@ use Modules\Auth\Application\Contracts\AuthorizationServiceInterface;
 use Modules\Product\Application\Contracts\CreateUomConversionServiceInterface;
 use Modules\Product\Application\Contracts\DeleteUomConversionServiceInterface;
 use Modules\Product\Application\Contracts\FindUomConversionServiceInterface;
+use Modules\Product\Application\Contracts\UomConversionResolverServiceInterface;
 use Modules\Product\Application\Contracts\UpdateUomConversionServiceInterface;
 use Modules\Product\Domain\Entities\UomConversion;
 use Modules\Tenant\Application\Contracts\TenantConfigClientInterface;
@@ -34,6 +35,7 @@ class UomConversionEndpointsAuthenticatedTest extends TestCase
         $this->app->instance(CreateUomConversionServiceInterface::class, $this->createMock(CreateUomConversionServiceInterface::class));
         $this->app->instance(UpdateUomConversionServiceInterface::class, $this->createMock(UpdateUomConversionServiceInterface::class));
         $this->app->instance(DeleteUomConversionServiceInterface::class, $this->createMock(DeleteUomConversionServiceInterface::class));
+        $this->app->instance(UomConversionResolverServiceInterface::class, $this->createMock(UomConversionResolverServiceInterface::class));
 
         $authorizationService = $this->createMock(AuthorizationServiceInterface::class);
         $authorizationService->method('can')->willReturn(true);
@@ -57,7 +59,7 @@ class UomConversionEndpointsAuthenticatedTest extends TestCase
         $user->setAttribute('id', 421);
         $user->setAttribute('tenant_id', 15);
 
-        Passport::actingAs($user, [], 'api');
+        $this->actingAs($user, 'api');
     }
 
     public function test_authenticated_index_returns_success_payload(): void
@@ -74,6 +76,7 @@ class UomConversionEndpointsAuthenticatedTest extends TestCase
             ->method('list')
             ->with(
                 [
+                    'tenant_id' => 15,
                     'from_uom_id' => 11,
                     'to_uom_id' => 12,
                 ],
@@ -127,10 +130,40 @@ class UomConversionEndpointsAuthenticatedTest extends TestCase
             ->assertJsonPath('message', 'This action is unauthorized.');
     }
 
+    public function test_authenticated_resolve_returns_conversion_path_and_quantity(): void
+    {
+        $resolver = $this->createMock(UomConversionResolverServiceInterface::class);
+        $resolver->expects($this->once())
+            ->method('convertQuantity')
+            ->with(15, null, 11, 13, '2.5', 6)
+            ->willReturn([
+                'quantity' => '2500.000000',
+                'factor' => '1000',
+                'path' => [11, 12, 13],
+                'from_uom_id' => 11,
+                'to_uom_id' => 13,
+            ]);
+        $this->app->instance(UomConversionResolverServiceInterface::class, $resolver);
+
+        $response = $this->withHeader('X-Tenant-ID', '15')
+            ->postJson('/api/uom-conversions/resolve', [
+                'from_uom_id' => 11,
+                'to_uom_id' => 13,
+                'quantity' => '2.5',
+            ]);
+
+        $response->assertStatus(HttpResponse::HTTP_OK)
+            ->assertJsonPath('data.quantity', '2500.000000')
+            ->assertJsonPath('data.factor', '1000')
+            ->assertJsonPath('data.path.0', 11)
+            ->assertJsonPath('data.path.2', 13);
+    }
+
     private function buildUomConversion(int $id): UomConversion
     {
         return new UomConversion(
             id: $id,
+            tenantId: 15,
             fromUomId: 11,
             toUomId: 12,
             factor: '12.5000000000',

@@ -13,9 +13,13 @@ class UomConversionResource extends JsonResource
     {
         return [
             'id' => $this->getId(),
+            'tenant_id' => $this->getTenantId(),
+            'product_id' => $this->getProductId(),
             'from_uom_id' => $this->getFromUomId(),
             'to_uom_id' => $this->getToUomId(),
             'factor' => $this->getFactor(),
+            'is_bidirectional' => $this->isBidirectional(),
+            'is_active' => $this->isActive(),
             'created_at' => $this->getCreatedAt()->format('c'),
             'updated_at' => $this->getUpdatedAt()->format('c'),
         ];

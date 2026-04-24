@@ -20,6 +20,7 @@ class UomConversionRepositoryIntegrationTest extends TestCase
 
         $this->seedTenants();
         $this->seedUnitsOfMeasure();
+        $this->seedProducts();
     }
 
     public function test_save_creates_and_updates_uom_conversion(): void
@@ -92,13 +93,33 @@ class UomConversionRepositoryIntegrationTest extends TestCase
         $this->assertContainsOnlyInstancesOf(UomConversion::class, $collection);
     }
 
-    private function insertConversionRow(int $id, int $fromUomId, int $toUomId, string $factor): void
+    public function test_list_for_resolution_returns_scope_and_global_rows(): void
+    {
+        $this->insertConversionRow(id: 701, fromUomId: 1101, toUomId: 1102, factor: '2.0000000000', tenantId: 11, productId: null);
+        $this->insertConversionRow(id: 702, fromUomId: 1102, toUomId: 1103, factor: '3.0000000000', tenantId: 11, productId: 9001);
+        $this->insertConversionRow(id: 703, fromUomId: 1201, toUomId: 1202, factor: '4.0000000000', tenantId: 12, productId: null);
+
+        /** @var UomConversionRepositoryInterface $repository */
+        $repository = app(UomConversionRepositoryInterface::class);
+
+        $rows = $repository->listForResolution(11, 9001);
+
+        $this->assertCount(2, $rows);
+        $this->assertSame(701, $rows[0]->getId());
+        $this->assertSame(702, $rows[1]->getId());
+    }
+
+    private function insertConversionRow(int $id, int $fromUomId, int $toUomId, string $factor, ?int $tenantId = null, ?int $productId = null): void
     {
         DB::table('uom_conversions')->insert([
             'id' => $id,
+            'tenant_id' => $tenantId,
+            'product_id' => $productId,
             'from_uom_id' => $fromUomId,
             'to_uom_id' => $toUomId,
             'factor' => $factor,
+            'is_bidirectional' => true,
+            'is_active' => true,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -153,5 +174,41 @@ class UomConversionRepositoryIntegrationTest extends TestCase
                 'deleted_at' => null,
             ]);
         }
+    }
+
+    private function seedProducts(): void
+    {
+        DB::table('products')->insert([
+            'id' => 9001,
+            'tenant_id' => 11,
+            'category_id' => null,
+            'brand_id' => null,
+            'org_unit_id' => null,
+            'type' => 'physical',
+            'name' => 'Repository Seed Product',
+            'slug' => 'repository-seed-product',
+            'sku' => 'RSP-9001',
+            'description' => null,
+            'base_uom_id' => 1101,
+            'purchase_uom_id' => null,
+            'sales_uom_id' => null,
+            'tax_group_id' => null,
+            'uom_conversion_factor' => '1.0000000000',
+            'is_batch_tracked' => false,
+            'is_lot_tracked' => false,
+            'is_serial_tracked' => false,
+            'valuation_method' => 'fifo',
+            'standard_cost' => '1.000000',
+            'income_account_id' => null,
+            'cogs_account_id' => null,
+            'inventory_account_id' => null,
+            'expense_account_id' => null,
+            'is_active' => true,
+            'image_path' => null,
+            'metadata' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]);
     }
 }

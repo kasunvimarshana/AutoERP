@@ -18,6 +18,7 @@ return new class extends Migration
             $table->enum('type', ['text', 'select', 'number', 'boolean'])->default('select');
             $table->boolean('is_required')->default(false);
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

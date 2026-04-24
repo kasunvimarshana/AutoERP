@@ -32,6 +32,12 @@ class UomConversionServiceTest extends TestCase
         $service = new CreateUomConversionService($this->repository);
 
         $this->repository
+            ->expects($this->exactly(2))
+            ->method('findByUomPair')
+            ->withAnyParameters()
+            ->willReturn(null);
+
+        $this->repository
             ->expects($this->once())
             ->method('save')
             ->with($this->callback(function (mixed $uomConversion): bool {

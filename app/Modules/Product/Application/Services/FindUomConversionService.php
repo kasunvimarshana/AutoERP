@@ -13,8 +13,11 @@ class FindUomConversionService implements FindUomConversionServiceInterface
 {
     /** @var array<string> */
     private const ALLOWED_FILTERS = [
+        'tenant_id',
+        'product_id',
         'from_uom_id',
         'to_uom_id',
+        'is_active',
     ];
 
     /** @var array<string> */

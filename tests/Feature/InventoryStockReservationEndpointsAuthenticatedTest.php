@@ -57,7 +57,7 @@ class InventoryStockReservationEndpointsAuthenticatedTest extends TestCase
         $user->setAttribute('id', 301);
         $user->setAttribute('tenant_id', 9);
 
-        Passport::actingAs($user, [], 'api');
+        $this->actingAs($user, 'api');
     }
 
     public function test_authenticated_store_returns_unprocessable_entity_when_stock_is_insufficient(): void

@@ -28,7 +28,7 @@ class EloquentTraceLogRepository implements TraceLogRepositoryInterface
             'performed_by' => $movement->getPerformedBy(),
             'performed_at' => $movement->getPerformedAt() ?? now(),
             'device_id' => is_array($metadata) ? ($metadata['device_id'] ?? null) : null,
-            'metadata' => $metadata,
+            'metadata' => is_array($metadata) ? json_encode($metadata, JSON_THROW_ON_ERROR) : null,
         ]);
     }
 

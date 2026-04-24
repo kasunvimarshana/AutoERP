@@ -24,6 +24,7 @@ class UomConversionRoutesTest extends TestCase
     {
         $this->getJson('/api/uom-conversions')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->getJson('/api/uom-conversions/1')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
+        $this->postJson('/api/uom-conversions/resolve', [])->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
     }
 
     public function test_uom_conversions_routes_keep_expected_middleware_contract(): void
@@ -32,6 +33,7 @@ class UomConversionRoutesTest extends TestCase
 
         $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/uom-conversions', 'GET'), ['auth:api', 'resolve.tenant']);
         $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/uom-conversions/{uom_conversion}', 'GET'), ['auth:api', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/uom-conversions/resolve', 'POST'), ['auth:api', 'resolve.tenant']);
     }
 
     /**

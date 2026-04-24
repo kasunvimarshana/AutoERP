@@ -15,6 +15,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained(null, 'id', 'attribute_groups_tenant_id_fk')->cascadeOnDelete();
             $table->string('name');
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

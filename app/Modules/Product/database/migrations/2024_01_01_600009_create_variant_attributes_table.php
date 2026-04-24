@@ -19,6 +19,7 @@ return new class extends Migration
             $table->boolean('is_variation_axis')->default(true);
             $table->unsignedInteger('display_order')->default(0);
             $table->timestamps();
+            $table->softDeletes();
 
             $table->unique(['tenant_id', 'product_id', 'attribute_id'], 'variant_attributes_tenant_product_attr_uk');
         });

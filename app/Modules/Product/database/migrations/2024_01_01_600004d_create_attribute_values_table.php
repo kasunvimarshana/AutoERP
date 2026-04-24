@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('value');
             $table->unsignedInteger('sort_order')->default(0);
             $table->timestamps();
+            $table->softDeletes();
 
             $table->unique(['tenant_id', 'attribute_id', 'value'], 'attribute_values_tenant_attribute_value_uk');
         });

@@ -10,12 +10,14 @@ use Modules\Inventory\Application\DTOs\RecordStockMovementDTO;
 use Modules\Inventory\Domain\Entities\StockMovement;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryStockRepositoryInterface;
 use Modules\Inventory\Domain\RepositoryInterfaces\TraceLogRepositoryInterface;
+use Modules\Product\Application\Contracts\UomConversionResolverServiceInterface;
 
 class RecordStockMovementService implements RecordStockMovementServiceInterface
 {
     public function __construct(
         private readonly InventoryStockRepositoryInterface $inventoryStockRepository,
         private readonly TraceLogRepositoryInterface $traceLogRepository,
+        private readonly UomConversionResolverServiceInterface $uomConversionResolverService,
     ) {}
 
     public function execute(array $data): StockMovement
@@ -53,6 +55,24 @@ class RecordStockMovementService implements RecordStockMovementServiceInterface
             throw new \InvalidArgumentException('To location does not belong to the warehouse.');
         }
 
+        $normalized = $this->uomConversionResolverService->normalizeToProductBase(
+            tenantId: $dto->tenantId,
+            productId: $dto->productId,
+            fromUomId: $dto->uomId,
+            quantity: $dto->quantity,
+            scale: 6,
+        );
+
+        $metadata = is_array($dto->metadata) ? $dto->metadata : [];
+        $metadata['uom_normalization'] = [
+            'original_uom_id' => $dto->uomId,
+            'original_quantity' => $dto->quantity,
+            'base_uom_id' => $normalized['base_uom_id'],
+            'normalized_quantity' => $normalized['quantity'],
+            'factor' => $normalized['factor'],
+            'path' => $normalized['path'],
+        ];
+
         $movement = new StockMovement(
             tenantId: $dto->tenantId,
             productId: $dto->productId,
@@ -64,13 +84,13 @@ class RecordStockMovementService implements RecordStockMovementServiceInterface
             movementType: $dto->movementType,
             referenceType: $dto->referenceType,
             referenceId: $dto->referenceId,
-            uomId: $dto->uomId,
-            quantity: $dto->quantity,
+            uomId: $normalized['base_uom_id'],
+            quantity: $normalized['quantity'],
             unitCost: $dto->unitCost,
             performedBy: $dto->performedBy,
             performedAt: $dto->performedAt !== null ? new \DateTimeImmutable($dto->performedAt) : null,
             notes: $dto->notes,
-            metadata: $dto->metadata,
+            metadata: $metadata,
         );
 
         $saved = $this->inventoryStockRepository->recordMovement($movement);

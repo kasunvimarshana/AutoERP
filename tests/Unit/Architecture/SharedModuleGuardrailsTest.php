@@ -30,6 +30,12 @@ class SharedModuleGuardrailsTest extends TestCase
     public function test_shared_module_keeps_no_runtime_migrations(): void
     {
         $migrationDir = $this->repoRoot.'/app/Modules/Shared/database/migrations';
+        if (! is_dir($migrationDir)) {
+            $this->assertSame([], [], 'Shared module should remain minimal and avoid domain-owned runtime migrations.');
+
+            return;
+        }
+
         $entries = array_values(array_filter(scandir($migrationDir) ?: [], static function (string $entry): bool {
             return $entry !== '.' && $entry !== '..';
         }));

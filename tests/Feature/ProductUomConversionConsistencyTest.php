@@ -8,6 +8,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Modules\Product\Application\Contracts\UomConversionResolverServiceInterface;
 use Modules\Product\Domain\Entities\Product;
 use Modules\Product\Domain\RepositoryInterfaces\ProductRepositoryInterface;
 use Modules\Product\Domain\RepositoryInterfaces\UomConversionRepositoryInterface;
@@ -103,6 +104,79 @@ class ProductUomConversionConsistencyTest extends TestCase
 
         $this->assertNull($purchaseConversion);
         $this->assertNull($salesConversion);
+    }
+
+    public function test_resolver_supports_multi_hop_and_bidirectional_conversion_without_redundant_rows(): void
+    {
+        /** @var UomConversionResolverServiceInterface $resolver */
+        $resolver = app(UomConversionResolverServiceInterface::class);
+
+        DB::table('products')->insert([
+            'id' => 2999,
+            'tenant_id' => 21,
+            'category_id' => null,
+            'brand_id' => null,
+            'org_unit_id' => null,
+            'type' => 'physical',
+            'name' => 'Multi Hop Product',
+            'slug' => 'multi-hop-product',
+            'sku' => 'MHP-001',
+            'description' => null,
+            'base_uom_id' => 2101,
+            'purchase_uom_id' => 2102,
+            'sales_uom_id' => 2103,
+            'tax_group_id' => null,
+            'uom_conversion_factor' => '1.0000000000',
+            'is_batch_tracked' => false,
+            'is_lot_tracked' => false,
+            'is_serial_tracked' => false,
+            'valuation_method' => 'fifo',
+            'standard_cost' => '1.000000',
+            'income_account_id' => null,
+            'cogs_account_id' => null,
+            'inventory_account_id' => null,
+            'expense_account_id' => null,
+            'is_active' => true,
+            'image_path' => null,
+            'metadata' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]);
+
+        DB::table('uom_conversions')->insert([
+            [
+                'tenant_id' => 21,
+                'product_id' => 2999,
+                'from_uom_id' => 2103,
+                'to_uom_id' => 2102,
+                'factor' => '2.0000000000',
+                'is_bidirectional' => true,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'tenant_id' => 21,
+                'product_id' => 2999,
+                'from_uom_id' => 2102,
+                'to_uom_id' => 2101,
+                'factor' => '6.0000000000',
+                'is_bidirectional' => true,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $forward = $resolver->convertQuantity(21, 2999, 2103, 2101, '3', 6);
+        $reverse = $resolver->convertQuantity(21, 2999, 2101, 2103, '36', 6);
+
+        $this->assertSame(0, bccomp($forward['quantity'], '36.000000', 6));
+        $this->assertSame([2103, 2102, 2101], $forward['path']);
+
+        $this->assertSame(0, bccomp($reverse['quantity'], '3.000000', 6));
+        $this->assertSame([2101, 2102, 2103], $reverse['path']);
     }
 
     private function seedUnitsOfMeasure(): void

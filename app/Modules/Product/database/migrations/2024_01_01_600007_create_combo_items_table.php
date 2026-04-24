@@ -20,6 +20,7 @@ return new class extends Migration
             $table->foreignId('uom_id')->constrained('units_of_measure', 'id', 'combo_items_uom_id_fk');
             $table->json('metadata')->nullable();
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

@@ -30,9 +30,9 @@ Route::prefix('hr')->middleware(['auth:api', 'resolve.tenant'])->group(function 
     Route::get('leave-balances/{leaveBalance}', [LeaveBalanceController::class, 'show']);
 
     Route::apiResource('leave-requests', LeaveRequestController::class);
-    Route::post('leave-requests/{leaveRequest}/approve', [LeaveRequestController::class, 'approve']);
-    Route::post('leave-requests/{leaveRequest}/reject', [LeaveRequestController::class, 'reject']);
-    Route::post('leave-requests/{leaveRequest}/cancel', [LeaveRequestController::class, 'cancel']);
+    Route::post('leave-requests/{leave_request}/approve', [LeaveRequestController::class, 'approve']);
+    Route::post('leave-requests/{leave_request}/reject', [LeaveRequestController::class, 'reject']);
+    Route::post('leave-requests/{leave_request}/cancel', [LeaveRequestController::class, 'cancel']);
 
     Route::get('attendance-logs', [AttendanceLogController::class, 'index']);
     Route::post('attendance-logs', [AttendanceLogController::class, 'store']);
@@ -44,11 +44,11 @@ Route::prefix('hr')->middleware(['auth:api', 'resolve.tenant'])->group(function 
     Route::post('attendance-records/process', [AttendanceRecordController::class, 'process']);
 
     Route::apiResource('biometric-devices', BiometricDeviceController::class);
-    Route::post('biometric-devices/{biometricDevice}/sync', [BiometricDeviceController::class, 'sync']);
+    Route::post('biometric-devices/{biometric_device}/sync', [BiometricDeviceController::class, 'sync']);
 
     Route::apiResource('payroll-runs', PayrollRunController::class);
-    Route::post('payroll-runs/{payrollRun}/approve', [PayrollRunController::class, 'approve']);
-    Route::post('payroll-runs/{payrollRun}/process', [PayrollRunController::class, 'process']);
+    Route::post('payroll-runs/{payroll_run}/approve', [PayrollRunController::class, 'approve']);
+    Route::post('payroll-runs/{payroll_run}/process', [PayrollRunController::class, 'process']);
 
     Route::apiResource('payroll-items', PayrollItemController::class);
 
@@ -58,7 +58,7 @@ Route::prefix('hr')->middleware(['auth:api', 'resolve.tenant'])->group(function 
     Route::apiResource('performance-cycles', PerformanceCycleController::class);
 
     Route::apiResource('performance-reviews', PerformanceReviewController::class);
-    Route::post('performance-reviews/{performanceReview}/submit', [PerformanceReviewController::class, 'submit']);
+    Route::post('performance-reviews/{performance_review}/submit', [PerformanceReviewController::class, 'submit']);
 
     Route::apiResource('employee-documents', EmployeeDocumentController::class);
 });

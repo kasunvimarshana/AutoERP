@@ -106,6 +106,97 @@ class InventoryStockMovementIntegrationTest extends TestCase
         ]);
     }
 
+    public function test_transfer_movement_normalizes_quantity_to_product_base_uom(): void
+    {
+        $tenantId = 61;
+        $this->seedTenant($tenantId);
+        $this->seedReferenceData($tenantId);
+
+        /** @var CreateWarehouseServiceInterface $createWarehouseService */
+        $createWarehouseService = app(CreateWarehouseServiceInterface::class);
+        /** @var CreateWarehouseLocationServiceInterface $createWarehouseLocationService */
+        $createWarehouseLocationService = app(CreateWarehouseLocationServiceInterface::class);
+        /** @var RecordStockMovementServiceInterface $recordStockMovementService */
+        $recordStockMovementService = app(RecordStockMovementServiceInterface::class);
+
+        $warehouse = $createWarehouseService->execute([
+            'tenant_id' => $tenantId,
+            'name' => 'Main DC',
+            'code' => 'MDC',
+            'is_default' => true,
+        ]);
+
+        $fromLocation = $createWarehouseLocationService->execute([
+            'tenant_id' => $tenantId,
+            'warehouse_id' => $warehouse->getId(),
+            'name' => 'Staging A',
+            'code' => 'STAGE-A',
+            'type' => 'staging',
+        ]);
+
+        $toLocation = $createWarehouseLocationService->execute([
+            'tenant_id' => $tenantId,
+            'warehouse_id' => $warehouse->getId(),
+            'name' => 'Rack B1',
+            'code' => 'RACK-B1',
+            'type' => 'rack',
+        ]);
+
+        DB::table('stock_levels')->insert([
+            'tenant_id' => $tenantId,
+            'product_id' => 1001,
+            'variant_id' => null,
+            'location_id' => $fromLocation->getId(),
+            'batch_id' => null,
+            'serial_id' => null,
+            'uom_id' => 2001,
+            'quantity_on_hand' => '24.000000',
+            'quantity_reserved' => '0.000000',
+            'unit_cost' => '10.000000',
+            'last_movement_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $movement = $recordStockMovementService->execute([
+            'tenant_id' => $tenantId,
+            'warehouse_id' => $warehouse->getId(),
+            'product_id' => 1001,
+            'from_location_id' => $fromLocation->getId(),
+            'to_location_id' => $toLocation->getId(),
+            'movement_type' => 'transfer',
+            'uom_id' => 2002,
+            'quantity' => '2.000000',
+            'unit_cost' => '10.000000',
+        ]);
+
+        $this->assertSame(2001, $movement->getUomId());
+        $this->assertSame(0, bccomp($movement->getQuantity(), '24.000000', 6));
+
+        $fromQty = DB::table('stock_levels')
+            ->where('tenant_id', $tenantId)
+            ->where('product_id', 1001)
+            ->where('location_id', $fromLocation->getId())
+            ->value('quantity_on_hand');
+
+        $toQty = DB::table('stock_levels')
+            ->where('tenant_id', $tenantId)
+            ->where('product_id', 1001)
+            ->where('location_id', $toLocation->getId())
+            ->value('quantity_on_hand');
+
+        $this->assertSame(0, bccomp((string) $fromQty, '0.000000', 6));
+        $this->assertSame(0, bccomp((string) $toQty, '24.000000', 6));
+
+        $this->assertDatabaseHas('stock_movements', [
+            'tenant_id' => $tenantId,
+            'product_id' => 1001,
+            'movement_type' => 'transfer',
+            'uom_id' => 2001,
+            'quantity' => '24.000000',
+        ]);
+    }
+
     private function seedTenant(int $tenantId): void
     {
         DB::table('tenants')->insert([
@@ -147,6 +238,18 @@ class InventoryStockMovementIntegrationTest extends TestCase
             'deleted_at' => null,
         ]);
 
+        DB::table('units_of_measure')->insert([
+            'id' => 2002,
+            'tenant_id' => $tenantId,
+            'name' => 'Box',
+            'symbol' => 'box',
+            'type' => 'unit',
+            'is_base' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]);
+
         DB::table('products')->insert([
             'id' => 1001,
             'tenant_id' => $tenantId,
@@ -175,6 +278,19 @@ class InventoryStockMovementIntegrationTest extends TestCase
             'is_active' => true,
             'image_path' => null,
             'metadata' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]);
+
+        DB::table('uom_conversions')->insert([
+            'tenant_id' => $tenantId,
+            'product_id' => 1001,
+            'from_uom_id' => 2002,
+            'to_uom_id' => 2001,
+            'factor' => '12.0000000000',
+            'is_bidirectional' => true,
+            'is_active' => true,
             'created_at' => now(),
             'updated_at' => now(),
             'deleted_at' => null,

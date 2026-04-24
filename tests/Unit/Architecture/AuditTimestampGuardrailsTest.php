@@ -32,7 +32,7 @@ class AuditTimestampGuardrailsTest extends TestCase
         $this->assertStringContainsString("->orderByDesc('occurred_at')", $contents);
         $this->assertStringContainsString('->where(\'occurred_at\', \'<\', $before)', $contents);
         $this->assertStringNotContainsString("->orderByDesc('created_at')", $contents);
-        $this->assertStringNotContainsString("->where('created_at', '<', $before)", $contents);
+        $this->assertStringNotContainsString("->where('created_at', '<', \$before)", $contents);
     }
 
     public function test_audit_resource_exposes_occurred_at(): void

@@ -57,7 +57,7 @@ class ProductIdentifierEndpointsAuthenticatedTest extends TestCase
         $user->setAttribute('id', 281);
         $user->setAttribute('tenant_id', 9);
 
-        Passport::actingAs($user, [], 'api');
+        $this->actingAs($user, 'api');
     }
 
     public function test_authenticated_index_returns_success_payload(): void

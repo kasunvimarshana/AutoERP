@@ -117,7 +117,7 @@ class CustomerEndpointsAuthenticatedTest extends TestCase
         $user->setAttribute('id', 901);
         $user->setAttribute('tenant_id', 9);
 
-        Passport::actingAs($user, [], 'api');
+        $this->actingAs($user, 'api');
     }
 
     public function test_authenticated_customer_index_returns_success_payload(): void

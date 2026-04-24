@@ -16,9 +16,13 @@ class StoreUomConversionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'from_uom_id' => 'required|integer|exists:units_of_measure,id|different:to_uom_id',
-            'to_uom_id' => 'required|integer|exists:units_of_measure,id|different:from_uom_id',
+            'tenant_id' => 'required|integer|min:1',
+            'product_id' => 'nullable|integer|min:1',
+            'from_uom_id' => 'required|integer|min:1|different:to_uom_id',
+            'to_uom_id' => 'required|integer|min:1|different:from_uom_id',
             'factor' => 'required|numeric|gt:0',
+            'is_bidirectional' => 'sometimes|boolean',
+            'is_active' => 'sometimes|boolean',
         ];
     }
 }

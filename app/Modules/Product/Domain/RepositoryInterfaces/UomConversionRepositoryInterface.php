@@ -11,7 +11,12 @@ interface UomConversionRepositoryInterface extends RepositoryInterface
 {
     public function save(UomConversion $uomConversion): UomConversion;
 
-    public function findByUomPair(int $fromUomId, int $toUomId): ?UomConversion;
+    public function findByUomPair(int $fromUomId, int $toUomId, ?int $tenantId = null, ?int $productId = null): ?UomConversion;
+
+    /**
+     * @return array<UomConversion>
+     */
+    public function listForResolution(int $tenantId, ?int $productId = null): array;
 
     public function find(int|string $id, array $columns = ['*']): ?UomConversion;
 }

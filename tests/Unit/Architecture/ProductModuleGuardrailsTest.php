@@ -38,8 +38,30 @@ class ProductModuleGuardrailsTest extends TestCase
         $this->assertStringContainsString('Route::apiResource(\'product-categories\'', $routesFile);
         $this->assertStringContainsString('Route::apiResource(\'uom-conversions\'', $routesFile);
         $this->assertStringContainsString('Route::apiResource(\'units-of-measure\'', $routesFile);
+        $this->assertStringContainsString('Route::apiResource(\'product-attribute-groups\'', $routesFile);
+        $this->assertStringContainsString('Route::apiResource(\'product-attributes\'', $routesFile);
+        $this->assertStringContainsString('Route::apiResource(\'product-attribute-values\'', $routesFile);
+        $this->assertStringContainsString('Route::apiResource(\'variant-attributes\'', $routesFile);
+        $this->assertStringContainsString('Route::apiResource(\'combo-items\'', $routesFile);
         $this->assertStringContainsString('auth:api', $routesFile);
         $this->assertStringContainsString('resolve.tenant', $routesFile);
+    }
+
+    public function test_product_module_registers_catalog_bindings(): void
+    {
+        $providerFile = $this->readSource('app/Modules/Product/Infrastructure/Providers/ProductServiceProvider.php');
+
+        $this->assertStringContainsString('ProductAttributeGroupRepositoryInterface::class', $providerFile);
+        $this->assertStringContainsString('ProductAttributeRepositoryInterface::class', $providerFile);
+        $this->assertStringContainsString('ProductAttributeValueRepositoryInterface::class', $providerFile);
+        $this->assertStringContainsString('VariantAttributeRepositoryInterface::class', $providerFile);
+        $this->assertStringContainsString('ComboItemRepositoryInterface::class', $providerFile);
+
+        $this->assertStringContainsString('CreateProductAttributeGroupServiceInterface::class', $providerFile);
+        $this->assertStringContainsString('CreateProductAttributeServiceInterface::class', $providerFile);
+        $this->assertStringContainsString('CreateProductAttributeValueServiceInterface::class', $providerFile);
+        $this->assertStringContainsString('CreateVariantAttributeServiceInterface::class', $providerFile);
+        $this->assertStringContainsString('CreateComboItemServiceInterface::class', $providerFile);
     }
 
     private function readSource(string $relativePath): string

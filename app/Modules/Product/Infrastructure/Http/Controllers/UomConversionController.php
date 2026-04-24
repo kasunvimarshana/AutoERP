@@ -11,9 +11,11 @@ use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Product\Application\Contracts\CreateUomConversionServiceInterface;
 use Modules\Product\Application\Contracts\DeleteUomConversionServiceInterface;
 use Modules\Product\Application\Contracts\FindUomConversionServiceInterface;
+use Modules\Product\Application\Contracts\UomConversionResolverServiceInterface;
 use Modules\Product\Application\Contracts\UpdateUomConversionServiceInterface;
 use Modules\Product\Domain\Entities\UomConversion;
 use Modules\Product\Infrastructure\Http\Requests\ListUomConversionRequest;
+use Modules\Product\Infrastructure\Http\Requests\ResolveUomConversionRequest;
 use Modules\Product\Infrastructure\Http\Requests\StoreUomConversionRequest;
 use Modules\Product\Infrastructure\Http\Requests\UpdateUomConversionRequest;
 use Modules\Product\Infrastructure\Http\Resources\UomConversionCollection;
@@ -28,6 +30,7 @@ class UomConversionController extends AuthorizedController
         protected UpdateUomConversionServiceInterface $updateUomConversionService,
         protected DeleteUomConversionServiceInterface $deleteUomConversionService,
         protected FindUomConversionServiceInterface $findUomConversionService,
+        protected UomConversionResolverServiceInterface $uomConversionResolverService,
     ) {}
 
     public function index(ListUomConversionRequest $request): JsonResponse
@@ -36,8 +39,11 @@ class UomConversionController extends AuthorizedController
         $validated = $request->validated();
 
         $filters = array_filter([
+            'tenant_id' => (int) $validated['tenant_id'],
+            'product_id' => $validated['product_id'] ?? null,
             'from_uom_id' => $validated['from_uom_id'] ?? null,
             'to_uom_id' => $validated['to_uom_id'] ?? null,
+            'is_active' => $validated['is_active'] ?? null,
         ], static fn (mixed $value): bool => $value !== null && $value !== '');
 
         $uomConversions = $this->findUomConversionService->list(
@@ -54,7 +60,10 @@ class UomConversionController extends AuthorizedController
     {
         $this->authorize('create', UomConversion::class);
 
-        $uomConversion = $this->createUomConversionService->execute($request->validated());
+        $payload = $request->validated();
+        $payload['tenant_id'] = (int) $payload['tenant_id'];
+
+        $uomConversion = $this->createUomConversionService->execute($payload);
 
         return (new UomConversionResource($uomConversion))
             ->response()
@@ -76,8 +85,27 @@ class UomConversionController extends AuthorizedController
 
         $payload = $request->validated();
         $payload['id'] = $uomConversion;
+        $payload['tenant_id'] = (int) $payload['tenant_id'];
 
         return new UomConversionResource($this->updateUomConversionService->execute($payload));
+    }
+
+    public function resolve(ResolveUomConversionRequest $request): JsonResponse
+    {
+        $this->authorize('viewAny', UomConversion::class);
+
+        $validated = $request->validated();
+
+        $result = $this->uomConversionResolverService->convertQuantity(
+            tenantId: (int) $validated['tenant_id'],
+            productId: isset($validated['product_id']) ? (int) $validated['product_id'] : null,
+            fromUomId: (int) $validated['from_uom_id'],
+            toUomId: (int) $validated['to_uom_id'],
+            quantity: (string) $validated['quantity'],
+            scale: (int) ($validated['scale'] ?? 6),
+        );
+
+        return Response::json(['data' => $result]);
     }
 
     public function destroy(int $uomConversion): JsonResponse

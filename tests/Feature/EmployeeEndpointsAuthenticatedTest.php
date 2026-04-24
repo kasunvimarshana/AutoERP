@@ -85,7 +85,7 @@ class EmployeeEndpointsAuthenticatedTest extends TestCase
         $user->setAttribute('id', 271);
         $user->setAttribute('tenant_id', 9);
 
-        Passport::actingAs($user, [], 'api');
+        $this->actingAs($user, 'api');
     }
 
     private function clearRoutesCacheOnce(): void
