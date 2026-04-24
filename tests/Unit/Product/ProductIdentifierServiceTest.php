@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Product;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Modules\Product\Application\Contracts\RefreshProductSearchProjectionServiceInterface;
 use Modules\Product\Application\Services\CreateProductIdentifierService;
 use Modules\Product\Application\Services\DeleteProductIdentifierService;
 use Modules\Product\Application\Services\FindProductIdentifierService;
@@ -20,16 +21,20 @@ class ProductIdentifierServiceTest extends TestCase
     /** @var ProductIdentifierRepositoryInterface&MockObject */
     private ProductIdentifierRepositoryInterface $repository;
 
+    /** @var RefreshProductSearchProjectionServiceInterface&MockObject */
+    private RefreshProductSearchProjectionServiceInterface $refreshService;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->repository = $this->createMock(ProductIdentifierRepositoryInterface::class);
+        $this->refreshService = $this->createMock(RefreshProductSearchProjectionServiceInterface::class);
     }
 
     public function test_create_product_identifier_service_maps_payload_and_saves(): void
     {
-        $service = new CreateProductIdentifierService($this->repository);
+        $service = new CreateProductIdentifierService($this->repository, $this->refreshService);
 
         $this->repository
             ->expects($this->once())
@@ -86,7 +91,7 @@ class ProductIdentifierServiceTest extends TestCase
 
     public function test_update_product_identifier_service_throws_when_identifier_missing(): void
     {
-        $service = new UpdateProductIdentifierService($this->repository);
+        $service = new UpdateProductIdentifierService($this->repository, $this->refreshService);
 
         $this->repository
             ->expects($this->once())
@@ -107,7 +112,7 @@ class ProductIdentifierServiceTest extends TestCase
 
     public function test_delete_product_identifier_service_throws_when_identifier_missing(): void
     {
-        $service = new DeleteProductIdentifierService($this->repository);
+        $service = new DeleteProductIdentifierService($this->repository, $this->refreshService);
 
         $this->repository
             ->expects($this->once())

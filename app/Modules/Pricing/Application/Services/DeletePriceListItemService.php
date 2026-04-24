@@ -8,10 +8,14 @@ use Modules\Core\Application\Services\BaseService;
 use Modules\Pricing\Application\Contracts\DeletePriceListItemServiceInterface;
 use Modules\Pricing\Domain\Exceptions\PriceListItemNotFoundException;
 use Modules\Pricing\Domain\RepositoryInterfaces\PriceListItemRepositoryInterface;
+use Modules\Product\Application\Contracts\RefreshProductSearchProjectionServiceInterface;
 
 class DeletePriceListItemService extends BaseService implements DeletePriceListItemServiceInterface
 {
-    public function __construct(private readonly PriceListItemRepositoryInterface $priceListItemRepository)
+    public function __construct(
+        private readonly PriceListItemRepositoryInterface $priceListItemRepository,
+        private readonly RefreshProductSearchProjectionServiceInterface $refreshProjectionService,
+    )
     {
         parent::__construct($priceListItemRepository);
     }
@@ -25,6 +29,11 @@ class DeletePriceListItemService extends BaseService implements DeletePriceListI
             throw new PriceListItemNotFoundException($id);
         }
 
-        return $this->priceListItemRepository->delete($id);
+        $deleted = $this->priceListItemRepository->delete($id);
+        if ($deleted) {
+            $this->refreshProjectionService->execute($item->getTenantId(), $item->getProductId());
+        }
+
+        return $deleted;
     }
 }

@@ -6,6 +6,10 @@ namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Modules\Inventory\Application\Contracts\CreateBatchServiceInterface;
+use Modules\Inventory\Application\Contracts\DeleteBatchServiceInterface;
+use Modules\Inventory\Application\Contracts\RecordStockMovementServiceInterface;
+use Modules\Inventory\Application\Contracts\UpdateBatchServiceInterface;
 use Modules\Product\Application\Contracts\CreateProductServiceInterface;
 use Modules\Product\Application\Contracts\CreateProductVariantServiceInterface;
 use Modules\Product\Application\Contracts\UpdateProductServiceInterface;
@@ -13,6 +17,8 @@ use Modules\Product\Application\Contracts\DeleteProductServiceInterface;
 use Modules\Product\Application\Contracts\CreateProductIdentifierServiceInterface;
 use Modules\Product\Application\Contracts\DeleteProductVariantServiceInterface;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductSearchProjectionModel;
+use Modules\Warehouse\Application\Contracts\CreateWarehouseLocationServiceInterface;
+use Modules\Warehouse\Application\Contracts\CreateWarehouseServiceInterface;
 use Tests\TestCase;
 
 class ProductSearchProjectionAutomaticRefreshIntegrationTest extends TestCase
@@ -26,6 +32,12 @@ class ProductSearchProjectionAutomaticRefreshIntegrationTest extends TestCase
     private CreateProductVariantServiceInterface $createVariantService;
     private DeleteProductVariantServiceInterface $deleteVariantService;
     private CreateProductIdentifierServiceInterface $createIdentifierService;
+    private CreateBatchServiceInterface $createBatchService;
+    private UpdateBatchServiceInterface $updateBatchService;
+    private DeleteBatchServiceInterface $deleteBatchService;
+    private RecordStockMovementServiceInterface $recordStockMovementService;
+    private CreateWarehouseServiceInterface $createWarehouseService;
+    private CreateWarehouseLocationServiceInterface $createWarehouseLocationService;
 
     protected function setUp(): void
     {
@@ -74,6 +86,12 @@ class ProductSearchProjectionAutomaticRefreshIntegrationTest extends TestCase
         $this->createVariantService = app(CreateProductVariantServiceInterface::class);
         $this->deleteVariantService = app(DeleteProductVariantServiceInterface::class);
         $this->createIdentifierService = app(CreateProductIdentifierServiceInterface::class);
+        $this->createBatchService = app(CreateBatchServiceInterface::class);
+        $this->updateBatchService = app(UpdateBatchServiceInterface::class);
+        $this->deleteBatchService = app(DeleteBatchServiceInterface::class);
+        $this->recordStockMovementService = app(RecordStockMovementServiceInterface::class);
+        $this->createWarehouseService = app(CreateWarehouseServiceInterface::class);
+        $this->createWarehouseLocationService = app(CreateWarehouseLocationServiceInterface::class);
     }
 
     public function test_creating_product_automatically_populates_projection(): void
@@ -348,5 +366,133 @@ class ProductSearchProjectionAutomaticRefreshIntegrationTest extends TestCase
         $this->assertNotEmpty($identifierData);
         $this->assertGreaterThan(0, count($identifierData));
         $this->assertStringContainsString('5901234123457', implode(' ', $identifierData));
+    }
+
+    public function test_batch_mutations_automatically_refresh_projection_batch_lot_text(): void
+    {
+        $product = $this->createProductService->execute([
+            'tenant_id' => $this->tenantId,
+            'name' => 'Batch Tracked Product',
+            'sku' => 'BATCH-TRACK-001',
+            'category_id' => null,
+            'brand_id' => null,
+            'base_uom_id' => 1,
+            'description' => 'Product whose batch projection text should refresh',
+            'is_batch_tracked' => true,
+            'is_lot_tracked' => true,
+            'is_active' => true,
+            'metadata' => [],
+        ]);
+
+        $projectionBefore = ProductSearchProjectionModel::where('tenant_id', $this->tenantId)
+            ->where('product_id', $product->getId())
+            ->whereNull('variant_id')
+            ->firstOrFail();
+
+        $this->assertTrue($projectionBefore->batch_lot_text === null || $projectionBefore->batch_lot_text === '');
+
+        $batch = $this->createBatchService->execute([
+            'tenant_id' => $this->tenantId,
+            'product_id' => $product->getId(),
+            'variant_id' => null,
+            'batch_number' => 'BATCH-RED-001',
+            'lot_number' => 'LOT-RED-001',
+            'status' => 'active',
+        ]);
+
+        $projectionAfterCreate = ProductSearchProjectionModel::where('tenant_id', $this->tenantId)
+            ->where('product_id', $product->getId())
+            ->whereNull('variant_id')
+            ->firstOrFail();
+
+        $this->assertStringContainsString('BATCH-RED-001', (string) $projectionAfterCreate->batch_lot_text);
+        $this->assertStringContainsString('LOT-RED-001', (string) $projectionAfterCreate->batch_lot_text);
+
+        $this->updateBatchService->execute([
+            'id' => $batch->getId(),
+            'tenant_id' => $this->tenantId,
+            'batch_number' => 'BATCH-BLUE-001',
+            'lot_number' => 'LOT-BLUE-001',
+            'status' => 'quarantine',
+        ]);
+
+        $projectionAfterUpdate = ProductSearchProjectionModel::where('tenant_id', $this->tenantId)
+            ->where('product_id', $product->getId())
+            ->whereNull('variant_id')
+            ->firstOrFail();
+
+        $this->assertStringContainsString('BATCH-BLUE-001', (string) $projectionAfterUpdate->batch_lot_text);
+        $this->assertStringContainsString('LOT-BLUE-001', (string) $projectionAfterUpdate->batch_lot_text);
+        $this->assertStringNotContainsString('BATCH-RED-001', (string) $projectionAfterUpdate->batch_lot_text);
+
+        $this->deleteBatchService->execute([
+            'id' => $batch->getId(),
+        ]);
+
+        $projectionAfterDelete = ProductSearchProjectionModel::where('tenant_id', $this->tenantId)
+            ->where('product_id', $product->getId())
+            ->whereNull('variant_id')
+            ->firstOrFail();
+
+        $this->assertTrue($projectionAfterDelete->batch_lot_text === null || $projectionAfterDelete->batch_lot_text === '');
+    }
+
+    public function test_stock_movement_automatically_refreshes_projection_stock_fields(): void
+    {
+        $product = $this->createProductService->execute([
+            'tenant_id' => $this->tenantId,
+            'name' => 'Stock Refresh Product',
+            'sku' => 'STOCK-REFRESH-001',
+            'category_id' => null,
+            'brand_id' => null,
+            'base_uom_id' => 1,
+            'description' => 'Product whose projection stock should refresh after movement',
+            'is_active' => true,
+            'metadata' => [],
+        ]);
+
+        $warehouse = $this->createWarehouseService->execute([
+            'tenant_id' => $this->tenantId,
+            'name' => 'Projection Warehouse',
+            'code' => 'PRJ-WH-'.$this->tenantId,
+            'is_default' => true,
+        ]);
+
+        $location = $this->createWarehouseLocationService->execute([
+            'tenant_id' => $this->tenantId,
+            'warehouse_id' => $warehouse->getId(),
+            'name' => 'Projection Bin',
+            'code' => 'PRJ-BIN-'.$this->tenantId,
+            'type' => 'bin',
+        ]);
+
+        $projectionBefore = ProductSearchProjectionModel::where('tenant_id', $this->tenantId)
+            ->where('product_id', $product->getId())
+            ->whereNull('variant_id')
+            ->firstOrFail();
+
+        $this->assertSame('0.000000', (string) $projectionBefore->stock_available);
+
+        $this->recordStockMovementService->execute([
+            'tenant_id' => $this->tenantId,
+            'warehouse_id' => $warehouse->getId(),
+            'product_id' => $product->getId(),
+            'to_location_id' => $location->getId(),
+            'movement_type' => 'receipt',
+            'uom_id' => 1,
+            'quantity' => '7.000000',
+            'unit_cost' => '4.500000',
+        ]);
+
+        $projectionAfter = ProductSearchProjectionModel::where('tenant_id', $this->tenantId)
+            ->where('product_id', $product->getId())
+            ->whereNull('variant_id')
+            ->firstOrFail();
+
+        $this->assertSame('7.000000', (string) $projectionAfter->stock_available);
+        $this->assertIsArray($projectionAfter->stock_by_warehouse_json);
+        $this->assertCount(1, $projectionAfter->stock_by_warehouse_json);
+        $this->assertSame($warehouse->getId(), $projectionAfter->stock_by_warehouse_json[0]['warehouse_id']);
+        $this->assertSame('7.000000', $projectionAfter->stock_by_warehouse_json[0]['available']);
     }
 }

@@ -11,12 +11,14 @@ use Modules\Pricing\Domain\Entities\PriceListItem;
 use Modules\Pricing\Domain\Exceptions\PriceListNotFoundException;
 use Modules\Pricing\Domain\RepositoryInterfaces\PriceListItemRepositoryInterface;
 use Modules\Pricing\Domain\RepositoryInterfaces\PriceListRepositoryInterface;
+use Modules\Product\Application\Contracts\RefreshProductSearchProjectionServiceInterface;
 
 class CreatePriceListItemService extends BaseService implements CreatePriceListItemServiceInterface
 {
     public function __construct(
         private readonly PriceListItemRepositoryInterface $priceListItemRepository,
         private readonly PriceListRepositoryInterface $priceListRepository,
+        private readonly RefreshProductSearchProjectionServiceInterface $refreshProjectionService,
     ) {
         parent::__construct($priceListItemRepository);
     }
@@ -43,7 +45,10 @@ class CreatePriceListItemService extends BaseService implements CreatePriceListI
             validTo: $this->toDate($dto->valid_to),
         );
 
-        return $this->priceListItemRepository->save($item);
+        $saved = $this->priceListItemRepository->save($item);
+        $this->refreshProjectionService->execute($saved->getTenantId(), $saved->getProductId());
+
+        return $saved;
     }
 
     private function toDate(?string $value): ?\DateTimeInterface

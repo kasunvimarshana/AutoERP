@@ -6,6 +6,7 @@ namespace Tests\Unit\Product;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Modules\Core\Application\Contracts\SlugGeneratorInterface;
+use Modules\Product\Application\Contracts\RefreshProductSearchProjectionServiceInterface;
 use Modules\Product\Application\Services\CreateProductService;
 use Modules\Product\Application\Services\DeleteProductService;
 use Modules\Product\Application\Services\FindProductService;
@@ -24,17 +25,21 @@ class ProductServiceTest extends TestCase
     /** @var SlugGeneratorInterface&MockObject */
     private SlugGeneratorInterface $slugGenerator;
 
+    /** @var RefreshProductSearchProjectionServiceInterface&MockObject */
+    private RefreshProductSearchProjectionServiceInterface $refreshService;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->repository = $this->createMock(ProductRepositoryInterface::class);
         $this->slugGenerator = $this->createMock(SlugGeneratorInterface::class);
+        $this->refreshService = $this->createMock(RefreshProductSearchProjectionServiceInterface::class);
     }
 
     public function test_create_product_service_maps_payload_and_saves(): void
     {
-        $service = new CreateProductService($this->repository, $this->slugGenerator);
+        $service = new CreateProductService($this->repository, $this->slugGenerator, $this->refreshService);
 
         $this->slugGenerator
             ->expects($this->once())
@@ -96,7 +101,7 @@ class ProductServiceTest extends TestCase
 
     public function test_update_product_service_throws_when_product_missing(): void
     {
-        $service = new UpdateProductService($this->repository, $this->slugGenerator);
+        $service = new UpdateProductService($this->repository, $this->slugGenerator, $this->refreshService);
 
         $this->repository
             ->expects($this->once())
@@ -122,7 +127,7 @@ class ProductServiceTest extends TestCase
 
     public function test_delete_product_service_throws_when_product_missing(): void
     {
-        $service = new DeleteProductService($this->repository);
+        $service = new DeleteProductService($this->repository, $this->refreshService);
 
         $this->repository
             ->expects($this->once())

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Modules\Inventory\Infrastructure\Http\Controllers\InventoryBatchController;
 use Modules\Inventory\Infrastructure\Http\Controllers\InventoryCycleCountController;
 use Modules\Inventory\Infrastructure\Http\Controllers\InventoryStockController;
 use Modules\Inventory\Infrastructure\Http\Controllers\InventoryStockReservationController;
@@ -65,4 +66,16 @@ Route::prefix('inventory')
             ->name('inventory.valuation-configs.update');
         Route::delete('valuation-configs/{config}', [InventoryValuationController::class, 'destroy'])
             ->name('inventory.valuation-configs.destroy');
+
+        // Batch management
+        Route::get('batches', [InventoryBatchController::class, 'index'])
+            ->name('inventory.batches.index');
+        Route::post('batches', [InventoryBatchController::class, 'store'])
+            ->name('inventory.batches.store');
+        Route::get('batches/{batch}', [InventoryBatchController::class, 'show'])
+            ->name('inventory.batches.show');
+        Route::put('batches/{batch}', [InventoryBatchController::class, 'update'])
+            ->name('inventory.batches.update');
+        Route::delete('batches/{batch}', [InventoryBatchController::class, 'destroy'])
+            ->name('inventory.batches.destroy');
     });

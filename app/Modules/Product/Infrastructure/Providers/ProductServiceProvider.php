@@ -37,6 +37,7 @@ use Modules\Product\Application\Contracts\FindProductAttributeValueServiceInterf
 use Modules\Product\Application\Contracts\FindProductBrandServiceInterface;
 use Modules\Product\Application\Contracts\FindProductCategoryServiceInterface;
 use Modules\Product\Application\Contracts\FindProductIdentifierServiceInterface;
+use Modules\Product\Application\Contracts\ProductSearchProjectionRefreshDispatcherInterface;
 use Modules\Product\Application\Contracts\RefreshProductSearchProjectionServiceInterface;
 use Modules\Product\Application\Contracts\RebuildProductSearchProjectionServiceInterface;
 use Modules\Product\Application\Contracts\SearchProductsServiceInterface;
@@ -136,6 +137,7 @@ use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentPro
 use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentUnitOfMeasureRepository;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentUomConversionRepository;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentVariantAttributeRepository;
+use Modules\Product\Infrastructure\Jobs\QueuedProductSearchProjectionRefreshDispatcher;
 
 class ProductServiceProvider extends ServiceProvider
 {
@@ -162,6 +164,8 @@ class ProductServiceProvider extends ServiceProvider
         foreach ($repositoryBindings as $contract => $implementation) {
             $this->app->bind($contract, $implementation);
         }
+
+        $this->app->bind(ProductSearchProjectionRefreshDispatcherInterface::class, QueuedProductSearchProjectionRefreshDispatcher::class);
 
         $serviceBindings = [
             CreateProductBrandServiceInterface::class => CreateProductBrandService::class,

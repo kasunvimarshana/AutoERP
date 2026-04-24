@@ -44,6 +44,22 @@ class EloquentPriceListItemRepository extends EloquentRepository implements Pric
         return $this->toDomainEntity($model);
     }
 
+    /**
+     * @return array<int, int>
+     */
+    public function getDistinctProductIdsByPriceList(int $tenantId, int $priceListId): array
+    {
+        return DB::table('price_list_items')
+            ->where('tenant_id', $tenantId)
+            ->where('price_list_id', $priceListId)
+            ->distinct()
+            ->orderBy('product_id')
+            ->pluck('product_id')
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->values()
+            ->all();
+    }
+
     public function findBestMatch(
         int $tenantId,
         string $type,

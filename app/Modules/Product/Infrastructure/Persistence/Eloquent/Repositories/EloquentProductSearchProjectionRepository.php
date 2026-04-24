@@ -100,6 +100,9 @@ class EloquentProductSearchProjectionRepository implements ProductSearchProjecti
         $identifierMap = $this->buildIdentifierMap($tenantId);
         $attributeMap = $this->buildVariantAttributeMap($tenantId);
         $batchLotMap = $this->buildBatchLotMap($tenantId);
+        $uomMap = $this->buildUomMap($tenantId);
+        $salesPriceMap = $this->buildDefaultPriceMap($tenantId, 'sales');
+        $purchasePriceMap = $this->buildDefaultPriceMap($tenantId, 'purchase');
         [$stockExactMap, $stockByProductMap, $stockWarehouseExactMap, $stockWarehouseByProductMap] = $this->buildStockMaps($tenantId);
 
         $payload = [];
@@ -111,6 +114,15 @@ class EloquentProductSearchProjectionRepository implements ProductSearchProjecti
             $identifierData = $this->resolveIdentifiers($identifierMap, $productId, $variantId);
             $attributeData = $variantId !== null ? ($attributeMap[$variantId] ?? []) : [];
             $batchLotText = $this->resolveBatchLotText($batchLotMap, $productId, $variantId);
+            $baseUom = $uomMap[(int) $row->base_uom_id] ?? ['name' => null, 'symbol' => null];
+            $purchaseUom = $row->purchase_uom_id !== null
+                ? ($uomMap[(int) $row->purchase_uom_id] ?? ['name' => null, 'symbol' => null])
+                : ['name' => null, 'symbol' => null];
+            $salesUom = $row->sales_uom_id !== null
+                ? ($uomMap[(int) $row->sales_uom_id] ?? ['name' => null, 'symbol' => null])
+                : ['name' => null, 'symbol' => null];
+            $salesPrice = $this->resolveDefaultPrice($salesPriceMap, $productId, $variantId);
+            $purchasePrice = $this->resolveDefaultPrice($purchasePriceMap, $productId, $variantId);
 
             $stock = $variantId !== null
                 ? ($stockExactMap[$this->stockKey($productId, $variantId)] ?? ['on_hand' => '0.000000', 'reserved' => '0.000000', 'available' => '0.000000'])
@@ -131,6 +143,12 @@ class EloquentProductSearchProjectionRepository implements ProductSearchProjecti
                 $batchLotText,
                 (string) ($row->category_name ?? ''),
                 (string) ($row->brand_name ?? ''),
+                (string) ($baseUom['name'] ?? ''),
+                (string) ($baseUom['symbol'] ?? ''),
+                (string) ($purchaseUom['name'] ?? ''),
+                (string) ($purchaseUom['symbol'] ?? ''),
+                (string) ($salesUom['name'] ?? ''),
+                (string) ($salesUom['symbol'] ?? ''),
             ])));
 
             $payload[] = [
@@ -150,6 +168,12 @@ class EloquentProductSearchProjectionRepository implements ProductSearchProjecti
                 'base_uom_id' => (int) $row->base_uom_id,
                 'purchase_uom_id' => $row->purchase_uom_id,
                 'sales_uom_id' => $row->sales_uom_id,
+                'base_uom_name' => $baseUom['name'],
+                'base_uom_symbol' => $baseUom['symbol'],
+                'purchase_uom_name' => $purchaseUom['name'],
+                'purchase_uom_symbol' => $purchaseUom['symbol'],
+                'sales_uom_name' => $salesUom['name'],
+                'sales_uom_symbol' => $salesUom['symbol'],
                 'is_active_product' => (bool) $row->is_active_product,
                 'is_active_variant' => (bool) $row->is_active_variant,
                 'identifiers_text' => implode(' ', $identifierData),
@@ -160,6 +184,12 @@ class EloquentProductSearchProjectionRepository implements ProductSearchProjecti
                 'stock_reserved' => $stock['reserved'],
                 'stock_available' => $stock['available'],
                 'stock_by_warehouse_json' => $this->toJson($stockByWarehouse),
+                'default_sales_unit_price' => $salesPrice['unit_price'],
+                'default_sales_currency_id' => $salesPrice['currency_id'],
+                'default_sales_price_uom_id' => $salesPrice['uom_id'],
+                'default_purchase_unit_price' => $purchasePrice['unit_price'],
+                'default_purchase_currency_id' => $purchasePrice['currency_id'],
+                'default_purchase_price_uom_id' => $purchasePrice['uom_id'],
                 'searchable_text' => $searchableText,
                 'source_updated_at' => $row->source_updated_at,
                 'last_projected_at' => $now,
@@ -188,7 +218,7 @@ class EloquentProductSearchProjectionRepository implements ProductSearchProjecti
     {
         $tenantId = (int) ($filters['tenant_id'] ?? 0);
 
-        $query = $this->projectionModel->newQuery()->where('tenant_id', $tenantId);
+        $query = $this->projectionModel->newQuery()->where('product_search_projections.tenant_id', $tenantId);
 
         if (array_key_exists('is_active', $filters)) {
             $isActive = filter_var($filters['is_active'], FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
@@ -226,10 +256,36 @@ class EloquentProductSearchProjectionRepository implements ProductSearchProjecti
             });
         }
 
+        if (isset($filters['variant_attribute'])) {
+            $variantAttribute = trim((string) $filters['variant_attribute']);
+            if ($variantAttribute !== '') {
+                $query->where('variant_attributes_json', 'like', '%'.$variantAttribute.'%');
+            }
+        }
+
+        if (isset($filters['uom_id'])) {
+            $uomId = (int) $filters['uom_id'];
+            $query->where(function ($builder) use ($uomId): void {
+                $builder->where('base_uom_id', $uomId)
+                    ->orWhere('purchase_uom_id', $uomId)
+                    ->orWhere('sales_uom_id', $uomId)
+                    ->orWhere('default_sales_price_uom_id', $uomId)
+                    ->orWhere('default_purchase_price_uom_id', $uomId);
+            });
+        }
+
         $keyword = isset($filters['q']) ? trim((string) $filters['q']) : '';
         if ($keyword !== '') {
             foreach ($this->tokenize($keyword) as $token) {
-                $query->where('searchable_text', 'like', '%'.$token.'%');
+                $query->where(function ($builder) use ($token, $filters): void {
+                    $builder->where('searchable_text', 'like', '%'.$token.'%');
+
+                    $fuzzy = filter_var($filters['fuzzy'] ?? false, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) === true;
+                    if ($fuzzy) {
+                        $builder->orWhereRaw('SOUNDEX(product_name) = SOUNDEX(?)', [$token])
+                            ->orWhereRaw("SOUNDEX(COALESCE(variant_name, '')) = SOUNDEX(?)", [$token]);
+                    }
+                });
             }
         }
 
@@ -273,9 +329,28 @@ class EloquentProductSearchProjectionRepository implements ProductSearchProjecti
             $query->where('stock_available', '<=', (string) $filters['max_available']);
         }
 
+        $priceContext = (string) ($filters['price_context'] ?? $filters['context_type'] ?? '');
+        if (in_array($priceContext, ['sales', 'purchase'], true)) {
+            $priceColumn = $priceContext === 'purchase' ? 'default_purchase_unit_price' : 'default_sales_unit_price';
+            $currencyColumn = $priceContext === 'purchase' ? 'default_purchase_currency_id' : 'default_sales_currency_id';
+
+            if (isset($filters['min_price'])) {
+                $query->whereNotNull($priceColumn)->where($priceColumn, '>=', (string) $filters['min_price']);
+            }
+
+            if (isset($filters['max_price'])) {
+                $query->whereNotNull($priceColumn)->where($priceColumn, '<=', (string) $filters['max_price']);
+            }
+
+            if (isset($filters['currency_id'])) {
+                $query->where($currencyColumn, (int) $filters['currency_id']);
+            }
+        }
+
         if (isset($filters['warehouse_id'])) {
             $warehouseId = (int) $filters['warehouse_id'];
             $query
+                ->select('product_search_projections.*')
                 ->leftJoin('stock_levels as sl', function ($join) use ($tenantId): void {
                     $join->on('sl.product_id', '=', 'product_search_projections.product_id')
                         ->where('sl.tenant_id', '=', $tenantId)
@@ -320,7 +395,8 @@ class EloquentProductSearchProjectionRepository implements ProductSearchProjecti
         } elseif ($sort === '-stock') {
             $query->orderBy('stock_available');
         } else {
-            $query->orderByDesc('source_updated_at')->orderByDesc('id');
+            $query->orderByDesc('product_search_projections.source_updated_at')
+                ->orderByDesc('product_search_projections.id');
         }
 
         $perPage = (int) ($filters['per_page'] ?? 15);
@@ -367,6 +443,128 @@ class EloquentProductSearchProjectionRepository implements ProductSearchProjecti
         }
 
         return $map;
+    }
+
+    /**
+     * @return array<int, array{name: string|null, symbol: string|null}>
+     */
+    private function buildUomMap(int $tenantId): array
+    {
+        $rows = DB::table('units_of_measure')
+            ->where('tenant_id', $tenantId)
+            ->select(['id', 'name', 'symbol'])
+            ->get();
+
+        $map = [];
+        foreach ($rows as $row) {
+            $map[(int) $row->id] = [
+                'name' => $row->name !== null ? (string) $row->name : null,
+                'symbol' => $row->symbol !== null ? (string) $row->symbol : null,
+            ];
+        }
+
+        return $map;
+    }
+
+    /**
+     * @return array<string, array{unit_price: string|null, currency_id: int|null, uom_id: int|null, specificity: int, min_quantity: string}>
+     */
+    private function buildDefaultPriceMap(int $tenantId, string $contextType): array
+    {
+        $today = now()->toDateString();
+
+        $rows = DB::table('price_list_items as pli')
+            ->join('price_lists as pl', 'pl.id', '=', 'pli.price_list_id')
+            ->where('pl.tenant_id', $tenantId)
+            ->where('pli.tenant_id', $tenantId)
+            ->where('pl.type', $contextType)
+            ->where('pl.is_default', true)
+            ->where('pl.is_active', true)
+            ->where(function ($q) use ($today): void {
+                $q->whereNull('pl.valid_from')->orWhereDate('pl.valid_from', '<=', $today);
+            })
+            ->where(function ($q) use ($today): void {
+                $q->whereNull('pl.valid_to')->orWhereDate('pl.valid_to', '>=', $today);
+            })
+            ->where(function ($q) use ($today): void {
+                $q->whereNull('pli.valid_from')->orWhereDate('pli.valid_from', '<=', $today);
+            })
+            ->where(function ($q) use ($today): void {
+                $q->whereNull('pli.valid_to')->orWhereDate('pli.valid_to', '>=', $today);
+            })
+            ->whereRaw('CAST(pli.min_quantity AS DECIMAL(20,6)) <= CAST(? AS DECIMAL(20,6))', ['1.000000'])
+            ->select([
+                'pli.product_id',
+                'pli.variant_id',
+                'pli.uom_id',
+                'pli.min_quantity',
+                'pli.price',
+                'pli.discount_pct',
+                'pl.currency_id',
+            ])
+            ->get();
+
+        $map = [];
+        foreach ($rows as $row) {
+            $productId = (int) $row->product_id;
+            $variantId = $row->variant_id !== null ? (int) $row->variant_id : null;
+            $key = $this->stockKey($productId, $variantId);
+
+            $price = (float) $row->price;
+            $discount = (float) $row->discount_pct;
+            $unitPrice = $price * (1 - ($discount / 100));
+            $specificity = $variantId !== null ? 1 : 0;
+            $minQuantity = number_format((float) $row->min_quantity, 6, '.', '');
+
+            $candidate = [
+                'unit_price' => number_format($unitPrice, 6, '.', ''),
+                'currency_id' => (int) $row->currency_id,
+                'uom_id' => (int) $row->uom_id,
+                'specificity' => $specificity,
+                'min_quantity' => $minQuantity,
+            ];
+
+            if (! isset($map[$key])) {
+                $map[$key] = $candidate;
+                continue;
+            }
+
+            if ($candidate['specificity'] > $map[$key]['specificity']) {
+                $map[$key] = $candidate;
+                continue;
+            }
+
+            if ($candidate['specificity'] === $map[$key]['specificity']
+                && bccomp($candidate['min_quantity'], $map[$key]['min_quantity'], 6) >= 0) {
+                $map[$key] = $candidate;
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * @param  array<string, array{unit_price: string|null, currency_id: int|null, uom_id: int|null, specificity: int, min_quantity: string}>  $priceMap
+     * @return array{unit_price: string|null, currency_id: int|null, uom_id: int|null}
+     */
+    private function resolveDefaultPrice(array $priceMap, int $productId, ?int $variantId): array
+    {
+        $base = $priceMap[$this->stockKey($productId, null)] ?? null;
+        if ($variantId === null) {
+            return [
+                'unit_price' => $base['unit_price'] ?? null,
+                'currency_id' => $base['currency_id'] ?? null,
+                'uom_id' => $base['uom_id'] ?? null,
+            ];
+        }
+
+        $variant = $priceMap[$this->stockKey($productId, $variantId)] ?? $base;
+
+        return [
+            'unit_price' => $variant['unit_price'] ?? null,
+            'currency_id' => $variant['currency_id'] ?? null,
+            'uom_id' => $variant['uom_id'] ?? null,
+        ];
     }
 
     /**

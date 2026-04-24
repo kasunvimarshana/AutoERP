@@ -22,6 +22,8 @@ return new class extends Migration
             $table->nullableMorphs('current_owner'); // e.g., customer, supplier, employee            $table->date('manufacture_date')->nullable();
             $table->date('warranty_expiry')->nullable();
             $table->text('notes')->nullable();
+            // $table->decimal('purchase_price', 20, 6)->nullable();
+            $table->decimal('sales_price', 20, 6)->nullable();
             $table->timestamps();
 
             $table->unique(['tenant_id', 'serial_number'], 'serials_tenant_number_uk');
