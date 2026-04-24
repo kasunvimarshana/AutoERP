@@ -6,12 +6,16 @@ namespace Modules\Product\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
 use Modules\Product\Application\Contracts\DeleteProductIdentifierServiceInterface;
+use Modules\Product\Application\Contracts\RefreshProductSearchProjectionServiceInterface;
 use Modules\Product\Domain\Exceptions\ProductIdentifierNotFoundException;
 use Modules\Product\Domain\RepositoryInterfaces\ProductIdentifierRepositoryInterface;
 
 class DeleteProductIdentifierService extends BaseService implements DeleteProductIdentifierServiceInterface
 {
-    public function __construct(private readonly ProductIdentifierRepositoryInterface $productIdentifierRepository)
+    public function __construct(
+        private readonly ProductIdentifierRepositoryInterface $productIdentifierRepository,
+        private readonly RefreshProductSearchProjectionServiceInterface $refreshProjectionService,
+    )
     {
         parent::__construct($productIdentifierRepository);
     }
@@ -25,6 +29,12 @@ class DeleteProductIdentifierService extends BaseService implements DeleteProduc
             throw new ProductIdentifierNotFoundException($id);
         }
 
-        return $this->productIdentifierRepository->delete($id);
+        $deleted = $this->productIdentifierRepository->delete($id);
+
+        if ($deleted) {
+            $this->refreshProjectionService->execute($productIdentifier->getTenantId(), $productIdentifier->getProductId());
+        }
+
+        return $deleted;
     }
 }

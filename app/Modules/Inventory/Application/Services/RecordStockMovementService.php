@@ -10,6 +10,7 @@ use Modules\Inventory\Application\DTOs\RecordStockMovementDTO;
 use Modules\Inventory\Domain\Entities\StockMovement;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryStockRepositoryInterface;
 use Modules\Inventory\Domain\RepositoryInterfaces\TraceLogRepositoryInterface;
+use Modules\Product\Application\Contracts\RefreshProductSearchProjectionServiceInterface;
 use Modules\Product\Application\Contracts\UomConversionResolverServiceInterface;
 
 class RecordStockMovementService implements RecordStockMovementServiceInterface
@@ -18,6 +19,7 @@ class RecordStockMovementService implements RecordStockMovementServiceInterface
         private readonly InventoryStockRepositoryInterface $inventoryStockRepository,
         private readonly TraceLogRepositoryInterface $traceLogRepository,
         private readonly UomConversionResolverServiceInterface $uomConversionResolverService,
+        private readonly RefreshProductSearchProjectionServiceInterface $refreshProjectionService,
     ) {}
 
     public function execute(array $data): StockMovement
@@ -96,6 +98,7 @@ class RecordStockMovementService implements RecordStockMovementServiceInterface
         $saved = $this->inventoryStockRepository->recordMovement($movement);
         $this->inventoryStockRepository->adjustStockLevel($saved);
         $this->traceLogRepository->recordForMovement($saved);
+        $this->refreshProjectionService->execute($saved->getTenantId(), $saved->getProductId());
 
         return $saved;
     }

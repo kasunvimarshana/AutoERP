@@ -37,6 +37,9 @@ use Modules\Product\Application\Contracts\FindProductAttributeValueServiceInterf
 use Modules\Product\Application\Contracts\FindProductBrandServiceInterface;
 use Modules\Product\Application\Contracts\FindProductCategoryServiceInterface;
 use Modules\Product\Application\Contracts\FindProductIdentifierServiceInterface;
+use Modules\Product\Application\Contracts\RefreshProductSearchProjectionServiceInterface;
+use Modules\Product\Application\Contracts\RebuildProductSearchProjectionServiceInterface;
+use Modules\Product\Application\Contracts\SearchProductsServiceInterface;
 use Modules\Product\Application\Contracts\FindProductServiceInterface;
 use Modules\Product\Application\Contracts\FindProductVariantServiceInterface;
 use Modules\Product\Application\Contracts\FindUnitOfMeasureServiceInterface;
@@ -86,6 +89,9 @@ use Modules\Product\Application\Services\FindProductAttributeValueService;
 use Modules\Product\Application\Services\FindProductBrandService;
 use Modules\Product\Application\Services\FindProductCategoryService;
 use Modules\Product\Application\Services\FindProductIdentifierService;
+use Modules\Product\Application\Services\RefreshProductSearchProjectionService;
+use Modules\Product\Application\Services\RebuildProductSearchProjectionService;
+use Modules\Product\Application\Services\SearchProductsService;
 use Modules\Product\Application\Services\FindProductService;
 use Modules\Product\Application\Services\FindProductVariantService;
 use Modules\Product\Application\Services\FindUnitOfMeasureService;
@@ -111,6 +117,7 @@ use Modules\Product\Domain\RepositoryInterfaces\ProductAttributeValueRepositoryI
 use Modules\Product\Domain\RepositoryInterfaces\ProductBrandRepositoryInterface;
 use Modules\Product\Domain\RepositoryInterfaces\ProductCategoryRepositoryInterface;
 use Modules\Product\Domain\RepositoryInterfaces\ProductIdentifierRepositoryInterface;
+use Modules\Product\Domain\RepositoryInterfaces\ProductSearchProjectionRepositoryInterface;
 use Modules\Product\Domain\RepositoryInterfaces\ProductRepositoryInterface;
 use Modules\Product\Domain\RepositoryInterfaces\ProductVariantRepositoryInterface;
 use Modules\Product\Domain\RepositoryInterfaces\UnitOfMeasureRepositoryInterface;
@@ -123,6 +130,7 @@ use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentPro
 use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentProductBrandRepository;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentProductCategoryRepository;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentProductIdentifierRepository;
+use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentProductSearchProjectionRepository;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentProductRepository;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentProductVariantRepository;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentUnitOfMeasureRepository;
@@ -139,6 +147,7 @@ class ProductServiceProvider extends ServiceProvider
             ProductBrandRepositoryInterface::class => EloquentProductBrandRepository::class,
             ProductCategoryRepositoryInterface::class => EloquentProductCategoryRepository::class,
             ProductIdentifierRepositoryInterface::class => EloquentProductIdentifierRepository::class,
+            ProductSearchProjectionRepositoryInterface::class => EloquentProductSearchProjectionRepository::class,
             ProductRepositoryInterface::class => EloquentProductRepository::class,
             ProductVariantRepositoryInterface::class => EloquentProductVariantRepository::class,
             UnitOfMeasureRepositoryInterface::class => EloquentUnitOfMeasureRepository::class,
@@ -165,6 +174,9 @@ class ProductServiceProvider extends ServiceProvider
             DeleteProductCategoryServiceInterface::class => DeleteProductCategoryService::class,
             CreateProductIdentifierServiceInterface::class => CreateProductIdentifierService::class,
             FindProductIdentifierServiceInterface::class => FindProductIdentifierService::class,
+            SearchProductsServiceInterface::class => SearchProductsService::class,
+            RebuildProductSearchProjectionServiceInterface::class => RebuildProductSearchProjectionService::class,
+            RefreshProductSearchProjectionServiceInterface::class => RefreshProductSearchProjectionService::class,
             UpdateProductIdentifierServiceInterface::class => UpdateProductIdentifierService::class,
             DeleteProductIdentifierServiceInterface::class => DeleteProductIdentifierService::class,
             CreateProductVariantServiceInterface::class => CreateProductVariantService::class,
