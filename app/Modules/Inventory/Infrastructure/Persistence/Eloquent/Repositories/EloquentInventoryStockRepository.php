@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Domain\Entities\StockMovement;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryStockRepositoryInterface;
@@ -12,6 +13,20 @@ use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\StockMovementMo
 class EloquentInventoryStockRepository implements InventoryStockRepositoryInterface
 {
     public function __construct(private readonly StockMovementModel $stockMovementModel) {}
+
+    public function findByIdempotencyKey(int $tenantId, string $idempotencyKey): ?StockMovement
+    {
+        $model = $this->stockMovementModel->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->where('idempotency_key', $idempotencyKey)
+            ->first();
+
+        if ($model === null) {
+            return null;
+        }
+
+        return $this->mapToEntity($model);
+    }
 
     public function recordMovement(StockMovement $movement): StockMovement
     {
@@ -34,6 +49,7 @@ class EloquentInventoryStockRepository implements InventoryStockRepositoryInterf
             'performed_at' => $movement->getPerformedAt() ?? now(),
             'notes' => $movement->getNotes(),
             'metadata' => $movement->getMetadata(),
+            'idempotency_key' => $movement->getIdempotencyKey(),
         ]);
 
         return $this->mapToEntity($saved);
@@ -41,16 +57,18 @@ class EloquentInventoryStockRepository implements InventoryStockRepositoryInterf
 
     public function adjustStockLevel(StockMovement $movement): void
     {
-        $movementType = $movement->getMovementType();
-        $qty = (string) $movement->getQuantity();
+        DB::transaction(function () use ($movement): void {
+            $movementType = $movement->getMovementType();
+            $qty = (string) $movement->getQuantity();
 
-        if (in_array($movementType, ['shipment', 'transfer', 'adjustment_out', 'return_out', 'write_off'], true) && $movement->getFromLocationId() !== null) {
-            $this->applyStockDelta($movement, $movement->getFromLocationId(), $qty, '-');
-        }
+            if (in_array($movementType, ['shipment', 'transfer', 'adjustment_out', 'return_out', 'write_off'], true) && $movement->getFromLocationId() !== null) {
+                $this->applyStockDelta($movement, $movement->getFromLocationId(), $qty, '-');
+            }
 
-        if (in_array($movementType, ['receipt', 'transfer', 'adjustment_in', 'return_in', 'opening'], true) && $movement->getToLocationId() !== null) {
-            $this->applyStockDelta($movement, $movement->getToLocationId(), $qty, '+');
-        }
+            if (in_array($movementType, ['receipt', 'transfer', 'adjustment_in', 'return_in', 'opening'], true) && $movement->getToLocationId() !== null) {
+                $this->applyStockDelta($movement, $movement->getToLocationId(), $qty, '+');
+            }
+        }, 3);
     }
 
     public function paginateByWarehouse(
@@ -134,26 +152,48 @@ class EloquentInventoryStockRepository implements InventoryStockRepositoryInterf
             ->where('location_id', $locationId)
             ->where('batch_id', $movement->getBatchId())
             ->where('serial_id', $movement->getSerialId())
+            ->lockForUpdate()
             ->first();
 
         if ($existing === null) {
-            DB::table('stock_levels')->insert([
-                'tenant_id' => $movement->getTenantId(),
-                'product_id' => $movement->getProductId(),
-                'variant_id' => $movement->getVariantId(),
-                'location_id' => $locationId,
-                'batch_id' => $movement->getBatchId(),
-                'serial_id' => $movement->getSerialId(),
-                'uom_id' => $movement->getUomId(),
-                'quantity_on_hand' => $operation === '-' ? bcmul($qty, '-1', 6) : $qty,
-                'quantity_reserved' => '0.000000',
-                'unit_cost' => $movement->getUnitCost(),
-                'last_movement_at' => $movement->getPerformedAt() ?? now(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            try {
+                DB::table('stock_levels')->insert([
+                    'tenant_id' => $movement->getTenantId(),
+                    'product_id' => $movement->getProductId(),
+                    'variant_id' => $movement->getVariantId(),
+                    'location_id' => $locationId,
+                    'batch_id' => $movement->getBatchId(),
+                    'serial_id' => $movement->getSerialId(),
+                    'uom_id' => $movement->getUomId(),
+                    'quantity_on_hand' => $operation === '-' ? bcmul($qty, '-1', 6) : $qty,
+                    'quantity_reserved' => '0.000000',
+                    'unit_cost' => $movement->getUnitCost(),
+                    'last_movement_at' => $movement->getPerformedAt() ?? now(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
 
-            return;
+                return;
+            } catch (QueryException $exception) {
+                if (! $this->isUniqueConstraintViolation($exception)) {
+                    throw $exception;
+                }
+
+                $existing = DB::table('stock_levels')
+                    ->where('tenant_id', $movement->getTenantId())
+                    ->where('product_id', $movement->getProductId())
+                    ->where('variant_id', $movement->getVariantId())
+                    ->where('location_id', $locationId)
+                    ->where('batch_id', $movement->getBatchId())
+                    ->where('serial_id', $movement->getSerialId())
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($existing === null) {
+                    throw $exception;
+                }
+            }
+
         }
 
         $current = (string) $existing->quantity_on_hand;
@@ -167,6 +207,16 @@ class EloquentInventoryStockRepository implements InventoryStockRepositoryInterf
                 'last_movement_at' => $movement->getPerformedAt() ?? now(),
                 'updated_at' => now(),
             ]);
+    }
+
+    private function isUniqueConstraintViolation(QueryException $exception): bool
+    {
+        $sqlState = (string) $exception->getCode();
+        $message = strtolower($exception->getMessage());
+
+        return in_array($sqlState, ['23000', '23505'], true)
+            || str_contains($message, 'unique constraint')
+            || str_contains($message, 'duplicate entry');
     }
 
     private function mapToEntity(StockMovementModel $model): StockMovement
@@ -189,6 +239,7 @@ class EloquentInventoryStockRepository implements InventoryStockRepositoryInterf
             performedAt: $model->performed_at,
             notes: $model->notes,
             metadata: is_array($model->metadata) ? $model->metadata : null,
+            idempotencyKey: $model->idempotency_key !== null ? (string) $model->idempotency_key : null,
             id: (int) $model->id,
         );
     }

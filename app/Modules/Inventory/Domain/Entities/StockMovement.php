@@ -26,6 +26,7 @@ class StockMovement
         private readonly ?\DateTimeInterface $performedAt,
         private readonly ?string $notes,
         private readonly ?array $metadata,
+        private readonly ?string $idempotencyKey = null,
         ?int $id = null,
     ) {
         $this->id = $id;
@@ -119,5 +120,10 @@ class StockMovement
     public function getMetadata(): ?array
     {
         return $this->metadata;
+    }
+
+    public function getIdempotencyKey(): ?string
+    {
+        return $this->idempotencyKey;
     }
 }

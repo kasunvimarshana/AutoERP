@@ -19,11 +19,7 @@ use Modules\Inventory\Application\Contracts\FindStockMovementServiceInterface;
 use Modules\Inventory\Application\Contracts\FindStockReservationServiceInterface;
 use Modules\Inventory\Application\Contracts\FindTransferOrderServiceInterface;
 use Modules\Inventory\Application\Contracts\ManageValuationConfigServiceInterface;
-use Modules\Inventory\Application\Contracts\CreateBatchServiceInterface;
-use Modules\Inventory\Application\Contracts\DeleteBatchServiceInterface;
-use Modules\Inventory\Application\Contracts\FindBatchServiceInterface;
 use Modules\Inventory\Application\Contracts\ReceiveTransferOrderServiceInterface;
-use Modules\Inventory\Application\Contracts\UpdateBatchServiceInterface;
 use Modules\Inventory\Application\Contracts\RecordStockMovementServiceInterface;
 use Modules\Inventory\Application\Contracts\ReleaseExpiredStockReservationsServiceInterface;
 use Modules\Inventory\Application\Contracts\ReleaseStockReservationServiceInterface;
@@ -41,18 +37,13 @@ use Modules\Inventory\Application\Services\FindStockMovementService;
 use Modules\Inventory\Application\Services\FindStockReservationService;
 use Modules\Inventory\Application\Services\FindTransferOrderService;
 use Modules\Inventory\Application\Services\ManageValuationConfigService;
-use Modules\Inventory\Application\Services\CreateBatchService;
-use Modules\Inventory\Application\Services\DeleteBatchService;
-use Modules\Inventory\Application\Services\FindBatchService;
 use Modules\Inventory\Application\Services\ReceiveTransferOrderService;
-use Modules\Inventory\Application\Services\UpdateBatchService;
 use Modules\Inventory\Application\Services\RecordStockMovementService;
 use Modules\Inventory\Application\Services\ReleaseExpiredStockReservationsService;
 use Modules\Inventory\Application\Services\ReleaseStockReservationService;
 use Modules\Inventory\Application\Services\StartCycleCountService;
 use Modules\Inventory\Application\Services\ValuationEngineService;
 use Modules\Inventory\Domain\RepositoryInterfaces\CostLayerRepositoryInterface;
-use Modules\Inventory\Domain\RepositoryInterfaces\BatchRepositoryInterface;
 use Modules\Inventory\Domain\RepositoryInterfaces\CycleCountRepositoryInterface;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryStockRepositoryInterface;
 use Modules\Inventory\Domain\RepositoryInterfaces\StockReservationRepositoryInterface;
@@ -65,7 +56,6 @@ use Modules\Inventory\Infrastructure\Listeners\HandlePurchaseReturnPosted;
 use Modules\Inventory\Infrastructure\Listeners\HandleSalesReturnReceived;
 use Modules\Inventory\Infrastructure\Listeners\HandleShipmentProcessed;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentCostLayerRepository;
-use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentBatchRepository;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentCycleCountRepository;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentInventoryStockRepository;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentStockReservationRepository;
@@ -83,7 +73,6 @@ class InventoryServiceProvider extends ServiceProvider
 
     public function register(): void
     {
-        $this->app->bind(BatchRepositoryInterface::class, EloquentBatchRepository::class);
         $this->app->bind(InventoryStockRepositoryInterface::class, EloquentInventoryStockRepository::class);
         $this->app->bind(TransferOrderRepositoryInterface::class, EloquentTransferOrderRepository::class);
         $this->app->bind(CycleCountRepositoryInterface::class, EloquentCycleCountRepository::class);
@@ -114,11 +103,6 @@ class InventoryServiceProvider extends ServiceProvider
         $this->app->bind(ValuationEngineServiceInterface::class, ValuationEngineService::class);
         $this->app->bind(AllocationEngineServiceInterface::class, AllocationEngineService::class);
         $this->app->bind(ManageValuationConfigServiceInterface::class, ManageValuationConfigService::class);
-
-        $this->app->bind(CreateBatchServiceInterface::class, CreateBatchService::class);
-        $this->app->bind(UpdateBatchServiceInterface::class, UpdateBatchService::class);
-        $this->app->bind(DeleteBatchServiceInterface::class, DeleteBatchService::class);
-        $this->app->bind(FindBatchServiceInterface::class, FindBatchService::class);
     }
 
     public function boot(): void

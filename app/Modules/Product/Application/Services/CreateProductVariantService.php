@@ -6,17 +6,13 @@ namespace Modules\Product\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
 use Modules\Product\Application\Contracts\CreateProductVariantServiceInterface;
-use Modules\Product\Application\Contracts\RefreshProductSearchProjectionServiceInterface;
 use Modules\Product\Application\DTOs\ProductVariantData;
 use Modules\Product\Domain\Entities\ProductVariant;
 use Modules\Product\Domain\RepositoryInterfaces\ProductVariantRepositoryInterface;
 
 class CreateProductVariantService extends BaseService implements CreateProductVariantServiceInterface
 {
-    public function __construct(
-        private readonly ProductVariantRepositoryInterface $productVariantRepository,
-        private readonly RefreshProductSearchProjectionServiceInterface $refreshProjectionService,
-    )
+    public function __construct(private readonly ProductVariantRepositoryInterface $productVariantRepository)
     {
         parent::__construct($productVariantRepository);
     }
@@ -39,12 +35,6 @@ class CreateProductVariantService extends BaseService implements CreateProductVa
             metadata: $dto->metadata,
         );
 
-        $saved = $this->productVariantRepository->save($productVariant);
-        $tenantId = $saved->getTenantId();
-        if ($tenantId !== null) {
-            $this->refreshProjectionService->execute($tenantId, $saved->getProductId());
-        }
-
-        return $saved;
+        return $this->productVariantRepository->save($productVariant);
     }
 }

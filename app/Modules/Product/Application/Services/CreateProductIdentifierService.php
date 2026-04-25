@@ -6,17 +6,13 @@ namespace Modules\Product\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
 use Modules\Product\Application\Contracts\CreateProductIdentifierServiceInterface;
-use Modules\Product\Application\Contracts\RefreshProductSearchProjectionServiceInterface;
 use Modules\Product\Application\DTOs\ProductIdentifierData;
 use Modules\Product\Domain\Entities\ProductIdentifier;
 use Modules\Product\Domain\RepositoryInterfaces\ProductIdentifierRepositoryInterface;
 
 class CreateProductIdentifierService extends BaseService implements CreateProductIdentifierServiceInterface
 {
-    public function __construct(
-        private readonly ProductIdentifierRepositoryInterface $productIdentifierRepository,
-        private readonly RefreshProductSearchProjectionServiceInterface $refreshProjectionService,
-    )
+    public function __construct(private readonly ProductIdentifierRepositoryInterface $productIdentifierRepository)
     {
         parent::__construct($productIdentifierRepository);
     }
@@ -42,9 +38,6 @@ class CreateProductIdentifierService extends BaseService implements CreateProduc
             metadata: $dto->metadata,
         );
 
-        $saved = $this->productIdentifierRepository->save($productIdentifier);
-        $this->refreshProjectionService->execute($saved->getTenantId(), $saved->getProductId());
-
-        return $saved;
+        return $this->productIdentifierRepository->save($productIdentifier);
     }
 }

@@ -12,14 +12,12 @@ use Modules\Pricing\Domain\Exceptions\PriceListItemNotFoundException;
 use Modules\Pricing\Domain\Exceptions\PriceListNotFoundException;
 use Modules\Pricing\Domain\RepositoryInterfaces\PriceListItemRepositoryInterface;
 use Modules\Pricing\Domain\RepositoryInterfaces\PriceListRepositoryInterface;
-use Modules\Product\Application\Contracts\RefreshProductSearchProjectionServiceInterface;
 
 class UpdatePriceListItemService extends BaseService implements UpdatePriceListItemServiceInterface
 {
     public function __construct(
         private readonly PriceListItemRepositoryInterface $priceListItemRepository,
         private readonly PriceListRepositoryInterface $priceListRepository,
-        private readonly RefreshProductSearchProjectionServiceInterface $refreshProjectionService,
     ) {
         parent::__construct($priceListItemRepository);
     }
@@ -39,8 +37,6 @@ class UpdatePriceListItemService extends BaseService implements UpdatePriceListI
             throw new PriceListNotFoundException($dto->price_list_id);
         }
 
-        $oldProductId = $item->getProductId();
-
         $item->update(
             productId: $dto->product_id,
             variantId: $dto->variant_id,
@@ -52,14 +48,7 @@ class UpdatePriceListItemService extends BaseService implements UpdatePriceListI
             validTo: $this->toDate($dto->valid_to),
         );
 
-        $saved = $this->priceListItemRepository->save($item);
-
-        $this->refreshProjectionService->execute($saved->getTenantId(), $saved->getProductId());
-        if ($oldProductId !== $saved->getProductId()) {
-            $this->refreshProjectionService->execute($saved->getTenantId(), $oldProductId);
-        }
-
-        return $saved;
+        return $this->priceListItemRepository->save($item);
     }
 
     private function toDate(?string $value): ?\DateTimeInterface

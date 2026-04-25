@@ -35,6 +35,7 @@ class StockMovementModel extends Model
         'performed_at',
         'notes',
         'metadata',
+        'idempotency_key',
     ];
 
     protected $casts = [

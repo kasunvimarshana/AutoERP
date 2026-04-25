@@ -8,6 +8,8 @@ use Modules\Inventory\Domain\Entities\StockMovement;
 
 interface InventoryStockRepositoryInterface
 {
+    public function findByIdempotencyKey(int $tenantId, string $idempotencyKey): ?StockMovement;
+
     public function recordMovement(StockMovement $movement): StockMovement;
 
     public function adjustStockLevel(StockMovement $movement): void;

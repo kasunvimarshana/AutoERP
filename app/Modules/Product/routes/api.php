@@ -10,8 +10,8 @@ use Modules\Product\Infrastructure\Http\Controllers\ProductAttributeValueControl
 use Modules\Product\Infrastructure\Http\Controllers\ProductBrandController;
 use Modules\Product\Infrastructure\Http\Controllers\ProductCategoryController;
 use Modules\Product\Infrastructure\Http\Controllers\ProductController;
-use Modules\Product\Infrastructure\Http\Controllers\ProductIdentifierController;
 use Modules\Product\Infrastructure\Http\Controllers\ProductSearchController;
+use Modules\Product\Infrastructure\Http\Controllers\ProductIdentifierController;
 use Modules\Product\Infrastructure\Http\Controllers\ProductVariantController;
 use Modules\Product\Infrastructure\Http\Controllers\UnitOfMeasureController;
 use Modules\Product\Infrastructure\Http\Controllers\UomConversionController;
@@ -19,7 +19,6 @@ use Modules\Product\Infrastructure\Http\Controllers\VariantAttributeController;
 
 Route::middleware(['auth:api', 'resolve.tenant'])->group(function (): void {
     Route::get('products/search', [ProductSearchController::class, 'index']);
-    Route::post('products/search/rebuild', [ProductSearchController::class, 'rebuild']);
     Route::apiResource('products', ProductController::class);
     Route::apiResource('product-identifiers', ProductIdentifierController::class);
     Route::apiResource('product-variants', ProductVariantController::class);

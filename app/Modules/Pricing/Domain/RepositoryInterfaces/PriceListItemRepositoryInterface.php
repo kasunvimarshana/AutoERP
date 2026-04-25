@@ -11,11 +11,6 @@ interface PriceListItemRepositoryInterface extends RepositoryInterface
 {
     public function save(PriceListItem $priceListItem): PriceListItem;
 
-    /**
-     * @return array<int, int>
-     */
-    public function getDistinctProductIdsByPriceList(int $tenantId, int $priceListId): array;
-
     public function findBestMatch(
         int $tenantId,
         string $type,

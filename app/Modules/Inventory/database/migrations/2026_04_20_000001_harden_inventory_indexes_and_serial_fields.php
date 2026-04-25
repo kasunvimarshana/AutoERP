@@ -12,7 +12,7 @@ return new class extends Migration
     {
         if (Schema::hasTable('serials') && ! Schema::hasColumn('serials', 'manufacture_date')) {
             Schema::table('serials', function (Blueprint $table): void {
-                $table->date('manufacture_date')->nullable()->after('lot_number');
+                $table->date('manufacture_date')->nullable();
             });
         }
 

@@ -197,6 +197,65 @@ class InventoryStockMovementIntegrationTest extends TestCase
         ]);
     }
 
+    public function test_record_movement_is_idempotent_when_key_is_replayed(): void
+    {
+        $tenantId = 62;
+        $this->seedTenant($tenantId);
+        $this->seedReferenceData($tenantId);
+
+        /** @var CreateWarehouseServiceInterface $createWarehouseService */
+        $createWarehouseService = app(CreateWarehouseServiceInterface::class);
+        /** @var CreateWarehouseLocationServiceInterface $createWarehouseLocationService */
+        $createWarehouseLocationService = app(CreateWarehouseLocationServiceInterface::class);
+        /** @var RecordStockMovementServiceInterface $recordStockMovementService */
+        $recordStockMovementService = app(RecordStockMovementServiceInterface::class);
+
+        $warehouse = $createWarehouseService->execute([
+            'tenant_id' => $tenantId,
+            'name' => 'Main DC',
+            'code' => 'MDC',
+            'is_default' => true,
+        ]);
+
+        $toLocation = $createWarehouseLocationService->execute([
+            'tenant_id' => $tenantId,
+            'warehouse_id' => $warehouse->getId(),
+            'name' => 'Rack B1',
+            'code' => 'RACK-B1',
+            'type' => 'rack',
+        ]);
+
+        $payload = [
+            'tenant_id' => $tenantId,
+            'warehouse_id' => $warehouse->getId(),
+            'product_id' => 1001,
+            'to_location_id' => $toLocation->getId(),
+            'movement_type' => 'receipt',
+            'uom_id' => 2001,
+            'quantity' => '5.000000',
+            'unit_cost' => '10.000000',
+            'idempotency_key' => 'inv-receipt-62-001',
+        ];
+
+        $first = $recordStockMovementService->execute($payload);
+        $second = $recordStockMovementService->execute($payload);
+
+        $this->assertSame($first->getId(), $second->getId());
+
+        $this->assertSame(1, DB::table('stock_movements')
+            ->where('tenant_id', $tenantId)
+            ->where('idempotency_key', 'inv-receipt-62-001')
+            ->count());
+
+        $toQty = DB::table('stock_levels')
+            ->where('tenant_id', $tenantId)
+            ->where('product_id', 1001)
+            ->where('location_id', $toLocation->getId())
+            ->value('quantity_on_hand');
+
+        $this->assertSame(0, bccomp((string) $toQty, '5.000000', 6));
+    }
+
     private function seedTenant(int $tenantId): void
     {
         DB::table('tenants')->insert([

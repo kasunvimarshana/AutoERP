@@ -9,17 +9,11 @@ use Modules\Pricing\Application\Contracts\UpdatePriceListServiceInterface;
 use Modules\Pricing\Application\DTOs\PriceListData;
 use Modules\Pricing\Domain\Entities\PriceList;
 use Modules\Pricing\Domain\Exceptions\PriceListNotFoundException;
-use Modules\Pricing\Domain\RepositoryInterfaces\PriceListItemRepositoryInterface;
 use Modules\Pricing\Domain\RepositoryInterfaces\PriceListRepositoryInterface;
-use Modules\Product\Application\Contracts\RefreshProductSearchProjectionServiceInterface;
 
 class UpdatePriceListService extends BaseService implements UpdatePriceListServiceInterface
 {
-    public function __construct(
-        private readonly PriceListRepositoryInterface $priceListRepository,
-        private readonly PriceListItemRepositoryInterface $priceListItemRepository,
-        private readonly RefreshProductSearchProjectionServiceInterface $refreshProjectionService,
-    )
+    public function __construct(private readonly PriceListRepositoryInterface $priceListRepository)
     {
         parent::__construct($priceListRepository);
     }
@@ -53,14 +47,7 @@ class UpdatePriceListService extends BaseService implements UpdatePriceListServi
             $this->priceListRepository->clearDefaultByType($dto->tenant_id, $dto->type, $id);
         }
 
-        $saved = $this->priceListRepository->save($priceList);
-
-        $productIds = $this->priceListItemRepository->getDistinctProductIdsByPriceList($saved->getTenantId(), $saved->getId());
-        foreach ($productIds as $productId) {
-            $this->refreshProjectionService->execute($saved->getTenantId(), $productId);
-        }
-
-        return $saved;
+        return $this->priceListRepository->save($priceList);
     }
 
     private function toDate(?string $value): ?\DateTimeInterface

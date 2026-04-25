@@ -1,0 +1,231 @@
+name: Product Search Benchmark Main Report
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "app/Modules/Product/**"
+      - "docs/benchmarks/**"
+      - ".github/workflows/product-search-benchmark-main-report.yml"
+      - ".github/workflows/product-search-benchmark-gate.yml"
+  workflow_dispatch:
+
+jobs:
+  benchmark-main-report:
+    runs-on: ubuntu-latest
+    env:
+      TENANT_ID: ${{ vars.BENCHMARK_TENANT_ID }}
+      WAREHOUSE_ID: ${{ vars.BENCHMARK_WAREHOUSE_ID }}
+      TERMS: ${{ vars.BENCHMARK_TERMS }}
+      ITERATIONS: ${{ vars.BENCHMARK_ITERATIONS }}
+      PER_PAGE: ${{ vars.BENCHMARK_PER_PAGE }}
+      BASELINE_FILE: ${{ vars.BENCHMARK_BASELINE_FILE }}
+      P95_THRESHOLD: ${{ vars.BENCHMARK_P95_THRESHOLD }}
+      MAX_THRESHOLD: ${{ vars.BENCHMARK_MAX_THRESHOLD }}
+      ARTIFACT_RETENTION_DAYS: ${{ vars.BENCHMARK_ARTIFACT_RETENTION_DAYS }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          extensions: mbstring, bcmath, pdo, pdo_mysql, pdo_pgsql, sqlite3
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Prepare app key
+        run: |
+          cp .env.example .env
+          php artisan key:generate --ansi
+
+      - name: Resolve benchmark parameters
+        run: |
+          if [ -z "$TERMS" ]; then
+            TERMS="SKU-001,BARCODE-001,PRODUCT-NAME"
+          fi
+
+          if [ -z "$ITERATIONS" ]; then
+            ITERATIONS="5"
+          fi
+
+          if [ -z "$PER_PAGE" ]; then
+            PER_PAGE="25"
+          fi
+
+          if [ -z "$BASELINE_FILE" ]; then
+            BASELINE_FILE="docs/benchmarks/product-search-baseline.staging.example.json"
+          fi
+
+          if [ -z "$P95_THRESHOLD" ]; then
+            P95_THRESHOLD="20"
+          fi
+
+          if [ -z "$MAX_THRESHOLD" ]; then
+            MAX_THRESHOLD="30"
+          fi
+
+          if [ -z "$ARTIFACT_RETENTION_DAYS" ]; then
+            ARTIFACT_RETENTION_DAYS="30"
+          fi
+
+          echo "TERMS=$TERMS" >> $GITHUB_ENV
+          echo "ITERATIONS=$ITERATIONS" >> $GITHUB_ENV
+          echo "PER_PAGE=$PER_PAGE" >> $GITHUB_ENV
+          echo "BASELINE_FILE=$BASELINE_FILE" >> $GITHUB_ENV
+          echo "P95_THRESHOLD=$P95_THRESHOLD" >> $GITHUB_ENV
+          echo "MAX_THRESHOLD=$MAX_THRESHOLD" >> $GITHUB_ENV
+          echo "ARTIFACT_RETENTION_DAYS=$ARTIFACT_RETENTION_DAYS" >> $GITHUB_ENV
+
+      - name: Run benchmark (non-blocking)
+        env:
+          DB_CONNECTION: ${{ secrets.DB_CONNECTION }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_DATABASE: ${{ secrets.DB_DATABASE }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_URL: ${{ secrets.DB_URL }}
+        run: |
+          if [ -z "$TENANT_ID" ] || [ -z "$WAREHOUSE_ID" ]; then
+            echo "::notice::Skipping benchmark report because BENCHMARK_TENANT_ID/BENCHMARK_WAREHOUSE_ID are not configured."
+            exit 0
+          fi
+
+          IFS=',' read -ra TERM_LIST <<< "$TERMS"
+          TERM_ARGS=""
+          for term in "${TERM_LIST[@]}"; do
+            CLEANED=$(echo "$term" | xargs)
+            TERM_ARGS+=" --term=${CLEANED}"
+          done
+
+          set +e
+          php artisan product:benchmark-search \
+            --format=json \
+            --tenant_id="$TENANT_ID" \
+            --warehouse_id="$WAREHOUSE_ID" \
+            --iterations="$ITERATIONS" \
+            --per_page="$PER_PAGE" \
+            --include_pricing=0 \
+            ${TERM_ARGS} > current-benchmark.json
+          BENCH_EXIT=$?
+          set -e
+
+          if [ ! -f current-benchmark.json ]; then
+            echo "::notice::No benchmark output file was produced."
+            exit 0
+          fi
+
+          echo "Benchmark command exit code: ${BENCH_EXIT}"
+          cat current-benchmark.json
+
+      - name: Compare with baseline and publish summary (non-blocking)
+        run: |
+          php -r '
+          $baselineFile = getenv("BASELINE_FILE") ?: "";
+          $p95Threshold = (float) (getenv("P95_THRESHOLD") ?: "20");
+          $maxThreshold = (float) (getenv("MAX_THRESHOLD") ?: "30");
+
+          if (!file_exists("current-benchmark.json")) {
+              echo "::notice::Skipping comparison because current benchmark output is missing.\n";
+              exit(0);
+          }
+
+          $current = json_decode(file_get_contents("current-benchmark.json"), true);
+          if (!is_array($current)) {
+              echo "::notice::Skipping comparison because current benchmark output is not valid JSON.\n";
+              exit(0);
+          }
+
+          if (($current["status"] ?? "") !== "success") {
+              $msg = (string) ($current["message"] ?? "benchmark did not return success");
+              echo "::notice::Benchmark status is not success: {$msg}\n";
+              exit(0);
+          }
+
+          if ($baselineFile === "" || !file_exists($baselineFile)) {
+              echo "::notice::Baseline file not found ({$baselineFile}); skipping delta comparison.\n";
+              exit(0);
+          }
+
+          $baseline = json_decode(file_get_contents($baselineFile), true);
+          if (!is_array($baseline)) {
+              echo "::notice::Baseline file is not valid JSON; skipping delta comparison.\n";
+              exit(0);
+          }
+
+          $baselineByTerm = [];
+          foreach (($baseline["results"] ?? []) as $row) {
+              if (isset($row["term"])) {
+                  $baselineByTerm[(string) $row["term"]] = $row;
+              }
+          }
+
+          $lines = [];
+          $regressionDetected = false;
+
+          foreach (($current["results"] ?? []) as $row) {
+              $term = (string) ($row["term"] ?? "");
+              if ($term === "") {
+                  continue;
+              }
+
+              if (!isset($baselineByTerm[$term])) {
+                  $lines[] = "- {$term}: baseline missing";
+                  continue;
+              }
+
+              $base = $baselineByTerm[$term];
+              $currP95 = (float) ($row["p95_ms"] ?? 0.0);
+              $currMax = (float) ($row["max_ms"] ?? 0.0);
+              $baseP95 = (float) ($base["p95_ms"] ?? 0.0);
+              $baseMax = (float) ($base["max_ms"] ?? 0.0);
+
+              $deltaP95 = $baseP95 > 0 ? (($currP95 - $baseP95) / $baseP95) * 100 : 0.0;
+              $deltaMax = $baseMax > 0 ? (($currMax - $baseMax) / $baseMax) * 100 : 0.0;
+
+              $regression = ($deltaP95 > $p95Threshold) || ($deltaMax > $maxThreshold);
+              if ($regression) {
+                  $regressionDetected = true;
+              }
+
+              $lines[] = sprintf(
+                  "- %s: p95=%.2fms (delta %.2f%%), max=%.2fms (delta %.2f%%), regression=%s",
+                  $term,
+                  $currP95,
+                  $deltaP95,
+                  $currMax,
+                  $deltaMax,
+                  $regression ? "YES" : "NO"
+              );
+          }
+
+          $summary = "Product Search Benchmark Main Report\n";
+          $summary .= "Thresholds: p95>" . $p95Threshold . "%, max>" . $maxThreshold . "%\n";
+          $summary .= implode("\n", $lines) . "\n";
+          file_put_contents("benchmark-comparison-summary.txt", $summary);
+          file_put_contents(getenv("GITHUB_STEP_SUMMARY"), $summary, FILE_APPEND);
+
+          if ($regressionDetected) {
+              echo "::warning::Benchmark regression detected on main (non-blocking). Review workflow summary for details.\n";
+          } else {
+              echo "::notice::Benchmark comparison complete with no regression threshold breach.\n";
+          }
+          '
+
+      - name: Upload benchmark main artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: product-search-benchmark-main-${{ github.run_id }}
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: warn
+          path: |
+            current-benchmark.json
+            benchmark-comparison-summary.txt
+            ${{ env.BASELINE_FILE }}

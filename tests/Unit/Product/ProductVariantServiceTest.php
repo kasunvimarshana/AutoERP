@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Unit\Product;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Modules\Product\Application\Contracts\RefreshProductSearchProjectionServiceInterface;
 use Modules\Product\Application\Services\CreateProductVariantService;
 use Modules\Product\Application\Services\DeleteProductVariantService;
 use Modules\Product\Application\Services\FindProductVariantService;
@@ -21,20 +20,16 @@ class ProductVariantServiceTest extends TestCase
     /** @var ProductVariantRepositoryInterface&MockObject */
     private ProductVariantRepositoryInterface $repository;
 
-    /** @var RefreshProductSearchProjectionServiceInterface&MockObject */
-    private RefreshProductSearchProjectionServiceInterface $refreshService;
-
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->repository = $this->createMock(ProductVariantRepositoryInterface::class);
-        $this->refreshService = $this->createMock(RefreshProductSearchProjectionServiceInterface::class);
     }
 
     public function test_create_product_variant_service_maps_payload_and_saves(): void
     {
-        $service = new CreateProductVariantService($this->repository, $this->refreshService);
+        $service = new CreateProductVariantService($this->repository);
 
         $this->repository
             ->expects($this->once())
@@ -92,7 +87,7 @@ class ProductVariantServiceTest extends TestCase
 
     public function test_update_product_variant_service_throws_when_variant_missing(): void
     {
-        $service = new UpdateProductVariantService($this->repository, $this->refreshService);
+        $service = new UpdateProductVariantService($this->repository);
 
         $this->repository
             ->expects($this->once())
@@ -113,7 +108,7 @@ class ProductVariantServiceTest extends TestCase
 
     public function test_delete_product_variant_service_throws_when_variant_missing(): void
     {
-        $service = new DeleteProductVariantService($this->repository, $this->refreshService);
+        $service = new DeleteProductVariantService($this->repository);
 
         $this->repository
             ->expects($this->once())

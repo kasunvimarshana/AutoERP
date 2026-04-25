@@ -1,0 +1,130 @@
+name: Product Search Benchmark PR Checks
+
+on:
+  pull_request:
+    paths:
+      - "app/Modules/Product/**"
+      - "tests/Feature/ProductSearchBenchmarkCommandTest.php"
+      - "docs/benchmarks/product-search-baseline.example.json"
+      - "docs/PRODUCT_SEARCH_PERFORMANCE_RUNBOOK.md"
+      - ".github/workflows/product-search-benchmark-gate.yml"
+      - ".github/workflows/product-search-benchmark-pr-check.yml"
+
+jobs:
+  benchmark-contract-check:
+    runs-on: ubuntu-latest
+    env:
+      ARTIFACT_RETENTION_DAYS: ${{ vars.BENCHMARK_ARTIFACT_RETENTION_DAYS }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          extensions: mbstring, bcmath, pdo, pdo_mysql, pdo_pgsql, sqlite3
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Prepare app key
+        run: |
+          cp .env.example .env
+          php artisan key:generate --ansi
+
+      - name: Resolve artifact retention
+        run: |
+          if [ -z "$ARTIFACT_RETENTION_DAYS" ]; then
+            ARTIFACT_RETENTION_DAYS="14"
+          fi
+
+          echo "ARTIFACT_RETENTION_DAYS=$ARTIFACT_RETENTION_DAYS" >> $GITHUB_ENV
+
+      - name: Run benchmark command feature test
+        run: php ./vendor/bin/phpunit tests/Feature/ProductSearchBenchmarkCommandTest.php
+
+      - name: Validate baseline JSON schema shape
+        run: |
+          php -r '
+          $file = "docs/benchmarks/product-search-baseline.example.json";
+          if (!file_exists($file)) {
+              fwrite(STDERR, "Missing baseline file: {$file}\n");
+              exit(1);
+          }
+
+          $json = json_decode(file_get_contents($file), true);
+          if (!is_array($json)) {
+              fwrite(STDERR, "Baseline file is not valid JSON.\n");
+              exit(1);
+          }
+
+          $requiredRoot = ["status", "tenant_id", "warehouse_id", "iterations", "per_page", "include_pricing", "terms", "results", "generated_at"];
+          foreach ($requiredRoot as $key) {
+              if (!array_key_exists($key, $json)) {
+                  fwrite(STDERR, "Missing root key: {$key}\n");
+                  exit(1);
+              }
+          }
+
+          if (!is_array($json["results"]) || count($json["results"]) === 0) {
+              fwrite(STDERR, "Baseline results must be a non-empty array.\n");
+              exit(1);
+          }
+
+          $requiredResultKeys = ["term", "matches", "min_ms", "avg_ms", "p95_ms", "max_ms"];
+          foreach ($json["results"] as $idx => $row) {
+              if (!is_array($row)) {
+                  fwrite(STDERR, "Result row {$idx} is not an object.\n");
+                  exit(1);
+              }
+
+              foreach ($requiredResultKeys as $key) {
+                  if (!array_key_exists($key, $row)) {
+                      fwrite(STDERR, "Result row {$idx} missing key: {$key}\n");
+                      exit(1);
+                  }
+              }
+          }
+
+          echo "Baseline JSON schema shape looks valid.\n";
+          '
+
+      - name: Validate JSON mode output contract
+        run: |
+          set +e
+          php artisan product:benchmark-search --format=json > benchmark-output.json
+          CMD_EXIT=$?
+          set -e
+
+          php -r '
+          $output = trim((string) file_get_contents("benchmark-output.json"));
+          $json = json_decode($output, true);
+          if (!is_array($json)) {
+              fwrite(STDERR, "Command output is not valid JSON.\n");
+              fwrite(STDERR, "Raw output: {$output}\n");
+              exit(1);
+          }
+
+          if (!array_key_exists("status", $json)) {
+              fwrite(STDERR, "JSON output missing status key.\n");
+              exit(1);
+          }
+
+          echo "JSON mode output contract validated.\n";
+          '
+
+          echo "Command exit code (informational): ${CMD_EXIT}"
+
+      - name: Upload benchmark PR artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: product-search-benchmark-pr-${{ github.run_id }}
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: warn
+          path: |
+            benchmark-output.json
+            docs/benchmarks/product-search-baseline.example.json

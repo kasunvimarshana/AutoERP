@@ -6,7 +6,6 @@ namespace Modules\Product\Application\Services;
 
 use Modules\Core\Application\Contracts\SlugGeneratorInterface;
 use Modules\Core\Application\Services\BaseService;
-use Modules\Product\Application\Contracts\RefreshProductSearchProjectionServiceInterface;
 use Modules\Product\Application\Contracts\UpdateProductServiceInterface;
 use Modules\Product\Application\DTOs\ProductData;
 use Modules\Product\Domain\Entities\Product;
@@ -18,7 +17,6 @@ class UpdateProductService extends BaseService implements UpdateProductServiceIn
     public function __construct(
         private readonly ProductRepositoryInterface $productRepository,
         private readonly SlugGeneratorInterface $slugGenerator,
-        private readonly RefreshProductSearchProjectionServiceInterface $refreshProjectionService,
     ) {
         parent::__construct($productRepository);
     }
@@ -68,13 +66,6 @@ class UpdateProductService extends BaseService implements UpdateProductServiceIn
             metadata: $dto->metadata,
         );
 
-        $saved = $this->productRepository->save($product);
-        $savedId = $saved->getId();
-
-        if ($savedId !== null) {
-            $this->refreshProjectionService->execute($saved->getTenantId(), $savedId);
-        }
-
-        return $saved;
+        return $this->productRepository->save($product);
     }
 }
