@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Application\Services;
 
-use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Modules\Core\Domain\Exceptions\NotFoundException;
 use Modules\Inventory\Application\Contracts\RecordStockMovementServiceInterface;
 use Modules\Inventory\Application\DTOs\RecordStockMovementDTO;
 use Modules\Inventory\Domain\Entities\StockMovement;
+use Modules\Inventory\Domain\Events\StockAdjustmentRecorded;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryStockRepositoryInterface;
 use Modules\Inventory\Domain\RepositoryInterfaces\TraceLogRepositoryInterface;
 use Modules\Product\Application\Contracts\UomConversionResolverServiceInterface;
@@ -42,15 +44,7 @@ class RecordStockMovementService implements RecordStockMovementServiceInterface
             performedAt: $data['performed_at'] ?? null,
             notes: $data['notes'] ?? null,
             metadata: is_array($data['metadata'] ?? null) ? $data['metadata'] : null,
-            idempotencyKey: isset($data['idempotency_key']) ? trim((string) $data['idempotency_key']) : null,
         );
-
-        if ($dto->idempotencyKey !== null && $dto->idempotencyKey !== '') {
-            $existing = $this->inventoryStockRepository->findByIdempotencyKey($dto->tenantId, $dto->idempotencyKey);
-            if ($existing !== null) {
-                return $existing;
-            }
-        }
 
         if (! $this->inventoryStockRepository->warehouseExists($dto->tenantId, $dto->warehouseId)) {
             throw new NotFoundException('Warehouse', $dto->warehouseId);
@@ -100,37 +94,39 @@ class RecordStockMovementService implements RecordStockMovementServiceInterface
             performedAt: $dto->performedAt !== null ? new \DateTimeImmutable($dto->performedAt) : null,
             notes: $dto->notes,
             metadata: $metadata,
-            idempotencyKey: $dto->idempotencyKey,
         );
 
-        try {
-            $saved = $this->inventoryStockRepository->recordMovement($movement);
-        } catch (QueryException $exception) {
-            if (! $this->isUniqueConstraintViolation($exception) || $dto->idempotencyKey === null || $dto->idempotencyKey === '') {
-                throw $exception;
-            }
-
-            $existing = $this->inventoryStockRepository->findByIdempotencyKey($dto->tenantId, $dto->idempotencyKey);
-            if ($existing !== null) {
-                return $existing;
-            }
-
-            throw $exception;
-        }
-
+        $saved = $this->inventoryStockRepository->recordMovement($movement);
         $this->inventoryStockRepository->adjustStockLevel($saved);
         $this->traceLogRepository->recordForMovement($saved);
 
+        if (
+            in_array($saved->getMovementType(), ['adjustment_in', 'adjustment_out'], true)
+            && $saved->getReferenceType() !== 'cycle_count_headers'
+            && $saved->getUnitCost() !== null
+            && $saved->getId() !== null
+        ) {
+            $product = DB::table('products')
+                ->where('tenant_id', $saved->getTenantId())
+                ->where('id', $saved->getProductId())
+                ->select('inventory_account_id', 'expense_account_id')
+                ->first();
+
+            Event::dispatch(new StockAdjustmentRecorded(
+                tenantId: $saved->getTenantId(),
+                stockMovementId: (int) $saved->getId(),
+                productId: $saved->getProductId(),
+                movementType: $saved->getMovementType(),
+                quantity: $saved->getQuantity(),
+                unitCost: $saved->getUnitCost(),
+                amount: bcmul($saved->getQuantity(), $saved->getUnitCost(), 6),
+                inventoryAccountId: $product !== null && $product->inventory_account_id !== null ? (int) $product->inventory_account_id : null,
+                expenseAccountId: $product !== null && $product->expense_account_id !== null ? (int) $product->expense_account_id : null,
+                movementDate: ($saved->getPerformedAt() ?? now())->format('Y-m-d'),
+                createdBy: $saved->getPerformedBy() ?? 1,
+            ));
+        }
+
         return $saved;
-    }
-
-    private function isUniqueConstraintViolation(QueryException $exception): bool
-    {
-        $sqlState = (string) $exception->getCode();
-        $message = strtolower($exception->getMessage());
-
-        return in_array($sqlState, ['23000', '23505'], true)
-            || str_contains($message, 'unique constraint')
-            || str_contains($message, 'duplicate entry');
     }
 }

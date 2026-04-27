@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Persistence\Eloquent\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
@@ -18,6 +20,8 @@ class JournalEntryModel extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'org_unit_id',
+        'row_version',
         'fiscal_period_id',
         'entry_number',
         'entry_type',
@@ -41,8 +45,13 @@ class JournalEntryModel extends BaseModel
         'is_reversed' => 'boolean',
     ];
 
-    public function lines()
+    public function lines(): HasMany
     {
         return $this->hasMany(JournalEntryLineModel::class, 'journal_entry_id');
+    }
+
+    public function fiscalPeriod(): BelongsTo
+    {
+        return $this->belongsTo(FiscalPeriodModel::class, 'fiscal_period_id');
     }
 }

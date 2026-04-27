@@ -12,7 +12,9 @@ return new class extends Migration
     {
         Schema::create('hr_employee_documents', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id', 'hr_employee_documents_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->unsignedBigInteger('employee_id');
             $table->string('document_type', 50);
             $table->string('title');
@@ -23,6 +25,8 @@ return new class extends Migration
             $table->date('issued_date')->nullable();
             $table->date('expiry_date')->nullable();
             $table->json('metadata')->nullable();
+            $table->foreign('employee_id', 'hr_employee_documents_employee_id_fk')
+                ->references('id')->on('employees')->cascadeOnDelete();
             $table->timestamps();
             $table->softDeletes();
 

@@ -22,6 +22,7 @@ class PaymentData
         public readonly string $status = 'draft',
         public readonly ?string $reference = null,
         public readonly ?string $notes = null,
+        public readonly ?string $idempotency_key = null,
         public readonly ?int $journal_entry_id = null,
         public readonly ?int $id = null,
     ) {}
@@ -47,6 +48,7 @@ class PaymentData
             status: (string) ($data['status'] ?? 'draft'),
             reference: isset($data['reference']) ? (string) $data['reference'] : null,
             notes: isset($data['notes']) ? (string) $data['notes'] : null,
+            idempotency_key: isset($data['idempotency_key']) ? (string) $data['idempotency_key'] : null,
             journal_entry_id: isset($data['journal_entry_id']) ? (int) $data['journal_entry_id'] : null,
             id: isset($data['id']) ? (int) $data['id'] : null,
         );

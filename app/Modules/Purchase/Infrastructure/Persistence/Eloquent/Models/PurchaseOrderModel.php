@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Purchase\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
@@ -18,7 +19,8 @@ class PurchaseOrderModel extends Model
     protected $fillable = [
         'tenant_id',
         'supplier_id',
-        'org_unit_id',
+            'org_unit_id',
+            'row_version',
         'warehouse_id',
         'po_number',
         'status',
@@ -53,4 +55,9 @@ class PurchaseOrderModel extends Model
         'expected_date' => 'date',
         'metadata' => 'array',
     ];
+
+        public function lines(): HasMany
+        {
+            return $this->hasMany(PurchaseOrderLineModel::class, 'purchase_order_id');
+        }
 }

@@ -12,6 +12,7 @@ return new class extends Migration
     {
         Schema::create('tenant_plans', function (Blueprint $table) {
             $table->id();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->string('name');
             $table->string('slug', 127)->unique('tenant_plans_slug_uk');
             $table->json('features')->nullable();
@@ -20,6 +21,7 @@ return new class extends Migration
             $table->string('currency_code', 3)->default('USD');
             $table->enum('billing_interval', ['month', 'year'])->default('month');
             $table->boolean('is_active')->default(true)->index('tenant_plans_active_idx');
+            $table->softDeletes();
             $table->timestamps();
 
             $table->index(['is_active', 'billing_interval'], 'tenant_plans_active_interval_idx');

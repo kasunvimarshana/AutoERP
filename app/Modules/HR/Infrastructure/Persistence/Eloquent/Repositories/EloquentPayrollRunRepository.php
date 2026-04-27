@@ -42,7 +42,8 @@ class EloquentPayrollRunRepository extends EloquentRepository implements Payroll
     {
         $dt = fn ($v) => $v ? ($v instanceof \DateTimeInterface ? $v : new \DateTimeImmutable($v)) : null;
         $now = fn ($v) => $v instanceof \DateTimeInterface ? $v : new \DateTimeImmutable($v ?? 'now');
+        $decimal = static fn (mixed $value): string => $value === null ? '0' : (string) $value;
 
-        return new PayrollRun($m->tenant_id, $now($m->period_start), $now($m->period_end), PayrollRunStatus::from($m->status), $dt($m->processed_at), $dt($m->approved_at), $m->approved_by, $m->total_gross ?? '0', $m->total_deductions ?? '0', $m->total_net ?? '0', $m->metadata ?? [], $now($m->created_at), $now($m->updated_at), $m->id);
+        return new PayrollRun($m->tenant_id, $now($m->period_start), $now($m->period_end), PayrollRunStatus::from($m->status), $dt($m->processed_at), $dt($m->approved_at), $m->approved_by, $decimal($m->total_gross), $decimal($m->total_deductions), $decimal($m->total_net), $m->metadata ?? [], $now($m->created_at), $now($m->updated_at), $m->id);
     }
 }

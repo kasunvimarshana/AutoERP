@@ -12,10 +12,11 @@ return new class extends Migration
     {
         Schema::create('products', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained(null, 'id', 'products_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+$table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+$table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('category_id')->nullable()->constrained('product_categories', 'id', 'products_category_id_fk')->nullOnDelete();
             $table->foreignId('brand_id')->nullable()->constrained('product_brands', 'id', 'products_brand_id_fk')->nullOnDelete();
-            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id', 'products_org_unit_id_fk')->nullOnDelete();
             $table->enum('type', ['physical', 'service', 'digital', 'combo', 'variable'])->default('physical');
             $table->string('name');
             $table->string('slug');
@@ -43,13 +44,19 @@ return new class extends Migration
             $table->foreign('expense_account_id', 'products_expense_account_id_fk')->references('id')->on('accounts')->nullOnDelete();
             $table->boolean('is_active')->default(true);
             $table->json('metadata')->nullable();
-            // $table->decimal('purchase_price', 20, 6)->nullable();
-            // $table->decimal('sales_price', 20, 6)->nullable();
+            $table->decimal('purchase_price', 20, 6)->nullable();
+            $table->decimal('sales_price', 20, 6)->nullable();
+
+            $table->foreign('tax_group_id')->references('id')->on('tax_groups')->nullOnDelete();
+
             $table->timestamps();
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'sku'], 'products_tenant_sku_uk');
             $table->index(['tenant_id', 'type'], 'products_tenant_type_idx');
+            $table->unique(['tenant_id', 'slug'], 'products_tenant_slug_uk');
+            $table->index(['tenant_id', 'is_active'], 'products_tenant_active_idx');
+            $table->index(['tenant_id', 'name'], 'products_tenant_name_idx');
         });
     }
 

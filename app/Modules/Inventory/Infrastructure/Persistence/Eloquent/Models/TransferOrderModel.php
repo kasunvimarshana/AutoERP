@@ -18,7 +18,8 @@ class TransferOrderModel extends Model
 
     protected $fillable = [
         'tenant_id',
-        'org_unit_id',
+            'org_unit_id',
+            'row_version',
         'from_warehouse_id',
         'to_warehouse_id',
         'transfer_number',

@@ -53,12 +53,6 @@ class WarehouseStockController extends AuthorizedController
 
         $payload = $request->validated();
         $payload['warehouse_id'] = $warehouse;
-        if (! isset($payload['idempotency_key'])) {
-            $headerIdempotencyKey = $request->header('Idempotency-Key');
-            if (is_string($headerIdempotencyKey) && trim($headerIdempotencyKey) !== '') {
-                $payload['idempotency_key'] = trim($headerIdempotencyKey);
-            }
-        }
 
         $movement = $this->recordStockMovementService->execute($payload);
 

@@ -12,7 +12,9 @@ return new class extends Migration
     {
         Schema::create('bank_transactions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->nullable()->constrained('tenants', 'id', 'bank_transactions_tenant_id_fk')->nullOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('bank_account_id')->constrained(null, 'id', 'bank_transactions_bank_account_id_fk')->cascadeOnDelete();
             $table->string('external_id')->nullable();
             $table->date('transaction_date');
@@ -25,6 +27,7 @@ return new class extends Migration
             $table->foreignId('category_rule_id')->nullable();
             $table->foreign('matched_journal_entry_id', 'bank_transactions_matched_journal_entry_id_fk')->references('id')->on('journal_entries')->nullOnDelete();
             $table->foreign('category_rule_id', 'bank_transactions_category_rule_id_fk')->references('id')->on('bank_category_rules')->nullOnDelete();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->unique(['bank_account_id', 'external_id'], 'bank_transactions_account_external_uk');

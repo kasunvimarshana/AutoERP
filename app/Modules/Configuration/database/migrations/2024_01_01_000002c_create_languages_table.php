@@ -14,6 +14,7 @@ return new class extends Migration
             $table->id();
             $table->string('code', 5)->unique('languages_code_uk');
             $table->string('name');
+            $table->softDeletes();
             $table->timestamps();
         });
     }

@@ -16,9 +16,9 @@ class BankAccountModel extends BaseModel
     protected $table = 'bank_accounts';
 
     protected $fillable = [
-        'tenant_id', 'account_id', 'name', 'bank_name', 'account_number',
-        'routing_number', 'currency_id', 'current_balance', 'last_sync_at',
-        'feed_provider', 'feed_credentials_enc', 'is_active',
+        'tenant_id', 'org_unit_id', 'row_version', 'account_id', 'name',
+        'bank_name', 'account_number', 'routing_number', 'currency_id',
+        'current_balance', 'last_sync_at', 'feed_provider', 'feed_credentials_enc', 'is_active',
     ];
 
     protected $casts = [

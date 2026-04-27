@@ -38,7 +38,6 @@ use Modules\Product\Application\Contracts\FindProductBrandServiceInterface;
 use Modules\Product\Application\Contracts\FindProductCategoryServiceInterface;
 use Modules\Product\Application\Contracts\FindProductIdentifierServiceInterface;
 use Modules\Product\Application\Contracts\FindProductServiceInterface;
-use Modules\Product\Application\Contracts\SearchProductCatalogServiceInterface;
 use Modules\Product\Application\Contracts\FindProductVariantServiceInterface;
 use Modules\Product\Application\Contracts\FindUnitOfMeasureServiceInterface;
 use Modules\Product\Application\Contracts\FindUomConversionServiceInterface;
@@ -88,7 +87,6 @@ use Modules\Product\Application\Services\FindProductBrandService;
 use Modules\Product\Application\Services\FindProductCategoryService;
 use Modules\Product\Application\Services\FindProductIdentifierService;
 use Modules\Product\Application\Services\FindProductService;
-use Modules\Product\Application\Services\SearchProductCatalogService;
 use Modules\Product\Application\Services\FindProductVariantService;
 use Modules\Product\Application\Services\FindUnitOfMeasureService;
 use Modules\Product\Application\Services\FindUomConversionService;
@@ -114,7 +112,6 @@ use Modules\Product\Domain\RepositoryInterfaces\ProductBrandRepositoryInterface;
 use Modules\Product\Domain\RepositoryInterfaces\ProductCategoryRepositoryInterface;
 use Modules\Product\Domain\RepositoryInterfaces\ProductIdentifierRepositoryInterface;
 use Modules\Product\Domain\RepositoryInterfaces\ProductRepositoryInterface;
-use Modules\Product\Domain\RepositoryInterfaces\ProductSearchRepositoryInterface;
 use Modules\Product\Domain\RepositoryInterfaces\ProductVariantRepositoryInterface;
 use Modules\Product\Domain\RepositoryInterfaces\UnitOfMeasureRepositoryInterface;
 use Modules\Product\Domain\RepositoryInterfaces\UomConversionRepositoryInterface;
@@ -127,12 +124,10 @@ use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentPro
 use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentProductCategoryRepository;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentProductIdentifierRepository;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentProductRepository;
-use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentProductSearchRepository;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentProductVariantRepository;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentUnitOfMeasureRepository;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentUomConversionRepository;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Repositories\EloquentVariantAttributeRepository;
-use Modules\Product\Infrastructure\Console\Commands\BenchmarkProductSearchCommand;
 
 class ProductServiceProvider extends ServiceProvider
 {
@@ -145,7 +140,6 @@ class ProductServiceProvider extends ServiceProvider
             ProductCategoryRepositoryInterface::class => EloquentProductCategoryRepository::class,
             ProductIdentifierRepositoryInterface::class => EloquentProductIdentifierRepository::class,
             ProductRepositoryInterface::class => EloquentProductRepository::class,
-            ProductSearchRepositoryInterface::class => EloquentProductSearchRepository::class,
             ProductVariantRepositoryInterface::class => EloquentProductVariantRepository::class,
             UnitOfMeasureRepositoryInterface::class => EloquentUnitOfMeasureRepository::class,
             UomConversionRepositoryInterface::class => EloquentUomConversionRepository::class,
@@ -188,7 +182,6 @@ class ProductServiceProvider extends ServiceProvider
             UomConversionResolverServiceInterface::class => UomConversionResolverService::class,
             CreateProductServiceInterface::class => CreateProductService::class,
             FindProductServiceInterface::class => FindProductService::class,
-            SearchProductCatalogServiceInterface::class => SearchProductCatalogService::class,
             UpdateProductServiceInterface::class => UpdateProductService::class,
             DeleteProductServiceInterface::class => DeleteProductService::class,
             CreateProductAttributeGroupServiceInterface::class => CreateProductAttributeGroupService::class,
@@ -220,10 +213,6 @@ class ProductServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->commands([
-            BenchmarkProductSearchCommand::class,
-        ]);
-
         $this->bootModule(
             __DIR__.'/../../routes/api.php',
             __DIR__.'/../../database/migrations',

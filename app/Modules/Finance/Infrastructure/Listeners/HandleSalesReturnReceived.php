@@ -140,7 +140,7 @@ class HandleSalesReturnReceived
                 'tenant_id' => $event->tenantId,
                 'customer_id' => $event->customerId,
                 'account_id' => $event->arAccountId,
-                'transaction_type' => 'credit_note',
+                'transaction_type' => 'credit_memo',
                 'amount' => -1 * (float) $grandTotal,
                 'balance_after' => (float) $newBalance,
                 'transaction_date' => $returnDate->format('Y-m-d'),

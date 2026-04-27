@@ -12,7 +12,9 @@ return new class extends Migration
     {
         Schema::create('grn_headers', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained(null, 'id', 'grn_headers_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('supplier_id');
             $table->foreignId('warehouse_id');
             $table->foreignId('purchase_order_id')->nullable()->constrained(null, 'id', 'grn_headers_purchase_order_id_fk')->nullOnDelete();
@@ -24,7 +26,13 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->json('metadata')->nullable();
             $table->foreignId('created_by');
+
+            $table->foreign('supplier_id')->references('id')->on('suppliers')->cascadeOnDelete();
+            $table->foreign('warehouse_id')->references('id')->on('warehouses')->cascadeOnDelete();
+            $table->foreign('created_by')->references('id')->on('users');
+
             $table->timestamps();
+            $table->softDeletes();
 
             $table->unique(['tenant_id', 'grn_number'], 'grn_headers_tenant_grn_uk');
         });

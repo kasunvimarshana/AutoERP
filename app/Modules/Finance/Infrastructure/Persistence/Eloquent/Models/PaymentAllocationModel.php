@@ -16,7 +16,8 @@ class PaymentAllocationModel extends BaseModel
     protected $table = 'payment_allocations';
 
     protected $fillable = [
-        'tenant_id', 'payment_id', 'invoice_type', 'invoice_id', 'allocated_amount',
+        'tenant_id', 'org_unit_id', 'row_version', 'payment_id',
+        'invoice_type', 'invoice_id', 'allocated_amount',
     ];
 
     protected $casts = [

@@ -17,6 +17,8 @@ class PurchaseOrderLineModel extends Model
 
     protected $fillable = [
         'tenant_id',
+        'org_unit_id',
+        'row_version',
         'purchase_order_id',
         'product_id',
         'variant_id',

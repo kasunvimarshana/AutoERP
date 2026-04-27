@@ -17,6 +17,8 @@ class NumberingSequenceModel extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'org_unit_id',
+        'row_version',
         'module',
         'document_type',
         'prefix',

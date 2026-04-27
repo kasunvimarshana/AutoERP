@@ -16,8 +16,8 @@ class BankReconciliationModel extends BaseModel
     protected $table = 'bank_reconciliations';
 
     protected $fillable = [
-        'tenant_id', 'bank_account_id', 'period_start', 'period_end',
-        'opening_balance', 'closing_balance', 'status', 'completed_by', 'completed_at',
+        'tenant_id', 'org_unit_id', 'row_version', 'bank_account_id', 'period_start',
+        'period_end', 'opening_balance', 'closing_balance', 'status', 'completed_by', 'completed_at',
     ];
 
     protected $casts = [

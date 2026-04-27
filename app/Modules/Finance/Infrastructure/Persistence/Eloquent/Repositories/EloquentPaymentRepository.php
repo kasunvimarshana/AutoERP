@@ -35,6 +35,7 @@ class EloquentPaymentRepository extends EloquentRepository implements PaymentRep
             'status' => $payment->getStatus(),
             'reference' => $payment->getReference(),
             'notes' => $payment->getNotes(),
+            'idempotency_key' => $payment->getIdempotencyKey(),
             'journal_entry_id' => $payment->getJournalEntryId(),
         ];
 
@@ -51,10 +52,20 @@ class EloquentPaymentRepository extends EloquentRepository implements PaymentRep
     public function findByTenantAndNumber(int $tenantId, string $paymentNumber): ?Payment
     {
         /** @var PaymentModel|null $model */
-        $model = $this->model->newQuery()
-            ->withoutGlobalScope('tenant')
+        $model = $this->model->newQueryWithoutScopes()
             ->where('tenant_id', $tenantId)
             ->where('payment_number', $paymentNumber)
+            ->first();
+
+        return $model ? $this->toDomainEntity($model) : null;
+    }
+
+    public function findByTenantAndIdempotencyKey(int $tenantId, string $idempotencyKey): ?Payment
+    {
+        /** @var PaymentModel|null $model */
+        $model = $this->model->newQueryWithoutScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('idempotency_key', $idempotencyKey)
             ->first();
 
         return $model ? $this->toDomainEntity($model) : null;
@@ -78,6 +89,7 @@ class EloquentPaymentRepository extends EloquentRepository implements PaymentRep
             status: (string) $model->status,
             reference: $model->reference,
             notes: $model->notes,
+            idempotencyKey: $model->idempotency_key,
             journalEntryId: $model->journal_entry_id !== null ? (int) $model->journal_entry_id : null,
             id: (int) $model->id,
             createdAt: $model->created_at,

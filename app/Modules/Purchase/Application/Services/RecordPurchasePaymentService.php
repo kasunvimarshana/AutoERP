@@ -55,7 +55,7 @@ class RecordPurchasePaymentService extends BaseService implements RecordPurchase
             $payment = $this->createPaymentService->execute([
                 'tenant_id' => $dto->tenant_id,
                 'payment_number' => $dto->payment_number,
-                'direction' => 'outgoing',
+                'direction' => 'outbound',
                 'party_type' => 'supplier',
                 'party_id' => $invoice->getSupplierId(),
                 'payment_method_id' => $dto->payment_method_id,

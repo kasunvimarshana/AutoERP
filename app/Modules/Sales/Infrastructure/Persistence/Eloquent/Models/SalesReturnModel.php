@@ -17,6 +17,8 @@ class SalesReturnModel extends Model
 
     protected $fillable = [
         'tenant_id',
+        'org_unit_id',
+        'row_version',
         'customer_id',
         'original_sales_order_id',
         'original_invoice_id',

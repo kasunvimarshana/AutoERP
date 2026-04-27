@@ -25,6 +25,5 @@ class RecordStockMovementDTO
         public readonly ?string $performedAt,
         public readonly ?string $notes,
         public readonly ?array $metadata,
-        public readonly ?string $idempotencyKey,
     ) {}
 }

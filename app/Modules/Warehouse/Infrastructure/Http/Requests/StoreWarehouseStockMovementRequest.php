@@ -33,7 +33,6 @@ class StoreWarehouseStockMovementRequest extends FormRequest
             'performed_at' => 'nullable|date',
             'notes' => 'nullable|string',
             'metadata' => 'nullable|array',
-            'idempotency_key' => 'nullable|string|max:128',
         ];
     }
 }

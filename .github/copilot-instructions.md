@@ -29,32 +29,6 @@ cp .env.example .env && php artisan key:generate
 
 ## Project Layout
 
-```
-app/Modules/           # All business modules (19 modules)
-├── Core/              # Shared kernel: base classes, repository abstractions, technical concerns
-├── Tenant/            # Multi-tenancy management, plans, settings, config
-├── OrganizationUnit/  # Hierarchical org structures (materialized path)
-├── User/              # User CRUD, profiles, roles, permissions, devices
-├── Auth/              # OAuth2 (Laravel Passport) login/token/SSO flows
-├── Product/           # Product catalog, variants, categories, brands, UoM
-├── Finance/           # Double-entry accounting, chart of accounts, journal entries
-├── HR/                # Human resources, leave, attendance, payroll, performance
-├── Audit/             # Immutable audit logs, compliance trails
-├── Configuration/     # Reference data ownership (countries, currencies, languages, timezones)
-├── Shared/            # Minimal shell for truly shared cross-cutting surface only
-├── Customer/          # Migration-only stub
-├── Supplier/          # Migration-only stub
-├── Pricing/           # Migration-only stub
-├── Warehouse/         # Migration-only stub
-├── Inventory/         # Migration-only stub
-├── Purchase/          # Migration-only stub
-├── Sales/             # Migration-only stub
-└── Tax/               # Migration-only stub
-bootstrap/providers.php  # 13 ServiceProviders registered
-composer.json            # PSR-4: "Modules\\" => "app/Modules/"
-phpunit.xml              # Test config (SQLite :memory:)
-```
-
 ## Module Architecture
 
 Each fully implemented module follows this layered structure:
@@ -90,10 +64,6 @@ app/Modules/<Module>/
 
 - **`declare(strict_types=1);`** in every PHP file. Strong typing on all parameters/returns.
 - **Namespaces**: `Modules\<Module>\...` (not `App\Modules\...`).
-- **Models**: Extend `Illuminate\Database\Eloquent\Model` directly. `BaseModel` exists in Core but is unused.
-- **`HasAudit` trait**: Owned by Audit module and used by 20 models for automatic change tracking.
-- **`SoftDeletes`**: Used by 8 models (Account, OrgUnit, OrgUnitAttachment, Product, Tenant, TenantAttachment, User, UserAttachment).
-- **`HasUuid` trait**: Defined in Core but currently unused. All models use integer auto-increment PKs.
 - **`HasTenant` trait**: Owned by Tenant module and used by tenant-scoped models. Tenant isolation uses `resolve.tenant` middleware with `X-Tenant-ID` header.
 - **Multi-tenancy**: `ResolveTenant` middleware reads `X-Tenant-ID` from request headers. Repositories filter `tenant_id` explicitly.
 - **Repositories**: Interface in `Domain/RepositoryInterfaces/`, implementation in `Infrastructure/Persistence/Eloquent/Repositories/`.
@@ -103,8 +73,6 @@ app/Modules/<Module>/
 - **Float comparison**: `abs($value) < PHP_FLOAT_EPSILON` instead of `== 0.0`.
 
 ## Registered Providers (bootstrap/providers.php)
-
-AppServiceProvider, CoreServiceProvider, ConfigurationServiceProvider, SharedServiceProvider, AuditServiceProvider, AuthModuleServiceProvider, TenantServiceProvider, TenantConfigServiceProvider, UserServiceProvider, OrganizationUnitServiceProvider, ProductServiceProvider, FinanceServiceProvider, HRServiceProvider
 
 ## File Naming
 
