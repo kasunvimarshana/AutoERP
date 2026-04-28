@@ -87,14 +87,10 @@ class WarehouseController extends AuthorizedController
 
     public function destroy(Request $request, int $warehouse): JsonResponse
     {
-        $tenantId = $this->resolveTenantId($request);
-        $foundWarehouse = $this->findWarehouseOrFail($warehouse, $tenantId);
+        $foundWarehouse = $this->findWarehouseOrFail($warehouse, $this->resolveTenantId($request));
         $this->authorize('delete', $foundWarehouse);
 
-        $this->deleteWarehouseService->execute([
-            'id' => $warehouse,
-            'tenant_id' => $tenantId,
-        ]);
+        $this->deleteWarehouseService->execute(['id' => $warehouse]);
 
         return Response::json(['message' => 'Warehouse deleted successfully']);
     }

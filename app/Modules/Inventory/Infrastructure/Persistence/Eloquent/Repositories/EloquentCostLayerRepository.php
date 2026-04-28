@@ -22,10 +22,6 @@ class EloquentCostLayerRepository implements CostLayerRepositoryInterface
 
     public function update(InventoryCostLayer $layer): InventoryCostLayer
     {
-        if ($layer->getId() === null) {
-            return $layer;
-        }
-
         $this->model->newQuery()
             ->withoutGlobalScope('tenant')
             ->where('tenant_id', $layer->getTenantId())

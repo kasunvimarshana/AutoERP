@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Listeners;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Finance\Application\Contracts\CreateJournalEntryServiceInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\FiscalPeriodRepositoryInterface;
+use Modules\Finance\Infrastructure\Listeners\Concerns\HandlesReplayConflicts;
 use Modules\HR\Domain\Events\PayrollRunApproved;
 
 /**
@@ -28,6 +30,8 @@ use Modules\HR\Domain\Events\PayrollRunApproved;
  */
 class HandlePayrollRunApproved
 {
+    use HandlesReplayConflicts;
+
     public function __construct(
         private readonly FiscalPeriodRepositoryInterface $fiscalPeriodRepository,
         private readonly CreateJournalEntryServiceInterface $createJournalEntryService,
@@ -55,6 +59,15 @@ class HandlePayrollRunApproved
                 'expense_account_id'       => $expenseAccountId,
                 'liability_account_id'     => $liabilityAccountId,
                 'deductions_account_id'    => $deductionsAccountId,
+            ]);
+
+            return;
+        }
+
+        if ($this->journalAlreadyPosted($tenantId, 'payroll_run', (int) $runId)) {
+            Log::info('HandlePayrollRunApproved: replay detected; journal entry already exists, skipping', [
+                'payroll_run_id' => $runId,
+                'tenant_id' => $tenantId,
             ]);
 
             return;
@@ -130,23 +143,43 @@ class HandlePayrollRunApproved
             ],
         ];
 
-        DB::transaction(function () use ($event, $period, $periodEnd, $description, $lines, $runId, $tenantId): void {
-            $this->createJournalEntryService->execute([
-                'tenant_id'        => $tenantId,
-                'fiscal_period_id' => $period->getId(),
-                'entry_date'       => $periodEnd->format('Y-m-d'),
-                'created_by'       => $event->payrollRun->getApprovedBy() ?? 1,
-                'entry_type'       => 'system',
-                'reference_type'   => 'payroll_run',
-                'reference_id'     => $runId,
-                'description'      => $description,
-                'lines'            => $lines,
-            ]);
+        try {
+            DB::transaction(function () use ($event, $period, $periodEnd, $description, $lines, $runId, $tenantId): void {
+                $this->createJournalEntryService->execute([
+                    'tenant_id'        => $tenantId,
+                    'fiscal_period_id' => $period->getId(),
+                    'entry_date'       => $periodEnd->format('Y-m-d'),
+                    'created_by'       => $event->payrollRun->getApprovedBy() ?? 1,
+                    'entry_type'       => 'system',
+                    'reference_type'   => 'payroll_run',
+                    'reference_id'     => $runId,
+                    'description'      => $description,
+                    'lines'            => $lines,
+                ]);
 
-            Log::info('HandlePayrollRunApproved: payroll journal entry created', [
+                Log::info('HandlePayrollRunApproved: payroll journal entry created', [
+                    'payroll_run_id' => $runId,
+                    'tenant_id'      => $tenantId,
+                ]);
+            });
+        } catch (QueryException $exception) {
+            if (! $this->isReplayConflict($exception)) {
+                throw $exception;
+            }
+
+            if (! $this->journalAlreadyPosted($tenantId, 'payroll_run', (int) $runId)) {
+                throw new \RuntimeException(
+                    'HandlePayrollRunApproved: replay conflict detected with missing journal artifact for payroll_run_id '.$runId,
+                    0,
+                    $exception
+                );
+            }
+
+            Log::info('HandlePayrollRunApproved: duplicate-key replay conflict detected; skipping', [
                 'payroll_run_id' => $runId,
-                'tenant_id'      => $tenantId,
+                'tenant_id' => $tenantId,
             ]);
-        });
+        }
     }
+
 }

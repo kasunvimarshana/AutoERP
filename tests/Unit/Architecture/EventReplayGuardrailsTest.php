@@ -44,6 +44,54 @@ class EventReplayGuardrailsTest extends TestCase
                 'HandleSalesReturnReceived: replay detected; finance artifacts already exist, skipping',
                 'incomplete finance artifacts',
             ],
+            'app/Modules/Finance/Infrastructure/Listeners/HandlePurchaseInvoiceApproved.php' => [
+                'artifactsAlreadyPosted',
+                "'purchase_invoice'",
+                'HandlePurchaseInvoiceApproved: replay detected; finance artifacts already exist, skipping',
+                'incomplete finance artifacts',
+            ],
+        ];
+
+        foreach ($requiredGuards as $relativePath => $needles) {
+            $contents = $this->readSource($relativePath);
+
+            foreach ($needles as $needle) {
+                $this->assertStringContainsString(
+                    $needle,
+                    $contents,
+                    'Missing replay guard contract in: '.$relativePath.' -> '.$needle
+                );
+            }
+        }
+    }
+
+    public function test_finance_journal_only_listeners_keep_replay_guards_for_retry_safety(): void
+    {
+        $requiredGuards = [
+            'app/Modules/Finance/Infrastructure/Listeners/HandleSalesInvoicePosted.php' => [
+                'journalAlreadyPosted',
+                "'sales_invoice'",
+                'HandleSalesInvoicePosted: replay detected; journal entry already exists, skipping',
+                'missing journal artifact',
+            ],
+            'app/Modules/Finance/Infrastructure/Listeners/HandlePayrollRunApproved.php' => [
+                'journalAlreadyPosted',
+                "'payroll_run'",
+                'HandlePayrollRunApproved: replay detected; journal entry already exists, skipping',
+                'missing journal artifact',
+            ],
+            'app/Modules/Finance/Infrastructure/Listeners/HandleCycleCountCompleted.php' => [
+                'journalAlreadyPosted',
+                "'cycle_count'",
+                'HandleCycleCountCompleted: replay detected; journal entry already exists, skipping',
+                'missing journal artifact',
+            ],
+            'app/Modules/Finance/Infrastructure/Listeners/HandleStockAdjustmentRecorded.php' => [
+                'journalAlreadyPosted',
+                "'stock_movement'",
+                'HandleStockAdjustmentRecorded: replay detected; journal entry already exists, skipping',
+                'missing journal artifact',
+            ],
         ];
 
         foreach ($requiredGuards as $relativePath => $needles) {

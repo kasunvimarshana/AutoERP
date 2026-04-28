@@ -172,10 +172,7 @@ class OrganizationUnitController extends AuthorizedController
         $organizationUnit = $this->findOrganizationUnitOrFail($organizationUnitId);
         $this->authorize('delete', $organizationUnit);
 
-        $this->deleteOrganizationUnitService->execute([
-            'id' => $organizationUnitId,
-            'tenant_id' => $organizationUnit->getTenantId(),
-        ]);
+        $this->deleteOrganizationUnitService->execute(['id' => $organizationUnitId]);
 
         return Response::json(['message' => 'Organization unit deleted successfully']);
     }

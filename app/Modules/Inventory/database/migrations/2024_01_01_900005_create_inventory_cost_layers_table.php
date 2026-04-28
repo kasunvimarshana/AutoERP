@@ -30,6 +30,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['tenant_id', 'product_id', 'layer_date'], 'inventory_cost_layers_tenant_product_date_idx');
+            $table->index(['tenant_id', 'product_id', 'is_closed'], 'inventory_cost_layers_tenant_product_open_idx');
         });
     }
 

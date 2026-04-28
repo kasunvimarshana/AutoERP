@@ -23,6 +23,8 @@ return new class extends Migration
             $table->foreignId('approved_by_user_id')->nullable()->constrained('users', 'id', 'cycle_count_headers_approved_by_user_id_fk');
             $table->timestamp('approved_at')->nullable();
             $table->timestamps();
+
+            $table->index(['tenant_id', 'status'], 'cycle_count_headers_tenant_status_idx');
         });
     }
 

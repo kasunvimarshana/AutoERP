@@ -24,16 +24,6 @@ class DeleteWarehouseLocationService extends BaseService implements DeleteWareho
             return false;
         }
 
-        $tenantId = isset($data['tenant_id']) ? (int) $data['tenant_id'] : null;
-        if ($tenantId !== null && $location->getTenantId() !== $tenantId) {
-            return false;
-        }
-
-        $warehouseId = isset($data['warehouse_id']) ? (int) $data['warehouse_id'] : null;
-        if ($warehouseId !== null && $location->getWarehouseId() !== $warehouseId) {
-            return false;
-        }
-
         $locationPath = $location->getPath();
         if ($locationPath !== null) {
             foreach ($this->warehouseLocationRepository->listByWarehouse($location->getTenantId(), $location->getWarehouseId()) as $warehouseLocation) {

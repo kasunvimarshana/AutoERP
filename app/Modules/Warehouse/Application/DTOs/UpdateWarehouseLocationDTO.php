@@ -10,7 +10,6 @@ class UpdateWarehouseLocationDTO
         public readonly int $id,
         public readonly int $tenantId,
         public readonly int $warehouseId,
-        public readonly ?int $orgUnitId,
         public readonly ?int $parentId,
         public readonly string $name,
         public readonly ?string $code,

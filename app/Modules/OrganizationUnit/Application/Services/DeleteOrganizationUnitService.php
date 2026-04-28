@@ -24,11 +24,6 @@ class DeleteOrganizationUnitService extends BaseService implements DeleteOrganiz
             throw new OrganizationUnitNotFoundException($organizationUnitId);
         }
 
-        $tenantId = isset($data['tenant_id']) ? (int) $data['tenant_id'] : null;
-        if ($tenantId !== null && $organizationUnit->getTenantId() !== $tenantId) {
-            return false;
-        }
-
         return $this->organizationUnitRepository->delete($organizationUnitId);
     }
 }

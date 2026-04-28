@@ -31,6 +31,7 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'org_unit_id', 'warehouse_id', 'code'], 'warehouse_locations_tenant_warehouse_code_uk');
             $table->index(['tenant_id', 'parent_id'], 'warehouse_locations_tenant_parent_idx');
+            $table->index(['tenant_id', 'warehouse_id'], 'warehouse_locations_tenant_warehouse_idx');
         });
     }
 

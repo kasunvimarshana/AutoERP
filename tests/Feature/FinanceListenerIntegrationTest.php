@@ -29,10 +29,14 @@ use Modules\Finance\Infrastructure\Listeners\HandlePurchaseReturnPosted;
 use Modules\Finance\Infrastructure\Listeners\HandleSalesPaymentRecorded;
 use Modules\Finance\Infrastructure\Listeners\HandleSalesInvoicePosted;
 use Modules\Finance\Infrastructure\Listeners\HandleSalesReturnReceived;
+use Modules\Finance\Infrastructure\Listeners\HandleStockAdjustmentRecorded;
+use Modules\Finance\Infrastructure\Listeners\HandleCycleCountCompleted;
 use Modules\Sales\Application\Contracts\PostSalesInvoiceServiceInterface;
 use Modules\HR\Domain\Entities\PayrollRun;
 use Modules\HR\Domain\Events\PayrollRunApproved;
 use Modules\HR\Domain\ValueObjects\PayrollRunStatus;
+use Modules\Inventory\Domain\Events\StockAdjustmentRecorded;
+use Modules\Inventory\Domain\Events\CycleCountCompleted;
 use Modules\Purchase\Domain\Events\PurchaseInvoiceApproved;
 use Modules\Purchase\Domain\Events\PurchasePaymentRecorded;
 use Modules\Purchase\Domain\Events\PurchaseReturnPosted;
@@ -249,6 +253,76 @@ class FinanceListenerIntegrationTest extends TestCase
         $this->assertSame(0, DB::table('journal_entries')->count());
     }
 
+    public function test_handle_purchase_invoice_approved_duplicate_event_is_replay_safe(): void
+    {
+        $event = new PurchaseInvoiceApproved(
+            tenantId: $this->tenantId,
+            purchaseInvoiceId: 106,
+            supplierId: 1,
+            apAccountId: $this->apAccountId,
+            grandTotal: '110.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            invoiceDate: '2026-01-15',
+            dueDate: '2026-02-15',
+            lines: [
+                ['account_id' => $this->inventoryAccountId, 'line_total' => '100.000000', 'tax_amount' => '10.000000'],
+            ],
+        );
+
+        $this->makeApListener()->handle($event);
+        $this->makeApListener()->handle($event);
+
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'purchase_invoice')->where('reference_id', 106)->count());
+        $this->assertSame(1, DB::table('ap_transactions')->where('reference_type', 'purchase_invoice')->where('reference_id', 106)->count());
+    }
+
+    public function test_handle_purchase_invoice_approved_duplicate_conflict_with_partial_artifacts_throws(): void
+    {
+        DB::table('journal_entries')->insert([
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'row_version' => 1,
+            'fiscal_period_id' => $this->fiscalPeriodId,
+            'entry_number' => null,
+            'entry_type' => 'system',
+            'reference_type' => 'purchase_invoice',
+            'reference_id' => 107,
+            'description' => 'Pre-existing partial artifact',
+            'entry_date' => '2026-01-15',
+            'posting_date' => null,
+            'status' => 'posted',
+            'is_reversed' => false,
+            'reversal_entry_id' => null,
+            'created_by' => 1,
+            'posted_by' => null,
+            'posted_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]);
+
+        $event = new PurchaseInvoiceApproved(
+            tenantId: $this->tenantId,
+            purchaseInvoiceId: 107,
+            supplierId: 1,
+            apAccountId: $this->apAccountId,
+            grandTotal: '110.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            invoiceDate: '2026-01-15',
+            dueDate: '2026-02-15',
+            lines: [
+                ['account_id' => $this->inventoryAccountId, 'line_total' => '100.000000', 'tax_amount' => '10.000000'],
+            ],
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('incomplete finance artifacts');
+
+        $this->makeApListener()->handle($event);
+    }
+
     // ──────────────────────────────────────────────────────────────────
     // HandleSalesInvoicePosted
     // ──────────────────────────────────────────────────────────────────
@@ -347,6 +421,28 @@ class FinanceListenerIntegrationTest extends TestCase
         $this->makeArListener()->handle($event);
 
         $this->assertSame(0, DB::table('journal_entries')->count());
+    }
+
+    public function test_handle_sales_invoice_posted_duplicate_event_is_replay_safe(): void
+    {
+        $event = new SalesInvoicePosted(
+            tenantId: $this->tenantId,
+            salesInvoiceId: 204,
+            customerId: 1,
+            arAccountId: $this->arAccountId,
+            grandTotal: '220.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            invoiceDate: '2026-01-20',
+            lines: [
+                ['income_account_id' => $this->revenueAccountId, 'line_total' => '200.000000', 'tax_amount' => '20.000000'],
+            ],
+        );
+
+        $this->makeArListener()->handle($event);
+        $this->makeArListener()->handle($event);
+
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'sales_invoice')->where('reference_id', 204)->count());
     }
 
     // ──────────────────────────────────────────────────────────────────
@@ -1998,6 +2094,61 @@ class FinanceListenerIntegrationTest extends TestCase
         $this->assertNotNull($lines->get($this->payrollExpenseAccountId));
     }
 
+    public function test_handle_cycle_count_completed_duplicate_event_is_replay_safe(): void
+    {
+        $event = new CycleCountCompleted(
+            tenantId: $this->tenantId,
+            cycleCountId: 1201,
+            warehouseId: $this->warehouseId,
+            locationId: $this->warehouseLocationId,
+            countDate: '2026-01-26',
+            adjustments: [[
+                'inventory_account_id' => $this->inventoryAccountId,
+                'expense_account_id' => $this->payrollExpenseAccountId,
+                'direction' => 'increase',
+                'amount' => '12.000000',
+            ]],
+            createdBy: 1,
+        );
+
+        $listener = new HandleCycleCountCompleted(
+            fiscalPeriodRepository: app(FiscalPeriodRepositoryInterface::class),
+            createJournalEntryService: app(CreateJournalEntryServiceInterface::class),
+        );
+
+        $listener->handle($event);
+        $listener->handle($event);
+
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'cycle_count')->where('reference_id', 1201)->count());
+    }
+
+    public function test_handle_stock_adjustment_recorded_duplicate_event_is_replay_safe(): void
+    {
+        $event = new StockAdjustmentRecorded(
+            tenantId: $this->tenantId,
+            stockMovementId: 1202,
+            productId: $this->productId,
+            movementType: 'adjustment_out',
+            quantity: '2.000000',
+            unitCost: '12.000000',
+            amount: '24.000000',
+            inventoryAccountId: $this->inventoryAccountId,
+            expenseAccountId: $this->payrollExpenseAccountId,
+            movementDate: '2026-01-26',
+            createdBy: 1,
+        );
+
+        $listener = new HandleStockAdjustmentRecorded(
+            fiscalPeriodRepository: app(FiscalPeriodRepositoryInterface::class),
+            createJournalEntryService: app(CreateJournalEntryServiceInterface::class),
+        );
+
+        $listener->handle($event);
+        $listener->handle($event);
+
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'stock_movement')->where('reference_id', 1202)->count());
+    }
+
     // ──────────────────────────────────────────────────────────────────
     // HandlePayrollRunApproved
     // ──────────────────────────────────────────────────────────────────
@@ -2081,6 +2232,19 @@ class FinanceListenerIntegrationTest extends TestCase
 
         $this->assertSame(0, DB::table('journal_entries')->count());
         $this->assertSame(0, DB::table('journal_entry_lines')->count());
+    }
+
+    public function test_handle_payroll_run_approved_duplicate_event_is_replay_safe(): void
+    {
+        $event = new PayrollRunApproved(
+            payrollRun: $this->makePayrollRun(),
+            tenantId: $this->tenantId,
+        );
+
+        $this->makePayrollListener()->handle($event);
+        $this->makePayrollListener()->handle($event);
+
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'payroll_run')->where('reference_id', 501)->count());
     }
 
     public function test_approve_payroll_run_service_dispatches_finance_posting_end_to_end(): void

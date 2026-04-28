@@ -49,9 +49,12 @@ class EloquentPurchaseOrderLineRepository extends EloquentRepository implements 
         return parent::find($id, $columns);
     }
 
-    public function findByPurchaseOrderId(int $purchaseOrderId): Collection
+    public function findByPurchaseOrderId(int $tenantId, int $purchaseOrderId): Collection
     {
-        $models = $this->model->newQuery()->where('purchase_order_id', $purchaseOrderId)->get();
+        $models = $this->model->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->where('purchase_order_id', $purchaseOrderId)
+            ->get();
 
         return $this->toDomainCollection($models);
     }

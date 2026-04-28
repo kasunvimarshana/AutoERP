@@ -113,11 +113,7 @@ class WarehouseLocationController extends AuthorizedController
         $foundLocation = $this->findLocationOrFail($location, $warehouse, $tenantId);
         $this->authorize('delete', $foundLocation);
 
-        $this->deleteWarehouseLocationService->execute([
-            'id' => $location,
-            'tenant_id' => $tenantId,
-            'warehouse_id' => $warehouse,
-        ]);
+        $this->deleteWarehouseLocationService->execute(['id' => $location]);
 
         return Response::json(['message' => 'Warehouse location deleted successfully']);
     }

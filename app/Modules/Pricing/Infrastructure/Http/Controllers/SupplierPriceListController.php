@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Pricing\Infrastructure\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Response;
 use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Pricing\Application\Contracts\CreateSupplierPriceListServiceInterface;
@@ -29,10 +28,9 @@ class SupplierPriceListController extends AuthorizedController
     public function index(int $supplier, ListAssignmentRequest $request): SupplierPriceListCollection
     {
         $validated = $request->validated();
-        $tenantId = (int) ($validated['tenant_id'] ?? $this->resolveTenantId($request));
 
         $assignments = $this->findSupplierPriceListService->paginateBySupplier(
-            tenantId: $tenantId,
+            tenantId: (int) $request->input('tenant_id', $request->header('X-Tenant-ID')),
             supplierId: $supplier,
             perPage: (int) ($validated['per_page'] ?? 15),
             page: (int) ($validated['page'] ?? 1),
@@ -53,26 +51,16 @@ class SupplierPriceListController extends AuthorizedController
             ->setStatusCode(HttpResponse::HTTP_CREATED);
     }
 
-    public function destroy(Request $request, int $supplier, int $assignment): JsonResponse
+    public function destroy(int $supplier, int $assignment): JsonResponse
     {
-        $tenantId = $this->resolveTenantId($request);
         $foundAssignment = $this->findSupplierPriceListService->find($assignment);
 
-        if (
-            ! $foundAssignment
-            || $foundAssignment->getTenantId() !== $tenantId
-            || $foundAssignment->getSupplierId() !== $supplier
-        ) {
+        if (! $foundAssignment || $foundAssignment->getSupplierId() !== $supplier) {
             throw new NotFoundHttpException('Supplier price list assignment not found.');
         }
 
         $this->deleteSupplierPriceListService->execute(['id' => $assignment]);
 
         return Response::json(['message' => 'Supplier price list assignment deleted successfully']);
-    }
-
-    private function resolveTenantId(Request $request): int
-    {
-        return (int) ($request->user()?->tenant_id ?? $request->header('X-Tenant-ID', '0'));
     }
 }

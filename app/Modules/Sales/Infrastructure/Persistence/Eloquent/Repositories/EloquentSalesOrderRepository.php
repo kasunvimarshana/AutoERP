@@ -51,10 +51,10 @@ class EloquentSalesOrderRepository extends EloquentRepository implements SalesOr
             }
 
             /** @var SalesOrderModel $model */
-            $model->lines()->delete();
+            $keptLineIds = [];
             foreach ($order->getLines() as $line) {
-                $model->lines()->create([
-                    'tenant_id' => $line->getTenantId(),
+                $lineData = [
+                    'tenant_id' => (int) $model->tenant_id,
                     'product_id' => $line->getProductId(),
                     'variant_id' => $line->getVariantId(),
                     'description' => $line->getDescription(),
@@ -69,7 +69,30 @@ class EloquentSalesOrderRepository extends EloquentRepository implements SalesOr
                     'income_account_id' => $line->getIncomeAccountId(),
                     'batch_id' => $line->getBatchId(),
                     'serial_id' => $line->getSerialId(),
-                ]);
+                ];
+
+                $lineId = $line->getId();
+                if ($lineId !== null) {
+                    $updated = $model->lines()
+                        ->where('tenant_id', (int) $model->tenant_id)
+                        ->whereKey($lineId)
+                        ->update($lineData);
+
+                    if ($updated > 0) {
+                        $keptLineIds[] = $lineId;
+                        continue;
+                    }
+                }
+
+                $createdLine = $model->lines()->create($lineData);
+                $keptLineIds[] = (int) $createdLine->id;
+            }
+
+            $lineCleanupQuery = $model->lines()->where('tenant_id', (int) $model->tenant_id);
+            if ($keptLineIds === []) {
+                $lineCleanupQuery->delete();
+            } else {
+                $lineCleanupQuery->whereNotIn('id', $keptLineIds)->delete();
             }
 
             $model->load('lines');

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Database\Eloquent\Collection;
 use Modules\Inventory\Domain\Entities\ValuationConfig;
 use Modules\Inventory\Domain\RepositoryInterfaces\ValuationConfigRepositoryInterface;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\ValuationConfigModel;
@@ -23,10 +22,6 @@ class EloquentValuationConfigRepository implements ValuationConfigRepositoryInte
 
     public function update(ValuationConfig $config): ValuationConfig
     {
-        if ($config->getId() === null) {
-            return $config;
-        }
-
         $this->model->newQuery()
             ->withoutGlobalScope('tenant')
             ->where('tenant_id', $config->getTenantId())
@@ -67,7 +62,6 @@ class EloquentValuationConfigRepository implements ValuationConfigRepositoryInte
         ?int $orgUnitId = null,
         ?string $transactionType = null,
     ): ?ValuationConfig {
-        /** @var Collection<int, ValuationConfigModel> $candidates */
         $candidates = $this->model->newQuery()
             ->withoutGlobalScope('tenant')
             ->where('tenant_id', $tenantId)
@@ -75,13 +69,12 @@ class EloquentValuationConfigRepository implements ValuationConfigRepositoryInte
             ->get();
 
         $scopePriority = [
-            fn (ValuationConfigModel $c) => $productId !== null && $c->product_id !== null && (int) $c->product_id === $productId ? 4 : null,
-            fn (ValuationConfigModel $c) => $warehouseId !== null && $c->warehouse_id !== null && (int) $c->warehouse_id === $warehouseId ? 3 : null,
-            fn (ValuationConfigModel $c) => $orgUnitId !== null && $c->org_unit_id !== null && (int) $c->org_unit_id === $orgUnitId ? 2 : null,
+            fn (ValuationConfigModel $c) => $productId !== null && $c->product_id === $productId ? 4 : null,
+            fn (ValuationConfigModel $c) => $warehouseId !== null && $c->warehouse_id === $warehouseId ? 3 : null,
+            fn (ValuationConfigModel $c) => $orgUnitId !== null && $c->org_unit_id === $orgUnitId ? 2 : null,
             fn (ValuationConfigModel $c) => ($c->product_id === null && $c->warehouse_id === null && $c->org_unit_id === null) ? 1 : null,
         ];
 
-        /** @var ValuationConfigModel|null $best */
         $best = null;
         $bestPriority = 0;
 

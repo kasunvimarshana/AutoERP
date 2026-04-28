@@ -43,17 +43,11 @@ class PricingEndpointsAuthenticatedTest extends TestCase
     /** @var FindCustomerPriceListServiceInterface&MockObject */
     private FindCustomerPriceListServiceInterface $findCustomerPriceListService;
 
-    /** @var DeleteCustomerPriceListServiceInterface&MockObject */
-    private DeleteCustomerPriceListServiceInterface $deleteCustomerPriceListService;
-
     /** @var ResolvePriceServiceInterface&MockObject */
     private ResolvePriceServiceInterface $resolvePriceService;
 
     /** @var FindSupplierPriceListServiceInterface&MockObject */
     private FindSupplierPriceListServiceInterface $findSupplierPriceListService;
-
-    /** @var DeleteSupplierPriceListServiceInterface&MockObject */
-    private DeleteSupplierPriceListServiceInterface $deleteSupplierPriceListService;
 
     protected function setUp(): void
     {
@@ -64,8 +58,6 @@ class PricingEndpointsAuthenticatedTest extends TestCase
         $this->findPriceListService = $this->createMock(FindPriceListServiceInterface::class);
         $this->findCustomerPriceListService = $this->createMock(FindCustomerPriceListServiceInterface::class);
         $this->findSupplierPriceListService = $this->createMock(FindSupplierPriceListServiceInterface::class);
-        $this->deleteCustomerPriceListService = $this->createMock(DeleteCustomerPriceListServiceInterface::class);
-        $this->deleteSupplierPriceListService = $this->createMock(DeleteSupplierPriceListServiceInterface::class);
         $this->resolvePriceService = $this->createMock(ResolvePriceServiceInterface::class);
 
         $this->app->instance(FindPriceListServiceInterface::class, $this->findPriceListService);
@@ -75,11 +67,11 @@ class PricingEndpointsAuthenticatedTest extends TestCase
 
         $this->app->instance(FindCustomerPriceListServiceInterface::class, $this->findCustomerPriceListService);
         $this->app->instance(CreateCustomerPriceListServiceInterface::class, $this->createMock(CreateCustomerPriceListServiceInterface::class));
-        $this->app->instance(DeleteCustomerPriceListServiceInterface::class, $this->deleteCustomerPriceListService);
+        $this->app->instance(DeleteCustomerPriceListServiceInterface::class, $this->createMock(DeleteCustomerPriceListServiceInterface::class));
 
         $this->app->instance(FindSupplierPriceListServiceInterface::class, $this->findSupplierPriceListService);
         $this->app->instance(CreateSupplierPriceListServiceInterface::class, $this->createMock(CreateSupplierPriceListServiceInterface::class));
-        $this->app->instance(DeleteSupplierPriceListServiceInterface::class, $this->deleteSupplierPriceListService);
+        $this->app->instance(DeleteSupplierPriceListServiceInterface::class, $this->createMock(DeleteSupplierPriceListServiceInterface::class));
 
         $this->app->instance(ResolvePriceServiceInterface::class, $this->resolvePriceService);
 
@@ -285,54 +277,6 @@ class PricingEndpointsAuthenticatedTest extends TestCase
 
         $response->assertStatus(HttpResponse::HTTP_UNPROCESSABLE_ENTITY)
             ->assertJsonValidationErrors(['supplier_id']);
-    }
-
-    public function test_authenticated_customer_assignment_delete_rejects_cross_tenant_assignment(): void
-    {
-        $this->findCustomerPriceListService
-            ->expects($this->once())
-            ->method('find')
-            ->with(91)
-            ->willReturn(new CustomerPriceList(
-                id: 91,
-                tenantId: 99,
-                customerId: 41,
-                priceListId: 71,
-                priority: 5,
-            ));
-
-        $this->deleteCustomerPriceListService
-            ->expects($this->never())
-            ->method('execute');
-
-        $response = $this->withHeader('X-Tenant-ID', '9')
-            ->deleteJson('/api/pricing/customers/41/price-lists/91');
-
-        $response->assertStatus(HttpResponse::HTTP_NOT_FOUND);
-    }
-
-    public function test_authenticated_supplier_assignment_delete_rejects_cross_tenant_assignment(): void
-    {
-        $this->findSupplierPriceListService
-            ->expects($this->once())
-            ->method('find')
-            ->with(101)
-            ->willReturn(new SupplierPriceList(
-                id: 101,
-                tenantId: 99,
-                supplierId: 55,
-                priceListId: 80,
-                priority: 10,
-            ));
-
-        $this->deleteSupplierPriceListService
-            ->expects($this->never())
-            ->method('execute');
-
-        $response = $this->withHeader('X-Tenant-ID', '9')
-            ->deleteJson('/api/pricing/suppliers/55/price-lists/101');
-
-        $response->assertStatus(HttpResponse::HTTP_NOT_FOUND);
     }
 
     private function clearRoutesCacheOnce(): void

@@ -11,10 +11,13 @@ use Modules\Finance\Application\Contracts\CreateApTransactionServiceInterface;
 use Modules\Finance\Application\Contracts\CreateJournalEntryServiceInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\ApTransactionRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\FiscalPeriodRepositoryInterface;
+use Modules\Finance\Infrastructure\Listeners\Concerns\HandlesReplayConflicts;
 use Modules\Purchase\Domain\Events\PurchaseReturnPosted;
 
 class HandlePurchaseReturnPosted
 {
+    use HandlesReplayConflicts;
+
     public function __construct(
         private readonly FiscalPeriodRepositoryInterface $fiscalPeriodRepository,
         private readonly CreateJournalEntryServiceInterface $createJournalEntryService,
@@ -41,7 +44,7 @@ class HandlePurchaseReturnPosted
             return;
         }
 
-        if ($this->artifactsAlreadyPosted($event->tenantId, 'purchase_return', $event->purchaseReturnId)) {
+        if ($this->artifactsAlreadyPosted($event->tenantId, 'purchase_return', $event->purchaseReturnId, 'ap_transactions')) {
             Log::info('HandlePurchaseReturnPosted: replay detected; finance artifacts already exist, skipping', [
                 'purchase_return_id' => $event->purchaseReturnId,
                 'tenant_id' => $event->tenantId,
@@ -160,11 +163,14 @@ class HandlePurchaseReturnPosted
                 ]);
             });
         } catch (QueryException $exception) {
-            if (! $this->isReplayConflict($exception)) {
+            if (! $this->isReplayConflict($exception, [
+                'ap_transactions_tenant_reference_uk',
+                'ap_transactions.tenant_id, ap_transactions.reference_type, ap_transactions.reference_id',
+            ])) {
                 throw $exception;
             }
 
-            if (! $this->artifactsAlreadyPosted($event->tenantId, 'purchase_return', $event->purchaseReturnId)) {
+            if (! $this->artifactsAlreadyPosted($event->tenantId, 'purchase_return', $event->purchaseReturnId, 'ap_transactions')) {
                 throw new \RuntimeException(
                     'HandlePurchaseReturnPosted: replay conflict detected with incomplete finance artifacts for purchase_return_id '.$event->purchaseReturnId,
                     0,
@@ -177,36 +183,5 @@ class HandlePurchaseReturnPosted
                 'tenant_id' => $event->tenantId,
             ]);
         }
-    }
-
-    private function artifactsAlreadyPosted(int $tenantId, string $referenceType, int $referenceId): bool
-    {
-        $journalExists = DB::table('journal_entries')
-            ->where('tenant_id', $tenantId)
-            ->where('reference_type', $referenceType)
-            ->where('reference_id', $referenceId)
-            ->exists();
-
-        $apTransactionExists = DB::table('ap_transactions')
-            ->where('tenant_id', $tenantId)
-            ->where('reference_type', $referenceType)
-            ->where('reference_id', $referenceId)
-            ->exists();
-
-        return $journalExists && $apTransactionExists;
-    }
-
-    private function isReplayConflict(QueryException $exception): bool
-    {
-        $message = strtolower($exception->getMessage());
-
-        if (! str_contains($message, 'duplicate') && ! str_contains($message, 'unique')) {
-            return false;
-        }
-
-        return str_contains($message, 'journal_entries_tenant_reference_uk')
-            || str_contains($message, 'ap_transactions_tenant_reference_uk')
-            || str_contains($message, 'journal_entries.tenant_id, journal_entries.reference_type, journal_entries.reference_id')
-            || str_contains($message, 'ap_transactions.tenant_id, ap_transactions.reference_type, ap_transactions.reference_id');
     }
 }

@@ -55,6 +55,9 @@ class MigrationGuardrailsTest extends TestCase
             'app/Modules/Sales/database/migrations/2024_01_01_110001_create_sales_orders_table.php' => 'sales_orders_tenant_customer_status_idx',
             'app/Modules/Purchase/database/migrations/2024_01_01_100001_create_purchase_orders_table.php' => 'purchase_orders_tenant_supplier_status_idx',
             'app/Modules/Finance/database/migrations/2024_01_01_120005b_create_payments_table.php' => 'payments_tenant_status_date_idx',
+            'app/Modules/Inventory/database/migrations/2024_01_01_900011_create_transfer_orders_table.php' => 'transfer_orders_tenant_status_idx',
+            'app/Modules/Inventory/database/migrations/2024_01_01_900010a_create_cycle_count_headers_table.php' => 'cycle_count_headers_tenant_status_idx',
+            'app/Modules/Inventory/database/migrations/2024_01_01_900008a_create_stock_adjustments_table.php' => 'stock_adjustments_tenant_status_idx',
             'app/Modules/HR/database/migrations/2024_01_01_900006_create_hr_leave_requests_table.php' => 'hr_leave_requests_tenant_status_start_date_idx',
             'app/Modules/HR/database/migrations/2024_01_01_900010_create_hr_payroll_runs_table.php' => 'hr_payroll_runs_tenant_status_period_end_idx',
             'app/Modules/HR/database/migrations/2024_01_01_900012_create_hr_payslips_table.php' => 'hr_payslips_tenant_status_run_idx',
@@ -326,6 +329,42 @@ class MigrationGuardrailsTest extends TestCase
             "Org-unit-aware migrations must not keep tenant-only unique keys unless explicitly allowlisted.\n"
             .implode("\n", $violations)
         );
+    }
+
+    public function test_warehouse_and_inventory_valuation_paths_keep_operational_indexes(): void
+    {
+        $requiredIndexChecks = [
+            // Warehouse — active warehouse listing (common tenant landing page query)
+            'app/Modules/Warehouse/database/migrations/2024_01_01_800001_create_warehouses_table.php' => [
+                'warehouses_tenant_active_idx',
+            ],
+            // Warehouse locations — listing locations by warehouse (most common nested query)
+            'app/Modules/Warehouse/database/migrations/2024_01_01_800002_create_warehouse_locations_table.php' => [
+                'warehouse_locations_tenant_parent_idx',
+                'warehouse_locations_tenant_warehouse_idx',
+            ],
+            // Stock transfers — operational status filter (pending/in_transit listing)
+            'app/Modules/Inventory/database/migrations/2024_01_01_900007a_create_stock_transfers_table.php' => [
+                'stock_transfers_tenant_status_idx',
+            ],
+            // Inventory cost layers — open-layer query for FIFO/FEFO valuation
+            'app/Modules/Inventory/database/migrations/2024_01_01_900005_create_inventory_cost_layers_table.php' => [
+                'inventory_cost_layers_tenant_product_date_idx',
+                'inventory_cost_layers_tenant_product_open_idx',
+            ],
+        ];
+
+        foreach ($requiredIndexChecks as $relativePath => $indexNames) {
+            $contents = $this->readSource($relativePath);
+
+            foreach ($indexNames as $indexName) {
+                $this->assertStringContainsString(
+                    $indexName,
+                    $contents,
+                    'Missing operational index in migration: '.$relativePath.' -> '.$indexName
+                );
+            }
+        }
     }
 
     /**

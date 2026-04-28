@@ -14,5 +14,5 @@ interface PurchaseReturnLineRepositoryInterface extends RepositoryInterface
 
     public function find(int|string $id, array $columns = ['*']): ?PurchaseReturnLine;
 
-    public function findByPurchaseReturnId(int $purchaseReturnId): Collection;
+    public function findByPurchaseReturnId(int $tenantId, int $purchaseReturnId): Collection;
 }

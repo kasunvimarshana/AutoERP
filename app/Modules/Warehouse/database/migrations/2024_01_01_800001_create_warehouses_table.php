@@ -26,6 +26,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['tenant_id', 'org_unit_id', 'code'], 'warehouses_tenant_code_uk');
+            $table->index(['tenant_id', 'is_active'], 'warehouses_tenant_active_idx');
         });
     }
 

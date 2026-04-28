@@ -116,15 +116,6 @@ class EloquentRepository extends BaseRepository
     {
         $record = $this->findModel($id);
         if ($record) {
-            if (array_key_exists('tenant_id', $data)) {
-                $recordTenantId = $record->getAttribute('tenant_id');
-                $targetTenantId = $data['tenant_id'];
-
-                if ($recordTenantId !== null && (int) $recordTenantId !== (int) $targetTenantId) {
-                    throw new \RuntimeException('Tenant mismatch for update operation.');
-                }
-            }
-
             $record->update($data);
 
             return $record->fresh();

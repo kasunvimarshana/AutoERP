@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Listeners;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Log;
 use Modules\Finance\Application\Contracts\CreateJournalEntryServiceInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\FiscalPeriodRepositoryInterface;
+use Modules\Finance\Infrastructure\Listeners\Concerns\HandlesReplayConflicts;
 use Modules\Inventory\Domain\Events\CycleCountCompleted;
 
 class HandleCycleCountCompleted
 {
+    use HandlesReplayConflicts;
+
     public function __construct(
         private readonly FiscalPeriodRepositoryInterface $fiscalPeriodRepository,
         private readonly CreateJournalEntryServiceInterface $createJournalEntryService,
@@ -19,6 +23,15 @@ class HandleCycleCountCompleted
     public function handle(CycleCountCompleted $event): void
     {
         if (empty($event->adjustments)) {
+            return;
+        }
+
+        if ($this->journalAlreadyPosted($event->tenantId, 'cycle_count', $event->cycleCountId)) {
+            Log::info('HandleCycleCountCompleted: replay detected; journal entry already exists, skipping', [
+                'tenant_id' => $event->tenantId,
+                'cycle_count_id' => $event->cycleCountId,
+            ]);
+
             return;
         }
 
@@ -103,16 +116,36 @@ class HandleCycleCountCompleted
             ];
         }
 
-        $this->createJournalEntryService->execute([
-            'tenant_id' => $event->tenantId,
-            'fiscal_period_id' => $period->getId(),
-            'entry_date' => $countDate->format('Y-m-d'),
-            'created_by' => $event->createdBy > 0 ? $event->createdBy : 1,
-            'entry_type' => 'system',
-            'reference_type' => 'cycle_count',
-            'reference_id' => $event->cycleCountId,
-            'description' => $description,
-            'lines' => $jeLines,
-        ]);
+        try {
+            $this->createJournalEntryService->execute([
+                'tenant_id' => $event->tenantId,
+                'fiscal_period_id' => $period->getId(),
+                'entry_date' => $countDate->format('Y-m-d'),
+                'created_by' => $event->createdBy > 0 ? $event->createdBy : 1,
+                'entry_type' => 'system',
+                'reference_type' => 'cycle_count',
+                'reference_id' => $event->cycleCountId,
+                'description' => $description,
+                'lines' => $jeLines,
+            ]);
+        } catch (QueryException $exception) {
+            if (! $this->isReplayConflict($exception)) {
+                throw $exception;
+            }
+
+            if (! $this->journalAlreadyPosted($event->tenantId, 'cycle_count', $event->cycleCountId)) {
+                throw new \RuntimeException(
+                    'HandleCycleCountCompleted: replay conflict detected with missing journal artifact for cycle_count_id '.$event->cycleCountId,
+                    0,
+                    $exception
+                );
+            }
+
+            Log::info('HandleCycleCountCompleted: duplicate-key replay conflict detected; skipping', [
+                'tenant_id' => $event->tenantId,
+                'cycle_count_id' => $event->cycleCountId,
+            ]);
+        }
     }
+
 }
