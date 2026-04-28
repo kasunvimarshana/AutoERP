@@ -32,6 +32,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['tenant_id', 'customer_id'], 'ar_transactions_tenant_customer_idx');
+            $table->unique(['tenant_id', 'reference_type', 'reference_id'], 'ar_transactions_tenant_reference_uk');
         });
     }
 

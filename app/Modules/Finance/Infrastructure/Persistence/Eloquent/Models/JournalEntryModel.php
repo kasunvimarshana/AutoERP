@@ -39,6 +39,9 @@ class JournalEntryModel extends BaseModel
     ];
 
     protected $casts = [
+        'row_version' => 'integer',
+        'entry_type' => 'string',
+        'status' => 'string',
         'entry_date' => 'date',
         'posting_date' => 'date',
         'posted_at' => 'datetime',

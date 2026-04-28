@@ -48,6 +48,8 @@ class CustomerModel extends Model
         'currency_id' => 'integer',
         'payment_terms_days' => 'integer',
         'ar_account_id' => 'integer',
+        'type' => 'string',
+        'status' => 'string',
         'credit_limit' => 'decimal:6',
         'metadata' => 'array',
     ];

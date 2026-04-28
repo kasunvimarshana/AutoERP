@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Listeners;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Finance\Application\Contracts\CreateArTransactionServiceInterface;
@@ -37,6 +38,15 @@ class HandleSalesPaymentRecorded
             Log::warning('HandleSalesPaymentRecorded: zero or negative payment amount; skipping journal entry', [
                 'sales_invoice_id' => $event->salesInvoiceId,
                 'payment_id' => $event->paymentId,
+            ]);
+
+            return;
+        }
+
+        if ($this->artifactsAlreadyPosted($event->tenantId, 'sales_payment', $event->paymentId)) {
+            Log::info('HandleSalesPaymentRecorded: replay detected; finance artifacts already exist, skipping', [
+                'payment_id' => $event->paymentId,
+                'tenant_id' => $event->tenantId,
             ]);
 
             return;
@@ -88,37 +98,87 @@ class HandleSalesPaymentRecorded
             ],
         ];
 
-        DB::transaction(function () use ($event, $period, $paymentDate, $description, $jeLines, $amount): void {
-            $this->createJournalEntryService->execute([
+        try {
+            DB::transaction(function () use ($event, $period, $paymentDate, $description, $jeLines, $amount): void {
+                $this->createJournalEntryService->execute([
+                    'tenant_id' => $event->tenantId,
+                    'fiscal_period_id' => $period->getId(),
+                    'entry_date' => $paymentDate->format('Y-m-d'),
+                    'created_by' => $event->createdBy ?: 1,
+                    'entry_type' => 'system',
+                    'reference_type' => 'sales_payment',
+                    'reference_id' => $event->paymentId,
+                    'description' => $description,
+                    'lines' => $jeLines,
+                ]);
+
+                // Record AR payment transaction (reduces customer receivable balance)
+                $currentBalance = $this->arTransactionRepository
+                    ->getCustomerBalance($event->tenantId, $event->customerId);
+
+                $newBalance = bcsub($currentBalance, $amount, 6);
+
+                $this->createArTransactionService->execute([
+                    'tenant_id' => $event->tenantId,
+                    'customer_id' => $event->customerId,
+                    'account_id' => $event->arAccountId,
+                    'transaction_type' => 'payment',
+                    'amount' => -1 * (float) $amount,
+                    'balance_after' => (float) $newBalance,
+                    'transaction_date' => $paymentDate->format('Y-m-d'),
+                    'currency_id' => $event->currencyId,
+                    'reference_type' => 'sales_payment',
+                    'reference_id' => $event->paymentId,
+                ]);
+            });
+        } catch (QueryException $exception) {
+            if (! $this->isReplayConflict($exception)) {
+                throw $exception;
+            }
+
+            if (! $this->artifactsAlreadyPosted($event->tenantId, 'sales_payment', $event->paymentId)) {
+                throw new \RuntimeException(
+                    'HandleSalesPaymentRecorded: replay conflict detected with incomplete finance artifacts for payment_id '.$event->paymentId,
+                    0,
+                    $exception
+                );
+            }
+
+            Log::info('HandleSalesPaymentRecorded: duplicate-key replay conflict detected; skipping', [
+                'payment_id' => $event->paymentId,
                 'tenant_id' => $event->tenantId,
-                'fiscal_period_id' => $period->getId(),
-                'entry_date' => $paymentDate->format('Y-m-d'),
-                'created_by' => $event->createdBy ?: 1,
-                'entry_type' => 'system',
-                'reference_type' => 'sales_payment',
-                'reference_id' => $event->paymentId,
-                'description' => $description,
-                'lines' => $jeLines,
             ]);
+        }
+    }
 
-            // Record AR payment transaction (reduces customer receivable balance)
-            $currentBalance = $this->arTransactionRepository
-                ->getCustomerBalance($event->tenantId, $event->customerId);
+    private function artifactsAlreadyPosted(int $tenantId, string $referenceType, int $referenceId): bool
+    {
+        $journalExists = DB::table('journal_entries')
+            ->where('tenant_id', $tenantId)
+            ->where('reference_type', $referenceType)
+            ->where('reference_id', $referenceId)
+            ->exists();
 
-            $newBalance = bcsub($currentBalance, $amount, 6);
+        $arTransactionExists = DB::table('ar_transactions')
+            ->where('tenant_id', $tenantId)
+            ->where('reference_type', $referenceType)
+            ->where('reference_id', $referenceId)
+            ->exists();
 
-            $this->createArTransactionService->execute([
-                'tenant_id' => $event->tenantId,
-                'customer_id' => $event->customerId,
-                'account_id' => $event->arAccountId,
-                'transaction_type' => 'payment',
-                'amount' => -1 * (float) $amount,
-                'balance_after' => (float) $newBalance,
-                'transaction_date' => $paymentDate->format('Y-m-d'),
-                'currency_id' => $event->currencyId,
-                'reference_type' => 'sales_payment',
-                'reference_id' => $event->paymentId,
-            ]);
-        });
+        return $journalExists && $arTransactionExists;
+    }
+
+    private function isReplayConflict(QueryException $exception): bool
+    {
+        $message = strtolower($exception->getMessage());
+
+        if (! str_contains($message, 'duplicate') && ! str_contains($message, 'unique')) {
+            return false;
+        }
+
+        return str_contains($message, 'journal_entries_tenant_reference_uk')
+            || str_contains($message, 'ar_transactions_tenant_reference_uk')
+            || str_contains($message, 'journal_entries.tenant_id, journal_entries.reference_type, journal_entries.reference_id')
+            || str_contains($message, 'ar_transactions.tenant_id, ar_transactions.reference_type, ar_transactions.reference_id');
     }
 }

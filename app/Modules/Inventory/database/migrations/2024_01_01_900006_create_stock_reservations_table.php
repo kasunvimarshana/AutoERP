@@ -24,6 +24,10 @@ return new class extends Migration
             $table->nullableMorphs('reserved_for'); // e.g., sales order line
             $table->timestamp('expires_at')->nullable();
             $table->timestamps();
+
+            $table->index(['tenant_id', 'expires_at'], 'stock_reservations_tenant_expiry_idx');
+            $table->index(['tenant_id', 'product_id', 'location_id'], 'stock_reservations_tenant_product_location_idx');
+            $table->index(['tenant_id', 'reserved_for_type', 'reserved_for_id'], 'stock_reservations_tenant_reserved_for_idx');
         });
     }
 

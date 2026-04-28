@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Listeners;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Finance\Application\Contracts\CreateApTransactionServiceInterface;
@@ -35,6 +36,15 @@ class HandlePurchaseReturnPosted
         if (bccomp($event->grandTotal, '0.000000', 6) <= 0) {
             Log::warning('HandlePurchaseReturnPosted: zero grand total; skipping journal entry', [
                 'purchase_return_id' => $event->purchaseReturnId,
+            ]);
+
+            return;
+        }
+
+        if ($this->artifactsAlreadyPosted($event->tenantId, 'purchase_return', $event->purchaseReturnId)) {
+            Log::info('HandlePurchaseReturnPosted: replay detected; finance artifacts already exist, skipping', [
+                'purchase_return_id' => $event->purchaseReturnId,
+                'tenant_id' => $event->tenantId,
             ]);
 
             return;
@@ -72,81 +82,131 @@ class HandlePurchaseReturnPosted
         $exchangeRate = $event->exchangeRate;
         $description = 'AP reversal for Purchase Return #'.$event->purchaseReturnId;
 
-        DB::transaction(function () use ($event, $period, $returnDate, $description, $grandTotal, $exchangeRate, $creditsByAccount): void {
-            $jeLines = [];
+        try {
+            DB::transaction(function () use ($event, $period, $returnDate, $description, $grandTotal, $exchangeRate, $creditsByAccount): void {
+                $jeLines = [];
 
-            // DR: Accounts Payable (reduces the amount owed to supplier)
-            $baseGrandTotal = bcmul($grandTotal, $exchangeRate, 6);
-            $jeLines[] = [
-                'account_id' => $event->apAccountId,
-                'debit_amount' => $grandTotal,
-                'credit_amount' => '0.000000',
-                'description' => $description,
-                'currency_id' => $event->currencyId,
-                'exchange_rate' => (float) $exchangeRate,
-                'base_debit_amount' => $baseGrandTotal,
-                'base_credit_amount' => '0.000000',
-            ];
+                // DR: Accounts Payable (reduces the amount owed to supplier)
+                $baseGrandTotal = bcmul($grandTotal, $exchangeRate, 6);
+                $jeLines[] = [
+                    'account_id' => $event->apAccountId,
+                    'debit_amount' => $grandTotal,
+                    'credit_amount' => '0.000000',
+                    'description' => $description,
+                    'currency_id' => $event->currencyId,
+                    'exchange_rate' => (float) $exchangeRate,
+                    'base_debit_amount' => $baseGrandTotal,
+                    'base_credit_amount' => '0.000000',
+                ];
 
-            // CR: Inventory/Expense accounts (reverses original purchase entries)
-            if (! empty($creditsByAccount)) {
-                foreach ($creditsByAccount as $accountId => $amount) {
-                    $baseAmount = bcmul($amount, $exchangeRate, 6);
+                // CR: Inventory/Expense accounts (reverses original purchase entries)
+                if (! empty($creditsByAccount)) {
+                    foreach ($creditsByAccount as $accountId => $amount) {
+                        $baseAmount = bcmul($amount, $exchangeRate, 6);
+                        $jeLines[] = [
+                            'account_id' => $accountId,
+                            'debit_amount' => '0.000000',
+                            'credit_amount' => $amount,
+                            'description' => $description,
+                            'currency_id' => $event->currencyId,
+                            'exchange_rate' => (float) $exchangeRate,
+                            'base_debit_amount' => '0.000000',
+                            'base_credit_amount' => $baseAmount,
+                        ];
+                    }
+                } else {
+                    // Fallback: single balancing credit entry against AP account if no line accounts are available
                     $jeLines[] = [
-                        'account_id' => $accountId,
+                        'account_id' => $event->apAccountId,
                         'debit_amount' => '0.000000',
-                        'credit_amount' => $amount,
-                        'description' => $description,
+                        'credit_amount' => $grandTotal,
+                        'description' => $description.' (offset)',
                         'currency_id' => $event->currencyId,
                         'exchange_rate' => (float) $exchangeRate,
                         'base_debit_amount' => '0.000000',
-                        'base_credit_amount' => $baseAmount,
+                        'base_credit_amount' => $baseGrandTotal,
                     ];
                 }
-            } else {
-                // Fallback: single balancing credit entry against AP account if no line accounts are available
-                $jeLines[] = [
+
+                $this->createJournalEntryService->execute([
+                    'tenant_id' => $event->tenantId,
+                    'fiscal_period_id' => $period->getId(),
+                    'entry_date' => $returnDate->format('Y-m-d'),
+                    'created_by' => $event->createdBy ?: 1,
+                    'entry_type' => 'system',
+                    'reference_type' => 'purchase_return',
+                    'reference_id' => $event->purchaseReturnId,
+                    'description' => $description,
+                    'lines' => $jeLines,
+                ]);
+
+                // Record AP credit transaction (reduces supplier balance)
+                $currentBalance = (float) $this->apTransactionRepository
+                    ->getSupplierBalance($event->tenantId, $event->supplierId);
+
+                $newBalance = (float) bcsub((string) $currentBalance, $grandTotal, 6);
+
+                $this->createApTransactionService->execute([
+                    'tenant_id' => $event->tenantId,
+                    'supplier_id' => $event->supplierId,
                     'account_id' => $event->apAccountId,
-                    'debit_amount' => '0.000000',
-                    'credit_amount' => $grandTotal,
-                    'description' => $description.' (offset)',
+                    'transaction_type' => 'debit_note',
+                    'amount' => -1 * (float) $grandTotal,
+                    'balance_after' => $newBalance,
+                    'transaction_date' => $returnDate->format('Y-m-d'),
                     'currency_id' => $event->currencyId,
-                    'exchange_rate' => (float) $exchangeRate,
-                    'base_debit_amount' => '0.000000',
-                    'base_credit_amount' => $baseGrandTotal,
-                ];
+                    'reference_type' => 'purchase_return',
+                    'reference_id' => $event->purchaseReturnId,
+                ]);
+            });
+        } catch (QueryException $exception) {
+            if (! $this->isReplayConflict($exception)) {
+                throw $exception;
             }
 
-            $this->createJournalEntryService->execute([
+            if (! $this->artifactsAlreadyPosted($event->tenantId, 'purchase_return', $event->purchaseReturnId)) {
+                throw new \RuntimeException(
+                    'HandlePurchaseReturnPosted: replay conflict detected with incomplete finance artifacts for purchase_return_id '.$event->purchaseReturnId,
+                    0,
+                    $exception
+                );
+            }
+
+            Log::info('HandlePurchaseReturnPosted: duplicate-key replay conflict detected; skipping', [
+                'purchase_return_id' => $event->purchaseReturnId,
                 'tenant_id' => $event->tenantId,
-                'fiscal_period_id' => $period->getId(),
-                'entry_date' => $returnDate->format('Y-m-d'),
-                'created_by' => $event->createdBy ?: 1,
-                'entry_type' => 'system',
-                'reference_type' => 'purchase_return',
-                'reference_id' => $event->purchaseReturnId,
-                'description' => $description,
-                'lines' => $jeLines,
             ]);
+        }
+    }
 
-            // Record AP credit transaction (reduces supplier balance)
-            $currentBalance = (float) $this->apTransactionRepository
-                ->getSupplierBalance($event->tenantId, $event->supplierId);
+    private function artifactsAlreadyPosted(int $tenantId, string $referenceType, int $referenceId): bool
+    {
+        $journalExists = DB::table('journal_entries')
+            ->where('tenant_id', $tenantId)
+            ->where('reference_type', $referenceType)
+            ->where('reference_id', $referenceId)
+            ->exists();
 
-            $newBalance = (float) bcsub((string) $currentBalance, $grandTotal, 6);
+        $apTransactionExists = DB::table('ap_transactions')
+            ->where('tenant_id', $tenantId)
+            ->where('reference_type', $referenceType)
+            ->where('reference_id', $referenceId)
+            ->exists();
 
-            $this->createApTransactionService->execute([
-                'tenant_id' => $event->tenantId,
-                'supplier_id' => $event->supplierId,
-                'account_id' => $event->apAccountId,
-                'transaction_type' => 'debit_note',
-                'amount' => -1 * (float) $grandTotal,
-                'balance_after' => $newBalance,
-                'transaction_date' => $returnDate->format('Y-m-d'),
-                'currency_id' => $event->currencyId,
-                'reference_type' => 'purchase_return',
-                'reference_id' => $event->purchaseReturnId,
-            ]);
-        });
+        return $journalExists && $apTransactionExists;
+    }
+
+    private function isReplayConflict(QueryException $exception): bool
+    {
+        $message = strtolower($exception->getMessage());
+
+        if (! str_contains($message, 'duplicate') && ! str_contains($message, 'unique')) {
+            return false;
+        }
+
+        return str_contains($message, 'journal_entries_tenant_reference_uk')
+            || str_contains($message, 'ap_transactions_tenant_reference_uk')
+            || str_contains($message, 'journal_entries.tenant_id, journal_entries.reference_type, journal_entries.reference_id')
+            || str_contains($message, 'ap_transactions.tenant_id, ap_transactions.reference_type, ap_transactions.reference_id');
     }
 }

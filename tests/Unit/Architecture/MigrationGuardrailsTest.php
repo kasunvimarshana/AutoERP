@@ -121,6 +121,65 @@ class MigrationGuardrailsTest extends TestCase
         }
     }
 
+    public function test_inventory_seed_migrations_keep_explicit_cross_module_foreign_key_targets(): void
+    {
+        $batchesMigration = $this->readSource('app/Modules/Inventory/database/migrations/2024_01_01_900001_create_batches_table.php');
+        $serialsMigration = $this->readSource('app/Modules/Inventory/database/migrations/2024_01_01_900002_create_serials_table.php');
+
+        $this->assertStringContainsString("constrained('products', 'id', 'batches_product_id_fk')", $batchesMigration);
+        $this->assertStringContainsString("constrained('suppliers', 'id', 'batches_supplier_id_fk')", $batchesMigration);
+
+        $this->assertStringContainsString("constrained('products', 'id', 'serials_product_id_fk')", $serialsMigration);
+        $this->assertStringContainsString("constrained('batches', 'id', 'serials_batch_id_fk')", $serialsMigration);
+    }
+
+    public function test_finance_and_inventory_high_volume_paths_keep_composite_indexes(): void
+    {
+        $requiredIndexChecks = [
+            'app/Modules/Finance/database/migrations/2024_01_01_120003a_create_journal_entries_table.php' => [
+                'journal_entries_tenant_period_status_idx',
+                'journal_entries_tenant_reference_uk',
+            ],
+            'app/Modules/Finance/database/migrations/2024_01_01_120004a_create_ar_transactions_table.php' => [
+                'ar_transactions_tenant_reference_uk',
+            ],
+            'app/Modules/Finance/database/migrations/2024_01_01_120004b_create_ap_transactions_table.php' => [
+                'ap_transactions_tenant_reference_uk',
+            ],
+            'app/Modules/Finance/database/migrations/2024_01_01_120005b_create_payments_table.php' => [
+                'payments_tenant_party_idx',
+                'payments_tenant_status_date_idx',
+            ],
+            'app/Modules/Inventory/database/migrations/2024_01_01_900003_create_stock_levels_table.php' => [
+                'stock_levels_tenant_product_idx',
+                'stock_levels_tenant_location_product_idx',
+            ],
+            'app/Modules/Inventory/database/migrations/2024_01_01_900004_create_stock_movements_table.php' => [
+                'stock_movements_tenant_product_date_idx',
+                'stock_movements_tenant_ref_idx',
+                'stock_movements_tenant_from_loc_date_idx',
+                'stock_movements_tenant_to_loc_date_idx',
+            ],
+            'app/Modules/Inventory/database/migrations/2024_01_01_900006_create_stock_reservations_table.php' => [
+                'stock_reservations_tenant_expiry_idx',
+                'stock_reservations_tenant_product_location_idx',
+                'stock_reservations_tenant_reserved_for_idx',
+            ],
+        ];
+
+        foreach ($requiredIndexChecks as $relativePath => $indexNames) {
+            $contents = $this->readSource($relativePath);
+
+            foreach ($indexNames as $indexName) {
+                $this->assertStringContainsString(
+                    $indexName,
+                    $contents,
+                    'Missing high-volume query composite index in migration: '.$relativePath.' -> '.$indexName
+                );
+            }
+        }
+    }
+
     /**
      * @return list<string>
      */
