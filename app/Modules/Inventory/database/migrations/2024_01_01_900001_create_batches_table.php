@@ -30,7 +30,7 @@ return new class extends Migration
             $table->decimal('sales_price', 20, 6)->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'product_id', 'variant_id', 'batch_number'], 'batches_tenant_product_batch_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'product_id', 'variant_id', 'batch_number'], 'batches_tenant_product_batch_uk');
         });
     }
 

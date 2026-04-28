@@ -33,7 +33,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'shipment_number'], 'shipments_tenant_shipment_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'shipment_number'], 'shipments_tenant_shipment_uk');
         });
     }
 

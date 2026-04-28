@@ -24,7 +24,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'fiscal_year_id', 'period_number'], 'fiscal_periods_tenant_year_number_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'fiscal_year_id', 'period_number'], 'fiscal_periods_tenant_year_number_uk');
         });
     }
 

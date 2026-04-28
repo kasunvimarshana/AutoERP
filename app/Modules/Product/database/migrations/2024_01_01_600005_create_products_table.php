@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('products', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-$table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-$table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('category_id')->nullable()->constrained('product_categories', 'id', 'products_category_id_fk')->nullOnDelete();
             $table->foreignId('brand_id')->nullable()->constrained('product_brands', 'id', 'products_brand_id_fk')->nullOnDelete();
             $table->enum('type', ['physical', 'service', 'digital', 'combo', 'variable'])->default('physical');
@@ -52,9 +52,9 @@ $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimis
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'sku'], 'products_tenant_sku_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'sku'], 'products_tenant_sku_uk');
             $table->index(['tenant_id', 'type'], 'products_tenant_type_idx');
-            $table->unique(['tenant_id', 'slug'], 'products_tenant_slug_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'slug'], 'products_tenant_slug_uk');
             $table->index(['tenant_id', 'is_active'], 'products_tenant_active_idx');
             $table->index(['tenant_id', 'name'], 'products_tenant_name_idx');
         });

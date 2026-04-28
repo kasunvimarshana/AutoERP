@@ -8,7 +8,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\AccountModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
+use Modules\Tax\Infrastructure\Persistence\Eloquent\Models\TaxGroupModel;
 
 class ProductModel extends BaseModel
 {
@@ -19,6 +21,7 @@ class ProductModel extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'row_version',
         'category_id',
         'brand_id',
         'org_unit_id',
@@ -44,10 +47,13 @@ class ProductModel extends BaseModel
         'expense_account_id',
         'is_active',
         'metadata',
+        'purchase_price',
+        'sales_price',
     ];
 
     protected $casts = [
         'tenant_id' => 'integer',
+        'row_version' => 'integer',
         'category_id' => 'integer',
         'brand_id' => 'integer',
         'org_unit_id' => 'integer',
@@ -62,6 +68,8 @@ class ProductModel extends BaseModel
         'is_active' => 'boolean',
         'uom_conversion_factor' => 'decimal:10',
         'standard_cost' => 'decimal:6',
+        'purchase_price' => 'decimal:6',
+        'sales_price' => 'decimal:6',
     ];
 
     public function category(): BelongsTo
@@ -89,8 +97,43 @@ class ProductModel extends BaseModel
         return $this->belongsTo(UnitOfMeasureModel::class, 'sales_uom_id');
     }
 
+    public function taxGroup(): BelongsTo
+    {
+        return $this->belongsTo(TaxGroupModel::class, 'tax_group_id');
+    }
+
+    public function incomeAccount(): BelongsTo
+    {
+        return $this->belongsTo(AccountModel::class, 'income_account_id');
+    }
+
+    public function cogsAccount(): BelongsTo
+    {
+        return $this->belongsTo(AccountModel::class, 'cogs_account_id');
+    }
+
+    public function inventoryAccount(): BelongsTo
+    {
+        return $this->belongsTo(AccountModel::class, 'inventory_account_id');
+    }
+
+    public function expenseAccount(): BelongsTo
+    {
+        return $this->belongsTo(AccountModel::class, 'expense_account_id');
+    }
+
     public function variants(): HasMany
     {
         return $this->hasMany(ProductVariantModel::class, 'product_id');
+    }
+
+    public function identifiers(): HasMany
+    {
+        return $this->hasMany(ProductIdentifierModel::class, 'product_id');
+    }
+
+    public function variantAttributes(): HasMany
+    {
+        return $this->hasMany(VariantAttributeModel::class, 'product_id');
     }
 }

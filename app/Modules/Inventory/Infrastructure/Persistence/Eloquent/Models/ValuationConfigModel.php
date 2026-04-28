@@ -43,8 +43,12 @@ class ValuationConfigModel extends Model
     protected $casts = [
         'tenant_id' => 'integer',
         'org_unit_id' => 'integer',
+        'row_version' => 'integer',
         'warehouse_id' => 'integer',
         'product_id' => 'integer',
+        'transaction_type' => 'string',
+        'valuation_method' => 'string',
+        'allocation_strategy' => 'string',
         'is_active' => 'boolean',
         'metadata' => 'array',
     ];

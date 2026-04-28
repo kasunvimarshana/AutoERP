@@ -14,13 +14,13 @@ use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductVariantMod
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models\WarehouseLocationModel;
 
-class StockReservationModel extends Model
+class SerialModel extends Model
 {
     use HasAudit;
     use HasTenant;
     use ResolvesMorphTypeClass;
 
-    protected $table = 'stock_reservations';
+    protected $table = 'serials';
 
     protected $fillable = [
         'tenant_id',
@@ -28,13 +28,15 @@ class StockReservationModel extends Model
         'row_version',
         'product_id',
         'variant_id',
+        'serial_number',
         'batch_id',
-        'serial_id',
-        'location_id',
-        'quantity',
-        'reserved_for_type',
-        'reserved_for_id',
-        'expires_at',
+        'status',
+        'current_location_id',
+        'current_owner_type',
+        'current_owner_id',
+        'warranty_expiry',
+        'notes',
+        'manufacture_date',
     ];
 
     protected $casts = [
@@ -44,11 +46,11 @@ class StockReservationModel extends Model
         'product_id' => 'integer',
         'variant_id' => 'integer',
         'batch_id' => 'integer',
-        'serial_id' => 'integer',
-        'location_id' => 'integer',
-        'reserved_for_id' => 'integer',
-        'expires_at' => 'datetime',
-        'quantity' => 'decimal:6',
+        'current_location_id' => 'integer',
+        'current_owner_id' => 'integer',
+        'status' => 'string',
+        'warranty_expiry' => 'date',
+        'manufacture_date' => 'date',
     ];
 
     public function product(): BelongsTo
@@ -66,23 +68,18 @@ class StockReservationModel extends Model
         return $this->belongsTo(BatchModel::class, 'batch_id');
     }
 
-    public function serial(): BelongsTo
+    public function currentLocation(): BelongsTo
     {
-        return $this->belongsTo(SerialModel::class, 'serial_id');
+        return $this->belongsTo(WarehouseLocationModel::class, 'current_location_id');
     }
 
-    public function location(): BelongsTo
-    {
-        return $this->belongsTo(WarehouseLocationModel::class, 'location_id');
-    }
-
-    public function reservedFor(): MorphTo
+    public function currentOwner(): MorphTo
     {
         return $this->morphTo();
     }
 
-    public function getReservedForTypeClassAttribute(): ?string
+    public function getCurrentOwnerTypeClassAttribute(): ?string
     {
-        return $this->resolveMorphTypeClass($this->reserved_for_type);
+        return $this->resolveMorphTypeClass($this->current_owner_type);
     }
 }

@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('units_of_measure', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-$table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-$table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->string('name');
             $table->string('symbol', 10);
             $table->enum('type', ['unit', 'mass', 'volume', 'length', 'time', 'other'])->default('unit');
@@ -22,7 +22,7 @@ $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimis
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'symbol'], 'units_of_measure_tenant_symbol_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'symbol'], 'units_of_measure_tenant_symbol_uk');
         });
     }
 

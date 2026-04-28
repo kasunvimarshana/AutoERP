@@ -41,7 +41,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'po_number'], 'purchase_orders_tenant_po_number_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'po_number'], 'purchase_orders_tenant_po_number_uk');
             $table->index(['tenant_id', 'supplier_id', 'status'], 'purchase_orders_tenant_supplier_status_idx');
         });
     }

@@ -6,11 +6,13 @@ namespace Modules\Audit\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\ResolvesMorphTypeClass;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class AuditLogModel extends BaseModel
 {
     use HasTenant;
+    use ResolvesMorphTypeClass;
 
     public const CREATED_AT = 'occurred_at';
 
@@ -46,5 +48,10 @@ class AuditLogModel extends BaseModel
     public function auditable(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    public function getAuditableTypeClassAttribute(): ?string
+    {
+        return $this->resolveMorphTypeClass($this->auditable_type);
     }
 }

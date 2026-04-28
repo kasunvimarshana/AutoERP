@@ -28,7 +28,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['tenant_id'], 'hr_payroll_items_tenant_id_idx');
-            $table->unique(['tenant_id', 'code'], 'hr_payroll_items_tenant_code_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'code'], 'hr_payroll_items_tenant_code_uk');
         });
     }
 

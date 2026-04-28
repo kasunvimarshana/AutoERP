@@ -29,7 +29,7 @@ return new class extends Migration
             // $table->decimal('sales_price', 20, 6)->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'serial_number'], 'serials_tenant_number_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'serial_number'], 'serials_tenant_number_uk');
         });
     }
 

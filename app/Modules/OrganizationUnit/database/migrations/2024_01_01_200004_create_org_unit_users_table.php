@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('org_unit_users', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-$table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->cascadeOnDelete();
-$table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->cascadeOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('user_id')->constrained('users', 'id', 'org_unit_users_user_id_fk')->cascadeOnDelete();
             $table->string('role')->nullable();
             $table->boolean('is_primary')->default(false);

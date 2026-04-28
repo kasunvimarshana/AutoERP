@@ -27,7 +27,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'transfer_number'], 'transfer_orders_tenant_transfer_number_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'transfer_number'], 'transfer_orders_tenant_transfer_number_uk');
             $table->index(['tenant_id', 'status'], 'transfer_orders_tenant_status_idx');
         });
     }

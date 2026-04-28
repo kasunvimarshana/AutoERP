@@ -17,6 +17,8 @@ class UnitOfMeasureModel extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'org_unit_id',
+        'row_version',
         'name',
         'symbol',
         'type',
@@ -24,6 +26,10 @@ class UnitOfMeasureModel extends BaseModel
     ];
 
     protected $casts = [
+        'tenant_id' => 'integer',
+        'org_unit_id' => 'integer',
+        'row_version' => 'integer',
+        'type' => 'string',
         'is_base' => 'boolean',
     ];
 }

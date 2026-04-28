@@ -13,15 +13,15 @@ return new class extends Migration
         Schema::create('roles', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-$table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-$table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->string('name');
             $table->string('guard_name')->default('api');
             $table->string('description')->nullable();
             $table->softDeletes();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'name', 'guard_name'], 'roles_tenant_name_guard_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'name', 'guard_name'], 'roles_tenant_name_guard_uk');
         });
     }
 

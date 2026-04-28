@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('warehouses', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-$table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-$table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->string('name');
             $table->string('code')->nullable();
             $table->string('image_path')->nullable();
@@ -25,7 +25,7 @@ $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimis
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'code'], 'warehouses_tenant_code_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'code'], 'warehouses_tenant_code_uk');
         });
     }
 

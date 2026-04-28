@@ -34,7 +34,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'grn_number'], 'grn_headers_tenant_grn_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'grn_number'], 'grn_headers_tenant_grn_uk');
         });
     }
 

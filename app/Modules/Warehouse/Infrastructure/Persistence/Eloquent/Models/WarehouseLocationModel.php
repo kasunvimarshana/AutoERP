@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class WarehouseLocationModel extends Model
@@ -19,6 +20,8 @@ class WarehouseLocationModel extends Model
 
     protected $fillable = [
         'tenant_id',
+        'org_unit_id',
+        'row_version',
         'warehouse_id',
         'parent_id',
         'name',
@@ -35,6 +38,8 @@ class WarehouseLocationModel extends Model
 
     protected $casts = [
         'tenant_id' => 'integer',
+        'org_unit_id' => 'integer',
+        'row_version' => 'integer',
         'warehouse_id' => 'integer',
         'parent_id' => 'integer',
         'depth' => 'integer',
@@ -51,6 +56,11 @@ class WarehouseLocationModel extends Model
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(WarehouseModel::class, 'warehouse_id');
+    }
+
+    public function orgUnit(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationUnitModel::class, 'org_unit_id');
     }
 
     public function parent(): BelongsTo

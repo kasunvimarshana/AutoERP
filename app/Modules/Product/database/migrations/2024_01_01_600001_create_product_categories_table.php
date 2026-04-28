@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('product_categories', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-$table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-$table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('parent_id')->nullable()->constrained('product_categories', 'id', 'product_categories_parent_id_fk')->nullOnDelete();
             $table->string('name');
             $table->string('slug');
@@ -29,7 +29,7 @@ $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimis
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'code'], 'product_categories_tenant_code_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'code'], 'product_categories_tenant_code_uk');
             $table->index(['tenant_id', 'parent_id'], 'product_categories_tenant_parent_idx');
         });
     }

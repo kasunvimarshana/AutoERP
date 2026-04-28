@@ -17,6 +17,8 @@ class ProductIdentifierModel extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'org_unit_id',
+        'row_version',
         'product_id',
         'variant_id',
         'batch_id',
@@ -33,6 +35,15 @@ class ProductIdentifierModel extends BaseModel
     ];
 
     protected $casts = [
+        'tenant_id' => 'integer',
+        'org_unit_id' => 'integer',
+        'row_version' => 'integer',
+        'product_id' => 'integer',
+        'variant_id' => 'integer',
+        'batch_id' => 'integer',
+        'serial_id' => 'integer',
+        'technology' => 'string',
+        'format' => 'string',
         'gs1_application_identifiers' => 'array',
         'is_primary' => 'boolean',
         'is_active' => 'boolean',

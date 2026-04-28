@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Modules\Inventory\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
+use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models\WarehouseModel;
 
 class TransferOrderModel extends Model
 {
@@ -35,6 +37,8 @@ class TransferOrderModel extends Model
     protected $casts = [
         'tenant_id' => 'integer',
         'org_unit_id' => 'integer',
+        'row_version' => 'integer',
+        'status' => 'string',
         'from_warehouse_id' => 'integer',
         'to_warehouse_id' => 'integer',
         'request_date' => 'date',
@@ -47,5 +51,15 @@ class TransferOrderModel extends Model
     public function lines(): HasMany
     {
         return $this->hasMany(TransferOrderLineModel::class, 'transfer_order_id');
+    }
+
+    public function fromWarehouse(): BelongsTo
+    {
+        return $this->belongsTo(WarehouseModel::class, 'from_warehouse_id');
+    }
+
+    public function toWarehouse(): BelongsTo
+    {
+        return $this->belongsTo(WarehouseModel::class, 'to_warehouse_id');
     }
 }
