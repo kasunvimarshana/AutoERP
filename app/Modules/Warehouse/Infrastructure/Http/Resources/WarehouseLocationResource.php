@@ -15,6 +15,7 @@ class WarehouseLocationResource extends JsonResource
             'id' => $this->getId(),
             'tenant_id' => $this->getTenantId(),
             'warehouse_id' => $this->getWarehouseId(),
+            'org_unit_id' => $this->getOrgUnitId(),
             'parent_id' => $this->getParentId(),
             'name' => $this->getName(),
             'code' => $this->getCode(),

@@ -9,6 +9,7 @@ class CreateWarehouseLocationDTO
     public function __construct(
         public readonly int $tenantId,
         public readonly int $warehouseId,
+        public readonly ?int $orgUnitId,
         public readonly ?int $parentId,
         public readonly string $name,
         public readonly ?string $code,

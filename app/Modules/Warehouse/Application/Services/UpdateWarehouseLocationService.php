@@ -9,14 +9,19 @@ use Modules\Core\Domain\Exceptions\NotFoundException;
 use Modules\Warehouse\Application\Contracts\UpdateWarehouseLocationServiceInterface;
 use Modules\Warehouse\Application\DTOs\UpdateWarehouseLocationDTO;
 use Modules\Warehouse\Application\Services\Concerns\BuildsLocationPath;
+use Modules\Warehouse\Domain\Entities\Warehouse;
 use Modules\Warehouse\Domain\Entities\WarehouseLocation;
 use Modules\Warehouse\Domain\RepositoryInterfaces\WarehouseLocationRepositoryInterface;
+use Modules\Warehouse\Domain\RepositoryInterfaces\WarehouseRepositoryInterface;
 
 class UpdateWarehouseLocationService extends BaseService implements UpdateWarehouseLocationServiceInterface
 {
     use BuildsLocationPath;
 
-    public function __construct(private readonly WarehouseLocationRepositoryInterface $warehouseLocationRepository)
+    public function __construct(
+        private readonly WarehouseLocationRepositoryInterface $warehouseLocationRepository,
+        private readonly WarehouseRepositoryInterface $warehouseRepository,
+    )
     {
         parent::__construct($warehouseLocationRepository);
     }
@@ -27,6 +32,7 @@ class UpdateWarehouseLocationService extends BaseService implements UpdateWareho
             id: (int) $data['id'],
             tenantId: (int) $data['tenant_id'],
             warehouseId: (int) $data['warehouse_id'],
+            orgUnitId: null,
             parentId: isset($data['parent_id']) ? (int) $data['parent_id'] : null,
             name: (string) $data['name'],
             code: $data['code'] ?? null,
@@ -43,6 +49,27 @@ class UpdateWarehouseLocationService extends BaseService implements UpdateWareho
         if (! $location instanceof WarehouseLocation || $location->getTenantId() !== $dto->tenantId || $location->getWarehouseId() !== $dto->warehouseId) {
             throw new NotFoundException('Warehouse location', $dto->id);
         }
+
+        $warehouse = $this->warehouseRepository->find($dto->warehouseId);
+        if (! $warehouse instanceof Warehouse || $warehouse->getTenantId() !== $dto->tenantId) {
+            throw new NotFoundException('Warehouse', $dto->warehouseId);
+        }
+
+        $dto = new UpdateWarehouseLocationDTO(
+            id: $dto->id,
+            tenantId: $dto->tenantId,
+            warehouseId: $dto->warehouseId,
+            orgUnitId: $warehouse->getOrgUnitId(),
+            parentId: $dto->parentId,
+            name: $dto->name,
+            code: $dto->code,
+            type: $dto->type,
+            isActive: $dto->isActive,
+            isPickable: $dto->isPickable,
+            isReceivable: $dto->isReceivable,
+            capacity: $dto->capacity,
+            metadata: $dto->metadata,
+        );
 
         if ($dto->parentId === $dto->id) {
             throw new \InvalidArgumentException('A location cannot be its own parent.');
@@ -70,6 +97,7 @@ class UpdateWarehouseLocationService extends BaseService implements UpdateWareho
         $location->update(
             name: $dto->name,
             type: $dto->type,
+            orgUnitId: $dto->orgUnitId,
             parentId: $dto->parentId,
             code: $dto->code,
             path: $newPath,

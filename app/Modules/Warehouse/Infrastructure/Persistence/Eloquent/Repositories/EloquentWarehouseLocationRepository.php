@@ -26,6 +26,7 @@ class EloquentWarehouseLocationRepository extends EloquentRepository implements 
     {
         $data = [
             'tenant_id' => $location->getTenantId(),
+            'org_unit_id' => $location->getOrgUnitId(),
             'warehouse_id' => $location->getWarehouseId(),
             'parent_id' => $location->getParentId(),
             'name' => $location->getName(),
@@ -109,6 +110,7 @@ class EloquentWarehouseLocationRepository extends EloquentRepository implements 
         return new WarehouseLocation(
             tenantId: (int) $model->tenant_id,
             warehouseId: (int) $model->warehouse_id,
+            orgUnitId: $model->org_unit_id !== null ? (int) $model->org_unit_id : null,
             parentId: $model->parent_id !== null ? (int) $model->parent_id : null,
             name: (string) $model->name,
             code: $model->code,

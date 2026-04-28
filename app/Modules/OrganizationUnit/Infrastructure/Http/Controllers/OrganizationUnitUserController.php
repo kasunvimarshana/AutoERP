@@ -113,7 +113,11 @@ class OrganizationUnitUserController extends AuthorizedController
             throw new NotFoundHttpException('Organization unit user not found.');
         }
 
-        $this->deleteOrganizationUnitUserService->execute(['id' => $organizationUnitUserId]);
+        $this->deleteOrganizationUnitUserService->execute([
+            'id' => $organizationUnitUserId,
+            'tenant_id' => $organizationUnit->getTenantId(),
+            'org_unit_id' => $organizationUnitId,
+        ]);
 
         return Response::json(['message' => 'Organization unit user deleted successfully']);
     }

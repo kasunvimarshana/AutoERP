@@ -30,6 +30,7 @@ class CreateWarehouseLocationService extends BaseService implements CreateWareho
         $dto = new CreateWarehouseLocationDTO(
             tenantId: (int) $data['tenant_id'],
             warehouseId: (int) $data['warehouse_id'],
+            orgUnitId: null,
             parentId: isset($data['parent_id']) ? (int) $data['parent_id'] : null,
             name: (string) $data['name'],
             code: $data['code'] ?? null,
@@ -47,6 +48,21 @@ class CreateWarehouseLocationService extends BaseService implements CreateWareho
             throw new NotFoundException('Warehouse', $dto->warehouseId);
         }
 
+        $dto = new CreateWarehouseLocationDTO(
+            tenantId: $dto->tenantId,
+            warehouseId: $dto->warehouseId,
+            orgUnitId: $warehouse->getOrgUnitId(),
+            parentId: $dto->parentId,
+            name: $dto->name,
+            code: $dto->code,
+            type: $dto->type,
+            isActive: $dto->isActive,
+            isPickable: $dto->isPickable,
+            isReceivable: $dto->isReceivable,
+            capacity: $dto->capacity,
+            metadata: $dto->metadata,
+        );
+
         $parent = null;
         if ($dto->parentId !== null) {
             $parent = $this->warehouseLocationRepository->find($dto->parentId);
@@ -61,6 +77,7 @@ class CreateWarehouseLocationService extends BaseService implements CreateWareho
         return $this->warehouseLocationRepository->save(new WarehouseLocation(
             tenantId: $dto->tenantId,
             warehouseId: $dto->warehouseId,
+            orgUnitId: $dto->orgUnitId,
             parentId: $dto->parentId,
             name: $dto->name,
             code: $dto->code,

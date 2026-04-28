@@ -12,6 +12,8 @@ class WarehouseLocation
 
     private int $warehouseId;
 
+    private ?int $orgUnitId;
+
     private ?int $parentId;
 
     private string $name;
@@ -43,6 +45,7 @@ class WarehouseLocation
         int $warehouseId,
         string $name,
         string $type = 'bin',
+        ?int $orgUnitId = null,
         ?int $parentId = null,
         ?string $code = null,
         ?string $path = null,
@@ -61,6 +64,7 @@ class WarehouseLocation
         $this->id = $id;
         $this->tenantId = $tenantId;
         $this->warehouseId = $warehouseId;
+        $this->orgUnitId = $orgUnitId;
         $this->parentId = $parentId;
         $this->name = trim($name);
         $this->code = $code !== null ? trim($code) : null;
@@ -94,6 +98,11 @@ class WarehouseLocation
     public function getParentId(): ?int
     {
         return $this->parentId;
+    }
+
+    public function getOrgUnitId(): ?int
+    {
+        return $this->orgUnitId;
     }
 
     public function getName(): string
@@ -159,6 +168,7 @@ class WarehouseLocation
     public function update(
         string $name,
         string $type,
+        ?int $orgUnitId,
         ?int $parentId,
         ?string $code,
         ?string $path,
@@ -173,6 +183,7 @@ class WarehouseLocation
 
         $this->name = trim($name);
         $this->type = $type;
+        $this->orgUnitId = $orgUnitId;
         $this->parentId = $parentId;
         $this->code = $code !== null ? trim($code) : null;
         $this->path = $path;

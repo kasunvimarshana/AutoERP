@@ -6,6 +6,7 @@ namespace Modules\User\Infrastructure\Persistence\Eloquent\Repositories;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\User\Domain\Entities\Permission;
 use Modules\User\Domain\Entities\Role;
@@ -78,7 +79,7 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
                 ->filter(static fn (?int $roleId): bool => $roleId !== null)
                 ->values()
                 ->toArray();
-            $model->roles()->sync($roleIds);
+            $this->syncRoleAssignments((int) $model->tenant_id, (int) $model->id, $roleIds);
         }
 
         $model->load('roles.permissions');
@@ -88,16 +89,80 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
 
     public function syncRoles(User $user, array $roleIds): void
     {
-        /** @var UserModel|null $model */
-        $model = $this->model->find($user->getId());
-        if ($model) {
-            $model->roles()->sync($roleIds);
+        $userId = $user->getId();
+        if ($userId === null) {
+            return;
         }
+
+        $this->syncRoleAssignments($user->getTenantId(), $userId, $roleIds);
+    }
+
+    /**
+     * @param  array<int, int|string>  $roleIds
+     */
+    private function syncRoleAssignments(int $tenantId, int $userId, array $roleIds): void
+    {
+        $normalizedRoleIds = array_values(array_unique(array_filter(
+            array_map('intval', $roleIds),
+            static fn (int $id): bool => $id > 0
+        )));
+
+        $allowedRoleIds = empty($normalizedRoleIds)
+            ? []
+            : DB::table('roles')
+                ->where('tenant_id', $tenantId)
+                ->whereIn('id', $normalizedRoleIds)
+                ->pluck('id')
+                ->map(static fn (mixed $id): int => (int) $id)
+                ->all();
+
+        $baseQuery = DB::table('role_user')
+            ->where('tenant_id', $tenantId)
+            ->where('user_id', $userId);
+
+        if ($allowedRoleIds === []) {
+            $baseQuery->delete();
+
+            return;
+        }
+
+        $baseQuery->whereNotIn('role_id', $allowedRoleIds)->delete();
+
+        $existingRoleIds = DB::table('role_user')
+            ->where('tenant_id', $tenantId)
+            ->where('user_id', $userId)
+            ->pluck('role_id')
+            ->map(static fn (mixed $id): int => (int) $id)
+            ->all();
+
+        $missingRoleIds = array_values(array_diff($allowedRoleIds, $existingRoleIds));
+
+        if ($missingRoleIds === []) {
+            return;
+        }
+
+        DB::table('role_user')->insert(array_map(
+            static fn (int $roleId): array => [
+                'tenant_id' => $tenantId,
+                'org_unit_id' => null,
+                'row_version' => 1,
+                'role_id' => $roleId,
+                'user_id' => $userId,
+            ],
+            $missingRoleIds
+        ));
     }
 
     public function changePassword(int $userId, string $hashedPassword): void
     {
-        $this->model->where('id', $userId)->update(['password' => $hashedPassword]);
+        $query = $this->model->newQuery()->where('id', $userId);
+        $tenantId = $this->resolveTenantId();
+
+        if ($tenantId !== null) {
+            $query->where('tenant_id', $tenantId);
+        }
+
+        $query->update(['password' => $hashedPassword]);
     }
 
     /**
@@ -124,15 +189,37 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
 
     public function updateAvatar(int $userId, ?string $avatarPath): void
     {
-        $this->model->where('id', $userId)->update(['avatar' => $avatarPath]);
+        $query = $this->model->newQuery()->where('id', $userId);
+        $tenantId = $this->resolveTenantId();
+
+        if ($tenantId !== null) {
+            $query->where('tenant_id', $tenantId);
+        }
+
+        $query->update(['avatar' => $avatarPath]);
     }
 
     public function verifyPassword(int $userId, string $plainPassword): bool
     {
+        $query = $this->model->newQuery()->where('id', $userId);
+        $tenantId = $this->resolveTenantId();
+
+        if ($tenantId !== null) {
+            $query->where('tenant_id', $tenantId);
+        }
+
         /** @var UserModel|null $model */
-        $model = $this->model->find($userId);
+        $model = $query->first();
 
         return $model && Hash::check($plainPassword, $model->password);
+    }
+
+    private function resolveTenantId(): ?int
+    {
+        $request = request();
+        $tenantId = $request->user()?->tenant_id ?? $request->header('X-Tenant-ID');
+
+        return $tenantId !== null && $tenantId !== '' ? (int) $tenantId : null;
     }
 
     /**
@@ -190,7 +277,13 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
         );
 
         foreach ($model->roles as $roleModel) {
-            $role = new Role($roleModel->tenant_id, $roleModel->name, $roleModel->id);
+            $role = new Role(
+                tenantId: (int) $roleModel->tenant_id,
+                name: (string) $roleModel->name,
+                guardName: (string) $roleModel->guard_name,
+                description: $roleModel->description,
+                id: (int) $roleModel->id,
+            );
             foreach ($roleModel->permissions as $permModel) {
                 $perm = new Permission(
                     tenantId: (int) $permModel->tenant_id,

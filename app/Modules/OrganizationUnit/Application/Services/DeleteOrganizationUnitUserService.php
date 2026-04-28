@@ -24,6 +24,16 @@ class DeleteOrganizationUnitUserService extends BaseService implements DeleteOrg
             throw new OrganizationUnitUserNotFoundException($organizationUnitUserId);
         }
 
+        $tenantId = isset($data['tenant_id']) ? (int) $data['tenant_id'] : null;
+        if ($tenantId !== null && $organizationUnitUser->getTenantId() !== $tenantId) {
+            return false;
+        }
+
+        $organizationUnitId = isset($data['org_unit_id']) ? (int) $data['org_unit_id'] : null;
+        if ($organizationUnitId !== null && $organizationUnitUser->getOrganizationUnitId() !== $organizationUnitId) {
+            return false;
+        }
+
         return $this->organizationUnitUserRepository->delete($organizationUnitUser->getId());
     }
 }

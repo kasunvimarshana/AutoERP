@@ -25,13 +25,11 @@ class RoleModel extends BaseModel
 
     public function permissions(): BelongsToMany
     {
-        return $this->belongsToMany(PermissionModel::class, 'permission_role', 'role_id', 'permission_id')
-            ->withTimestamps();
+        return $this->belongsToMany(PermissionModel::class, 'permission_role', 'role_id', 'permission_id');
     }
 
     public function users(): BelongsToMany
     {
-        return $this->belongsToMany(UserModel::class, 'role_user', 'role_id', 'user_id')
-            ->withTimestamps();
+        return $this->belongsToMany(UserModel::class, 'role_user', 'role_id', 'user_id');
     }
 }

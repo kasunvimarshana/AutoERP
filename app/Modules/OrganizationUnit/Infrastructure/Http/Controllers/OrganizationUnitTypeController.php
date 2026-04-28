@@ -85,9 +85,12 @@ class OrganizationUnitTypeController extends AuthorizedController
     public function destroy(int $organizationUnitTypeId): JsonResponse
     {
         $this->authorize('delete', OrganizationUnit::class);
-        $this->findOrganizationUnitTypeOrFail($organizationUnitTypeId);
+        $organizationUnitType = $this->findOrganizationUnitTypeOrFail($organizationUnitTypeId);
 
-        $this->deleteOrganizationUnitTypeService->execute(['id' => $organizationUnitTypeId]);
+        $this->deleteOrganizationUnitTypeService->execute([
+            'id' => $organizationUnitTypeId,
+            'tenant_id' => $organizationUnitType->getTenantId(),
+        ]);
 
         return Response::json(['message' => 'Organization unit type deleted successfully']);
     }
