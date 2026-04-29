@@ -9,7 +9,7 @@ use Modules\Tenant\Infrastructure\Http\Controllers\TenantDomainController;
 use Modules\Tenant\Infrastructure\Http\Controllers\TenantPlanController;
 use Modules\Tenant\Infrastructure\Http\Controllers\TenantSettingController;
 
-Route::middleware(['auth:api', 'resolve.tenant'])->group(function () {
+Route::middleware(['auth.configured', 'resolve.tenant'])->group(function () {
     Route::apiResource('tenants', TenantController::class);
     Route::patch('tenants/{tenant}/config', [TenantController::class, 'updateConfig']);
 
@@ -47,4 +47,4 @@ Route::middleware(['auth:api', 'resolve.tenant'])->group(function () {
 Route::get('config/domain/{domain}', [TenantController::class, 'configByDomain']);
 
 // File serving (authenticated)
-Route::get('storage/tenant-attachments/{uuid}', [TenantAttachmentController::class, 'serve'])->middleware('auth:api');
+Route::get('storage/tenant-attachments/{uuid}', [TenantAttachmentController::class, 'serve'])->middleware('auth.configured');

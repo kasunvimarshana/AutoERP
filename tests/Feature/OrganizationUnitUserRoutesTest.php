@@ -34,8 +34,8 @@ class OrganizationUnitUserRoutesTest extends TestCase
     {
         $routes = app('router')->getRoutes();
 
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/organization-units/{organization_unit}/users', 'GET'), ['auth:api', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/organization-units/{organization_unit}/users/{organization_unit_user}', 'GET'), ['auth:api', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/organization-units/{organization_unit}/users', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/organization-units/{organization_unit}/users/{organization_unit_user}', 'GET'), ['auth.configured', 'resolve.tenant']);
     }
 
     /**

@@ -117,7 +117,7 @@ class CustomerEndpointsAuthenticatedTest extends TestCase
         $user->setAttribute('id', 901);
         $user->setAttribute('tenant_id', 9);
 
-        $this->actingAs($user, 'api');
+        $this->actingAs($user, (string) config('auth_context.guards.api', config('auth.defaults.guard', 'api')));
     }
 
     public function test_authenticated_customer_index_returns_success_payload(): void

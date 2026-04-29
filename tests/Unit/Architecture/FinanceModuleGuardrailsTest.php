@@ -36,7 +36,7 @@ class FinanceModuleGuardrailsTest extends TestCase
         $this->assertStringContainsString('Route::apiResource(\'fiscal-periods\'', $routesFile);
         $this->assertStringContainsString('Route::apiResource(\'journal-entries\'', $routesFile);
         $this->assertStringContainsString('journal-entries/{journal_entry}/post', $routesFile);
-        $this->assertStringContainsString('auth:api', $routesFile);
+        $this->assertStringContainsString('auth.configured', $routesFile);
         $this->assertStringContainsString('resolve.tenant', $routesFile);
     }
 

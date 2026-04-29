@@ -18,7 +18,7 @@ use Modules\HR\Infrastructure\Http\Controllers\PerformanceCycleController;
 use Modules\HR\Infrastructure\Http\Controllers\PerformanceReviewController;
 use Modules\HR\Infrastructure\Http\Controllers\ShiftController;
 
-Route::prefix('hr')->middleware(['auth:api', 'resolve.tenant'])->group(function (): void {
+Route::prefix('hr')->middleware(['auth.configured', 'resolve.tenant'])->group(function (): void {
     Route::apiResource('shifts', ShiftController::class);
     Route::post('shifts/{shift}/assign', [ShiftController::class, 'assign']);
 

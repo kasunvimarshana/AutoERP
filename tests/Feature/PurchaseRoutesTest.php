@@ -67,35 +67,35 @@ class PurchaseRoutesTest extends TestCase
 
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/purchase-orders', 'GET'),
-            ['auth:api', 'resolve.tenant']
+            ['auth.configured', 'resolve.tenant']
         );
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/purchase-orders/{purchaseOrder}/confirm', 'POST'),
-            ['auth:api', 'resolve.tenant']
+            ['auth.configured', 'resolve.tenant']
         );
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/grns', 'GET'),
-            ['auth:api', 'resolve.tenant']
+            ['auth.configured', 'resolve.tenant']
         );
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/grns/{grn}/post', 'POST'),
-            ['auth:api', 'resolve.tenant']
+            ['auth.configured', 'resolve.tenant']
         );
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/purchase-invoices', 'GET'),
-            ['auth:api', 'resolve.tenant']
+            ['auth.configured', 'resolve.tenant']
         );
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/purchase-invoices/{invoice}/approve', 'POST'),
-            ['auth:api', 'resolve.tenant']
+            ['auth.configured', 'resolve.tenant']
         );
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/purchase-returns', 'GET'),
-            ['auth:api', 'resolve.tenant']
+            ['auth.configured', 'resolve.tenant']
         );
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/purchase-returns/{purchaseReturn}/post', 'POST'),
-            ['auth:api', 'resolve.tenant']
+            ['auth.configured', 'resolve.tenant']
         );
     }
 

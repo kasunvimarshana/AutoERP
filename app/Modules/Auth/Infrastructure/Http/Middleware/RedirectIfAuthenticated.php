@@ -17,9 +17,19 @@ use Symfony\Component\HttpFoundation\Response as HttpResponse;
  */
 class RedirectIfAuthenticated
 {
-    public function handle(Request $request, Closure $next, string ...$guards): Response
+    public function handle(Request $request, Closure $next, string ...$guards): HttpResponse
     {
-        $guards = empty($guards) ? ['api'] : $guards;
+        if (empty($guards)) {
+            $configuredGuards = config('auth_context.guards.guest');
+
+            if (is_string($configuredGuards) && str_contains($configuredGuards, ',')) {
+                $guards = array_values(array_filter(array_map('trim', explode(',', $configuredGuards))));
+            } elseif (is_string($configuredGuards) && $configuredGuards !== '') {
+                $guards = [$configuredGuards];
+            } else {
+                $guards = [(string) config('auth_context.guards.api', config('auth.defaults.guard', 'api'))];
+            }
+        }
 
         foreach ($guards as $guard) {
             if (Auth::guard($guard)->check()) {

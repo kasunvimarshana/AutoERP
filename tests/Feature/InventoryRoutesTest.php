@@ -33,9 +33,9 @@ class InventoryRoutesTest extends TestCase
     {
         $routes = app('router')->getRoutes();
 
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/warehouses/{warehouse}/movements', 'GET'), ['auth:api', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/warehouses/{warehouse}/movements', 'POST'), ['auth:api', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/warehouses/{warehouse}/stock-levels', 'GET'), ['auth:api', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/warehouses/{warehouse}/movements', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/warehouses/{warehouse}/movements', 'POST'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/warehouses/{warehouse}/stock-levels', 'GET'), ['auth.configured', 'resolve.tenant']);
     }
 
     /**

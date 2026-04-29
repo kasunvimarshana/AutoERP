@@ -8,7 +8,7 @@ use Modules\OrganizationUnit\Infrastructure\Http\Controllers\OrganizationUnitCon
 use Modules\OrganizationUnit\Infrastructure\Http\Controllers\OrganizationUnitTypeController;
 use Modules\OrganizationUnit\Infrastructure\Http\Controllers\OrganizationUnitUserController;
 
-Route::middleware(['auth:api', 'resolve.tenant'])->group(function (): void {
+Route::middleware(['auth.configured', 'resolve.tenant'])->group(function (): void {
     Route::apiResource('organization-units', OrganizationUnitController::class);
 
     Route::apiResource('organization-unit-types', OrganizationUnitTypeController::class);
@@ -25,4 +25,4 @@ Route::middleware(['auth:api', 'resolve.tenant'])->group(function (): void {
     Route::delete('organization-units/{organization_unit}/attachments/{attachment}', [OrganizationUnitAttachmentController::class, 'destroy']);
 });
 
-Route::get('storage/org-unit-attachments/{uuid}', [OrganizationUnitAttachmentController::class, 'serve'])->middleware('auth:api');
+Route::get('storage/org-unit-attachments/{uuid}', [OrganizationUnitAttachmentController::class, 'serve'])->middleware('auth.configured');

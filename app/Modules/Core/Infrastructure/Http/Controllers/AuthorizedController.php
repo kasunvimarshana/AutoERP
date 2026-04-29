@@ -20,7 +20,7 @@ class AuthorizedController extends Controller
     public function authorize(string $ability, mixed $arguments = []): mixed
     {
         // return $this->laravelAuthorize($ability, $arguments);
-        $user = auth()->guard()->user();
+        $user = request()->user();
 
         if (! $user instanceof Authenticatable) {
             throw new AuthenticationException;

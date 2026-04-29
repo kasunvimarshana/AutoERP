@@ -15,7 +15,7 @@ interface TokenServiceInterface
     /**
      * Issue a new access token for the given user.
      */
-    public function issueToken(int $userId, string $tokenName = 'api', array $scopes = []): AccessToken;
+    public function issueToken(int $userId, ?string $tokenName = null, array $scopes = []): AccessToken;
 
     /**
      * Revoke the current access token for the given user.

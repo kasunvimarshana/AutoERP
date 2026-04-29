@@ -24,7 +24,7 @@ use Modules\Finance\Infrastructure\Http\Controllers\PaymentController;
 use Modules\Finance\Infrastructure\Http\Controllers\PaymentMethodController;
 use Modules\Finance\Infrastructure\Http\Controllers\PaymentTermController;
 
-Route::middleware(['auth:api', 'resolve.tenant'])->group(function (): void {
+Route::middleware(['auth.configured', 'resolve.tenant'])->group(function (): void {
     // Chart of Accounts & General Ledger
     Route::apiResource('accounts', AccountController::class);
 

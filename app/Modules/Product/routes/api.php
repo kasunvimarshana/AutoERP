@@ -17,7 +17,7 @@ use Modules\Product\Infrastructure\Http\Controllers\UnitOfMeasureController;
 use Modules\Product\Infrastructure\Http\Controllers\UomConversionController;
 use Modules\Product\Infrastructure\Http\Controllers\VariantAttributeController;
 
-Route::middleware(['auth:api', 'resolve.tenant'])->group(function (): void {
+Route::middleware(['auth.configured', 'resolve.tenant'])->group(function (): void {
     Route::get('products/search', [ProductSearchController::class, 'index']);
     Route::apiResource('products', ProductController::class);
     Route::apiResource('product-identifiers', ProductIdentifierController::class);

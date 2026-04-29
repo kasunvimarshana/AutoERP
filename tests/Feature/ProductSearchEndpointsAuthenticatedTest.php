@@ -54,7 +54,7 @@ class ProductSearchEndpointsAuthenticatedTest extends TestCase
         $user->setAttribute('id', 301);
         $user->setAttribute('tenant_id', 9);
 
-        $this->actingAs($user, 'api');
+        $this->actingAs($user, (string) config('auth_context.guards.api', config('auth.defaults.guard', 'api')));
     }
 
     public function test_authenticated_search_returns_expected_payload(): void
