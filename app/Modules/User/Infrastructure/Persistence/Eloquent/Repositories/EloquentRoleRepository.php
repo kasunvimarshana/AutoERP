@@ -86,10 +86,24 @@ class EloquentRoleRepository extends EloquentRepository implements RoleRepositor
 
     private function mapModelToDomainEntity(RoleModel $model): Role
     {
-        $role = new Role($model->tenant_id, $model->name, $model->id);
+        $role = new Role(
+            tenantId: (int) $model->tenant_id,
+            name: (string) $model->name,
+            guardName: (string) $model->guard_name,
+            description: $model->description,
+            id: (int) $model->id,
+        );
+
         if ($model->relationLoaded('permissions')) {
             foreach ($model->permissions as $permModel) {
-                $role->grantPermission(new Permission($permModel->tenant_id, $permModel->name, $permModel->id));
+                $role->grantPermission(new Permission(
+                    tenantId: (int) $permModel->tenant_id,
+                    name: (string) $permModel->name,
+                    guardName: (string) $permModel->guard_name,
+                    module: (string) ($permModel->module ?? 'general'),
+                    description: $permModel->description,
+                    id: (int) $permModel->id,
+                ));
             }
         }
 
