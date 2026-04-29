@@ -104,7 +104,7 @@ class EloquentSalesOrderRepository extends EloquentRepository implements SalesOr
     public function find(int|string $id, array $columns = ['*']): ?SalesOrder
     {
         /** @var SalesOrderModel|null $model */
-        $model = $this->model->newQuery()->with('lines')->find($id, $columns);
+        $model = $this->newScopedQuery()->with('lines')->find($id, $columns);
 
         return $model ? $this->toDomainEntity($model) : null;
     }
@@ -112,7 +112,7 @@ class EloquentSalesOrderRepository extends EloquentRepository implements SalesOr
     public function findByTenantAndSoNumber(int $tenantId, string $soNumber): ?SalesOrder
     {
         /** @var SalesOrderModel|null $model */
-        $model = $this->model->newQuery()->with('lines')
+        $model = $this->newScopedQuery()->with('lines')
             ->where('tenant_id', $tenantId)
             ->where('so_number', $soNumber)
             ->first();

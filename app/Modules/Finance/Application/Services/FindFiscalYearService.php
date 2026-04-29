@@ -24,7 +24,7 @@ class FindFiscalYearService implements FindFiscalYearServiceInterface
         return $this->fiscalYearRepository->find($id);
     }
 
-    public function list(array $filters = [], ?int $perPage = null, int $page = 1, ?string $sort = null): LengthAwarePaginator
+    public function list(array $filters = [], ?int $perPage = null, int $page = 1, ?string $sort = null, ?string $include = null): LengthAwarePaginator
     {
         $repository = $this->fiscalYearRepository->resetCriteria();
 

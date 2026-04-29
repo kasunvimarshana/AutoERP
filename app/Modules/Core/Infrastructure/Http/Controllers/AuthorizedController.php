@@ -9,6 +9,7 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 
 class AuthorizedController extends Controller
@@ -20,7 +21,7 @@ class AuthorizedController extends Controller
     public function authorize(string $ability, mixed $arguments = []): mixed
     {
         // return $this->laravelAuthorize($ability, $arguments);
-        $user = request()->user();
+        $user = request()->user() ?? Auth::user();
 
         if (! $user instanceof Authenticatable) {
             throw new AuthenticationException;
