@@ -42,6 +42,7 @@ return new class extends Migration
 
             $table->index(['tenant_id', 'product_id', 'variant_id'], 'product_identifiers_tenant_product_variant_idx');
             $table->index(['tenant_id', 'value'], 'product_identifiers_tenant_value_idx');
+            $table->index(['tenant_id', 'is_active', 'value'], 'product_identifiers_tenant_active_value_idx');
         });
     }
 

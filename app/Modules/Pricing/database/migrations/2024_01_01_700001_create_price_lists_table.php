@@ -25,6 +25,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['tenant_id', 'org_unit_id', 'name'], 'price_lists_tenant_name_uk');
+            $table->index(['tenant_id', 'type', 'currency_id', 'is_active'], 'price_lists_tenant_type_currency_active_idx');
         });
     }
 

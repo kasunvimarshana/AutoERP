@@ -31,6 +31,8 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['tenant_id', 'org_unit_id', 'product_id', 'variant_id', 'batch_number'], 'batches_tenant_product_batch_uk');
+            $table->index(['tenant_id', 'product_id', 'variant_id', 'batch_number'], 'batches_tenant_product_variant_batch_idx');
+            $table->index(['tenant_id', 'product_id', 'variant_id', 'lot_number'], 'batches_tenant_product_variant_lot_idx');
         });
     }
 
