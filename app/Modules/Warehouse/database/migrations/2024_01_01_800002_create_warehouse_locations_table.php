@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('warehouse_locations', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-$table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-$table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('warehouse_id')->constrained(null, 'id', 'warehouse_locations_warehouse_id_fk')->cascadeOnDelete();
             $table->foreignId('parent_id')->nullable()->constrained('warehouse_locations', 'id', 'warehouse_locations_parent_id_fk')->nullOnDelete();
             $table->string('name');
@@ -29,8 +29,9 @@ $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimis
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'warehouse_id', 'code'], 'warehouse_locations_tenant_warehouse_code_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'warehouse_id', 'code'], 'warehouse_locations_tenant_warehouse_code_uk');
             $table->index(['tenant_id', 'parent_id'], 'warehouse_locations_tenant_parent_idx');
+            $table->index(['tenant_id', 'warehouse_id'], 'warehouse_locations_tenant_warehouse_idx');
         });
     }
 

@@ -25,7 +25,7 @@ return new class extends Migration
             $table->softDeletes();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'module', 'document_type'], 'numbering_sequences_tenant_module_doc_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'module', 'document_type'], 'numbering_sequences_tenant_module_doc_uk');
         });
     }
 

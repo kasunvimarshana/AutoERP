@@ -8,7 +8,7 @@ use Modules\Tax\Infrastructure\Http\Controllers\TaxGroupController;
 use Modules\Tax\Infrastructure\Http\Controllers\TaxRateController;
 use Modules\Tax\Infrastructure\Http\Controllers\TaxRuleController;
 
-Route::middleware(['auth:api', 'resolve.tenant'])->group(function (): void {
+Route::middleware(['auth.configured', 'resolve.tenant'])->group(function (): void {
     Route::get('tax/groups', [TaxGroupController::class, 'index']);
     Route::post('tax/groups', [TaxGroupController::class, 'store']);
     Route::get('tax/groups/{taxGroup}', [TaxGroupController::class, 'show']);

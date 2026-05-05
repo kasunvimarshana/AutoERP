@@ -32,7 +32,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'code'], 'accounts_tenant_code_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'code'], 'accounts_tenant_code_uk');
             $table->index(['tenant_id', 'type'], 'accounts_tenant_type_idx');
             $table->index(['tenant_id', 'parent_id'], 'accounts_tenant_parent_idx');
         });

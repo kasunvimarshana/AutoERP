@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Domain\Exceptions\NotFoundException;
 use Modules\Inventory\Application\Contracts\ApproveTransferOrderServiceInterface;
 use Modules\Inventory\Application\Contracts\CreateTransferOrderServiceInterface;
 use Modules\Inventory\Application\Contracts\ReceiveTransferOrderServiceInterface;
@@ -142,6 +143,108 @@ class InventoryTransferOrderIntegrationTest extends TestCase
             'transfer_number' => 'TO-7001',
             'status' => 'received',
         ]);
+    }
+
+    public function test_transfer_order_receive_rejects_cross_tenant_mutation(): void
+    {
+        $tenantId = 80;
+        $wrongTenantId = 81;
+
+        $this->seedTenant($tenantId);
+        $this->seedReferenceData($tenantId);
+
+        /** @var CreateWarehouseServiceInterface $createWarehouseService */
+        $createWarehouseService = app(CreateWarehouseServiceInterface::class);
+        /** @var CreateWarehouseLocationServiceInterface $createWarehouseLocationService */
+        $createWarehouseLocationService = app(CreateWarehouseLocationServiceInterface::class);
+        /** @var CreateTransferOrderServiceInterface $createTransferOrderService */
+        $createTransferOrderService = app(CreateTransferOrderServiceInterface::class);
+        /** @var ApproveTransferOrderServiceInterface $approveTransferOrderService */
+        $approveTransferOrderService = app(ApproveTransferOrderServiceInterface::class);
+        /** @var ReceiveTransferOrderServiceInterface $receiveTransferOrderService */
+        $receiveTransferOrderService = app(ReceiveTransferOrderServiceInterface::class);
+
+        $fromWarehouse = $createWarehouseService->execute([
+            'tenant_id' => $tenantId,
+            'name' => 'Tenant 80 Origin',
+            'code' => 'ORIG-80',
+            'is_default' => true,
+        ]);
+
+        $toWarehouse = $createWarehouseService->execute([
+            'tenant_id' => $tenantId,
+            'name' => 'Tenant 80 Destination',
+            'code' => 'DEST-80',
+            'is_default' => false,
+        ]);
+
+        $fromLocation = $createWarehouseLocationService->execute([
+            'tenant_id' => $tenantId,
+            'warehouse_id' => $fromWarehouse->getId(),
+            'name' => 'From Rack 80',
+            'code' => 'FROM-80',
+            'type' => 'rack',
+        ]);
+
+        $toLocation = $createWarehouseLocationService->execute([
+            'tenant_id' => $tenantId,
+            'warehouse_id' => $toWarehouse->getId(),
+            'name' => 'To Rack 80',
+            'code' => 'TO-80',
+            'type' => 'rack',
+        ]);
+
+        DB::table('stock_levels')->insert([
+            'tenant_id' => $tenantId,
+            'product_id' => 1001,
+            'variant_id' => null,
+            'location_id' => $fromLocation->getId(),
+            'batch_id' => null,
+            'serial_id' => null,
+            'uom_id' => 2001,
+            'quantity_on_hand' => '12.000000',
+            'quantity_reserved' => '0.000000',
+            'unit_cost' => '10.000000',
+            'last_movement_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $order = $createTransferOrderService->execute([
+            'tenant_id' => $tenantId,
+            'from_warehouse_id' => $fromWarehouse->getId(),
+            'to_warehouse_id' => $toWarehouse->getId(),
+            'transfer_number' => 'TO-8001',
+            'request_date' => now()->toDateString(),
+            'lines' => [[
+                'product_id' => 1001,
+                'from_location_id' => $fromLocation->getId(),
+                'to_location_id' => $toLocation->getId(),
+                'uom_id' => 2001,
+                'requested_qty' => '4.000000',
+                'unit_cost' => '10.000000',
+            ]],
+        ]);
+
+        $approved = $approveTransferOrderService->execute($tenantId, (int) $order->getId());
+
+        try {
+            $receiveTransferOrderService->execute($wrongTenantId, (int) $approved->getId(), [[
+                'line_id' => (int) $approved->getLines()[0]->getId(),
+                'received_qty' => '4.000000',
+            ]]);
+
+            $this->fail('Expected cross-tenant transfer receipt to be rejected.');
+        } catch (NotFoundException) {
+            $this->assertDatabaseHas('transfer_orders', [
+                'id' => $approved->getId(),
+                'tenant_id' => $tenantId,
+                'transfer_number' => 'TO-8001',
+                'status' => 'approved',
+            ]);
+
+            $this->assertSame(0, DB::table('stock_movements')->where('tenant_id', $wrongTenantId)->count());
+        }
     }
 
     private function seedTenant(int $tenantId): void

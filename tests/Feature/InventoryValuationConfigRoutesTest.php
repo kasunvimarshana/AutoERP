@@ -25,12 +25,12 @@ class InventoryValuationConfigRoutesTest extends TestCase
 
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/inventory/valuation-configs', 'GET'),
-            ['auth:api', 'resolve.tenant'],
+            ['auth.configured', 'resolve.tenant'],
         );
 
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/inventory/valuation-configs', 'POST'),
-            ['auth:api', 'resolve.tenant'],
+            ['auth.configured', 'resolve.tenant'],
         );
     }
 

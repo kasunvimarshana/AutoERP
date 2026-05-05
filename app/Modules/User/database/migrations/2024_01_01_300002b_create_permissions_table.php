@@ -10,19 +10,21 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('permissions', function (Blueprint $table) {
+        $guardName = (string) config('auth_context.guards.api', config('auth.defaults.guard', 'api'));
+
+        Schema::create('permissions', function (Blueprint $table) use ($guardName) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-$table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-$table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->string('name');
-            $table->string('guard_name')->default('api');
+            $table->string('guard_name')->default($guardName);
             $table->string('module')->nullable();
             $table->string('description')->nullable();
             $table->softDeletes();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'name', 'guard_name'], 'permissions_tenant_name_guard_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'name', 'guard_name'], 'permissions_tenant_name_guard_uk');
         });
     }
 

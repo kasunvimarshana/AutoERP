@@ -27,6 +27,22 @@ class SharedModuleGuardrailsTest extends TestCase
         );
     }
 
+    public function test_shared_module_top_level_structure_remains_minimal(): void
+    {
+        $sharedRoot = $this->repoRoot.'/app/Modules/Shared';
+        $entries = array_values(array_filter(scandir($sharedRoot) ?: [], static function (string $entry): bool {
+            return $entry !== '.' && $entry !== '..';
+        }));
+
+        sort($entries);
+
+        $this->assertSame(
+            ['Infrastructure', 'routes'],
+            $entries,
+            'Shared module should remain a thin shell with only Infrastructure and routes directories.'
+        );
+    }
+
     public function test_shared_module_keeps_no_runtime_migrations(): void
     {
         $migrationDir = $this->repoRoot.'/app/Modules/Shared/database/migrations';

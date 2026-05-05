@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
-use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\CurrencyModel;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\ResolvesMorphTypeClass;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class ArTransactionModel extends BaseModel
 {
     use HasAudit;
     use HasTenant;
+    use ResolvesMorphTypeClass;
 
     protected $table = 'ar_transactions';
 
@@ -39,5 +42,15 @@ class ArTransactionModel extends BaseModel
     public function currency(): BelongsTo
     {
         return $this->belongsTo(CurrencyModel::class, 'currency_id');
+    }
+
+    public function reference(): MorphTo
+    {
+        return $this->morphTo(__FUNCTION__, 'reference_type', 'reference_id');
+    }
+
+    public function getReferenceTypeClassAttribute(): ?string
+    {
+        return $this->resolveMorphTypeClass($this->reference_type);
     }
 }

@@ -19,6 +19,8 @@ class SupplierPriceListModel extends Model
 
     protected $fillable = [
         'tenant_id',
+        'org_unit_id',
+        'row_version',
         'supplier_id',
         'price_list_id',
         'priority',
@@ -26,6 +28,8 @@ class SupplierPriceListModel extends Model
 
     protected $casts = [
         'tenant_id' => 'integer',
+        'org_unit_id' => 'integer',
+        'row_version' => 'integer',
         'supplier_id' => 'integer',
         'price_list_id' => 'integer',
         'priority' => 'integer',

@@ -7,8 +7,10 @@ namespace Tests\Feature;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Modules\Finance\Application\Contracts\CreateApTransactionServiceInterface;
+use Modules\Finance\Application\Contracts\CreateArTransactionServiceInterface;
 use Modules\Finance\Application\Contracts\CreateJournalEntryServiceInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\ApTransactionRepositoryInterface;
+use Modules\Finance\Domain\RepositoryInterfaces\ArTransactionRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\FiscalPeriodRepositoryInterface;
 use Modules\HR\Application\Contracts\ApprovePayrollRunServiceInterface;
 use Modules\Inventory\Application\Contracts\CompleteCycleCountServiceInterface;
@@ -23,14 +25,24 @@ use Modules\Sales\Application\Contracts\ReceiveSalesReturnServiceInterface;
 use Modules\Finance\Infrastructure\Listeners\HandlePayrollRunApproved;
 use Modules\Finance\Infrastructure\Listeners\HandlePurchaseInvoiceApproved;
 use Modules\Finance\Infrastructure\Listeners\HandlePurchasePaymentRecorded;
+use Modules\Finance\Infrastructure\Listeners\HandlePurchaseReturnPosted;
+use Modules\Finance\Infrastructure\Listeners\HandleSalesPaymentRecorded;
 use Modules\Finance\Infrastructure\Listeners\HandleSalesInvoicePosted;
+use Modules\Finance\Infrastructure\Listeners\HandleSalesReturnReceived;
+use Modules\Finance\Infrastructure\Listeners\HandleStockAdjustmentRecorded;
+use Modules\Finance\Infrastructure\Listeners\HandleCycleCountCompleted;
 use Modules\Sales\Application\Contracts\PostSalesInvoiceServiceInterface;
 use Modules\HR\Domain\Entities\PayrollRun;
 use Modules\HR\Domain\Events\PayrollRunApproved;
 use Modules\HR\Domain\ValueObjects\PayrollRunStatus;
+use Modules\Inventory\Domain\Events\StockAdjustmentRecorded;
+use Modules\Inventory\Domain\Events\CycleCountCompleted;
 use Modules\Purchase\Domain\Events\PurchaseInvoiceApproved;
 use Modules\Purchase\Domain\Events\PurchasePaymentRecorded;
+use Modules\Purchase\Domain\Events\PurchaseReturnPosted;
 use Modules\Sales\Domain\Events\SalesInvoicePosted;
+use Modules\Sales\Domain\Events\SalesPaymentRecorded;
+use Modules\Sales\Domain\Events\SalesReturnReceived;
 use Tests\TestCase;
 
 class FinanceListenerIntegrationTest extends TestCase
@@ -241,6 +253,76 @@ class FinanceListenerIntegrationTest extends TestCase
         $this->assertSame(0, DB::table('journal_entries')->count());
     }
 
+    public function test_handle_purchase_invoice_approved_duplicate_event_is_replay_safe(): void
+    {
+        $event = new PurchaseInvoiceApproved(
+            tenantId: $this->tenantId,
+            purchaseInvoiceId: 106,
+            supplierId: 1,
+            apAccountId: $this->apAccountId,
+            grandTotal: '110.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            invoiceDate: '2026-01-15',
+            dueDate: '2026-02-15',
+            lines: [
+                ['account_id' => $this->inventoryAccountId, 'line_total' => '100.000000', 'tax_amount' => '10.000000'],
+            ],
+        );
+
+        $this->makeApListener()->handle($event);
+        $this->makeApListener()->handle($event);
+
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'purchase_invoice')->where('reference_id', 106)->count());
+        $this->assertSame(1, DB::table('ap_transactions')->where('reference_type', 'purchase_invoice')->where('reference_id', 106)->count());
+    }
+
+    public function test_handle_purchase_invoice_approved_duplicate_conflict_with_partial_artifacts_throws(): void
+    {
+        DB::table('journal_entries')->insert([
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'row_version' => 1,
+            'fiscal_period_id' => $this->fiscalPeriodId,
+            'entry_number' => null,
+            'entry_type' => 'system',
+            'reference_type' => 'purchase_invoice',
+            'reference_id' => 107,
+            'description' => 'Pre-existing partial artifact',
+            'entry_date' => '2026-01-15',
+            'posting_date' => null,
+            'status' => 'posted',
+            'is_reversed' => false,
+            'reversal_entry_id' => null,
+            'created_by' => 1,
+            'posted_by' => null,
+            'posted_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]);
+
+        $event = new PurchaseInvoiceApproved(
+            tenantId: $this->tenantId,
+            purchaseInvoiceId: 107,
+            supplierId: 1,
+            apAccountId: $this->apAccountId,
+            grandTotal: '110.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            invoiceDate: '2026-01-15',
+            dueDate: '2026-02-15',
+            lines: [
+                ['account_id' => $this->inventoryAccountId, 'line_total' => '100.000000', 'tax_amount' => '10.000000'],
+            ],
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('incomplete finance artifacts');
+
+        $this->makeApListener()->handle($event);
+    }
+
     // ──────────────────────────────────────────────────────────────────
     // HandleSalesInvoicePosted
     // ──────────────────────────────────────────────────────────────────
@@ -341,6 +423,28 @@ class FinanceListenerIntegrationTest extends TestCase
         $this->assertSame(0, DB::table('journal_entries')->count());
     }
 
+    public function test_handle_sales_invoice_posted_duplicate_event_is_replay_safe(): void
+    {
+        $event = new SalesInvoicePosted(
+            tenantId: $this->tenantId,
+            salesInvoiceId: 204,
+            customerId: 1,
+            arAccountId: $this->arAccountId,
+            grandTotal: '220.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            invoiceDate: '2026-01-20',
+            lines: [
+                ['income_account_id' => $this->revenueAccountId, 'line_total' => '200.000000', 'tax_amount' => '20.000000'],
+            ],
+        );
+
+        $this->makeArListener()->handle($event);
+        $this->makeArListener()->handle($event);
+
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'sales_invoice')->where('reference_id', 204)->count());
+    }
+
     // ──────────────────────────────────────────────────────────────────
     // HandlePurchasePaymentRecorded
     // ──────────────────────────────────────────────────────────────────
@@ -437,6 +541,532 @@ class FinanceListenerIntegrationTest extends TestCase
         $this->assertNotNull($apTransaction);
         // Balance after = 1000 - 400 = 600
         $this->assertEqualsWithDelta(600.0, (float) $apTransaction->balance_after, 0.001);
+    }
+
+    public function test_handle_purchase_payment_recorded_duplicate_event_is_replay_safe(): void
+    {
+        $event = new PurchasePaymentRecorded(
+            tenantId: $this->tenantId,
+            purchaseInvoiceId: 59,
+            supplierId: 1,
+            paymentId: 15,
+            apAccountId: $this->apAccountId,
+            cashAccountId: $this->cashAccountId,
+            amount: '150.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            paymentDate: '2026-01-20',
+        );
+
+        $this->makePaymentListener()->handle($event);
+        $this->makePaymentListener()->handle($event);
+
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'purchase_payment')->where('reference_id', 15)->count());
+        $this->assertSame(1, DB::table('ap_transactions')->where('reference_type', 'purchase_payment')->where('reference_id', 15)->count());
+    }
+
+    public function test_handle_sales_payment_recorded_duplicate_event_is_replay_safe(): void
+    {
+        $event = new SalesPaymentRecorded(
+            tenantId: $this->tenantId,
+            salesInvoiceId: 260,
+            customerId: $this->customerId,
+            paymentId: 16,
+            arAccountId: $this->arAccountId,
+            cashAccountId: $this->cashAccountId,
+            amount: '180.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            paymentDate: '2026-01-21',
+        );
+
+        $this->makeSalesPaymentListener()->handle($event);
+        $this->makeSalesPaymentListener()->handle($event);
+
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'sales_payment')->where('reference_id', 16)->count());
+        $this->assertSame(1, DB::table('ar_transactions')->where('reference_type', 'sales_payment')->where('reference_id', 16)->count());
+    }
+
+    public function test_handle_purchase_payment_recorded_duplicate_conflict_with_partial_artifacts_throws(): void
+    {
+        DB::table('journal_entries')->insert([
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'row_version' => 1,
+            'fiscal_period_id' => $this->fiscalPeriodId,
+            'entry_number' => null,
+            'entry_type' => 'system',
+            'reference_type' => 'purchase_payment',
+            'reference_id' => 996,
+            'description' => 'Pre-existing partial artifact',
+            'entry_date' => '2026-01-20',
+            'posting_date' => null,
+            'status' => 'posted',
+            'is_reversed' => false,
+            'reversal_entry_id' => null,
+            'created_by' => 1,
+            'posted_by' => null,
+            'posted_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]);
+
+        $event = new PurchasePaymentRecorded(
+            tenantId: $this->tenantId,
+            purchaseInvoiceId: 559,
+            supplierId: 1,
+            paymentId: 996,
+            apAccountId: $this->apAccountId,
+            cashAccountId: $this->cashAccountId,
+            amount: '150.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            paymentDate: '2026-01-20',
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('incomplete finance artifacts');
+
+        $this->makePaymentListener()->handle($event);
+    }
+
+    public function test_handle_sales_payment_recorded_duplicate_conflict_with_partial_artifacts_throws(): void
+    {
+        DB::table('journal_entries')->insert([
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'row_version' => 1,
+            'fiscal_period_id' => $this->fiscalPeriodId,
+            'entry_number' => null,
+            'entry_type' => 'system',
+            'reference_type' => 'sales_payment',
+            'reference_id' => 997,
+            'description' => 'Pre-existing partial artifact',
+            'entry_date' => '2026-01-21',
+            'posting_date' => null,
+            'status' => 'posted',
+            'is_reversed' => false,
+            'reversal_entry_id' => null,
+            'created_by' => 1,
+            'posted_by' => null,
+            'posted_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]);
+
+        $event = new SalesPaymentRecorded(
+            tenantId: $this->tenantId,
+            salesInvoiceId: 560,
+            customerId: $this->customerId,
+            paymentId: 997,
+            arAccountId: $this->arAccountId,
+            cashAccountId: $this->cashAccountId,
+            amount: '180.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            paymentDate: '2026-01-21',
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('incomplete finance artifacts');
+
+        $this->makeSalesPaymentListener()->handle($event);
+    }
+
+    public function test_handle_purchase_return_posted_duplicate_event_is_replay_safe(): void
+    {
+        $event = new PurchaseReturnPosted(
+            tenantId: $this->tenantId,
+            purchaseReturnId: 875,
+            supplierId: 1,
+            apAccountId: $this->apAccountId,
+            grandTotal: '55.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            returnDate: '2026-01-24',
+            lines: [
+                [
+                    'id' => null,
+                    'product_id' => $this->productId,
+                    'from_location_id' => $this->warehouseLocationId,
+                    'uom_id' => $this->uomId,
+                    'return_qty' => '1.000000',
+                    'unit_cost' => '55.000000',
+                    'variant_id' => null,
+                    'batch_id' => null,
+                    'serial_id' => null,
+                    'account_id' => $this->inventoryAccountId,
+                    'line_total' => '55.000000',
+                    'tax_amount' => '0.000000',
+                ],
+            ],
+        );
+
+        $this->makePurchaseReturnListener()->handle($event);
+        $this->makePurchaseReturnListener()->handle($event);
+
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'purchase_return')->where('reference_id', 875)->count());
+        $this->assertSame(1, DB::table('ap_transactions')->where('reference_type', 'purchase_return')->where('reference_id', 875)->count());
+    }
+
+    public function test_handle_sales_return_received_duplicate_event_is_replay_safe(): void
+    {
+        $event = new SalesReturnReceived(
+            tenantId: $this->tenantId,
+            salesReturnId: 895,
+            customerId: $this->customerId,
+            arAccountId: $this->arAccountId,
+            grandTotal: '60.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            returnDate: '2026-01-25',
+            lines: [
+                [
+                    'id' => null,
+                    'product_id' => $this->productId,
+                    'to_location_id' => $this->warehouseLocationId,
+                    'uom_id' => $this->uomId,
+                    'return_qty' => '1.000000',
+                    'variant_id' => null,
+                    'batch_id' => null,
+                    'serial_id' => null,
+                    'income_account_id' => $this->revenueAccountId,
+                    'line_total' => '60.000000',
+                ],
+            ],
+        );
+
+        $this->makeSalesReturnListener()->handle($event);
+        $this->makeSalesReturnListener()->handle($event);
+
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'sales_return')->where('reference_id', 895)->count());
+        $this->assertSame(1, DB::table('ar_transactions')->where('reference_type', 'sales_return')->where('reference_id', 895)->count());
+    }
+
+    public function test_handle_purchase_return_posted_duplicate_conflict_with_partial_artifacts_throws(): void
+    {
+        DB::table('journal_entries')->insert([
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'row_version' => 1,
+            'fiscal_period_id' => $this->fiscalPeriodId,
+            'entry_number' => null,
+            'entry_type' => 'system',
+            'reference_type' => 'purchase_return',
+            'reference_id' => 998,
+            'description' => 'Pre-existing partial artifact',
+            'entry_date' => '2026-01-24',
+            'posting_date' => null,
+            'status' => 'posted',
+            'is_reversed' => false,
+            'reversal_entry_id' => null,
+            'created_by' => 1,
+            'posted_by' => null,
+            'posted_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]);
+
+        $event = new PurchaseReturnPosted(
+            tenantId: $this->tenantId,
+            purchaseReturnId: 998,
+            supplierId: 1,
+            apAccountId: $this->apAccountId,
+            grandTotal: '55.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            returnDate: '2026-01-24',
+            lines: [
+                [
+                    'id' => null,
+                    'product_id' => $this->productId,
+                    'from_location_id' => $this->warehouseLocationId,
+                    'uom_id' => $this->uomId,
+                    'return_qty' => '1.000000',
+                    'unit_cost' => '55.000000',
+                    'variant_id' => null,
+                    'batch_id' => null,
+                    'serial_id' => null,
+                    'account_id' => $this->inventoryAccountId,
+                    'line_total' => '55.000000',
+                    'tax_amount' => '0.000000',
+                ],
+            ],
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('incomplete finance artifacts');
+
+        $this->makePurchaseReturnListener()->handle($event);
+    }
+
+    public function test_handle_sales_return_received_duplicate_conflict_with_partial_artifacts_throws(): void
+    {
+        DB::table('journal_entries')->insert([
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'row_version' => 1,
+            'fiscal_period_id' => $this->fiscalPeriodId,
+            'entry_number' => null,
+            'entry_type' => 'system',
+            'reference_type' => 'sales_return',
+            'reference_id' => 999,
+            'description' => 'Pre-existing partial artifact',
+            'entry_date' => '2026-01-25',
+            'posting_date' => null,
+            'status' => 'posted',
+            'is_reversed' => false,
+            'reversal_entry_id' => null,
+            'created_by' => 1,
+            'posted_by' => null,
+            'posted_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]);
+
+        $event = new SalesReturnReceived(
+            tenantId: $this->tenantId,
+            salesReturnId: 999,
+            customerId: $this->customerId,
+            arAccountId: $this->arAccountId,
+            grandTotal: '60.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            returnDate: '2026-01-25',
+            lines: [
+                [
+                    'id' => null,
+                    'product_id' => $this->productId,
+                    'to_location_id' => $this->warehouseLocationId,
+                    'uom_id' => $this->uomId,
+                    'return_qty' => '1.000000',
+                    'variant_id' => null,
+                    'batch_id' => null,
+                    'serial_id' => null,
+                    'income_account_id' => $this->revenueAccountId,
+                    'line_total' => '60.000000',
+                ],
+            ],
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('incomplete finance artifacts');
+
+        $this->makeSalesReturnListener()->handle($event);
+    }
+
+    public function test_handle_purchase_payment_recorded_transaction_first_partial_artifacts_throw(): void
+    {
+        DB::table('ap_transactions')->insert([
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'row_version' => 1,
+            'supplier_id' => 1,
+            'account_id' => $this->apAccountId,
+            'transaction_type' => 'payment',
+            'reference_type' => 'purchase_payment',
+            'reference_id' => 1001,
+            'amount' => '-150.000000',
+            'balance_after' => '600.000000',
+            'transaction_date' => '2026-01-20',
+            'due_date' => null,
+            'currency_id' => 1,
+            'is_reconciled' => false,
+            'deleted_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $event = new PurchasePaymentRecorded(
+            tenantId: $this->tenantId,
+            purchaseInvoiceId: 1001,
+            supplierId: 1,
+            paymentId: 1001,
+            apAccountId: $this->apAccountId,
+            cashAccountId: $this->cashAccountId,
+            amount: '150.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            paymentDate: '2026-01-20',
+        );
+
+        try {
+            $this->makePaymentListener()->handle($event);
+            $this->fail('Expected incomplete-artifact replay conflict to throw RuntimeException.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('incomplete finance artifacts', strtolower($exception->getMessage()));
+        }
+
+        $this->assertSame(0, DB::table('journal_entries')->where('reference_type', 'purchase_payment')->where('reference_id', 1001)->count());
+        $this->assertSame(1, DB::table('ap_transactions')->where('reference_type', 'purchase_payment')->where('reference_id', 1001)->count());
+    }
+
+    public function test_handle_sales_payment_recorded_transaction_first_partial_artifacts_throw(): void
+    {
+        DB::table('ar_transactions')->insert([
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'row_version' => 1,
+            'customer_id' => $this->customerId,
+            'account_id' => $this->arAccountId,
+            'transaction_type' => 'payment',
+            'reference_type' => 'sales_payment',
+            'reference_id' => 1003,
+            'amount' => '-180.000000',
+            'balance_after' => '320.000000',
+            'transaction_date' => '2026-01-21',
+            'due_date' => null,
+            'currency_id' => 1,
+            'is_reconciled' => false,
+            'deleted_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $event = new SalesPaymentRecorded(
+            tenantId: $this->tenantId,
+            salesInvoiceId: 1003,
+            customerId: $this->customerId,
+            paymentId: 1003,
+            arAccountId: $this->arAccountId,
+            cashAccountId: $this->cashAccountId,
+            amount: '180.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            paymentDate: '2026-01-21',
+        );
+
+        try {
+            $this->makeSalesPaymentListener()->handle($event);
+            $this->fail('Expected incomplete-artifact replay conflict to throw RuntimeException.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('incomplete finance artifacts', strtolower($exception->getMessage()));
+        }
+
+        $this->assertSame(0, DB::table('journal_entries')->where('reference_type', 'sales_payment')->where('reference_id', 1003)->count());
+        $this->assertSame(1, DB::table('ar_transactions')->where('reference_type', 'sales_payment')->where('reference_id', 1003)->count());
+    }
+
+    public function test_handle_purchase_return_posted_transaction_first_partial_artifacts_throw(): void
+    {
+        DB::table('ap_transactions')->insert([
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'row_version' => 1,
+            'supplier_id' => 1,
+            'account_id' => $this->apAccountId,
+            'transaction_type' => 'debit_note',
+            'reference_type' => 'purchase_return',
+            'reference_id' => 1004,
+            'amount' => '-55.000000',
+            'balance_after' => '545.000000',
+            'transaction_date' => '2026-01-24',
+            'due_date' => null,
+            'currency_id' => 1,
+            'is_reconciled' => false,
+            'deleted_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $event = new PurchaseReturnPosted(
+            tenantId: $this->tenantId,
+            purchaseReturnId: 1004,
+            supplierId: 1,
+            apAccountId: $this->apAccountId,
+            grandTotal: '55.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            returnDate: '2026-01-24',
+            lines: [
+                [
+                    'id' => null,
+                    'product_id' => $this->productId,
+                    'from_location_id' => $this->warehouseLocationId,
+                    'uom_id' => $this->uomId,
+                    'return_qty' => '1.000000',
+                    'unit_cost' => '55.000000',
+                    'variant_id' => null,
+                    'batch_id' => null,
+                    'serial_id' => null,
+                    'account_id' => $this->inventoryAccountId,
+                    'line_total' => '55.000000',
+                    'tax_amount' => '0.000000',
+                ],
+            ],
+        );
+
+        try {
+            $this->makePurchaseReturnListener()->handle($event);
+            $this->fail('Expected incomplete-artifact replay conflict to throw RuntimeException.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('incomplete finance artifacts', strtolower($exception->getMessage()));
+        }
+
+        $this->assertSame(0, DB::table('journal_entries')->where('reference_type', 'purchase_return')->where('reference_id', 1004)->count());
+        $this->assertSame(1, DB::table('ap_transactions')->where('reference_type', 'purchase_return')->where('reference_id', 1004)->count());
+    }
+
+    public function test_handle_sales_return_received_transaction_first_partial_artifacts_throw(): void
+    {
+        DB::table('ar_transactions')->insert([
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'row_version' => 1,
+            'customer_id' => $this->customerId,
+            'account_id' => $this->arAccountId,
+            'transaction_type' => 'credit_memo',
+            'reference_type' => 'sales_return',
+            'reference_id' => 1002,
+            'amount' => '-60.000000',
+            'balance_after' => '240.000000',
+            'transaction_date' => '2026-01-25',
+            'due_date' => null,
+            'currency_id' => 1,
+            'is_reconciled' => false,
+            'deleted_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $event = new SalesReturnReceived(
+            tenantId: $this->tenantId,
+            salesReturnId: 1002,
+            customerId: $this->customerId,
+            arAccountId: $this->arAccountId,
+            grandTotal: '60.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            returnDate: '2026-01-25',
+            lines: [
+                [
+                    'id' => null,
+                    'product_id' => $this->productId,
+                    'to_location_id' => $this->warehouseLocationId,
+                    'uom_id' => $this->uomId,
+                    'return_qty' => '1.000000',
+                    'variant_id' => null,
+                    'batch_id' => null,
+                    'serial_id' => null,
+                    'income_account_id' => $this->revenueAccountId,
+                    'line_total' => '60.000000',
+                ],
+            ],
+        );
+
+        try {
+            $this->makeSalesReturnListener()->handle($event);
+            $this->fail('Expected incomplete-artifact replay conflict to throw RuntimeException.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('incomplete finance artifacts', strtolower($exception->getMessage()));
+        }
+
+        $this->assertSame(0, DB::table('journal_entries')->where('reference_type', 'sales_return')->where('reference_id', 1002)->count());
+        $this->assertSame(1, DB::table('ar_transactions')->where('reference_type', 'sales_return')->where('reference_id', 1002)->count());
     }
 
     public function test_handle_purchase_payment_recorded_skips_when_ap_account_is_null(): void
@@ -765,6 +1395,150 @@ class FinanceListenerIntegrationTest extends TestCase
         $this->assertSame(1, DB::table('ar_transactions')->where('reference_type', 'sales_payment')->where('reference_id', $payment->id)->count());
     }
 
+    public function test_record_purchase_payment_service_duplicate_submit_with_idempotency_key_is_replay_safe(): void
+    {
+        DB::table('purchase_invoices')->insert([
+            'id' => 885,
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'row_version' => 1,
+            'supplier_id' => 1,
+            'grn_header_id' => null,
+            'purchase_order_id' => null,
+            'invoice_number' => 'PINV-885',
+            'supplier_invoice_number' => 'S-885',
+            'status' => 'approved',
+            'invoice_date' => '2026-01-20',
+            'due_date' => '2026-02-04',
+            'currency_id' => 1,
+            'exchange_rate' => '1.000000',
+            'subtotal' => '500.000000',
+            'tax_total' => '0.000000',
+            'discount_total' => '0.000000',
+            'grand_total' => '500.000000',
+            'paid_amount' => '0.000000',
+            'ap_account_id' => $this->apAccountId,
+            'journal_entry_id' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]);
+
+        $payload = [
+            'tenant_id' => $this->tenantId,
+            'invoice_id' => 885,
+            'payment_number' => 'PAY-885-A',
+            'idempotency_key' => 'dup-purchase-885',
+            'payment_method_id' => $this->paymentMethodId,
+            'account_id' => $this->cashAccountId,
+            'amount' => '200.000000',
+            'currency_id' => 1,
+            'payment_date' => '2026-01-21',
+            'exchange_rate' => 1.0,
+            'reference' => 'PUR-PMT-885',
+            'notes' => 'Replay-safe purchase payment',
+        ];
+
+        $first = app(RecordPurchasePaymentServiceInterface::class)->execute($payload);
+        $second = app(RecordPurchasePaymentServiceInterface::class)->execute(array_merge($payload, [
+            'payment_number' => 'PAY-885-B',
+        ]));
+
+        $this->assertSame('200.000000', $first->getPaidAmount());
+        $this->assertSame('200.000000', $second->getPaidAmount());
+
+        $payment = DB::table('payments')->where('idempotency_key', 'dup-purchase-885')->first();
+        $this->assertNotNull($payment);
+        $this->assertSame(1, DB::table('payments')->where('idempotency_key', 'dup-purchase-885')->count());
+        $this->assertSame(1, DB::table('payment_allocations')->where('payment_id', $payment->id)->count());
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'purchase_payment')->where('reference_id', $payment->id)->count());
+        $this->assertSame(1, DB::table('ap_transactions')->where('reference_type', 'purchase_payment')->where('reference_id', $payment->id)->count());
+    }
+
+    public function test_record_sales_payment_service_duplicate_submit_with_idempotency_key_is_replay_safe(): void
+    {
+        DB::table('sales_invoices')->insert([
+            'id' => 886,
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'row_version' => 1,
+            'customer_id' => $this->customerId,
+            'sales_order_id' => null,
+            'shipment_id' => null,
+            'invoice_number' => 'SINV-886',
+            'status' => 'sent',
+            'invoice_date' => '2026-01-22',
+            'due_date' => '2026-02-06',
+            'currency_id' => 1,
+            'exchange_rate' => '1.000000',
+            'subtotal' => '300.000000',
+            'tax_total' => '0.000000',
+            'discount_total' => '0.000000',
+            'grand_total' => '300.000000',
+            'paid_amount' => '0.000000',
+            'ar_account_id' => $this->arAccountId,
+            'journal_entry_id' => null,
+            'notes' => null,
+            'metadata' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]);
+
+        DB::table('sales_invoice_lines')->insert([
+            'id' => 887,
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'row_version' => 1,
+            'sales_invoice_id' => 886,
+            'sales_order_line_id' => null,
+            'product_id' => $this->productId,
+            'variant_id' => null,
+            'description' => 'Duplicate-safe customer payment line',
+            'uom_id' => $this->uomId,
+            'quantity' => '1.000000',
+            'unit_price' => '300.000000',
+            'discount_pct' => '0.000000',
+            'tax_group_id' => null,
+            'tax_amount' => '0.000000',
+            'line_total' => '300.000000',
+            'income_account_id' => $this->revenueAccountId,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]);
+
+        $payload = [
+            'tenant_id' => $this->tenantId,
+            'invoice_id' => 886,
+            'payment_number' => 'PAY-886-A',
+            'idempotency_key' => 'dup-sales-886',
+            'payment_method_id' => $this->paymentMethodId,
+            'account_id' => $this->cashAccountId,
+            'amount' => '120.000000',
+            'currency_id' => 1,
+            'payment_date' => '2026-01-23',
+            'exchange_rate' => 1.0,
+            'reference' => 'SAL-PMT-886',
+            'notes' => 'Replay-safe sales payment',
+        ];
+
+        $first = app(RecordSalesPaymentServiceInterface::class)->execute($payload);
+        $second = app(RecordSalesPaymentServiceInterface::class)->execute(array_merge($payload, [
+            'payment_number' => 'PAY-886-B',
+        ]));
+
+        $this->assertSame('120.000000', $first->getPaidAmount());
+        $this->assertSame('120.000000', $second->getPaidAmount());
+
+        $payment = DB::table('payments')->where('idempotency_key', 'dup-sales-886')->first();
+        $this->assertNotNull($payment);
+        $this->assertSame(1, DB::table('payments')->where('idempotency_key', 'dup-sales-886')->count());
+        $this->assertSame(1, DB::table('payment_allocations')->where('payment_id', $payment->id)->count());
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'sales_payment')->where('reference_id', $payment->id)->count());
+        $this->assertSame(1, DB::table('ar_transactions')->where('reference_type', 'sales_payment')->where('reference_id', $payment->id)->count());
+    }
+
     public function test_post_purchase_return_service_dispatches_finance_posting_end_to_end(): void
     {
         DB::table('purchase_invoices')->insert([
@@ -969,6 +1743,221 @@ class FinanceListenerIntegrationTest extends TestCase
         $this->assertSame(1, DB::table('ar_transactions')->where('reference_type', 'sales_return')->where('reference_id', 883)->count());
     }
 
+    public function test_post_purchase_return_service_duplicate_submit_does_not_duplicate_finance_artifacts(): void
+    {
+        DB::table('purchase_invoices')->insert([
+            'id' => 888,
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'row_version' => 1,
+            'supplier_id' => 1,
+            'grn_header_id' => null,
+            'purchase_order_id' => null,
+            'invoice_number' => 'PINV-888',
+            'supplier_invoice_number' => 'S-888',
+            'status' => 'approved',
+            'invoice_date' => '2026-01-20',
+            'due_date' => '2026-02-04',
+            'currency_id' => 1,
+            'exchange_rate' => '1.000000',
+            'subtotal' => '55.000000',
+            'tax_total' => '0.000000',
+            'discount_total' => '0.000000',
+            'grand_total' => '55.000000',
+            'paid_amount' => '0.000000',
+            'ap_account_id' => $this->apAccountId,
+            'journal_entry_id' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]);
+
+        DB::table('purchase_invoice_lines')->insert([
+            'id' => 889,
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'row_version' => 1,
+            'purchase_invoice_id' => 888,
+            'grn_line_id' => null,
+            'product_id' => $this->productId,
+            'variant_id' => null,
+            'description' => 'Duplicate-safe purchase return line',
+            'uom_id' => $this->uomId,
+            'quantity' => '1.000000',
+            'unit_price' => '55.000000',
+            'discount_pct' => '0.000000',
+            'tax_group_id' => null,
+            'tax_amount' => '0.000000',
+            'line_total' => '55.000000',
+            'account_id' => $this->inventoryAccountId,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]);
+
+        DB::table('purchase_returns')->insert([
+            'id' => 890,
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'row_version' => 1,
+            'supplier_id' => 1,
+            'original_grn_id' => null,
+            'original_invoice_id' => 888,
+            'return_number' => 'PRTN-890',
+            'status' => 'draft',
+            'return_date' => '2026-01-24',
+            'return_reason' => 'Duplicate submit guard',
+            'currency_id' => 1,
+            'exchange_rate' => '1.000000',
+            'subtotal' => '55.000000',
+            'tax_total' => '0.000000',
+            'grand_total' => '55.000000',
+            'debit_note_number' => null,
+            'journal_entry_id' => null,
+            'notes' => null,
+            'metadata' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]);
+
+        DB::table('purchase_return_lines')->insert([
+            'id' => 891,
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'row_version' => 1,
+            'purchase_return_id' => 890,
+            'original_grn_line_id' => null,
+            'product_id' => $this->productId,
+            'variant_id' => null,
+            'batch_id' => null,
+            'serial_id' => null,
+            'from_location_id' => $this->warehouseLocationId,
+            'uom_id' => $this->uomId,
+            'return_qty' => '1.000000',
+            'unit_cost' => '55.000000',
+            'condition' => 'good',
+            'disposition' => 'return_to_vendor',
+            'restocking_fee' => '0.000000',
+            'quality_check_notes' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]);
+
+        app(PostPurchaseReturnServiceInterface::class)->execute([
+            'id' => 890,
+            'created_by' => 1,
+        ]);
+
+        try {
+            app(PostPurchaseReturnServiceInterface::class)->execute([
+                'id' => 890,
+                'created_by' => 1,
+            ]);
+            $this->fail('Duplicate purchase return post should be rejected by status guard.');
+        } catch (\InvalidArgumentException $exception) {
+            $this->assertStringContainsString('cannot be posted in its current state', strtolower($exception->getMessage()));
+        }
+
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'purchase_return')->where('reference_id', 890)->count());
+        $this->assertSame(1, DB::table('ap_transactions')->where('reference_type', 'purchase_return')->where('reference_id', 890)->count());
+    }
+
+    public function test_receive_sales_return_service_duplicate_submit_does_not_duplicate_finance_artifacts(): void
+    {
+        DB::table('sales_invoices')->insert([
+            'id' => 892,
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'row_version' => 1,
+            'customer_id' => $this->customerId,
+            'sales_order_id' => null,
+            'shipment_id' => null,
+            'invoice_number' => 'SINV-892',
+            'status' => 'sent',
+            'invoice_date' => '2026-01-22',
+            'due_date' => '2026-02-06',
+            'currency_id' => 1,
+            'exchange_rate' => '1.000000',
+            'subtotal' => '60.000000',
+            'tax_total' => '0.000000',
+            'discount_total' => '0.000000',
+            'grand_total' => '60.000000',
+            'paid_amount' => '0.000000',
+            'ar_account_id' => $this->arAccountId,
+            'journal_entry_id' => null,
+            'notes' => null,
+            'metadata' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]);
+
+        DB::table('sales_returns')->insert([
+            'id' => 893,
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'row_version' => 1,
+            'customer_id' => $this->customerId,
+            'original_sales_order_id' => null,
+            'original_invoice_id' => 892,
+            'return_number' => 'SRTN-893',
+            'status' => 'approved',
+            'return_date' => '2026-01-25',
+            'return_reason' => 'Duplicate submit guard',
+            'currency_id' => 1,
+            'exchange_rate' => '1.000000',
+            'subtotal' => '60.000000',
+            'tax_total' => '0.000000',
+            'restocking_fee_total' => '0.000000',
+            'grand_total' => '60.000000',
+            'credit_memo_number' => null,
+            'journal_entry_id' => null,
+            'notes' => null,
+            'metadata' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]);
+
+        DB::table('sales_return_lines')->insert([
+            'id' => 894,
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'row_version' => 1,
+            'sales_return_id' => 893,
+            'original_sales_order_line_id' => null,
+            'product_id' => $this->productId,
+            'variant_id' => null,
+            'batch_id' => null,
+            'serial_id' => null,
+            'to_location_id' => $this->warehouseLocationId,
+            'uom_id' => $this->uomId,
+            'return_qty' => '1.000000',
+            'unit_price' => '60.000000',
+            'condition' => 'good',
+            'disposition' => 'restock',
+            'restocking_fee' => '0.000000',
+            'quality_check_notes' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]);
+
+        app(ReceiveSalesReturnServiceInterface::class)->execute(['id' => 893]);
+
+        try {
+            app(ReceiveSalesReturnServiceInterface::class)->execute(['id' => 893]);
+            $this->fail('Duplicate sales return receive should be rejected by status guard.');
+        } catch (\InvalidArgumentException $exception) {
+            $this->assertStringContainsString('only approved returns can be received', strtolower($exception->getMessage()));
+        }
+
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'sales_return')->where('reference_id', 893)->count());
+        $this->assertSame(1, DB::table('ar_transactions')->where('reference_type', 'sales_return')->where('reference_id', 893)->count());
+    }
+
     public function test_complete_cycle_count_service_dispatches_finance_posting_when_accounts_are_mapped(): void
     {
         DB::table('fiscal_periods')
@@ -1105,6 +2094,61 @@ class FinanceListenerIntegrationTest extends TestCase
         $this->assertNotNull($lines->get($this->payrollExpenseAccountId));
     }
 
+    public function test_handle_cycle_count_completed_duplicate_event_is_replay_safe(): void
+    {
+        $event = new CycleCountCompleted(
+            tenantId: $this->tenantId,
+            cycleCountId: 1201,
+            warehouseId: $this->warehouseId,
+            locationId: $this->warehouseLocationId,
+            countDate: '2026-01-26',
+            adjustments: [[
+                'inventory_account_id' => $this->inventoryAccountId,
+                'expense_account_id' => $this->payrollExpenseAccountId,
+                'direction' => 'increase',
+                'amount' => '12.000000',
+            ]],
+            createdBy: 1,
+        );
+
+        $listener = new HandleCycleCountCompleted(
+            fiscalPeriodRepository: app(FiscalPeriodRepositoryInterface::class),
+            createJournalEntryService: app(CreateJournalEntryServiceInterface::class),
+        );
+
+        $listener->handle($event);
+        $listener->handle($event);
+
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'cycle_count')->where('reference_id', 1201)->count());
+    }
+
+    public function test_handle_stock_adjustment_recorded_duplicate_event_is_replay_safe(): void
+    {
+        $event = new StockAdjustmentRecorded(
+            tenantId: $this->tenantId,
+            stockMovementId: 1202,
+            productId: $this->productId,
+            movementType: 'adjustment_out',
+            quantity: '2.000000',
+            unitCost: '12.000000',
+            amount: '24.000000',
+            inventoryAccountId: $this->inventoryAccountId,
+            expenseAccountId: $this->payrollExpenseAccountId,
+            movementDate: '2026-01-26',
+            createdBy: 1,
+        );
+
+        $listener = new HandleStockAdjustmentRecorded(
+            fiscalPeriodRepository: app(FiscalPeriodRepositoryInterface::class),
+            createJournalEntryService: app(CreateJournalEntryServiceInterface::class),
+        );
+
+        $listener->handle($event);
+        $listener->handle($event);
+
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'stock_movement')->where('reference_id', 1202)->count());
+    }
+
     // ──────────────────────────────────────────────────────────────────
     // HandlePayrollRunApproved
     // ──────────────────────────────────────────────────────────────────
@@ -1190,6 +2234,19 @@ class FinanceListenerIntegrationTest extends TestCase
         $this->assertSame(0, DB::table('journal_entry_lines')->count());
     }
 
+    public function test_handle_payroll_run_approved_duplicate_event_is_replay_safe(): void
+    {
+        $event = new PayrollRunApproved(
+            payrollRun: $this->makePayrollRun(),
+            tenantId: $this->tenantId,
+        );
+
+        $this->makePayrollListener()->handle($event);
+        $this->makePayrollListener()->handle($event);
+
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'payroll_run')->where('reference_id', 501)->count());
+    }
+
     public function test_approve_payroll_run_service_dispatches_finance_posting_end_to_end(): void
     {
         DB::table('hr_payroll_runs')->insert([
@@ -1250,6 +2307,36 @@ class FinanceListenerIntegrationTest extends TestCase
             createJournalEntryService: app(CreateJournalEntryServiceInterface::class),
             createApTransactionService: app(CreateApTransactionServiceInterface::class),
             apTransactionRepository: app(ApTransactionRepositoryInterface::class),
+        );
+    }
+
+    private function makeSalesPaymentListener(): HandleSalesPaymentRecorded
+    {
+        return new HandleSalesPaymentRecorded(
+            fiscalPeriodRepository: app(FiscalPeriodRepositoryInterface::class),
+            createJournalEntryService: app(CreateJournalEntryServiceInterface::class),
+            createArTransactionService: app(CreateArTransactionServiceInterface::class),
+            arTransactionRepository: app(ArTransactionRepositoryInterface::class),
+        );
+    }
+
+    private function makePurchaseReturnListener(): HandlePurchaseReturnPosted
+    {
+        return new HandlePurchaseReturnPosted(
+            fiscalPeriodRepository: app(FiscalPeriodRepositoryInterface::class),
+            createJournalEntryService: app(CreateJournalEntryServiceInterface::class),
+            createApTransactionService: app(CreateApTransactionServiceInterface::class),
+            apTransactionRepository: app(ApTransactionRepositoryInterface::class),
+        );
+    }
+
+    private function makeSalesReturnListener(): HandleSalesReturnReceived
+    {
+        return new HandleSalesReturnReceived(
+            fiscalPeriodRepository: app(FiscalPeriodRepositoryInterface::class),
+            createJournalEntryService: app(CreateJournalEntryServiceInterface::class),
+            createArTransactionService: app(CreateArTransactionServiceInterface::class),
+            arTransactionRepository: app(ArTransactionRepositoryInterface::class),
         );
     }
 

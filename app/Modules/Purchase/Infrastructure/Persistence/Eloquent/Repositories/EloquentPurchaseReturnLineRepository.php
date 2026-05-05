@@ -52,9 +52,12 @@ class EloquentPurchaseReturnLineRepository extends EloquentRepository implements
         return parent::find($id, $columns);
     }
 
-    public function findByPurchaseReturnId(int $purchaseReturnId): Collection
+    public function findByPurchaseReturnId(int $tenantId, int $purchaseReturnId): Collection
     {
-        $models = $this->model->newQuery()->where('purchase_return_id', $purchaseReturnId)->get();
+        $models = $this->model->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->where('purchase_return_id', $purchaseReturnId)
+            ->get();
 
         return $this->toDomainCollection($models);
     }

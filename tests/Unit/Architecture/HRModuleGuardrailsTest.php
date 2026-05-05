@@ -44,7 +44,7 @@ class HRModuleGuardrailsTest extends TestCase
         $this->assertStringContainsString("Route::apiResource('performance-reviews'", $routesFile);
         $this->assertStringContainsString("Route::apiResource('employee-documents'", $routesFile);
 
-        $this->assertStringContainsString('auth:api', $routesFile);
+        $this->assertStringContainsString('auth.configured', $routesFile);
         $this->assertStringContainsString('resolve.tenant', $routesFile);
     }
 

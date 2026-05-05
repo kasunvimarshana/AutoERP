@@ -19,8 +19,8 @@ class PurchaseOrderModel extends Model
     protected $fillable = [
         'tenant_id',
         'supplier_id',
-            'org_unit_id',
-            'row_version',
+        'org_unit_id',
+        'row_version',
         'warehouse_id',
         'po_number',
         'status',
@@ -42,7 +42,9 @@ class PurchaseOrderModel extends Model
         'tenant_id' => 'integer',
         'supplier_id' => 'integer',
         'org_unit_id' => 'integer',
+        'row_version' => 'integer',
         'warehouse_id' => 'integer',
+        'status' => 'string',
         'currency_id' => 'integer',
         'created_by' => 'integer',
         'approved_by' => 'integer',
@@ -56,8 +58,8 @@ class PurchaseOrderModel extends Model
         'metadata' => 'array',
     ];
 
-        public function lines(): HasMany
-        {
-            return $this->hasMany(PurchaseOrderLineModel::class, 'purchase_order_id');
-        }
+    public function lines(): HasMany
+    {
+        return $this->hasMany(PurchaseOrderLineModel::class, 'purchase_order_id');
+    }
 }

@@ -14,5 +14,5 @@ interface GrnLineRepositoryInterface extends RepositoryInterface
 
     public function find(int|string $id, array $columns = ['*']): ?GrnLine;
 
-    public function findByGrnHeaderId(int $grnHeaderId): Collection;
+    public function findByGrnHeaderId(int $tenantId, int $grnHeaderId): Collection;
 }

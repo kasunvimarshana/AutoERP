@@ -11,7 +11,7 @@ use Modules\Auth\Infrastructure\Http\Controllers\AuthController;
 |--------------------------------------------------------------------------
 |
 | Public routes (no auth required) use throttle:60,1 to limit brute-force.
-| Protected routes use 'auth:api' guard (Passport).
+| Protected routes use 'auth.configured' guard (Passport).
 |
 */
 
@@ -31,7 +31,7 @@ Route::prefix('auth')->middleware('throttle:60,1')->group(function () {
 });
 
 // Protected auth endpoints
-Route::prefix('auth')->middleware('auth:api')->group(function () {
+Route::prefix('auth')->middleware('auth.configured')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/refresh', [AuthController::class, 'refresh']);

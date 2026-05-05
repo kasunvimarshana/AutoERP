@@ -29,7 +29,7 @@ return new class extends Migration
 
             $table->index(['tenant_id'], 'hr_leave_balances_tenant_id_idx');
             $table->index(['employee_id'], 'hr_leave_balances_employee_id_idx');
-            $table->unique(['tenant_id', 'employee_id', 'leave_type_id', 'year'], 'hr_leave_balances_unique_idx');
+            $table->unique(['tenant_id', 'org_unit_id', 'employee_id', 'leave_type_id', 'year'], 'hr_leave_balances_unique_idx');
         });
     }
 

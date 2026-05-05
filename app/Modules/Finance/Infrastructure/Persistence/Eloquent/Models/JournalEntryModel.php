@@ -6,15 +6,18 @@ namespace Modules\Finance\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\ResolvesMorphTypeClass;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class JournalEntryModel extends BaseModel
 {
     use HasAudit, SoftDeletes;
     use HasTenant;
+    use ResolvesMorphTypeClass;
 
     protected $table = 'journal_entries';
 
@@ -39,6 +42,9 @@ class JournalEntryModel extends BaseModel
     ];
 
     protected $casts = [
+        'row_version' => 'integer',
+        'entry_type' => 'string',
+        'status' => 'string',
         'entry_date' => 'date',
         'posting_date' => 'date',
         'posted_at' => 'datetime',
@@ -53,5 +59,15 @@ class JournalEntryModel extends BaseModel
     public function fiscalPeriod(): BelongsTo
     {
         return $this->belongsTo(FiscalPeriodModel::class, 'fiscal_period_id');
+    }
+
+    public function reference(): MorphTo
+    {
+        return $this->morphTo(__FUNCTION__, 'reference_type', 'reference_id');
+    }
+
+    public function getReferenceTypeClassAttribute(): ?string
+    {
+        return $this->resolveMorphTypeClass($this->reference_type);
     }
 }

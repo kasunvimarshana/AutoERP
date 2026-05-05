@@ -31,7 +31,7 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->index(['tenant_id'], 'hr_shifts_tenant_id_idx');
-            $table->unique(['tenant_id', 'code'], 'hr_shifts_tenant_code_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'code'], 'hr_shifts_tenant_code_uk');
         });
     }
 

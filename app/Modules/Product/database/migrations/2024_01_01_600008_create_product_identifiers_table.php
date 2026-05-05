@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create('product_identifiers', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-$table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-$table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             // $table->morphs('identifiable'); // product, variant, batch, serial, location, etc.
             $table->foreignId('product_id')->constrained('products', 'id', 'product_identifiers_product_id_fk');
             $table->foreignId('variant_id')->nullable()->constrained('product_variants', 'id', 'product_identifiers_variant_id_fk');
@@ -42,6 +42,7 @@ $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimis
 
             $table->index(['tenant_id', 'product_id', 'variant_id'], 'product_identifiers_tenant_product_variant_idx');
             $table->index(['tenant_id', 'value'], 'product_identifiers_tenant_value_idx');
+            $table->index(['tenant_id', 'is_active', 'value'], 'product_identifiers_tenant_active_value_idx');
         });
     }
 

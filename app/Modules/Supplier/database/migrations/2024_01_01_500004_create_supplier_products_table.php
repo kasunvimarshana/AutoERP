@@ -25,7 +25,7 @@ return new class extends Migration
             $table->decimal('last_purchase_price', 20, 6)->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'supplier_id', 'product_id', 'variant_id'], 'supplier_products_tenant_supplier_product_variant_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'supplier_id', 'product_id', 'variant_id'], 'supplier_products_tenant_supplier_product_variant_uk');
         });
     }
 

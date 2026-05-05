@@ -9,7 +9,7 @@ use Modules\Pricing\Infrastructure\Http\Controllers\PriceListItemController;
 use Modules\Pricing\Infrastructure\Http\Controllers\PriceResolutionController;
 use Modules\Pricing\Infrastructure\Http\Controllers\SupplierPriceListController;
 
-Route::middleware(['auth:api', 'resolve.tenant'])->group(function (): void {
+Route::middleware(['auth.configured', 'resolve.tenant'])->group(function (): void {
     Route::get('pricing/price-lists', [PriceListController::class, 'index']);
     Route::post('pricing/price-lists', [PriceListController::class, 'store']);
     Route::get('pricing/price-lists/{priceList}', [PriceListController::class, 'show']);

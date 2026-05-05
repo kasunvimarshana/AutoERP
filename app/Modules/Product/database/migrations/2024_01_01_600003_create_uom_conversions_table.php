@@ -28,7 +28,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'product_id', 'from_uom_id', 'to_uom_id'], 'uom_conversions_scope_from_to_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'product_id', 'from_uom_id', 'to_uom_id'], 'uom_conversions_scope_from_to_uk');
             $table->index(['tenant_id', 'product_id', 'is_active'], 'uom_conversions_scope_active_idx');
         });
     }

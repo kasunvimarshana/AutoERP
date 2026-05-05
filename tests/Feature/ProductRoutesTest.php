@@ -24,14 +24,16 @@ class ProductRoutesTest extends TestCase
     {
         $this->getJson('/api/products')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->getJson('/api/products/1')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
+        $this->getJson('/api/products/search')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
     }
 
     public function test_product_routes_keep_expected_middleware_contract(): void
     {
         $routes = app('router')->getRoutes();
 
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/products', 'GET'), ['auth:api', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/products/{product}', 'GET'), ['auth:api', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/products', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/products/{product}', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/products/search', 'GET'), ['auth.configured', 'resolve.tenant']);
     }
 
     /**

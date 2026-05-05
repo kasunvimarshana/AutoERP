@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Listeners;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Log;
 use Modules\Finance\Application\Contracts\CreateJournalEntryServiceInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\FiscalPeriodRepositoryInterface;
+use Modules\Finance\Infrastructure\Listeners\Concerns\HandlesReplayConflicts;
 use Modules\Inventory\Domain\Events\StockAdjustmentRecorded;
 
 class HandleStockAdjustmentRecorded
 {
+    use HandlesReplayConflicts;
+
     public function __construct(
         private readonly FiscalPeriodRepositoryInterface $fiscalPeriodRepository,
         private readonly CreateJournalEntryServiceInterface $createJournalEntryService,
@@ -29,6 +33,15 @@ class HandleStockAdjustmentRecorded
         }
 
         if (bccomp($event->amount, '0.000000', 6) <= 0) {
+            return;
+        }
+
+        if ($this->journalAlreadyPosted($event->tenantId, 'stock_movement', $event->stockMovementId)) {
+            Log::info('HandleStockAdjustmentRecorded: replay detected; journal entry already exists, skipping', [
+                'tenant_id' => $event->tenantId,
+                'stock_movement_id' => $event->stockMovementId,
+            ]);
+
             return;
         }
 
@@ -58,37 +71,57 @@ class HandleStockAdjustmentRecorded
             ? $event->expenseAccountId
             : $event->inventoryAccountId;
 
-        $this->createJournalEntryService->execute([
-            'tenant_id' => $event->tenantId,
-            'fiscal_period_id' => $period->getId(),
-            'entry_date' => $movementDate->format('Y-m-d'),
-            'created_by' => $event->createdBy > 0 ? $event->createdBy : 1,
-            'entry_type' => 'system',
-            'reference_type' => 'stock_movement',
-            'reference_id' => $event->stockMovementId,
-            'description' => $description,
-            'lines' => [
-                [
-                    'account_id' => $debitAccountId,
-                    'debit_amount' => $amount,
-                    'credit_amount' => 0.0,
-                    'description' => $description,
-                    'currency_id' => 1,
-                    'exchange_rate' => 1.0,
-                    'base_debit_amount' => $amount,
-                    'base_credit_amount' => 0.0,
+        try {
+            $this->createJournalEntryService->execute([
+                'tenant_id' => $event->tenantId,
+                'fiscal_period_id' => $period->getId(),
+                'entry_date' => $movementDate->format('Y-m-d'),
+                'created_by' => $event->createdBy > 0 ? $event->createdBy : 1,
+                'entry_type' => 'system',
+                'reference_type' => 'stock_movement',
+                'reference_id' => $event->stockMovementId,
+                'description' => $description,
+                'lines' => [
+                    [
+                        'account_id' => $debitAccountId,
+                        'debit_amount' => $amount,
+                        'credit_amount' => 0.0,
+                        'description' => $description,
+                        'currency_id' => 1,
+                        'exchange_rate' => 1.0,
+                        'base_debit_amount' => $amount,
+                        'base_credit_amount' => 0.0,
+                    ],
+                    [
+                        'account_id' => $creditAccountId,
+                        'debit_amount' => 0.0,
+                        'credit_amount' => $amount,
+                        'description' => $description,
+                        'currency_id' => 1,
+                        'exchange_rate' => 1.0,
+                        'base_debit_amount' => 0.0,
+                        'base_credit_amount' => $amount,
+                    ],
                 ],
-                [
-                    'account_id' => $creditAccountId,
-                    'debit_amount' => 0.0,
-                    'credit_amount' => $amount,
-                    'description' => $description,
-                    'currency_id' => 1,
-                    'exchange_rate' => 1.0,
-                    'base_debit_amount' => 0.0,
-                    'base_credit_amount' => $amount,
-                ],
-            ],
-        ]);
+            ]);
+        } catch (QueryException $exception) {
+            if (! $this->isReplayConflict($exception)) {
+                throw $exception;
+            }
+
+            if (! $this->journalAlreadyPosted($event->tenantId, 'stock_movement', $event->stockMovementId)) {
+                throw new \RuntimeException(
+                    'HandleStockAdjustmentRecorded: replay conflict detected with missing journal artifact for stock_movement_id '.$event->stockMovementId,
+                    0,
+                    $exception
+                );
+            }
+
+            Log::info('HandleStockAdjustmentRecorded: duplicate-key replay conflict detected; skipping', [
+                'tenant_id' => $event->tenantId,
+                'stock_movement_id' => $event->stockMovementId,
+            ]);
+        }
     }
+
 }

@@ -25,7 +25,7 @@ return new class extends Migration
             $table->softDeletes();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'name'], 'payment_terms_tenant_name_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'name'], 'payment_terms_tenant_name_uk');
             $table->index(['tenant_id', 'is_active'], 'payment_terms_tenant_active_idx');
         });
     }

@@ -32,7 +32,7 @@ return new class extends Migration
             $table->softDeletes();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'credit_memo_number'], 'credit_memos_tenant_number_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'credit_memo_number'], 'credit_memos_tenant_number_uk');
             $table->index(['tenant_id', 'party_type', 'party_id'], 'credit_memos_tenant_party_idx');
         });
     }

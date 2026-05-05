@@ -37,6 +37,7 @@ use Modules\Product\Application\Contracts\FindProductAttributeValueServiceInterf
 use Modules\Product\Application\Contracts\FindProductBrandServiceInterface;
 use Modules\Product\Application\Contracts\FindProductCategoryServiceInterface;
 use Modules\Product\Application\Contracts\FindProductIdentifierServiceInterface;
+use Modules\Product\Application\Contracts\SearchProductCatalogServiceInterface;
 use Modules\Product\Application\Contracts\FindProductServiceInterface;
 use Modules\Product\Application\Contracts\FindProductVariantServiceInterface;
 use Modules\Product\Application\Contracts\FindUnitOfMeasureServiceInterface;
@@ -86,6 +87,7 @@ use Modules\Product\Application\Services\FindProductAttributeValueService;
 use Modules\Product\Application\Services\FindProductBrandService;
 use Modules\Product\Application\Services\FindProductCategoryService;
 use Modules\Product\Application\Services\FindProductIdentifierService;
+use Modules\Product\Application\Services\SearchProductCatalogService;
 use Modules\Product\Application\Services\FindProductService;
 use Modules\Product\Application\Services\FindProductVariantService;
 use Modules\Product\Application\Services\FindUnitOfMeasureService;
@@ -165,6 +167,7 @@ class ProductServiceProvider extends ServiceProvider
             DeleteProductCategoryServiceInterface::class => DeleteProductCategoryService::class,
             CreateProductIdentifierServiceInterface::class => CreateProductIdentifierService::class,
             FindProductIdentifierServiceInterface::class => FindProductIdentifierService::class,
+            SearchProductCatalogServiceInterface::class => SearchProductCatalogService::class,
             UpdateProductIdentifierServiceInterface::class => UpdateProductIdentifierService::class,
             DeleteProductIdentifierServiceInterface::class => DeleteProductIdentifierService::class,
             CreateProductVariantServiceInterface::class => CreateProductVariantService::class,

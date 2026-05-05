@@ -536,6 +536,76 @@ class CrossModuleFlowInvariantsTest extends TestCase
         );
     }
 
+    /**
+     * Finance posting listeners are only allowed to consume cross-module domain
+     * events from the approved bounded contexts: Purchase, Sales, Inventory, HR.
+     *
+     * This prevents accidental coupling where Finance starts consuming ad-hoc
+     * events from unrelated modules without an explicit architecture decision.
+     */
+    public function test_finance_listeners_only_consume_events_from_approved_modules(): void
+    {
+        $allowedEventNamespacePrefixes = [
+            'Modules\\Purchase\\Domain\\Events\\',
+            'Modules\\Sales\\Domain\\Events\\',
+            'Modules\\Inventory\\Domain\\Events\\',
+            'Modules\\HR\\Domain\\Events\\',
+        ];
+
+        $financeListenerFiles = [
+            'app/Modules/Finance/Infrastructure/Listeners/HandlePurchaseInvoiceApproved.php',
+            'app/Modules/Finance/Infrastructure/Listeners/HandlePurchasePaymentRecorded.php',
+            'app/Modules/Finance/Infrastructure/Listeners/HandlePurchaseReturnPosted.php',
+            'app/Modules/Finance/Infrastructure/Listeners/HandleSalesInvoicePosted.php',
+            'app/Modules/Finance/Infrastructure/Listeners/HandleSalesPaymentRecorded.php',
+            'app/Modules/Finance/Infrastructure/Listeners/HandleSalesReturnReceived.php',
+            'app/Modules/Finance/Infrastructure/Listeners/HandleCycleCountCompleted.php',
+            'app/Modules/Finance/Infrastructure/Listeners/HandleStockAdjustmentRecorded.php',
+            'app/Modules/Finance/Infrastructure/Listeners/HandlePayrollRunApproved.php',
+        ];
+
+        foreach ($financeListenerFiles as $listenerPath) {
+            $source = $this->readSource($listenerPath);
+
+            preg_match_all(
+                '/^use\\s+((?:Modules\\\\[^;]+)\\\\Domain\\\\Events\\\\[^;]+);/m',
+                $source,
+                $matches
+            );
+
+            $eventImports = $matches[1] ?? [];
+
+            $this->assertCount(
+                1,
+                $eventImports,
+                basename($listenerPath).' must import exactly one domain event class'
+            );
+
+            $eventFqcn = $eventImports[0];
+            $isAllowed = false;
+
+            foreach ($allowedEventNamespacePrefixes as $prefix) {
+                if (str_starts_with($eventFqcn, $prefix)) {
+                    $isAllowed = true;
+                    break;
+                }
+            }
+
+            $this->assertTrue(
+                $isAllowed,
+                basename($listenerPath).' imports non-approved event source namespace: '.$eventFqcn
+            );
+
+            $eventShortName = substr($eventFqcn, (int) strrpos($eventFqcn, '\\') + 1);
+
+            $this->assertMatchesRegularExpression(
+                '/function\s+handle\s*\(\s*'.$eventShortName.'\s+\$event\s*\):\s*void/',
+                $source,
+                basename($listenerPath).' must type-hint handle() with the imported domain event'
+            );
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------

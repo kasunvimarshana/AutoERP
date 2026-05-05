@@ -33,7 +33,7 @@ return new class extends Migration
 
             $table->index(['tenant_id'], 'hr_attendance_records_tenant_id_idx');
             $table->index(['employee_id'], 'hr_attendance_records_employee_id_idx');
-            $table->unique(['tenant_id', 'employee_id', 'attendance_date'], 'hr_attendance_records_unique_idx');
+            $table->unique(['tenant_id', 'org_unit_id', 'employee_id', 'attendance_date'], 'hr_attendance_records_unique_idx');
         });
     }
 
