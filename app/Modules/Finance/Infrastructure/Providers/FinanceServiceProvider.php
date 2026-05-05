@@ -73,7 +73,6 @@ use Modules\Finance\Application\Contracts\FindPaymentTermServiceInterface;
 use Modules\Finance\Application\Contracts\IssueCreditMemoServiceInterface;
 use Modules\Finance\Application\Contracts\NextNumberingSequenceServiceInterface;
 use Modules\Finance\Application\Contracts\PostJournalEntryServiceInterface;
-use Modules\Finance\Application\Contracts\ReverseJournalEntryServiceInterface;
 use Modules\Finance\Application\Contracts\PostPaymentServiceInterface;
 use Modules\Finance\Application\Contracts\ReconcileApTransactionServiceInterface;
 use Modules\Finance\Application\Contracts\ReconcileArTransactionServiceInterface;
@@ -164,7 +163,6 @@ use Modules\Finance\Application\Services\FindPaymentTermService;
 use Modules\Finance\Application\Services\IssueCreditMemoService;
 use Modules\Finance\Application\Services\NextNumberingSequenceService;
 use Modules\Finance\Application\Services\PostJournalEntryService;
-use Modules\Finance\Application\Services\ReverseJournalEntryService;
 use Modules\Finance\Application\Services\PostPaymentService;
 use Modules\Finance\Application\Services\ReconcileApTransactionService;
 use Modules\Finance\Application\Services\ReconcileArTransactionService;
@@ -208,15 +206,11 @@ use Modules\Finance\Domain\RepositoryInterfaces\PaymentAllocationRepositoryInter
 use Modules\Finance\Domain\RepositoryInterfaces\PaymentMethodRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\PaymentRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\PaymentTermRepositoryInterface;
-use Modules\Finance\Infrastructure\Listeners\HandlePayrollRunApproved;
 use Modules\Finance\Infrastructure\Listeners\HandlePurchaseInvoiceApproved;
 use Modules\Finance\Infrastructure\Listeners\HandlePurchasePaymentRecorded;
 use Modules\Finance\Infrastructure\Listeners\HandlePurchaseReturnPosted;
-use Modules\Finance\Infrastructure\Listeners\HandleCycleCountCompleted;
-use Modules\Finance\Infrastructure\Listeners\HandleStockAdjustmentRecorded;
 use Modules\Finance\Infrastructure\Listeners\HandleSalesInvoicePosted;
 use Modules\Finance\Infrastructure\Listeners\HandleSalesPaymentRecorded;
-use Modules\Finance\Infrastructure\Listeners\HandleReturnRefundDrafted;
 use Modules\Finance\Infrastructure\Listeners\HandleSalesReturnReceived;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentAccountRepository;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentApprovalRequestRepository;
@@ -237,16 +231,12 @@ use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentPay
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentPaymentMethodRepository;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentPaymentRepository;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentPaymentTermRepository;
-use Modules\HR\Domain\Events\PayrollRunApproved;
-use Modules\Inventory\Domain\Events\CycleCountCompleted;
-use Modules\Inventory\Domain\Events\StockAdjustmentRecorded;
 use Modules\Purchase\Domain\Events\PurchaseInvoiceApproved;
 use Modules\Purchase\Domain\Events\PurchasePaymentRecorded;
 use Modules\Purchase\Domain\Events\PurchaseReturnPosted;
 use Modules\Sales\Domain\Events\SalesInvoicePosted;
 use Modules\Sales\Domain\Events\SalesPaymentRecorded;
 use Modules\Sales\Domain\Events\SalesReturnReceived;
-use Modules\ReturnRefund\Domain\Events\ReturnRefundDrafted;
 
 class FinanceServiceProvider extends ServiceProvider
 {
@@ -338,7 +328,6 @@ class FinanceServiceProvider extends ServiceProvider
             UpdateJournalEntryServiceInterface::class => UpdateJournalEntryService::class,
             DeleteJournalEntryServiceInterface::class => DeleteJournalEntryService::class,
             PostJournalEntryServiceInterface::class => PostJournalEntryService::class,
-            ReverseJournalEntryServiceInterface::class => ReverseJournalEntryService::class,
             PostPaymentServiceInterface::class => PostPaymentService::class,
             VoidPaymentServiceInterface::class => VoidPaymentService::class,
             IssueCreditMemoServiceInterface::class => IssueCreditMemoService::class,
@@ -381,16 +370,12 @@ class FinanceServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        Event::listen(PayrollRunApproved::class, HandlePayrollRunApproved::class);
         Event::listen(PurchaseInvoiceApproved::class, HandlePurchaseInvoiceApproved::class);
         Event::listen(PurchasePaymentRecorded::class, HandlePurchasePaymentRecorded::class);
         Event::listen(PurchaseReturnPosted::class, HandlePurchaseReturnPosted::class);
-        Event::listen(CycleCountCompleted::class, HandleCycleCountCompleted::class);
-        Event::listen(StockAdjustmentRecorded::class, HandleStockAdjustmentRecorded::class);
         Event::listen(SalesInvoicePosted::class, HandleSalesInvoicePosted::class);
         Event::listen(SalesPaymentRecorded::class, HandleSalesPaymentRecorded::class);
         Event::listen(SalesReturnReceived::class, HandleSalesReturnReceived::class);
-        Event::listen(ReturnRefundDrafted::class, HandleReturnRefundDrafted::class);
 
         $this->bootModule(
             __DIR__.'/../../routes/api.php',

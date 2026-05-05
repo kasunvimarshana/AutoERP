@@ -19,15 +19,6 @@ class EloquentCustomerAddressRepository extends EloquentRepository implements Cu
 
     public function save(CustomerAddress $address): CustomerAddress
     {
-        if ($address->isDefault()) {
-            $this->clearDefaultByCustomerAndType(
-                tenantId: $address->getTenantId(),
-                customerId: $address->getCustomerId(),
-                type: $address->getType(),
-                excludeId: $address->getId(),
-            );
-        }
-
         $data = [
             'tenant_id' => $address->getTenantId(),
             'customer_id' => $address->getCustomerId(),

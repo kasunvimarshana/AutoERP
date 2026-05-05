@@ -21,7 +21,7 @@ class PassportTokenService implements TokenServiceInterface
         private readonly AuthUserRepositoryInterface $userRepository,
     ) {}
 
-    public function issueToken(int $userId, ?string $tokenName = null, array $scopes = []): AccessToken
+    public function issueToken(int $userId, string $tokenName = 'api', array $scopes = []): AccessToken
     {
         $user = $this->userRepository->findForPassport($userId);
 
@@ -29,8 +29,7 @@ class PassportTokenService implements TokenServiceInterface
             throw new InvalidCredentialsException('User not found for token issuance');
         }
 
-        $resolvedTokenName = $tokenName ?? (string) config('auth_context.token.name', 'api');
-        $result = $user->createToken($resolvedTokenName, $scopes);
+        $result = $user->createToken($tokenName, $scopes);
 
         return new AccessToken(
             accessToken: $result->accessToken,

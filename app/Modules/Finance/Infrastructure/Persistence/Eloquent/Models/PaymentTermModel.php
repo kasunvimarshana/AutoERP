@@ -17,8 +17,6 @@ class PaymentTermModel extends BaseModel
 
     protected $fillable = [
         'tenant_id',
-        'org_unit_id',
-        'row_version',
         'name',
         'days',
         'is_default',
@@ -33,6 +31,6 @@ class PaymentTermModel extends BaseModel
         'is_default' => 'boolean',
         'is_active' => 'boolean',
         'discount_days' => 'integer',
-        'discount_rate' => 'decimal:6',
+        'discount_rate' => 'decimal:4',
     ];
 }

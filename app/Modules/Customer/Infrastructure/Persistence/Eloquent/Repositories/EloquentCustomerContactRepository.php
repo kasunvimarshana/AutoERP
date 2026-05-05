@@ -19,14 +19,6 @@ class EloquentCustomerContactRepository extends EloquentRepository implements Cu
 
     public function save(CustomerContact $contact): CustomerContact
     {
-        if ($contact->isPrimary()) {
-            $this->clearPrimaryByCustomer(
-                tenantId: $contact->getTenantId(),
-                customerId: $contact->getCustomerId(),
-                excludeId: $contact->getId(),
-            );
-        }
-
         $data = [
             'tenant_id' => $contact->getTenantId(),
             'customer_id' => $contact->getCustomerId(),

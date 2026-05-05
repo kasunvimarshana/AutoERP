@@ -38,13 +38,13 @@ class PostGrnService extends BaseService implements PostGrnServiceInterface
             throw new \InvalidArgumentException('GRN cannot be posted in its current state.');
         }
 
-        $lines = $this->grnLineRepository->findByGrnHeaderId($grnHeader->getTenantId(), $id);
+        $lines = $this->grnLineRepository->findByGrnHeaderId($id);
 
         if ($grnHeader->getPurchaseOrderId() !== null) {
             foreach ($lines as $grnLine) {
                 if ($grnLine->getPurchaseOrderLineId() !== null) {
                     $poLine = $this->purchaseOrderLineRepository->find($grnLine->getPurchaseOrderLineId());
-                    if ($poLine && $poLine->getTenantId() === $grnHeader->getTenantId()) {
+                    if ($poLine) {
                         $poLine->addReceivedQty($grnLine->getReceivedQty());
                         $this->purchaseOrderLineRepository->save($poLine);
                     }

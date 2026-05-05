@@ -20,12 +20,12 @@ class TenantDomainRoutesTest extends TestCase
     {
         $routes = app('router')->getRoutes();
 
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/tenants/{tenant}/domains', 'GET'), ['auth.configured', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/tenants/{tenant}/domains/{domain}', 'GET'), ['auth.configured', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/tenants/{tenant}/domains', 'POST'), ['auth.configured', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/tenants/{tenant}/domains/{domain}', 'PUT'), ['auth.configured', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/tenants/{tenant}/domains/{domain}', 'PATCH'), ['auth.configured', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/tenants/{tenant}/domains/{domain}', 'DELETE'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/tenants/{tenant}/domains', 'GET'), ['auth:api', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/tenants/{tenant}/domains/{domain}', 'GET'), ['auth:api', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/tenants/{tenant}/domains', 'POST'), ['auth:api', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/tenants/{tenant}/domains/{domain}', 'PUT'), ['auth:api', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/tenants/{tenant}/domains/{domain}', 'PATCH'), ['auth:api', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/tenants/{tenant}/domains/{domain}', 'DELETE'), ['auth:api', 'resolve.tenant']);
     }
 
     /**

@@ -85,7 +85,6 @@ class EloquentJournalEntryRepository extends EloquentRepository implements Journ
     {
         foreach ($lines as $line) {
             JournalEntryLineModel::query()->create([
-                'tenant_id' => (int) $model->tenant_id,
                 'journal_entry_id' => (int) $model->id,
                 'account_id' => $line->getAccountId(),
                 'description' => $line->getDescription(),

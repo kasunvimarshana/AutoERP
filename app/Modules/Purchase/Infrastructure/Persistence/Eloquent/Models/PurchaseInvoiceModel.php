@@ -17,8 +17,6 @@ class PurchaseInvoiceModel extends Model
 
     protected $fillable = [
         'tenant_id',
-        'org_unit_id',
-        'row_version',
         'supplier_id',
         'grn_header_id',
         'purchase_order_id',

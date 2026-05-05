@@ -12,7 +12,6 @@ use Modules\Finance\Application\Contracts\CreateJournalEntryServiceInterface;
 use Modules\Finance\Application\Contracts\DeleteJournalEntryServiceInterface;
 use Modules\Finance\Application\Contracts\FindJournalEntryServiceInterface;
 use Modules\Finance\Application\Contracts\PostJournalEntryServiceInterface;
-use Modules\Finance\Application\Contracts\ReverseJournalEntryServiceInterface;
 use Modules\Finance\Application\Contracts\UpdateJournalEntryServiceInterface;
 use Modules\Finance\Domain\Entities\JournalEntry;
 use Modules\Finance\Infrastructure\Http\Requests\ListJournalEntryRequest;
@@ -32,7 +31,6 @@ class JournalEntryController extends AuthorizedController
         private readonly DeleteJournalEntryServiceInterface $deleteJournalEntryService,
         private readonly FindJournalEntryServiceInterface $findJournalEntryService,
         private readonly PostJournalEntryServiceInterface $postJournalEntryService,
-        private readonly ReverseJournalEntryServiceInterface $reverseJournalEntryService,
     ) {}
 
     public function index(ListJournalEntryRequest $request): JsonResponse
@@ -109,19 +107,6 @@ class JournalEntryController extends AuthorizedController
         $payload['id'] = $journalEntry;
 
         return new JournalEntryResource($this->postJournalEntryService->execute($payload));
-    }
-
-    public function reverse(Request $request, int $journalEntry): JournalEntryResource
-    {
-        $foundJournalEntry = $this->findJournalEntryOrFail($journalEntry);
-        $this->authorize('update', $foundJournalEntry);
-
-        $reversalEntry = $this->reverseJournalEntryService->execute([
-            'id'          => $journalEntry,
-            'reversed_by' => $request->user()?->getAuthIdentifier() ?? 0,
-        ]);
-
-        return new JournalEntryResource($reversalEntry);
     }
 
     private function findJournalEntryOrFail(int $journalEntryId): JournalEntry

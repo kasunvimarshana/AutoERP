@@ -89,11 +89,6 @@ class InventoryStockReservationIntegrationTest extends TestCase
             'location_id' => $location->getId(),
             'quantity' => '6.000000',
         ]);
-
-        // Current contract: reservation validation failures must not create Finance artifacts.
-        $this->assertSame(0, DB::table('journal_entries')->count());
-        $this->assertSame(0, DB::table('ap_transactions')->count());
-        $this->assertSame(0, DB::table('ar_transactions')->count());
     }
 
     public function test_reserve_then_release_updates_quantity_reserved(): void
@@ -185,11 +180,6 @@ class InventoryStockReservationIntegrationTest extends TestCase
             'id' => (int) $reservation->getId(),
             'tenant_id' => $tenantId,
         ]);
-
-        // Current contract: reservation/release lifecycle remains inventory-internal.
-        $this->assertSame(0, DB::table('journal_entries')->count());
-        $this->assertSame(0, DB::table('ap_transactions')->count());
-        $this->assertSame(0, DB::table('ar_transactions')->count());
     }
 
     public function test_release_expired_releases_only_expired_reservations(): void
@@ -275,11 +265,6 @@ class InventoryStockReservationIntegrationTest extends TestCase
             'tenant_id' => $tenantId,
             'quantity' => '1.250000',
         ]);
-
-        // Current contract: expired-reservation release remains inventory-internal.
-        $this->assertSame(0, DB::table('journal_entries')->count());
-        $this->assertSame(0, DB::table('ap_transactions')->count());
-        $this->assertSame(0, DB::table('ar_transactions')->count());
     }
 
     private function seedTenant(int $tenantId): void

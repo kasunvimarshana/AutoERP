@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\DB;
 use Modules\Core\Application\Services\BaseService;
 use Modules\Finance\Application\Contracts\CreatePaymentAllocationServiceInterface;
 use Modules\Finance\Application\Contracts\CreatePaymentServiceInterface;
-use Modules\Finance\Domain\RepositoryInterfaces\PaymentRepositoryInterface;
 use Modules\Sales\Application\Contracts\RecordSalesPaymentServiceInterface;
 use Modules\Sales\Application\DTOs\RecordSalesPaymentData;
 use Modules\Sales\Domain\Entities\SalesInvoice;
@@ -23,7 +22,6 @@ class RecordSalesPaymentService extends BaseService implements RecordSalesPaymen
         private readonly SalesInvoiceRepositoryInterface $invoiceRepository,
         private readonly CreatePaymentServiceInterface $createPaymentService,
         private readonly CreatePaymentAllocationServiceInterface $createPaymentAllocationService,
-        private readonly PaymentRepositoryInterface $paymentRepository,
     ) {
         parent::__construct($invoiceRepository);
     }
@@ -36,19 +34,6 @@ class RecordSalesPaymentService extends BaseService implements RecordSalesPaymen
 
         if (! $invoice) {
             throw new SalesInvoiceNotFoundException($dto->invoice_id);
-        }
-
-        $existingPayment = null;
-        if ($dto->idempotency_key !== null && $dto->idempotency_key !== '') {
-            $existingPayment = $this->paymentRepository->findByTenantAndIdempotencyKey($dto->tenant_id, $dto->idempotency_key);
-            if ($existingPayment !== null && $this->hasActiveAllocation(
-                (int) $dto->tenant_id,
-                (int) $existingPayment->getId(),
-                'sales_invoice',
-                (int) $invoice->getId(),
-            )) {
-                return $invoice;
-            }
         }
 
         if (! in_array($invoice->getStatus(), ['sent', 'partial_paid', 'overdue'], true)) {
@@ -70,7 +55,7 @@ class RecordSalesPaymentService extends BaseService implements RecordSalesPaymen
             $payment = $this->createPaymentService->execute([
                 'tenant_id' => $dto->tenant_id,
                 'payment_number' => $dto->payment_number,
-                'direction' => 'inbound',
+                'direction' => 'incoming',
                 'party_type' => 'customer',
                 'party_id' => $invoice->getCustomerId(),
                 'payment_method_id' => $dto->payment_method_id,
@@ -82,17 +67,7 @@ class RecordSalesPaymentService extends BaseService implements RecordSalesPaymen
                 'reference' => $dto->reference,
                 'notes' => $dto->notes,
                 'status' => 'posted',
-                'idempotency_key' => $dto->idempotency_key,
             ]);
-
-            if ($this->hasActiveAllocation(
-                (int) $dto->tenant_id,
-                (int) $payment->getId(),
-                'sales_invoice',
-                (int) $invoice->getId(),
-            )) {
-                return $this->invoiceRepository->find((int) $invoice->getId()) ?? $invoice;
-            }
 
             $this->createPaymentAllocationService->execute([
                 'payment_id' => $payment->getId(),
@@ -122,16 +97,5 @@ class RecordSalesPaymentService extends BaseService implements RecordSalesPaymen
 
             return $saved;
         });
-    }
-
-    private function hasActiveAllocation(int $tenantId, int $paymentId, string $invoiceType, int $invoiceId): bool
-    {
-        return DB::table('payment_allocations')
-            ->where('tenant_id', $tenantId)
-            ->where('payment_id', $paymentId)
-            ->where('invoice_type', $invoiceType)
-            ->where('invoice_id', $invoiceId)
-            ->whereNull('deleted_at')
-            ->exists();
     }
 }

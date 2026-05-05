@@ -169,11 +169,4 @@ class JournalEntry
     {
         return $this->status === 'draft';
     }
-
-    public function markReversed(int $reversalEntryId): void
-    {
-        $this->isReversed = true;
-        $this->reversalEntryId = $reversalEntryId;
-        $this->updatedAt = new \DateTimeImmutable;
-    }
 }

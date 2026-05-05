@@ -96,7 +96,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
         $user->setAttribute('id', 311);
         $user->setAttribute('tenant_id', 9);
 
-        $this->actingAs($user, (string) config('auth_context.guards.api', config('auth.defaults.guard', 'api')));
+        $this->actingAs($user, 'api');
     }
 
     public function test_authenticated_store_fiscal_year_returns_conflict_when_duplicate(): void

@@ -12,9 +12,7 @@ return new class extends Migration
     {
         Schema::create('journal_entry_lines', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('tenant_id')->nullable()->constrained('tenants', 'id', 'journal_entry_lines_tenant_id_fk')->nullOnDelete();
             $table->foreignId('journal_entry_id')->constrained(null, 'id', 'journal_entry_lines_journal_entry_id_fk')->cascadeOnDelete();
             $table->foreignId('account_id')->constrained(null, 'id', 'journal_entry_lines_account_id_fk')->cascadeOnDelete();
             $table->text('description')->nullable();
@@ -24,10 +22,7 @@ return new class extends Migration
             $table->decimal('exchange_rate', 20, 10)->default(1);
             $table->decimal('base_debit_amount', 20, 6)->default(0);
             $table->decimal('base_credit_amount', 20, 6)->default(0);
-            $table->foreignId('cost_center_id')->nullable();
-
-            // $table->foreignId('cost_center_id')->nullable()->constrained('org_units', 'id', 'journal_entry_lines_cost_center_id_fk')->nullOnDelete();
-            $table->foreign('cost_center_id', 'journal_entry_lines_cost_center_id_fk')->references('id')->on('cost_centers')->nullOnDelete();
+            $table->foreignId('cost_center_id')->nullable()->constrained('org_units', 'id', 'journal_entry_lines_cost_center_id_fk')->nullOnDelete();
             $table->json('metadata')->nullable();
             $table->timestamps();
             $table->softDeletes();

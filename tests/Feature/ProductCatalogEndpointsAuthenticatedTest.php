@@ -159,7 +159,7 @@ class ProductCatalogEndpointsAuthenticatedTest extends TestCase
         $user->setAttribute('id', 291);
         $user->setAttribute('tenant_id', 9);
 
-        $this->actingAs($user, (string) config('auth_context.guards.api', config('auth.defaults.guard', 'api')));
+        $this->actingAs($user, 'api');
     }
 
     public function test_authenticated_catalog_index_endpoints_return_success_payloads(): void

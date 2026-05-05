@@ -14,5 +14,5 @@ interface PurchaseOrderLineRepositoryInterface extends RepositoryInterface
 
     public function find(int|string $id, array $columns = ['*']): ?PurchaseOrderLine;
 
-    public function findByPurchaseOrderId(int $tenantId, int $purchaseOrderId): Collection;
+    public function findByPurchaseOrderId(int $purchaseOrderId): Collection;
 }

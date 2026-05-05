@@ -32,7 +32,6 @@ class StorePaymentRequest extends FormRequest
             'status' => ['sometimes', 'in:draft,posted,reconciled,voided'],
             'reference' => ['sometimes', 'nullable', 'string', 'max:255'],
             'notes' => ['sometimes', 'nullable', 'string'],
-            'idempotency_key' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
     }
 }

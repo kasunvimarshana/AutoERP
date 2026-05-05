@@ -16,8 +16,8 @@ class BankTransactionModel extends BaseModel
     protected $table = 'bank_transactions';
 
     protected $fillable = [
-        'tenant_id', 'org_unit_id', 'row_version', 'bank_account_id', 'external_id',
-        'transaction_date', 'description', 'amount', 'balance', 'type', 'status',
+        'tenant_id', 'bank_account_id', 'external_id', 'transaction_date',
+        'description', 'amount', 'balance', 'type', 'status',
         'matched_journal_entry_id', 'category_rule_id',
     ];
 

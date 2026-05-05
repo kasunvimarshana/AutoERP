@@ -55,7 +55,7 @@ class AuditEndpointsAuthenticatedTest extends TestCase
         $user->setAttribute('id', 101);
         $user->setAttribute('tenant_id', 3);
 
-        $this->actingAs($user, (string) config('auth_context.guards.api', config('auth.defaults.guard', 'api')));
+        $this->actingAs($user, 'api');
     }
 
     public function test_authenticated_index_returns_success_payload(): void

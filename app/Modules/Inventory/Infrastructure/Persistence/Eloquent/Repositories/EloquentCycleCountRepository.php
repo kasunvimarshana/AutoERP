@@ -107,11 +107,8 @@ class EloquentCycleCountRepository implements CycleCountRepositoryInterface
                 return null;
             }
 
-            $linesById = $model->lines->keyBy('id');
-
             foreach ($lineUpdates as $lineUpdate) {
-                $lineId = (int) ($lineUpdate['line_id'] ?? 0);
-                $line = $linesById->get($lineId);
+                $line = $model->lines->firstWhere('id', $lineUpdate['line_id']);
                 if ($line === null) {
                     continue;
                 }

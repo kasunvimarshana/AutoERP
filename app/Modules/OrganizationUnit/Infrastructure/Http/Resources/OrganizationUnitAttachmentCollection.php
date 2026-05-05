@@ -17,7 +17,7 @@ class OrganizationUnitAttachmentCollection extends ResourceCollection
         parent::__construct($resource);
     }
 
-    public $collects = OrganizationUnitAttachmentResource::class;
+    public string $collects = OrganizationUnitAttachmentResource::class;
 
     public function toArray(Request $request): array
     {

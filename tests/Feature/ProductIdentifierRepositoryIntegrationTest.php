@@ -222,7 +222,6 @@ class ProductIdentifierRepositoryIntegrationTest extends TestCase
 
         DB::table('product_variants')->insert([
             'id' => $variantId,
-            'tenant_id' => $tenantId,
             'product_id' => $productId,
             'sku' => $variantSku,
             'name' => 'Variant '.$variantSku,

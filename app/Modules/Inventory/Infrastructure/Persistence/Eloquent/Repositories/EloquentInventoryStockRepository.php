@@ -134,7 +134,6 @@ class EloquentInventoryStockRepository implements InventoryStockRepositoryInterf
             ->where('location_id', $locationId)
             ->where('batch_id', $movement->getBatchId())
             ->where('serial_id', $movement->getSerialId())
-            ->lockForUpdate()
             ->first();
 
         if ($existing === null) {

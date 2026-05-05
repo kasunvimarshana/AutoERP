@@ -8,7 +8,7 @@ use Modules\Supplier\Infrastructure\Http\Controllers\SupplierContactController;
 use Modules\Supplier\Infrastructure\Http\Controllers\SupplierController;
 use Modules\Supplier\Infrastructure\Http\Controllers\SupplierProductController;
 
-Route::middleware(['auth.configured', 'resolve.tenant'])->group(function (): void {
+Route::middleware(['auth:api', 'resolve.tenant'])->group(function (): void {
     Route::apiResource('suppliers', SupplierController::class);
 
     Route::get('suppliers/{supplier}/addresses', [SupplierAddressController::class, 'index']);

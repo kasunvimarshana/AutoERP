@@ -17,8 +17,6 @@ class UomConversionModel extends BaseModel
 
     protected $fillable = [
         'tenant_id',
-        'org_unit_id',
-        'row_version',
         'product_id',
         'from_uom_id',
         'to_uom_id',
@@ -29,11 +27,7 @@ class UomConversionModel extends BaseModel
 
     protected $casts = [
         'tenant_id' => 'integer',
-        'org_unit_id' => 'integer',
-        'row_version' => 'integer',
         'product_id' => 'integer',
-        'from_uom_id' => 'integer',
-        'to_uom_id' => 'integer',
         'factor' => 'decimal:10',
         'is_bidirectional' => 'boolean',
         'is_active' => 'boolean',

@@ -44,10 +44,10 @@ class EloquentShipmentRepository extends EloquentRepository implements ShipmentR
             }
 
             /** @var ShipmentModel $model */
-            $keptLineIds = [];
+            $model->lines()->delete();
             foreach ($shipment->getLines() as $line) {
-                $lineData = [
-                    'tenant_id' => (int) $model->tenant_id,
+                $model->lines()->create([
+                    'tenant_id' => $line->getTenantId(),
                     'sales_order_line_id' => $line->getSalesOrderLineId(),
                     'product_id' => $line->getProductId(),
                     'variant_id' => $line->getVariantId(),
@@ -57,30 +57,7 @@ class EloquentShipmentRepository extends EloquentRepository implements ShipmentR
                     'uom_id' => $line->getUomId(),
                     'shipped_qty' => $line->getShippedQty(),
                     'unit_cost' => $line->getUnitCost(),
-                ];
-
-                $lineId = $line->getId();
-                if ($lineId !== null) {
-                    $updated = $model->lines()
-                        ->where('tenant_id', (int) $model->tenant_id)
-                        ->whereKey($lineId)
-                        ->update($lineData);
-
-                    if ($updated > 0) {
-                        $keptLineIds[] = $lineId;
-                        continue;
-                    }
-                }
-
-                $createdLine = $model->lines()->create($lineData);
-                $keptLineIds[] = (int) $createdLine->id;
-            }
-
-            $lineCleanupQuery = $model->lines()->where('tenant_id', (int) $model->tenant_id);
-            if ($keptLineIds === []) {
-                $lineCleanupQuery->delete();
-            } else {
-                $lineCleanupQuery->whereNotIn('id', $keptLineIds)->delete();
+                ]);
             }
 
             $model->load('lines');

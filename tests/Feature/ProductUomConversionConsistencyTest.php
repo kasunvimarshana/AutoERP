@@ -37,26 +37,18 @@ class ProductUomConversionConsistencyTest extends TestCase
 
         DB::table('uom_conversions')->insert([
             'id' => 7001,
-            'tenant_id' => 21,
-            'product_id' => null,
             'from_uom_id' => 2101,
             'to_uom_id' => 2102,
             'factor' => '12.0000000000',
-            'is_bidirectional' => true,
-            'is_active' => true,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
 
         DB::table('uom_conversions')->insert([
             'id' => 7002,
-            'tenant_id' => 21,
-            'product_id' => null,
             'from_uom_id' => 2101,
             'to_uom_id' => 2103,
             'factor' => '6.0000000000',
-            'is_bidirectional' => true,
-            'is_active' => true,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

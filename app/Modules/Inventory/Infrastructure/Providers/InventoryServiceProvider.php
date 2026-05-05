@@ -18,7 +18,6 @@ use Modules\Inventory\Application\Contracts\FindStockLevelServiceInterface;
 use Modules\Inventory\Application\Contracts\FindStockMovementServiceInterface;
 use Modules\Inventory\Application\Contracts\FindStockReservationServiceInterface;
 use Modules\Inventory\Application\Contracts\FindTransferOrderServiceInterface;
-use Modules\Inventory\Application\Contracts\ManageStockReorderRuleServiceInterface;
 use Modules\Inventory\Application\Contracts\ManageValuationConfigServiceInterface;
 use Modules\Inventory\Application\Contracts\ReceiveTransferOrderServiceInterface;
 use Modules\Inventory\Application\Contracts\RecordStockMovementServiceInterface;
@@ -37,7 +36,6 @@ use Modules\Inventory\Application\Services\FindStockLevelService;
 use Modules\Inventory\Application\Services\FindStockMovementService;
 use Modules\Inventory\Application\Services\FindStockReservationService;
 use Modules\Inventory\Application\Services\FindTransferOrderService;
-use Modules\Inventory\Application\Services\ManageStockReorderRuleService;
 use Modules\Inventory\Application\Services\ManageValuationConfigService;
 use Modules\Inventory\Application\Services\ReceiveTransferOrderService;
 use Modules\Inventory\Application\Services\RecordStockMovementService;
@@ -48,7 +46,6 @@ use Modules\Inventory\Application\Services\ValuationEngineService;
 use Modules\Inventory\Domain\RepositoryInterfaces\CostLayerRepositoryInterface;
 use Modules\Inventory\Domain\RepositoryInterfaces\CycleCountRepositoryInterface;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryStockRepositoryInterface;
-use Modules\Inventory\Domain\RepositoryInterfaces\StockReorderRuleRepositoryInterface;
 use Modules\Inventory\Domain\RepositoryInterfaces\StockReservationRepositoryInterface;
 use Modules\Inventory\Domain\RepositoryInterfaces\TraceLogRepositoryInterface;
 use Modules\Inventory\Domain\RepositoryInterfaces\TransferOrderRepositoryInterface;
@@ -61,7 +58,6 @@ use Modules\Inventory\Infrastructure\Listeners\HandleShipmentProcessed;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentCostLayerRepository;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentCycleCountRepository;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentInventoryStockRepository;
-use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentStockReorderRuleRepository;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentStockReservationRepository;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentTraceLogRepository;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentTransferOrderRepository;
@@ -84,7 +80,6 @@ class InventoryServiceProvider extends ServiceProvider
         $this->app->bind(StockReservationRepositoryInterface::class, EloquentStockReservationRepository::class);
         $this->app->bind(CostLayerRepositoryInterface::class, EloquentCostLayerRepository::class);
         $this->app->bind(ValuationConfigRepositoryInterface::class, EloquentValuationConfigRepository::class);
-        $this->app->bind(StockReorderRuleRepositoryInterface::class, EloquentStockReorderRuleRepository::class);
 
         $this->app->bind(RecordStockMovementServiceInterface::class, RecordStockMovementService::class);
         $this->app->bind(FindStockMovementServiceInterface::class, FindStockMovementService::class);
@@ -108,7 +103,6 @@ class InventoryServiceProvider extends ServiceProvider
         $this->app->bind(ValuationEngineServiceInterface::class, ValuationEngineService::class);
         $this->app->bind(AllocationEngineServiceInterface::class, AllocationEngineService::class);
         $this->app->bind(ManageValuationConfigServiceInterface::class, ManageValuationConfigService::class);
-        $this->app->bind(ManageStockReorderRuleServiceInterface::class, ManageStockReorderRuleService::class);
     }
 
     public function boot(): void

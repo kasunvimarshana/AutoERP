@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use Illuminate\Validation\PresenceVerifierInterface;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Laravel\Passport\Passport;
 use Modules\Auth\Application\Contracts\AuthorizationServiceInterface;
-use Modules\Product\Application\Contracts\SearchProductCatalogServiceInterface;
+use Modules\Product\Application\Contracts\RebuildProductSearchProjectionServiceInterface;
+use Modules\Product\Application\Contracts\SearchProductsServiceInterface;
 use Modules\Tenant\Application\Contracts\TenantConfigClientInterface;
 use Modules\Tenant\Application\Contracts\TenantConfigManagerInterface;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
@@ -16,15 +18,21 @@ use Tests\TestCase;
 
 class ProductSearchEndpointsAuthenticatedTest extends TestCase
 {
-    /** @var SearchProductCatalogServiceInterface&MockObject */
-    private SearchProductCatalogServiceInterface $searchProductCatalogService;
+    /** @var SearchProductsServiceInterface&MockObject */
+    private SearchProductsServiceInterface $searchService;
+
+    /** @var RebuildProductSearchProjectionServiceInterface&MockObject */
+    private RebuildProductSearchProjectionServiceInterface $rebuildService;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->searchProductCatalogService = $this->createMock(SearchProductCatalogServiceInterface::class);
-        $this->app->instance(SearchProductCatalogServiceInterface::class, $this->searchProductCatalogService);
+        $this->searchService = $this->createMock(SearchProductsServiceInterface::class);
+        $this->rebuildService = $this->createMock(RebuildProductSearchProjectionServiceInterface::class);
+
+        $this->app->instance(SearchProductsServiceInterface::class, $this->searchService);
+        $this->app->instance(RebuildProductSearchProjectionServiceInterface::class, $this->rebuildService);
 
         $authorizationService = $this->createMock(AuthorizationServiceInterface::class);
         $authorizationService->method('can')->willReturn(true);
@@ -37,16 +45,10 @@ class ProductSearchEndpointsAuthenticatedTest extends TestCase
         $tenantConfigManager = $this->createMock(TenantConfigManagerInterface::class);
         $this->app->instance(TenantConfigManagerInterface::class, $tenantConfigManager);
 
-        $presenceVerifier = $this->createMock(PresenceVerifierInterface::class);
-        $presenceVerifier->method('getCount')->willReturn(1);
-        $presenceVerifier->method('getMultiCount')->willReturn(1);
-        $this->app->instance(PresenceVerifierInterface::class, $presenceVerifier);
-        $this->app['validator']->setPresenceVerifier($presenceVerifier);
-
         $user = new UserModel([
             'id' => 301,
             'tenant_id' => 9,
-            'email' => 'search.test@example.com',
+            'email' => 'product.search@example.com',
             'password' => 'secret',
             'first_name' => 'Search',
             'last_name' => 'Tester',
@@ -54,81 +56,58 @@ class ProductSearchEndpointsAuthenticatedTest extends TestCase
         $user->setAttribute('id', 301);
         $user->setAttribute('tenant_id', 9);
 
-        $this->actingAs($user, (string) config('auth_context.guards.api', config('auth.defaults.guard', 'api')));
+        Passport::actingAs($user, [], 'api');
     }
 
-    public function test_authenticated_search_returns_expected_payload(): void
+    public function test_authenticated_search_returns_paginated_results(): void
     {
-        $this->searchProductCatalogService
+        $paginator = new LengthAwarePaginator(
+            items: [
+                (object) [
+                    'id' => 1,
+                    'tenant_id' => 9,
+                    'product_id' => 10,
+                    'variant_id' => null,
+                    'product_name' => 'Widget A',
+                    'product_sku' => 'WID-A',
+                    'stock_available' => '12.000000',
+                ],
+            ],
+            total: 1,
+            perPage: 15,
+            currentPage: 1,
+        );
+
+        $this->searchService
             ->expects($this->once())
             ->method('execute')
-            ->with($this->callback(static function (array $payload): bool {
-                return (int) ($payload['tenant_id'] ?? 0) === 9
-                    && ($payload['q'] ?? null) === 'WID-100'
-                    && (int) ($payload['customer_id'] ?? 0) === 55
-                    && (int) ($payload['supplier_id'] ?? 0) === 77;
-            }))
-            ->willReturn([
-                'data' => [
-                    [
-                        'product_id' => 101,
-                        'variant_id' => null,
-                        'name' => 'Widget',
-                        'sku' => 'WID-100',
-                        'uom' => [
-                            'id' => 1,
-                            'name' => 'Piece',
-                            'symbol' => 'pc',
-                        ],
-                        'pricing' => [
-                            'unit_price' => '45.000000',
-                        ],
-                        'quantity' => [
-                            'available' => '12.000000',
-                        ],
-                    ],
-                ],
-                'meta' => [
-                    'current_page' => 1,
-                    'per_page' => 20,
-                    'total' => 1,
-                    'last_page' => 1,
-                ],
-            ]);
+            ->with($this->callback(static fn (array $filters): bool =>
+                (int) ($filters['tenant_id'] ?? 0) === 9
+                && ($filters['q'] ?? '') === 'Widget'
+            ))
+            ->willReturn($paginator);
 
         $response = $this->withHeader('X-Tenant-ID', '9')
-            ->getJson('/api/products/search?tenant_id=9&q=WID-100&customer_id=55&supplier_id=77');
+            ->getJson('/api/products/search?q=Widget');
 
         $response->assertStatus(HttpResponse::HTTP_OK)
-            ->assertJsonPath('data.0.product_id', 101)
-            ->assertJsonPath('data.0.sku', 'WID-100')
-            ->assertJsonPath('data.0.uom.symbol', 'pc')
-            ->assertJsonPath('data.0.pricing.unit_price', '45.000000')
-            ->assertJsonPath('data.0.quantity.available', '12.000000');
+            ->assertJsonPath('data.0.product_id', 10)
+            ->assertJsonPath('data.0.product_name', 'Widget A');
     }
 
-    public function test_search_uses_header_tenant_context_for_execution(): void
+    public function test_authenticated_rebuild_returns_indexed_rows(): void
     {
-        $this->searchProductCatalogService
+        $this->rebuildService
             ->expects($this->once())
             ->method('execute')
-            ->with($this->callback(static function (array $payload): bool {
-                return (int) ($payload['tenant_id'] ?? 0) === 8;
-            }))
-            ->willReturn([
-                'data' => [],
-                'meta' => [
-                    'current_page' => 1,
-                    'per_page' => 20,
-                    'total' => 0,
-                    'last_page' => 1,
-                ],
-            ]);
+            ->with(9)
+            ->willReturn(27);
 
-        $response = $this->withHeader('X-Tenant-ID', '8')
-            ->getJson('/api/products/search?tenant_id=9&q=WID-100');
+        $response = $this->withHeader('X-Tenant-ID', '9')
+            ->postJson('/api/products/search/rebuild');
 
         $response->assertStatus(HttpResponse::HTTP_OK)
-            ->assertJsonPath('meta.total', 0);
+            ->assertJsonPath('data.tenant_id', 9)
+            ->assertJsonPath('data.indexed_rows', 27);
     }
 }

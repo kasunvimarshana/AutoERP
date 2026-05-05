@@ -6,12 +6,16 @@ namespace Modules\Product\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
 use Modules\Product\Application\Contracts\DeleteProductServiceInterface;
+use Modules\Product\Application\Contracts\RefreshProductSearchProjectionServiceInterface;
 use Modules\Product\Domain\Exceptions\ProductNotFoundException;
 use Modules\Product\Domain\RepositoryInterfaces\ProductRepositoryInterface;
 
 class DeleteProductService extends BaseService implements DeleteProductServiceInterface
 {
-    public function __construct(private readonly ProductRepositoryInterface $productRepository)
+    public function __construct(
+        private readonly ProductRepositoryInterface $productRepository,
+        private readonly RefreshProductSearchProjectionServiceInterface $refreshProjectionService,
+    )
     {
         parent::__construct($productRepository);
     }
@@ -25,6 +29,12 @@ class DeleteProductService extends BaseService implements DeleteProductServiceIn
             throw new ProductNotFoundException($id);
         }
 
-        return $this->productRepository->delete($id);
+        $deleted = $this->productRepository->delete($id);
+
+        if ($deleted) {
+            $this->refreshProjectionService->execute($product->getTenantId(), $id);
+        }
+
+        return $deleted;
     }
 }

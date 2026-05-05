@@ -8,7 +8,7 @@ use Modules\Purchase\Infrastructure\Http\Controllers\PurchaseInvoiceController;
 use Modules\Purchase\Infrastructure\Http\Controllers\PurchaseOrderController;
 use Modules\Purchase\Infrastructure\Http\Controllers\PurchaseReturnController;
 
-Route::middleware(['auth.configured', 'resolve.tenant'])->group(function (): void {
+Route::middleware(['auth:api', 'resolve.tenant'])->group(function (): void {
     Route::apiResource('purchase-orders', PurchaseOrderController::class);
     Route::post('purchase-orders/{purchaseOrder}/confirm', [PurchaseOrderController::class, 'confirm']);
     Route::post('purchase-orders/{purchaseOrder}/send', [PurchaseOrderController::class, 'send']);

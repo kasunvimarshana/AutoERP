@@ -17,8 +17,6 @@ class CycleCountLineModel extends Model
 
     protected $fillable = [
         'tenant_id',
-        'org_unit_id',
-        'row_version',
         'count_header_id',
         'product_id',
         'variant_id',
@@ -40,10 +38,5 @@ class CycleCountLineModel extends Model
         'batch_id' => 'integer',
         'serial_id' => 'integer',
         'adjustment_movement_id' => 'integer',
-            'system_qty' => 'decimal:6',
-            'counted_qty' => 'decimal:6',
-            'variance_qty' => 'decimal:6',
-            'unit_cost' => 'decimal:6',
-            'variance_value' => 'decimal:6',
-        ];
+    ];
 }

@@ -4,12 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Application\Services;
 
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Event;
 use Modules\Core\Domain\Exceptions\NotFoundException;
 use Modules\Inventory\Application\Contracts\CompleteCycleCountServiceInterface;
 use Modules\Inventory\Application\Contracts\RecordStockMovementServiceInterface;
-use Modules\Inventory\Domain\Events\CycleCountCompleted;
 use Modules\Inventory\Domain\Entities\CycleCountHeader;
 use Modules\Inventory\Domain\RepositoryInterfaces\CycleCountRepositoryInterface;
 
@@ -28,7 +25,6 @@ class CompleteCycleCountService implements CompleteCycleCountServiceInterface
         }
 
         $lineUpdates = [];
-        $financeAdjustments = [];
         foreach ($countedLines as $countedLine) {
             $line = null;
             foreach ($header->getLines() as $headerLine) {
@@ -74,22 +70,6 @@ class CompleteCycleCountService implements CompleteCycleCountServiceInterface
                 ]);
 
                 $adjustmentMovementId = $movement->getId();
-
-                $product = DB::table('products')
-                    ->where('tenant_id', $tenantId)
-                    ->where('id', $line->getProductId())
-                    ->select('inventory_account_id', 'expense_account_id')
-                    ->first();
-
-                $financeAdjustments[] = [
-                    'product_id' => $line->getProductId(),
-                    'variance_qty' => $varianceQty,
-                    'unit_cost' => $line->getUnitCost(),
-                    'amount' => bcmul($movementQty, $line->getUnitCost(), 6),
-                    'direction' => $movementType === 'adjustment_in' ? 'increase' : 'decrease',
-                    'inventory_account_id' => $product !== null ? $product->inventory_account_id : null,
-                    'expense_account_id' => $product !== null ? $product->expense_account_id : null,
-                ];
             }
 
             $lineUpdates[] = [
@@ -102,18 +82,6 @@ class CompleteCycleCountService implements CompleteCycleCountServiceInterface
         $completed = $this->cycleCountRepository->complete($tenantId, $countId, $lineUpdates, $approvedByUserId);
         if ($completed === null) {
             throw new NotFoundException('CycleCount', $countId);
-        }
-
-        if (! empty($financeAdjustments)) {
-            Event::dispatch(new CycleCountCompleted(
-                tenantId: $tenantId,
-                cycleCountId: $countId,
-                warehouseId: $header->getWarehouseId(),
-                locationId: $header->getLocationId(),
-                countDate: $completed->getCountedAt() ?? now()->toDateString(),
-                adjustments: $financeAdjustments,
-                createdBy: $approvedByUserId,
-            ));
         }
 
         return $completed;

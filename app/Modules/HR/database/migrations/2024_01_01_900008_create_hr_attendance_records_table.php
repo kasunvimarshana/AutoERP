@@ -12,9 +12,7 @@ return new class extends Migration
     {
         Schema::create('hr_attendance_records', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', 'hr_attendance_records_tenant_id_fk')->cascadeOnDelete();
             $table->unsignedBigInteger('employee_id');
             $table->date('attendance_date');
             $table->timestamp('check_in')->nullable();
@@ -26,14 +24,12 @@ return new class extends Migration
             $table->foreignId('shift_id')->nullable()->constrained('hr_shifts', 'id', 'hr_attendance_records_shift_id_fk')->nullOnDelete();
             $table->text('remarks')->nullable();
             $table->json('metadata')->nullable();
-            $table->foreign('employee_id', 'hr_attendance_records_employee_id_fk')
-                ->references('id')->on('employees')->cascadeOnDelete();
             $table->timestamps();
             $table->softDeletes();
 
             $table->index(['tenant_id'], 'hr_attendance_records_tenant_id_idx');
             $table->index(['employee_id'], 'hr_attendance_records_employee_id_idx');
-            $table->unique(['tenant_id', 'org_unit_id', 'employee_id', 'attendance_date'], 'hr_attendance_records_unique_idx');
+            $table->unique(['tenant_id', 'employee_id', 'attendance_date'], 'hr_attendance_records_unique_idx');
         });
     }
 

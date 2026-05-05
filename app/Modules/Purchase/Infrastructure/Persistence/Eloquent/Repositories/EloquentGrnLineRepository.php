@@ -50,12 +50,9 @@ class EloquentGrnLineRepository extends EloquentRepository implements GrnLineRep
         return parent::find($id, $columns);
     }
 
-    public function findByGrnHeaderId(int $tenantId, int $grnHeaderId): Collection
+    public function findByGrnHeaderId(int $grnHeaderId): Collection
     {
-        $models = $this->model->newQuery()
-            ->where('tenant_id', $tenantId)
-            ->where('grn_header_id', $grnHeaderId)
-            ->get();
+        $models = $this->model->newQuery()->where('grn_header_id', $grnHeaderId)->get();
 
         return $this->toDomainCollection($models);
     }

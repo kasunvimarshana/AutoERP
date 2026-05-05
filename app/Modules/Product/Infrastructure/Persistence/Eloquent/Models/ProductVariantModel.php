@@ -18,28 +18,20 @@ class ProductVariantModel extends BaseModel
 
     protected $fillable = [
         'tenant_id',
-        'org_unit_id',
-        'row_version',
         'product_id',
         'sku',
         'name',
         'is_default',
         'is_active',
         'metadata',
-        'purchase_price',
-        'sales_price',
     ];
 
     protected $casts = [
         'tenant_id' => 'integer',
-        'org_unit_id' => 'integer',
-        'row_version' => 'integer',
         'product_id' => 'integer',
         'is_default' => 'boolean',
         'is_active' => 'boolean',
         'metadata' => 'array',
-        'purchase_price' => 'decimal:6',
-        'sales_price' => 'decimal:6',
     ];
 
     public function product(): BelongsTo

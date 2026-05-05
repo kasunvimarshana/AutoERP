@@ -42,7 +42,7 @@ class PostPurchaseReturnService extends BaseService implements PostPurchaseRetur
         $entity->post();
         $saved = $this->repo->save($entity);
 
-        $lines = $this->purchaseReturnLineRepository->findByPurchaseReturnId($saved->getTenantId(), (int) $saved->getId());
+        $lines = $this->purchaseReturnLineRepository->findByPurchaseReturnId((int) $saved->getId());
 
         // Resolve financial data from original invoice when available
         $apAccountId = null;
@@ -57,7 +57,7 @@ class PostPurchaseReturnService extends BaseService implements PostPurchaseRetur
                 $currencyId = $originalInvoice->getCurrencyId();
                 $exchangeRate = $originalInvoice->getExchangeRate();
 
-                $invoiceLines = $this->purchaseInvoiceLineRepository->findByInvoiceId($saved->getTenantId(), (int) $originalInvoice->getId());
+                $invoiceLines = $this->purchaseInvoiceLineRepository->findByInvoiceId((int) $originalInvoice->getId());
                 foreach ($invoiceLines as $invoiceLine) {
                     $productAccountMap[$invoiceLine->getProductId()] = $invoiceLine->getAccountId();
                 }

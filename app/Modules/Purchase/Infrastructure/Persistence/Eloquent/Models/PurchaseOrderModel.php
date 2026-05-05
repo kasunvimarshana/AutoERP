@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Purchase\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
@@ -20,7 +19,6 @@ class PurchaseOrderModel extends Model
         'tenant_id',
         'supplier_id',
         'org_unit_id',
-        'row_version',
         'warehouse_id',
         'po_number',
         'status',
@@ -42,9 +40,7 @@ class PurchaseOrderModel extends Model
         'tenant_id' => 'integer',
         'supplier_id' => 'integer',
         'org_unit_id' => 'integer',
-        'row_version' => 'integer',
         'warehouse_id' => 'integer',
-        'status' => 'string',
         'currency_id' => 'integer',
         'created_by' => 'integer',
         'approved_by' => 'integer',
@@ -57,9 +53,4 @@ class PurchaseOrderModel extends Model
         'expected_date' => 'date',
         'metadata' => 'array',
     ];
-
-    public function lines(): HasMany
-    {
-        return $this->hasMany(PurchaseOrderLineModel::class, 'purchase_order_id');
-    }
 }

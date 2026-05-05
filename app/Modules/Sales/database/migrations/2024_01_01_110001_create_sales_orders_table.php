@@ -12,10 +12,9 @@ return new class extends Migration
     {
         Schema::create('sales_orders', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('tenant_id')->constrained(null, 'id', 'sales_orders_tenant_id_fk')->cascadeOnDelete();
             $table->foreignId('customer_id');
+            $table->foreignId('org_unit_id')->nullable();
             $table->foreignId('warehouse_id');
             $table->string('so_number');
             $table->enum('status', ['draft', 'confirmed', 'partial', 'shipped', 'invoiced', 'closed', 'cancelled'])->default('draft');
@@ -32,17 +31,9 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->foreignId('created_by');
             $table->foreignId('approved_by')->nullable();
-
-            $table->foreign('customer_id')->references('id')->on('customers')->cascadeOnDelete();
-            $table->foreign('warehouse_id')->references('id')->on('warehouses')->cascadeOnDelete();
-            $table->foreign('price_list_id')->references('id')->on('price_lists')->nullOnDelete();
-            $table->foreign('created_by')->references('id')->on('users');
-            $table->foreign('approved_by')->references('id')->on('users')->nullOnDelete();
-
             $table->timestamps();
-            $table->softDeletes();
 
-            $table->unique(['tenant_id', 'org_unit_id', 'so_number'], 'sales_orders_tenant_so_number_uk');
+            $table->unique(['tenant_id', 'so_number'], 'sales_orders_tenant_so_number_uk');
             $table->index(['tenant_id', 'customer_id', 'status'], 'sales_orders_tenant_customer_status_idx');
         });
     }

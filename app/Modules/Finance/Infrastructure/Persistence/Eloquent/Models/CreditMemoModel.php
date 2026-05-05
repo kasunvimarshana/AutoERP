@@ -16,10 +16,9 @@ class CreditMemoModel extends BaseModel
     protected $table = 'credit_memos';
 
     protected $fillable = [
-        'tenant_id', 'org_unit_id', 'row_version', 'party_id', 'party_type',
-        'return_order_id', 'return_order_type', 'credit_memo_number', 'amount',
-        'status', 'issued_date', 'applied_to_invoice_id', 'applied_to_invoice_type',
-        'notes', 'journal_entry_id',
+        'tenant_id', 'party_id', 'party_type', 'return_order_id', 'return_order_type',
+        'credit_memo_number', 'amount', 'status', 'issued_date',
+        'applied_to_invoice_id', 'applied_to_invoice_type', 'notes', 'journal_entry_id',
     ];
 
     protected $casts = [

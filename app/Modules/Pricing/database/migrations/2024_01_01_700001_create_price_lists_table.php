@@ -12,9 +12,7 @@ return new class extends Migration
     {
         Schema::create('price_lists', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('tenant_id')->constrained(null, 'id', 'price_lists_tenant_id_fk')->cascadeOnDelete();
             $table->string('name');
             $table->enum('type', ['purchase', 'sales'])->default('sales');
             $table->foreignId('currency_id')->constrained('currencies', 'id', 'price_lists_currency_id_fk');
@@ -24,8 +22,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'org_unit_id', 'name'], 'price_lists_tenant_name_uk');
-            $table->index(['tenant_id', 'type', 'currency_id', 'is_active'], 'price_lists_tenant_type_currency_active_idx');
+            $table->unique(['tenant_id', 'name'], 'price_lists_tenant_name_uk');
         });
     }
 

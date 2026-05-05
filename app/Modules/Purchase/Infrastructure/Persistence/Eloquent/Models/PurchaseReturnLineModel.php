@@ -17,8 +17,6 @@ class PurchaseReturnLineModel extends Model
 
     protected $fillable = [
         'tenant_id',
-        'org_unit_id',
-        'row_version',
         'purchase_return_id',
         'original_grn_line_id',
         'product_id',

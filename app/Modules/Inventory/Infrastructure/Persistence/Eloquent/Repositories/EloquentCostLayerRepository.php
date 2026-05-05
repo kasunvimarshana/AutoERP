@@ -24,7 +24,6 @@ class EloquentCostLayerRepository implements CostLayerRepositoryInterface
     {
         $this->model->newQuery()
             ->withoutGlobalScope('tenant')
-            ->where('tenant_id', $layer->getTenantId())
             ->where('id', $layer->getId())
             ->update([
                 'quantity_remaining' => $layer->getQuantityRemaining(),

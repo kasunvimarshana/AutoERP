@@ -18,8 +18,6 @@ class VariantAttributeModel extends BaseModel
 
     protected $fillable = [
         'tenant_id',
-        'org_unit_id',
-        'row_version',
         'product_id',
         'attribute_id',
         'is_required',
@@ -29,8 +27,6 @@ class VariantAttributeModel extends BaseModel
 
     protected $casts = [
         'tenant_id' => 'integer',
-        'org_unit_id' => 'integer',
-        'row_version' => 'integer',
         'product_id' => 'integer',
         'attribute_id' => 'integer',
         'is_required' => 'boolean',
