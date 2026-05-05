@@ -51,7 +51,7 @@ class EloquentPurchaseOrderLineRepository extends EloquentRepository implements 
 
     public function findByPurchaseOrderId(int $tenantId, int $purchaseOrderId): Collection
     {
-        $models = $this->newScopedQuery()
+        $models = $this->model->newQuery()
             ->where('tenant_id', $tenantId)
             ->where('purchase_order_id', $purchaseOrderId)
             ->get();

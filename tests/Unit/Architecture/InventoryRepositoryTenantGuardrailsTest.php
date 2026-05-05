@@ -50,18 +50,16 @@ class InventoryRepositoryTenantGuardrailsTest extends TestCase
     // Interface contract: InventoryStockRepositoryInterface
     // -------------------------------------------------------------------------
 
-    public function testInventoryStockInterfaceTenantScopedMethodsRequireTenantIdFirstParam(): void
+    public function test_inventory_stock_interface_tenant_scoped_methods_require_tenant_id_first_param(): void
     {
         $iface = InventoryStockRepositoryInterface::class;
 
-        foreach (
-            [
+        foreach ([
             'paginateByWarehouse',
             'paginateStockLevelsByWarehouse',
             'locationBelongsToWarehouse',
             'warehouseExists',
-            ] as $method
-        ) {
+        ] as $method) {
             $this->assertFirstParamIsIntTenantId($iface, $method);
         }
     }
@@ -70,7 +68,7 @@ class InventoryRepositoryTenantGuardrailsTest extends TestCase
     // Interface contract: StockReservationRepositoryInterface
     // -------------------------------------------------------------------------
 
-    public function testStockReservationInterfaceLookupMethodsRequireTenantIdFirstParam(): void
+    public function test_stock_reservation_interface_lookup_methods_require_tenant_id_first_param(): void
     {
         $iface = StockReservationRepositoryInterface::class;
 
@@ -83,7 +81,7 @@ class InventoryRepositoryTenantGuardrailsTest extends TestCase
     // Interface contract: TransferOrderRepositoryInterface
     // -------------------------------------------------------------------------
 
-    public function testTransferOrderInterfaceLookupMethodsRequireTenantIdFirstParam(): void
+    public function test_transfer_order_interface_lookup_methods_require_tenant_id_first_param(): void
     {
         $iface = TransferOrderRepositoryInterface::class;
 
@@ -96,7 +94,7 @@ class InventoryRepositoryTenantGuardrailsTest extends TestCase
     // Interface contract: CycleCountRepositoryInterface
     // -------------------------------------------------------------------------
 
-    public function testCycleCountInterfaceLookupMethodsRequireTenantIdFirstParam(): void
+    public function test_cycle_count_interface_lookup_methods_require_tenant_id_first_param(): void
     {
         $iface = CycleCountRepositoryInterface::class;
 
@@ -109,19 +107,17 @@ class InventoryRepositoryTenantGuardrailsTest extends TestCase
     // Interface contract: CostLayerRepositoryInterface
     // -------------------------------------------------------------------------
 
-    public function testCostLayerInterfaceTenantScopedMethodsRequireTenantIdFirstParam(): void
+    public function test_cost_layer_interface_tenant_scoped_methods_require_tenant_id_first_param(): void
     {
         $iface = CostLayerRepositoryInterface::class;
 
-        foreach (
-            [
+        foreach ([
             'findOpenLayersOldestFirst',
             'findOpenLayersNewestFirst',
             'findOpenLayersByExpiryAsc',
             'findAllOpenLayers',
             'findById',
-            ] as $method
-        ) {
+        ] as $method) {
             $this->assertFirstParamIsIntTenantId($iface, $method);
         }
     }
@@ -130,7 +126,7 @@ class InventoryRepositoryTenantGuardrailsTest extends TestCase
     // Interface contract: ValuationConfigRepositoryInterface
     // -------------------------------------------------------------------------
 
-    public function testValuationConfigInterfaceTenantScopedMethodsRequireTenantIdFirstParam(): void
+    public function test_valuation_config_interface_tenant_scoped_methods_require_tenant_id_first_param(): void
     {
         $iface = ValuationConfigRepositoryInterface::class;
 
@@ -143,7 +139,7 @@ class InventoryRepositoryTenantGuardrailsTest extends TestCase
     // Implementation: StockReservation and InventoryStock query filters
     // -------------------------------------------------------------------------
 
-    public function testStockReservationAndInventoryStockImplementationsEnforceTenantIdFilter(): void
+    public function test_stock_reservation_and_inventory_stock_implementations_enforce_tenant_id_filter(): void
     {
         $base = __DIR__ . '/../../../app/Modules/Inventory/Infrastructure/Persistence/Eloquent/Repositories/';
 
@@ -172,7 +168,7 @@ class InventoryRepositoryTenantGuardrailsTest extends TestCase
     // Implementation: TransferOrder and CycleCount query filters
     // -------------------------------------------------------------------------
 
-    public function testTransferOrderAndCycleCountImplementationsEnforceTenantIdFilter(): void
+    public function test_transfer_order_and_cycle_count_implementations_enforce_tenant_id_filter(): void
     {
         $base = __DIR__ . '/../../../app/Modules/Inventory/Infrastructure/Persistence/Eloquent/Repositories/';
 
@@ -199,7 +195,7 @@ class InventoryRepositoryTenantGuardrailsTest extends TestCase
     // Critical: update() methods that bypass global tenant scope must guard with tenant_id
     // -------------------------------------------------------------------------
 
-    public function testCostLayerAndValuationConfigUpdateMethodsIncludeTenantIdGuard(): void
+    public function test_cost_layer_and_valuation_config_update_methods_include_tenant_id_guard(): void
     {
         $base = __DIR__ . '/../../../app/Modules/Inventory/Infrastructure/Persistence/Eloquent/Repositories/';
 
@@ -225,14 +221,12 @@ class InventoryRepositoryTenantGuardrailsTest extends TestCase
         $this->assertStringContainsString(
             'withoutGlobalScope',
             $valuationSource,
-            'EloquentValuationConfigRepository::update must call withoutGlobalScope '
-            . '(confirming scope bypass is intentional)',
+            'EloquentValuationConfigRepository::update must call withoutGlobalScope (confirming scope bypass is intentional)',
         );
         $this->assertStringContainsString(
             "->where('tenant_id', \$config->getTenantId())",
             $valuationSource,
-            'EloquentValuationConfigRepository::update must guard with tenant_id before update '
-            . 'to prevent cross-tenant write',
+            'EloquentValuationConfigRepository::update must guard with tenant_id before update to prevent cross-tenant write',
         );
     }
 }

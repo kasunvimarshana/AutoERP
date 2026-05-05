@@ -8,5 +8,5 @@ use Illuminate\Http\Resources\Json\ResourceCollection;
 
 class UserDeviceCollection extends ResourceCollection
 {
-    public $collects = UserDeviceResource::class;
+    public string $collects = UserDeviceResource::class;
 }

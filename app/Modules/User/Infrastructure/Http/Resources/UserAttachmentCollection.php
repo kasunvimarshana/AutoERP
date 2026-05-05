@@ -8,5 +8,5 @@ use Illuminate\Http\Resources\Json\ResourceCollection;
 
 class UserAttachmentCollection extends ResourceCollection
 {
-    public $collects = UserAttachmentResource::class;
+    public string $collects = UserAttachmentResource::class;
 }

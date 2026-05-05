@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Application\Services;
 
-use Illuminate\Support\Facades\Auth;
 use Modules\Core\Application\Services\BaseService;
-use Modules\Product\Domain\RepositoryInterfaces\ProductRepositoryInterface;
 use Modules\Purchase\Application\Contracts\PostGrnServiceInterface;
 use Modules\Purchase\Domain\Entities\GrnHeader;
 use Modules\Purchase\Domain\Events\GoodsReceiptPosted;
@@ -15,7 +13,6 @@ use Modules\Purchase\Domain\RepositoryInterfaces\GrnHeaderRepositoryInterface;
 use Modules\Purchase\Domain\RepositoryInterfaces\GrnLineRepositoryInterface;
 use Modules\Purchase\Domain\RepositoryInterfaces\PurchaseOrderLineRepositoryInterface;
 use Modules\Purchase\Domain\RepositoryInterfaces\PurchaseOrderRepositoryInterface;
-use Modules\Supplier\Domain\RepositoryInterfaces\SupplierRepositoryInterface;
 
 class PostGrnService extends BaseService implements PostGrnServiceInterface
 {
@@ -24,8 +21,6 @@ class PostGrnService extends BaseService implements PostGrnServiceInterface
         private readonly GrnLineRepositoryInterface $grnLineRepository,
         private readonly PurchaseOrderRepositoryInterface $purchaseOrderRepository,
         private readonly PurchaseOrderLineRepositoryInterface $purchaseOrderLineRepository,
-        private readonly SupplierRepositoryInterface $supplierRepository,
-        private readonly ProductRepositoryInterface $productRepository,
     ) {
         parent::__construct($grnHeaderRepository);
     }
@@ -60,20 +55,6 @@ class PostGrnService extends BaseService implements PostGrnServiceInterface
         $grnHeader->post();
         $saved = $this->grnHeaderRepository->save($grnHeader);
 
-        // Resolve supplier AP account for GL posting
-        $supplier = $this->supplierRepository->find($saved->getSupplierId());
-        $apAccountId = $supplier?->getApAccountId();
-
-        // Resolve per-product inventory account IDs for GL posting
-        $inventoryAccountMap = [];
-        foreach ($lines as $line) {
-            $productId = $line->getProductId();
-            if (! isset($inventoryAccountMap[$productId])) {
-                $product = $this->productRepository->find($productId);
-                $inventoryAccountMap[$productId] = $product?->getInventoryAccountId();
-            }
-        }
-
         $this->addEvent(new GoodsReceiptPosted(
             tenantId: $saved->getTenantId(),
             grnHeaderId: (int) $saved->getId(),
@@ -89,13 +70,7 @@ class PostGrnService extends BaseService implements PostGrnServiceInterface
                 'variant_id' => $l->getVariantId(),
                 'batch_id' => $l->getBatchId(),
                 'serial_id' => $l->getSerialId(),
-                'inventory_account_id' => $inventoryAccountMap[$l->getProductId()] ?? null,
             ])->values()->all(),
-            apAccountId: $apAccountId,
-            currencyId: $saved->getCurrencyId(),
-            exchangeRate: $saved->getExchangeRate(),
-            receivedDate: $saved->getReceivedDate()->format('Y-m-d'),
-            createdBy: (int) (Auth::id() ?? 0),
         ));
 
         return $saved;

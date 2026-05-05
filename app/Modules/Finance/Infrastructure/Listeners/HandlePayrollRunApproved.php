@@ -24,6 +24,9 @@ use Modules\HR\Domain\Events\PayrollRunApproved;
  * the event payload. All account IDs must be present in event metadata for the
  * entry to be created; missing accounts cause a warning and a graceful skip.
  *
+ * Known dependency: HR ProcessPayrollRunService currently sets journalEntryId = null.
+ * A future enhancement should write the created JournalEntry ID back to the payslip
+ * (see hr.md Section 10 known debt).
  */
 class HandlePayrollRunApproved
 {
@@ -142,7 +145,7 @@ class HandlePayrollRunApproved
 
         try {
             DB::transaction(function () use ($event, $period, $periodEnd, $description, $lines, $runId, $tenantId): void {
-                $journalEntry = $this->createJournalEntryService->execute([
+                $this->createJournalEntryService->execute([
                     'tenant_id'        => $tenantId,
                     'fiscal_period_id' => $period->getId(),
                     'entry_date'       => $periodEnd->format('Y-m-d'),
@@ -154,19 +157,9 @@ class HandlePayrollRunApproved
                     'lines'            => $lines,
                 ]);
 
-                // Write the created journal entry ID back to all payslips for this run,
-                // resolving the known debt noted at the top of this class.
-                if ($journalEntry->getId() !== null) {
-                    DB::table('hr_payslips')
-                        ->where('tenant_id', $tenantId)
-                        ->where('payroll_run_id', $runId)
-                        ->update(['journal_entry_id' => $journalEntry->getId()]);
-                }
-
                 Log::info('HandlePayrollRunApproved: payroll journal entry created', [
-                    'payroll_run_id'   => $runId,
-                    'journal_entry_id' => $journalEntry->getId(),
-                    'tenant_id'        => $tenantId,
+                    'payroll_run_id' => $runId,
+                    'tenant_id'      => $tenantId,
                 ]);
             });
         } catch (QueryException $exception) {

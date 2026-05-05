@@ -49,7 +49,8 @@ class UserModel extends Authenticatable implements OAuthenticatable
 
     public function roles(): BelongsToMany
     {
-        return $this->belongsToMany(RoleModel::class, 'role_user', 'user_id', 'role_id');
+        return $this->belongsToMany(RoleModel::class, 'role_user', 'user_id', 'role_id')
+            ->withTimestamps();
     }
 
     public function attachments(): HasMany

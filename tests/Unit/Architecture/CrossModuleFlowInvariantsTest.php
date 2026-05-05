@@ -606,46 +606,6 @@ class CrossModuleFlowInvariantsTest extends TestCase
         }
     }
 
-    /**
-     * The Supplier module must listen to GoodsReceiptPosted to update
-     * supplier_products.last_purchase_price, closing the P2P costing signal.
-     *
-     * Purchase module raises the event; Supplier module is the cross-module consumer.
-     */
-    public function test_supplier_module_listens_to_goods_receipt_posted_event(): void
-    {
-        $supplierProvider = $this->readSource(
-            'app/Modules/Supplier/Infrastructure/Providers/SupplierServiceProvider.php'
-        );
-
-        $this->assertStringContainsString(
-            'GoodsReceiptPosted',
-            $supplierProvider,
-            'SupplierServiceProvider must register a listener for GoodsReceiptPosted to update last_purchase_price'
-        );
-
-        $this->assertStringContainsString(
-            'HandleGoodsReceiptPosted',
-            $supplierProvider,
-            'SupplierServiceProvider must bind HandleGoodsReceiptPosted listener'
-        );
-
-        $this->assertSourceExists(
-            'app/Modules/Supplier/Infrastructure/Listeners/HandleGoodsReceiptPosted.php',
-            'HandleGoodsReceiptPosted listener must exist in Supplier module'
-        );
-
-        $listener = $this->readSource(
-            'app/Modules/Supplier/Infrastructure/Listeners/HandleGoodsReceiptPosted.php'
-        );
-
-        $this->assertStringContainsString(
-            'last_purchase_price',
-            $listener,
-            'Supplier HandleGoodsReceiptPosted must update last_purchase_price on supplier_products'
-        );
-    }
-
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------

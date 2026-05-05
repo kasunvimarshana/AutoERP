@@ -190,14 +190,7 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
         );
 
         foreach ($model->roles as $roleModel) {
-            $role = new Role(
-                tenantId: (int) $roleModel->tenant_id,
-                name: (string) $roleModel->name,
-                guardName: (string) $roleModel->guard_name,
-                description: $roleModel->description,
-                id: (int) $roleModel->id,
-            );
-
+            $role = new Role($roleModel->tenant_id, $roleModel->name, $roleModel->id);
             foreach ($roleModel->permissions as $permModel) {
                 $perm = new Permission(
                     tenantId: (int) $permModel->tenant_id,
