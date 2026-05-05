@@ -19,6 +19,8 @@ class AccountModel extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'org_unit_id',
+        'row_version',
         'parent_id',
         'code',
         'name',

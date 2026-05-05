@@ -12,7 +12,9 @@ return new class extends Migration
     {
         Schema::create('sales_return_lines', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id');
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('sales_return_id')->constrained(null, 'id', 'sales_return_lines_sales_return_id_fk')->cascadeOnDelete();
             $table->foreignId('original_sales_order_line_id')->nullable()->constrained('sales_order_lines', 'id', 'sales_return_lines_original_sales_order_line_id_fk')->nullOnDelete();
             $table->foreignId('product_id');
@@ -35,9 +37,9 @@ return new class extends Migration
             $table->foreign('serial_id')->references('id')->on('serials')->nullOnDelete();
             $table->foreign('to_location_id')->references('id')->on('warehouse_locations')->cascadeOnDelete();
             $table->foreign('uom_id')->references('id')->on('units_of_measure');
-            $table->foreign('tenant_id')->references('id')->on('tenants')->cascadeOnDelete();
 
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

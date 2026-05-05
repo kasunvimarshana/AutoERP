@@ -17,6 +17,8 @@ class StockReservationModel extends Model
 
     protected $fillable = [
         'tenant_id',
+        'org_unit_id',
+        'row_version',
         'product_id',
         'variant_id',
         'batch_id',
@@ -37,5 +39,6 @@ class StockReservationModel extends Model
         'location_id' => 'integer',
         'reserved_for_id' => 'integer',
         'expires_at' => 'datetime',
-    ];
+            'quantity' => 'decimal:6',
+        ];
 }

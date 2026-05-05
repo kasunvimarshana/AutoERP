@@ -17,6 +17,8 @@ class GrnHeaderModel extends Model
 
     protected $fillable = [
         'tenant_id',
+        'org_unit_id',
+        'row_version',
         'supplier_id',
         'warehouse_id',
         'purchase_order_id',

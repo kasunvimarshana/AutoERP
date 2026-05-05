@@ -12,7 +12,9 @@ return new class extends Migration
     {
         Schema::create('purchase_order_lines', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id');
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('purchase_order_id')->constrained(null, 'id', 'purchase_order_lines_purchase_order_id_fk')->cascadeOnDelete();
             $table->foreignId('product_id');
             $table->foreignId('variant_id')->nullable();
@@ -31,10 +33,9 @@ return new class extends Migration
             $table->foreign('variant_id')->references('id')->on('product_variants')->nullOnDelete();
             $table->foreign('uom_id')->references('id')->on('units_of_measure');
             $table->foreign('tax_group_id')->references('id')->on('tax_groups')->nullOnDelete();
-            $table->foreign('account_id')->references('id')->on('accounts')->nullOnDelete();
-            $table->foreign('tenant_id')->references('id')->on('tenants')->cascadeOnDelete();
 
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 

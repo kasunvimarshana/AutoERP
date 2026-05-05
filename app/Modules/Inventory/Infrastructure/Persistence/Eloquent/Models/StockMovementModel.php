@@ -19,6 +19,8 @@ class StockMovementModel extends Model
 
     protected $fillable = [
         'tenant_id',
+        'org_unit_id',
+        'row_version',
         'product_id',
         'variant_id',
         'batch_id',
@@ -50,5 +52,7 @@ class StockMovementModel extends Model
         'performed_by' => 'integer',
         'performed_at' => 'datetime',
         'metadata' => 'array',
-    ];
+            'quantity' => 'decimal:6',
+            'unit_cost' => 'decimal:6',
+        ];
 }

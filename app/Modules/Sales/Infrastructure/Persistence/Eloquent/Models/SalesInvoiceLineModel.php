@@ -5,13 +5,20 @@ declare(strict_types=1);
 namespace Modules\Sales\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class SalesInvoiceLineModel extends Model
 {
+    use HasAudit;
+    use HasTenant;
+
     protected $table = 'sales_invoice_lines';
 
     protected $fillable = [
         'tenant_id',
+        'org_unit_id',
+        'row_version',
         'sales_invoice_id',
         'sales_order_line_id',
         'product_id',

@@ -14,6 +14,7 @@ return new class extends Migration
             $table->id();
             $table->string('name')->unique('timezones_name_uk');
             $table->string('offset', 10);
+            $table->softDeletes();
             $table->timestamps();
         });
     }

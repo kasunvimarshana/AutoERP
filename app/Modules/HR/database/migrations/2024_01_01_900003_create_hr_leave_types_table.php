@@ -12,7 +12,9 @@ return new class extends Migration
     {
         Schema::create('hr_leave_types', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id', 'hr_leave_types_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->string('name');
             $table->string('code', 20);
             $table->text('description')->nullable();
@@ -24,6 +26,7 @@ return new class extends Migration
             $table->integer('min_service_days')->default(0);
             $table->boolean('is_active')->default(true);
             $table->json('metadata')->nullable();
+            $table->softDeletes();
             $table->timestamps();
 
             $table->index(['tenant_id'], 'hr_leave_types_tenant_id_idx');

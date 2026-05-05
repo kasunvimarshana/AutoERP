@@ -34,6 +34,8 @@ class InventoryCostLayerModel extends Model
 
     protected $fillable = [
         'tenant_id',
+        'org_unit_id',
+        'row_version',
         'product_id',
         'variant_id',
         'batch_id',
@@ -56,5 +58,8 @@ class InventoryCostLayerModel extends Model
         'location_id' => 'integer',
         'reference_id' => 'integer',
         'is_closed' => 'boolean',
-    ];
+            'quantity_in' => 'decimal:6',
+            'quantity_remaining' => 'decimal:6',
+            'unit_cost' => 'decimal:6',
+        ];
 }

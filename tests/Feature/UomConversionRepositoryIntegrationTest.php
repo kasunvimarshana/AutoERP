@@ -29,6 +29,7 @@ class UomConversionRepositoryIntegrationTest extends TestCase
         $repository = app(UomConversionRepositoryInterface::class);
 
         $created = $repository->save(new UomConversion(
+            tenantId: 11,
             fromUomId: 1101,
             toUomId: 1102,
             factor: '12.5000000000',
@@ -39,6 +40,7 @@ class UomConversionRepositoryIntegrationTest extends TestCase
 
         $updated = $repository->save(new UomConversion(
             id: $created->getId(),
+            tenantId: 11,
             fromUomId: 1101,
             toUomId: 1102,
             factor: '13.5000000000',
@@ -64,9 +66,9 @@ class UomConversionRepositoryIntegrationTest extends TestCase
 
     public function test_paginate_and_where_return_mapped_domain_entities(): void
     {
-        $this->insertConversionRow(id: 601, fromUomId: 1101, toUomId: 1102, factor: '1000.0000000000');
-        $this->insertConversionRow(id: 602, fromUomId: 1101, toUomId: 1103, factor: '2.5000000000');
-        $this->insertConversionRow(id: 603, fromUomId: 1201, toUomId: 1202, factor: '3.0000000000');
+        $this->insertConversionRow(id: 601, fromUomId: 1101, toUomId: 1102, factor: '1000.0000000000', tenantId: 11);
+        $this->insertConversionRow(id: 602, fromUomId: 1101, toUomId: 1103, factor: '2.5000000000', tenantId: 11);
+        $this->insertConversionRow(id: 603, fromUomId: 1201, toUomId: 1202, factor: '3.0000000000', tenantId: 12);
 
         /** @var UomConversionRepositoryInterface $repository */
         $repository = app(UomConversionRepositoryInterface::class);
@@ -109,7 +111,7 @@ class UomConversionRepositoryIntegrationTest extends TestCase
         $this->assertSame(702, $rows[1]->getId());
     }
 
-    private function insertConversionRow(int $id, int $fromUomId, int $toUomId, string $factor, ?int $tenantId = null, ?int $productId = null): void
+    private function insertConversionRow(int $id, int $fromUomId, int $toUomId, string $factor, ?int $tenantId = 11, ?int $productId = null): void
     {
         DB::table('uom_conversions')->insert([
             'id' => $id,

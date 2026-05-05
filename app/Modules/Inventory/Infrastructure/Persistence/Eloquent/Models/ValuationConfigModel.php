@@ -29,7 +29,8 @@ class ValuationConfigModel extends Model
 
     protected $fillable = [
         'tenant_id',
-        'org_unit_id',
+            'org_unit_id',
+            'row_version',
         'warehouse_id',
         'product_id',
         'transaction_type',

@@ -12,7 +12,9 @@ return new class extends Migration
     {
         Schema::create('payment_terms', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id', 'payment_terms_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->string('name');
             $table->text('description')->nullable();
             $table->unsignedInteger('days')->default(30);
@@ -20,6 +22,7 @@ return new class extends Migration
             $table->decimal('discount_rate', 8, 4)->nullable();
             $table->boolean('is_default')->default(false);
             $table->boolean('is_active')->default(true);
+            $table->softDeletes();
             $table->timestamps();
 
             $table->unique(['tenant_id', 'name'], 'payment_terms_tenant_name_uk');

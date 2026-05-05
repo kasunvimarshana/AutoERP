@@ -206,9 +206,12 @@ use Modules\Finance\Domain\RepositoryInterfaces\PaymentAllocationRepositoryInter
 use Modules\Finance\Domain\RepositoryInterfaces\PaymentMethodRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\PaymentRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\PaymentTermRepositoryInterface;
+use Modules\Finance\Infrastructure\Listeners\HandlePayrollRunApproved;
 use Modules\Finance\Infrastructure\Listeners\HandlePurchaseInvoiceApproved;
 use Modules\Finance\Infrastructure\Listeners\HandlePurchasePaymentRecorded;
 use Modules\Finance\Infrastructure\Listeners\HandlePurchaseReturnPosted;
+use Modules\Finance\Infrastructure\Listeners\HandleCycleCountCompleted;
+use Modules\Finance\Infrastructure\Listeners\HandleStockAdjustmentRecorded;
 use Modules\Finance\Infrastructure\Listeners\HandleSalesInvoicePosted;
 use Modules\Finance\Infrastructure\Listeners\HandleSalesPaymentRecorded;
 use Modules\Finance\Infrastructure\Listeners\HandleSalesReturnReceived;
@@ -231,6 +234,9 @@ use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentPay
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentPaymentMethodRepository;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentPaymentRepository;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentPaymentTermRepository;
+use Modules\HR\Domain\Events\PayrollRunApproved;
+use Modules\Inventory\Domain\Events\CycleCountCompleted;
+use Modules\Inventory\Domain\Events\StockAdjustmentRecorded;
 use Modules\Purchase\Domain\Events\PurchaseInvoiceApproved;
 use Modules\Purchase\Domain\Events\PurchasePaymentRecorded;
 use Modules\Purchase\Domain\Events\PurchaseReturnPosted;
@@ -370,9 +376,12 @@ class FinanceServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Event::listen(PayrollRunApproved::class, HandlePayrollRunApproved::class);
         Event::listen(PurchaseInvoiceApproved::class, HandlePurchaseInvoiceApproved::class);
         Event::listen(PurchasePaymentRecorded::class, HandlePurchasePaymentRecorded::class);
         Event::listen(PurchaseReturnPosted::class, HandlePurchaseReturnPosted::class);
+        Event::listen(CycleCountCompleted::class, HandleCycleCountCompleted::class);
+        Event::listen(StockAdjustmentRecorded::class, HandleStockAdjustmentRecorded::class);
         Event::listen(SalesInvoicePosted::class, HandleSalesInvoicePosted::class);
         Event::listen(SalesPaymentRecorded::class, HandleSalesPaymentRecorded::class);
         Event::listen(SalesReturnReceived::class, HandleSalesReturnReceived::class);

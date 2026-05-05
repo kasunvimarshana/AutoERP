@@ -63,7 +63,6 @@ class EloquentSalesReturnRepository extends EloquentRepository implements SalesR
                     'uom_id' => $line->getUomId(),
                     'return_qty' => $line->getReturnQty(),
                     'unit_price' => $line->getUnitPrice(),
-                    'line_total' => $line->getLineTotal(),
                     'condition' => $line->getCondition(),
                     'disposition' => $line->getDisposition(),
                     'restocking_fee' => $line->getRestockingFee(),

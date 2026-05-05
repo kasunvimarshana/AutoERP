@@ -12,7 +12,9 @@ return new class extends Migration
     {
         Schema::create('stock_reservations', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained(null, 'id', 'stock_reservations_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('product_id')->constrained(null, 'id', 'stock_reservations_product_id_fk')->cascadeOnDelete();
             $table->foreignId('variant_id')->nullable()->constrained('product_variants', 'id', 'stock_reservations_variant_id_fk')->nullOnDelete();
             $table->foreignId('batch_id')->nullable()->constrained(null, 'id', 'stock_reservations_batch_id_fk')->nullOnDelete();

@@ -16,7 +16,7 @@ class ApprovalWorkflowConfigModel extends BaseModel
     protected $table = 'approval_workflow_configs';
 
     protected $fillable = [
-        'tenant_id', 'module', 'entity_type', 'name',
+        'tenant_id', 'org_unit_id', 'row_version', 'module', 'entity_type', 'name',
         'min_amount', 'max_amount', 'steps', 'is_active',
     ];
 

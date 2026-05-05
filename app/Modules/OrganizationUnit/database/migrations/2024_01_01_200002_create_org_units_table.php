@@ -13,6 +13,7 @@ return new class extends Migration
         Schema::create('org_units', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained(null, 'id', 'org_units_tenant_id_fk')->cascadeOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('type_id')->nullable()->constrained('org_unit_types', 'id', 'org_units_type_id_fk')->nullOnDelete();
             $table->foreignId('parent_id')->nullable()->constrained('org_units', 'id', 'org_units_parent_id_fk')->nullOnDelete();
             $table->string('name');

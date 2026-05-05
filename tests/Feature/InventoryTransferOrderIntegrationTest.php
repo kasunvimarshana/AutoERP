@@ -123,6 +123,20 @@ class InventoryTransferOrderIntegrationTest extends TestCase
         $this->assertSame(0, bccomp((string) $fromQty, '25.000000', 6));
         $this->assertSame(0, bccomp((string) $toQty, '5.000000', 6));
 
+        // Transfer receipt should materialize two inventory movements (shipment + receipt)
+        $this->assertSame(
+            2,
+            DB::table('stock_movements')
+                ->where('tenant_id', $tenantId)
+                ->whereIn('movement_type', ['shipment', 'receipt'])
+                ->count()
+        );
+
+        // Current contract: transfer receiving is inventory-internal and must not post finance artifacts.
+        $this->assertSame(0, DB::table('journal_entries')->count());
+        $this->assertSame(0, DB::table('ap_transactions')->count());
+        $this->assertSame(0, DB::table('ar_transactions')->count());
+
         $this->assertDatabaseHas('transfer_orders', [
             'tenant_id' => $tenantId,
             'transfer_number' => 'TO-7001',
