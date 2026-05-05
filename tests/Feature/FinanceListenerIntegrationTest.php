@@ -12,34 +12,36 @@ use Modules\Finance\Application\Contracts\CreateJournalEntryServiceInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\ApTransactionRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\ArTransactionRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\FiscalPeriodRepositoryInterface;
-use Modules\HR\Application\Contracts\ApprovePayrollRunServiceInterface;
-use Modules\Inventory\Application\Contracts\CompleteCycleCountServiceInterface;
-use Modules\Inventory\Application\Contracts\CreateCycleCountServiceInterface;
-use Modules\Inventory\Application\Contracts\RecordStockMovementServiceInterface;
-use Modules\Inventory\Application\Contracts\StartCycleCountServiceInterface;
-use Modules\Purchase\Application\Contracts\ApprovePurchaseInvoiceServiceInterface;
-use Modules\Purchase\Application\Contracts\PostPurchaseReturnServiceInterface;
-use Modules\Purchase\Application\Contracts\RecordPurchasePaymentServiceInterface;
-use Modules\Sales\Application\Contracts\RecordSalesPaymentServiceInterface;
-use Modules\Sales\Application\Contracts\ReceiveSalesReturnServiceInterface;
+use Modules\Finance\Infrastructure\Listeners\HandleCycleCountCompleted;
+use Modules\Finance\Infrastructure\Listeners\HandleGoodsReceiptPosted;
 use Modules\Finance\Infrastructure\Listeners\HandlePayrollRunApproved;
 use Modules\Finance\Infrastructure\Listeners\HandlePurchaseInvoiceApproved;
 use Modules\Finance\Infrastructure\Listeners\HandlePurchasePaymentRecorded;
 use Modules\Finance\Infrastructure\Listeners\HandlePurchaseReturnPosted;
-use Modules\Finance\Infrastructure\Listeners\HandleSalesPaymentRecorded;
 use Modules\Finance\Infrastructure\Listeners\HandleSalesInvoicePosted;
+use Modules\Finance\Infrastructure\Listeners\HandleSalesPaymentRecorded;
 use Modules\Finance\Infrastructure\Listeners\HandleSalesReturnReceived;
 use Modules\Finance\Infrastructure\Listeners\HandleStockAdjustmentRecorded;
-use Modules\Finance\Infrastructure\Listeners\HandleCycleCountCompleted;
-use Modules\Sales\Application\Contracts\PostSalesInvoiceServiceInterface;
+use Modules\HR\Application\Contracts\ApprovePayrollRunServiceInterface;
 use Modules\HR\Domain\Entities\PayrollRun;
 use Modules\HR\Domain\Events\PayrollRunApproved;
 use Modules\HR\Domain\ValueObjects\PayrollRunStatus;
-use Modules\Inventory\Domain\Events\StockAdjustmentRecorded;
+use Modules\Inventory\Application\Contracts\CompleteCycleCountServiceInterface;
+use Modules\Inventory\Application\Contracts\CreateCycleCountServiceInterface;
+use Modules\Inventory\Application\Contracts\RecordStockMovementServiceInterface;
+use Modules\Inventory\Application\Contracts\StartCycleCountServiceInterface;
 use Modules\Inventory\Domain\Events\CycleCountCompleted;
+use Modules\Inventory\Domain\Events\StockAdjustmentRecorded;
+use Modules\Purchase\Application\Contracts\ApprovePurchaseInvoiceServiceInterface;
+use Modules\Purchase\Application\Contracts\PostPurchaseReturnServiceInterface;
+use Modules\Purchase\Application\Contracts\RecordPurchasePaymentServiceInterface;
+use Modules\Purchase\Domain\Events\GoodsReceiptPosted;
 use Modules\Purchase\Domain\Events\PurchaseInvoiceApproved;
 use Modules\Purchase\Domain\Events\PurchasePaymentRecorded;
 use Modules\Purchase\Domain\Events\PurchaseReturnPosted;
+use Modules\Sales\Application\Contracts\PostSalesInvoiceServiceInterface;
+use Modules\Sales\Application\Contracts\ReceiveSalesReturnServiceInterface;
+use Modules\Sales\Application\Contracts\RecordSalesPaymentServiceInterface;
 use Modules\Sales\Domain\Events\SalesInvoicePosted;
 use Modules\Sales\Domain\Events\SalesPaymentRecorded;
 use Modules\Sales\Domain\Events\SalesReturnReceived;
@@ -2247,6 +2249,121 @@ class FinanceListenerIntegrationTest extends TestCase
         $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'payroll_run')->where('reference_id', 501)->count());
     }
 
+    public function test_handle_payroll_run_approved_sets_payslip_journal_entry_id(): void
+    {
+        // user id=1 already inserted by seedReferenceData(); use distinct ids
+        DB::table('users')->insert([
+            ['id' => 10, 'tenant_id' => $this->tenantId, 'org_unit_id' => null, 'row_version' => 1,
+                'first_name' => 'Alice', 'last_name' => 'Smith', 'email' => 'alice@test.com',
+                'password' => 'hash', 'status' => 'active', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 11, 'tenant_id' => $this->tenantId, 'org_unit_id' => null, 'row_version' => 1,
+                'first_name' => 'Bob', 'last_name' => 'Jones', 'email' => 'bob@test.com',
+                'password' => 'hash', 'status' => 'active', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        DB::table('employees')->insert([
+            ['id' => 10, 'tenant_id' => $this->tenantId, 'org_unit_id' => null, 'row_version' => 1,
+                'user_id' => 10, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 11, 'tenant_id' => $this->tenantId, 'org_unit_id' => null, 'row_version' => 1,
+                'user_id' => 11, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        DB::table('hr_payroll_runs')->insert([
+            'id' => 501,
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'row_version' => 1,
+            'period_start' => '2026-01-01',
+            'period_end' => '2026-01-31',
+            'status' => 'approved',
+            'processed_at' => '2026-01-31 09:00:00',
+            'approved_at' => '2026-01-31 10:00:00',
+            'approved_by' => 1,
+            'total_gross' => '1000.000000',
+            'total_deductions' => '200.000000',
+            'total_net' => '800.000000',
+            'metadata' => json_encode([
+                'payroll_expense_account_id' => $this->payrollExpenseAccountId,
+                'payroll_liability_account_id' => $this->payrollLiabilityAccountId,
+                'payroll_deductions_account_id' => $this->payrollDeductionsAccountId,
+                'currency_id' => 1,
+                'exchange_rate' => 1,
+            ], JSON_THROW_ON_ERROR),
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]);
+
+        DB::table('hr_payslips')->insert([
+            [
+                'id' => 1,
+                'tenant_id' => $this->tenantId,
+                'org_unit_id' => null,
+                'row_version' => 1,
+                'payroll_run_id' => 501,
+                'employee_id' => 10,
+                'period_start' => '2026-01-01',
+                'period_end' => '2026-01-31',
+                'gross_salary' => '1000.000000',
+                'total_deductions' => '200.000000',
+                'net_salary' => '800.000000',
+                'base_salary' => '1000.000000',
+                'worked_days' => '20.00',
+                'status' => 'approved',
+                'journal_entry_id' => null,
+                'metadata' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+                'deleted_at' => null,
+            ],
+            [
+                'id' => 2,
+                'tenant_id' => $this->tenantId,
+                'org_unit_id' => null,
+                'row_version' => 1,
+                'payroll_run_id' => 501,
+                'employee_id' => 11,
+                'period_start' => '2026-01-01',
+                'period_end' => '2026-01-31',
+                'gross_salary' => '1000.000000',
+                'total_deductions' => '200.000000',
+                'net_salary' => '800.000000',
+                'base_salary' => '1000.000000',
+                'worked_days' => '20.00',
+                'status' => 'approved',
+                'journal_entry_id' => null,
+                'metadata' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+                'deleted_at' => null,
+            ],
+        ]);
+
+        $event = new PayrollRunApproved(
+            payrollRun: $this->makePayrollRun(),
+            tenantId: $this->tenantId,
+        );
+
+        $this->makePayrollListener()->handle($event);
+
+        $journalEntry = DB::table('journal_entries')
+            ->where('reference_type', 'payroll_run')
+            ->where('reference_id', 501)
+            ->first();
+
+        $this->assertNotNull($journalEntry);
+
+        $payslips = DB::table('hr_payslips')
+            ->where('payroll_run_id', 501)
+            ->get();
+
+        $this->assertCount(2, $payslips);
+        foreach ($payslips as $payslip) {
+            $this->assertSame((int) $journalEntry->id, (int) $payslip->journal_entry_id,
+                "Payslip #{$payslip->id} must have journal_entry_id set after payroll run approval");
+        }
+    }
+
     public function test_approve_payroll_run_service_dispatches_finance_posting_end_to_end(): void
     {
         DB::table('hr_payroll_runs')->insert([
@@ -2298,6 +2415,303 @@ class FinanceListenerIntegrationTest extends TestCase
             ->get();
 
         $this->assertCount(3, $lines);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // HandleGoodsReceiptPosted (CRITICAL-002)
+    // ──────────────────────────────────────────────────────────────────
+
+    public function test_handle_goods_receipt_posted_creates_journal_entry(): void
+    {
+        $event = new GoodsReceiptPosted(
+            tenantId: $this->tenantId,
+            grnHeaderId: 501,
+            supplierId: 1,
+            warehouseId: $this->warehouseId,
+            lines: [
+                [
+                    'id' => null,
+                    'product_id' => $this->productId,
+                    'location_id' => $this->warehouseLocationId,
+                    'uom_id' => $this->uomId,
+                    'received_qty' => '5.000000',
+                    'unit_cost' => '20.000000',
+                    'variant_id' => null,
+                    'batch_id' => null,
+                    'serial_id' => null,
+                    'inventory_account_id' => $this->inventoryAccountId,
+                ],
+            ],
+            apAccountId: $this->apAccountId,
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            receivedDate: '2026-01-15',
+            createdBy: 1,
+        );
+
+        $this->makeGrnListener()->handle($event);
+
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'grn')->where('reference_id', 501)->count());
+
+        $je = DB::table('journal_entries')->where('reference_type', 'grn')->where('reference_id', 501)->first();
+        $this->assertSame('system', $je->entry_type);
+        $this->assertSame('grn', $je->reference_type);
+        $this->assertSame(501, (int) $je->reference_id);
+
+        $lines = DB::table('journal_entry_lines')->where('journal_entry_id', $je->id)->orderBy('debit_amount', 'desc')->get();
+        $this->assertCount(2, $lines);
+
+        // DR Inventory
+        $debitLine = $lines[0];
+        $this->assertSame($this->inventoryAccountId, (int) $debitLine->account_id);
+        $this->assertEqualsWithDelta(100.0, (float) $debitLine->debit_amount, 0.001);
+        $this->assertEqualsWithDelta(0.0, (float) $debitLine->credit_amount, 0.001);
+
+        // CR AP
+        $creditLine = $lines[1];
+        $this->assertSame($this->apAccountId, (int) $creditLine->account_id);
+        $this->assertEqualsWithDelta(0.0, (float) $creditLine->debit_amount, 0.001);
+        $this->assertEqualsWithDelta(100.0, (float) $creditLine->credit_amount, 0.001);
+    }
+
+    public function test_handle_goods_receipt_posted_skips_when_ap_account_is_null(): void
+    {
+        $event = new GoodsReceiptPosted(
+            tenantId: $this->tenantId,
+            grnHeaderId: 502,
+            supplierId: 1,
+            warehouseId: $this->warehouseId,
+            lines: [
+                [
+                    'id' => null,
+                    'product_id' => $this->productId,
+                    'location_id' => $this->warehouseLocationId,
+                    'uom_id' => $this->uomId,
+                    'received_qty' => '2.000000',
+                    'unit_cost' => '50.000000',
+                    'variant_id' => null,
+                    'batch_id' => null,
+                    'serial_id' => null,
+                    'inventory_account_id' => $this->inventoryAccountId,
+                ],
+            ],
+            apAccountId: null,
+        );
+
+        $this->makeGrnListener()->handle($event);
+
+        $this->assertSame(0, DB::table('journal_entries')->count());
+    }
+
+    public function test_handle_goods_receipt_posted_skips_when_line_missing_inventory_account(): void
+    {
+        $event = new GoodsReceiptPosted(
+            tenantId: $this->tenantId,
+            grnHeaderId: 503,
+            supplierId: 1,
+            warehouseId: $this->warehouseId,
+            lines: [
+                [
+                    'id' => null,
+                    'product_id' => $this->productId,
+                    'location_id' => $this->warehouseLocationId,
+                    'uom_id' => $this->uomId,
+                    'received_qty' => '2.000000',
+                    'unit_cost' => '50.000000',
+                    'variant_id' => null,
+                    'batch_id' => null,
+                    'serial_id' => null,
+                    'inventory_account_id' => null,
+                ],
+            ],
+            apAccountId: $this->apAccountId,
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            receivedDate: '2026-01-15',
+            createdBy: 1,
+        );
+
+        $this->makeGrnListener()->handle($event);
+
+        $this->assertSame(0, DB::table('journal_entries')->count());
+    }
+
+    public function test_handle_goods_receipt_posted_is_replay_safe(): void
+    {
+        $event = new GoodsReceiptPosted(
+            tenantId: $this->tenantId,
+            grnHeaderId: 504,
+            supplierId: 1,
+            warehouseId: $this->warehouseId,
+            lines: [
+                [
+                    'id' => null,
+                    'product_id' => $this->productId,
+                    'location_id' => $this->warehouseLocationId,
+                    'uom_id' => $this->uomId,
+                    'received_qty' => '3.000000',
+                    'unit_cost' => '10.000000',
+                    'variant_id' => null,
+                    'batch_id' => null,
+                    'serial_id' => null,
+                    'inventory_account_id' => $this->inventoryAccountId,
+                ],
+            ],
+            apAccountId: $this->apAccountId,
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            receivedDate: '2026-01-15',
+            createdBy: 1,
+        );
+
+        $this->makeGrnListener()->handle($event);
+        $this->makeGrnListener()->handle($event);
+
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'grn')->where('reference_id', 504)->count());
+    }
+
+    public function test_handle_goods_receipt_posted_aggregates_multiple_lines_by_account(): void
+    {
+        $event = new GoodsReceiptPosted(
+            tenantId: $this->tenantId,
+            grnHeaderId: 505,
+            supplierId: 1,
+            warehouseId: $this->warehouseId,
+            lines: [
+                [
+                    'id' => null,
+                    'product_id' => $this->productId,
+                    'location_id' => $this->warehouseLocationId,
+                    'uom_id' => $this->uomId,
+                    'received_qty' => '2.000000',
+                    'unit_cost' => '25.000000',
+                    'variant_id' => null,
+                    'batch_id' => null,
+                    'serial_id' => null,
+                    'inventory_account_id' => $this->inventoryAccountId,
+                ],
+                [
+                    'id' => null,
+                    'product_id' => $this->productId,
+                    'location_id' => $this->warehouseLocationId,
+                    'uom_id' => $this->uomId,
+                    'received_qty' => '4.000000',
+                    'unit_cost' => '25.000000',
+                    'variant_id' => null,
+                    'batch_id' => null,
+                    'serial_id' => null,
+                    'inventory_account_id' => $this->inventoryAccountId,
+                ],
+            ],
+            apAccountId: $this->apAccountId,
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            receivedDate: '2026-01-15',
+            createdBy: 1,
+        );
+
+        $this->makeGrnListener()->handle($event);
+
+        $lines = DB::table('journal_entry_lines')->get();
+        $this->assertCount(2, $lines); // Aggregated into 1 debit + 1 credit
+
+        $debitLine = $lines->where('debit_amount', '>', 0)->first();
+        $this->assertEqualsWithDelta(150.0, (float) $debitLine->debit_amount, 0.001);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // HandleSalesReturnReceived — income_account_id fix (CRITICAL-003)
+    // ──────────────────────────────────────────────────────────────────
+
+    public function test_handle_sales_return_received_posts_revenue_reversal_when_income_account_provided(): void
+    {
+        $event = new SalesReturnReceived(
+            tenantId: $this->tenantId,
+            salesReturnId: 601,
+            customerId: $this->customerId,
+            arAccountId: $this->arAccountId,
+            grandTotal: '80.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            returnDate: '2026-01-20',
+            lines: [
+                [
+                    'id' => null,
+                    'product_id' => $this->productId,
+                    'to_location_id' => $this->warehouseLocationId,
+                    'uom_id' => $this->uomId,
+                    'return_qty' => '2.000000',
+                    'variant_id' => null,
+                    'batch_id' => null,
+                    'serial_id' => null,
+                    'income_account_id' => $this->revenueAccountId,
+                    'line_total' => '80.000000',
+                ],
+            ],
+        );
+
+        $this->makeSalesReturnListener()->handle($event);
+
+        $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'sales_return')->where('reference_id', 601)->count());
+
+        $je = DB::table('journal_entries')->where('reference_type', 'sales_return')->where('reference_id', 601)->first();
+        $jeLines = DB::table('journal_entry_lines')->where('journal_entry_id', $je->id)->orderBy('debit_amount', 'desc')->get();
+
+        // Must be 2 lines: DR Revenue + CR AR
+        $this->assertCount(2, $jeLines);
+
+        $debitLine = $jeLines[0];
+        $this->assertSame($this->revenueAccountId, (int) $debitLine->account_id, 'Revenue account must be debited for return');
+        $this->assertEqualsWithDelta(80.0, (float) $debitLine->debit_amount, 0.001);
+
+        $creditLine = $jeLines[1];
+        $this->assertSame($this->arAccountId, (int) $creditLine->account_id, 'AR account must be credited for return');
+        $this->assertEqualsWithDelta(80.0, (float) $creditLine->credit_amount, 0.001);
+    }
+
+    public function test_handle_sales_return_received_with_null_income_account_posts_only_ar_credit(): void
+    {
+        // This test documents the degraded (but non-crashing) behaviour when income_account_id
+        // is null — only the AR credit entry is created, leaving GL unbalanced.
+        // The fix in ReceiveSalesReturnService ensures income_account_id is populated from the
+        // original invoice, making this case only possible when no original invoice exists.
+        $event = new SalesReturnReceived(
+            tenantId: $this->tenantId,
+            salesReturnId: 602,
+            customerId: $this->customerId,
+            arAccountId: $this->arAccountId,
+            grandTotal: '50.000000',
+            currencyId: 1,
+            exchangeRate: '1.000000',
+            returnDate: '2026-01-20',
+            lines: [
+                [
+                    'id' => null,
+                    'product_id' => $this->productId,
+                    'to_location_id' => $this->warehouseLocationId,
+                    'uom_id' => $this->uomId,
+                    'return_qty' => '1.000000',
+                    'variant_id' => null,
+                    'batch_id' => null,
+                    'serial_id' => null,
+                    'income_account_id' => null,
+                    'line_total' => '50.000000',
+                ],
+            ],
+        );
+
+        $this->makeSalesReturnListener()->handle($event);
+
+        // AR credit entry still posted even with missing income account
+        $this->assertSame(1, DB::table('ar_transactions')->where('reference_type', 'sales_return')->where('reference_id', 602)->count());
+    }
+
+    private function makeGrnListener(): HandleGoodsReceiptPosted
+    {
+        return new HandleGoodsReceiptPosted(
+            fiscalPeriodRepository: app(FiscalPeriodRepositoryInterface::class),
+            createJournalEntryService: app(CreateJournalEntryServiceInterface::class),
+        );
     }
 
     private function makePaymentListener(): HandlePurchasePaymentRecorded

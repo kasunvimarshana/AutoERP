@@ -9,7 +9,7 @@ use Illuminate\Http\Resources\Json\ResourceCollection;
 
 class UserCollection extends ResourceCollection
 {
-    public string $collects = UserResource::class;
+    public $collects = UserResource::class;
 
     public function toArray(Request $request): array
     {

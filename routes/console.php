@@ -12,3 +12,6 @@ Artisan::command('inspire', function () {
 
 Schedule::command('inventory:release-expired-reservations')
     ->everyFifteenMinutes();
+
+Schedule::command('audit:prune --months=12')
+    ->monthly();

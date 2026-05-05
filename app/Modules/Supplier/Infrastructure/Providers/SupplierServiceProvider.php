@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Supplier\Infrastructure\Providers;
 
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Infrastructure\Concerns\LoadsModuleRoutesAndMigrations;
+use Modules\Purchase\Domain\Events\GoodsReceiptPosted;
+use Modules\Supplier\Infrastructure\Listeners\HandleGoodsReceiptPosted;
 use Modules\Supplier\Application\Contracts\CreateSupplierAddressServiceInterface;
 use Modules\Supplier\Application\Contracts\CreateSupplierContactServiceInterface;
 use Modules\Supplier\Application\Contracts\CreateSupplierProductServiceInterface;
@@ -88,5 +91,7 @@ class SupplierServiceProvider extends ServiceProvider
             __DIR__.'/../../routes/api.php',
             __DIR__.'/../../database/migrations',
         );
+
+        Event::listen(GoodsReceiptPosted::class, HandleGoodsReceiptPosted::class);
     }
 }
