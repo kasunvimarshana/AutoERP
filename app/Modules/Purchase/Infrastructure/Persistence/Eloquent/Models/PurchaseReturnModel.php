@@ -36,6 +36,7 @@ class PurchaseReturnModel extends Model
         'subtotal',
         'tax_total',
         'grand_total',
+            'discount_total',
         'debit_note_number',
         'journal_entry_id',
         'notes',
@@ -55,6 +56,7 @@ class PurchaseReturnModel extends Model
         'subtotal' => 'decimal:6',
         'tax_total' => 'decimal:6',
         'grand_total' => 'decimal:6',
+            'discount_total' => 'decimal:6',
         'return_date' => 'date',
         'metadata' => 'array',
     ];

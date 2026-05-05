@@ -25,6 +25,8 @@ return new class extends Migration
             $table->string('postal_code');
             $table->foreignId('country_id')->constrained('countries', 'id', 'supplier_addresses_country_id_fk');
             $table->boolean('is_default')->default(false);
+            $table->decimal('geo_lat', 10, 7)->nullable();
+            $table->decimal('geo_lng', 10, 7)->nullable();
             $table->timestamps();
 
             $table->index(['supplier_id', 'type'], 'supplier_addresses_supplier_type_idx');

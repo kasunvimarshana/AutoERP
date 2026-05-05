@@ -85,6 +85,7 @@ class ApprovalWorkflowConfig
     }
 
     public function update(
+        string $name,
         array $steps,
         ?float $minAmount,
         ?float $maxAmount,

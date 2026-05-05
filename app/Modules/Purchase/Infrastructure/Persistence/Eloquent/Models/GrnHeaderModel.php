@@ -35,6 +35,9 @@ class GrnHeaderModel extends Model
         'notes',
         'metadata',
         'created_by',
+        'subtotal',
+        'tax_total',
+        'grand_total',
     ];
 
     protected $casts = [
@@ -49,6 +52,9 @@ class GrnHeaderModel extends Model
         'exchange_rate' => 'decimal:10',
         'received_date' => 'date',
         'metadata' => 'array',
+        'subtotal' => 'decimal:6',
+        'tax_total' => 'decimal:6',
+        'grand_total' => 'decimal:6',
     ];
 
     public function supplier(): BelongsTo

@@ -78,6 +78,7 @@ class PostGrnService extends BaseService implements PostGrnServiceInterface
                     'batch_id' => $l->getBatchId(),
                     'serial_id' => $l->getSerialId(),
                 ])->values()->all(),
+                createdBy: (int) ($data['created_by'] ?? 0),
             ));
 
             return $saved;

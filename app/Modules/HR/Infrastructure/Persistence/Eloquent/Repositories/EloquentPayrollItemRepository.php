@@ -41,6 +41,6 @@ class EloquentPayrollItemRepository extends EloquentRepository implements Payrol
     {
         $now = fn ($v) => $v instanceof \DateTimeInterface ? $v : new \DateTimeImmutable($v ?? 'now');
 
-        return new PayrollItem($m->tenant_id, $m->name, $m->code, $m->type, $m->calculation_type, $m->value, (bool) $m->is_active, (bool) $m->is_taxable, $m->account_id, $m->metadata ?? [], $now($m->created_at), $now($m->updated_at), $m->id);
+        return new PayrollItem($m->tenant_id, $m->name, $m->code, $m->type, $m->calculation_type, (string) $m->value, (bool) $m->is_active, (bool) $m->is_taxable, $m->account_id, $m->metadata ?? [], $now($m->created_at), $now($m->updated_at), $m->id);
     }
 }

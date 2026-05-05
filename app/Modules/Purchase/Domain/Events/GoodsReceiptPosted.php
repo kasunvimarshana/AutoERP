@@ -15,5 +15,6 @@ class GoodsReceiptPosted
         public readonly int $supplierId,
         public readonly int $warehouseId,
         public readonly array $lines,
+        public readonly int $createdBy = 0,
     ) {}
 }

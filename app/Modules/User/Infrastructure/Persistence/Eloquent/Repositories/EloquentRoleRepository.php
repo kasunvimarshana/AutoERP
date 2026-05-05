@@ -56,7 +56,8 @@ class EloquentRoleRepository extends EloquentRepository implements RoleRepositor
         /** @var RoleModel|null $model */
         $model = $this->newScopedQuery()->find($role->getId());
         if ($model) {
-            $model->permissions()->sync($permissionIds);
+            $pivotData = array_fill_keys($permissionIds, ['tenant_id' => $role->getTenantId()]);
+            $model->permissions()->sync($pivotData);
         }
     }
 

@@ -78,7 +78,8 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
                 ->filter(static fn (?int $roleId): bool => $roleId !== null)
                 ->values()
                 ->toArray();
-            $model->roles()->sync($roleIds);
+            $pivotData = array_fill_keys($roleIds, ['tenant_id' => $user->getTenantId()]);
+            $model->roles()->sync($pivotData);
         }
 
         $model->load('roles.permissions');
@@ -91,7 +92,8 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
         /** @var UserModel|null $model */
         $model = $this->newScopedQuery()->find($user->getId());
         if ($model) {
-            $model->roles()->sync($roleIds);
+            $pivotData = array_fill_keys($roleIds, ['tenant_id' => $user->getTenantId()]);
+            $model->roles()->sync($pivotData);
         }
     }
 

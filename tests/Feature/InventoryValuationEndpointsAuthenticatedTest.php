@@ -12,6 +12,7 @@ use Modules\Inventory\Application\Contracts\ManageValuationConfigServiceInterfac
 use Modules\Inventory\Application\Contracts\ValuationEngineServiceInterface;
 use Modules\Inventory\Domain\Entities\ValuationConfig;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Tests\TestCase;
 
 class InventoryValuationEndpointsAuthenticatedTest extends TestCase
@@ -26,8 +27,8 @@ class InventoryValuationEndpointsAuthenticatedTest extends TestCase
         parent::setUp();
 
         $this->authUser = new UserModel([
-            'name' => 'Inventory Admin',
-            'email' => 'inventory-admin@example.com',
+            'name' => 'Valuation Admin',
+            'email' => 'valuation-admin@example.com',
             'password' => 'hashed',
         ]);
         $this->authUser->setAttribute('id', 99);
@@ -45,9 +46,9 @@ class InventoryValuationEndpointsAuthenticatedTest extends TestCase
         $this->config = new ValuationConfig(
             tenantId: 1,
             orgUnitId: null,
-            warehouseId: null,
-            productId: null,
-            transactionType: null,
+            warehouseId: 2,
+            productId: 10,
+            transactionType: 'receipt',
             valuationMethod: 'fifo',
             allocationStrategy: 'fifo',
             isActive: true,
@@ -56,15 +57,26 @@ class InventoryValuationEndpointsAuthenticatedTest extends TestCase
         );
 
         $manageService = $this->createMock(ManageValuationConfigServiceInterface::class);
-        $manageService->method('create')->willReturn($this->config);
-        $manageService->method('update')->willReturn($this->config);
-        $manageService->method('find')->willReturn($this->config);
         $manageService->method('list')->willReturn([
             'data' => [$this->config],
             'total' => 1,
             'per_page' => 15,
             'current_page' => 1,
         ]);
+        $manageService->method('create')->willReturn($this->config);
+        $manageService->method('find')->willReturn($this->config);
+        $manageService->method('update')->willReturn(new ValuationConfig(
+            tenantId: 1,
+            orgUnitId: null,
+            warehouseId: 2,
+            productId: 10,
+            transactionType: 'receipt',
+            valuationMethod: 'weighted_average',
+            allocationStrategy: 'nearest_bin',
+            isActive: true,
+            metadata: null,
+            id: 1,
+        ));
         $this->app->instance(ManageValuationConfigServiceInterface::class, $manageService);
 
         $valuationEngine = $this->createMock(ValuationEngineServiceInterface::class);
@@ -72,22 +84,25 @@ class InventoryValuationEndpointsAuthenticatedTest extends TestCase
         $this->app->instance(ValuationEngineServiceInterface::class, $valuationEngine);
 
         $allocationEngine = $this->createMock(AllocationEngineServiceInterface::class);
-        $allocationEngine->method('resolveAllocationStrategy')->willReturn('fifo');
+        $allocationEngine->method('resolveAllocationStrategy')->willReturn('nearest_bin');
         $this->app->instance(AllocationEngineServiceInterface::class, $allocationEngine);
     }
 
     private function actingAsUser(): static
     {
         return $this->withHeader('X-Tenant-ID', '1')
-            ->actingAs($this->authUser, (string) config('auth_context.guards.api', config('auth.defaults.guard', 'api')));
+            ->actingAs(
+                $this->authUser,
+                (string) config('auth_context.guards.api', config('auth.defaults.guard', 'api')),
+            );
     }
 
-    public function test_index_returns_list(): void
+    public function test_index_returns_configs(): void
     {
         $response = $this->actingAsUser()
             ->getJson('/api/inventory/valuation-configs?tenant_id=1');
 
-        $response->assertStatus(200);
+        $response->assertStatus(HttpResponse::HTTP_OK);
     }
 
     public function test_store_creates_config(): void
@@ -95,22 +110,17 @@ class InventoryValuationEndpointsAuthenticatedTest extends TestCase
         $response = $this->actingAsUser()
             ->postJson('/api/inventory/valuation-configs', [
                 'tenant_id' => 1,
+                'warehouse_id' => 2,
+                'product_id' => 10,
+                'transaction_type' => 'receipt',
                 'valuation_method' => 'fifo',
                 'allocation_strategy' => 'fifo',
+                'is_active' => true,
             ]);
 
-        $response->assertStatus(201);
+        $response->assertStatus(HttpResponse::HTTP_CREATED);
+        $response->assertJsonPath('data.id', 1);
         $response->assertJsonPath('data.valuation_method', 'fifo');
-    }
-
-    public function test_resolve_returns_method_and_strategy(): void
-    {
-        $response = $this->actingAsUser()
-            ->getJson('/api/inventory/valuation-configs/resolve?tenant_id=1');
-
-        $response->assertStatus(200);
-        $response->assertJsonPath('valuation_method', 'fifo');
-        $response->assertJsonPath('allocation_strategy', 'fifo');
     }
 
     public function test_show_returns_config(): void
@@ -118,7 +128,7 @@ class InventoryValuationEndpointsAuthenticatedTest extends TestCase
         $response = $this->actingAsUser()
             ->getJson('/api/inventory/valuation-configs/1?tenant_id=1');
 
-        $response->assertStatus(200);
+        $response->assertStatus(HttpResponse::HTTP_OK);
         $response->assertJsonPath('data.id', 1);
     }
 
@@ -127,22 +137,30 @@ class InventoryValuationEndpointsAuthenticatedTest extends TestCase
         $response = $this->actingAsUser()
             ->putJson('/api/inventory/valuation-configs/1', [
                 'tenant_id' => 1,
-                'valuation_method' => 'fifo',
+                'valuation_method' => 'weighted_average',
+                'allocation_strategy' => 'nearest_bin',
             ]);
 
-        $response->assertStatus(200);
+        $response->assertStatus(HttpResponse::HTTP_OK);
+        $response->assertJsonPath('data.valuation_method', 'weighted_average');
+        $response->assertJsonPath('data.allocation_strategy', 'nearest_bin');
     }
 
     public function test_destroy_returns_no_content(): void
     {
         $response = $this->actingAsUser()
-            ->getJson('/api/inventory/valuation-configs/1?tenant_id=1');
-
-        $response->assertStatus(200);
-
-        $deleteResponse = $this->actingAsUser()
             ->deleteJson('/api/inventory/valuation-configs/1?tenant_id=1');
 
-        $deleteResponse->assertStatus(204);
+        $response->assertStatus(HttpResponse::HTTP_NO_CONTENT);
+    }
+
+    public function test_resolve_returns_method_and_strategy(): void
+    {
+        $response = $this->actingAsUser()
+            ->getJson('/api/inventory/valuation-configs/resolve?tenant_id=1&product_id=10&warehouse_id=2');
+
+        $response->assertStatus(HttpResponse::HTTP_OK);
+        $response->assertJsonPath('valuation_method', 'fifo');
+        $response->assertJsonPath('allocation_strategy', 'nearest_bin');
     }
 }
