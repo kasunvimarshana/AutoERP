@@ -8,5 +8,5 @@ use Illuminate\Http\Resources\Json\ResourceCollection;
 
 class PermissionCollection extends ResourceCollection
 {
-    public string $collects = PermissionResource::class;
+    public $collects = PermissionResource::class;
 }
