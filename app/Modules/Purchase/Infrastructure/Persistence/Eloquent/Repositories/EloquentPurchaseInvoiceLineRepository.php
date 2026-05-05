@@ -53,7 +53,7 @@ class EloquentPurchaseInvoiceLineRepository extends EloquentRepository implement
     /** @return PurchaseInvoiceLine[] */
     public function findByInvoiceId(int $tenantId, int $invoiceId): array
     {
-        return $this->model->newQuery()
+        return $this->newScopedQuery()
             ->where('tenant_id', $tenantId)
             ->where('purchase_invoice_id', $invoiceId)
             ->get()

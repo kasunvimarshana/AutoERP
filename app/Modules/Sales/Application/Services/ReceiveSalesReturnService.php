@@ -36,10 +36,16 @@ class ReceiveSalesReturnService extends BaseService implements ReceiveSalesRetur
 
         // Resolve AR account from original invoice when available
         $arAccountId = null;
+        $incomeAccountMap = [];
         if ($saved->getOriginalInvoiceId() !== null) {
             $originalInvoice = $this->salesInvoiceRepository->find($saved->getOriginalInvoiceId());
             if ($originalInvoice !== null) {
                 $arAccountId = $originalInvoice->getArAccountId();
+                foreach ($originalInvoice->getLines() as $invoiceLine) {
+                    if ($invoiceLine->getIncomeAccountId() !== null) {
+                        $incomeAccountMap[$invoiceLine->getProductId()] = $invoiceLine->getIncomeAccountId();
+                    }
+                }
             }
         }
 
@@ -61,7 +67,7 @@ class ReceiveSalesReturnService extends BaseService implements ReceiveSalesRetur
                 'variant_id' => $l->getVariantId(),
                 'batch_id' => $l->getBatchId(),
                 'serial_id' => $l->getSerialId(),
-                'income_account_id' => null,
+                'income_account_id' => $incomeAccountMap[$l->getProductId()] ?? null,
                 'line_total' => $l->getLineTotal(),
             ], $saved->getLines()),
             createdBy: (int) (Auth::id() ?? 0),

@@ -2247,6 +2247,121 @@ class FinanceListenerIntegrationTest extends TestCase
         $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'payroll_run')->where('reference_id', 501)->count());
     }
 
+    public function test_handle_payroll_run_approved_sets_payslip_journal_entry_id(): void
+    {
+        // user id=1 already inserted by seedReferenceData(); use distinct ids
+        DB::table('users')->insert([
+            ['id' => 10, 'tenant_id' => $this->tenantId, 'org_unit_id' => null, 'row_version' => 1,
+             'first_name' => 'Alice', 'last_name' => 'Smith', 'email' => 'alice@test.com',
+             'password' => 'hash', 'status' => 'active', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 11, 'tenant_id' => $this->tenantId, 'org_unit_id' => null, 'row_version' => 1,
+             'first_name' => 'Bob', 'last_name' => 'Jones', 'email' => 'bob@test.com',
+             'password' => 'hash', 'status' => 'active', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        DB::table('employees')->insert([
+            ['id' => 10, 'tenant_id' => $this->tenantId, 'org_unit_id' => null, 'row_version' => 1,
+             'user_id' => 10, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 11, 'tenant_id' => $this->tenantId, 'org_unit_id' => null, 'row_version' => 1,
+             'user_id' => 11, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        DB::table('hr_payroll_runs')->insert([
+            'id' => 501,
+            'tenant_id' => $this->tenantId,
+            'org_unit_id' => null,
+            'row_version' => 1,
+            'period_start' => '2026-01-01',
+            'period_end' => '2026-01-31',
+            'status' => 'approved',
+            'processed_at' => '2026-01-31 09:00:00',
+            'approved_at' => '2026-01-31 10:00:00',
+            'approved_by' => 1,
+            'total_gross' => '1000.000000',
+            'total_deductions' => '200.000000',
+            'total_net' => '800.000000',
+            'metadata' => json_encode([
+                'payroll_expense_account_id' => $this->payrollExpenseAccountId,
+                'payroll_liability_account_id' => $this->payrollLiabilityAccountId,
+                'payroll_deductions_account_id' => $this->payrollDeductionsAccountId,
+                'currency_id' => 1,
+                'exchange_rate' => 1,
+            ], JSON_THROW_ON_ERROR),
+            'created_at' => now(),
+            'updated_at' => now(),
+            'deleted_at' => null,
+        ]);
+
+        DB::table('hr_payslips')->insert([
+            [
+                'id' => 1,
+                'tenant_id' => $this->tenantId,
+                'org_unit_id' => null,
+                'row_version' => 1,
+                'payroll_run_id' => 501,
+                'employee_id' => 10,
+                'period_start' => '2026-01-01',
+                'period_end' => '2026-01-31',
+                'gross_salary' => '1000.000000',
+                'total_deductions' => '200.000000',
+                'net_salary' => '800.000000',
+                'base_salary' => '1000.000000',
+                'worked_days' => '20.00',
+                'status' => 'approved',
+                'journal_entry_id' => null,
+                'metadata' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+                'deleted_at' => null,
+            ],
+            [
+                'id' => 2,
+                'tenant_id' => $this->tenantId,
+                'org_unit_id' => null,
+                'row_version' => 1,
+                'payroll_run_id' => 501,
+                'employee_id' => 11,
+                'period_start' => '2026-01-01',
+                'period_end' => '2026-01-31',
+                'gross_salary' => '1000.000000',
+                'total_deductions' => '200.000000',
+                'net_salary' => '800.000000',
+                'base_salary' => '1000.000000',
+                'worked_days' => '20.00',
+                'status' => 'approved',
+                'journal_entry_id' => null,
+                'metadata' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+                'deleted_at' => null,
+            ],
+        ]);
+
+        $event = new PayrollRunApproved(
+            payrollRun: $this->makePayrollRun(),
+            tenantId: $this->tenantId,
+        );
+
+        $this->makePayrollListener()->handle($event);
+
+        $journalEntry = DB::table('journal_entries')
+            ->where('reference_type', 'payroll_run')
+            ->where('reference_id', 501)
+            ->first();
+
+        $this->assertNotNull($journalEntry);
+
+        $payslips = DB::table('hr_payslips')
+            ->where('payroll_run_id', 501)
+            ->get();
+
+        $this->assertCount(2, $payslips);
+        foreach ($payslips as $payslip) {
+            $this->assertSame((int) $journalEntry->id, (int) $payslip->journal_entry_id,
+                "Payslip #{$payslip->id} must have journal_entry_id set after payroll run approval");
+        }
+    }
+
     public function test_approve_payroll_run_service_dispatches_finance_posting_end_to_end(): void
     {
         DB::table('hr_payroll_runs')->insert([
