@@ -7,6 +7,7 @@ namespace Modules\Inventory\Infrastructure\Listeners;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Inventory\Domain\Entities\StockMovement;
+use Modules\Inventory\Domain\Exceptions\InsufficientAvailableStockException;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryStockRepositoryInterface;
 use Modules\Inventory\Domain\RepositoryInterfaces\TraceLogRepositoryInterface;
 use Modules\Sales\Domain\Events\ShipmentProcessed;
@@ -57,7 +58,18 @@ class HandleShipmentProcessed
                 );
 
                 $saved = $this->inventoryStockRepository->recordMovement($movement);
-                $this->inventoryStockRepository->adjustStockLevel($saved);
+
+                try {
+                    $this->inventoryStockRepository->adjustStockLevel($saved);
+                } catch (InsufficientAvailableStockException $e) {
+                    Log::warning('HandleShipmentProcessed: insufficient stock for shipment line — stock level not adjusted', [
+                        'shipment_id'      => $event->shipmentId,
+                        'product_id'       => $line['product_id'],
+                        'from_location_id' => $fromLocationId,
+                        'shipped_qty'      => $line['shipped_qty'],
+                    ]);
+                }
+
                 $this->traceLogRepository->recordForMovement($saved);
             }
         });

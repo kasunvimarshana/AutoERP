@@ -6,6 +6,9 @@ namespace Modules\Purchase\Application\DTOs;
 
 class PurchaseOrderData
 {
+    /**
+     * @param  array<int, mixed>|null  $lines  Raw line arrays from the normalized payload
+     */
     public function __construct(
         public readonly int $tenantId,
         public readonly int $supplierId,
@@ -25,6 +28,7 @@ class PurchaseOrderData
         public readonly ?string $notes = null,
         public readonly ?array $metadata = null,
         public readonly ?int $approvedBy = null,
+        public readonly ?array $lines = null,
         public readonly ?int $id = null,
     )
     {
@@ -51,6 +55,7 @@ class PurchaseOrderData
             notes: isset($data['notes']) ? (string) $data['notes'] : null,
             metadata: isset($data['metadata']) ? (array) $data['metadata'] : null,
             approvedBy: isset($data['approved_by']) ? (int) $data['approved_by'] : null,
+            lines: isset($data['lines']) && is_array($data['lines']) ? $data['lines'] : null,
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

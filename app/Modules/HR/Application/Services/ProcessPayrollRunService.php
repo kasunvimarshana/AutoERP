@@ -51,34 +51,33 @@ class ProcessPayrollRunService extends BaseService implements ProcessPayrollRunS
 
         return DB::transaction(function () use ($run, $employees, $activeItems): PayrollRun {
             $now = new \DateTimeImmutable;
-            $totalGross = 0.0;
-            $totalDeductions = 0.0;
+            $totalGross = '0.000000';
+            $totalDeductions = '0.000000';
 
             foreach ($employees as $employee) {
                 $employeeId = (int) ($employee['employee_id'] ?? 0);
-                $baseSalary = (string) ($employee['base_salary'] ?? '0');
+                $baseSalary = number_format((float) ($employee['base_salary'] ?? 0), 6, '.', '');
                 $workedDays = (float) ($employee['worked_days'] ?? 0);
-                $baseAmount = (float) $baseSalary;
 
-                $earnings = 0.0;
-                $deductions = 0.0;
+                $earnings = '0.000000';
+                $deductions = '0.000000';
 
                 foreach ($activeItems as $item) {
-                    $itemValue = (float) $item->getValue();
+                    $itemValue = number_format((float) $item->getValue(), 6, '.', '');
 
                     if ($item->getCalculationType() === 'percentage') {
-                        $itemValue = $baseAmount * ($itemValue / 100);
+                        $itemValue = bcmul($baseSalary, bcdiv($itemValue, '100.000000', 6), 6);
                     }
 
                     if ($item->getType() === 'earning') {
-                        $earnings += $itemValue;
+                        $earnings = bcadd($earnings, $itemValue, 6);
                     } elseif ($item->getType() === 'deduction') {
-                        $deductions += $itemValue;
+                        $deductions = bcadd($deductions, $itemValue, 6);
                     }
                 }
 
-                $gross = $baseAmount + $earnings;
-                $net = $gross - $deductions;
+                $gross = bcadd($baseSalary, $earnings, 6);
+                $net = bcsub($gross, $deductions, 6);
 
                 $payslip = new Payslip(
                     tenantId: $run->getTenantId(),
@@ -86,9 +85,9 @@ class ProcessPayrollRunService extends BaseService implements ProcessPayrollRunS
                     payrollRunId: $run->getId(),
                     periodStart: $run->getPeriodStart(),
                     periodEnd: $run->getPeriodEnd(),
-                    grossSalary: number_format($gross, 6, '.', ''),
-                    totalDeductions: number_format($deductions, 6, '.', ''),
-                    netSalary: number_format($net, 6, '.', ''),
+                    grossSalary: $gross,
+                    totalDeductions: $deductions,
+                    netSalary: $net,
                     baseSalary: $baseSalary,
                     workedDays: $workedDays,
                     status: 'draft',
@@ -100,13 +99,13 @@ class ProcessPayrollRunService extends BaseService implements ProcessPayrollRunS
 
                 $savedPayslip = $this->payslipRepository->save($payslip);
 
-                $totalGross += $gross;
-                $totalDeductions += $deductions;
+                $totalGross = bcadd($totalGross, $gross, 6);
+                $totalDeductions = bcadd($totalDeductions, $deductions, 6);
 
                 $this->addEvent(new PayslipGenerated($savedPayslip, $run->getTenantId()));
             }
 
-            $totalNet = $totalGross - $totalDeductions;
+            $totalNet = bcsub($totalGross, $totalDeductions, 6);
             $processedRun = new PayrollRun(
                 tenantId: $run->getTenantId(),
                 periodStart: $run->getPeriodStart(),
@@ -115,9 +114,9 @@ class ProcessPayrollRunService extends BaseService implements ProcessPayrollRunS
                 processedAt: $now,
                 approvedAt: $run->getApprovedAt(),
                 approvedBy: $run->getApprovedBy(),
-                totalGross: number_format($totalGross, 6, '.', ''),
-                totalDeductions: number_format($totalDeductions, 6, '.', ''),
-                totalNet: number_format($totalNet, 6, '.', ''),
+                totalGross: $totalGross,
+                totalDeductions: $totalDeductions,
+                totalNet: $totalNet,
                 metadata: $run->getMetadata(),
                 createdAt: $run->getCreatedAt(),
                 updatedAt: $now,

@@ -32,6 +32,22 @@ class UpdatePurchaseInvoiceRequest extends FormRequest
             'grand_total' => ['nullable', 'string'],
             'ap_account_id' => ['nullable', 'integer'],
             'journal_entry_id' => ['nullable', 'integer'],
+            'lines' => ['nullable', 'array'],
+            'lines.*.product_id' => ['required_with:lines', 'integer'],
+            'lines.*.uom_id' => ['required_with:lines', 'integer'],
+            'lines.*.quantity' => ['required_with:lines', 'numeric', 'min:0'],
+            'lines.*.unit_price' => ['required_with:lines', 'numeric', 'min:0'],
+            'lines.*.variant_id' => ['nullable', 'integer'],
+            'lines.*.description' => ['nullable', 'string'],
+            'lines.*.discount_pct' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'lines.*.tax_group_id' => ['nullable', 'integer'],
+            'lines.*.account_id' => ['nullable', 'integer'],
+            'lines.*.grn_line_id' => ['nullable', 'integer'],
+            'metadata' => ['nullable', 'array'],
+            'metadata.discount_strategy' => ['nullable', 'string', 'in:unit,total,hybrid,basket'],
+            'metadata.discount_type' => ['nullable', 'string', 'in:percentage,fixed'],
+            'metadata.discount_value' => ['nullable', 'numeric', 'min:0'],
+            'metadata.stack_discounts' => ['nullable', 'boolean'],
         ];
     }
 }

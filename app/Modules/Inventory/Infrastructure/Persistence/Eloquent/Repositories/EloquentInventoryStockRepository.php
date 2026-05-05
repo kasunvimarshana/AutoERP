@@ -6,6 +6,7 @@ namespace Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Domain\Entities\StockMovement;
+use Modules\Inventory\Domain\Exceptions\InsufficientAvailableStockException;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryStockRepositoryInterface;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\StockMovementModel;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\StockLevelModel;
@@ -158,6 +159,10 @@ class EloquentInventoryStockRepository implements InventoryStockRepositoryInterf
             ->first();
 
         if ($existing === null) {
+            if ($operation === '-') {
+                throw new InsufficientAvailableStockException;
+            }
+
             DB::table($this->stockLevelsTable)->insert([
                 'tenant_id' => $movement->getTenantId(),
                 'product_id' => $movement->getProductId(),
@@ -179,6 +184,10 @@ class EloquentInventoryStockRepository implements InventoryStockRepositoryInterf
 
         $current = (string) $existing->quantity_on_hand;
         $updatedQty = $operation === '-' ? bcsub($current, $qty, 6) : bcadd($current, $qty, 6);
+
+        if ($operation === '-' && bccomp($updatedQty, '0', 6) < 0) {
+            throw new InsufficientAvailableStockException;
+        }
 
         DB::table($this->stockLevelsTable)
             ->where('id', $existing->id)

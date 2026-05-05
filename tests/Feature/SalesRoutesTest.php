@@ -49,6 +49,7 @@ class SalesRoutesTest extends TestCase
         $this->deleteJson('/api/sales-invoices/1')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->postJson('/api/sales-invoices/1/post')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->postJson('/api/sales-invoices/1/record-payment', [])->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
+        $this->postJson('/api/sales-invoices/1/record-refund', [])->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
     }
 
     public function test_sales_return_endpoints_require_authentication(): void
@@ -98,6 +99,10 @@ class SalesRoutesTest extends TestCase
         );
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/sales-invoices/{salesInvoice}/record-payment', 'POST'),
+            ['auth.configured', 'resolve.tenant']
+        );
+        $this->assertRouteUsesMiddleware(
+            $this->findRoute($routes, 'api/sales-invoices/{salesInvoice}/record-refund', 'POST'),
             ['auth.configured', 'resolve.tenant']
         );
         $this->assertRouteUsesMiddleware(

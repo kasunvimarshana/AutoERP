@@ -110,7 +110,7 @@ class EloquentSalesReturnRepository extends EloquentRepository implements SalesR
     public function findByTenantAndReturnNumber(int $tenantId, string $returnNumber): ?SalesReturn
     {
         /** @var SalesReturnModel|null $model */
-        $model = $this->model->newQuery()->with('lines')
+        $model = $this->newScopedQuery()->with('lines')
             ->where('tenant_id', $tenantId)
             ->where('return_number', $returnNumber)
             ->first();

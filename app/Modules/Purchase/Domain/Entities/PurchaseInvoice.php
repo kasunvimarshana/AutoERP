@@ -48,6 +48,9 @@ class PurchaseInvoice
 
     private \DateTimeInterface $updatedAt;
 
+    /** @var PurchaseInvoiceLine[] */
+    private array $lines = [];
+
     public function __construct(
         int $tenantId,
         int $supplierId,
@@ -263,5 +266,21 @@ class PurchaseInvoice
     {
         $this->status = 'approved';
         $this->updatedAt = new \DateTimeImmutable;
+    }
+
+    /**
+     * @param  PurchaseInvoiceLine[]  $lines
+     */
+    public function setLines(array $lines): void
+    {
+        $this->lines = $lines;
+    }
+
+    /**
+     * @return PurchaseInvoiceLine[]
+     */
+    public function getLines(): array
+    {
+        return $this->lines;
     }
 }

@@ -8,20 +8,24 @@ use Modules\Core\Application\Services\BaseService;
 use Modules\Sales\Application\Contracts\CreateSalesOrderServiceInterface;
 use Modules\Sales\Application\DTOs\SalesOrderData;
 use Modules\Sales\Application\DTOs\SalesOrderLineData;
+use Modules\Sales\Application\Support\SalesPricingCalculator;
 use Modules\Sales\Domain\Entities\SalesOrder;
 use Modules\Sales\Domain\Entities\SalesOrderLine;
 use Modules\Sales\Domain\RepositoryInterfaces\SalesOrderRepositoryInterface;
 
 class CreateSalesOrderService extends BaseService implements CreateSalesOrderServiceInterface
 {
-    public function __construct(private readonly SalesOrderRepositoryInterface $salesOrderRepository)
-    {
+    public function __construct(
+        private readonly SalesOrderRepositoryInterface $salesOrderRepository,
+        private readonly SalesPricingCalculator $pricingCalculator,
+    ) {
         parent::__construct($salesOrderRepository);
     }
 
     protected function handle(array $data): SalesOrder
     {
-        $dto = SalesOrderData::fromArray($data);
+        $normalizedData = $this->pricingCalculator->normalizeOrderPayload($data);
+        $dto = SalesOrderData::fromArray($normalizedData);
 
         $orderDate = $dto->orderDate !== null
             ? new \DateTimeImmutable($dto->orderDate)

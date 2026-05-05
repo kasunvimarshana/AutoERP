@@ -214,6 +214,7 @@ use Modules\Finance\Infrastructure\Listeners\HandleCycleCountCompleted;
 use Modules\Finance\Infrastructure\Listeners\HandleStockAdjustmentRecorded;
 use Modules\Finance\Infrastructure\Listeners\HandleSalesInvoicePosted;
 use Modules\Finance\Infrastructure\Listeners\HandleSalesPaymentRecorded;
+use Modules\Finance\Infrastructure\Listeners\HandleSalesRefundRecorded;
 use Modules\Finance\Infrastructure\Listeners\HandleSalesReturnReceived;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentAccountRepository;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentApprovalRequestRepository;
@@ -242,6 +243,7 @@ use Modules\Purchase\Domain\Events\PurchasePaymentRecorded;
 use Modules\Purchase\Domain\Events\PurchaseReturnPosted;
 use Modules\Sales\Domain\Events\SalesInvoicePosted;
 use Modules\Sales\Domain\Events\SalesPaymentRecorded;
+use Modules\Sales\Domain\Events\SalesRefundRecorded;
 use Modules\Sales\Domain\Events\SalesReturnReceived;
 
 class FinanceServiceProvider extends ServiceProvider
@@ -384,6 +386,7 @@ class FinanceServiceProvider extends ServiceProvider
         Event::listen(StockAdjustmentRecorded::class, HandleStockAdjustmentRecorded::class);
         Event::listen(SalesInvoicePosted::class, HandleSalesInvoicePosted::class);
         Event::listen(SalesPaymentRecorded::class, HandleSalesPaymentRecorded::class);
+        Event::listen(SalesRefundRecorded::class, HandleSalesRefundRecorded::class);
         Event::listen(SalesReturnReceived::class, HandleSalesReturnReceived::class);
 
         $this->bootModule(

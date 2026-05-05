@@ -92,7 +92,7 @@ class EloquentShipmentRepository extends EloquentRepository implements ShipmentR
     public function find(int|string $id, array $columns = ['*']): ?Shipment
     {
         /** @var ShipmentModel|null $model */
-        $model = $this->model->newQuery()->with('lines')->find($id, $columns);
+        $model = $this->newScopedQuery()->with('lines')->find($id, $columns);
 
         return $model ? $this->toDomainEntity($model) : null;
     }
@@ -100,7 +100,7 @@ class EloquentShipmentRepository extends EloquentRepository implements ShipmentR
     public function findByTenantAndShipmentNumber(int $tenantId, string $shipmentNumber): ?Shipment
     {
         /** @var ShipmentModel|null $model */
-        $model = $this->model->newQuery()->with('lines')
+        $model = $this->newScopedQuery()->with('lines')
             ->where('tenant_id', $tenantId)
             ->where('shipment_number', $shipmentNumber)
             ->first();

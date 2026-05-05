@@ -6,6 +6,9 @@ namespace Modules\Purchase\Application\DTOs;
 
 class PurchaseInvoiceData
 {
+    /**
+     * @param  array<int, mixed>|null  $lines  Raw line arrays from the normalized payload
+     */
     public function __construct(
         public readonly int $tenantId,
         public readonly int $supplierId,
@@ -24,6 +27,7 @@ class PurchaseInvoiceData
         public readonly string $grandTotal = '0',
         public readonly ?int $apAccountId = null,
         public readonly ?int $journalEntryId = null,
+        public readonly ?array $lines = null,
         public readonly ?int $id = null,
     ) {}
 
@@ -47,6 +51,7 @@ class PurchaseInvoiceData
             grandTotal: isset($data['grand_total']) ? (string) $data['grand_total'] : '0',
             apAccountId: isset($data['ap_account_id']) ? (int) $data['ap_account_id'] : null,
             journalEntryId: isset($data['journal_entry_id']) ? (int) $data['journal_entry_id'] : null,
+            lines: isset($data['lines']) && is_array($data['lines']) ? $data['lines'] : null,
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }
