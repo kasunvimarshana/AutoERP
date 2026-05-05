@@ -3,36 +3,36 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use Modules\Service\Infrastructure\Http\Controllers\ServiceJobCardController;
-use Modules\Service\Infrastructure\Http\Controllers\ServiceMaintenancePlanController;
+use Modules\Service\Infrastructure\Http\Controllers\ServiceAvailabilityBridgeController;
+use Modules\Service\Infrastructure\Http\Controllers\ServiceWorkOrderController;
 
-Route::prefix('service')
+Route::prefix('services')
     ->middleware(['auth.configured', 'resolve.tenant'])
-    ->group(function (): void {
+    ->group(static function (): void {
+        Route::post('availability/start-downtime', [ServiceAvailabilityBridgeController::class, 'startDowntime'])
+            ->name('services.availability.start-downtime');
 
-        // Maintenance plans
-        Route::get('maintenance-plans', [ServiceMaintenancePlanController::class, 'index'])
-            ->name('service.maintenance-plans.index');
-        Route::post('maintenance-plans', [ServiceMaintenancePlanController::class, 'store'])
-            ->name('service.maintenance-plans.store');
-        Route::get('maintenance-plans/{plan}', [ServiceMaintenancePlanController::class, 'show'])
-            ->name('service.maintenance-plans.show');
-        Route::put('maintenance-plans/{plan}', [ServiceMaintenancePlanController::class, 'update'])
-            ->name('service.maintenance-plans.update');
-        Route::delete('maintenance-plans/{plan}', [ServiceMaintenancePlanController::class, 'destroy'])
-            ->name('service.maintenance-plans.destroy');
+        Route::post('availability/end-downtime', [ServiceAvailabilityBridgeController::class, 'endDowntime'])
+            ->name('services.availability.end-downtime');
 
-        // Job cards
-        Route::get('job-cards', [ServiceJobCardController::class, 'index'])
-            ->name('service.job-cards.index');
-        Route::post('job-cards', [ServiceJobCardController::class, 'store'])
-            ->name('service.job-cards.store');
-        Route::get('job-cards/{jobCard}', [ServiceJobCardController::class, 'show'])
-            ->name('service.job-cards.show');
-        Route::put('job-cards/{jobCard}/status', [ServiceJobCardController::class, 'updateStatus'])
-            ->name('service.job-cards.update-status');
-        Route::post('job-cards/{jobCard}/complete', [ServiceJobCardController::class, 'complete'])
-            ->name('service.job-cards.complete');
-        Route::delete('job-cards/{jobCard}', [ServiceJobCardController::class, 'destroy'])
-            ->name('service.job-cards.destroy');
+        Route::get('work-orders', [ServiceWorkOrderController::class, 'index'])
+            ->name('services.work-orders.index');
+
+        Route::post('work-orders', [ServiceWorkOrderController::class, 'store'])
+            ->name('services.work-orders.store');
+
+        Route::get('work-orders/{id}', [ServiceWorkOrderController::class, 'show'])
+            ->name('services.work-orders.show');
+
+        Route::put('work-orders/{id}', [ServiceWorkOrderController::class, 'update'])
+            ->name('services.work-orders.update');
+
+        Route::delete('work-orders/{id}', [ServiceWorkOrderController::class, 'destroy'])
+            ->name('services.work-orders.destroy');
+
+        Route::post('work-orders/{id}/complete', [ServiceWorkOrderController::class, 'complete'])
+            ->name('services.work-orders.complete');
+
+        Route::post('work-orders/{id}/cancel', [ServiceWorkOrderController::class, 'cancel'])
+            ->name('services.work-orders.cancel');
     });

@@ -8,14 +8,22 @@ use Modules\Rental\Domain\Entities\RentalBooking;
 
 interface RentalBookingRepositoryInterface
 {
-    public function save(RentalBooking $booking): RentalBooking;
-
     public function findById(int $tenantId, int $id): ?RentalBooking;
 
-    public function findByBookingNumber(int $tenantId, string $bookingNumber): ?RentalBooking;
+    public function findByTenant(int $tenantId, int $orgUnitId = null, array $filters = []): array;
 
-    /** @return array{data: RentalBooking[], total: int, per_page: int, current_page: int} */
-    public function paginate(int $tenantId, array $filters, int $perPage, int $page): array;
+    public function save(RentalBooking $booking): RentalBooking;
 
-    public function existsByBookingNumber(int $tenantId, string $bookingNumber): bool;
+    public function delete(int $tenantId, int $id): bool;
+
+    /** @return RentalBooking[] */
+    public function findConflictingBookings(
+        int $tenantId,
+        int $assetId,
+        string $pickupAt,
+        string $returnDueAt,
+        ?int $excludeBookingId = null,
+    ): array;
+
+    public function nextBookingNumber(int $tenantId, ?int $orgUnitId): string;
 }

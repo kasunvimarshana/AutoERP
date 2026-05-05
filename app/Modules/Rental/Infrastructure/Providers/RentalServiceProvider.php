@@ -4,35 +4,38 @@ declare(strict_types=1);
 
 namespace Modules\Rental\Infrastructure\Providers;
 
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Infrastructure\Concerns\LoadsModuleRoutesAndMigrations;
+use Modules\Rental\Application\Contracts\ActivateRentalBookingServiceInterface;
+use Modules\Rental\Application\Contracts\AssignDriverServiceInterface;
 use Modules\Rental\Application\Contracts\CancelRentalBookingServiceInterface;
-use Modules\Rental\Application\Contracts\ConfirmRentalBookingServiceInterface;
-use Modules\Rental\Application\Contracts\CreateAssetServiceInterface;
+use Modules\Rental\Application\Contracts\CompleteRentalBookingServiceInterface;
 use Modules\Rental\Application\Contracts\CreateRentalBookingServiceInterface;
-use Modules\Rental\Application\Contracts\CreateRentalRateCardServiceInterface;
-use Modules\Rental\Application\Contracts\FindAssetServiceInterface;
-use Modules\Rental\Application\Contracts\FindRentalBookingServiceInterface;
-use Modules\Rental\Application\Contracts\FindRentalRateCardServiceInterface;
-use Modules\Rental\Application\Contracts\UpdateAssetServiceInterface;
+use Modules\Rental\Application\Contracts\CreateRentalIncidentServiceInterface;
+use Modules\Rental\Application\Contracts\HoldRentalDepositServiceInterface;
+use Modules\Rental\Application\Contracts\ReleaseRentalDepositServiceInterface;
+use Modules\Rental\Application\Contracts\SubstituteDriverServiceInterface;
+use Modules\Rental\Application\Contracts\UpdateRentalBookingServiceInterface;
+use Modules\Rental\Application\Contracts\UpdateRentalIncidentServiceInterface;
+use Modules\Rental\Application\Services\ActivateRentalBookingService;
+use Modules\Rental\Application\Services\AssignDriverService;
 use Modules\Rental\Application\Services\CancelRentalBookingService;
-use Modules\Rental\Application\Services\ConfirmRentalBookingService;
-use Modules\Rental\Application\Services\CreateAssetService;
+use Modules\Rental\Application\Services\CompleteRentalBookingService;
 use Modules\Rental\Application\Services\CreateRentalBookingService;
-use Modules\Rental\Application\Services\CreateRentalRateCardService;
-use Modules\Rental\Application\Services\FindAssetService;
-use Modules\Rental\Application\Services\FindRentalBookingService;
-use Modules\Rental\Application\Services\FindRentalRateCardService;
-use Modules\Rental\Application\Services\UpdateAssetService;
-use Modules\Rental\Domain\RepositoryInterfaces\AssetRepositoryInterface;
+use Modules\Rental\Application\Services\CreateRentalIncidentService;
+use Modules\Rental\Application\Services\HoldRentalDepositService;
+use Modules\Rental\Application\Services\ReleaseRentalDepositService;
+use Modules\Rental\Application\Services\SubstituteDriverService;
+use Modules\Rental\Application\Services\UpdateRentalBookingService;
+use Modules\Rental\Application\Services\UpdateRentalIncidentService;
 use Modules\Rental\Domain\RepositoryInterfaces\RentalBookingRepositoryInterface;
-use Modules\Rental\Domain\RepositoryInterfaces\RentalRateCardRepositoryInterface;
-use Modules\Rental\Infrastructure\Persistence\Eloquent\Repositories\EloquentAssetRepository;
+use Modules\Rental\Domain\RepositoryInterfaces\RentalDepositRepositoryInterface;
+use Modules\Rental\Domain\RepositoryInterfaces\RentalDriverAssignmentRepositoryInterface;
+use Modules\Rental\Domain\RepositoryInterfaces\RentalIncidentRepositoryInterface;
 use Modules\Rental\Infrastructure\Persistence\Eloquent\Repositories\EloquentRentalBookingRepository;
-use Modules\Rental\Infrastructure\Persistence\Eloquent\Repositories\EloquentRentalRateCardRepository;
-use Modules\Service\Domain\Events\ServiceJobCardCompleted;
-use Modules\Rental\Infrastructure\Listeners\HandleServiceJobCardCompleted;
+use Modules\Rental\Infrastructure\Persistence\Eloquent\Repositories\EloquentRentalDepositRepository;
+use Modules\Rental\Infrastructure\Persistence\Eloquent\Repositories\EloquentRentalDriverAssignmentRepository;
+use Modules\Rental\Infrastructure\Persistence\Eloquent\Repositories\EloquentRentalIncidentRepository;
 
 class RentalServiceProvider extends ServiceProvider
 {
@@ -40,28 +43,32 @@ class RentalServiceProvider extends ServiceProvider
 
     public function register(): void
     {
-        // Repositories
-        $this->app->bind(AssetRepositoryInterface::class, EloquentAssetRepository::class);
+        // Bookings
         $this->app->bind(RentalBookingRepositoryInterface::class, EloquentRentalBookingRepository::class);
-        $this->app->bind(RentalRateCardRepositoryInterface::class, EloquentRentalRateCardRepository::class);
-
-        // Services
-        $this->app->bind(CreateAssetServiceInterface::class, CreateAssetService::class);
-        $this->app->bind(FindAssetServiceInterface::class, FindAssetService::class);
-        $this->app->bind(UpdateAssetServiceInterface::class, UpdateAssetService::class);
         $this->app->bind(CreateRentalBookingServiceInterface::class, CreateRentalBookingService::class);
-        $this->app->bind(FindRentalBookingServiceInterface::class, FindRentalBookingService::class);
-        $this->app->bind(ConfirmRentalBookingServiceInterface::class, ConfirmRentalBookingService::class);
+        $this->app->bind(UpdateRentalBookingServiceInterface::class, UpdateRentalBookingService::class);
+        $this->app->bind(ActivateRentalBookingServiceInterface::class, ActivateRentalBookingService::class);
+        $this->app->bind(CompleteRentalBookingServiceInterface::class, CompleteRentalBookingService::class);
         $this->app->bind(CancelRentalBookingServiceInterface::class, CancelRentalBookingService::class);
-        $this->app->bind(CreateRentalRateCardServiceInterface::class, CreateRentalRateCardService::class);
-        $this->app->bind(FindRentalRateCardServiceInterface::class, FindRentalRateCardService::class);
+
+        // Driver Assignments
+        $this->app->bind(RentalDriverAssignmentRepositoryInterface::class, EloquentRentalDriverAssignmentRepository::class);
+        $this->app->bind(AssignDriverServiceInterface::class, AssignDriverService::class);
+        $this->app->bind(SubstituteDriverServiceInterface::class, SubstituteDriverService::class);
+
+        // Incidents
+        $this->app->bind(RentalIncidentRepositoryInterface::class, EloquentRentalIncidentRepository::class);
+        $this->app->bind(CreateRentalIncidentServiceInterface::class, CreateRentalIncidentService::class);
+        $this->app->bind(UpdateRentalIncidentServiceInterface::class, UpdateRentalIncidentService::class);
+
+        // Deposits
+        $this->app->bind(RentalDepositRepositoryInterface::class, EloquentRentalDepositRepository::class);
+        $this->app->bind(HoldRentalDepositServiceInterface::class, HoldRentalDepositService::class);
+        $this->app->bind(ReleaseRentalDepositServiceInterface::class, ReleaseRentalDepositService::class);
     }
 
     public function boot(): void
     {
-        // Real-time status bridge: when a service job completes, release asset rental hold
-        Event::listen(ServiceJobCardCompleted::class, HandleServiceJobCardCompleted::class);
-
         $this->bootModule(
             __DIR__.'/../../routes/api.php',
             __DIR__.'/../../database/migrations',
