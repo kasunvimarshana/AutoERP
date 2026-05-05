@@ -8,5 +8,5 @@ use Illuminate\Http\Resources\Json\ResourceCollection;
 
 class RoleCollection extends ResourceCollection
 {
-    public $collects = RoleResource::class;
+    public string $collects = RoleResource::class;
 }

@@ -56,13 +56,7 @@ class AuthModuleServiceProvider extends ServiceProvider
 
         $this->app->bind(RbacAuthorizationStrategy::class, RbacAuthorizationStrategy::class);
         $this->app->bind(AbacAuthorizationStrategy::class, AbacAuthorizationStrategy::class);
-        $this->app->singleton(AuthorizationServiceInterface::class, function ($app): AuthorizationServiceInterface {
-            return new AuthorizationService(
-                $app->make(AuthUserRepositoryInterface::class),
-                $app->make(RbacAuthorizationStrategy::class),
-                $app->make(AbacAuthorizationStrategy::class),
-            );
-        });
+        $this->app->bind(AuthorizationServiceInterface::class, AuthorizationService::class);
         $this->app->alias(AuthorizationServiceInterface::class, 'auth.authorization');
 
         $serviceBindings = [
