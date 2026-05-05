@@ -7,6 +7,7 @@ namespace Modules\Inventory\Infrastructure\Listeners;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Inventory\Domain\Entities\StockMovement;
+use Modules\Inventory\Domain\Exceptions\InsufficientAvailableStockException;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryStockRepositoryInterface;
 use Modules\Inventory\Domain\RepositoryInterfaces\TraceLogRepositoryInterface;
 use Modules\Sales\Domain\Events\SalesReturnReceived;
@@ -57,7 +58,18 @@ class HandleSalesReturnReceived
                 );
 
                 $saved = $this->inventoryStockRepository->recordMovement($movement);
-                $this->inventoryStockRepository->adjustStockLevel($saved);
+
+                try {
+                    $this->inventoryStockRepository->adjustStockLevel($saved);
+                } catch (InsufficientAvailableStockException $e) {
+                    Log::warning('HandleSalesReturnReceived: stock level adjustment failed for return line', [
+                        'sales_return_id' => $event->salesReturnId,
+                        'product_id'      => $line['product_id'],
+                        'to_location_id'  => $toLocationId,
+                        'return_qty'      => $line['return_qty'],
+                    ]);
+                }
+
                 $this->traceLogRepository->recordForMovement($saved);
             }
         });

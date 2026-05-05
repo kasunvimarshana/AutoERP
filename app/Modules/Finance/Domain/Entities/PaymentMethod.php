@@ -56,18 +56,16 @@ class PaymentMethod
         return $this->createdAt;
     }
 
-        public function getRowVersion(): int
-        {
-            return $this->rowVersion;
-        }
-
+    public function getRowVersion(): int
+    {
+        return $this->rowVersion;
+    }
 
     public function getUpdatedAt(): \DateTimeInterface
     {
         return $this->updatedAt;
     }
 
-            $this->rowVersion++;
     public function update(string $name, string $type, ?int $accountId, bool $isActive): void
     {
         $this->name = $name;

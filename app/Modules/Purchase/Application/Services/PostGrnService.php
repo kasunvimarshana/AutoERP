@@ -52,6 +52,11 @@ class PostGrnService extends BaseService implements PostGrnServiceInterface
                         }
                     }
                 }
+
+                $this->updatePurchaseOrderStatus(
+                    $grnHeader->getTenantId(),
+                    $grnHeader->getPurchaseOrderId(),
+                );
             }
 
             $grnHeader->post();
@@ -77,5 +82,39 @@ class PostGrnService extends BaseService implements PostGrnServiceInterface
 
             return $saved;
         });
+    }
+
+    private function updatePurchaseOrderStatus(int $tenantId, int $purchaseOrderId): void
+    {
+        $purchaseOrder = $this->purchaseOrderRepository->find($purchaseOrderId);
+        if ($purchaseOrder === null || ! in_array($purchaseOrder->getStatus(), ['confirmed', 'sent', 'partial'], true)) {
+            return;
+        }
+
+        $allPoLines = $this->purchaseOrderLineRepository->findByPurchaseOrderId($tenantId, $purchaseOrderId);
+
+        if ($allPoLines->isEmpty()) {
+            return;
+        }
+
+        $fullyReceived = true;
+        $anyReceived   = false;
+
+        foreach ($allPoLines as $poLine) {
+            if (bccomp($poLine->getReceivedQty(), '0.000000', 6) > 0) {
+                $anyReceived = true;
+            }
+            if (bccomp($poLine->getReceivedQty(), $poLine->getOrderedQty(), 6) < 0) {
+                $fullyReceived = false;
+            }
+        }
+
+        if ($fullyReceived) {
+            $purchaseOrder->receive();
+        } elseif ($anyReceived) {
+            $purchaseOrder->markPartial();
+        }
+
+        $this->purchaseOrderRepository->save($purchaseOrder);
     }
 }

@@ -50,6 +50,12 @@ class EventReplayGuardrailsTest extends TestCase
                 'HandlePurchaseInvoiceApproved: replay detected; finance artifacts already exist, skipping',
                 'incomplete finance artifacts',
             ],
+            'app/Modules/Finance/Infrastructure/Listeners/HandleSalesInvoicePosted.php' => [
+                'artifactsAlreadyPosted',
+                "'sales_invoice'",
+                'HandleSalesInvoicePosted: replay detected; finance artifacts already exist, skipping',
+                'incomplete finance artifacts',
+            ],
         ];
 
         foreach ($requiredGuards as $relativePath => $needles) {
@@ -68,12 +74,7 @@ class EventReplayGuardrailsTest extends TestCase
     public function test_finance_journal_only_listeners_keep_replay_guards_for_retry_safety(): void
     {
         $requiredGuards = [
-            'app/Modules/Finance/Infrastructure/Listeners/HandleSalesInvoicePosted.php' => [
-                'journalAlreadyPosted',
-                "'sales_invoice'",
-                'HandleSalesInvoicePosted: replay detected; journal entry already exists, skipping',
-                'missing journal artifact',
-            ],
+
             'app/Modules/Finance/Infrastructure/Listeners/HandlePayrollRunApproved.php' => [
                 'journalAlreadyPosted',
                 "'payroll_run'",

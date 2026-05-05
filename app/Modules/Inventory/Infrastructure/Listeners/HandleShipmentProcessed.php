@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Log;
 use Modules\Inventory\Domain\Entities\StockMovement;
 use Modules\Inventory\Domain\Exceptions\InsufficientAvailableStockException;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryStockRepositoryInterface;
+use Modules\Inventory\Domain\RepositoryInterfaces\StockReservationRepositoryInterface;
 use Modules\Inventory\Domain\RepositoryInterfaces\TraceLogRepositoryInterface;
 use Modules\Sales\Domain\Events\ShipmentProcessed;
 
@@ -17,6 +18,7 @@ class HandleShipmentProcessed
     public function __construct(
         private readonly InventoryStockRepositoryInterface $inventoryStockRepository,
         private readonly TraceLogRepositoryInterface $traceLogRepository,
+        private readonly StockReservationRepositoryInterface $stockReservationRepository,
     ) {}
 
     public function handle(ShipmentProcessed $event): void
@@ -71,6 +73,14 @@ class HandleShipmentProcessed
                 }
 
                 $this->traceLogRepository->recordForMovement($saved);
+            }
+
+            if ($event->salesOrderId !== null) {
+                $this->stockReservationRepository->releaseByReference(
+                    $event->tenantId,
+                    'sales_orders',
+                    $event->salesOrderId,
+                );
             }
         });
     }

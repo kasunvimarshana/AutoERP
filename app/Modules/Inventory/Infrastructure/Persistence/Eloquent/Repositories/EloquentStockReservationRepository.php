@@ -157,6 +157,33 @@ class EloquentStockReservationRepository implements StockReservationRepositoryIn
             ]);
     }
 
+    public function releaseByReference(int $tenantId, string $referenceType, int $referenceId): int
+    {
+        return DB::transaction(function () use ($tenantId, $referenceType, $referenceId): int {
+            /** @var \Illuminate\Database\Eloquent\Collection<int, StockReservationModel> $reservations */
+            $reservations = $this->stockReservationModel->newQuery()
+                ->where('tenant_id', $tenantId)
+                ->where('reserved_for_type', $referenceType)
+                ->where('reserved_for_id', $referenceId)
+                ->lockForUpdate()
+                ->get();
+
+            if ($reservations->isEmpty()) {
+                return 0;
+            }
+
+            foreach ($reservations as $reservation) {
+                $this->applyReservedDelta($this->mapToEntity($reservation), '-');
+            }
+
+            return $this->stockReservationModel->newQuery()
+                ->where('tenant_id', $tenantId)
+                ->where('reserved_for_type', $referenceType)
+                ->where('reserved_for_id', $referenceId)
+                ->delete();
+        });
+    }
+
     private function mapToEntity(StockReservationModel $model): StockReservation
     {
         return new StockReservation(
