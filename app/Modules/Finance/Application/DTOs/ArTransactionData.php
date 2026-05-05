@@ -19,6 +19,7 @@ class ArTransactionData
         public readonly ?int $reference_id = null,
         public readonly ?string $due_date = null,
         public readonly bool $is_reconciled = false,
+        public readonly int $row_version = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -38,6 +39,7 @@ class ArTransactionData
             reference_id: isset($data['reference_id']) ? (int) $data['reference_id'] : null,
             due_date: isset($data['due_date']) ? (string) $data['due_date'] : null,
             is_reconciled: (bool) ($data['is_reconciled'] ?? false),
+            row_version: isset($data['row_version']) ? (int) $data['row_version'] : 1,
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

@@ -15,6 +15,7 @@ class BankCategoryRuleData
         public readonly int $priority = 0,
         public readonly ?string $description_template = null,
         public readonly bool $is_active = true,
+        public readonly int $row_version = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -30,6 +31,7 @@ class BankCategoryRuleData
             priority: (int) ($data['priority'] ?? 0),
             description_template: isset($data['description_template']) ? (string) $data['description_template'] : null,
             is_active: (bool) ($data['is_active'] ?? true),
+            row_version: isset($data['row_version']) ? (int) $data['row_version'] : 1,
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

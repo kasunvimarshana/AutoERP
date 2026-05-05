@@ -92,7 +92,7 @@ class EloquentShipmentRepository extends EloquentRepository implements ShipmentR
     public function find(int|string $id, array $columns = ['*']): ?Shipment
     {
         /** @var ShipmentModel|null $model */
-        $model = $this->newScopedQuery()->with('lines')->find($id, $columns);
+        $model = $this->model->newQuery()->with('lines')->find($id, $columns);
 
         return $model ? $this->toDomainEntity($model) : null;
     }
@@ -100,7 +100,7 @@ class EloquentShipmentRepository extends EloquentRepository implements ShipmentR
     public function findByTenantAndShipmentNumber(int $tenantId, string $shipmentNumber): ?Shipment
     {
         /** @var ShipmentModel|null $model */
-        $model = $this->newScopedQuery()->with('lines')
+        $model = $this->model->newQuery()->with('lines')
             ->where('tenant_id', $tenantId)
             ->where('shipment_number', $shipmentNumber)
             ->first();
@@ -138,9 +138,7 @@ class EloquentShipmentRepository extends EloquentRepository implements ShipmentR
                 fromLocationId: (int) $lineModel->from_location_id,
                 uomId: (int) $lineModel->uom_id,
                 shipmentId: (int) $lineModel->shipment_id,
-                salesOrderLineId: $lineModel->sales_order_line_id !== null
-                    ? (int) $lineModel->sales_order_line_id
-                    : null,
+                salesOrderLineId: $lineModel->sales_order_line_id !== null ? (int) $lineModel->sales_order_line_id : null,
                 variantId: $lineModel->variant_id !== null ? (int) $lineModel->variant_id : null,
                 batchId: $lineModel->batch_id !== null ? (int) $lineModel->batch_id : null,
                 serialId: $lineModel->serial_id !== null ? (int) $lineModel->serial_id : null,

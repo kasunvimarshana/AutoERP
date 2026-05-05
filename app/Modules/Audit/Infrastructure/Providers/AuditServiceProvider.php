@@ -8,7 +8,6 @@ use Illuminate\Support\ServiceProvider;
 use Modules\Audit\Application\Contracts\AuditServiceInterface;
 use Modules\Audit\Application\Services\AuditService;
 use Modules\Audit\Domain\RepositoryInterfaces\AuditRepositoryInterface;
-use Modules\Audit\Infrastructure\Console\Commands\PruneAuditLogsCommand;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Repositories\EloquentAuditRepository;
 use Modules\Core\Infrastructure\Concerns\LoadsModuleRoutesAndMigrations;
 
@@ -24,10 +23,6 @@ class AuditServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->commands([
-            PruneAuditLogsCommand::class,
-        ]);
-
         $this->bootModule(
             __DIR__.'/../../routes/api.php',
             __DIR__.'/../../database/migrations',

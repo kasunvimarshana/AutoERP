@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Finance\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Finance\Application\Contracts\UpdatePaymentServiceInterface;
 use Modules\Finance\Application\DTOs\PaymentData;
 use Modules\Finance\Domain\Entities\Payment;
@@ -26,6 +27,9 @@ class UpdatePaymentService extends BaseService implements UpdatePaymentServiceIn
         $payment = $this->paymentRepository->find((int) $dto->id);
         if (! $payment) {
             throw new PaymentNotFoundException((int) $dto->id);
+        }
+        if ($dto->row_version !== $payment->getRowVersion()) {
+            throw new ConcurrentModificationException('Payment', (int) $dto->id);
         }
 
         $payment->update(

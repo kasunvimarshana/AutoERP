@@ -25,6 +25,7 @@ class LeavePolicyResource extends JsonResource
             'org_unit_id' => $entity->getOrgUnitId(),
             'is_active' => $entity->isActive(),
             'metadata' => $entity->getMetadata(),
+            'row_version' => $entity->getRowVersion(),
             'created_at' => $entity->getCreatedAt()->format('c'),
             'updated_at' => $entity->getUpdatedAt()->format('c'),
         ];

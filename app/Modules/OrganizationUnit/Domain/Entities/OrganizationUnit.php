@@ -47,6 +47,8 @@ class OrganizationUnit
 
     private int $right;
 
+    private int $rowVersion;
+
     private \DateTimeInterface $createdAt;
 
     private \DateTimeInterface $updatedAt;
@@ -66,7 +68,6 @@ class OrganizationUnit
         ?array $metadata = null,
         bool $isActive = true,
         ?string $description = null,
-
         ?string $imagePath = null,
         ?int $defaultRevenueAccountId = null,
         ?int $defaultExpenseAccountId = null,
@@ -75,6 +76,7 @@ class OrganizationUnit
         ?int $warehouseId = null,
         int $left = 0,
         int $right = 0,
+        int $rowVersion = 1,
         ?int $id = null,
         ?\DateTimeInterface $createdAt = null,
         ?\DateTimeInterface $updatedAt = null,
@@ -91,14 +93,6 @@ class OrganizationUnit
         $this->metadata = $metadata;
         $this->isActive = $isActive;
         $this->description = $description;
-
-        $this->imagePath = $imagePath;
-        $this->defaultRevenueAccountId = $defaultRevenueAccountId;
-        $this->defaultExpenseAccountId = $defaultExpenseAccountId;
-        $this->defaultAssetAccountId = $defaultAssetAccountId;
-        $this->defaultLiabilityAccountId = $defaultLiabilityAccountId;
-        $this->warehouseId = $warehouseId;
-
         $this->imagePath = $imagePath;
         $this->defaultRevenueAccountId = $defaultRevenueAccountId;
         $this->defaultExpenseAccountId = $defaultExpenseAccountId;
@@ -107,6 +101,7 @@ class OrganizationUnit
         $this->warehouseId = $warehouseId;
         $this->left = $left;
         $this->right = $right;
+        $this->rowVersion = $rowVersion;
         $this->createdAt = $createdAt ?? new \DateTimeImmutable;
         $this->updatedAt = $updatedAt ?? new \DateTimeImmutable;
     }
@@ -224,6 +219,11 @@ class OrganizationUnit
         return $this->updatedAt;
     }
 
+    public function getRowVersion(): int
+    {
+        return $this->rowVersion;
+    }
+
     /**
      * @param  array<string, mixed>|null  $metadata
      */
@@ -236,7 +236,6 @@ class OrganizationUnit
         ?array $metadata,
         bool $isActive,
         ?string $description,
-
         ?string $imagePath,
         ?int $defaultRevenueAccountId,
         ?int $defaultExpenseAccountId,
@@ -252,20 +251,13 @@ class OrganizationUnit
         $this->metadata = $metadata;
         $this->isActive = $isActive;
         $this->description = $description;
-
         $this->imagePath = $imagePath;
         $this->defaultRevenueAccountId = $defaultRevenueAccountId;
         $this->defaultExpenseAccountId = $defaultExpenseAccountId;
         $this->defaultAssetAccountId = $defaultAssetAccountId;
         $this->defaultLiabilityAccountId = $defaultLiabilityAccountId;
         $this->warehouseId = $warehouseId;
-
-        $this->imagePath = $imagePath;
-        $this->defaultRevenueAccountId = $defaultRevenueAccountId;
-        $this->defaultExpenseAccountId = $defaultExpenseAccountId;
-        $this->defaultAssetAccountId = $defaultAssetAccountId;
-        $this->defaultLiabilityAccountId = $defaultLiabilityAccountId;
-        $this->warehouseId = $warehouseId;
+        $this->rowVersion++;
         $this->updatedAt = new \DateTimeImmutable;
     }
 

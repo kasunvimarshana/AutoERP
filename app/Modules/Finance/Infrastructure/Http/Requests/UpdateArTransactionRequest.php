@@ -17,6 +17,7 @@ class UpdateArTransactionRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'row_version' => ['required', 'integer', 'min:1'],
             'tenant_id' => ['required', 'integer', 'exists:tenants,id'],
             'customer_id' => ['required', 'integer'],
             'account_id' => ['required', 'integer', 'exists:accounts,id'],

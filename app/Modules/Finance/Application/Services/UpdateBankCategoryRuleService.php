@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Finance\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Finance\Application\Contracts\UpdateBankCategoryRuleServiceInterface;
 use Modules\Finance\Application\DTOs\BankCategoryRuleData;
 use Modules\Finance\Domain\Entities\BankCategoryRule;
@@ -25,6 +26,9 @@ class UpdateBankCategoryRuleService extends BaseService implements UpdateBankCat
         $rule = $this->bankCategoryRuleRepository->find((int) $dto->id);
         if (! $rule) {
             throw new BankCategoryRuleNotFoundException((int) $dto->id);
+        }
+        if ($dto->row_version !== $rule->getRowVersion()) {
+            throw new ConcurrentModificationException('BankCategoryRule', (int) $dto->id);
         }
         $rule->update(
             name: $dto->name,

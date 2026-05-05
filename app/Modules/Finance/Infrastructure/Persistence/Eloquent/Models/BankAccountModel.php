@@ -25,5 +25,6 @@ class BankAccountModel extends BaseModel
         'current_balance' => 'decimal:6',
         'last_sync_at' => 'datetime',
         'is_active' => 'boolean',
+        'row_version' => 'integer',
     ];
 }

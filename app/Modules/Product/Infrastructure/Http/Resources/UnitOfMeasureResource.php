@@ -18,6 +18,7 @@ class UnitOfMeasureResource extends JsonResource
             'symbol' => $this->getSymbol(),
             'type' => $this->getType(),
             'is_base' => $this->isBase(),
+            'row_version' => $this->getRowVersion(),
             'created_at' => $this->getCreatedAt()->format('c'),
             'updated_at' => $this->getUpdatedAt()->format('c'),
         ];

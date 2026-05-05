@@ -15,7 +15,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('supplier_id')->constrained(null, 'id', 'supplier_contacts_supplier_id_fk')->cascadeOnDelete();
+            $table->foreignId('supplier_id')->constrained('suppliers', 'id', 'supplier_contacts_supplier_id_fk')->cascadeOnDelete();
             $table->string('name');
             $table->string('role')->nullable();
             $table->string('email')->nullable();

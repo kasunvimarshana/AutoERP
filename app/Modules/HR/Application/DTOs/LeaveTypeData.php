@@ -22,6 +22,7 @@ class LeaveTypeData
         public readonly int $minServiceDays = 0,
         public readonly bool $isActive = true,
         public readonly array $metadata = [],
+        public readonly int $rowVersion = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -41,6 +42,7 @@ class LeaveTypeData
             minServiceDays: isset($data['min_service_days']) ? (int) $data['min_service_days'] : 0,
             isActive: isset($data['is_active']) ? (bool) $data['is_active'] : true,
             metadata: isset($data['metadata']) && is_array($data['metadata']) ? $data['metadata'] : [],
+            rowVersion: isset($data['row_version']) ? (int) $data['row_version'] : 1,
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

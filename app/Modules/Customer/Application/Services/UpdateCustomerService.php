@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Customer\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Core\Domain\Exceptions\DomainException;
 use Modules\Customer\Application\Contracts\UpdateCustomerServiceInterface;
 use Modules\Customer\Application\DTOs\CustomerData;
@@ -35,6 +36,10 @@ class UpdateCustomerService extends BaseService implements UpdateCustomerService
 
         if ($customer->getTenantId() !== $dto->tenant_id) {
             throw new CustomerNotFoundException($id);
+        }
+
+        if ($dto->row_version !== $customer->getRowVersion()) {
+            throw new ConcurrentModificationException('Customer', $id);
         }
 
         if ($dto->user_id !== null && $dto->user_id !== $customer->getUserId()) {

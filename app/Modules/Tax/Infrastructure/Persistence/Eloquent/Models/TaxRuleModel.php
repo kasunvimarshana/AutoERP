@@ -24,6 +24,7 @@ class TaxRuleModel extends Model
         'party_type',
         'region',
         'priority',
+        'row_version',
     ];
 
     protected $casts = [
@@ -31,6 +32,7 @@ class TaxRuleModel extends Model
         'tax_group_id' => 'integer',
         'product_category_id' => 'integer',
         'priority' => 'integer',
+        'row_version' => 'integer',
     ];
 
     public function group(): BelongsTo

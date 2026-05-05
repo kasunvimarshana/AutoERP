@@ -4,8 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Infrastructure\Providers;
 
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Infrastructure\Concerns\LoadsModuleRoutesAndMigrations;
+use Modules\OrganizationUnit\Domain\Events\OrganizationUnitCreated;
+use Modules\OrganizationUnit\Domain\Events\OrganizationUnitDeleted;
+use Modules\OrganizationUnit\Domain\Events\OrganizationUnitUpdated;
+use Modules\OrganizationUnit\Domain\Events\OrganizationUnitUserAdded;
+use Modules\OrganizationUnit\Domain\Events\OrganizationUnitUserRemoved;
+use Modules\OrganizationUnit\Infrastructure\Listeners\HandleOrganizationUnitCreated;
+use Modules\OrganizationUnit\Infrastructure\Listeners\HandleOrganizationUnitDeleted;
+use Modules\OrganizationUnit\Infrastructure\Listeners\HandleOrganizationUnitUpdated;
+use Modules\OrganizationUnit\Infrastructure\Listeners\HandleOrganizationUnitUserAdded;
+use Modules\OrganizationUnit\Infrastructure\Listeners\HandleOrganizationUnitUserRemoved;
 use Modules\OrganizationUnit\Application\Contracts\CreateOrganizationUnitServiceInterface;
 use Modules\OrganizationUnit\Application\Contracts\CreateOrganizationUnitTypeServiceInterface;
 use Modules\OrganizationUnit\Application\Contracts\CreateOrganizationUnitUserServiceInterface;
@@ -91,5 +102,11 @@ class OrganizationUnitServiceProvider extends ServiceProvider
             __DIR__.'/../../routes/api.php',
             __DIR__.'/../../database/migrations',
         );
+
+        Event::listen(OrganizationUnitCreated::class, HandleOrganizationUnitCreated::class);
+        Event::listen(OrganizationUnitUpdated::class, HandleOrganizationUnitUpdated::class);
+        Event::listen(OrganizationUnitDeleted::class, HandleOrganizationUnitDeleted::class);
+        Event::listen(OrganizationUnitUserAdded::class, HandleOrganizationUnitUserAdded::class);
+        Event::listen(OrganizationUnitUserRemoved::class, HandleOrganizationUnitUserRemoved::class);
     }
 }

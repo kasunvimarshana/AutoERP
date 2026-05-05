@@ -22,6 +22,7 @@ class Account
         private bool $isActive = true,
         private ?string $path = null,
         private int $depth = 0,
+        private int $rowVersion = 1,
         private ?int $id = null,
         private ?\DateTimeInterface $createdAt = null,
         private ?\DateTimeInterface $updatedAt = null,
@@ -120,6 +121,12 @@ class Account
         return $this->updatedAt;
     }
 
+
+    public function getRowVersion(): int
+    {
+        return $this->rowVersion;
+    }
+
     public function update(
         string $code,
         string $name,
@@ -146,6 +153,7 @@ class Account
         $this->currencyId = $currencyId;
         $this->description = $description;
         $this->isActive = $isActive;
+        $this->rowVersion++;
         $this->updatedAt = new \DateTimeImmutable;
     }
 

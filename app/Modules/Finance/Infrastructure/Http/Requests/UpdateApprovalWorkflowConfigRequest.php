@@ -17,6 +17,7 @@ class UpdateApprovalWorkflowConfigRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'row_version' => ['required', 'integer', 'min:1'],
             'tenant_id' => ['required', 'integer', 'exists:tenants,id'],
             'module' => ['required', 'string', 'max:100'],
             'entity_type' => ['required', 'string', 'max:100'],

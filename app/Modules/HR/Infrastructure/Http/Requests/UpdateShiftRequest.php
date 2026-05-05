@@ -28,6 +28,7 @@ class UpdateShiftRequest extends FormRequest
             'is_night_shift' => 'nullable|boolean',
             'is_active' => 'nullable|boolean',
             'metadata' => 'nullable|array',
+            'row_version' => 'required|integer|min:1',
         ];
     }
 }

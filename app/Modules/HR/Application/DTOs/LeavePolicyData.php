@@ -18,6 +18,7 @@ class LeavePolicyData
         public readonly ?int $orgUnitId = null,
         public readonly bool $isActive = true,
         public readonly array $metadata = [],
+        public readonly int $rowVersion = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -33,6 +34,7 @@ class LeavePolicyData
             orgUnitId: isset($data['org_unit_id']) ? (int) $data['org_unit_id'] : null,
             isActive: isset($data['is_active']) ? (bool) $data['is_active'] : true,
             metadata: isset($data['metadata']) && is_array($data['metadata']) ? $data['metadata'] : [],
+            rowVersion: isset($data['row_version']) ? (int) $data['row_version'] : 1,
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

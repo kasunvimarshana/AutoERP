@@ -9,6 +9,7 @@ use Modules\Finance\Application\Contracts\UpdateAccountServiceInterface;
 use Modules\Finance\Application\DTOs\AccountData;
 use Modules\Finance\Domain\Entities\Account;
 use Modules\Finance\Domain\Exceptions\AccountNotFoundException;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Finance\Domain\RepositoryInterfaces\AccountRepositoryInterface;
 
 class UpdateAccountService extends BaseService implements UpdateAccountServiceInterface
@@ -28,6 +29,11 @@ class UpdateAccountService extends BaseService implements UpdateAccountServiceIn
         }
 
         $dto = AccountData::fromArray($data);
+
+
+        if ($dto->rowVersion !== $account->getRowVersion()) {
+            throw new ConcurrentModificationException('Account', $id);
+        }
 
         $account->update(
             code: $dto->code,

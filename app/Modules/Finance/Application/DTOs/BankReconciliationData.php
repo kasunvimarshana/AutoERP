@@ -15,6 +15,7 @@ class BankReconciliationData
         public readonly float $closing_balance,
         public readonly string $status = 'draft',
         public readonly ?int $completed_by = null,
+        public readonly int $row_version = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -30,6 +31,7 @@ class BankReconciliationData
             closing_balance: (float) $data['closing_balance'],
             status: (string) ($data['status'] ?? 'draft'),
             completed_by: isset($data['completed_by']) ? (int) $data['completed_by'] : null,
+            row_version: isset($data['row_version']) ? (int) $data['row_version'] : 1,
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

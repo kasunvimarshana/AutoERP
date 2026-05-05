@@ -15,6 +15,7 @@ class ApprovalWorkflowConfigData
         public readonly ?float $min_amount = null,
         public readonly ?float $max_amount = null,
         public readonly bool $is_active = true,
+        public readonly int $row_version = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -30,6 +31,7 @@ class ApprovalWorkflowConfigData
             min_amount: isset($data['min_amount']) ? (float) $data['min_amount'] : null,
             max_amount: isset($data['max_amount']) ? (float) $data['max_amount'] : null,
             is_active: (bool) ($data['is_active'] ?? true),
+            row_version: isset($data['row_version']) ? (int) $data['row_version'] : 1,
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

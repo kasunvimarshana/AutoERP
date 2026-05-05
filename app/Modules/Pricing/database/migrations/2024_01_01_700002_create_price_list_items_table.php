@@ -15,8 +15,12 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('price_list_id')->constrained(null, 'id', 'price_list_items_price_list_id_fk')->cascadeOnDelete();
-            $table->foreignId('product_id')->constrained(null, 'id', 'price_list_items_product_id_fk')->cascadeOnDelete();
+            $table->foreignId('price_list_id')
+                ->constrained('price_lists', 'id', 'price_list_items_price_list_id_fk')
+                ->cascadeOnDelete();
+            $table->foreignId('product_id')
+                ->constrained('products', 'id', 'price_list_items_product_id_fk')
+                ->cascadeOnDelete();
             $table->foreignId('variant_id')->nullable()->constrained('product_variants', 'id', 'price_list_items_variant_id_fk')->nullOnDelete();
             $table->foreignId('uom_id')->constrained('units_of_measure', 'id', 'price_list_items_uom_id_fk');
             $table->decimal('min_quantity', 20, 6)->default(1);
@@ -28,7 +32,6 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'org_unit_id', 'price_list_id', 'product_id', 'variant_id', 'uom_id', 'min_quantity'], 'price_list_items_tenant_pricelist_product_var_uom_minqty_uk');
             $table->index(['tenant_id', 'product_id', 'variant_id', 'price_list_id'], 'price_list_items_tenant_product_variant_pl_idx');
-            $table->index(['tenant_id', 'product_id', 'variant_id', 'valid_from', 'valid_to'],'price_list_items_tenant_product_variant_validity_idx');
         });
     }
 

@@ -16,6 +16,7 @@ class ApprovalRequestData
         public readonly int $current_step_order = 1,
         public readonly ?int $resolved_by_user_id = null,
         public readonly ?string $comments = null,
+        public readonly int $row_version = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -32,6 +33,7 @@ class ApprovalRequestData
             current_step_order: (int) ($data['current_step_order'] ?? 1),
             resolved_by_user_id: isset($data['resolved_by_user_id']) ? (int) $data['resolved_by_user_id'] : null,
             comments: isset($data['comments']) ? (string) $data['comments'] : null,
+            row_version: isset($data['row_version']) ? (int) $data['row_version'] : 1,
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

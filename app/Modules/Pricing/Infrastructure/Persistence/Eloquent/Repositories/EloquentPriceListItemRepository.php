@@ -31,6 +31,7 @@ class EloquentPriceListItemRepository extends EloquentRepository implements Pric
             'discount_pct' => $priceListItem->getDiscountPct(),
             'valid_from' => $priceListItem->getValidFrom()?->format('Y-m-d'),
             'valid_to' => $priceListItem->getValidTo()?->format('Y-m-d'),
+            'row_version' => $priceListItem->getRowVersion(),
         ];
 
         if ($priceListItem->getId()) {
@@ -176,6 +177,7 @@ class EloquentPriceListItemRepository extends EloquentRepository implements Pric
             discountPct: number_format((float) $model->discount_pct, 6, '.', ''),
             validFrom: $model->valid_from,
             validTo: $model->valid_to,
+            rowVersion: (int) ($model->row_version ?? 1),
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,
         );

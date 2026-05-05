@@ -32,5 +32,6 @@ class BankCategoryRuleModel extends BaseModel
         'conditions' => 'array',
         'is_active' => 'boolean',
         'priority' => 'integer',
+        'row_version' => 'integer',
     ];
 }

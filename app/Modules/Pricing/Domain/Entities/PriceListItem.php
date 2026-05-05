@@ -30,6 +30,8 @@ class PriceListItem
 
     private \DateTimeInterface $createdAt;
 
+    private int $rowVersion;
+
     private \DateTimeInterface $updatedAt;
 
     public function __construct(
@@ -43,6 +45,7 @@ class PriceListItem
         string $discountPct = '0.000000',
         ?\DateTimeInterface $validFrom = null,
         ?\DateTimeInterface $validTo = null,
+        int $rowVersion = 1,
         ?int $id = null,
         ?\DateTimeInterface $createdAt = null,
         ?\DateTimeInterface $updatedAt = null,
@@ -66,6 +69,7 @@ class PriceListItem
         $this->discountPct = $this->normalizeDecimal($discountPct);
         $this->validFrom = $validFrom;
         $this->validTo = $validTo;
+        $this->rowVersion = $rowVersion;
         $this->createdAt = $createdAt ?? new \DateTimeImmutable;
         $this->updatedAt = $updatedAt ?? new \DateTimeImmutable;
     }
@@ -135,6 +139,12 @@ class PriceListItem
         return $this->updatedAt;
     }
 
+
+    public function getRowVersion(): int
+    {
+        return $this->rowVersion;
+    }
+
     public function update(
         int $productId,
         ?int $variantId,
@@ -161,6 +171,7 @@ class PriceListItem
         $this->discountPct = $this->normalizeDecimal($discountPct);
         $this->validFrom = $validFrom;
         $this->validTo = $validTo;
+        $this->rowVersion++;
         $this->updatedAt = new \DateTimeImmutable;
     }
 

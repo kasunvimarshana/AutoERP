@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Supplier\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Core\Domain\Exceptions\DomainException;
 use Modules\Supplier\Application\Contracts\UpdateSupplierServiceInterface;
 use Modules\Supplier\Application\DTOs\SupplierData;
@@ -35,6 +36,10 @@ class UpdateSupplierService extends BaseService implements UpdateSupplierService
 
         if ($supplier->getTenantId() !== $dto->tenant_id) {
             throw new SupplierNotFoundException($id);
+        }
+
+        if ($dto->row_version !== $supplier->getRowVersion()) {
+            throw new ConcurrentModificationException('Supplier', $id);
         }
 
         if ($dto->user_id !== null && $dto->user_id !== $supplier->getUserId()) {

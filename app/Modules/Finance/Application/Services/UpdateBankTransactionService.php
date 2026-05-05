@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Finance\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Finance\Application\Contracts\UpdateBankTransactionServiceInterface;
 use Modules\Finance\Application\DTOs\BankTransactionData;
 use Modules\Finance\Domain\Entities\BankTransaction;
@@ -25,6 +26,9 @@ class UpdateBankTransactionService extends BaseService implements UpdateBankTran
         $bt = $this->bankTransactionRepository->find((int) $dto->id);
         if (! $bt) {
             throw new BankTransactionNotFoundException((int) $dto->id);
+        }
+        if ($dto->row_version !== $bt->getRowVersion()) {
+            throw new ConcurrentModificationException('BankTransaction', (int) $dto->id);
         }
         if ($dto->category_rule_id !== null) {
             $bt->categorize($dto->category_rule_id);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Repositories;
 
+use Illuminate\Support\Collection;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\OrganizationUnit\Domain\Entities\OrganizationUnit;
 use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitRepositoryInterface;
@@ -26,13 +27,20 @@ class EloquentOrganizationUnitRepository extends EloquentRepository implements O
             'manager_user_id' => $organizationUnit->getManagerUserId(),
             'name' => $organizationUnit->getName(),
             'code' => $organizationUnit->getCode(),
+            'image_path' => $organizationUnit->getImagePath(),
             'path' => $organizationUnit->getPath(),
             'depth' => $organizationUnit->getDepth(),
             'metadata' => $organizationUnit->getMetadata(),
             'is_active' => $organizationUnit->isActive(),
             'description' => $organizationUnit->getDescription(),
+            'default_revenue_account_id' => $organizationUnit->getDefaultRevenueAccountId(),
+            'default_expense_account_id' => $organizationUnit->getDefaultExpenseAccountId(),
+            'default_asset_account_id' => $organizationUnit->getDefaultAssetAccountId(),
+            'default_liability_account_id' => $organizationUnit->getDefaultLiabilityAccountId(),
+            'warehouse_id' => $organizationUnit->getWarehouseId(),
             '_lft' => $organizationUnit->getLeft(),
             '_rgt' => $organizationUnit->getRight(),
+            'row_version' => $organizationUnit->getRowVersion(),
         ];
 
         if ($organizationUnit->getId()) {
@@ -55,6 +63,109 @@ class EloquentOrganizationUnitRepository extends EloquentRepository implements O
             ->first();
 
         return $model ? $this->toDomainEntity($model) : null;
+    }
+
+    public function getChildren(int $organizationUnitId): Collection
+    {
+        /** @var OrganizationUnitModel|null $parent */
+        $parent = $this->model->newQuery()->find($organizationUnitId);
+        if (! $parent) {
+            return new Collection;
+        }
+
+        $models = $this->model->newQuery()
+            ->where('parent_id', $organizationUnitId)
+            ->orderBy('name')
+            ->get();
+
+        return $this->toDomainCollection($models);
+    }
+
+    public function getDescendants(int $organizationUnitId): Collection
+    {
+        /** @var OrganizationUnitModel|null $parent */
+        $parent = $this->model->newQuery()->find($organizationUnitId);
+        if (! $parent) {
+            return new Collection;
+        }
+
+        // Use nested set model for efficient tree queries
+        $models = $this->model->newQuery()
+            ->where('_lft', '>', $parent->_lft)
+            ->where('_rgt', '<', $parent->_rgt)
+            ->orderBy('_lft')
+            ->get();
+
+        return $this->toDomainCollection($models);
+    }
+
+    public function getAncestors(int $organizationUnitId): Collection
+    {
+        /** @var OrganizationUnitModel|null $node */
+        $node = $this->model->newQuery()->find($organizationUnitId);
+        if (! $node) {
+            return new Collection;
+        }
+
+        // Use nested set model to find ancestors
+        $models = $this->model->newQuery()
+            ->where('_lft', '<', $node->_lft)
+            ->where('_rgt', '>', $node->_rgt)
+            ->where('tenant_id', $node->tenant_id)
+            ->orderBy('_lft')
+            ->get();
+
+        return $this->toDomainCollection($models);
+    }
+
+    public function getSiblings(int $organizationUnitId): Collection
+    {
+        /** @var OrganizationUnitModel|null $node */
+        $node = $this->model->newQuery()->find($organizationUnitId);
+        if (! $node) {
+            return new Collection;
+        }
+
+        $models = $this->model->newQuery()
+            ->where('parent_id', $node->parent_id)
+            ->where('id', '!=', $organizationUnitId)
+            ->orderBy('name')
+            ->get();
+
+        return $this->toDomainCollection($models);
+    }
+
+    public function getByTypeAndLevel(int $tenantId, int $typeId, int $level): Collection
+    {
+        $models = $this->model->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->where('type_id', $typeId)
+            ->where('depth', $level)
+            ->orderBy('path')
+            ->get();
+
+        return $this->toDomainCollection($models);
+    }
+
+    public function getRoots(int $tenantId): Collection
+    {
+        $models = $this->model->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->whereNull('parent_id')
+            ->orderBy('name')
+            ->get();
+
+        return $this->toDomainCollection($models);
+    }
+
+    public function getHierarchy(int $tenantId): Collection
+    {
+        $models = $this->model->newQuery()
+            ->where('tenant_id', $tenantId)
+            ->orderBy('_lft')
+            ->get();
+
+        return $this->toDomainCollection($models);
     }
 
     private function mapModelToDomainEntity(OrganizationUnitModel $model): OrganizationUnit
@@ -80,6 +191,7 @@ class EloquentOrganizationUnitRepository extends EloquentRepository implements O
             warehouseId: $model->warehouse_id,
             left: (int) $model->_lft,
             right: (int) $model->_rgt,
+            rowVersion: (int) ($model->row_version ?? 1),
             id: (int) $model->id,
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,

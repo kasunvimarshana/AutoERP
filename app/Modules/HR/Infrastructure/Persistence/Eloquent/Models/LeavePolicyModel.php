@@ -15,9 +15,9 @@ class LeavePolicyModel extends BaseModel
 
     protected $table = 'hr_leave_policies';
 
-    protected $fillable = ['tenant_id', 'leave_type_id', 'name', 'accrual_type', 'accrual_amount', 'org_unit_id', 'is_active', 'metadata'];
+    protected $fillable = ['tenant_id', 'leave_type_id', 'name', 'accrual_type', 'accrual_amount', 'org_unit_id', 'is_active', 'metadata', 'row_version'];
 
-    protected $casts = ['accrual_amount' => 'float', 'is_active' => 'boolean', 'metadata' => 'array'];
+    protected $casts = ['accrual_amount' => 'float', 'is_active' => 'boolean', 'metadata' => 'array', 'row_version' => 'integer'];
 
     public function leaveType(): BelongsTo
     {

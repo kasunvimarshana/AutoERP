@@ -27,6 +27,7 @@ class CreditMemoResource extends JsonResource
             'applied_to_invoice_type' => $this->resource->getAppliedToInvoiceType(),
             'notes' => $this->resource->getNotes(),
             'journal_entry_id' => $this->resource->getJournalEntryId(),
+            'row_version' => $this->resource->getRowVersion(),
             'created_at' => $this->resource->getCreatedAt(),
             'updated_at' => $this->resource->getUpdatedAt(),
         ];

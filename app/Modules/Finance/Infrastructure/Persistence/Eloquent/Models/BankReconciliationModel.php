@@ -26,5 +26,6 @@ class BankReconciliationModel extends BaseModel
         'opening_balance' => 'decimal:6',
         'closing_balance' => 'decimal:6',
         'completed_at' => 'datetime',
+        'row_version' => 'integer',
     ];
 }

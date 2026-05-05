@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Application\Services;
 
+use Illuminate\Support\Facades\DB;
 use Modules\Core\Application\Services\BaseService;
 use Modules\OrganizationUnit\Application\Contracts\UpdateOrganizationUnitUserServiceInterface;
 use Modules\OrganizationUnit\Domain\Entities\OrganizationUnitUser;
@@ -20,16 +21,19 @@ class UpdateOrganizationUnitUserService extends BaseService implements UpdateOrg
     protected function handle(array $data): OrganizationUnitUser
     {
         $organizationUnitUserId = (int) $data['id'];
-        $organizationUnitUser = $this->organizationUnitUserRepository->find($organizationUnitUserId);
-        if (! $organizationUnitUser) {
-            throw new OrganizationUnitUserNotFoundException($organizationUnitUserId);
-        }
 
-        $organizationUnitUser->update(
-            role: array_key_exists('role', $data) ? (is_string($data['role']) ? $data['role'] : null) : $organizationUnitUser->getRole(),
-            isPrimary: array_key_exists('is_primary', $data) ? (bool) $data['is_primary'] : $organizationUnitUser->isPrimary(),
-        );
+        return DB::transaction(function () use ($organizationUnitUserId, $data): OrganizationUnitUser {
+            $organizationUnitUser = $this->organizationUnitUserRepository->find($organizationUnitUserId);
+            if (! $organizationUnitUser) {
+                throw new OrganizationUnitUserNotFoundException($organizationUnitUserId);
+            }
 
-        return $this->organizationUnitUserRepository->save($organizationUnitUser);
+            $organizationUnitUser->update(
+                roleId: array_key_exists('role_id', $data) ? (is_int($data['role_id']) ? $data['role_id'] : null) : $organizationUnitUser->getRole(),
+                isPrimary: array_key_exists('is_primary', $data) ? (bool) $data['is_primary'] : $organizationUnitUser->isPrimary(),
+            );
+
+            return $this->organizationUnitUserRepository->save($organizationUnitUser);
+        });
     }
 }

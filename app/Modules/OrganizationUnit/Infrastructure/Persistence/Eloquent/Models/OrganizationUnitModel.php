@@ -39,6 +39,7 @@ class OrganizationUnitModel extends BaseModel
         'warehouse_id',
         '_lft',
         '_rgt',
+        'row_version',
     ];
 
     protected $casts = [
@@ -47,6 +48,7 @@ class OrganizationUnitModel extends BaseModel
         'is_active' => 'boolean',
         '_lft' => 'integer',
         '_rgt' => 'integer',
+        'row_version' => 'integer',
     ];
 
     public function type(): BelongsTo

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Product\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Support\Facades\Cache;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Product\Domain\Entities\UomConversion;
 use Modules\Product\Domain\RepositoryInterfaces\UomConversionRepositoryInterface;
@@ -38,8 +37,6 @@ class EloquentUomConversionRepository extends EloquentRepository implements UomC
 
         /** @var UomConversionModel $model */
 
-        $this->bustCache($uomConversion->getTenantId());
-
         return $this->toDomainEntity($model);
     }
 
@@ -67,16 +64,6 @@ class EloquentUomConversionRepository extends EloquentRepository implements UomC
 
     public function listForResolution(int $tenantId, ?int $productId = null): array
     {
-        $version  = (int) Cache::get($this->tenantVersionKey($tenantId), 0);
-        $cacheKey = "uom_res:{$tenantId}:{$version}:".($productId ?? 'G');
-
-        /** @var array<int, UomConversion>|null $cached */
-        $cached = Cache::get($cacheKey);
-
-        if ($cached !== null) {
-            return $cached;
-        }
-
         $query = $this->model->newQuery()
             ->where('is_active', true)
             ->where(function ($builder) use ($tenantId): void {
@@ -99,24 +86,7 @@ class EloquentUomConversionRepository extends EloquentRepository implements UomC
         /** @var array<int, UomConversionModel> $models */
         $models = $query->get()->all();
 
-        $result = array_map(fn (UomConversionModel $model): UomConversion => $this->toDomainEntity($model), $models);
-
-        Cache::put($cacheKey, $result, 3600);
-
-        return $result;
-    }
-
-    public function delete(int|string $id): bool
-    {
-        $tenantId = $this->model->newQuery()
-            ->where('id', $id)
-            ->value('tenant_id');
-
-        $result = parent::delete($id);
-
-        $this->bustCache($tenantId !== null ? (int) $tenantId : null);
-
-        return $result;
+        return array_map(fn (UomConversionModel $model): UomConversion => $this->toDomainEntity($model), $models);
     }
 
     public function find(int|string $id, array $columns = ['*']): ?UomConversion
@@ -138,28 +108,5 @@ class EloquentUomConversionRepository extends EloquentRepository implements UomC
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,
         );
-    }
-
-    private function tenantVersionKey(int $tenantId): string
-    {
-        return "uom_ver:{$tenantId}";
-    }
-
-    /**
-     * Bust the cached conversion graph for the given tenant by incrementing the
-     * tenant-scoped version counter.  All previously cached keys for this tenant
-     * become unreachable and will naturally expire from the store.
-     *
-     * When $tenantId is null (global/system-wide conversion), the call is a no-op
-     * because we cannot enumerate every tenant; the TTL of 1 hour will expire
-     * stale entries naturally.
-     */
-    private function bustCache(?int $tenantId): void
-    {
-        if ($tenantId === null) {
-            return;
-        }
-
-        Cache::increment($this->tenantVersionKey($tenantId));
     }
 }

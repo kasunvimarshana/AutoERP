@@ -12,6 +12,7 @@ class PaymentTerm
         private int $days = 30,
         private bool $isDefault = false,
         private bool $isActive = true,
+        private int $rowVersion = 1,
         private ?int $id = null,
         private ?\DateTimeInterface $createdAt = null,
         private ?\DateTimeInterface $updatedAt = null,
@@ -63,6 +64,12 @@ class PaymentTerm
         return $this->updatedAt;
     }
 
+
+    public function getRowVersion(): int
+    {
+        return $this->rowVersion;
+    }
+
     public function getDescription(): ?string
     {
         return $this->description;
@@ -94,6 +101,7 @@ class PaymentTerm
         $this->description = $description;
         $this->discountDays = $discountDays;
         $this->discountRate = $discountRate;
+        $this->rowVersion++;
         $this->updatedAt = new \DateTimeImmutable;
     }
 }

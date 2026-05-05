@@ -25,5 +25,6 @@ class ApprovalRequestModel extends BaseModel
         'requested_at' => 'datetime',
         'resolved_at' => 'datetime',
         'current_step_order' => 'integer',
+        'row_version' => 'integer',
     ];
 }

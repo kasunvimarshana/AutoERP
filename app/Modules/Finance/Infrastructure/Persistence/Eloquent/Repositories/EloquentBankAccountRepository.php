@@ -30,6 +30,7 @@ class EloquentBankAccountRepository extends EloquentRepository implements BankAc
             'current_balance' => $ba->getCurrentBalance(),
             'feed_provider' => $ba->getFeedProvider(),
             'is_active' => $ba->isActive(),
+            'row_version' => $ba->getRowVersion(),
         ];
 
         $model = $ba->getId() ? $this->update($ba->getId(), $data) : $this->create($data);
@@ -52,6 +53,7 @@ class EloquentBankAccountRepository extends EloquentRepository implements BankAc
             lastSyncAt: $m->last_sync_at,
             feedProvider: $m->feed_provider,
             isActive: (bool) $m->is_active,
+            rowVersion: (int) ($m->row_version ?? 1),
             id: (int) $m->id,
             createdAt: $m->created_at,
             updatedAt: $m->updated_at,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Tax\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Tax\Application\Contracts\UpdateTaxRateServiceInterface;
 use Modules\Tax\Application\DTOs\TaxRateData;
 use Modules\Tax\Domain\RepositoryInterfaces\TaxRateRepositoryInterface;
@@ -23,6 +24,10 @@ class UpdateTaxRateService extends BaseService implements UpdateTaxRateServiceIn
         $taxRate = $this->taxRateRepository->find($dto->id ?? 0);
         if (! $taxRate) {
             throw new \InvalidArgumentException('Tax rate not found.');
+        }
+
+        if ($dto->row_version !== $taxRate->getRowVersion()) {
+            throw new ConcurrentModificationException('TaxRate', $dto->id ?? 0);
         }
 
         $taxRate->update(

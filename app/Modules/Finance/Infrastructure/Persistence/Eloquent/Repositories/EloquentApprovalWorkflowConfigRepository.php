@@ -28,6 +28,7 @@ class EloquentApprovalWorkflowConfigRepository extends EloquentRepository implem
             'min_amount' => $config->getMinAmount(),
             'max_amount' => $config->getMaxAmount(),
             'is_active' => $config->isActive(),
+            'row_version' => $config->getRowVersion(),
         ];
 
         $model = $config->getId() ? $this->update($config->getId(), $data) : $this->create($data);
@@ -47,6 +48,7 @@ class EloquentApprovalWorkflowConfigRepository extends EloquentRepository implem
             minAmount: $m->min_amount !== null ? (float) $m->min_amount : null,
             maxAmount: $m->max_amount !== null ? (float) $m->max_amount : null,
             isActive: (bool) $m->is_active,
+            rowVersion: (int) ($m->row_version ?? 1),
             id: (int) $m->id,
             createdAt: $m->created_at,
             updatedAt: $m->updated_at,

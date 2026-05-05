@@ -102,7 +102,7 @@ class EloquentSalesReturnRepository extends EloquentRepository implements SalesR
     public function find(int|string $id, array $columns = ['*']): ?SalesReturn
     {
         /** @var SalesReturnModel|null $model */
-        $model = $this->newScopedQuery()->with('lines')->find($id, $columns);
+        $model = $this->model->newQuery()->with('lines')->find($id, $columns);
 
         return $model ? $this->toDomainEntity($model) : null;
     }
@@ -110,7 +110,7 @@ class EloquentSalesReturnRepository extends EloquentRepository implements SalesR
     public function findByTenantAndReturnNumber(int $tenantId, string $returnNumber): ?SalesReturn
     {
         /** @var SalesReturnModel|null $model */
-        $model = $this->newScopedQuery()->with('lines')
+        $model = $this->model->newQuery()->with('lines')
             ->where('tenant_id', $tenantId)
             ->where('return_number', $returnNumber)
             ->first();
@@ -125,9 +125,7 @@ class EloquentSalesReturnRepository extends EloquentRepository implements SalesR
             customerId: (int) $model->customer_id,
             currencyId: (int) $model->currency_id,
             returnDate: new \DateTimeImmutable((string) $model->return_date),
-            originalSalesOrderId: $model->original_sales_order_id !== null
-                ? (int) $model->original_sales_order_id
-                : null,
+            originalSalesOrderId: $model->original_sales_order_id !== null ? (int) $model->original_sales_order_id : null,
             originalInvoiceId: $model->original_invoice_id !== null ? (int) $model->original_invoice_id : null,
             returnNumber: $model->return_number,
             status: (string) $model->status,

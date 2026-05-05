@@ -34,10 +34,14 @@ class ProductData
         public readonly ?int $cogs_account_id = null,
         public readonly ?int $inventory_account_id = null,
         public readonly ?int $expense_account_id = null,
+        public readonly ?string $purchase_price = null,
+        public readonly ?string $sales_price = null,
         public readonly bool $is_active = true,
         public readonly ?array $metadata = null,
+        public readonly int $rowVersion = 1,
         public readonly ?int $id = null,
-    ) {}
+    ) {
+    }
 
     /**
      * @param  array<string, mixed>  $data
@@ -69,8 +73,11 @@ class ProductData
             cogs_account_id: isset($data['cogs_account_id']) ? (int) $data['cogs_account_id'] : null,
             inventory_account_id: isset($data['inventory_account_id']) ? (int) $data['inventory_account_id'] : null,
             expense_account_id: isset($data['expense_account_id']) ? (int) $data['expense_account_id'] : null,
+            purchase_price: isset($data['purchase_price']) ? (string) $data['purchase_price'] : null,
+            sales_price: isset($data['sales_price']) ? (string) $data['sales_price'] : null,
             is_active: (bool) ($data['is_active'] ?? true),
             metadata: isset($data['metadata']) && is_array($data['metadata']) ? $data['metadata'] : null,
+            rowVersion: (int) ($data['row_version'] ?? 0),
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }
@@ -106,6 +113,8 @@ class ProductData
             'cogs_account_id' => $this->cogs_account_id,
             'inventory_account_id' => $this->inventory_account_id,
             'expense_account_id' => $this->expense_account_id,
+            'purchase_price' => $this->purchase_price,
+            'sales_price' => $this->sales_price,
             'is_active' => $this->is_active,
             'metadata' => $this->metadata,
         ];

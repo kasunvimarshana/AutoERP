@@ -253,6 +253,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
                 'start_date' => '2026-01-01',
                 'end_date' => '2026-12-31',
                 'status' => 'open',
+                'row_version' => 1,
             ]);
 
         $response->assertStatus(HttpResponse::HTTP_CONFLICT)
@@ -290,6 +291,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
                 'start_date' => '2026-01-01',
                 'end_date' => '2026-12-31',
                 'status' => 'open',
+                'row_version' => 1,
             ]);
 
         $response->assertStatus(HttpResponse::HTTP_OK)
@@ -475,6 +477,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
                 'start_date' => '2026-01-01',
                 'end_date' => '2026-01-31',
                 'status' => 'open',
+                'row_version' => 1,
             ]);
 
         $response->assertStatus(HttpResponse::HTTP_CONFLICT)
@@ -517,6 +520,7 @@ class FinanceFiscalEndpointsAuthenticatedTest extends TestCase
                 'start_date' => '2026-02-01',
                 'end_date' => '2026-02-28',
                 'status' => 'open',
+                'row_version' => 1,
             ]);
 
         $response->assertStatus(HttpResponse::HTTP_OK)

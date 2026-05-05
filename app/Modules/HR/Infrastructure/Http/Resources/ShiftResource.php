@@ -30,6 +30,7 @@ class ShiftResource extends JsonResource
             'is_night_shift' => $entity->isNightShift(),
             'is_active' => $entity->isActive(),
             'metadata' => $entity->getMetadata(),
+            'row_version' => $entity->getRowVersion(),
             'created_at' => $entity->getCreatedAt()->format('c'),
             'updated_at' => $entity->getUpdatedAt()->format('c'),
         ];

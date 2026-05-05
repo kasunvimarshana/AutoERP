@@ -26,6 +26,7 @@ class PayrollItemController extends AuthorizedController
 
     public function index(): JsonResponse
     {
+        $this->authorize('viewAny', PayrollItem::class);
         $result = $this->findService->list();
 
         return Response::json(['data' => PayrollItemResource::collection($result)]);
@@ -33,6 +34,7 @@ class PayrollItemController extends AuthorizedController
 
     public function store(StorePayrollItemRequest $request): JsonResponse
     {
+        $this->authorize('create', PayrollItem::class);
         $entity = $this->createService->execute($request->validated());
 
         return (new PayrollItemResource($entity))->response()->setStatusCode(201);
@@ -40,12 +42,16 @@ class PayrollItemController extends AuthorizedController
 
     public function show(int $payrollItem): PayrollItemResource
     {
-        return new PayrollItemResource($this->findOrFail($payrollItem));
+        $entity = $this->findOrFail($payrollItem);
+        $this->authorize('view', $entity);
+
+        return new PayrollItemResource($entity);
     }
 
     public function update(UpdatePayrollItemRequest $request, int $payrollItem): PayrollItemResource
     {
-        $this->findOrFail($payrollItem);
+        $entity = $this->findOrFail($payrollItem);
+        $this->authorize('update', $entity);
         $payload = $request->validated();
         $payload['id'] = $payrollItem;
         $updated = $this->updateService->execute($payload);
@@ -55,7 +61,8 @@ class PayrollItemController extends AuthorizedController
 
     public function destroy(int $payrollItem): JsonResponse
     {
-        $this->findOrFail($payrollItem);
+        $entity = $this->findOrFail($payrollItem);
+        $this->authorize('delete', $entity);
 
         return Response::json(null, 204);
     }

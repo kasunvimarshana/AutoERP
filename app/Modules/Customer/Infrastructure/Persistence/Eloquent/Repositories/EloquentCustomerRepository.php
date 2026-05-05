@@ -35,6 +35,7 @@ class EloquentCustomerRepository extends EloquentRepository implements CustomerR
             'status' => $customer->getStatus(),
             'notes' => $customer->getNotes(),
             'metadata' => $customer->getMetadata(),
+            'row_version' => $customer->getRowVersion(),
         ];
 
         if ($customer->getId()) {
@@ -94,6 +95,7 @@ class EloquentCustomerRepository extends EloquentRepository implements CustomerR
             status: (string) $model->status,
             notes: $model->notes,
             metadata: is_array($model->metadata) ? $model->metadata : null,
+            rowVersion: (int) ($model->row_version ?? 1),
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,
         );

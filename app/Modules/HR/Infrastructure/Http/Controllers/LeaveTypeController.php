@@ -28,6 +28,7 @@ class LeaveTypeController extends AuthorizedController
 
     public function index(): JsonResponse
     {
+        $this->authorize('viewAny', LeaveType::class);
         $result = $this->findService->list();
 
         return Response::json(['data' => LeaveTypeResource::collection($result)]);
@@ -35,6 +36,7 @@ class LeaveTypeController extends AuthorizedController
 
     public function store(StoreLeaveTypeRequest $request): JsonResponse
     {
+        $this->authorize('create', LeaveType::class);
         $entity = $this->createService->execute($request->validated());
 
         return (new LeaveTypeResource($entity))->response()->setStatusCode(201);
@@ -42,12 +44,16 @@ class LeaveTypeController extends AuthorizedController
 
     public function show(int $leaveType): LeaveTypeResource
     {
-        return new LeaveTypeResource($this->findOrFail($leaveType));
+        $entity = $this->findOrFail($leaveType);
+        $this->authorize('view', $entity);
+
+        return new LeaveTypeResource($entity);
     }
 
     public function update(UpdateLeaveTypeRequest $request, int $leaveType): LeaveTypeResource
     {
-        $this->findOrFail($leaveType);
+        $entity = $this->findOrFail($leaveType);
+        $this->authorize('update', $entity);
         $payload = $request->validated();
         $payload['id'] = $leaveType;
         $updated = $this->updateService->execute($payload);
@@ -57,7 +63,8 @@ class LeaveTypeController extends AuthorizedController
 
     public function destroy(int $leaveType): JsonResponse
     {
-        $this->findOrFail($leaveType);
+        $entity = $this->findOrFail($leaveType);
+        $this->authorize('delete', $entity);
         $this->deleteService->execute(['id' => $leaveType]);
 
         return Response::json(null, 204);

@@ -18,6 +18,7 @@ class BankTransactionData
         public readonly string $status = 'imported',
         public readonly ?int $matched_journal_entry_id = null,
         public readonly ?int $category_rule_id = null,
+        public readonly int $row_version = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -36,6 +37,7 @@ class BankTransactionData
             status: (string) ($data['status'] ?? 'imported'),
             matched_journal_entry_id: isset($data['matched_journal_entry_id']) ? (int) $data['matched_journal_entry_id'] : null,
             category_rule_id: isset($data['category_rule_id']) ? (int) $data['category_rule_id'] : null,
+            row_version: isset($data['row_version']) ? (int) $data['row_version'] : 1,
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

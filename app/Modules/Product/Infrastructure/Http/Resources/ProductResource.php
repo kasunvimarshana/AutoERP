@@ -37,8 +37,11 @@ class ProductResource extends JsonResource
             'cogs_account_id' => $this->getCogsAccountId(),
             'inventory_account_id' => $this->getInventoryAccountId(),
             'expense_account_id' => $this->getExpenseAccountId(),
+            'purchase_price' => $this->getPurchasePrice(),
+            'sales_price' => $this->getSalesPrice(),
             'is_active' => $this->isActive(),
             'metadata' => $this->getMetadata(),
+            'row_version' => $this->getRowVersion(),
             'created_at' => $this->getCreatedAt()->format('c'),
             'updated_at' => $this->getUpdatedAt()->format('c'),
         ];

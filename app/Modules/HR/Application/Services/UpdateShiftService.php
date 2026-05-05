@@ -9,6 +9,7 @@ use Modules\HR\Application\Contracts\UpdateShiftServiceInterface;
 use Modules\HR\Application\DTOs\ShiftData;
 use Modules\HR\Domain\Entities\Shift;
 use Modules\HR\Domain\Exceptions\ShiftNotFoundException;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\HR\Domain\RepositoryInterfaces\ShiftRepositoryInterface;
 use Modules\HR\Domain\ValueObjects\ShiftType;
 
@@ -35,6 +36,11 @@ class UpdateShiftService extends BaseService implements UpdateShiftServiceInterf
             throw new ShiftNotFoundException($id);
         }
 
+
+        if ($dto->rowVersion !== $shift->getRowVersion()) {
+            throw new ConcurrentModificationException('Shift', $id);
+        }
+
         $updated = new Shift(
             tenantId: $shift->getTenantId(),
             name: $dto->name,
@@ -50,6 +56,7 @@ class UpdateShiftService extends BaseService implements UpdateShiftServiceInterf
             metadata: $dto->metadata,
             isActive: $dto->isActive,
             createdAt: $shift->getCreatedAt(),
+            rowVersion: $shift->getRowVersion() + 1,
             updatedAt: new \DateTimeImmutable,
             id: $shift->getId(),
         );

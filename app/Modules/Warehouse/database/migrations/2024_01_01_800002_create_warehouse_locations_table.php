@@ -15,8 +15,13 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('warehouse_id')->constrained(null, 'id', 'warehouse_locations_warehouse_id_fk')->cascadeOnDelete();
-            $table->foreignId('parent_id')->nullable()->constrained('warehouse_locations', 'id', 'warehouse_locations_parent_id_fk')->nullOnDelete();
+            $table->foreignId('warehouse_id')
+                ->constrained('warehouses', 'id', 'warehouse_locations_warehouse_id_fk')
+                ->cascadeOnDelete();
+            $table->foreignId('parent_id')
+                ->nullable()
+                ->constrained('warehouse_locations', 'id', 'warehouse_locations_parent_id_fk')
+                ->nullOnDelete();
             $table->string('name');
             $table->string('code')->nullable();
             $table->string('path')->nullable();

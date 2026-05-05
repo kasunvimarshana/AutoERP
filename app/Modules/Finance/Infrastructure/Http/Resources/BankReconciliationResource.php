@@ -23,6 +23,7 @@ class BankReconciliationResource extends JsonResource
             'status' => $this->resource->getStatus(),
             'completed_by' => $this->resource->getCompletedBy(),
             'completed_at' => $this->resource->getCompletedAt()?->format(\DateTimeInterface::ATOM),
+            'row_version' => $this->resource->getRowVersion(),
             'created_at' => $this->resource->getCreatedAt(),
             'updated_at' => $this->resource->getUpdatedAt(),
         ];

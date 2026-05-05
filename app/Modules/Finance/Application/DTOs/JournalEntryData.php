@@ -26,6 +26,7 @@ class JournalEntryData
         public readonly ?int $reversal_entry_id = null,
         public readonly ?int $posted_by = null,
         public readonly ?string $posted_at = null,
+        public readonly int $row_version = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -60,6 +61,7 @@ class JournalEntryData
             reversal_entry_id: isset($data['reversal_entry_id']) ? (int) $data['reversal_entry_id'] : null,
             posted_by: isset($data['posted_by']) ? (int) $data['posted_by'] : null,
             posted_at: isset($data['posted_at']) ? (string) $data['posted_at'] : null,
+            row_version: isset($data['row_version']) ? (int) $data['row_version'] : 1,
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

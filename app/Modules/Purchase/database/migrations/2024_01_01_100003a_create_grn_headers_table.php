@@ -17,7 +17,7 @@ return new class extends Migration
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('supplier_id');
             $table->foreignId('warehouse_id');
-            $table->foreignId('purchase_order_id')->nullable()->constrained(null, 'id', 'grn_headers_purchase_order_id_fk')->nullOnDelete();
+            $table->foreignId('purchase_order_id')->nullable()->constrained('purchase_orders', 'id', 'grn_headers_purchase_order_id_fk')->nullOnDelete();
             $table->string('grn_number');
             $table->enum('status', ['draft', 'partial', 'complete', 'posted'])->default('draft');
             $table->date('received_date');

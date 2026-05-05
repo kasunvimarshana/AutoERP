@@ -28,6 +28,7 @@ class CustomerData
         public readonly ?array $metadata = null,
         public readonly ?array $user = null,
         public readonly ?int $id = null,
+        public readonly int $row_version = 1,
     ) {}
 
     /**
@@ -53,6 +54,7 @@ class CustomerData
             metadata: isset($data['metadata']) && is_array($data['metadata']) ? $data['metadata'] : null,
             user: isset($data['user']) && is_array($data['user']) ? $data['user'] : null,
             id: isset($data['id']) ? (int) $data['id'] : null,
+            row_version: isset($data['row_version']) ? (int) $data['row_version'] : 1,
         );
     }
 

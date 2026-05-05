@@ -12,6 +12,7 @@ class UnitOfMeasureData
         public readonly string $symbol,
         public readonly string $type = 'unit',
         public readonly bool $is_base = false,
+        public readonly int $rowVersion = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -26,6 +27,7 @@ class UnitOfMeasureData
             symbol: (string) $data['symbol'],
             type: (string) ($data['type'] ?? 'unit'),
             is_base: (bool) ($data['is_base'] ?? false),
+            rowVersion: (int) ($data['row_version'] ?? 0),
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

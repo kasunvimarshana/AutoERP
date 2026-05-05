@@ -29,6 +29,7 @@ class PerformanceReviewController extends AuthorizedController
 
     public function index(): JsonResponse
     {
+        $this->authorize('viewAny', PerformanceReview::class);
         $result = $this->findService->list();
 
         return Response::json(['data' => PerformanceReviewResource::collection($result)]);
@@ -36,6 +37,7 @@ class PerformanceReviewController extends AuthorizedController
 
     public function store(StorePerformanceReviewRequest $request): JsonResponse
     {
+        $this->authorize('create', PerformanceReview::class);
         $entity = $this->createService->execute($request->validated());
 
         return (new PerformanceReviewResource($entity))->response()->setStatusCode(201);
@@ -43,12 +45,16 @@ class PerformanceReviewController extends AuthorizedController
 
     public function show(int $performanceReview): PerformanceReviewResource
     {
-        return new PerformanceReviewResource($this->findOrFail($performanceReview));
+        $entity = $this->findOrFail($performanceReview);
+        $this->authorize('view', $entity);
+
+        return new PerformanceReviewResource($entity);
     }
 
     public function update(UpdatePerformanceReviewRequest $request, int $performanceReview): PerformanceReviewResource
     {
-        $this->findOrFail($performanceReview);
+        $entity = $this->findOrFail($performanceReview);
+        $this->authorize('update', $entity);
         $payload = $request->validated();
         $payload['id'] = $performanceReview;
         $updated = $this->updateService->execute($payload);
@@ -58,14 +64,16 @@ class PerformanceReviewController extends AuthorizedController
 
     public function destroy(int $performanceReview): JsonResponse
     {
-        $this->findOrFail($performanceReview);
+        $entity = $this->findOrFail($performanceReview);
+        $this->authorize('delete', $entity);
 
         return Response::json(null, 204);
     }
 
     public function submit(SubmitPerformanceReviewRequest $request, int $performanceReview): PerformanceReviewResource
     {
-        $this->findOrFail($performanceReview);
+        $entity = $this->findOrFail($performanceReview);
+        $this->authorize('update', $entity);
         $updated = $this->submitService->execute(['id' => $performanceReview]);
 
         return new PerformanceReviewResource($updated);

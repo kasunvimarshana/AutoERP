@@ -24,6 +24,7 @@ class ShiftData
         public readonly bool $isNightShift = false,
         public readonly array $metadata = [],
         public readonly bool $isActive = true,
+        public readonly int $rowVersion = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -44,6 +45,7 @@ class ShiftData
             isNightShift: isset($data['is_night_shift']) ? (bool) $data['is_night_shift'] : false,
             metadata: isset($data['metadata']) && is_array($data['metadata']) ? $data['metadata'] : [],
             isActive: isset($data['is_active']) ? (bool) $data['is_active'] : true,
+            rowVersion: (int) ($data['row_version'] ?? 1),
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

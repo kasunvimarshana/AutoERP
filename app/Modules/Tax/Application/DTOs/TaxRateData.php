@@ -17,6 +17,7 @@ class TaxRateData
         public readonly bool $is_active = true,
         public readonly ?string $valid_from = null,
         public readonly ?string $valid_to = null,
+        public readonly int $row_version = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -33,6 +34,7 @@ class TaxRateData
             is_active: (bool) ($data['is_active'] ?? true),
             valid_from: isset($data['valid_from']) ? (string) $data['valid_from'] : null,
             valid_to: isset($data['valid_to']) ? (string) $data['valid_to'] : null,
+            row_version: isset($data['row_version']) ? (int) $data['row_version'] : 1,
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

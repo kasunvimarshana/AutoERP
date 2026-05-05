@@ -106,6 +106,8 @@ class ProductEntityTest extends TestCase
             cogsAccountId: null,
             inventoryAccountId: null,
             expenseAccountId: null,
+            purchasePrice: '9.990000',
+            salesPrice: '19.990000',
             isActive: true,
             metadata: ['channel' => 'online'],
         );

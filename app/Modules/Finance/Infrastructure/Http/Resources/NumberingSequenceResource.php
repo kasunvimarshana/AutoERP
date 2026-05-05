@@ -24,6 +24,7 @@ class NumberingSequenceResource extends JsonResource
             'next_number' => $this->resource->getNextNumber(),
             'padding' => $this->resource->getPadding(),
             'is_active' => $this->resource->isActive(),
+            'row_version' => $this->resource->getRowVersion(),
             'created_at' => $this->resource->getCreatedAt(),
             'updated_at' => $this->resource->getUpdatedAt(),
         ];

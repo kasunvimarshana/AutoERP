@@ -9,6 +9,7 @@ use Modules\Finance\Application\Contracts\UpdateFiscalPeriodServiceInterface;
 use Modules\Finance\Application\DTOs\FiscalPeriodData;
 use Modules\Finance\Domain\Entities\FiscalPeriod;
 use Modules\Finance\Domain\Exceptions\FiscalPeriodAlreadyExistsException;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Finance\Domain\Exceptions\FiscalPeriodNotFoundException;
 use Modules\Finance\Domain\Exceptions\FiscalYearNotFoundException;
 use Modules\Finance\Domain\RepositoryInterfaces\FiscalPeriodRepositoryInterface;
@@ -33,6 +34,11 @@ class UpdateFiscalPeriodService extends BaseService implements UpdateFiscalPerio
         }
 
         $dto = FiscalPeriodData::fromArray($data);
+
+
+        if ($dto->rowVersion !== $fiscalPeriod->getRowVersion()) {
+            throw new ConcurrentModificationException('FiscalPeriod', $id);
+        }
 
         $fiscalYear = $this->fiscalYearRepository->find($dto->fiscal_year_id);
         if (! $fiscalYear) {

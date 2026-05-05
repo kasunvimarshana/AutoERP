@@ -27,6 +27,7 @@ class UpdatePaymentTermRequest extends FormRequest
             'description' => ['nullable', 'string'],
             'discount_days' => ['nullable', 'integer', 'min:0'],
             'discount_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'row_version' => ['required', 'integer', 'min:1'],
         ];
     }
 }

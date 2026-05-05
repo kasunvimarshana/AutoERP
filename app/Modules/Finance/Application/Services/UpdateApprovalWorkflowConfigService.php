@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Finance\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Finance\Application\Contracts\UpdateApprovalWorkflowConfigServiceInterface;
 use Modules\Finance\Application\DTOs\ApprovalWorkflowConfigData;
 use Modules\Finance\Domain\Entities\ApprovalWorkflowConfig;
@@ -25,6 +26,9 @@ class UpdateApprovalWorkflowConfigService extends BaseService implements UpdateA
         $config = $this->configRepository->find((int) $dto->id);
         if (! $config) {
             throw new ApprovalWorkflowConfigNotFoundException((int) $dto->id);
+        }
+        if ($dto->row_version !== $config->getRowVersion()) {
+            throw new ConcurrentModificationException('ApprovalWorkflowConfig', (int) $dto->id);
         }
         $config->update(
             name: $dto->name,

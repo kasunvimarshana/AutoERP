@@ -18,5 +18,6 @@ class UpdateWarehouseDTO
         public readonly bool $isActive,
         public readonly bool $isDefault,
         public readonly ?array $metadata,
+        public readonly int $rowVersion = 1,
     ) {}
 }

@@ -52,7 +52,7 @@ class EloquentGrnLineRepository extends EloquentRepository implements GrnLineRep
 
     public function findByGrnHeaderId(int $tenantId, int $grnHeaderId): Collection
     {
-        $models = $this->newScopedQuery()
+        $models = $this->model->newQuery()
             ->where('tenant_id', $tenantId)
             ->where('grn_header_id', $grnHeaderId)
             ->get();

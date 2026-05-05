@@ -25,6 +25,7 @@ class EloquentFiscalYearRepository extends EloquentRepository implements FiscalY
             'start_date' => $fiscalYear->getStartDate()->format('Y-m-d'),
             'end_date' => $fiscalYear->getEndDate()->format('Y-m-d'),
             'status' => $fiscalYear->getStatus(),
+            'row_version' => $fiscalYear->getRowVersion(),
         ];
 
         if ($fiscalYear->getId()) {
@@ -62,6 +63,7 @@ class EloquentFiscalYearRepository extends EloquentRepository implements FiscalY
             startDate: $model->start_date,
             endDate: $model->end_date,
             status: (string) $model->status,
+            rowVersion: (int) ($model->row_version ?? 1),
             id: (int) $model->id,
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,

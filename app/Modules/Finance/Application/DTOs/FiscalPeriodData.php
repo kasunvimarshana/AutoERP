@@ -14,6 +14,7 @@ class FiscalPeriodData
         public readonly string $start_date,
         public readonly string $end_date,
         public readonly string $status = 'open',
+        public readonly int $rowVersion = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -30,6 +31,7 @@ class FiscalPeriodData
             start_date: (string) $data['start_date'],
             end_date: (string) $data['end_date'],
             status: (string) ($data['status'] ?? 'open'),
+            rowVersion: (int) ($data['row_version'] ?? 1),
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

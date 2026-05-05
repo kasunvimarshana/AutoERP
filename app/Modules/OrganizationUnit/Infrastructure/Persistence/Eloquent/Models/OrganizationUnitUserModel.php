@@ -20,7 +20,7 @@ class OrganizationUnitUserModel extends BaseModel
         'tenant_id',
         'org_unit_id',
         'user_id',
-        'role',
+        'role_id',
         'is_primary',
     ];
 

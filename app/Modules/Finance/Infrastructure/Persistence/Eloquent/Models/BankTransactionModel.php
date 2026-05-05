@@ -25,5 +25,6 @@ class BankTransactionModel extends BaseModel
         'amount' => 'decimal:6',
         'balance' => 'decimal:6',
         'transaction_date' => 'date',
+        'row_version' => 'integer',
     ];
 }

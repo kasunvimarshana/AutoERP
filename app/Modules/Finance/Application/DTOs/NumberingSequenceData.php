@@ -15,6 +15,7 @@ class NumberingSequenceData
         public readonly int $next_number = 1,
         public readonly int $padding = 5,
         public readonly bool $is_active = true,
+        public readonly int $row_version = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -32,6 +33,7 @@ class NumberingSequenceData
             next_number: (int) ($data['next_number'] ?? 1),
             padding: (int) ($data['padding'] ?? 5),
             is_active: (bool) ($data['is_active'] ?? true),
+            row_version: isset($data['row_version']) ? (int) $data['row_version'] : 1,
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

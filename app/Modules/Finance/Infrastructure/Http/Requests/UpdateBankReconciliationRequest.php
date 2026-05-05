@@ -17,6 +17,7 @@ class UpdateBankReconciliationRequest extends FormRequest
     public function rules(): array
     {
         $base = [
+            'row_version' => ['required', 'integer', 'min:1'],
             'tenant_id' => ['required', 'integer', 'exists:tenants,id'],
             'bank_account_id' => ['required', 'integer', 'exists:bank_accounts,id'],
             'period_start' => ['required', 'date'],

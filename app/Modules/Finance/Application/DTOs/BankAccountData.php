@@ -17,6 +17,7 @@ class BankAccountData
         public readonly float $current_balance = 0.0,
         public readonly ?string $feed_provider = null,
         public readonly bool $is_active = true,
+        public readonly int $row_version = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -34,6 +35,7 @@ class BankAccountData
             current_balance: (float) ($data['current_balance'] ?? 0.0),
             feed_provider: isset($data['feed_provider']) ? (string) $data['feed_provider'] : null,
             is_active: (bool) ($data['is_active'] ?? true),
+            row_version: isset($data['row_version']) ? (int) $data['row_version'] : 1,
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

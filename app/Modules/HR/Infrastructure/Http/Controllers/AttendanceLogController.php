@@ -23,6 +23,7 @@ class AttendanceLogController extends AuthorizedController
 
     public function index(): JsonResponse
     {
+        $this->authorize('viewAny', AttendanceLog::class);
         $result = $this->findService->list();
 
         return Response::json(['data' => AttendanceLogResource::collection($result)]);
@@ -30,6 +31,7 @@ class AttendanceLogController extends AuthorizedController
 
     public function store(StoreAttendanceLogRequest $request): JsonResponse
     {
+        $this->authorize('create', AttendanceLog::class);
         $entity = $this->createService->execute($request->validated());
 
         return (new AttendanceLogResource($entity))->response()->setStatusCode(201);
@@ -37,7 +39,10 @@ class AttendanceLogController extends AuthorizedController
 
     public function show(int $attendanceLog): AttendanceLogResource
     {
-        return new AttendanceLogResource($this->findOrFail($attendanceLog));
+        $entity = $this->findOrFail($attendanceLog);
+        $this->authorize('view', $entity);
+
+        return new AttendanceLogResource($entity);
     }
 
     private function findOrFail(int $id): AttendanceLog

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Finance\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Finance\Application\Contracts\UpdateArTransactionServiceInterface;
 use Modules\Finance\Application\DTOs\ArTransactionData;
 use Modules\Finance\Domain\Entities\ArTransaction;
@@ -25,6 +26,9 @@ class UpdateArTransactionService extends BaseService implements UpdateArTransact
         $ar = $this->arTransactionRepository->find((int) $dto->id);
         if (! $ar) {
             throw new ArTransactionNotFoundException((int) $dto->id);
+        }
+        if ($dto->row_version !== $ar->getRowVersion()) {
+            throw new ConcurrentModificationException('ArTransaction', (int) $dto->id);
         }
         if ($dto->is_reconciled) {
             $ar->reconcile();

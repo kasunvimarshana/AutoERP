@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Finance\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Finance\Application\Contracts\UpdateApprovalRequestServiceInterface;
 use Modules\Finance\Application\DTOs\ApprovalRequestData;
 use Modules\Finance\Domain\Entities\ApprovalRequest;
@@ -25,6 +26,9 @@ class UpdateApprovalRequestService extends BaseService implements UpdateApproval
         $ar = $this->approvalRequestRepository->find((int) $dto->id);
         if (! $ar) {
             throw new ApprovalRequestNotFoundException((int) $dto->id);
+        }
+        if ($dto->row_version !== $ar->getRowVersion()) {
+            throw new ConcurrentModificationException('ApprovalRequest', (int) $dto->id);
         }
         if ($dto->status === 'approved' && $dto->resolved_by_user_id !== null) {
             $ar->approve($dto->resolved_by_user_id, $dto->comments);

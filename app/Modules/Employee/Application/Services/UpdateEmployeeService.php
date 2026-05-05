@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Employee\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Core\Domain\Exceptions\DomainException;
 use Modules\Employee\Application\Contracts\UpdateEmployeeServiceInterface;
 use Modules\Employee\Application\DTOs\EmployeeData;
@@ -35,6 +36,10 @@ class UpdateEmployeeService extends BaseService implements UpdateEmployeeService
 
         if ($employee->getTenantId() !== $dto->tenant_id) {
             throw new EmployeeNotFoundException($id);
+        }
+
+        if ($dto->row_version !== $employee->getRowVersion()) {
+            throw new ConcurrentModificationException('Employee', $id);
         }
 
         if ($dto->user_id !== null && $dto->user_id !== $employee->getUserId()) {

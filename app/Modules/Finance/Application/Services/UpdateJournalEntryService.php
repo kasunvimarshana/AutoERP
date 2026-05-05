@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Finance\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Core\Domain\Exceptions\DomainException;
 use Modules\Finance\Application\Contracts\UpdateJournalEntryServiceInterface;
 use Modules\Finance\Application\DTOs\JournalEntryData;
@@ -32,6 +33,10 @@ class UpdateJournalEntryService extends BaseService implements UpdateJournalEntr
 
         if (! $journalEntry) {
             throw new JournalEntryNotFoundException($id);
+        }
+
+        if (isset($data['row_version']) && (int) $data['row_version'] !== $journalEntry->getRowVersion()) {
+            throw new ConcurrentModificationException('JournalEntry', $id);
         }
 
         if (! $journalEntry->isDraft()) {

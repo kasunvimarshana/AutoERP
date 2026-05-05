@@ -16,6 +16,7 @@ class BankReconciliation
         private string $status = 'draft',
         private ?int $completedBy = null,
         private ?\DateTimeInterface $completedAt = null,
+        private int $rowVersion = 1,
         private ?int $id = null,
         private ?\DateTimeInterface $createdAt = null,
         private ?\DateTimeInterface $updatedAt = null,
@@ -82,6 +83,11 @@ class BankReconciliation
     public function getUpdatedAt(): \DateTimeInterface
     {
         return $this->updatedAt;
+    }
+
+    public function getRowVersion(): int
+    {
+        return $this->rowVersion;
     }
 
     public function complete(int $completedBy): void

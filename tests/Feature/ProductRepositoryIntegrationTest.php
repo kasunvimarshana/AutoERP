@@ -41,11 +41,15 @@ class ProductRepositoryIntegrationTest extends TestCase
             slug: 'widget-a',
             sku: 'W-A-001',
             baseUomId: 101,
+            purchasePrice: '12.340000',
+            salesPrice: '45.670000',
             isActive: true,
         ));
 
         $this->assertNotNull($created->getId());
         $this->assertSame('Widget A', $created->getName());
+        $this->assertSame('12.340000', $created->getPurchasePrice());
+        $this->assertSame('45.670000', $created->getSalesPrice());
 
         $updated = $repository->save(new Product(
             id: $created->getId(),
@@ -55,12 +59,16 @@ class ProductRepositoryIntegrationTest extends TestCase
             slug: 'widget-a-prime',
             sku: 'W-A-001',
             baseUomId: 101,
+            purchasePrice: '13.000000',
+            salesPrice: '46.000000',
             isActive: true,
         ));
 
         $this->assertSame($created->getId(), $updated->getId());
         $this->assertSame('Widget A Prime', $updated->getName());
         $this->assertSame('widget-a-prime', $updated->getSlug());
+        $this->assertSame('13.000000', $updated->getPurchasePrice());
+        $this->assertSame('46.000000', $updated->getSalesPrice());
     }
 
     public function test_find_by_tenant_and_sku_returns_domain_entity(): void
@@ -136,6 +144,8 @@ class ProductRepositoryIntegrationTest extends TestCase
             'cogs_account_id' => null,
             'inventory_account_id' => null,
             'expense_account_id' => null,
+            'purchase_price' => '10.250000',
+            'sales_price' => '20.500000',
             'is_active' => true,
             'metadata' => null,
             'created_at' => now(),

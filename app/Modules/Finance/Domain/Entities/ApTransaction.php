@@ -19,6 +19,7 @@ class ApTransaction
         private ?int $referenceId = null,
         private ?\DateTimeInterface $dueDate = null,
         private bool $isReconciled = false,
+        private int $rowVersion = 1,
         private ?int $id = null,
         private ?\DateTimeInterface $createdAt = null,
         private ?\DateTimeInterface $updatedAt = null,
@@ -100,6 +101,11 @@ class ApTransaction
     public function getUpdatedAt(): \DateTimeInterface
     {
         return $this->updatedAt;
+    }
+
+    public function getRowVersion(): int
+    {
+        return $this->rowVersion;
     }
 
     public function reconcile(): void

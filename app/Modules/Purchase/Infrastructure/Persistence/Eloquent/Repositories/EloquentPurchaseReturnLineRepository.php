@@ -54,7 +54,7 @@ class EloquentPurchaseReturnLineRepository extends EloquentRepository implements
 
     public function findByPurchaseReturnId(int $tenantId, int $purchaseReturnId): Collection
     {
-        $models = $this->newScopedQuery()
+        $models = $this->model->newQuery()
             ->where('tenant_id', $tenantId)
             ->where('purchase_return_id', $purchaseReturnId)
             ->get();

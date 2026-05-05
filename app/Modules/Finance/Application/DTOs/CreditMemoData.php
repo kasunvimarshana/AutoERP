@@ -20,6 +20,7 @@ class CreditMemoData
         public readonly ?string $applied_to_invoice_type = null,
         public readonly ?string $notes = null,
         public readonly ?int $journal_entry_id = null,
+        public readonly int $row_version = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -40,6 +41,7 @@ class CreditMemoData
             applied_to_invoice_type: isset($data['applied_to_invoice_type']) ? (string) $data['applied_to_invoice_type'] : null,
             notes: isset($data['notes']) ? (string) $data['notes'] : null,
             journal_entry_id: isset($data['journal_entry_id']) ? (int) $data['journal_entry_id'] : null,
+            row_version: isset($data['row_version']) ? (int) $data['row_version'] : 1,
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

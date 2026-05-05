@@ -13,6 +13,7 @@ class TaxRuleData
         public readonly ?string $party_type = null,
         public readonly ?string $region = null,
         public readonly int $priority = 0,
+        public readonly int $row_version = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -25,6 +26,7 @@ class TaxRuleData
             party_type: isset($data['party_type']) ? (string) $data['party_type'] : null,
             region: isset($data['region']) ? (string) $data['region'] : null,
             priority: (int) ($data['priority'] ?? 0),
+            row_version: isset($data['row_version']) ? (int) $data['row_version'] : 1,
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }
