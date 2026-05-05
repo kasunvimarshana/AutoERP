@@ -16,9 +16,7 @@ class ActivateRentalBookingService extends BaseService implements ActivateRental
     public function __construct(
         private readonly RentalBookingRepositoryInterface $bookingRepository,
         private readonly SyncAssetAvailabilityServiceInterface $syncAvailabilityService,
-    ) {
-        parent::__construct($bookingRepository);
-    }
+    ) {}
 
     protected function handle(array $data): RentalBooking
     {

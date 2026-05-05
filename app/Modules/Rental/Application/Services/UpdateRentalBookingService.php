@@ -12,10 +12,7 @@ use Modules\Rental\Domain\RepositoryInterfaces\RentalBookingRepositoryInterface;
 
 class UpdateRentalBookingService extends BaseService implements UpdateRentalBookingServiceInterface
 {
-    public function __construct(private readonly RentalBookingRepositoryInterface $bookingRepository)
-    {
-        parent::__construct($bookingRepository);
-    }
+    public function __construct(private readonly RentalBookingRepositoryInterface $bookingRepository) {}
 
     protected function handle(array $data): RentalBooking
     {
