@@ -12,9 +12,8 @@ return new class extends Migration
     {
         Schema::create('org_unit_attachments', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-$table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->cascadeOnDelete();
-$table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->unsignedBigInteger('tenant_id');
+            $table->unsignedBigInteger('org_unit_id');
             $table->string('uuid')->unique('org_unit_attachments_uuid_uk');
             $table->string('name');
             $table->string('file_path');
@@ -28,6 +27,7 @@ $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimis
             $table->timestamps();
             $table->softDeletes();
 
+            $table->foreign('org_unit_id', 'org_unit_attachments_org_unit_id_fk')->references('id')->on('org_units')->onDelete('cascade');
             $table->index(['tenant_id', 'org_unit_id', 'type'], 'org_unit_attachments_tenant_id_org_unit_id_type_idx');
         });
     }

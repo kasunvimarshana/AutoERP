@@ -12,9 +12,7 @@ return new class extends Migration
     {
         Schema::create('cycle_count_headers', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', 'cycle_count_headers_tenant_id_fk')->cascadeOnDelete();
             $table->foreignId('warehouse_id')->constrained('warehouses', 'id', 'cycle_count_headers_warehouse_id_fk');
             $table->foreignId('location_id')->nullable()->constrained('warehouse_locations', 'id', 'cycle_count_headers_location_id_fk')->nullOnDelete();
             $table->enum('status', ['draft', 'in_progress', 'completed', 'cancelled']);

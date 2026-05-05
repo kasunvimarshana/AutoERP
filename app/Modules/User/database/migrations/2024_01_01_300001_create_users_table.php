@@ -12,9 +12,8 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-$table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-$table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('tenant_id')->nullable()->constrained(null, 'id', 'users_tenant_id_fk')->nullOnDelete(); // null for super admins
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id', 'users_org_unit_id_fk')->nullOnDelete();
             $table->string('first_name');
             $table->string('last_name');
             $table->string('email');

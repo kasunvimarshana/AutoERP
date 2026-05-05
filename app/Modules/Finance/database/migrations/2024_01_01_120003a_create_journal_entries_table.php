@@ -12,9 +12,7 @@ return new class extends Migration
     {
         Schema::create('journal_entries', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('tenant_id')->constrained(null, 'id', 'journal_entries_tenant_id_fk')->cascadeOnDelete();
             $table->foreignId('fiscal_period_id')->constrained(null, 'id', 'journal_entries_fiscal_period_id_fk')->cascadeOnDelete();
             $table->string('entry_number')->nullable();
             $table->enum('entry_type', ['manual', 'auto', 'system'])->default('manual');

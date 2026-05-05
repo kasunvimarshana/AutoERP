@@ -12,9 +12,7 @@ return new class extends Migration
     {
         Schema::create('stock_adjustments', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('tenant_id')->constrained(null, 'id', 'stock_adjustments_tenant_id_fk')->cascadeOnDelete();
             $table->string('reference_number');
             $table->foreignId('warehouse_id')->constrained(null, 'id', 'stock_adjustments_warehouse_id_fk')->cascadeOnDelete();
             $table->foreignId('location_id')->nullable()->constrained('warehouse_locations', 'id', 'stock_adjustments_location_id_fk')->nullOnDelete();

@@ -12,9 +12,7 @@ return new class extends Migration
     {
         Schema::create('hr_performance_cycles', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', 'hr_performance_cycles_tenant_id_fk')->cascadeOnDelete();
             $table->string('name');
             $table->date('period_start');
             $table->date('period_end');

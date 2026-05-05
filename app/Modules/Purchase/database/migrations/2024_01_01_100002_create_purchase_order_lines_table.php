@@ -12,9 +12,7 @@ return new class extends Migration
     {
         Schema::create('purchase_order_lines', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('tenant_id');
             $table->foreignId('purchase_order_id')->constrained(null, 'id', 'purchase_order_lines_purchase_order_id_fk')->cascadeOnDelete();
             $table->foreignId('product_id');
             $table->foreignId('variant_id')->nullable();

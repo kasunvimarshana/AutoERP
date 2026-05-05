@@ -12,9 +12,7 @@ return new class extends Migration
     {
         Schema::create('combo_items', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-$table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-$table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('tenant_id')->nullable()->constrained('tenants', 'id', 'combo_items_tenant_id_fk')->nullOnDelete();
             $table->foreignId('combo_product_id')->constrained('products', 'id', 'combo_items_combo_product_id_fk')->cascadeOnDelete();
             $table->foreignId('component_product_id')->constrained('products', 'id', 'combo_items_component_product_id_fk')->cascadeOnDelete();
             $table->foreignId('component_variant_id')->nullable()->constrained('product_variants', 'id', 'combo_items_component_variant_id_fk')->nullOnDelete();
