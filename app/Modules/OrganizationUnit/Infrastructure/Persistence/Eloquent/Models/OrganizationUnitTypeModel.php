@@ -24,6 +24,7 @@ class OrganizationUnitTypeModel extends BaseModel
     ];
 
     protected $casts = [
+        'tenant_id' => 'integer',
         'level' => 'integer',
         'is_active' => 'boolean',
     ];

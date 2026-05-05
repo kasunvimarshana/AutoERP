@@ -7,14 +7,22 @@ namespace Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories;
 use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Domain\Entities\StockMovement;
 use Modules\Inventory\Domain\RepositoryInterfaces\TraceLogRepositoryInterface;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\TraceLogModel;
 
 class EloquentTraceLogRepository implements TraceLogRepositoryInterface
 {
+    private string $traceLogsTable;
+
+    public function __construct(TraceLogModel $traceLogModel)
+    {
+        $this->traceLogsTable = $traceLogModel->getTable();
+    }
+
     public function recordForMovement(StockMovement $movement): void
     {
         $metadata = $movement->getMetadata();
 
-        DB::table('trace_logs')->insert([
+        DB::table($this->traceLogsTable)->insert([
             'tenant_id' => $movement->getTenantId(),
             'entity_type' => 'product',
             'entity_id' => $movement->getProductId(),

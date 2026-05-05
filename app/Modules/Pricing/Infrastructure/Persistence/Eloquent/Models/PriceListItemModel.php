@@ -7,6 +7,7 @@ namespace Modules\Pricing\Infrastructure\Persistence\Eloquent\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductModel;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductVariantModel;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Models\UnitOfMeasureModel;
@@ -67,5 +68,10 @@ class PriceListItemModel extends Model
     public function uom(): BelongsTo
     {
         return $this->belongsTo(UnitOfMeasureModel::class, 'uom_id');
+    }
+
+    public function orgUnit(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationUnitModel::class, 'org_unit_id');
     }
 }

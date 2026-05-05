@@ -5,7 +5,13 @@ declare(strict_types=1);
 namespace Modules\Purchase\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\CurrencyModel;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\AccountModel;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\JournalEntryModel;
+use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class PurchaseInvoiceModel extends Model
@@ -40,6 +46,8 @@ class PurchaseInvoiceModel extends Model
 
     protected $casts = [
         'tenant_id' => 'integer',
+        'org_unit_id' => 'integer',
+        'row_version' => 'integer',
         'supplier_id' => 'integer',
         'grn_header_id' => 'integer',
         'purchase_order_id' => 'integer',
@@ -55,4 +63,39 @@ class PurchaseInvoiceModel extends Model
         'invoice_date' => 'date',
         'due_date' => 'date',
     ];
+
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(SupplierModel::class, 'supplier_id');
+    }
+
+    public function purchaseOrder(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseOrderModel::class, 'purchase_order_id');
+    }
+
+    public function grnHeader(): BelongsTo
+    {
+        return $this->belongsTo(GrnHeaderModel::class, 'grn_header_id');
+    }
+
+    public function currency(): BelongsTo
+    {
+        return $this->belongsTo(CurrencyModel::class, 'currency_id');
+    }
+
+    public function apAccount(): BelongsTo
+    {
+        return $this->belongsTo(AccountModel::class, 'ap_account_id');
+    }
+
+    public function journalEntry(): BelongsTo
+    {
+        return $this->belongsTo(JournalEntryModel::class, 'journal_entry_id');
+    }
+
+    public function lines(): HasMany
+    {
+        return $this->hasMany(PurchaseInvoiceLineModel::class, 'purchase_invoice_id');
+    }
 }

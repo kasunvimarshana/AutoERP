@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Support\Carbon;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
@@ -40,7 +41,7 @@ class TenantDomainModel extends BaseModel
         'verified_at' => 'datetime',
     ];
 
-    public function tenant()
+    public function tenant(): BelongsTo
     {
         return $this->belongsTo(TenantModel::class, 'tenant_id');
     }

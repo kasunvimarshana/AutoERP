@@ -26,14 +26,14 @@ class UpdateTaxRuleService extends BaseService implements UpdateTaxRuleServiceIn
             throw new \InvalidArgumentException('Tax rule not found.');
         }
 
-        if ($dto->row_version !== $taxRule->getRowVersion()) {
+        if ($dto->rowVersion !== $taxRule->getRowVersion()) {
             throw new ConcurrentModificationException('TaxRule', $dto->id ?? 0);
         }
 
         $taxRule->update(
-            taxGroupId: $dto->tax_group_id,
-            productCategoryId: $dto->product_category_id,
-            partyType: $dto->party_type,
+            taxGroupId: $dto->taxGroupId,
+            productCategoryId: $dto->productCategoryId,
+            partyType: $dto->partyType,
             region: $dto->region,
             priority: $dto->priority,
         );

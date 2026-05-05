@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\User\Infrastructure\Persistence\Eloquent\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -12,6 +13,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Passport\Contracts\OAuthenticatable;
 use Laravel\Passport\HasApiTokens;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class UserModel extends Authenticatable implements OAuthenticatable
@@ -50,6 +52,11 @@ class UserModel extends Authenticatable implements OAuthenticatable
     public function roles(): BelongsToMany
     {
         return $this->belongsToMany(RoleModel::class, 'role_user', 'user_id', 'role_id');
+    }
+
+    public function orgUnit(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationUnitModel::class, 'org_unit_id');
     }
 
     public function attachments(): HasMany

@@ -25,25 +25,25 @@ class CreateSupplierContactService extends BaseService implements CreateSupplier
     {
         $dto = SupplierContactData::fromArray($data);
 
-        $supplier = $this->supplierRepository->find($dto->supplier_id);
+        $supplier = $this->supplierRepository->find($dto->supplierId);
         if (! $supplier) {
-            throw new SupplierNotFoundException($dto->supplier_id);
+            throw new SupplierNotFoundException($dto->supplierId);
         }
 
         $contact = new SupplierContact(
             tenantId: $supplier->getTenantId(),
-            supplierId: $dto->supplier_id,
+            supplierId: $dto->supplierId,
             name: $dto->name,
             role: $dto->role,
             email: $dto->email,
             phone: $dto->phone,
-            isPrimary: $dto->is_primary,
+            isPrimary: $dto->isPrimary,
         );
 
-        if ($dto->is_primary) {
+        if ($dto->isPrimary) {
             $this->supplierContactRepository->clearPrimaryBySupplier(
                 tenantId: $supplier->getTenantId(),
-                supplierId: $dto->supplier_id,
+                supplierId: $dto->supplierId,
             );
         }
 

@@ -17,7 +17,7 @@ class PayrollRunModel extends BaseModel
 
     protected $fillable = ['tenant_id', 'period_start', 'period_end', 'status', 'processed_at', 'approved_at', 'approved_by', 'total_gross', 'total_deductions', 'total_net', 'metadata'];
 
-    protected $casts = ['period_start' => 'date', 'period_end' => 'date', 'processed_at' => 'datetime', 'approved_at' => 'datetime', 'metadata' => 'array'];
+    protected $casts = ['tenant_id' => 'integer', 'approved_by' => 'integer', 'period_start' => 'date', 'period_end' => 'date', 'processed_at' => 'datetime', 'approved_at' => 'datetime', 'metadata' => 'array'];
 
     public function payslips(): HasMany
     {

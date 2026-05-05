@@ -18,7 +18,7 @@ class ShiftAssignmentModel extends BaseModel
 
     protected $fillable = ['tenant_id', 'org_unit_id', 'row_version', 'employee_id', 'shift_id', 'effective_from', 'effective_to'];
 
-    protected $casts = ['org_unit_id' => 'integer', 'row_version' => 'integer', 'effective_from' => 'date', 'effective_to' => 'date'];
+    protected $casts = ['tenant_id' => 'integer', 'org_unit_id' => 'integer', 'row_version' => 'integer', 'employee_id' => 'integer', 'shift_id' => 'integer', 'effective_from' => 'date', 'effective_to' => 'date'];
 
     public function employee(): BelongsTo
     {

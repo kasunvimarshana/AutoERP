@@ -102,7 +102,7 @@ class EloquentSalesReturnRepository extends EloquentRepository implements SalesR
     public function find(int|string $id, array $columns = ['*']): ?SalesReturn
     {
         /** @var SalesReturnModel|null $model */
-        $model = $this->model->newQuery()->with('lines')->find($id, $columns);
+        $model = $this->newScopedQuery()->with('lines')->find($id, $columns);
 
         return $model ? $this->toDomainEntity($model) : null;
     }

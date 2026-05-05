@@ -22,23 +22,23 @@ class CreatePurchaseInvoiceService extends BaseService implements CreatePurchase
         $dto = PurchaseInvoiceData::fromArray($data);
 
         $entity = new PurchaseInvoice(
-            tenantId: $dto->tenant_id,
-            supplierId: $dto->supplier_id,
-            invoiceNumber: $dto->invoice_number,
+            tenantId: $dto->tenantId,
+            supplierId: $dto->supplierId,
+            invoiceNumber: $dto->invoiceNumber,
             status: $dto->status,
-            invoiceDate: new \DateTimeImmutable($dto->invoice_date),
-            dueDate: new \DateTimeImmutable($dto->due_date),
-            currencyId: $dto->currency_id,
-            exchangeRate: $dto->exchange_rate,
-            grnHeaderId: $dto->grn_header_id,
-            purchaseOrderId: $dto->purchase_order_id,
-            supplierInvoiceNumber: $dto->supplier_invoice_number,
+            invoiceDate: new \DateTimeImmutable($dto->invoiceDate),
+            dueDate: new \DateTimeImmutable($dto->dueDate),
+            currencyId: $dto->currencyId,
+            exchangeRate: $dto->exchangeRate,
+            grnHeaderId: $dto->grnHeaderId,
+            purchaseOrderId: $dto->purchaseOrderId,
+            supplierInvoiceNumber: $dto->supplierInvoiceNumber,
             subtotal: $dto->subtotal,
-            taxTotal: $dto->tax_total,
-            discountTotal: $dto->discount_total,
-            grandTotal: $dto->grand_total,
-            apAccountId: $dto->ap_account_id,
-            journalEntryId: $dto->journal_entry_id,
+            taxTotal: $dto->taxTotal,
+            discountTotal: $dto->discountTotal,
+            grandTotal: $dto->grandTotal,
+            apAccountId: $dto->apAccountId,
+            journalEntryId: $dto->journalEntryId,
         );
 
         return $this->repo->save($entity);

@@ -7,7 +7,7 @@ namespace Modules\Inventory\Application\DTOs;
 /**
  * Input for an allocation engine request.
  */
-readonly class AllocationRequestDTO
+readonly class AllocationRequestData
 {
     public function __construct(
         public readonly int $tenantId,

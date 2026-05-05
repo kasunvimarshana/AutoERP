@@ -25,28 +25,28 @@ class CreateSupplierProductService extends BaseService implements CreateSupplier
     {
         $dto = SupplierProductData::fromArray($data);
 
-        $supplier = $this->supplierRepository->find($dto->supplier_id);
+        $supplier = $this->supplierRepository->find($dto->supplierId);
         if (! $supplier) {
-            throw new SupplierNotFoundException($dto->supplier_id);
+            throw new SupplierNotFoundException($dto->supplierId);
         }
 
         $supplierProduct = new SupplierProduct(
             tenantId: $supplier->getTenantId(),
-            supplierId: $dto->supplier_id,
-            productId: $dto->product_id,
-            variantId: $dto->variant_id,
-            supplierSku: $dto->supplier_sku,
-            leadTimeDays: $dto->lead_time_days,
-            minOrderQty: $dto->min_order_qty,
-            isPreferred: $dto->is_preferred,
-            lastPurchasePrice: $dto->last_purchase_price,
+            supplierId: $dto->supplierId,
+            productId: $dto->productId,
+            variantId: $dto->variantId,
+            supplierSku: $dto->supplierSku,
+            leadTimeDays: $dto->leadTimeDays,
+            minOrderQty: $dto->minOrderQty,
+            isPreferred: $dto->isPreferred,
+            lastPurchasePrice: $dto->lastPurchasePrice,
         );
 
-        if ($dto->is_preferred) {
+        if ($dto->isPreferred) {
             $this->supplierProductRepository->clearPreferredByProductVariant(
                 tenantId: $supplier->getTenantId(),
-                productId: $dto->product_id,
-                variantId: $dto->variant_id,
+                productId: $dto->productId,
+                variantId: $dto->variantId,
             );
         }
 

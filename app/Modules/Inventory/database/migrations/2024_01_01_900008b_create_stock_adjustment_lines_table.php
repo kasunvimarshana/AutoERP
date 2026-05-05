@@ -26,7 +26,7 @@ return new class extends Migration
             $table->decimal('variance_qty', 20, 6)->storedAs('counted_qty - system_qty');
             $table->decimal('unit_cost', 20, 6)->nullable();
             $table->decimal('variance_value', 20, 6)->storedAs('variance_qty * unit_cost');
-            $table->foreignId('adjustment_movement_id')->nullable();
+            $table->foreignId('adjustment_movement_id')->nullable()->constrained('stock_movements', 'id', 'stock_adjustment_lines_adjustment_movement_id_fk')->nullOnDelete();
             $table->timestamps();
         });
     }

@@ -28,17 +28,17 @@ class UpdatePaymentService extends BaseService implements UpdatePaymentServiceIn
         if (! $payment) {
             throw new PaymentNotFoundException((int) $dto->id);
         }
-        if ($dto->row_version !== $payment->getRowVersion()) {
+        if ($dto->rowVersion !== $payment->getRowVersion()) {
             throw new ConcurrentModificationException('Payment', (int) $dto->id);
         }
 
         $payment->update(
-            paymentMethodId: $dto->payment_method_id,
-            accountId: $dto->account_id,
+            paymentMethodId: $dto->paymentMethodId,
+            accountId: $dto->accountId,
             amount: $dto->amount,
-            currencyId: $dto->currency_id,
-            exchangeRate: $dto->exchange_rate,
-            paymentDate: new \DateTimeImmutable($dto->payment_date),
+            currencyId: $dto->currencyId,
+            exchangeRate: $dto->exchangeRate,
+            paymentDate: new \DateTimeImmutable($dto->paymentDate),
             reference: $dto->reference,
             notes: $dto->notes,
         );

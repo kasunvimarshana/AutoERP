@@ -27,13 +27,13 @@ class UpdateApprovalRequestService extends BaseService implements UpdateApproval
         if (! $ar) {
             throw new ApprovalRequestNotFoundException((int) $dto->id);
         }
-        if ($dto->row_version !== $ar->getRowVersion()) {
+        if ($dto->rowVersion !== $ar->getRowVersion()) {
             throw new ConcurrentModificationException('ApprovalRequest', (int) $dto->id);
         }
-        if ($dto->status === 'approved' && $dto->resolved_by_user_id !== null) {
-            $ar->approve($dto->resolved_by_user_id, $dto->comments);
-        } elseif ($dto->status === 'rejected' && $dto->resolved_by_user_id !== null) {
-            $ar->reject($dto->resolved_by_user_id, $dto->comments);
+        if ($dto->status === 'approved' && $dto->resolvedByUserId !== null) {
+            $ar->approve($dto->resolvedByUserId, $dto->comments);
+        } elseif ($dto->status === 'rejected' && $dto->resolvedByUserId !== null) {
+            $ar->reject($dto->resolvedByUserId, $dto->comments);
         } elseif ($dto->status === 'cancelled') {
             $ar->cancel($dto->comments);
         }

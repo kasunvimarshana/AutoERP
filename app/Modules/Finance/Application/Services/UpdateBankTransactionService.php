@@ -27,14 +27,14 @@ class UpdateBankTransactionService extends BaseService implements UpdateBankTran
         if (! $bt) {
             throw new BankTransactionNotFoundException((int) $dto->id);
         }
-        if ($dto->row_version !== $bt->getRowVersion()) {
+        if ($dto->rowVersion !== $bt->getRowVersion()) {
             throw new ConcurrentModificationException('BankTransaction', (int) $dto->id);
         }
-        if ($dto->category_rule_id !== null) {
-            $bt->categorize($dto->category_rule_id);
+        if ($dto->categoryRuleId !== null) {
+            $bt->categorize($dto->categoryRuleId);
         }
-        if ($dto->matched_journal_entry_id !== null) {
-            $bt->matchToJournalEntry($dto->matched_journal_entry_id);
+        if ($dto->matchedJournalEntryId !== null) {
+            $bt->matchToJournalEntry($dto->matchedJournalEntryId);
         }
 
         return $this->bankTransactionRepository->save($bt);

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Audit\Infrastructure\Persistence\Eloquent\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\ResolvesMorphTypeClass;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
+use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 
 class AuditLogModel extends BaseModel
 {
@@ -48,6 +50,11 @@ class AuditLogModel extends BaseModel
     public function auditable(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(UserModel::class, 'user_id');
     }
 
     public function getAuditableTypeClassAttribute(): ?string

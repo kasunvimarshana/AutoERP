@@ -27,10 +27,10 @@ class UpdateBankReconciliationService extends BaseService implements UpdateBankR
         if (! $br) {
             throw new BankReconciliationNotFoundException((int) $dto->id);
         }
-        if ($dto->row_version !== $br->getRowVersion()) {
+        if ($dto->rowVersion !== $br->getRowVersion()) {
             throw new ConcurrentModificationException('BankReconciliation', (int) $dto->id);
         }
-        $br->updateBalances($dto->opening_balance, $dto->closing_balance);
+        $br->updateBalances($dto->openingBalance, $dto->closingBalance);
 
         return $this->bankReconciliationRepository->save($br);
     }

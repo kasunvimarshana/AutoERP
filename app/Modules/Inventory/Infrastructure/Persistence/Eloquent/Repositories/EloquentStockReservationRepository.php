@@ -11,10 +11,18 @@ use Modules\Inventory\Domain\Entities\StockReservation;
 use Modules\Inventory\Domain\Exceptions\InsufficientAvailableStockException;
 use Modules\Inventory\Domain\RepositoryInterfaces\StockReservationRepositoryInterface;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\StockReservationModel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\StockLevelModel;
 
 class EloquentStockReservationRepository implements StockReservationRepositoryInterface
 {
-    public function __construct(private readonly StockReservationModel $stockReservationModel) {}
+    private string $stockLevelsTable;
+
+    public function __construct(
+        private readonly StockReservationModel $stockReservationModel,
+        StockLevelModel $stockLevelModel,
+    ) {
+        $this->stockLevelsTable = $stockLevelModel->getTable();
+    }
 
     public function create(StockReservation $reservation): StockReservation
     {
@@ -110,7 +118,7 @@ class EloquentStockReservationRepository implements StockReservationRepositoryIn
 
     private function applyReservedDelta(StockReservation $reservation, string $op): void
     {
-        $row = DB::table('stock_levels')
+        $row = DB::table($this->stockLevelsTable)
             ->where('tenant_id', $reservation->getTenantId())
             ->where('product_id', $reservation->getProductId())
             ->where('variant_id', $reservation->getVariantId())
@@ -141,7 +149,7 @@ class EloquentStockReservationRepository implements StockReservationRepositoryIn
             throw new \RuntimeException('Reserved quantity cannot be negative.');
         }
 
-        DB::table('stock_levels')
+        DB::table($this->stockLevelsTable)
             ->where('id', $row->id)
             ->update([
                 'quantity_reserved' => $newReserved,

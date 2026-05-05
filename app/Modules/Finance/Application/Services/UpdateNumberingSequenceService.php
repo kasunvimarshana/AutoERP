@@ -28,7 +28,7 @@ class UpdateNumberingSequenceService extends BaseService implements UpdateNumber
         if (! $sequence) {
             throw new NumberingSequenceNotFoundException((int) $dto->id);
         }
-        if ($dto->row_version !== $sequence->getRowVersion()) {
+        if ($dto->rowVersion !== $sequence->getRowVersion()) {
             throw new ConcurrentModificationException('NumberingSequence', (int) $dto->id);
         }
 
@@ -36,7 +36,7 @@ class UpdateNumberingSequenceService extends BaseService implements UpdateNumber
             prefix: $dto->prefix,
             suffix: $dto->suffix,
             padding: $dto->padding,
-            isActive: $dto->is_active,
+            isActive: $dto->isActive,
         );
 
         return $this->numberingSequenceRepository->save($sequence);

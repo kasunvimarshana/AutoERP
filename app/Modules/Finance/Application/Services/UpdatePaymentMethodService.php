@@ -34,7 +34,7 @@ class UpdatePaymentMethodService extends BaseService implements UpdatePaymentMet
             throw new ConcurrentModificationException('PaymentMethod', (int) $dto->id);
         }
 
-        $paymentMethod->update($dto->name, $dto->type, $dto->account_id, $dto->is_active);
+        $paymentMethod->update($dto->name, $dto->type, $dto->accountId, $dto->isActive);
 
         return $this->paymentMethodRepository->save($paymentMethod);
     }

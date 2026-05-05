@@ -47,7 +47,7 @@ class AccountData
             is_active: (bool) ($data['is_active'] ?? true),
             path: isset($data['path']) ? (string) $data['path'] : null,
             depth: (int) ($data['depth'] ?? 0),
-            rowVersion: (int) ($data['row_version'] ?? 0),
+            rowVersion: (int) ($data['row_version'] ?? 1),
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

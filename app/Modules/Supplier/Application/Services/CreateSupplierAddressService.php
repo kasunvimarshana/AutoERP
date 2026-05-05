@@ -25,31 +25,31 @@ class CreateSupplierAddressService extends BaseService implements CreateSupplier
     {
         $dto = SupplierAddressData::fromArray($data);
 
-        $supplier = $this->supplierRepository->find($dto->supplier_id);
+        $supplier = $this->supplierRepository->find($dto->supplierId);
         if (! $supplier) {
-            throw new SupplierNotFoundException($dto->supplier_id);
+            throw new SupplierNotFoundException($dto->supplierId);
         }
 
         $address = new SupplierAddress(
             tenantId: $supplier->getTenantId(),
-            supplierId: $dto->supplier_id,
+            supplierId: $dto->supplierId,
             type: $dto->type,
             label: $dto->label,
-            addressLine1: $dto->address_line1,
-            addressLine2: $dto->address_line2,
+            addressLine1: $dto->addressLine1,
+            addressLine2: $dto->addressLine2,
             city: $dto->city,
             state: $dto->state,
-            postalCode: $dto->postal_code,
-            countryId: $dto->country_id,
-            isDefault: $dto->is_default,
-            geoLat: $dto->geo_lat,
-            geoLng: $dto->geo_lng,
+            postalCode: $dto->postalCode,
+            countryId: $dto->countryId,
+            isDefault: $dto->isDefault,
+            geoLat: $dto->geoLat,
+            geoLng: $dto->geoLng,
         );
 
-        if ($dto->is_default) {
+        if ($dto->isDefault) {
             $this->supplierAddressRepository->clearDefaultBySupplierAndType(
                 tenantId: $supplier->getTenantId(),
-                supplierId: $dto->supplier_id,
+                supplierId: $dto->supplierId,
                 type: $dto->type,
             );
         }

@@ -48,7 +48,7 @@ class EloquentProductVariantRepository extends EloquentRepository implements Pro
 
     public function findByProductAndSku(int $productId, string $sku, ?int $tenantId = null): ?ProductVariant
     {
-        $query = $this->model->newQuery()
+        $query = $this->newScopedQuery()
             ->where('product_id', $productId)
             ->where('sku', $sku);
 

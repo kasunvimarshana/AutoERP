@@ -54,7 +54,7 @@ class EloquentRoleRepository extends EloquentRepository implements RoleRepositor
     public function syncPermissions(Role $role, array $permissionIds): void
     {
         /** @var RoleModel|null $model */
-        $model = $this->model->find($role->getId());
+        $model = $this->newScopedQuery()->find($role->getId());
         if ($model) {
             $model->permissions()->sync($permissionIds);
         }

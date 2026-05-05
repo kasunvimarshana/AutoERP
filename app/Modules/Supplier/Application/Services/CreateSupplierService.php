@@ -26,29 +26,29 @@ class CreateSupplierService extends BaseService implements CreateSupplierService
         $dto = SupplierData::fromArray($data);
 
         $resolvedUserId = $this->supplierUserSynchronizer->resolveUserIdForCreate(
-            tenantId: $dto->tenant_id,
-            orgUnitId: $dto->org_unit_id,
-            requestedUserId: $dto->user_id,
+            tenantId: $dto->tenantId,
+            orgUnitId: $dto->orgUnitId,
+            requestedUserId: $dto->userId,
             userPayload: $dto->user,
         );
 
-        $existingSupplier = $this->supplierRepository->findByTenantAndUserId($dto->tenant_id, $resolvedUserId);
+        $existingSupplier = $this->supplierRepository->findByTenantAndUserId($dto->tenantId, $resolvedUserId);
         if ($existingSupplier !== null) {
             throw new DomainException('The user is already linked to another supplier.');
         }
 
         $supplier = new Supplier(
-            tenantId: $dto->tenant_id,
+            tenantId: $dto->tenantId,
             userId: $resolvedUserId,
-            supplierCode: $dto->supplier_code,
+            supplierCode: $dto->supplierCode,
             name: $dto->name,
             type: $dto->type,
-            orgUnitId: $dto->org_unit_id,
-            taxNumber: $dto->tax_number,
-            registrationNumber: $dto->registration_number,
-            currencyId: $dto->currency_id,
-            paymentTermsDays: $dto->payment_terms_days,
-            apAccountId: $dto->ap_account_id,
+            orgUnitId: $dto->orgUnitId,
+            taxNumber: $dto->taxNumber,
+            registrationNumber: $dto->registrationNumber,
+            currencyId: $dto->currencyId,
+            paymentTermsDays: $dto->paymentTermsDays,
+            apAccountId: $dto->apAccountId,
             status: $dto->status,
             notes: $dto->notes,
             metadata: $dto->metadata,

@@ -77,7 +77,7 @@ class ProductData
             sales_price: isset($data['sales_price']) ? (string) $data['sales_price'] : null,
             is_active: (bool) ($data['is_active'] ?? true),
             metadata: isset($data['metadata']) && is_array($data['metadata']) ? $data['metadata'] : null,
-            rowVersion: (int) ($data['row_version'] ?? 0),
+            rowVersion: (int) ($data['row_version'] ?? 1),
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

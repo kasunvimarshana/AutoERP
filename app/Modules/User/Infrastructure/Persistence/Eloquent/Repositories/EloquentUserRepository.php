@@ -89,7 +89,7 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
     public function syncRoles(User $user, array $roleIds): void
     {
         /** @var UserModel|null $model */
-        $model = $this->model->find($user->getId());
+        $model = $this->newScopedQuery()->find($user->getId());
         if ($model) {
             $model->roles()->sync($roleIds);
         }
@@ -97,7 +97,7 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
 
     public function changePassword(int $userId, string $hashedPassword): void
     {
-        $this->model->where('id', $userId)->update(['password' => $hashedPassword]);
+        $this->newScopedQuery()->where('id', $userId)->update(['password' => $hashedPassword]);
     }
 
     /**
@@ -124,13 +124,13 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
 
     public function updateAvatar(int $userId, ?string $avatarPath): void
     {
-        $this->model->where('id', $userId)->update(['avatar' => $avatarPath]);
+        $this->newScopedQuery()->where('id', $userId)->update(['avatar' => $avatarPath]);
     }
 
     public function verifyPassword(int $userId, string $plainPassword): bool
     {
         /** @var UserModel|null $model */
-        $model = $this->model->find($userId);
+        $model = $this->newScopedQuery()->find($userId);
 
         return $model && Hash::check($plainPassword, $model->password);
     }

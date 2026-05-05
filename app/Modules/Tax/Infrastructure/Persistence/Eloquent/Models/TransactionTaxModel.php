@@ -6,6 +6,7 @@ namespace Modules\Tax\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\AccountModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
@@ -44,5 +45,10 @@ class TransactionTaxModel extends Model
     public function taxAccount(): BelongsTo
     {
         return $this->belongsTo(AccountModel::class, 'tax_account_id');
+    }
+
+    public function reference(): MorphTo
+    {
+        return $this->morphTo();
     }
 }

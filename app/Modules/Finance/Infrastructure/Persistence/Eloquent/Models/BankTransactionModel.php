@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Persistence\Eloquent\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
@@ -27,4 +28,19 @@ class BankTransactionModel extends BaseModel
         'transaction_date' => 'date',
         'row_version' => 'integer',
     ];
+
+    public function bankAccount(): BelongsTo
+    {
+        return $this->belongsTo(BankAccountModel::class, 'bank_account_id');
+    }
+
+    public function categoryRule(): BelongsTo
+    {
+        return $this->belongsTo(BankCategoryRuleModel::class, 'category_rule_id');
+    }
+
+    public function matchedJournalEntry(): BelongsTo
+    {
+        return $this->belongsTo(JournalEntryModel::class, 'matched_journal_entry_id');
+    }
 }

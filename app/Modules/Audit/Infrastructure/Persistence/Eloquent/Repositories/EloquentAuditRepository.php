@@ -37,7 +37,7 @@ class EloquentAuditRepository implements AuditRepositoryInterface
 
     public function find(int $id): ?AuditLog
     {
-        $model = $this->model->find($id);
+        $model = $this->newScopedQuery()->find($id);
 
         return $model ? $this->mapModelToDomainEntity($model) : null;
     }
@@ -49,7 +49,7 @@ class EloquentAuditRepository implements AuditRepositoryInterface
         ?string $sortField = 'occurred_at',
         string $sortDirection = 'desc'
     ): LengthAwarePaginator {
-        $query = $this->model->newQuery();
+        $query = $this->newScopedQuery();
 
         foreach ($filters as $field => $value) {
             $query->where($field, $value);
@@ -66,7 +66,7 @@ class EloquentAuditRepository implements AuditRepositoryInterface
 
     public function forAuditable(string $auditableType, int|string $auditableId): Collection
     {
-        return $this->model
+        return $this->newScopedQuery()
             ->where('auditable_type', $auditableType)
             ->where('auditable_id', (string) $auditableId)
             ->orderByDesc('occurred_at')
@@ -80,7 +80,7 @@ class EloquentAuditRepository implements AuditRepositoryInterface
         int $perPage = 15,
         int $page = 1
     ): LengthAwarePaginator {
-        return $this->model
+        return $this->newScopedQuery()
             ->where('auditable_type', $auditableType)
             ->where('auditable_id', (string) $auditableId)
             ->orderByDesc('occurred_at')
@@ -99,7 +99,7 @@ class EloquentAuditRepository implements AuditRepositoryInterface
 
     public function forUser(int $userId, int $perPage = 15, int $page = 1): LengthAwarePaginator
     {
-        return $this->model
+        return $this->newScopedQuery()
             ->where('user_id', $userId)
             ->orderByDesc('occurred_at')
             ->paginate($perPage, ['*'], 'page', $page)
@@ -108,7 +108,7 @@ class EloquentAuditRepository implements AuditRepositoryInterface
 
     public function forEvent(string $event, int $perPage = 15, int $page = 1): LengthAwarePaginator
     {
-        return $this->model
+        return $this->newScopedQuery()
             ->where('event', $event)
             ->orderByDesc('occurred_at')
             ->paginate($perPage, ['*'], 'page', $page)
@@ -121,6 +121,17 @@ class EloquentAuditRepository implements AuditRepositoryInterface
             ->withTrashed()
             ->where('occurred_at', '<', $before)
             ->forceDelete();
+    }
+
+    private function newScopedQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        $query = $this->model->newQuery();
+        $tenantId = app()->bound('current_tenant_id') ? app('current_tenant_id') : null;
+        if (is_int($tenantId)) {
+            $query->where('tenant_id', $tenantId);
+        }
+
+        return $query;
     }
 
     private function mapModelToDomainEntity(AuditLogModel $model): AuditLog

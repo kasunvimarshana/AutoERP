@@ -35,15 +35,15 @@ class UpdateFiscalYearService extends BaseService implements UpdateFiscalYearSer
             throw new ConcurrentModificationException('FiscalYear', $id);
         }
 
-        $existing = $this->fiscalYearRepository->findByTenantAndName($dto->tenant_id, $dto->name);
+        $existing = $this->fiscalYearRepository->findByTenantAndName($dto->tenantId, $dto->name);
         if ($existing !== null && $existing->getId() !== $fiscalYear->getId()) {
-            throw new FiscalYearAlreadyExistsException($dto->tenant_id, $dto->name);
+            throw new FiscalYearAlreadyExistsException($dto->tenantId, $dto->name);
         }
 
         $fiscalYear->update(
             name: $dto->name,
-            startDate: new \DateTimeImmutable($dto->start_date),
-            endDate: new \DateTimeImmutable($dto->end_date),
+            startDate: new \DateTimeImmutable($dto->startDate),
+            endDate: new \DateTimeImmutable($dto->endDate),
             status: $dto->status,
         );
 

@@ -41,7 +41,7 @@ class ProductVariantData
             purchase_price: isset($data['purchase_price']) ? (string) $data['purchase_price'] : null,
             sales_price: isset($data['sales_price']) ? (string) $data['sales_price'] : null,
             metadata: isset($data['metadata']) && is_array($data['metadata']) ? $data['metadata'] : null,
-            rowVersion: (int) ($data['row_version'] ?? 0),
+            rowVersion: (int) ($data['row_version'] ?? 1),
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

@@ -26,7 +26,7 @@ class UpdateTaxGroupService extends BaseService implements UpdateTaxGroupService
             throw new \InvalidArgumentException('Tax group not found.');
         }
 
-        if ($dto->row_version !== $taxGroup->getRowVersion()) {
+        if ($dto->rowVersion !== $taxGroup->getRowVersion()) {
             throw new ConcurrentModificationException('TaxGroup', $dto->id ?? 0);
         }
 

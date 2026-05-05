@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Persistence\Eloquent\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
@@ -28,4 +29,9 @@ class BankReconciliationModel extends BaseModel
         'completed_at' => 'datetime',
         'row_version' => 'integer',
     ];
+
+    public function bankAccount(): BelongsTo
+    {
+        return $this->belongsTo(BankAccountModel::class, 'bank_account_id');
+    }
 }

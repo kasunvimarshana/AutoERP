@@ -22,11 +22,11 @@ class CreatePaymentAllocationService extends BaseService implements CreatePaymen
         $dto = PaymentAllocationData::fromArray($data);
 
         $pa = new PaymentAllocation(
-            paymentId: $dto->payment_id,
-            invoiceType: $dto->invoice_type,
-            invoiceId: $dto->invoice_id,
-            allocatedAmount: $dto->allocated_amount,
-            tenantId: $dto->tenant_id,
+            paymentId: $dto->paymentId,
+            invoiceType: $dto->invoiceType,
+            invoiceId: $dto->invoiceId,
+            allocatedAmount: $dto->allocatedAmount,
+            tenantId: $dto->tenantId,
         );
 
         return $this->paymentAllocationRepository->save($pa);

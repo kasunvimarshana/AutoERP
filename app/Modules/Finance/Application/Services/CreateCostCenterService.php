@@ -22,12 +22,12 @@ class CreateCostCenterService extends BaseService implements CreateCostCenterSer
         $dto = CostCenterData::fromArray($data);
 
         $costCenter = new CostCenter(
-            tenantId: $dto->tenant_id,
+            tenantId: $dto->tenantId,
             code: $dto->code,
             name: $dto->name,
             parentId: $dto->parent_id,
             description: $dto->description,
-            isActive: $dto->is_active,
+            isActive: $dto->isActive,
             path: $dto->path,
             depth: $dto->depth,
         );

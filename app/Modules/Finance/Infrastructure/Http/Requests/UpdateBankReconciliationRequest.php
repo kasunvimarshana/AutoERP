@@ -16,7 +16,7 @@ class UpdateBankReconciliationRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        $base = [
+        return [
             'row_version' => ['required', 'integer', 'min:1'],
             'tenant_id' => ['required', 'integer', 'exists:tenants,id'],
             'bank_account_id' => ['required', 'integer', 'exists:bank_accounts,id'],
@@ -26,17 +26,5 @@ class UpdateBankReconciliationRequest extends FormRequest
             'closing_balance' => ['required', 'numeric'],
             'status' => ['sometimes', 'in:draft,completed'],
         ];
-        if ('List' === 'Update') {
-            return [
-                'tenant_id' => ['sometimes', 'integer'],
-                'bank_account_id' => ['sometimes', 'integer'],
-                'status' => ['sometimes', 'in:draft,completed'],
-                'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
-                'page' => ['sometimes', 'integer', 'min:1'],
-                'sort' => ['sometimes', 'string'],
-            ];
-        }
-
-        return $base;
     }
 }

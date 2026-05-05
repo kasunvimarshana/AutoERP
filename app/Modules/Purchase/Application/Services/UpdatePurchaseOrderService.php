@@ -30,21 +30,21 @@ class UpdatePurchaseOrderService extends BaseService implements UpdatePurchaseOr
         $dto = PurchaseOrderData::fromArray($data);
 
         $entity->update(
-            supplierId: $dto->supplier_id,
-            warehouseId: $dto->warehouse_id,
-            poNumber: $dto->po_number,
-            currencyId: $dto->currency_id,
-            exchangeRate: $dto->exchange_rate,
-            orderDate: new \DateTimeImmutable($dto->order_date),
-            orgUnitId: $dto->org_unit_id,
-            expectedDate: $dto->expected_date !== null ? new \DateTimeImmutable($dto->expected_date) : null,
+            supplierId: $dto->supplierId,
+            warehouseId: $dto->warehouseId,
+            poNumber: $dto->poNumber,
+            currencyId: $dto->currencyId,
+            exchangeRate: $dto->exchangeRate,
+            orderDate: new \DateTimeImmutable($dto->orderDate),
+            orgUnitId: $dto->orgUnitId,
+            expectedDate: $dto->expectedDate !== null ? new \DateTimeImmutable($dto->expectedDate) : null,
             subtotal: $dto->subtotal,
-            taxTotal: $dto->tax_total,
-            discountTotal: $dto->discount_total,
-            grandTotal: $dto->grand_total,
+            taxTotal: $dto->taxTotal,
+            discountTotal: $dto->discountTotal,
+            grandTotal: $dto->grandTotal,
             notes: $dto->notes,
             metadata: $dto->metadata,
-            approvedBy: $dto->approved_by,
+            approvedBy: $dto->approvedBy,
         );
 
         return $this->repo->save($entity);

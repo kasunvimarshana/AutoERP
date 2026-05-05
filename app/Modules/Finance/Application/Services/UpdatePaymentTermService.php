@@ -38,7 +38,7 @@ class UpdatePaymentTermService extends BaseService implements UpdatePaymentTermS
             $dto->name,
             $dto->days,
             $dto->is_default,
-            $dto->is_active,
+            $dto->isActive,
             $dto->description,
             $dto->discount_days,
             $dto->discount_rate,

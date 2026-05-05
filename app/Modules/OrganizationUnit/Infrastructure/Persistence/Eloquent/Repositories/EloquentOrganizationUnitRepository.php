@@ -74,6 +74,7 @@ class EloquentOrganizationUnitRepository extends EloquentRepository implements O
         }
 
         $models = $this->model->newQuery()
+            ->where('tenant_id', $parent->tenant_id)
             ->where('parent_id', $organizationUnitId)
             ->orderBy('name')
             ->get();
@@ -91,6 +92,7 @@ class EloquentOrganizationUnitRepository extends EloquentRepository implements O
 
         // Use nested set model for efficient tree queries
         $models = $this->model->newQuery()
+            ->where('tenant_id', $parent->tenant_id)
             ->where('_lft', '>', $parent->_lft)
             ->where('_rgt', '<', $parent->_rgt)
             ->orderBy('_lft')
@@ -127,6 +129,7 @@ class EloquentOrganizationUnitRepository extends EloquentRepository implements O
         }
 
         $models = $this->model->newQuery()
+            ->where('tenant_id', $node->tenant_id)
             ->where('parent_id', $node->parent_id)
             ->where('id', '!=', $organizationUnitId)
             ->orderBy('name')

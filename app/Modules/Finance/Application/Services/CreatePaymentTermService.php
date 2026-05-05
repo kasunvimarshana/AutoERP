@@ -22,11 +22,11 @@ class CreatePaymentTermService extends BaseService implements CreatePaymentTermS
         $dto = PaymentTermData::fromArray($data);
 
         $paymentTerm = new PaymentTerm(
-            tenantId: $dto->tenant_id,
+            tenantId: $dto->tenantId,
             name: $dto->name,
             days: $dto->days,
             isDefault: $dto->is_default,
-            isActive: $dto->is_active,
+            isActive: $dto->isActive,
         );
 
         return $this->paymentTermRepository->save($paymentTerm);

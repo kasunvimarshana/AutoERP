@@ -45,9 +45,9 @@ class UpdateAccountService extends BaseService implements UpdateAccountServiceIn
             isSystem: $dto->is_system,
             isBankAccount: $dto->is_bank_account,
             isCreditCard: $dto->is_credit_card,
-            currencyId: $dto->currency_id,
+            currencyId: $dto->currencyId,
             description: $dto->description,
-            isActive: $dto->is_active,
+            isActive: $dto->isActive,
         );
 
         $account->setHierarchy($dto->path, $dto->depth);

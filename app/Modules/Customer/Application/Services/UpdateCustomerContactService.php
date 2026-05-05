@@ -31,13 +31,13 @@ class UpdateCustomerContactService extends BaseService implements UpdateCustomer
         }
 
         $dto = CustomerContactData::fromArray($data);
-        if ($contact->getCustomerId() !== $dto->customer_id) {
+        if ($contact->getCustomerId() !== $dto->customerId) {
             throw new CustomerContactNotFoundException($id);
         }
 
-        $customer = $this->customerRepository->find($dto->customer_id);
+        $customer = $this->customerRepository->find($dto->customerId);
         if (! $customer || $customer->getTenantId() !== $contact->getTenantId()) {
-            throw new CustomerNotFoundException($dto->customer_id);
+            throw new CustomerNotFoundException($dto->customerId);
         }
 
         $contact->update(
@@ -45,13 +45,13 @@ class UpdateCustomerContactService extends BaseService implements UpdateCustomer
             role: $dto->role,
             email: $dto->email,
             phone: $dto->phone,
-            isPrimary: $dto->is_primary,
+            isPrimary: $dto->isPrimary,
         );
 
-        if ($dto->is_primary) {
+        if ($dto->isPrimary) {
             $this->customerContactRepository->clearPrimaryByCustomer(
                 tenantId: $customer->getTenantId(),
-                customerId: $dto->customer_id,
+                customerId: $dto->customerId,
                 excludeId: $id,
             );
         }

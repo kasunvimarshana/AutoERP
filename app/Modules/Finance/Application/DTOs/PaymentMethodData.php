@@ -27,7 +27,7 @@ class PaymentMethodData
             type: (string) ($data['type'] ?? 'bank_transfer'),
             account_id: isset($data['account_id']) ? (int) $data['account_id'] : null,
             is_active: (bool) ($data['is_active'] ?? true),
-            rowVersion: (int) ($data['row_version'] ?? 0),
+            rowVersion: (int) ($data['row_version'] ?? 1),
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

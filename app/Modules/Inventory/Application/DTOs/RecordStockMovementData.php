@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Application\DTOs;
 
-class RecordStockMovementDTO
+class RecordStockMovementData
 {
     public function __construct(
         public readonly int $tenantId,

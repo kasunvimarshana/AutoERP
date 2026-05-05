@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Persistence\Eloquent\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\CurrencyModel;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
@@ -27,4 +29,14 @@ class BankAccountModel extends BaseModel
         'is_active' => 'boolean',
         'row_version' => 'integer',
     ];
+
+    public function account(): BelongsTo
+    {
+        return $this->belongsTo(AccountModel::class, 'account_id');
+    }
+
+    public function currency(): BelongsTo
+    {
+        return $this->belongsTo(CurrencyModel::class, 'currency_id');
+    }
 }

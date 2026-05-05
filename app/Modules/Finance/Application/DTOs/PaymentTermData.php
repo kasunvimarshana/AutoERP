@@ -30,7 +30,7 @@ class PaymentTermData
             days: (int) ($data['days'] ?? 30),
             is_default: (bool) ($data['is_default'] ?? false),
             is_active: (bool) ($data['is_active'] ?? true),
-            rowVersion: (int) ($data['row_version'] ?? 0),
+            rowVersion: (int) ($data['row_version'] ?? 1),
             id: isset($data['id']) ? (int) $data['id'] : null,
             description: isset($data['description']) ? (string) $data['description'] : null,
             discount_days: isset($data['discount_days']) ? (int) $data['discount_days'] : null,

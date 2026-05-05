@@ -8,7 +8,7 @@ use Modules\Core\Application\Services\BaseService;
 use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Core\Domain\Exceptions\NotFoundException;
 use Modules\Warehouse\Application\Contracts\UpdateWarehouseServiceInterface;
-use Modules\Warehouse\Application\DTOs\UpdateWarehouseDTO;
+use Modules\Warehouse\Application\DTOs\UpdateWarehouseData;
 use Modules\Warehouse\Domain\Entities\Warehouse;
 use Modules\Warehouse\Domain\RepositoryInterfaces\WarehouseRepositoryInterface;
 
@@ -21,7 +21,7 @@ class UpdateWarehouseService extends BaseService implements UpdateWarehouseServi
 
     protected function handle(array $data): Warehouse
     {
-        $dto = new UpdateWarehouseDTO(
+        $dto = new UpdateWarehouseData(
             id: (int) $data['id'],
             tenantId: (int) $data['tenant_id'],
             orgUnitId: isset($data['org_unit_id']) ? (int) $data['org_unit_id'] : null,
@@ -33,7 +33,7 @@ class UpdateWarehouseService extends BaseService implements UpdateWarehouseServi
             isActive: (bool) ($data['is_active'] ?? true),
             isDefault: (bool) ($data['is_default'] ?? false),
             metadata: is_array($data['metadata'] ?? null) ? $data['metadata'] : null,
-            rowVersion: (int) ($data['row_version'] ?? 0),
+            rowVersion: (int) ($data['row_version'] ?? 1),
         );
 
         $warehouse = $this->warehouseRepository->find($dto->id);

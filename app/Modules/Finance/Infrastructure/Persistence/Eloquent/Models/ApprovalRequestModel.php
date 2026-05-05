@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Persistence\Eloquent\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
+use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 
 class ApprovalRequestModel extends BaseModel
 {
@@ -27,4 +29,19 @@ class ApprovalRequestModel extends BaseModel
         'current_step_order' => 'integer',
         'row_version' => 'integer',
     ];
+
+    public function workflowConfig(): BelongsTo
+    {
+        return $this->belongsTo(ApprovalWorkflowConfigModel::class, 'workflow_config_id');
+    }
+
+    public function requestedByUser(): BelongsTo
+    {
+        return $this->belongsTo(UserModel::class, 'requested_by_user_id');
+    }
+
+    public function resolvedByUser(): BelongsTo
+    {
+        return $this->belongsTo(UserModel::class, 'resolved_by_user_id');
+    }
 }

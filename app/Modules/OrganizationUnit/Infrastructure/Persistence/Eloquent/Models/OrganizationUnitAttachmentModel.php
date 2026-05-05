@@ -31,6 +31,8 @@ class OrganizationUnitAttachmentModel extends BaseModel
     ];
 
     protected $casts = [
+        'tenant_id' => 'integer',
+        'org_unit_id' => 'integer',
         'metadata' => 'array',
         'size' => 'integer',
     ];

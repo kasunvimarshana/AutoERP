@@ -7,6 +7,7 @@ namespace Modules\Supplier\Infrastructure\Persistence\Eloquent\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductModel;
 use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductVariantModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
@@ -58,5 +59,10 @@ class SupplierProductModel extends Model
     public function variant(): BelongsTo
     {
         return $this->belongsTo(ProductVariantModel::class, 'variant_id');
+    }
+
+    public function orgUnit(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationUnitModel::class, 'org_unit_id');
     }
 }

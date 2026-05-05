@@ -7,7 +7,7 @@ namespace Modules\Inventory\Application\DTOs;
 /**
  * Input for a valuation engine / cost-layer receipt operation.
  */
-readonly class CostLayerInboundDTO
+readonly class CostLayerInboundData
 {
     public function __construct(
         public readonly int $tenantId,

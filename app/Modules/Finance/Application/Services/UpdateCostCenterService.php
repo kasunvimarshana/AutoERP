@@ -39,7 +39,7 @@ class UpdateCostCenterService extends BaseService implements UpdateCostCenterSer
             name: $dto->name,
             parentId: $dto->parent_id,
             description: $dto->description,
-            isActive: $dto->is_active,
+            isActive: $dto->isActive,
         );
 
         return $this->costCenterRepository->save($costCenter);

@@ -22,11 +22,11 @@ class CreateUnitOfMeasureService extends BaseService implements CreateUnitOfMeas
         $dto = UnitOfMeasureData::fromArray($data);
 
         $unitOfMeasure = new UnitOfMeasure(
-            tenantId: $dto->tenant_id,
+            tenantId: $dto->tenantId,
             name: $dto->name,
             symbol: $dto->symbol,
             type: $dto->type,
-            isBase: $dto->is_base,
+            isBase: $dto->isBase,
         );
 
         return $this->unitOfMeasureRepository->save($unitOfMeasure);

@@ -7,7 +7,7 @@ namespace Modules\Inventory\Application\DTOs;
 /**
  * Input for a valuation-config create/update operation.
  */
-readonly class ValuationConfigDTO
+readonly class ValuationConfigData
 {
     public function __construct(
         public readonly int $tenantId,

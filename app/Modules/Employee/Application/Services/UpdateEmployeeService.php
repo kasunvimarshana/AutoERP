@@ -34,25 +34,25 @@ class UpdateEmployeeService extends BaseService implements UpdateEmployeeService
 
         $dto = EmployeeData::fromArray($data);
 
-        if ($employee->getTenantId() !== $dto->tenant_id) {
+        if ($employee->getTenantId() !== $dto->tenantId) {
             throw new EmployeeNotFoundException($id);
         }
 
-        if ($dto->row_version !== $employee->getRowVersion()) {
+        if ($dto->rowVersion !== $employee->getRowVersion()) {
             throw new ConcurrentModificationException('Employee', $id);
         }
 
-        if ($dto->user_id !== null && $dto->user_id !== $employee->getUserId()) {
+        if ($dto->userId !== null && $dto->userId !== $employee->getUserId()) {
             throw new DomainException('Changing employee user association is not allowed.');
         }
 
         $employee->update(
             userId: $employee->getUserId(),
-            employeeCode: $dto->employee_code,
-            orgUnitId: $dto->org_unit_id,
-            jobTitle: $dto->job_title,
-            hireDate: $dto->hire_date !== null ? new \DateTimeImmutable($dto->hire_date) : null,
-            terminationDate: $dto->termination_date !== null ? new \DateTimeImmutable($dto->termination_date) : null,
+            employeeCode: $dto->employeeCode,
+            orgUnitId: $dto->orgUnitId,
+            jobTitle: $dto->jobTitle,
+            hireDate: $dto->hireDate !== null ? new \DateTimeImmutable($dto->hireDate) : null,
+            terminationDate: $dto->terminationDate !== null ? new \DateTimeImmutable($dto->terminationDate) : null,
             metadata: $dto->metadata,
         );
 

@@ -6,7 +6,7 @@ namespace Modules\Warehouse\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
 use Modules\Warehouse\Application\Contracts\CreateWarehouseServiceInterface;
-use Modules\Warehouse\Application\DTOs\CreateWarehouseDTO;
+use Modules\Warehouse\Application\DTOs\CreateWarehouseData;
 use Modules\Warehouse\Domain\Entities\Warehouse;
 use Modules\Warehouse\Domain\RepositoryInterfaces\WarehouseRepositoryInterface;
 
@@ -19,7 +19,7 @@ class CreateWarehouseService extends BaseService implements CreateWarehouseServi
 
     protected function handle(array $data): Warehouse
     {
-        $dto = new CreateWarehouseDTO(
+        $dto = new CreateWarehouseData(
             tenantId: (int) $data['tenant_id'],
             orgUnitId: isset($data['org_unit_id']) ? (int) $data['org_unit_id'] : null,
             name: (string) $data['name'],

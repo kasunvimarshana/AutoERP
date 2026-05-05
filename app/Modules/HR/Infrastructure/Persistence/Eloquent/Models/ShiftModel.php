@@ -16,5 +16,5 @@ class ShiftModel extends BaseModel
 
     protected $fillable = ['tenant_id', 'org_unit_id', 'row_version', 'name', 'code', 'shift_type', 'start_time', 'end_time', 'break_duration', 'work_days', 'grace_minutes', 'overtime_threshold', 'is_night_shift', 'metadata', 'is_active'];
 
-    protected $casts = ['org_unit_id' => 'integer', 'row_version' => 'integer', 'shift_type' => 'string', 'work_days' => 'array', 'metadata' => 'array', 'is_night_shift' => 'boolean', 'is_active' => 'boolean', 'break_duration' => 'integer', 'grace_minutes' => 'integer', 'overtime_threshold' => 'integer'];
+    protected $casts = ['tenant_id' => 'integer', 'org_unit_id' => 'integer', 'row_version' => 'integer', 'shift_type' => 'string', 'work_days' => 'array', 'metadata' => 'array', 'is_night_shift' => 'boolean', 'is_active' => 'boolean', 'break_duration' => 'integer', 'grace_minutes' => 'integer', 'overtime_threshold' => 'integer'];
 }

@@ -26,25 +26,25 @@ class CreateEmployeeService extends BaseService implements CreateEmployeeService
         $dto = EmployeeData::fromArray($data);
 
         $resolvedUserId = $this->employeeUserSynchronizer->resolveUserIdForCreate(
-            tenantId: $dto->tenant_id,
-            orgUnitId: $dto->org_unit_id,
-            requestedUserId: $dto->user_id,
+            tenantId: $dto->tenantId,
+            orgUnitId: $dto->orgUnitId,
+            requestedUserId: $dto->userId,
             userPayload: $dto->user,
         );
 
-        $existingEmployee = $this->employeeRepository->findByTenantAndUserId($dto->tenant_id, $resolvedUserId);
+        $existingEmployee = $this->employeeRepository->findByTenantAndUserId($dto->tenantId, $resolvedUserId);
         if ($existingEmployee !== null) {
             throw new DomainException('The user is already linked to another employee.');
         }
 
         $employee = new Employee(
-            tenantId: $dto->tenant_id,
+            tenantId: $dto->tenantId,
             userId: $resolvedUserId,
-            employeeCode: $dto->employee_code,
-            orgUnitId: $dto->org_unit_id,
-            jobTitle: $dto->job_title,
-            hireDate: $dto->hire_date !== null ? new \DateTimeImmutable($dto->hire_date) : null,
-            terminationDate: $dto->termination_date !== null ? new \DateTimeImmutable($dto->termination_date) : null,
+            employeeCode: $dto->employeeCode,
+            orgUnitId: $dto->orgUnitId,
+            jobTitle: $dto->jobTitle,
+            hireDate: $dto->hireDate !== null ? new \DateTimeImmutable($dto->hireDate) : null,
+            terminationDate: $dto->terminationDate !== null ? new \DateTimeImmutable($dto->terminationDate) : null,
             metadata: $dto->metadata,
         );
 

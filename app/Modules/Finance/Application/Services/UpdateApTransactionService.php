@@ -27,10 +27,10 @@ class UpdateApTransactionService extends BaseService implements UpdateApTransact
         if (! $ap) {
             throw new ApTransactionNotFoundException((int) $dto->id);
         }
-        if ($dto->row_version !== $ap->getRowVersion()) {
+        if ($dto->rowVersion !== $ap->getRowVersion()) {
             throw new ConcurrentModificationException('ApTransaction', (int) $dto->id);
         }
-        if ($dto->is_reconciled) {
+        if ($dto->isReconciled) {
             $ap->reconcile();
         }
 

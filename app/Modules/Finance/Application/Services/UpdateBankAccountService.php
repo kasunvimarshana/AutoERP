@@ -27,15 +27,15 @@ class UpdateBankAccountService extends BaseService implements UpdateBankAccountS
         if (! $ba) {
             throw new BankAccountNotFoundException((int) $dto->id);
         }
-        if ($dto->row_version !== $ba->getRowVersion()) {
+        if ($dto->rowVersion !== $ba->getRowVersion()) {
             throw new ConcurrentModificationException('BankAccount', (int) $dto->id);
         }
         $ba->update(
             name: $dto->name,
-            bankName: $dto->bank_name,
-            accountNumber: $dto->account_number,
-            routingNumber: $dto->routing_number,
-            isActive: $dto->is_active,
+            bankName: $dto->bankName,
+            accountNumber: $dto->accountNumber,
+            routingNumber: $dto->routingNumber,
+            isActive: $dto->isActive,
         );
 
         return $this->bankAccountRepository->save($ba);

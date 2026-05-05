@@ -27,15 +27,15 @@ class UpdateCreditMemoService extends BaseService implements UpdateCreditMemoSer
         if (! $cm) {
             throw new CreditMemoNotFoundException((int) $dto->id);
         }
-        if ($dto->row_version !== $cm->getRowVersion()) {
+        if ($dto->rowVersion !== $cm->getRowVersion()) {
             throw new ConcurrentModificationException('CreditMemo', (int) $dto->id);
         }
         if ($dto->status === 'issued') {
             $cm->issue();
         } elseif ($dto->status === 'voided') {
             $cm->void();
-        } elseif ($dto->status === 'applied' && $dto->applied_to_invoice_id !== null && $dto->applied_to_invoice_type !== null) {
-            $cm->apply($dto->applied_to_invoice_id, $dto->applied_to_invoice_type);
+        } elseif ($dto->status === 'applied' && $dto->appliedToInvoiceId !== null && $dto->appliedToInvoiceType !== null) {
+            $cm->apply($dto->appliedToInvoiceId, $dto->appliedToInvoiceType);
         }
 
         return $this->creditMemoRepository->save($cm);

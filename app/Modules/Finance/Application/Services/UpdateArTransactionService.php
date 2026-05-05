@@ -27,10 +27,10 @@ class UpdateArTransactionService extends BaseService implements UpdateArTransact
         if (! $ar) {
             throw new ArTransactionNotFoundException((int) $dto->id);
         }
-        if ($dto->row_version !== $ar->getRowVersion()) {
+        if ($dto->rowVersion !== $ar->getRowVersion()) {
             throw new ConcurrentModificationException('ArTransaction', (int) $dto->id);
         }
-        if ($dto->is_reconciled) {
+        if ($dto->isReconciled) {
             $ar->reconcile();
         }
 

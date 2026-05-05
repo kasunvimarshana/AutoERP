@@ -40,30 +40,30 @@ class UpdateFiscalPeriodService extends BaseService implements UpdateFiscalPerio
             throw new ConcurrentModificationException('FiscalPeriod', $id);
         }
 
-        $fiscalYear = $this->fiscalYearRepository->find($dto->fiscal_year_id);
+        $fiscalYear = $this->fiscalYearRepository->find($dto->fiscalYearId);
         if (! $fiscalYear) {
-            throw new FiscalYearNotFoundException($dto->fiscal_year_id);
+            throw new FiscalYearNotFoundException($dto->fiscalYearId);
         }
 
         $existing = $this->fiscalPeriodRepository->findByTenantAndYearAndPeriodNumber(
-            $dto->tenant_id,
-            $dto->fiscal_year_id,
-            $dto->period_number,
+            $dto->tenantId,
+            $dto->fiscalYearId,
+            $dto->periodNumber,
         );
         if ($existing !== null && $existing->getId() !== $fiscalPeriod->getId()) {
             throw new FiscalPeriodAlreadyExistsException(
-                $dto->tenant_id,
-                $dto->fiscal_year_id,
-                $dto->period_number,
+                $dto->tenantId,
+                $dto->fiscalYearId,
+                $dto->periodNumber,
             );
         }
 
         $fiscalPeriod->update(
-            fiscalYearId: $dto->fiscal_year_id,
-            periodNumber: $dto->period_number,
+            fiscalYearId: $dto->fiscalYearId,
+            periodNumber: $dto->periodNumber,
             name: $dto->name,
-            startDate: new \DateTimeImmutable($dto->start_date),
-            endDate: new \DateTimeImmutable($dto->end_date),
+            startDate: new \DateTimeImmutable($dto->startDate),
+            endDate: new \DateTimeImmutable($dto->endDate),
             status: $dto->status,
         );
 

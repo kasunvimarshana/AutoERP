@@ -16,7 +16,7 @@ class StoreBankReconciliationRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
-        $base = [
+        return [
             'tenant_id' => ['required', 'integer', 'exists:tenants,id'],
             'bank_account_id' => ['required', 'integer', 'exists:bank_accounts,id'],
             'period_start' => ['required', 'date'],
@@ -25,17 +25,5 @@ class StoreBankReconciliationRequest extends FormRequest
             'closing_balance' => ['required', 'numeric'],
             'status' => ['sometimes', 'in:draft,completed'],
         ];
-        if ('List' === 'Store') {
-            return [
-                'tenant_id' => ['sometimes', 'integer'],
-                'bank_account_id' => ['sometimes', 'integer'],
-                'status' => ['sometimes', 'in:draft,completed'],
-                'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
-                'page' => ['sometimes', 'integer', 'min:1'],
-                'sort' => ['sometimes', 'string'],
-            ];
-        }
-
-        return $base;
     }
 }

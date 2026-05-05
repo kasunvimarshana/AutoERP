@@ -16,7 +16,7 @@ class PayslipLineModel extends BaseModel
 
     protected $fillable = ['tenant_id', 'org_unit_id', 'row_version', 'payslip_id', 'payroll_item_id', 'item_name', 'item_code', 'type', 'amount', 'metadata'];
 
-    protected $casts = ['org_unit_id' => 'integer', 'row_version' => 'integer', 'payslip_id' => 'integer', 'payroll_item_id' => 'integer', 'type' => 'string', 'amount' => 'decimal:6', 'metadata' => 'array'];
+    protected $casts = ['tenant_id' => 'integer', 'org_unit_id' => 'integer', 'row_version' => 'integer', 'payslip_id' => 'integer', 'payroll_item_id' => 'integer', 'type' => 'string', 'amount' => 'decimal:6', 'metadata' => 'array'];
 
     public function payslip(): BelongsTo
     {

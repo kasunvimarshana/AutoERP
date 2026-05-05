@@ -19,7 +19,7 @@ class PerformanceReviewModel extends BaseModel
 
     protected $fillable = ['tenant_id', 'employee_id', 'cycle_id', 'reviewer_id', 'overall_rating', 'goals', 'strengths', 'improvements', 'reviewer_comments', 'employee_comments', 'status', 'acknowledged_at', 'metadata'];
 
-    protected $casts = ['goals' => 'array', 'metadata' => 'array', 'acknowledged_at' => 'datetime'];
+    protected $casts = ['tenant_id' => 'integer', 'employee_id' => 'integer', 'cycle_id' => 'integer', 'reviewer_id' => 'integer', 'goals' => 'array', 'metadata' => 'array', 'acknowledged_at' => 'datetime'];
 
     public function employee(): BelongsTo
     {

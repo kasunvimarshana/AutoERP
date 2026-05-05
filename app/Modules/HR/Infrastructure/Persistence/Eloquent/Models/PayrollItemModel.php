@@ -16,5 +16,5 @@ class PayrollItemModel extends BaseModel
 
     protected $fillable = ['tenant_id', 'name', 'code', 'type', 'calculation_type', 'value', 'is_active', 'is_taxable', 'account_id', 'metadata'];
 
-    protected $casts = ['is_active' => 'boolean', 'is_taxable' => 'boolean', 'metadata' => 'array'];
+    protected $casts = ['tenant_id' => 'integer', 'account_id' => 'integer', 'is_active' => 'boolean', 'is_taxable' => 'boolean', 'metadata' => 'array'];
 }

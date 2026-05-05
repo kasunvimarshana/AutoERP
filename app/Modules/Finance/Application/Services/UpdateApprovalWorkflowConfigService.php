@@ -27,15 +27,15 @@ class UpdateApprovalWorkflowConfigService extends BaseService implements UpdateA
         if (! $config) {
             throw new ApprovalWorkflowConfigNotFoundException((int) $dto->id);
         }
-        if ($dto->row_version !== $config->getRowVersion()) {
+        if ($dto->rowVersion !== $config->getRowVersion()) {
             throw new ConcurrentModificationException('ApprovalWorkflowConfig', (int) $dto->id);
         }
         $config->update(
             name: $dto->name,
             steps: $dto->steps,
-            minAmount: $dto->min_amount,
-            maxAmount: $dto->max_amount,
-            isActive: $dto->is_active,
+            minAmount: $dto->minAmount,
+            maxAmount: $dto->maxAmount,
+            isActive: $dto->isActive,
         );
 
         return $this->configRepository->save($config);
