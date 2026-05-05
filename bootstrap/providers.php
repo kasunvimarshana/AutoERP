@@ -16,7 +16,9 @@ use Modules\Pricing\Infrastructure\Providers\PricingServiceProvider;
 use Modules\Product\Infrastructure\Providers\ProductServiceProvider;
 use Modules\Purchase\Infrastructure\Providers\PurchaseServiceProvider;
 use Modules\HR\Infrastructure\Providers\HRServiceProvider;
+use Modules\Rental\Infrastructure\Providers\RentalServiceProvider;
 use Modules\Sales\Infrastructure\Providers\SalesServiceProvider;
+use Modules\Service\Infrastructure\Providers\ServiceModuleServiceProvider;
 use Modules\Shared\Infrastructure\Providers\SharedServiceProvider;
 use Modules\Supplier\Infrastructure\Providers\SupplierServiceProvider;
 use Modules\Tax\Infrastructure\Providers\TaxServiceProvider;
@@ -48,4 +50,6 @@ return [
     PurchaseServiceProvider::class,
     SalesServiceProvider::class,
     HRServiceProvider::class,
+    RentalServiceProvider::class,
+    ServiceModuleServiceProvider::class,
 ];
