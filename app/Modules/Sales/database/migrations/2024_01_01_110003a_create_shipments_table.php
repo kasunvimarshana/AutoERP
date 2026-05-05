@@ -12,7 +12,9 @@ return new class extends Migration
     {
         Schema::create('shipments', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained(null, 'id', 'shipments_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('customer_id');
             $table->foreignId('sales_order_id')->nullable()->constrained(null, 'id', 'shipments_sales_order_id_fk')->nullOnDelete();
             $table->foreignId('warehouse_id');
@@ -24,6 +26,10 @@ return new class extends Migration
             $table->foreignId('currency_id')->constrained('currencies', 'id', 'shipments_currency_id_fk');
             $table->text('notes')->nullable();
             $table->json('metadata')->nullable();
+
+            $table->foreign('customer_id')->references('id')->on('customers')->cascadeOnDelete();
+            $table->foreign('warehouse_id')->references('id')->on('warehouses')->cascadeOnDelete();
+
             $table->timestamps();
 
             $table->unique(['tenant_id', 'shipment_number'], 'shipments_tenant_shipment_uk');

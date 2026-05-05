@@ -12,7 +12,9 @@ return new class extends Migration
     {
         Schema::create('approval_requests', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id', 'approval_requests_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('workflow_config_id')->constrained('approval_workflow_configs', 'id', 'approval_requests_workflow_config_id_fk')->cascadeOnDelete();
             $table->string('entity_type');
             $table->unsignedBigInteger('entity_id');

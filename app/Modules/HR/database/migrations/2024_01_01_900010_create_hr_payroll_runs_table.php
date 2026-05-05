@@ -12,7 +12,9 @@ return new class extends Migration
     {
         Schema::create('hr_payroll_runs', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id', 'hr_payroll_runs_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->date('period_start');
             $table->date('period_end');
             $table->string('status', 20)->default('draft');
