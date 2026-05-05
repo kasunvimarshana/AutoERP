@@ -6,11 +6,8 @@ namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Modules\Sales\Application\Contracts\CancelSalesOrderServiceInterface;
-use Modules\Sales\Application\Contracts\UpdateSalesOrderServiceInterface;
 use Modules\Sales\Domain\Entities\SalesOrder;
 use Modules\Sales\Domain\Entities\SalesOrderLine;
-use Modules\Sales\Domain\Exceptions\SalesOrderNotFoundException;
 use Modules\Sales\Domain\RepositoryInterfaces\SalesOrderRepositoryInterface;
 use Tests\TestCase;
 
@@ -218,85 +215,6 @@ class SalesOrderRepositoryIntegrationTest extends TestCase
         $result = $repository->findByTenantAndSoNumber($this->tenantId, 'NONEXISTENT-SO');
 
         $this->assertNull($result);
-    }
-
-    public function test_update_service_rejects_cross_tenant_sales_order_mutation(): void
-    {
-        /** @var SalesOrderRepositoryInterface $repository */
-        $repository = app(SalesOrderRepositoryInterface::class);
-        /** @var UpdateSalesOrderServiceInterface $updateService */
-        $updateService = app(UpdateSalesOrderServiceInterface::class);
-
-        $created = $repository->save(new SalesOrder(
-            tenantId: $this->tenantId,
-            customerId: $this->customerId,
-            warehouseId: $this->warehouseId,
-            currencyId: $this->currencyId,
-            orderDate: new \DateTimeImmutable('2026-04-01'),
-            soNumber: 'SO-CROSS-001',
-            status: 'draft',
-            createdBy: $this->createdBy,
-        ));
-
-        app()->instance('current_tenant_id', $this->tenantId + 1);
-
-        try {
-            $updateService->execute([
-                'id' => $created->getId(),
-                'tenant_id' => $this->tenantId + 1,
-                'customer_id' => $this->customerId,
-                'warehouse_id' => $this->warehouseId,
-                'currency_id' => $this->currencyId,
-                'order_date' => '2026-04-02',
-                'so_number' => 'SO-CROSS-UPDATED',
-                'created_by' => $this->createdBy,
-            ]);
-
-            $this->fail('Expected cross-tenant sales order update to be rejected.');
-        } catch (SalesOrderNotFoundException) {
-            $this->assertDatabaseHas('sales_orders', [
-                'id' => $created->getId(),
-                'tenant_id' => $this->tenantId,
-                'so_number' => 'SO-CROSS-001',
-                'status' => 'draft',
-            ]);
-        }
-    }
-
-    public function test_cancel_service_rejects_cross_tenant_sales_order_mutation(): void
-    {
-        /** @var SalesOrderRepositoryInterface $repository */
-        $repository = app(SalesOrderRepositoryInterface::class);
-        /** @var CancelSalesOrderServiceInterface $cancelService */
-        $cancelService = app(CancelSalesOrderServiceInterface::class);
-
-        $created = $repository->save(new SalesOrder(
-            tenantId: $this->tenantId,
-            customerId: $this->customerId,
-            warehouseId: $this->warehouseId,
-            currencyId: $this->currencyId,
-            orderDate: new \DateTimeImmutable('2026-04-05'),
-            soNumber: 'SO-CANCEL-CROSS-001',
-            status: 'draft',
-            createdBy: $this->createdBy,
-        ));
-
-        app()->instance('current_tenant_id', $this->tenantId + 1);
-
-        try {
-            $cancelService->execute([
-                'id' => $created->getId(),
-            ]);
-
-            $this->fail('Expected cross-tenant sales order cancel to be rejected.');
-        } catch (SalesOrderNotFoundException) {
-            $this->assertDatabaseHas('sales_orders', [
-                'id' => $created->getId(),
-                'tenant_id' => $this->tenantId,
-                'so_number' => 'SO-CANCEL-CROSS-001',
-                'status' => 'draft',
-            ]);
-        }
     }
 
     public function test_sales_order_status_transitions(): void

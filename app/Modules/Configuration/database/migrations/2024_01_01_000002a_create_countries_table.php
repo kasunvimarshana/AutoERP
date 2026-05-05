@@ -15,7 +15,6 @@ return new class extends Migration
             $table->string('code', 2)->unique('countries_code_uk');
             $table->string('name');
             $table->string('phone_code', 10)->nullable();
-            $table->softDeletes();
             $table->timestamps();
         });
     }

@@ -17,8 +17,6 @@ class TransferOrderLineModel extends Model
 
     protected $fillable = [
         'tenant_id',
-        'org_unit_id',
-        'row_version',
         'transfer_order_id',
         'product_id',
         'variant_id',
@@ -43,9 +41,5 @@ class TransferOrderLineModel extends Model
         'from_location_id' => 'integer',
         'to_location_id' => 'integer',
         'uom_id' => 'integer',
-            'requested_qty' => 'decimal:6',
-            'shipped_qty' => 'decimal:6',
-            'received_qty' => 'decimal:6',
-            'unit_cost' => 'decimal:6',
-        ];
+    ];
 }

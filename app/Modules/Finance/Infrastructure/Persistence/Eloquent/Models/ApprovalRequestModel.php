@@ -16,8 +16,8 @@ class ApprovalRequestModel extends BaseModel
     protected $table = 'approval_requests';
 
     protected $fillable = [
-        'tenant_id', 'org_unit_id', 'row_version', 'workflow_config_id', 'entity_type',
-        'entity_id', 'status', 'current_step_order', 'requested_by_user_id',
+        'tenant_id', 'workflow_config_id', 'entity_type', 'entity_id',
+        'status', 'current_step_order', 'requested_by_user_id',
         'resolved_by_user_id', 'requested_at', 'resolved_at', 'comments',
     ];
 

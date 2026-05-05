@@ -12,9 +12,7 @@ return new class extends Migration
     {
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('tenant_id')->constrained(null, 'id', 'payments_tenant_id_fk')->cascadeOnDelete();
             $table->string('payment_number');
             $table->enum('direction', ['inbound', 'outbound']);
             $table->enum('party_type', ['customer', 'supplier']);
@@ -29,16 +27,12 @@ return new class extends Migration
             $table->enum('status', ['draft', 'posted', 'reconciled', 'voided'])->default('draft');
             $table->string('reference')->nullable();
             $table->text('notes')->nullable();
-            $table->string('idempotency_key')->nullable()->comment('Caller-supplied key to prevent duplicate payment on replay');
             $table->foreignId('journal_entry_id')->nullable();
             $table->foreign('journal_entry_id', 'payments_journal_entry_id_fk')->references('id')->on('journal_entries')->nullOnDelete();
-            $table->softDeletes();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'org_unit_id', 'payment_number'], 'payments_tenant_number_uk');
-            $table->unique(['tenant_id', 'idempotency_key'], 'payments_tenant_idempotency_key_uk');
+            $table->unique(['tenant_id', 'payment_number'], 'payments_tenant_number_uk');
             $table->index(['tenant_id', 'party_type', 'party_id'], 'payments_tenant_party_idx');
-            $table->index(['tenant_id', 'status', 'payment_date'], 'payments_tenant_status_date_idx');
         });
     }
 

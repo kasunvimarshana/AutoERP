@@ -17,7 +17,6 @@ return new class extends Migration
             $table->string('symbol', 10)->nullable();
             $table->unsignedSmallInteger('decimal_places')->default(2);
             $table->boolean('is_active')->default(true);
-            $table->softDeletes();
             $table->timestamps();
         });
     }

@@ -30,8 +30,8 @@ class ProductIdentifierRoutesTest extends TestCase
     {
         $routes = app('router')->getRoutes();
 
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/product-identifiers', 'GET'), ['auth.configured', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/product-identifiers/{product_identifier}', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/product-identifiers', 'GET'), ['auth:api', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/product-identifiers/{product_identifier}', 'GET'), ['auth:api', 'resolve.tenant']);
     }
 
     /**

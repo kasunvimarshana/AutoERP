@@ -12,9 +12,8 @@ return new class extends Migration
     {
         Schema::create('transfer_orders', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', 'transfer_orders_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id', 'transfer_orders_org_unit_id_fk')->nullOnDelete();
             $table->foreignId('from_warehouse_id')->constrained('warehouses', 'id', 'transfer_orders_from_warehouse_id_fk')->cascadeOnDelete();
             $table->foreignId('to_warehouse_id')->constrained('warehouses', 'id', 'transfer_orders_to_warehouse_id_fk')->cascadeOnDelete();
             $table->string('transfer_number');
@@ -27,7 +26,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'org_unit_id', 'transfer_number'], 'transfer_orders_tenant_transfer_number_uk');
+            $table->unique(['tenant_id', 'transfer_number'], 'transfer_orders_tenant_transfer_number_uk');
             $table->index(['tenant_id', 'status'], 'transfer_orders_tenant_status_idx');
         });
     }

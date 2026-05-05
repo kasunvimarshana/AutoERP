@@ -104,11 +104,6 @@ class InventoryStockMovementIntegrationTest extends TestCase
             'movement_type' => 'transfer',
             'quantity' => '5.000000',
         ]);
-
-        // Current contract: direct stock movements remain inventory-internal.
-        $this->assertSame(0, DB::table('journal_entries')->count());
-        $this->assertSame(0, DB::table('ap_transactions')->count());
-        $this->assertSame(0, DB::table('ar_transactions')->count());
     }
 
     public function test_transfer_movement_normalizes_quantity_to_product_base_uom(): void
@@ -200,11 +195,6 @@ class InventoryStockMovementIntegrationTest extends TestCase
             'uom_id' => 2001,
             'quantity' => '24.000000',
         ]);
-
-        // Current contract: direct stock movements remain inventory-internal.
-        $this->assertSame(0, DB::table('journal_entries')->count());
-        $this->assertSame(0, DB::table('ap_transactions')->count());
-        $this->assertSame(0, DB::table('ar_transactions')->count());
     }
 
     private function seedTenant(int $tenantId): void

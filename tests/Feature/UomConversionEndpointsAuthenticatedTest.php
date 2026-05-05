@@ -59,7 +59,7 @@ class UomConversionEndpointsAuthenticatedTest extends TestCase
         $user->setAttribute('id', 421);
         $user->setAttribute('tenant_id', 15);
 
-        $this->actingAs($user, (string) config('auth_context.guards.api', config('auth.defaults.guard', 'api')));
+        $this->actingAs($user, 'api');
     }
 
     public function test_authenticated_index_returns_success_payload(): void

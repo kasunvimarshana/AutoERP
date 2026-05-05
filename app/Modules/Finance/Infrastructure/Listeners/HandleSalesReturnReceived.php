@@ -4,20 +4,16 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Listeners;
 
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Finance\Application\Contracts\CreateArTransactionServiceInterface;
 use Modules\Finance\Application\Contracts\CreateJournalEntryServiceInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\ArTransactionRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\FiscalPeriodRepositoryInterface;
-use Modules\Finance\Infrastructure\Listeners\Concerns\HandlesReplayConflicts;
 use Modules\Sales\Domain\Events\SalesReturnReceived;
 
 class HandleSalesReturnReceived
 {
-    use HandlesReplayConflicts;
-
     public function __construct(
         private readonly FiscalPeriodRepositoryInterface $fiscalPeriodRepository,
         private readonly CreateJournalEntryServiceInterface $createJournalEntryService,
@@ -39,15 +35,6 @@ class HandleSalesReturnReceived
         if (bccomp($event->grandTotal, '0.000000', 6) <= 0) {
             Log::warning('HandleSalesReturnReceived: zero grand total; skipping journal entry', [
                 'sales_return_id' => $event->salesReturnId,
-            ]);
-
-            return;
-        }
-
-        if ($this->artifactsAlreadyPosted($event->tenantId, 'sales_return', $event->salesReturnId, 'ar_transactions')) {
-            Log::info('HandleSalesReturnReceived: replay detected; finance artifacts already exist, skipping', [
-                'sales_return_id' => $event->salesReturnId,
-                'tenant_id' => $event->tenantId,
             ]);
 
             return;
@@ -86,103 +73,81 @@ class HandleSalesReturnReceived
         $exchangeRate = $event->exchangeRate;
         $description = 'AR reversal for Sales Return #'.$event->salesReturnId;
 
-        try {
-            DB::transaction(function () use ($event, $period, $returnDate, $description, $grandTotal, $exchangeRate, $debitsByAccount): void {
-                $jeLines = [];
+        DB::transaction(function () use ($event, $period, $returnDate, $description, $grandTotal, $exchangeRate, $debitsByAccount): void {
+            $jeLines = [];
 
-                // CR: Accounts Receivable (reduces amount owed by customer — credit note)
-                $baseGrandTotal = bcmul($grandTotal, $exchangeRate, 6);
-                $jeLines[] = [
-                    'account_id' => $event->arAccountId,
-                    'debit_amount' => '0.000000',
-                    'credit_amount' => $grandTotal,
-                    'description' => $description,
-                    'currency_id' => $event->currencyId,
-                    'exchange_rate' => (float) $exchangeRate,
-                    'base_debit_amount' => '0.000000',
-                    'base_credit_amount' => $baseGrandTotal,
-                ];
+            // CR: Accounts Receivable (reduces amount owed by customer — credit note)
+            $baseGrandTotal = bcmul($grandTotal, $exchangeRate, 6);
+            $jeLines[] = [
+                'account_id' => $event->arAccountId,
+                'debit_amount' => '0.000000',
+                'credit_amount' => $grandTotal,
+                'description' => $description,
+                'currency_id' => $event->currencyId,
+                'exchange_rate' => (float) $exchangeRate,
+                'base_debit_amount' => '0.000000',
+                'base_credit_amount' => $baseGrandTotal,
+            ];
 
-                // DR: Revenue/Income accounts (reverses original sale revenue)
-                if (! empty($debitsByAccount)) {
-                    foreach ($debitsByAccount as $accountId => $amount) {
-                        $baseAmount = bcmul($amount, $exchangeRate, 6);
-                        $jeLines[] = [
-                            'account_id' => $accountId,
-                            'debit_amount' => $amount,
-                            'credit_amount' => '0.000000',
-                            'description' => $description,
-                            'currency_id' => $event->currencyId,
-                            'exchange_rate' => (float) $exchangeRate,
-                            'base_debit_amount' => $baseAmount,
-                            'base_credit_amount' => '0.000000',
-                        ];
-                    }
-                } else {
-                    // Fallback: single balancing debit entry against AR account if no line accounts available
+            // DR: Revenue/Income accounts (reverses original sale revenue)
+            if (! empty($debitsByAccount)) {
+                foreach ($debitsByAccount as $accountId => $amount) {
+                    $baseAmount = bcmul($amount, $exchangeRate, 6);
                     $jeLines[] = [
-                        'account_id' => $event->arAccountId,
-                        'debit_amount' => $grandTotal,
+                        'account_id' => $accountId,
+                        'debit_amount' => $amount,
                         'credit_amount' => '0.000000',
-                        'description' => $description.' (offset)',
+                        'description' => $description,
                         'currency_id' => $event->currencyId,
                         'exchange_rate' => (float) $exchangeRate,
-                        'base_debit_amount' => $baseGrandTotal,
+                        'base_debit_amount' => $baseAmount,
                         'base_credit_amount' => '0.000000',
                     ];
                 }
-
-                $this->createJournalEntryService->execute([
-                    'tenant_id' => $event->tenantId,
-                    'fiscal_period_id' => $period->getId(),
-                    'entry_date' => $returnDate->format('Y-m-d'),
-                    'created_by' => $event->createdBy ?: 1,
-                    'entry_type' => 'system',
-                    'reference_type' => 'sales_return',
-                    'reference_id' => $event->salesReturnId,
-                    'description' => $description,
-                    'lines' => $jeLines,
-                ]);
-
-                // Record AR debit note transaction (reduces customer receivable balance)
-                $currentBalance = $this->arTransactionRepository
-                    ->getCustomerBalance($event->tenantId, $event->customerId);
-
-                $newBalance = bcsub($currentBalance, $grandTotal, 6);
-
-                $this->createArTransactionService->execute([
-                    'tenant_id' => $event->tenantId,
-                    'customer_id' => $event->customerId,
+            } else {
+                // Fallback: single balancing debit entry against AR account if no line accounts available
+                $jeLines[] = [
                     'account_id' => $event->arAccountId,
-                    'transaction_type' => 'credit_memo',
-                    'amount' => -1 * (float) $grandTotal,
-                    'balance_after' => (float) $newBalance,
-                    'transaction_date' => $returnDate->format('Y-m-d'),
+                    'debit_amount' => $grandTotal,
+                    'credit_amount' => '0.000000',
+                    'description' => $description.' (offset)',
                     'currency_id' => $event->currencyId,
-                    'reference_type' => 'sales_return',
-                    'reference_id' => $event->salesReturnId,
-                ]);
-            });
-        } catch (QueryException $exception) {
-            if (! $this->isReplayConflict($exception, [
-                'ar_transactions_tenant_reference_uk',
-                'ar_transactions.tenant_id, ar_transactions.reference_type, ar_transactions.reference_id',
-            ])) {
-                throw $exception;
+                    'exchange_rate' => (float) $exchangeRate,
+                    'base_debit_amount' => $baseGrandTotal,
+                    'base_credit_amount' => '0.000000',
+                ];
             }
 
-            if (! $this->artifactsAlreadyPosted($event->tenantId, 'sales_return', $event->salesReturnId, 'ar_transactions')) {
-                throw new \RuntimeException(
-                    'HandleSalesReturnReceived: replay conflict detected with incomplete finance artifacts for sales_return_id '.$event->salesReturnId,
-                    0,
-                    $exception
-                );
-            }
-
-            Log::info('HandleSalesReturnReceived: duplicate-key replay conflict detected; skipping', [
-                'sales_return_id' => $event->salesReturnId,
+            $this->createJournalEntryService->execute([
                 'tenant_id' => $event->tenantId,
+                'fiscal_period_id' => $period->getId(),
+                'entry_date' => $returnDate->format('Y-m-d'),
+                'created_by' => $event->createdBy ?: 1,
+                'entry_type' => 'system',
+                'reference_type' => 'sales_return',
+                'reference_id' => $event->salesReturnId,
+                'description' => $description,
+                'lines' => $jeLines,
             ]);
-        }
+
+            // Record AR debit note transaction (reduces customer receivable balance)
+            $currentBalance = $this->arTransactionRepository
+                ->getCustomerBalance($event->tenantId, $event->customerId);
+
+            $newBalance = bcsub($currentBalance, $grandTotal, 6);
+
+            $this->createArTransactionService->execute([
+                'tenant_id' => $event->tenantId,
+                'customer_id' => $event->customerId,
+                'account_id' => $event->arAccountId,
+                'transaction_type' => 'credit_note',
+                'amount' => -1 * (float) $grandTotal,
+                'balance_after' => (float) $newBalance,
+                'transaction_date' => $returnDate->format('Y-m-d'),
+                'currency_id' => $event->currencyId,
+                'reference_type' => 'sales_return',
+                'reference_id' => $event->salesReturnId,
+            ]);
+        });
     }
 }

@@ -38,7 +38,7 @@ class ApprovePurchaseInvoiceService extends BaseService implements ApprovePurcha
         $entity->approve();
         $saved = $this->repo->save($entity);
 
-        $invoiceLines = $this->lineRepo->findByInvoiceId($saved->getTenantId(), (int) $saved->getId());
+        $invoiceLines = $this->lineRepo->findByInvoiceId((int) $saved->getId());
 
         $lines = array_map(static fn ($line): array => [
             'account_id' => $line->getAccountId(),

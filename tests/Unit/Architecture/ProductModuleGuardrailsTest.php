@@ -43,7 +43,7 @@ class ProductModuleGuardrailsTest extends TestCase
         $this->assertStringContainsString('Route::apiResource(\'product-attribute-values\'', $routesFile);
         $this->assertStringContainsString('Route::apiResource(\'variant-attributes\'', $routesFile);
         $this->assertStringContainsString('Route::apiResource(\'combo-items\'', $routesFile);
-        $this->assertStringContainsString('auth.configured', $routesFile);
+        $this->assertStringContainsString('auth:api', $routesFile);
         $this->assertStringContainsString('resolve.tenant', $routesFile);
     }
 

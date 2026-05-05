@@ -4,20 +4,16 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Listeners;
 
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Finance\Application\Contracts\CreateApTransactionServiceInterface;
 use Modules\Finance\Application\Contracts\CreateJournalEntryServiceInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\ApTransactionRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\FiscalPeriodRepositoryInterface;
-use Modules\Finance\Infrastructure\Listeners\Concerns\HandlesReplayConflicts;
 use Modules\Purchase\Domain\Events\PurchaseReturnPosted;
 
 class HandlePurchaseReturnPosted
 {
-    use HandlesReplayConflicts;
-
     public function __construct(
         private readonly FiscalPeriodRepositoryInterface $fiscalPeriodRepository,
         private readonly CreateJournalEntryServiceInterface $createJournalEntryService,
@@ -39,15 +35,6 @@ class HandlePurchaseReturnPosted
         if (bccomp($event->grandTotal, '0.000000', 6) <= 0) {
             Log::warning('HandlePurchaseReturnPosted: zero grand total; skipping journal entry', [
                 'purchase_return_id' => $event->purchaseReturnId,
-            ]);
-
-            return;
-        }
-
-        if ($this->artifactsAlreadyPosted($event->tenantId, 'purchase_return', $event->purchaseReturnId, 'ap_transactions')) {
-            Log::info('HandlePurchaseReturnPosted: replay detected; finance artifacts already exist, skipping', [
-                'purchase_return_id' => $event->purchaseReturnId,
-                'tenant_id' => $event->tenantId,
             ]);
 
             return;
@@ -85,103 +72,81 @@ class HandlePurchaseReturnPosted
         $exchangeRate = $event->exchangeRate;
         $description = 'AP reversal for Purchase Return #'.$event->purchaseReturnId;
 
-        try {
-            DB::transaction(function () use ($event, $period, $returnDate, $description, $grandTotal, $exchangeRate, $creditsByAccount): void {
-                $jeLines = [];
+        DB::transaction(function () use ($event, $period, $returnDate, $description, $grandTotal, $exchangeRate, $creditsByAccount): void {
+            $jeLines = [];
 
-                // DR: Accounts Payable (reduces the amount owed to supplier)
-                $baseGrandTotal = bcmul($grandTotal, $exchangeRate, 6);
-                $jeLines[] = [
-                    'account_id' => $event->apAccountId,
-                    'debit_amount' => $grandTotal,
-                    'credit_amount' => '0.000000',
-                    'description' => $description,
-                    'currency_id' => $event->currencyId,
-                    'exchange_rate' => (float) $exchangeRate,
-                    'base_debit_amount' => $baseGrandTotal,
-                    'base_credit_amount' => '0.000000',
-                ];
+            // DR: Accounts Payable (reduces the amount owed to supplier)
+            $baseGrandTotal = bcmul($grandTotal, $exchangeRate, 6);
+            $jeLines[] = [
+                'account_id' => $event->apAccountId,
+                'debit_amount' => $grandTotal,
+                'credit_amount' => '0.000000',
+                'description' => $description,
+                'currency_id' => $event->currencyId,
+                'exchange_rate' => (float) $exchangeRate,
+                'base_debit_amount' => $baseGrandTotal,
+                'base_credit_amount' => '0.000000',
+            ];
 
-                // CR: Inventory/Expense accounts (reverses original purchase entries)
-                if (! empty($creditsByAccount)) {
-                    foreach ($creditsByAccount as $accountId => $amount) {
-                        $baseAmount = bcmul($amount, $exchangeRate, 6);
-                        $jeLines[] = [
-                            'account_id' => $accountId,
-                            'debit_amount' => '0.000000',
-                            'credit_amount' => $amount,
-                            'description' => $description,
-                            'currency_id' => $event->currencyId,
-                            'exchange_rate' => (float) $exchangeRate,
-                            'base_debit_amount' => '0.000000',
-                            'base_credit_amount' => $baseAmount,
-                        ];
-                    }
-                } else {
-                    // Fallback: single balancing credit entry against AP account if no line accounts are available
+            // CR: Inventory/Expense accounts (reverses original purchase entries)
+            if (! empty($creditsByAccount)) {
+                foreach ($creditsByAccount as $accountId => $amount) {
+                    $baseAmount = bcmul($amount, $exchangeRate, 6);
                     $jeLines[] = [
-                        'account_id' => $event->apAccountId,
+                        'account_id' => $accountId,
                         'debit_amount' => '0.000000',
-                        'credit_amount' => $grandTotal,
-                        'description' => $description.' (offset)',
+                        'credit_amount' => $amount,
+                        'description' => $description,
                         'currency_id' => $event->currencyId,
                         'exchange_rate' => (float) $exchangeRate,
                         'base_debit_amount' => '0.000000',
-                        'base_credit_amount' => $baseGrandTotal,
+                        'base_credit_amount' => $baseAmount,
                     ];
                 }
-
-                $this->createJournalEntryService->execute([
-                    'tenant_id' => $event->tenantId,
-                    'fiscal_period_id' => $period->getId(),
-                    'entry_date' => $returnDate->format('Y-m-d'),
-                    'created_by' => $event->createdBy ?: 1,
-                    'entry_type' => 'system',
-                    'reference_type' => 'purchase_return',
-                    'reference_id' => $event->purchaseReturnId,
-                    'description' => $description,
-                    'lines' => $jeLines,
-                ]);
-
-                // Record AP credit transaction (reduces supplier balance)
-                $currentBalance = (float) $this->apTransactionRepository
-                    ->getSupplierBalance($event->tenantId, $event->supplierId);
-
-                $newBalance = (float) bcsub((string) $currentBalance, $grandTotal, 6);
-
-                $this->createApTransactionService->execute([
-                    'tenant_id' => $event->tenantId,
-                    'supplier_id' => $event->supplierId,
+            } else {
+                // Fallback: single balancing credit entry against AP account if no line accounts are available
+                $jeLines[] = [
                     'account_id' => $event->apAccountId,
-                    'transaction_type' => 'debit_note',
-                    'amount' => -1 * (float) $grandTotal,
-                    'balance_after' => $newBalance,
-                    'transaction_date' => $returnDate->format('Y-m-d'),
+                    'debit_amount' => '0.000000',
+                    'credit_amount' => $grandTotal,
+                    'description' => $description.' (offset)',
                     'currency_id' => $event->currencyId,
-                    'reference_type' => 'purchase_return',
-                    'reference_id' => $event->purchaseReturnId,
-                ]);
-            });
-        } catch (QueryException $exception) {
-            if (! $this->isReplayConflict($exception, [
-                'ap_transactions_tenant_reference_uk',
-                'ap_transactions.tenant_id, ap_transactions.reference_type, ap_transactions.reference_id',
-            ])) {
-                throw $exception;
+                    'exchange_rate' => (float) $exchangeRate,
+                    'base_debit_amount' => '0.000000',
+                    'base_credit_amount' => $baseGrandTotal,
+                ];
             }
 
-            if (! $this->artifactsAlreadyPosted($event->tenantId, 'purchase_return', $event->purchaseReturnId, 'ap_transactions')) {
-                throw new \RuntimeException(
-                    'HandlePurchaseReturnPosted: replay conflict detected with incomplete finance artifacts for purchase_return_id '.$event->purchaseReturnId,
-                    0,
-                    $exception
-                );
-            }
-
-            Log::info('HandlePurchaseReturnPosted: duplicate-key replay conflict detected; skipping', [
-                'purchase_return_id' => $event->purchaseReturnId,
+            $this->createJournalEntryService->execute([
                 'tenant_id' => $event->tenantId,
+                'fiscal_period_id' => $period->getId(),
+                'entry_date' => $returnDate->format('Y-m-d'),
+                'created_by' => $event->createdBy ?: 1,
+                'entry_type' => 'system',
+                'reference_type' => 'purchase_return',
+                'reference_id' => $event->purchaseReturnId,
+                'description' => $description,
+                'lines' => $jeLines,
             ]);
-        }
+
+            // Record AP credit transaction (reduces supplier balance)
+            $currentBalance = (float) $this->apTransactionRepository
+                ->getSupplierBalance($event->tenantId, $event->supplierId);
+
+            $newBalance = (float) bcsub((string) $currentBalance, $grandTotal, 6);
+
+            $this->createApTransactionService->execute([
+                'tenant_id' => $event->tenantId,
+                'supplier_id' => $event->supplierId,
+                'account_id' => $event->apAccountId,
+                'transaction_type' => 'debit_note',
+                'amount' => -1 * (float) $grandTotal,
+                'balance_after' => $newBalance,
+                'transaction_date' => $returnDate->format('Y-m-d'),
+                'currency_id' => $event->currencyId,
+                'reference_type' => 'purchase_return',
+                'reference_id' => $event->purchaseReturnId,
+            ]);
+        });
     }
 }

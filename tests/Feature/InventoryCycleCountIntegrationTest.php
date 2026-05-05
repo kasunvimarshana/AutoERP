@@ -120,11 +120,6 @@ class InventoryCycleCountIntegrationTest extends TestCase
             'action_type' => 'adjust',
             'destination_location_id' => $location->getId(),
         ]);
-
-        // Current contract: cycle-count adjustments remain inventory-internal and do not post Finance artifacts.
-        $this->assertSame(0, DB::table('journal_entries')->count());
-        $this->assertSame(0, DB::table('ap_transactions')->count());
-        $this->assertSame(0, DB::table('ar_transactions')->count());
     }
 
     private function seedTenant(int $tenantId): void

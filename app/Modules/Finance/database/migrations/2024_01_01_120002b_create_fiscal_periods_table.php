@@ -12,9 +12,7 @@ return new class extends Migration
     {
         Schema::create('fiscal_periods', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('tenant_id')->constrained(null, 'id', 'fiscal_periods_tenant_id_fk')->cascadeOnDelete();
             $table->foreignId('fiscal_year_id')->constrained(null, 'id', 'fiscal_periods_fiscal_year_id_fk')->cascadeOnDelete();
             $table->unsignedInteger('period_number');
             $table->string('name');
@@ -24,7 +22,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'org_unit_id', 'fiscal_year_id', 'period_number'], 'fiscal_periods_tenant_year_number_uk');
+            $table->unique(['tenant_id', 'fiscal_year_id', 'period_number'], 'fiscal_periods_tenant_year_number_uk');
         });
     }
 

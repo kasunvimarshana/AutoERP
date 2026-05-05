@@ -10,7 +10,7 @@ trait HasTenant
     {
         static::addGlobalScope('tenant', function ($builder): void {
             if ($tenantId = auth()->user()?->tenant_id ?? request()->header('X-Tenant-ID')) {
-                $builder->where($builder->qualifyColumn('tenant_id'), $tenantId);
+                $builder->where('tenant_id', $tenantId);
             }
         });
 

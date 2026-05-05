@@ -37,11 +37,11 @@ class InventoryCycleCountRoutesTest extends TestCase
     {
         $routes = app('router')->getRoutes();
 
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/cycle-counts', 'GET'), ['auth.configured', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/cycle-counts', 'POST'), ['auth.configured', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/cycle-counts/{cycleCount}', 'GET'), ['auth.configured', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/cycle-counts/{cycleCount}/start', 'POST'), ['auth.configured', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/cycle-counts/{cycleCount}/complete', 'POST'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/cycle-counts', 'GET'), ['auth:api', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/cycle-counts', 'POST'), ['auth:api', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/cycle-counts/{cycleCount}', 'GET'), ['auth:api', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/cycle-counts/{cycleCount}/start', 'POST'), ['auth:api', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/cycle-counts/{cycleCount}/complete', 'POST'), ['auth:api', 'resolve.tenant']);
     }
 
     /**

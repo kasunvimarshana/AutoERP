@@ -20,8 +20,6 @@ class PriceListModel extends Model
 
     protected $fillable = [
         'tenant_id',
-        'org_unit_id',
-        'row_version',
         'name',
         'type',
         'currency_id',
@@ -33,9 +31,6 @@ class PriceListModel extends Model
 
     protected $casts = [
         'tenant_id' => 'integer',
-        'org_unit_id' => 'integer',
-        'row_version' => 'integer',
-        'type' => 'string',
         'currency_id' => 'integer',
         'is_default' => 'boolean',
         'is_active' => 'boolean',

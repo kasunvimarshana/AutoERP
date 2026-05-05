@@ -12,9 +12,7 @@ return new class extends Migration
     {
         Schema::create('hr_performance_reviews', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', 'hr_performance_reviews_tenant_id_fk')->cascadeOnDelete();
             $table->unsignedBigInteger('employee_id');
             $table->foreignId('cycle_id')->constrained('hr_performance_cycles', 'id', 'hr_performance_reviews_cycle_id_fk')->cascadeOnDelete();
             $table->unsignedBigInteger('reviewer_id');
@@ -27,16 +25,11 @@ return new class extends Migration
             $table->string('status', 20)->default('pending');
             $table->timestamp('acknowledged_at')->nullable();
             $table->json('metadata')->nullable();
-            $table->foreign('employee_id', 'hr_performance_reviews_employee_id_fk')
-                ->references('id')->on('employees')->cascadeOnDelete();
-            $table->foreign('reviewer_id', 'hr_performance_reviews_reviewer_id_fk')
-                ->references('id')->on('users')->cascadeOnDelete();
             $table->timestamps();
             $table->softDeletes();
 
             $table->index(['tenant_id'], 'hr_performance_reviews_tenant_id_idx');
             $table->index(['employee_id'], 'hr_performance_reviews_employee_id_idx');
-            $table->index(['tenant_id', 'status', 'cycle_id'], 'hr_performance_reviews_tenant_status_cycle_idx');
         });
     }
 

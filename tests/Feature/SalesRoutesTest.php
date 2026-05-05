@@ -70,47 +70,47 @@ class SalesRoutesTest extends TestCase
 
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/sales-orders', 'GET'),
-            ['auth.configured', 'resolve.tenant']
+            ['auth:api', 'resolve.tenant']
         );
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/sales-orders/{salesOrder}/confirm', 'POST'),
-            ['auth.configured', 'resolve.tenant']
+            ['auth:api', 'resolve.tenant']
         );
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/sales-orders/{salesOrder}/cancel', 'POST'),
-            ['auth.configured', 'resolve.tenant']
+            ['auth:api', 'resolve.tenant']
         );
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/shipments', 'GET'),
-            ['auth.configured', 'resolve.tenant']
+            ['auth:api', 'resolve.tenant']
         );
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/shipments/{shipment}/process', 'POST'),
-            ['auth.configured', 'resolve.tenant']
+            ['auth:api', 'resolve.tenant']
         );
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/sales-invoices', 'GET'),
-            ['auth.configured', 'resolve.tenant']
+            ['auth:api', 'resolve.tenant']
         );
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/sales-invoices/{salesInvoice}/post', 'POST'),
-            ['auth.configured', 'resolve.tenant']
+            ['auth:api', 'resolve.tenant']
         );
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/sales-invoices/{salesInvoice}/record-payment', 'POST'),
-            ['auth.configured', 'resolve.tenant']
+            ['auth:api', 'resolve.tenant']
         );
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/sales-returns', 'GET'),
-            ['auth.configured', 'resolve.tenant']
+            ['auth:api', 'resolve.tenant']
         );
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/sales-returns/{salesReturn}/approve', 'POST'),
-            ['auth.configured', 'resolve.tenant']
+            ['auth:api', 'resolve.tenant']
         );
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/sales-returns/{salesReturn}/receive', 'POST'),
-            ['auth.configured', 'resolve.tenant']
+            ['auth:api', 'resolve.tenant']
         );
     }
 

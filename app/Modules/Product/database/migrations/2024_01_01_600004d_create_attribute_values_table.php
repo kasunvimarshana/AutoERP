@@ -12,16 +12,14 @@ return new class extends Migration
     {
         Schema::create('attribute_values', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('tenant_id')->nullable()->constrained('tenants', 'id', 'attribute_values_tenant_id_fk')->nullOnDelete();
             $table->foreignId('attribute_id')->constrained(null, 'id', 'attribute_values_attribute_id_fk')->cascadeOnDelete();
             $table->string('value');
             $table->unsignedInteger('sort_order')->default(0);
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'org_unit_id', 'attribute_id', 'value'], 'attribute_values_tenant_attribute_value_uk');
+            $table->unique(['tenant_id', 'attribute_id', 'value'], 'attribute_values_tenant_attribute_value_uk');
         });
     }
 

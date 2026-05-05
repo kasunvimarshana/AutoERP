@@ -17,8 +17,6 @@ class GrnLineModel extends Model
 
     protected $fillable = [
         'tenant_id',
-        'org_unit_id',
-        'row_version',
         'grn_header_id',
         'purchase_order_line_id',
         'product_id',

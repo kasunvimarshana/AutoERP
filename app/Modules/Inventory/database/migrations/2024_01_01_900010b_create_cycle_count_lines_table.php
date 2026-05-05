@@ -12,9 +12,7 @@ return new class extends Migration
     {
         Schema::create('cycle_count_lines', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('tenant_id')->nullable()->constrained('tenants', 'id', 'cycle_count_lines_tenant_id_fk')->nullOnDelete();
             $table->foreignId('count_header_id')->constrained('cycle_count_headers', 'id', 'cycle_count_lines_count_header_id_fk')->cascadeOnDelete();
             $table->foreignId('product_id')->constrained('products', 'id', 'cycle_count_lines_product_id_fk');
             $table->foreignId('variant_id')->nullable()->constrained('product_variants', 'id', 'cycle_count_lines_variant_id_fk')->nullOnDelete();

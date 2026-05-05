@@ -12,10 +12,9 @@ return new class extends Migration
     {
         Schema::create('customers', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('tenant_id')->constrained(null, 'id', 'customers_tenant_id_fk')->cascadeOnDelete();
             $table->foreignId('user_id')->nullable()->unique('customers_user_id_uk')->constrained(null, 'id', 'customers_user_id_fk')->nullOnDelete(); // for portal access
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id', 'customers_org_unit_id_fk')->nullOnDelete();
             $table->string('customer_code')->nullable();
             $table->string('name');
             $table->enum('type', ['individual', 'company'])->default('company');
@@ -33,7 +32,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'org_unit_id', 'customer_code'], 'customers_tenant_code_uk');
+            $table->unique(['tenant_id', 'customer_code'], 'customers_tenant_code_uk');
             $table->index(['tenant_id', 'name'], 'customers_tenant_name_idx');
         });
     }

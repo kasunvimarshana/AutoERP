@@ -22,7 +22,6 @@ class Payment
         private string $status = 'draft',
         private ?string $reference = null,
         private ?string $notes = null,
-        private ?string $idempotencyKey = null,
         private ?int $journalEntryId = null,
         private ?int $id = null,
         private ?\DateTimeInterface $createdAt = null,
@@ -113,11 +112,6 @@ class Payment
     public function getNotes(): ?string
     {
         return $this->notes;
-    }
-
-    public function getIdempotencyKey(): ?string
-    {
-        return $this->idempotencyKey;
     }
 
     public function getJournalEntryId(): ?int

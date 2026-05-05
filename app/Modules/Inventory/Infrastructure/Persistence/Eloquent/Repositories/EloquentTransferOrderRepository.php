@@ -90,11 +90,8 @@ class EloquentTransferOrderRepository implements TransferOrderRepositoryInterfac
                 return null;
             }
 
-            $linesById = $model->lines->keyBy('id');
-
             foreach ($receivedLines as $receivedLine) {
-                $lineId = (int) ($receivedLine['line_id'] ?? 0);
-                $line = $linesById->get($lineId);
+                $line = $model->lines->firstWhere('id', $receivedLine['line_id']);
                 if ($line === null) {
                     continue;
                 }

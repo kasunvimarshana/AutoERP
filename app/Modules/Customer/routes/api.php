@@ -7,7 +7,7 @@ use Modules\Customer\Infrastructure\Http\Controllers\CustomerAddressController;
 use Modules\Customer\Infrastructure\Http\Controllers\CustomerContactController;
 use Modules\Customer\Infrastructure\Http\Controllers\CustomerController;
 
-Route::middleware(['auth.configured', 'resolve.tenant'])->group(function (): void {
+Route::middleware(['auth:api', 'resolve.tenant'])->group(function (): void {
     Route::apiResource('customers', CustomerController::class);
 
     Route::get('customers/{customer}/addresses', [CustomerAddressController::class, 'index']);

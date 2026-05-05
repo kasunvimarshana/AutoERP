@@ -17,8 +17,6 @@ class FiscalPeriodModel extends BaseModel
 
     protected $fillable = [
         'tenant_id',
-        'org_unit_id',
-        'row_version',
         'fiscal_year_id',
         'period_number',
         'name',

@@ -17,7 +17,6 @@ class RecordSalesPaymentRequest extends FormRequest
     {
         return [
             'payment_number' => ['required', 'string', 'max:100'],
-            'idempotency_key' => ['sometimes', 'nullable', 'string', 'max:255'],
             'payment_method_id' => ['required', 'integer', 'min:1'],
             'account_id' => ['required', 'integer', 'min:1'],
             'amount' => ['required', 'numeric', 'min:0.000001'],

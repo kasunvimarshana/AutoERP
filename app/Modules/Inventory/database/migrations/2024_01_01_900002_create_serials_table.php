@@ -12,24 +12,19 @@ return new class extends Migration
     {
         Schema::create('serials', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('product_id')->constrained('products', 'id', 'serials_product_id_fk')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained(null, 'id', 'serials_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('product_id')->constrained(null, 'id', 'serials_product_id_fk')->cascadeOnDelete();
             $table->foreignId('variant_id')->nullable()->constrained('product_variants', 'id', 'serials_variant_id_fk')->nullOnDelete();
             $table->string('serial_number');
-            $table->foreignId('batch_id')->nullable()->constrained('batches', 'id', 'serials_batch_id_fk')->nullOnDelete();
+            $table->foreignId('batch_id')->nullable()->constrained(null, 'id', 'serials_batch_id_fk')->nullOnDelete();
             $table->enum('status', ['available', 'reserved', 'sold', 'returned', 'scrapped', 'in_transit'])->default('available');
             $table->foreignId('current_location_id')->nullable()->constrained('warehouse_locations', 'id', 'serials_current_location_id_fk')->nullOnDelete();
-            $table->nullableMorphs('current_owner'); // e.g., customer, supplier, employee
+            $table->nullableMorphs('current_owner'); // e.g., customer, supplier, employee            $table->date('manufacture_date')->nullable();
             $table->date('warranty_expiry')->nullable();
             $table->text('notes')->nullable();
-            $table->date('manufacture_date')->nullable();
-            // $table->decimal('purchase_price', 20, 6)->nullable();
-            // $table->decimal('sales_price', 20, 6)->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'org_unit_id', 'serial_number'], 'serials_tenant_number_uk');
+            $table->unique(['tenant_id', 'serial_number'], 'serials_tenant_number_uk');
         });
     }
 

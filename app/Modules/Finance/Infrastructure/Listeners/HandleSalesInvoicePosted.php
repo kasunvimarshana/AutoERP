@@ -4,18 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Listeners;
 
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Finance\Application\Contracts\CreateJournalEntryServiceInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\FiscalPeriodRepositoryInterface;
-use Modules\Finance\Infrastructure\Listeners\Concerns\HandlesReplayConflicts;
 use Modules\Sales\Domain\Events\SalesInvoicePosted;
 
 class HandleSalesInvoicePosted
 {
-    use HandlesReplayConflicts;
-
     public function __construct(
         private readonly FiscalPeriodRepositoryInterface $fiscalPeriodRepository,
         private readonly CreateJournalEntryServiceInterface $createJournalEntryService,
@@ -34,15 +30,6 @@ class HandleSalesInvoicePosted
 
         if (empty($event->lines)) {
             Log::warning('HandleSalesInvoicePosted: no invoice lines in event; skipping journal entry', [
-                'sales_invoice_id' => $event->salesInvoiceId,
-                'tenant_id' => $event->tenantId,
-            ]);
-
-            return;
-        }
-
-        if ($this->journalAlreadyPosted($event->tenantId, 'sales_invoice', $event->salesInvoiceId)) {
-            Log::info('HandleSalesInvoicePosted: replay detected; journal entry already exists, skipping', [
                 'sales_invoice_id' => $event->salesInvoiceId,
                 'tenant_id' => $event->tenantId,
             ]);
@@ -128,38 +115,18 @@ class HandleSalesInvoicePosted
             ];
         }
 
-        try {
-            DB::transaction(function () use ($event, $period, $invoiceDate, $description, $jeLines): void {
-                $this->createJournalEntryService->execute([
-                    'tenant_id' => $event->tenantId,
-                    'fiscal_period_id' => $period->getId(),
-                    'entry_date' => $invoiceDate->format('Y-m-d'),
-                    'created_by' => $event->createdBy ?: 1,
-                    'entry_type' => 'system',
-                    'reference_type' => 'sales_invoice',
-                    'reference_id' => $event->salesInvoiceId,
-                    'description' => $description,
-                    'lines' => $jeLines,
-                ]);
-            });
-        } catch (QueryException $exception) {
-            if (! $this->isReplayConflict($exception)) {
-                throw $exception;
-            }
-
-            if (! $this->journalAlreadyPosted($event->tenantId, 'sales_invoice', $event->salesInvoiceId)) {
-                throw new \RuntimeException(
-                    'HandleSalesInvoicePosted: replay conflict detected with missing journal artifact for sales_invoice_id '.$event->salesInvoiceId,
-                    0,
-                    $exception
-                );
-            }
-
-            Log::info('HandleSalesInvoicePosted: duplicate-key replay conflict detected; skipping', [
-                'sales_invoice_id' => $event->salesInvoiceId,
+        DB::transaction(function () use ($event, $period, $invoiceDate, $description, $jeLines): void {
+            $this->createJournalEntryService->execute([
                 'tenant_id' => $event->tenantId,
+                'fiscal_period_id' => $period->getId(),
+                'entry_date' => $invoiceDate->format('Y-m-d'),
+                'created_by' => $event->createdBy ?: 1,
+                'entry_type' => 'system',
+                'reference_type' => 'sales_invoice',
+                'reference_id' => $event->salesInvoiceId,
+                'description' => $description,
+                'lines' => $jeLines,
             ]);
-        }
+        });
     }
-
 }

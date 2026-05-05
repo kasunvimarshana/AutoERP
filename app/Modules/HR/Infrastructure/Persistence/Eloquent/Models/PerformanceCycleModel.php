@@ -14,7 +14,7 @@ class PerformanceCycleModel extends BaseModel
 
     protected $table = 'hr_performance_cycles';
 
-    protected $fillable = ['tenant_id', 'org_unit_id', 'row_version', 'name', 'period_start', 'period_end', 'is_active', 'metadata'];
+    protected $fillable = ['tenant_id', 'name', 'period_start', 'period_end', 'is_active', 'metadata'];
 
-    protected $casts = ['org_unit_id' => 'integer', 'row_version' => 'integer', 'period_start' => 'date', 'period_end' => 'date', 'is_active' => 'boolean', 'metadata' => 'array'];
+    protected $casts = ['period_start' => 'date', 'period_end' => 'date', 'is_active' => 'boolean', 'metadata' => 'array'];
 }

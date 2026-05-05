@@ -7,7 +7,7 @@ use Modules\Warehouse\Infrastructure\Http\Controllers\WarehouseController;
 use Modules\Warehouse\Infrastructure\Http\Controllers\WarehouseLocationController;
 use Modules\Warehouse\Infrastructure\Http\Controllers\WarehouseStockController;
 
-Route::middleware(['auth.configured', 'resolve.tenant'])->group(function (): void {
+Route::middleware(['auth:api', 'resolve.tenant'])->group(function (): void {
     Route::get('warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
     Route::post('warehouses', [WarehouseController::class, 'store'])->name('warehouses.store');
     Route::get('warehouses/{warehouse}', [WarehouseController::class, 'show'])->name('warehouses.show');

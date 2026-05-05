@@ -21,8 +21,6 @@ class PriceListItemModel extends Model
 
     protected $fillable = [
         'tenant_id',
-        'org_unit_id',
-        'row_version',
         'price_list_id',
         'product_id',
         'variant_id',
@@ -36,8 +34,6 @@ class PriceListItemModel extends Model
 
     protected $casts = [
         'tenant_id' => 'integer',
-        'org_unit_id' => 'integer',
-        'row_version' => 'integer',
         'price_list_id' => 'integer',
         'product_id' => 'integer',
         'variant_id' => 'integer',

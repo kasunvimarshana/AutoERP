@@ -10,7 +10,7 @@ use Modules\Inventory\Infrastructure\Http\Controllers\InventoryTransferOrderCont
 use Modules\Inventory\Infrastructure\Http\Controllers\InventoryValuationController;
 
 Route::prefix('inventory')
-    ->middleware(['auth.configured', 'resolve.tenant'])
+    ->middleware(['auth:api', 'resolve.tenant'])
     ->group(function (): void {
         Route::get('warehouses/{warehouse}/movements', [InventoryStockController::class, 'movements'])
             ->name('inventory.warehouses.movements.index');

@@ -18,8 +18,6 @@ class CycleCountHeaderModel extends Model
 
     protected $fillable = [
         'tenant_id',
-        'org_unit_id',
-        'row_version',
         'warehouse_id',
         'location_id',
         'status',

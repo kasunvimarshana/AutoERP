@@ -29,7 +29,6 @@ class PaymentResource extends JsonResource
             'status' => $this->resource->getStatus(),
             'reference' => $this->resource->getReference(),
             'notes' => $this->resource->getNotes(),
-            'idempotency_key' => $this->resource->getIdempotencyKey(),
             'journal_entry_id' => $this->resource->getJournalEntryId(),
             'created_at' => $this->resource->getCreatedAt(),
             'updated_at' => $this->resource->getUpdatedAt(),

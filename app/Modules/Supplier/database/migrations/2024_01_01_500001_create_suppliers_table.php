@@ -12,9 +12,8 @@ return new class extends Migration
     {
         Schema::create('suppliers', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('tenant_id')->constrained(null, 'id', 'suppliers_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id', 'suppliers_org_unit_id_fk')->nullOnDelete();
             $table->foreignId('user_id')->nullable()->unique('suppliers_user_id_uk')->constrained(null, 'id', 'suppliers_user_id_fk')->nullOnDelete(); // for portal access
             $table->string('supplier_code')->nullable();
             $table->string('name');
@@ -32,7 +31,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'org_unit_id', 'supplier_code'], 'suppliers_tenant_code_uk');
+            $table->unique(['tenant_id', 'supplier_code'], 'suppliers_tenant_code_uk');
             $table->index(['tenant_id', 'name'], 'suppliers_tenant_name_idx');
         });
     }

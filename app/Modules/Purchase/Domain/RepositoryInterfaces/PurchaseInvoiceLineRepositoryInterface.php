@@ -14,5 +14,5 @@ interface PurchaseInvoiceLineRepositoryInterface extends RepositoryInterface
     public function find(int|string $id, array $columns = ['*']): ?PurchaseInvoiceLine;
 
     /** @return PurchaseInvoiceLine[] */
-    public function findByInvoiceId(int $tenantId, int $invoiceId): array;
+    public function findByInvoiceId(int $invoiceId): array;
 }
