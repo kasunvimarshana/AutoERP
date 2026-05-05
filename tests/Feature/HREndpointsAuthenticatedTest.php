@@ -383,7 +383,7 @@ class HREndpointsAuthenticatedTest extends TestCase
         $user->setAttribute('id', 301);
         $user->setAttribute('tenant_id', 7);
 
-        $this->actingAs($user, 'api');
+        $this->actingAs($user, (string) config('auth_context.guards.api', config('auth.defaults.guard', 'api')));
     }
 
     // =========================================================================

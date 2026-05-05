@@ -97,7 +97,7 @@ class PricingEndpointsAuthenticatedTest extends TestCase
         $user->setAttribute('id', 811);
         $user->setAttribute('tenant_id', 9);
 
-        $this->actingAs($user, 'api');
+        $this->actingAs($user, (string) config('auth_context.guards.api', config('auth.defaults.guard', 'api')));
 
         $this->seedResolveValidationData();
     }

@@ -51,10 +51,10 @@ class OrganizationUnitRoutesTest extends TestCase
     {
         $routes = app('router')->getRoutes();
 
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/organization-units', 'GET'), ['auth:api', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/organization-units/{organization_unit}', 'GET'), ['auth:api', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/organization-units/{organization_unit}/attachments', 'GET'), ['auth:api', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/storage/org-unit-attachments/{uuid}', 'GET'), ['auth:api']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/organization-units', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/organization-units/{organization_unit}', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/organization-units/{organization_unit}/attachments', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/storage/org-unit-attachments/{uuid}', 'GET'), ['auth.configured']);
     }
 
     /**

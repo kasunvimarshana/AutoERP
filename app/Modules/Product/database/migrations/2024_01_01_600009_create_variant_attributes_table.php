@@ -12,7 +12,9 @@ return new class extends Migration
     {
         Schema::create('variant_attributes', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id', 'variant_attributes_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('product_id')->constrained('products', 'id', 'variant_attributes_product_id_fk')->cascadeOnDelete();
             $table->foreignId('attribute_id')->constrained('attributes', 'id', 'variant_attributes_attribute_id_fk')->cascadeOnDelete();
             $table->boolean('is_required')->default(false);
@@ -21,7 +23,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'product_id', 'attribute_id'], 'variant_attributes_tenant_product_attr_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'product_id', 'attribute_id'], 'variant_attributes_tenant_product_attr_uk');
         });
     }
 

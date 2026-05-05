@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 use App\Providers\AppServiceProvider;
+use Modules\Asset\Infrastructure\Providers\AssetServiceProvider;
 use Modules\Audit\Infrastructure\Providers\AuditServiceProvider;
 use Modules\Auth\Infrastructure\Providers\AuthModuleServiceProvider;
 use Modules\Configuration\Infrastructure\Providers\ConfigurationServiceProvider;
 use Modules\Core\Infrastructure\Providers\CoreServiceProvider;
 use Modules\Customer\Infrastructure\Providers\CustomerServiceProvider;
+use Modules\Driver\Infrastructure\Providers\DriverServiceProvider;
 use Modules\Employee\Infrastructure\Providers\EmployeeServiceProvider;
 use Modules\Finance\Infrastructure\Providers\FinanceServiceProvider;
 use Modules\Inventory\Infrastructure\Providers\InventoryServiceProvider;
@@ -15,6 +17,10 @@ use Modules\OrganizationUnit\Infrastructure\Providers\OrganizationUnitServicePro
 use Modules\Pricing\Infrastructure\Providers\PricingServiceProvider;
 use Modules\Product\Infrastructure\Providers\ProductServiceProvider;
 use Modules\Purchase\Infrastructure\Providers\PurchaseServiceProvider;
+use Modules\Rental\Infrastructure\Providers\RentalServiceProvider;
+use Modules\ReturnRefund\Infrastructure\Providers\ReturnRefundServiceProvider;
+use Modules\PartyManagement\Infrastructure\Providers\PartyManagementServiceProvider;
+use Modules\ServiceCenter\Infrastructure\Providers\ServiceCenterServiceProvider;
 use Modules\HR\Infrastructure\Providers\HRServiceProvider;
 use Modules\Sales\Infrastructure\Providers\SalesServiceProvider;
 use Modules\Shared\Infrastructure\Providers\SharedServiceProvider;
@@ -45,7 +51,13 @@ return [
     FinanceServiceProvider::class,
     InventoryServiceProvider::class,
     WarehouseServiceProvider::class,
+    AssetServiceProvider::class,
+    DriverServiceProvider::class,
+    RentalServiceProvider::class,
+    ReturnRefundServiceProvider::class,
+    ServiceCenterServiceProvider::class,
     PurchaseServiceProvider::class,
     SalesServiceProvider::class,
     HRServiceProvider::class,
+    PartyManagementServiceProvider::class,
 ];

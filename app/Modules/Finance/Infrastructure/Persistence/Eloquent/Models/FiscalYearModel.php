@@ -17,6 +17,8 @@ class FiscalYearModel extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'org_unit_id',
+        'row_version',
         'name',
         'start_date',
         'end_date',

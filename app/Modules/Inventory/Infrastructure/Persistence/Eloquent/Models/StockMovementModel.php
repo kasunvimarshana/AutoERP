@@ -5,13 +5,22 @@ declare(strict_types=1);
 namespace Modules\Inventory\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Traits\ResolvesMorphTypeClass;
+use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductModel;
+use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductVariantModel;
+use Modules\Product\Infrastructure\Persistence\Eloquent\Models\UnitOfMeasureModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
+use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
+use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models\WarehouseLocationModel;
 
 class StockMovementModel extends Model
 {
     use HasAudit;
     use HasTenant;
+    use ResolvesMorphTypeClass;
 
     protected $table = 'stock_movements';
 
@@ -19,6 +28,8 @@ class StockMovementModel extends Model
 
     protected $fillable = [
         'tenant_id',
+        'org_unit_id',
+        'row_version',
         'product_id',
         'variant_id',
         'batch_id',
@@ -39,6 +50,8 @@ class StockMovementModel extends Model
 
     protected $casts = [
         'tenant_id' => 'integer',
+        'org_unit_id' => 'integer',
+        'row_version' => 'integer',
         'product_id' => 'integer',
         'variant_id' => 'integer',
         'batch_id' => 'integer',
@@ -50,5 +63,57 @@ class StockMovementModel extends Model
         'performed_by' => 'integer',
         'performed_at' => 'datetime',
         'metadata' => 'array',
+        'quantity' => 'decimal:6',
+        'unit_cost' => 'decimal:6',
     ];
+
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(ProductModel::class, 'product_id');
+    }
+
+    public function variant(): BelongsTo
+    {
+        return $this->belongsTo(ProductVariantModel::class, 'variant_id');
+    }
+
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(BatchModel::class, 'batch_id');
+    }
+
+    public function serial(): BelongsTo
+    {
+        return $this->belongsTo(SerialModel::class, 'serial_id');
+    }
+
+    public function fromLocation(): BelongsTo
+    {
+        return $this->belongsTo(WarehouseLocationModel::class, 'from_location_id');
+    }
+
+    public function toLocation(): BelongsTo
+    {
+        return $this->belongsTo(WarehouseLocationModel::class, 'to_location_id');
+    }
+
+    public function uom(): BelongsTo
+    {
+        return $this->belongsTo(UnitOfMeasureModel::class, 'uom_id');
+    }
+
+    public function performer(): BelongsTo
+    {
+        return $this->belongsTo(UserModel::class, 'performed_by');
+    }
+
+    public function reference(): MorphTo
+    {
+        return $this->morphTo();
+    }
+
+    public function getReferenceTypeClassAttribute(): ?string
+    {
+        return $this->resolveMorphTypeClass($this->reference_type);
+    }
 }

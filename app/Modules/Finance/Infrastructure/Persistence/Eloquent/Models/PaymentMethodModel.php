@@ -17,6 +17,8 @@ class PaymentMethodModel extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'org_unit_id',
+        'row_version',
         'name',
         'type',
         'account_id',

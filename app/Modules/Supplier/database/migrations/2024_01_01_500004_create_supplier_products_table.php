@@ -12,7 +12,9 @@ return new class extends Migration
     {
         Schema::create('supplier_products', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained(null, 'id', 'supplier_products_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('supplier_id')->constrained(null, 'id', 'supplier_products_supplier_id_fk')->cascadeOnDelete();
             $table->foreignId('product_id')->constrained('products', 'id', 'supplier_products_product_id_fk')->cascadeOnDelete();
             $table->foreignId('variant_id')->nullable()->constrained('product_variants', 'id', 'supplier_products_variant_id_fk')->nullOnDelete();
@@ -23,7 +25,7 @@ return new class extends Migration
             $table->decimal('last_purchase_price', 20, 6)->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'supplier_id', 'product_id', 'variant_id'], 'supplier_products_tenant_supplier_product_variant_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'supplier_id', 'product_id', 'variant_id'], 'supplier_products_tenant_supplier_product_variant_uk');
         });
     }
 

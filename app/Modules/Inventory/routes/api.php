@@ -8,9 +8,10 @@ use Modules\Inventory\Infrastructure\Http\Controllers\InventoryStockController;
 use Modules\Inventory\Infrastructure\Http\Controllers\InventoryStockReservationController;
 use Modules\Inventory\Infrastructure\Http\Controllers\InventoryTransferOrderController;
 use Modules\Inventory\Infrastructure\Http\Controllers\InventoryValuationController;
+use Modules\Inventory\Infrastructure\Http\Controllers\StockReorderRuleController;
 
 Route::prefix('inventory')
-    ->middleware(['auth:api', 'resolve.tenant'])
+    ->middleware(['auth.configured', 'resolve.tenant'])
     ->group(function (): void {
         Route::get('warehouses/{warehouse}/movements', [InventoryStockController::class, 'movements'])
             ->name('inventory.warehouses.movements.index');
@@ -65,4 +66,18 @@ Route::prefix('inventory')
             ->name('inventory.valuation-configs.update');
         Route::delete('valuation-configs/{config}', [InventoryValuationController::class, 'destroy'])
             ->name('inventory.valuation-configs.destroy');
+
+        // Stock Reorder Rules
+        Route::get('stock-reorder-rules/low-stock', [StockReorderRuleController::class, 'lowStock'])
+            ->name('inventory.stock-reorder-rules.low-stock');
+        Route::get('stock-reorder-rules', [StockReorderRuleController::class, 'index'])
+            ->name('inventory.stock-reorder-rules.index');
+        Route::post('stock-reorder-rules', [StockReorderRuleController::class, 'store'])
+            ->name('inventory.stock-reorder-rules.store');
+        Route::get('stock-reorder-rules/{rule}', [StockReorderRuleController::class, 'show'])
+            ->name('inventory.stock-reorder-rules.show');
+        Route::put('stock-reorder-rules/{rule}', [StockReorderRuleController::class, 'update'])
+            ->name('inventory.stock-reorder-rules.update');
+        Route::delete('stock-reorder-rules/{rule}', [StockReorderRuleController::class, 'destroy'])
+            ->name('inventory.stock-reorder-rules.destroy');
     });

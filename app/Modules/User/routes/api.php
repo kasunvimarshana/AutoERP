@@ -10,7 +10,7 @@ use Modules\User\Infrastructure\Http\Controllers\UserAttachmentController;
 use Modules\User\Infrastructure\Http\Controllers\UserController;
 use Modules\User\Infrastructure\Http\Controllers\UserDeviceController;
 
-Route::middleware(['auth:api', 'resolve.tenant'])->group(function () {
+Route::middleware(['auth.configured', 'resolve.tenant'])->group(function () {
     // Profile endpoints (authenticated user managing their own profile)
     Route::get('profile', [ProfileController::class, 'show']);
     Route::patch('profile', [ProfileController::class, 'update']);
@@ -45,4 +45,4 @@ Route::middleware(['auth:api', 'resolve.tenant'])->group(function () {
 });
 
 // File serving (authenticated)
-Route::get('storage/user-attachments/{uuid}', [UserAttachmentController::class, 'serve'])->middleware('auth:api');
+Route::get('storage/user-attachments/{uuid}', [UserAttachmentController::class, 'serve'])->middleware('auth.configured');

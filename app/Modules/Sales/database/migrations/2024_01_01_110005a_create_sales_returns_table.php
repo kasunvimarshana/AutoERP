@@ -12,7 +12,9 @@ return new class extends Migration
     {
         Schema::create('sales_returns', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained(null, 'id', 'sales_returns_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('customer_id');
             $table->foreignId('original_sales_order_id')->nullable()->constrained('sales_orders', 'id', 'sales_returns_original_sales_order_id_fk')->nullOnDelete();
             $table->foreignId('original_invoice_id')->nullable()->constrained('sales_invoices', 'id', 'sales_returns_original_invoice_id_fk')->nullOnDelete();
@@ -30,9 +32,14 @@ return new class extends Migration
             $table->foreignId('journal_entry_id')->nullable();
             $table->text('notes')->nullable();
             $table->json('metadata')->nullable();
-            $table->timestamps();
 
-            $table->unique(['tenant_id', 'return_number'], 'sales_returns_tenant_return_uk');
+            $table->foreign('customer_id')->references('id')->on('customers')->cascadeOnDelete();
+            $table->foreign('journal_entry_id')->references('id')->on('journal_entries')->nullOnDelete();
+
+            $table->timestamps();
+            $table->softDeletes();
+
+            $table->unique(['tenant_id', 'org_unit_id', 'return_number'], 'sales_returns_tenant_return_uk');
         });
     }
 

@@ -21,6 +21,9 @@ return new class extends Migration
             $table->unsignedInteger('size');
             $table->string('type')->nullable();
             $table->json('metadata')->nullable();
+
+            $table->foreign('tenant_id')->references('id')->on('tenants')->cascadeOnDelete();
+
             $table->timestamps();
             $table->softDeletes();
 

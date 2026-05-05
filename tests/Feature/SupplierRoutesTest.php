@@ -36,11 +36,11 @@ class SupplierRoutesTest extends TestCase
     {
         $routes = app('router')->getRoutes();
 
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/suppliers', 'GET'), ['auth:api', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/suppliers/{supplier}', 'GET'), ['auth:api', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/suppliers/{supplier}/addresses', 'GET'), ['auth:api', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/suppliers/{supplier}/contacts', 'GET'), ['auth:api', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/suppliers/{supplier}/products', 'GET'), ['auth:api', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/suppliers', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/suppliers/{supplier}', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/suppliers/{supplier}/addresses', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/suppliers/{supplier}/contacts', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/suppliers/{supplier}/products', 'GET'), ['auth.configured', 'resolve.tenant']);
     }
 
     /**

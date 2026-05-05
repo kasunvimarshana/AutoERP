@@ -12,7 +12,9 @@ return new class extends Migration
     {
         Schema::create('inventory_cost_layers', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained(null, 'id', 'inventory_cost_layers_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('product_id')->constrained(null, 'id', 'inventory_cost_layers_product_id_fk')->cascadeOnDelete();
             $table->foreignId('variant_id')->nullable()->constrained('product_variants', 'id', 'inventory_cost_layers_variant_id_fk')->nullOnDelete();
             $table->foreignId('batch_id')->nullable()->constrained(null, 'id', 'inventory_cost_layers_batch_id_fk')->nullOnDelete();
@@ -28,6 +30,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['tenant_id', 'product_id', 'layer_date'], 'inventory_cost_layers_tenant_product_date_idx');
+            $table->index(['tenant_id', 'product_id', 'is_closed'], 'inventory_cost_layers_tenant_product_open_idx');
         });
     }
 

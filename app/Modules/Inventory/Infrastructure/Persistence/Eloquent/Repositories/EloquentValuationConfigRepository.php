@@ -24,6 +24,7 @@ class EloquentValuationConfigRepository implements ValuationConfigRepositoryInte
     {
         $this->model->newQuery()
             ->withoutGlobalScope('tenant')
+            ->where('tenant_id', $config->getTenantId())
             ->where('id', $config->getId())
             ->update(array_merge($this->toArray($config), ['updated_at' => now()]));
 

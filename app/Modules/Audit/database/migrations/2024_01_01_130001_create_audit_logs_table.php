@@ -13,6 +13,8 @@ return new class extends Migration
         Schema::create('audit_logs', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('tenant_id')->nullable()->index('audit_logs_tenant_idx');
+            $table->unsignedBigInteger('org_unit_id')->nullable()->index('audit_logs_org_unit_idx');
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->unsignedBigInteger('user_id')->nullable()->index('audit_logs_user_idx');
 
             // The action that triggered this entry (created, updated, deleted, etc.)

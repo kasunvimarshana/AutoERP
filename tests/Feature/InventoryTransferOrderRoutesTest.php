@@ -37,11 +37,11 @@ class InventoryTransferOrderRoutesTest extends TestCase
     {
         $routes = app('router')->getRoutes();
 
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/transfer-orders', 'GET'), ['auth:api', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/transfer-orders', 'POST'), ['auth:api', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/transfer-orders/{transferOrder}', 'GET'), ['auth:api', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/transfer-orders/{transferOrder}/approve', 'POST'), ['auth:api', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/transfer-orders/{transferOrder}/receive', 'POST'), ['auth:api', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/transfer-orders', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/transfer-orders', 'POST'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/transfer-orders/{transferOrder}', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/transfer-orders/{transferOrder}/approve', 'POST'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/inventory/transfer-orders/{transferOrder}/receive', 'POST'), ['auth.configured', 'resolve.tenant']);
     }
 
     /**

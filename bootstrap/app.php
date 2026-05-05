@@ -7,6 +7,8 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Modules\Auth\Infrastructure\Http\Middleware\AuthenticateWithConfiguredGuard;
+use Modules\Auth\Infrastructure\Http\Middleware\RedirectIfAuthenticated;
 use Modules\Core\Domain\Exceptions\DomainException;
 use Modules\Tenant\Infrastructure\Http\Middleware\ResolveTenant;
 
@@ -19,6 +21,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'resolve.tenant' => ResolveTenant::class,
+            'auth.configured' => AuthenticateWithConfiguredGuard::class,
+            'guest' => RedirectIfAuthenticated::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

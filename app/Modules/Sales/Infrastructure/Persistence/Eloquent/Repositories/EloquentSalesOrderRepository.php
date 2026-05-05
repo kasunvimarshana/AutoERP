@@ -51,10 +51,10 @@ class EloquentSalesOrderRepository extends EloquentRepository implements SalesOr
             }
 
             /** @var SalesOrderModel $model */
-            $model->lines()->delete();
+            $keptLineIds = [];
             foreach ($order->getLines() as $line) {
-                $model->lines()->create([
-                    'tenant_id' => $line->getTenantId(),
+                $lineData = [
+                    'tenant_id' => (int) $model->tenant_id,
                     'product_id' => $line->getProductId(),
                     'variant_id' => $line->getVariantId(),
                     'description' => $line->getDescription(),
@@ -69,7 +69,30 @@ class EloquentSalesOrderRepository extends EloquentRepository implements SalesOr
                     'income_account_id' => $line->getIncomeAccountId(),
                     'batch_id' => $line->getBatchId(),
                     'serial_id' => $line->getSerialId(),
-                ]);
+                ];
+
+                $lineId = $line->getId();
+                if ($lineId !== null) {
+                    $updated = $model->lines()
+                        ->where('tenant_id', (int) $model->tenant_id)
+                        ->whereKey($lineId)
+                        ->update($lineData);
+
+                    if ($updated > 0) {
+                        $keptLineIds[] = $lineId;
+                        continue;
+                    }
+                }
+
+                $createdLine = $model->lines()->create($lineData);
+                $keptLineIds[] = (int) $createdLine->id;
+            }
+
+            $lineCleanupQuery = $model->lines()->where('tenant_id', (int) $model->tenant_id);
+            if ($keptLineIds === []) {
+                $lineCleanupQuery->delete();
+            } else {
+                $lineCleanupQuery->whereNotIn('id', $keptLineIds)->delete();
             }
 
             $model->load('lines');
@@ -81,7 +104,7 @@ class EloquentSalesOrderRepository extends EloquentRepository implements SalesOr
     public function find(int|string $id, array $columns = ['*']): ?SalesOrder
     {
         /** @var SalesOrderModel|null $model */
-        $model = $this->model->newQuery()->with('lines')->find($id, $columns);
+        $model = $this->newScopedQuery()->with('lines')->find($id, $columns);
 
         return $model ? $this->toDomainEntity($model) : null;
     }
@@ -89,7 +112,7 @@ class EloquentSalesOrderRepository extends EloquentRepository implements SalesOr
     public function findByTenantAndSoNumber(int $tenantId, string $soNumber): ?SalesOrder
     {
         /** @var SalesOrderModel|null $model */
-        $model = $this->model->newQuery()->with('lines')
+        $model = $this->newScopedQuery()->with('lines')
             ->where('tenant_id', $tenantId)
             ->where('so_number', $soNumber)
             ->first();

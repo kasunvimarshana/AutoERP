@@ -12,7 +12,9 @@ return new class extends Migration
     {
         Schema::create('numbering_sequences', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id', 'numbering_sequences_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->string('module');
             $table->string('document_type');
             $table->string('prefix')->nullable();
@@ -20,9 +22,10 @@ return new class extends Migration
             $table->unsignedBigInteger('next_number')->default(1);
             $table->unsignedInteger('padding')->default(5);
             $table->boolean('is_active')->default(true);
+            $table->softDeletes();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'module', 'document_type'], 'numbering_sequences_tenant_module_doc_uk');
+            $table->unique(['tenant_id', 'org_unit_id', 'module', 'document_type'], 'numbering_sequences_tenant_module_doc_uk');
         });
     }
 

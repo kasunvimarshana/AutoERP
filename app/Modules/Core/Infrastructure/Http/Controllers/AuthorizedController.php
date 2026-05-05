@@ -9,6 +9,7 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 
 class AuthorizedController extends Controller
@@ -20,7 +21,7 @@ class AuthorizedController extends Controller
     public function authorize(string $ability, mixed $arguments = []): mixed
     {
         // return $this->laravelAuthorize($ability, $arguments);
-        $user = auth()->guard()->user();
+        $user = request()->user() ?? Auth::user();
 
         if (! $user instanceof Authenticatable) {
             throw new AuthenticationException;
@@ -73,13 +74,19 @@ class AuthorizedController extends Controller
             return $this->uniqueAbilities($candidates);
         }
 
+        $resources = [$resource, ...$this->resourceAliases($resource)];
+
         $mappedAbility = $this->mapControllerAbility($ability);
         if ($mappedAbility !== null) {
-            $candidates[] = $resource.'.'.$mappedAbility;
+            foreach ($resources as $resourceName) {
+                $candidates[] = $resourceName.'.'.$mappedAbility;
+            }
         }
 
-        foreach ($this->specialAbilityCandidates($resource, $ability) as $candidate) {
-            $candidates[] = $candidate;
+        foreach ($resources as $resourceName) {
+            foreach ($this->specialAbilityCandidates($resourceName, $ability) as $candidate) {
+                $candidates[] = $candidate;
+            }
         }
 
         return $this->uniqueAbilities($candidates);
@@ -140,6 +147,20 @@ class AuthorizedController extends Controller
             ],
             default => [],
         };
+    }
+
+    /**
+     * Provide alias resource names for permissions when class pluralization differs from seeded keys.
+     *
+     * @return list<string>
+     */
+    private function resourceAliases(string $resource): array
+    {
+        $aliases = [
+            // 'key' => 'value', // key: route resource name, value: permission resource name
+        ];
+
+        return isset($aliases[$resource]) ? [$aliases[$resource]] : [];
     }
 
     private function uniqueAbilities(array $abilities): array

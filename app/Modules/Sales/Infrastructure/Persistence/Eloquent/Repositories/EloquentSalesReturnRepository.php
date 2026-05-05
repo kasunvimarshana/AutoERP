@@ -50,10 +50,10 @@ class EloquentSalesReturnRepository extends EloquentRepository implements SalesR
             }
 
             /** @var SalesReturnModel $model */
-            $model->lines()->delete();
+            $keptLineIds = [];
             foreach ($return->getLines() as $line) {
-                $model->lines()->create([
-                    'tenant_id' => $line->getTenantId(),
+                $lineData = [
+                    'tenant_id' => (int) $model->tenant_id,
                     'original_sales_order_line_id' => $line->getOriginalSalesOrderLineId(),
                     'product_id' => $line->getProductId(),
                     'variant_id' => $line->getVariantId(),
@@ -63,12 +63,34 @@ class EloquentSalesReturnRepository extends EloquentRepository implements SalesR
                     'uom_id' => $line->getUomId(),
                     'return_qty' => $line->getReturnQty(),
                     'unit_price' => $line->getUnitPrice(),
-                    'line_total' => $line->getLineTotal(),
                     'condition' => $line->getCondition(),
                     'disposition' => $line->getDisposition(),
                     'restocking_fee' => $line->getRestockingFee(),
                     'quality_check_notes' => $line->getQualityCheckNotes(),
-                ]);
+                ];
+
+                $lineId = $line->getId();
+                if ($lineId !== null) {
+                    $updated = $model->lines()
+                        ->where('tenant_id', (int) $model->tenant_id)
+                        ->whereKey($lineId)
+                        ->update($lineData);
+
+                    if ($updated > 0) {
+                        $keptLineIds[] = $lineId;
+                        continue;
+                    }
+                }
+
+                $createdLine = $model->lines()->create($lineData);
+                $keptLineIds[] = (int) $createdLine->id;
+            }
+
+            $lineCleanupQuery = $model->lines()->where('tenant_id', (int) $model->tenant_id);
+            if ($keptLineIds === []) {
+                $lineCleanupQuery->delete();
+            } else {
+                $lineCleanupQuery->whereNotIn('id', $keptLineIds)->delete();
             }
 
             $model->load('lines');

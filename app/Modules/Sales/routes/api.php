@@ -8,7 +8,7 @@ use Modules\Sales\Infrastructure\Http\Controllers\SalesOrderController;
 use Modules\Sales\Infrastructure\Http\Controllers\SalesReturnController;
 use Modules\Sales\Infrastructure\Http\Controllers\ShipmentController;
 
-Route::middleware(['auth:api', 'resolve.tenant'])->group(function (): void {
+Route::middleware(['auth.configured', 'resolve.tenant'])->group(function (): void {
     Route::apiResource('sales-orders', SalesOrderController::class);
     Route::post('sales-orders/{salesOrder}/confirm', [SalesOrderController::class, 'confirm']);
     Route::post('sales-orders/{salesOrder}/cancel', [SalesOrderController::class, 'cancel']);

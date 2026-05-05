@@ -18,15 +18,21 @@ class FinanceRoutesTest extends TestCase
         $this->getJson('/api/journal-entries')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
     }
 
+    public function test_finance_reversal_endpoint_requires_authentication(): void
+    {
+        $this->postJson('/api/journal-entries/1/reverse')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
+    }
+
     public function test_finance_routes_keep_expected_middleware_contract(): void
     {
         $routes = app('router')->getRoutes();
 
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/accounts', 'GET'), ['auth:api', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/fiscal-years', 'GET'), ['auth:api', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/fiscal-periods', 'GET'), ['auth:api', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/journal-entries', 'GET'), ['auth:api', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/journal-entries/{journal_entry}/post', 'POST'), ['auth:api', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/accounts', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/fiscal-years', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/fiscal-periods', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/journal-entries', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/journal-entries/{journal_entry}/post', 'POST'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/journal-entries/{journal_entry}/reverse', 'POST'), ['auth.configured', 'resolve.tenant']);
     }
 
     /**

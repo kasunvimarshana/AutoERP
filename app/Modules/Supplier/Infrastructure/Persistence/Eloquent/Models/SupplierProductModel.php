@@ -7,6 +7,8 @@ namespace Modules\Supplier\Infrastructure\Persistence\Eloquent\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductModel;
+use Modules\Product\Infrastructure\Persistence\Eloquent\Models\ProductVariantModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class SupplierProductModel extends Model
@@ -18,6 +20,8 @@ class SupplierProductModel extends Model
 
     protected $fillable = [
         'tenant_id',
+        'org_unit_id',
+        'row_version',
         'supplier_id',
         'product_id',
         'variant_id',
@@ -30,6 +34,8 @@ class SupplierProductModel extends Model
 
     protected $casts = [
         'tenant_id' => 'integer',
+        'org_unit_id' => 'integer',
+        'row_version' => 'integer',
         'supplier_id' => 'integer',
         'product_id' => 'integer',
         'variant_id' => 'integer',
@@ -42,5 +48,15 @@ class SupplierProductModel extends Model
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(SupplierModel::class, 'supplier_id');
+    }
+
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(ProductModel::class, 'product_id');
+    }
+
+    public function variant(): BelongsTo
+    {
+        return $this->belongsTo(ProductVariantModel::class, 'variant_id');
     }
 }

@@ -17,6 +17,8 @@ class BankCategoryRuleModel extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'org_unit_id',
+        'row_version',
         'bank_account_id',
         'name',
         'priority',

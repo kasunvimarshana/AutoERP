@@ -24,7 +24,7 @@ use Modules\Finance\Infrastructure\Http\Controllers\PaymentController;
 use Modules\Finance\Infrastructure\Http\Controllers\PaymentMethodController;
 use Modules\Finance\Infrastructure\Http\Controllers\PaymentTermController;
 
-Route::middleware(['auth:api', 'resolve.tenant'])->group(function (): void {
+Route::middleware(['auth.configured', 'resolve.tenant'])->group(function (): void {
     // Chart of Accounts & General Ledger
     Route::apiResource('accounts', AccountController::class);
 
@@ -35,6 +35,7 @@ Route::middleware(['auth:api', 'resolve.tenant'])->group(function (): void {
     // Journal Entries
     Route::apiResource('journal-entries', JournalEntryController::class);
     Route::post('journal-entries/{journal_entry}/post', [JournalEntryController::class, 'post']);
+    Route::post('journal-entries/{journal_entry}/reverse', [JournalEntryController::class, 'reverse']);
 
     // Payment lifecycle
     Route::post('payments/{payment}/post', [PaymentController::class, 'post']);

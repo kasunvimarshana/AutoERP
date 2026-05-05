@@ -6,7 +6,10 @@ namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Modules\Purchase\Application\Contracts\DeletePurchaseOrderServiceInterface;
+use Modules\Purchase\Application\Contracts\UpdatePurchaseOrderServiceInterface;
 use Modules\Purchase\Domain\Entities\PurchaseOrder;
+use Modules\Purchase\Domain\Exceptions\PurchaseOrderNotFoundException;
 use Modules\Purchase\Domain\RepositoryInterfaces\PurchaseOrderRepositoryInterface;
 use Tests\TestCase;
 
@@ -140,6 +143,87 @@ class PurchaseOrderRepositoryIntegrationTest extends TestCase
         $result = $repository->find(99999);
 
         $this->assertNull($result);
+    }
+
+    public function test_update_service_rejects_cross_tenant_purchase_order_mutation(): void
+    {
+        /** @var PurchaseOrderRepositoryInterface $repository */
+        $repository = app(PurchaseOrderRepositoryInterface::class);
+        /** @var UpdatePurchaseOrderServiceInterface $updateService */
+        $updateService = app(UpdatePurchaseOrderServiceInterface::class);
+
+        $created = $repository->save(new PurchaseOrder(
+            tenantId: $this->tenantId,
+            supplierId: $this->supplierId,
+            warehouseId: $this->warehouseId,
+            poNumber: 'PO-CROSS-001',
+            status: 'draft',
+            currencyId: $this->currencyId,
+            exchangeRate: '1.000000',
+            orderDate: new \DateTimeImmutable('2026-04-01'),
+            createdBy: $this->createdBy,
+        ));
+
+        app()->instance('current_tenant_id', $this->tenantId + 1);
+
+        try {
+            $updateService->execute([
+                'id' => $created->getId(),
+                'tenant_id' => $this->tenantId + 1,
+                'supplier_id' => $this->supplierId,
+                'warehouse_id' => $this->warehouseId,
+                'po_number' => 'PO-CROSS-UPDATED',
+                'currency_id' => $this->currencyId,
+                'order_date' => '2026-04-02',
+                'created_by' => $this->createdBy,
+            ]);
+
+            $this->fail('Expected cross-tenant purchase order update to be rejected.');
+        } catch (PurchaseOrderNotFoundException) {
+            $this->assertDatabaseHas('purchase_orders', [
+                'id' => $created->getId(),
+                'tenant_id' => $this->tenantId,
+                'po_number' => 'PO-CROSS-001',
+                'status' => 'draft',
+            ]);
+        }
+    }
+
+    public function test_delete_service_rejects_cross_tenant_purchase_order_mutation(): void
+    {
+        /** @var PurchaseOrderRepositoryInterface $repository */
+        $repository = app(PurchaseOrderRepositoryInterface::class);
+        /** @var DeletePurchaseOrderServiceInterface $deleteService */
+        $deleteService = app(DeletePurchaseOrderServiceInterface::class);
+
+        $created = $repository->save(new PurchaseOrder(
+            tenantId: $this->tenantId,
+            supplierId: $this->supplierId,
+            warehouseId: $this->warehouseId,
+            poNumber: 'PO-DELETE-CROSS-001',
+            status: 'draft',
+            currencyId: $this->currencyId,
+            exchangeRate: '1.000000',
+            orderDate: new \DateTimeImmutable('2026-04-05'),
+            createdBy: $this->createdBy,
+        ));
+
+        app()->instance('current_tenant_id', $this->tenantId + 1);
+
+        try {
+            $deleteService->execute([
+                'id' => $created->getId(),
+            ]);
+
+            $this->fail('Expected cross-tenant purchase order delete to be rejected.');
+        } catch (PurchaseOrderNotFoundException) {
+            $this->assertDatabaseHas('purchase_orders', [
+                'id' => $created->getId(),
+                'tenant_id' => $this->tenantId,
+                'po_number' => 'PO-DELETE-CROSS-001',
+                'status' => 'draft',
+            ]);
+        }
     }
 
     public function test_purchase_order_status_transitions(): void

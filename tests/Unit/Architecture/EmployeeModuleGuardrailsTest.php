@@ -32,7 +32,7 @@ class EmployeeModuleGuardrailsTest extends TestCase
         $routesFile = $this->readSource('app/Modules/Employee/routes/api.php');
 
         $this->assertStringContainsString('Route::apiResource(\'employees\'', $routesFile);
-        $this->assertStringContainsString('auth:api', $routesFile);
+        $this->assertStringContainsString('auth.configured', $routesFile);
         $this->assertStringContainsString('resolve.tenant', $routesFile);
     }
 

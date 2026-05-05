@@ -16,9 +16,9 @@ class AttendanceLogModel extends BaseModel
 
     protected $table = 'hr_attendance_logs';
 
-    protected $fillable = ['tenant_id', 'employee_id', 'biometric_device_id', 'punch_time', 'punch_type', 'source', 'raw_data', 'processed_at'];
+    protected $fillable = ['tenant_id', 'org_unit_id', 'row_version', 'employee_id', 'biometric_device_id', 'punch_time', 'punch_type', 'source', 'raw_data', 'processed_at'];
 
-    protected $casts = ['raw_data' => 'array', 'punch_time' => 'datetime', 'processed_at' => 'datetime'];
+    protected $casts = ['org_unit_id' => 'integer', 'row_version' => 'integer', 'punch_type' => 'string', 'source' => 'string', 'raw_data' => 'array', 'punch_time' => 'datetime', 'processed_at' => 'datetime'];
 
     public function employee(): BelongsTo
     {

@@ -12,7 +12,9 @@ return new class extends Migration
     {
         Schema::create('ar_transactions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained(null, 'id', 'ar_transactions_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->unsignedBigInteger('customer_id');
             $table->foreignId('account_id')->constrained(null, 'id', 'ar_transactions_account_id_fk')->cascadeOnDelete();
             $table->enum('transaction_type', ['invoice', 'payment', 'credit_memo', 'adjustment']);
@@ -23,9 +25,14 @@ return new class extends Migration
             $table->date('due_date')->nullable();
             $table->foreignId('currency_id')->constrained('currencies', 'id', 'ar_transactions_currency_id_fk');
             $table->boolean('is_reconciled')->default(false);
+
+            $table->foreign('customer_id')->references('id')->on('customers')->cascadeOnDelete();
+
+            $table->softDeletes();
             $table->timestamps();
 
             $table->index(['tenant_id', 'customer_id'], 'ar_transactions_tenant_customer_idx');
+            $table->unique(['tenant_id', 'reference_type', 'reference_id'], 'ar_transactions_tenant_reference_uk');
         });
     }
 

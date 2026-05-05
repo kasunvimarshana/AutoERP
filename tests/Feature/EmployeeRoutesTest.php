@@ -34,8 +34,8 @@ class EmployeeRoutesTest extends TestCase
     {
         $routes = app('router')->getRoutes();
 
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/employees', 'GET'), ['auth:api', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/employees/{employee}', 'GET'), ['auth:api', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/employees', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/employees/{employee}', 'GET'), ['auth.configured', 'resolve.tenant']);
     }
 
     /**

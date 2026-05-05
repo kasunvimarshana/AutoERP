@@ -5,13 +5,20 @@ declare(strict_types=1);
 namespace Modules\Sales\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class SalesReturnLineModel extends Model
 {
+    use HasAudit;
+    use HasTenant;
+
     protected $table = 'sales_return_lines';
 
     protected $fillable = [
         'tenant_id',
+        'org_unit_id',
+        'row_version',
         'sales_return_id',
         'original_sales_order_line_id',
         'product_id',
@@ -22,7 +29,6 @@ class SalesReturnLineModel extends Model
         'uom_id',
         'return_qty',
         'unit_price',
-        'line_total',
         'condition',
         'disposition',
         'restocking_fee',

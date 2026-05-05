@@ -12,7 +12,9 @@ return new class extends Migration
     {
         Schema::create('stock_reservations', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained(null, 'id', 'stock_reservations_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('product_id')->constrained(null, 'id', 'stock_reservations_product_id_fk')->cascadeOnDelete();
             $table->foreignId('variant_id')->nullable()->constrained('product_variants', 'id', 'stock_reservations_variant_id_fk')->nullOnDelete();
             $table->foreignId('batch_id')->nullable()->constrained(null, 'id', 'stock_reservations_batch_id_fk')->nullOnDelete();
@@ -22,6 +24,10 @@ return new class extends Migration
             $table->nullableMorphs('reserved_for'); // e.g., sales order line
             $table->timestamp('expires_at')->nullable();
             $table->timestamps();
+
+            $table->index(['tenant_id', 'expires_at'], 'stock_reservations_tenant_expiry_idx');
+            $table->index(['tenant_id', 'product_id', 'location_id'], 'stock_reservations_tenant_product_location_idx');
+            $table->index(['tenant_id', 'reserved_for_type', 'reserved_for_id'], 'stock_reservations_tenant_reserved_for_idx');
         });
     }
 

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Modules\Customer\Domain\Entities\CustomerAddress;
@@ -24,12 +23,12 @@ class CustomerNestedRepositoryIntegrationTest extends TestCase
         $this->seedReferenceData();
     }
 
-    public function test_address_repository_enforces_single_default_per_customer_type(): void
+    public function test_address_repository_keeps_single_default_per_customer_type(): void
     {
         /** @var CustomerAddressRepositoryInterface $repository */
         $repository = app(CustomerAddressRepositoryInterface::class);
 
-        $repository->save(new CustomerAddress(
+        $first = $repository->save(new CustomerAddress(
             tenantId: 11,
             customerId: 1101,
             type: 'billing',
@@ -40,9 +39,7 @@ class CustomerNestedRepositoryIntegrationTest extends TestCase
             isDefault: true,
         ));
 
-        $this->expectException(QueryException::class);
-
-        $repository->save(new CustomerAddress(
+        $second = $repository->save(new CustomerAddress(
             tenantId: 11,
             customerId: 1101,
             type: 'billing',
@@ -52,14 +49,22 @@ class CustomerNestedRepositoryIntegrationTest extends TestCase
             countryId: 91,
             isDefault: true,
         ));
+
+        $firstRow = DB::table('customer_addresses')->where('id', $first->getId())->first();
+        $secondRow = DB::table('customer_addresses')->where('id', $second->getId())->first();
+
+        $this->assertNotNull($firstRow);
+        $this->assertNotNull($secondRow);
+        $this->assertSame(0, (int) $firstRow->is_default);
+        $this->assertSame(1, (int) $secondRow->is_default);
     }
 
-    public function test_contact_repository_enforces_single_primary_per_customer(): void
+    public function test_contact_repository_keeps_single_primary_per_customer(): void
     {
         /** @var CustomerContactRepositoryInterface $repository */
         $repository = app(CustomerContactRepositoryInterface::class);
 
-        $repository->save(new CustomerContact(
+        $first = $repository->save(new CustomerContact(
             tenantId: 11,
             customerId: 1101,
             name: 'John Doe',
@@ -67,15 +72,21 @@ class CustomerNestedRepositoryIntegrationTest extends TestCase
             isPrimary: true,
         ));
 
-        $this->expectException(QueryException::class);
-
-        $repository->save(new CustomerContact(
+        $second = $repository->save(new CustomerContact(
             tenantId: 11,
             customerId: 1101,
             name: 'Jane Doe',
             email: 'jane@example.com',
             isPrimary: true,
         ));
+
+        $firstRow = DB::table('customer_contacts')->where('id', $first->getId())->first();
+        $secondRow = DB::table('customer_contacts')->where('id', $second->getId())->first();
+
+        $this->assertNotNull($firstRow);
+        $this->assertNotNull($secondRow);
+        $this->assertSame(0, (int) $firstRow->is_primary);
+        $this->assertSame(1, (int) $secondRow->is_primary);
     }
 
     public function test_clear_default_by_customer_and_type_is_tenant_scoped(): void

@@ -14,7 +14,7 @@ class EmployeeDocumentModel extends BaseModel
 
     protected $table = 'hr_employee_documents';
 
-    protected $fillable = ['tenant_id', 'employee_id', 'document_type', 'title', 'description', 'file_path', 'mime_type', 'file_size', 'issued_date', 'expiry_date', 'metadata'];
+    protected $fillable = ['tenant_id', 'org_unit_id', 'row_version', 'employee_id', 'document_type', 'title', 'description', 'file_path', 'mime_type', 'file_size', 'issued_date', 'expiry_date', 'metadata'];
 
-    protected $casts = ['issued_date' => 'date', 'expiry_date' => 'date', 'file_size' => 'integer', 'metadata' => 'array'];
+    protected $casts = ['org_unit_id' => 'integer', 'row_version' => 'integer', 'employee_id' => 'integer', 'document_type' => 'string', 'file_size' => 'integer', 'issued_date' => 'date', 'expiry_date' => 'date', 'metadata' => 'array'];
 }
