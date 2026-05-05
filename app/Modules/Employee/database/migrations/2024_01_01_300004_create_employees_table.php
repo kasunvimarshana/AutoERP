@@ -21,6 +21,7 @@ return new class extends Migration
             $table->date('termination_date')->nullable();
             $table->json('metadata')->nullable();
             $table->timestamps();
+            $table->softDeletes();
 
             $table->unique(['tenant_id', 'employee_code'], 'employees_tenant_id_employee_code_uk');
         });

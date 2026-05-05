@@ -50,6 +50,9 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'sku'], 'products_tenant_sku_uk');
             $table->index(['tenant_id', 'type'], 'products_tenant_type_idx');
+            $table->unique(['tenant_id', 'slug'], 'products_tenant_slug_uk');
+            $table->index(['tenant_id', 'is_active'], 'products_tenant_active_idx');
+            $table->index(['tenant_id', 'name'], 'products_tenant_name_idx');
         });
     }
 

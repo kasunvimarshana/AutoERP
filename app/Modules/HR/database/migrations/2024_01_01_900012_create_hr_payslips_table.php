@@ -25,6 +25,8 @@ return new class extends Migration
             $table->string('status', 20)->default('draft');
             $table->unsignedBigInteger('journal_entry_id')->nullable();
             $table->json('metadata')->nullable();
+            $table->foreign('employee_id', 'hr_payslips_employee_id_fk')
+                ->references('id')->on('employees')->cascadeOnDelete();
             $table->timestamps();
             $table->softDeletes();
 

@@ -11,9 +11,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('sales_invoices', function (Blueprint $table) {
-            $table->decimal('paid_amount', 20, 6)->default(0)->after('grand_total');
-            $table->text('notes')->nullable()->after('journal_entry_id');
-            $table->json('metadata')->nullable()->after('notes');
+
         });
     }
 

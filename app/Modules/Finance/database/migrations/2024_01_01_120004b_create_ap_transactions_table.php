@@ -24,6 +24,7 @@ return new class extends Migration
             $table->foreignId('currency_id')->constrained('currencies', 'id', 'ap_transactions_currency_id_fk');
             $table->boolean('is_reconciled')->default(false);
             $table->timestamps();
+            $table->softDeletes();
 
             $table->index(['tenant_id', 'supplier_id'], 'ap_transactions_tenant_supplier_idx');
         });

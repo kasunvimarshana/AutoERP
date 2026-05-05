@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Product\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
-use Modules\Product\Application\Contracts\RefreshProductSearchProjectionServiceInterface;
 use Modules\Product\Application\Contracts\UpdateProductIdentifierServiceInterface;
 use Modules\Product\Application\DTOs\ProductIdentifierData;
 use Modules\Product\Domain\Entities\ProductIdentifier;
@@ -14,10 +13,7 @@ use Modules\Product\Domain\RepositoryInterfaces\ProductIdentifierRepositoryInter
 
 class UpdateProductIdentifierService extends BaseService implements UpdateProductIdentifierServiceInterface
 {
-    public function __construct(
-        private readonly ProductIdentifierRepositoryInterface $productIdentifierRepository,
-        private readonly RefreshProductSearchProjectionServiceInterface $refreshProjectionService,
-    )
+    public function __construct(private readonly ProductIdentifierRepositoryInterface $productIdentifierRepository)
     {
         parent::__construct($productIdentifierRepository);
     }
@@ -49,9 +45,6 @@ class UpdateProductIdentifierService extends BaseService implements UpdateProduc
             metadata: $dto->metadata,
         );
 
-        $saved = $this->productIdentifierRepository->save($productIdentifier);
-        $this->refreshProjectionService->execute($saved->getTenantId(), $saved->getProductId());
-
-        return $saved;
+        return $this->productIdentifierRepository->save($productIdentifier);
     }
 }

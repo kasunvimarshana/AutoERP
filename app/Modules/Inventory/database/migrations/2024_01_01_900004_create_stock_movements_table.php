@@ -36,6 +36,8 @@ return new class extends Migration
 
             $table->index(['tenant_id', 'product_id', 'performed_at'], 'stock_movements_tenant_product_date_idx');
             $table->index(['tenant_id', 'reference_type', 'reference_id'], 'stock_movements_tenant_ref_idx');
+            $table->index(['tenant_id', 'from_location_id', 'performed_at'], 'stock_movements_tenant_from_loc_date_idx');
+            $table->index(['tenant_id', 'to_location_id', 'performed_at'], 'stock_movements_tenant_to_loc_date_idx');
         });
     }
 

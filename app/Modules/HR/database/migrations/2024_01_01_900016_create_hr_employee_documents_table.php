@@ -23,6 +23,8 @@ return new class extends Migration
             $table->date('issued_date')->nullable();
             $table->date('expiry_date')->nullable();
             $table->json('metadata')->nullable();
+            $table->foreign('employee_id', 'hr_employee_documents_employee_id_fk')
+                ->references('id')->on('employees')->cascadeOnDelete();
             $table->timestamps();
             $table->softDeletes();
 

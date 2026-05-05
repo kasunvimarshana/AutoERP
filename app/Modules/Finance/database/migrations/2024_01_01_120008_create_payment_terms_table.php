@@ -15,8 +15,11 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id', 'payment_terms_tenant_id_fk')->cascadeOnDelete();
             $table->string('name');
             $table->unsignedInteger('days')->default(30);
+            $table->unsignedInteger('discount_days')->nullable();
+            $table->decimal('discount_rate', 8, 4)->nullable();
             $table->boolean('is_default')->default(false);
             $table->boolean('is_active')->default(true);
+            $table->text('description')->nullable();
             $table->timestamps();
 
             $table->unique(['tenant_id', 'name'], 'payment_terms_tenant_name_uk');

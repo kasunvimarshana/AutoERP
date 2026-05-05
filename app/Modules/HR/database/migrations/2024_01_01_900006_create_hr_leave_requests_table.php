@@ -24,6 +24,8 @@ return new class extends Migration
             $table->text('approver_note')->nullable();
             $table->string('attachment_path')->nullable();
             $table->json('metadata')->nullable();
+            $table->foreign('employee_id', 'hr_leave_requests_employee_id_fk')
+                ->references('id')->on('employees')->cascadeOnDelete();
             $table->timestamps();
 
             $table->index(['tenant_id'], 'hr_leave_requests_tenant_id_idx');

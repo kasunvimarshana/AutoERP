@@ -17,6 +17,8 @@ return new class extends Migration
             $table->foreignId('shift_id')->constrained('hr_shifts', 'id', 'hr_shift_assignments_shift_id_fk')->cascadeOnDelete();
             $table->date('effective_from');
             $table->date('effective_to')->nullable();
+            $table->foreign('employee_id', 'hr_shift_assignments_employee_id_fk')
+                ->references('id')->on('employees')->cascadeOnDelete();
             $table->timestamps();
 
             $table->index(['tenant_id'], 'hr_shift_assignments_tenant_id_idx');

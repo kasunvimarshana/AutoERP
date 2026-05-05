@@ -24,6 +24,8 @@ return new class extends Migration
             $table->foreignId('shift_id')->nullable()->constrained('hr_shifts', 'id', 'hr_attendance_records_shift_id_fk')->nullOnDelete();
             $table->text('remarks')->nullable();
             $table->json('metadata')->nullable();
+            $table->foreign('employee_id', 'hr_attendance_records_employee_id_fk')
+                ->references('id')->on('employees')->cascadeOnDelete();
             $table->timestamps();
             $table->softDeletes();
 

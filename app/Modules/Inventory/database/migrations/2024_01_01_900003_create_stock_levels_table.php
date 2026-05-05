@@ -28,6 +28,7 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'product_id', 'variant_id', 'location_id', 'batch_id', 'serial_id'], 'stock_levels_tenant_product_loc_batch_serial_uk');
             $table->index(['tenant_id', 'product_id'], 'stock_levels_tenant_product_idx');
+            $table->index(['tenant_id', 'location_id', 'product_id'], 'stock_levels_tenant_location_product_idx');
         });
     }
 
