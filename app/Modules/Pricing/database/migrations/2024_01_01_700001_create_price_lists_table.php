@@ -19,7 +19,7 @@ return new class extends Migration
 
             $table->string('name');
             $table->enum('type', ['purchase', 'sales'])->default('sales');
-            $table->foreignId('currency_id')->constrained('currencies', 'id', 'price_lists_currency_id_fk');
+            $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'price_lists_currency_id_fk')->nullOnDelete();
             $table->boolean('is_default')->default(false);
             $table->date('valid_from')->nullable();
             $table->date('valid_to')->nullable();

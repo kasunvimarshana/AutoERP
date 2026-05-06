@@ -28,7 +28,8 @@ return new class extends Migration
             $table->date('shipped_date')->nullable();
             $table->string('carrier')->nullable();
             $table->string('tracking_number')->nullable();
-            $table->foreignId('currency_id')->constrained('currencies', 'id', 'shipments_currency_id_fk');
+            $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'shipments_currency_id_fk')->nullOnDelete();
+            $table->decimal('exchange_rate', 20, 10)->default(1);
             $table->text('notes')->nullable();
             $table->json('metadata')->nullable();
 

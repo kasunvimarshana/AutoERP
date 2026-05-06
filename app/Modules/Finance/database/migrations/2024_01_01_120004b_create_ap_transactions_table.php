@@ -25,7 +25,8 @@ return new class extends Migration
             $table->decimal('balance_after', 20, 6);
             $table->date('transaction_date');
             $table->date('due_date')->nullable();
-            $table->foreignId('currency_id')->constrained('currencies', 'id', 'ap_transactions_currency_id_fk');
+            $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'ap_transactions_currency_id_fk')->nullOnDelete();
+            $table->decimal('exchange_rate', 20, 10)->default(1);
             $table->boolean('is_reconciled')->default(false);
 
             $table->foreign('supplier_id')->references('id')->on('suppliers')->cascadeOnDelete();

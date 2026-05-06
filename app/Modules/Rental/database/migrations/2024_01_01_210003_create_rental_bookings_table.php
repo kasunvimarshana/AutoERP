@@ -27,7 +27,7 @@ return new class extends Migration
             $table->dateTime('end_datetime');
             $table->unsignedBigInteger('start_odometer')->nullable();
             $table->unsignedBigInteger('end_odometer')->nullable();
-            $table->foreignId('currency_id')->constrained('currencies');
+            $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'rental_bookings_currency_id_fk')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 10)->default(1);
             $table->text('notes')->nullable();
             $table->json('metadata')->nullable();

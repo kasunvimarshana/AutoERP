@@ -20,7 +20,8 @@ return new class extends Migration
             $table->foreignId('booking_id')->nullable()->constrained('rental_bookings')->nullOnDelete();
             $table->string('expense_type');
             $table->decimal('amount', 20, 6);
-            $table->foreignId('currency_id')->constrained('currencies');
+            $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'rental_expenses_currency_id_fk')->nullOnDelete();
+            $table->decimal('exchange_rate', 20, 10)->default(1);
             $table->date('expense_date');
             $table->text('description')->nullable();
             $table->string('paid_by');

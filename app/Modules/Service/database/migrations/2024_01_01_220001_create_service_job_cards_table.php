@@ -36,7 +36,8 @@ return new class extends Migration
             $table->decimal('tax_total', 20, 6)->default(0);
             $table->decimal('discount_total', 20, 6)->default(0);
             $table->decimal('grand_total', 20, 6)->default(0);
-            $table->foreignId('currency_id')->constrained('currencies');
+            $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'service_job_cards_currency_id_fk')->nullOnDelete();
+            $table->decimal('exchange_rate', 20, 10)->default(1);
             $table->boolean('warranty_eligible')->default(false);
             $table->foreignId('assigned_to')->nullable()->constrained('employees')->nullOnDelete();
             $table->foreignId('created_by')->constrained('users');

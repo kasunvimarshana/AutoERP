@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('bank_name');
             $table->string('account_number');
             $table->string('routing_number')->nullable();
-            $table->foreignId('currency_id')->constrained('currencies', 'id', 'bank_accounts_currency_id_fk');
+            $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'bank_accounts_currency_id_fk')->nullOnDelete();
             $table->decimal('current_balance', 20, 6)->default(0);
             $table->timestamp('last_sync_at')->nullable();
             $table->string('feed_provider')->nullable();

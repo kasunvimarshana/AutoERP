@@ -24,7 +24,7 @@ return new class extends Migration
             $table->enum('status', ['draft', 'approved', 'shipped', 'closed', 'cancelled'])->default('draft');
             $table->date('return_date');
             $table->string('return_reason')->nullable();
-            $table->foreignId('currency_id')->constrained('currencies', 'id', 'purchase_returns_currency_id_fk');
+            $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'purchase_returns_currency_id_fk')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 10)->default(1);
             $table->decimal('subtotal', 20, 6)->default(0);
             $table->decimal('tax_total', 20, 6)->default(0);

@@ -25,7 +25,7 @@ return new class extends Migration
             $table->enum('status', ['draft', 'approved', 'partial_paid', 'paid', 'disputed', 'cancelled'])->default('draft');
             $table->date('invoice_date');
             $table->date('due_date');
-            $table->foreignId('currency_id')->constrained('currencies', 'id', 'purchase_invoices_currency_id_fk');
+            $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'purchase_invoices_currency_id_fk')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 10)->default(1);
             $table->decimal('subtotal', 20, 6)->default(0);
             $table->decimal('tax_total', 20, 6)->default(0);
