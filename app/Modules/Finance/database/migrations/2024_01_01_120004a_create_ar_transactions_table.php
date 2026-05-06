@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
 
-            $table->unsignedBigInteger('customer_id');
+            $table->unsignedBigInteger('customer_id')->nullable();
             $table->foreignId('account_id')->constrained('accounts', 'id', 'ar_transactions_account_id_fk')->cascadeOnDelete();
             $table->enum('transaction_type', ['invoice', 'payment', 'credit_memo', 'adjustment']);
             $table->nullableMorphs('reference');
