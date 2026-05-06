@@ -54,7 +54,14 @@ class EloquentPermissionRepository extends EloquentRepository implements Permiss
 
     private function mapModelToDomainEntity(PermissionModel $model): Permission
     {
-        return new Permission($model->tenant_id, $model->name, $model->id);
+        return new Permission(
+            tenantId: (int) $model->tenant_id,
+            name: (string) $model->name,
+            guardName: (string) $model->guard_name,
+            module: (string) ($model->module ?? 'general'),
+            description: $model->description,
+            id: (int) $model->id,
+        );
     }
 
     /**
