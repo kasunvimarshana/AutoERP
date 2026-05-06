@@ -26,7 +26,6 @@ class JournalEntry
         private ?int $postedBy = null,
         private ?\DateTimeInterface $postedAt = null,
         private array $lines = [],
-        private int $rowVersion = 1,
         private ?int $id = null,
         private ?\DateTimeInterface $createdAt = null,
         private ?\DateTimeInterface $updatedAt = null,
@@ -133,11 +132,6 @@ class JournalEntry
         return $this->updatedAt;
     }
 
-    public function getRowVersion(): int
-    {
-        return $this->rowVersion;
-    }
-
     /**
      * @param  array<JournalEntryLine>  $lines
      */
@@ -159,7 +153,6 @@ class JournalEntry
         $this->entryDate = $entryDate;
         $this->postingDate = $postingDate;
         $this->lines = $lines;
-        $this->rowVersion++;
         $this->updatedAt = new \DateTimeImmutable;
     }
 

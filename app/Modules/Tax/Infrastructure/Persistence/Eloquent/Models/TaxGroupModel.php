@@ -20,11 +20,10 @@ class TaxGroupModel extends Model
         'tenant_id',
         'name',
         'description',
-        'row_version',
     ];
 
     protected $casts = [
-        'tenant_id' => 'integer', 'row_version' => 'integer',
+        'tenant_id' => 'integer',
     ];
 
     public function rates(): HasMany

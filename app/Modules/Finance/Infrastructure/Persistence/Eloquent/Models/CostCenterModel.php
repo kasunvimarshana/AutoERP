@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Persistence\Eloquent\Models;
 
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
@@ -36,14 +34,4 @@ class CostCenterModel extends BaseModel
         'is_active' => 'boolean',
         'depth' => 'integer',
     ];
-
-    public function parent(): BelongsTo
-    {
-        return $this->belongsTo(self::class, 'parent_id');
-    }
-
-    public function children(): HasMany
-    {
-        return $this->hasMany(self::class, 'parent_id');
-    }
 }

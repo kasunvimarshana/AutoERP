@@ -24,8 +24,6 @@ class PriceList
 
     private bool $isActive;
 
-    private int $rowVersion;
-
     private \DateTimeInterface $createdAt;
 
     private \DateTimeInterface $updatedAt;
@@ -39,7 +37,6 @@ class PriceList
         ?\DateTimeInterface $validFrom = null,
         ?\DateTimeInterface $validTo = null,
         bool $isActive = true,
-        int $rowVersion = 1,
         ?int $id = null,
         ?\DateTimeInterface $createdAt = null,
         ?\DateTimeInterface $updatedAt = null,
@@ -56,7 +53,6 @@ class PriceList
         $this->validFrom = $validFrom;
         $this->validTo = $validTo;
         $this->isActive = $isActive;
-        $this->rowVersion = $rowVersion;
         $this->createdAt = $createdAt ?? new \DateTimeImmutable;
         $this->updatedAt = $updatedAt ?? new \DateTimeImmutable;
     }
@@ -116,12 +112,6 @@ class PriceList
         return $this->updatedAt;
     }
 
-
-    public function getRowVersion(): int
-    {
-        return $this->rowVersion;
-    }
-
     public function update(
         string $name,
         string $type,
@@ -141,7 +131,6 @@ class PriceList
         $this->validFrom = $validFrom;
         $this->validTo = $validTo;
         $this->isActive = $isActive;
-        $this->rowVersion++;
         $this->updatedAt = new \DateTimeImmutable;
     }
 

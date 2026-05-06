@@ -26,7 +26,6 @@ class LeavePolicyController extends AuthorizedController
 
     public function index(): JsonResponse
     {
-        $this->authorize('viewAny', LeavePolicy::class);
         $result = $this->findService->list();
 
         return Response::json(['data' => LeavePolicyResource::collection($result)]);
@@ -34,7 +33,6 @@ class LeavePolicyController extends AuthorizedController
 
     public function store(StoreLeavePolicyRequest $request): JsonResponse
     {
-        $this->authorize('create', LeavePolicy::class);
         $entity = $this->createService->execute($request->validated());
 
         return (new LeavePolicyResource($entity))->response()->setStatusCode(201);
@@ -42,16 +40,12 @@ class LeavePolicyController extends AuthorizedController
 
     public function show(int $leavePolicy): LeavePolicyResource
     {
-        $entity = $this->findOrFail($leavePolicy);
-        $this->authorize('view', $entity);
-
-        return new LeavePolicyResource($entity);
+        return new LeavePolicyResource($this->findOrFail($leavePolicy));
     }
 
     public function update(UpdateLeavePolicyRequest $request, int $leavePolicy): LeavePolicyResource
     {
-        $entity = $this->findOrFail($leavePolicy);
-        $this->authorize('update', $entity);
+        $this->findOrFail($leavePolicy);
         $payload = $request->validated();
         $payload['id'] = $leavePolicy;
         $updated = $this->updateService->execute($payload);
@@ -61,8 +55,7 @@ class LeavePolicyController extends AuthorizedController
 
     public function destroy(int $leavePolicy): JsonResponse
     {
-        $entity = $this->findOrFail($leavePolicy);
-        $this->authorize('delete', $entity);
+        $this->findOrFail($leavePolicy);
 
         return Response::json(null, 204);
     }

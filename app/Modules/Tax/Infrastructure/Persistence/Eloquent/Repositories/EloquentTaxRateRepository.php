@@ -31,7 +31,6 @@ class EloquentTaxRateRepository extends EloquentRepository implements TaxRateRep
             'is_active' => $taxRate->isActive(),
             'valid_from' => $taxRate->getValidFrom()?->format('Y-m-d'),
             'valid_to' => $taxRate->getValidTo()?->format('Y-m-d'),
-            'row_version' => $taxRate->getRowVersion(),
         ];
 
         if ($taxRate->getId()) {
@@ -98,7 +97,6 @@ class EloquentTaxRateRepository extends EloquentRepository implements TaxRateRep
             isActive: (bool) $model->is_active,
             validFrom: $model->valid_from,
             validTo: $model->valid_to,
-            rowVersion: (int) ($model->row_version ?? 1),
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,
         );

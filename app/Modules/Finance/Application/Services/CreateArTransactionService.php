@@ -22,18 +22,18 @@ class CreateArTransactionService extends BaseService implements CreateArTransact
         $dto = ArTransactionData::fromArray($data);
 
         $ar = new ArTransaction(
-            tenantId: $dto->tenantId,
-            customerId: $dto->customerId,
-            accountId: $dto->accountId,
-            transactionType: $dto->transactionType,
+            tenantId: $dto->tenant_id,
+            customerId: $dto->customer_id,
+            accountId: $dto->account_id,
+            transactionType: $dto->transaction_type,
             amount: $dto->amount,
-            balanceAfter: $dto->balanceAfter,
-            transactionDate: new \DateTimeImmutable($dto->transactionDate),
-            currencyId: $dto->currencyId,
-            referenceType: $dto->referenceType,
-            referenceId: $dto->referenceId,
-            dueDate: $dto->dueDate !== null ? new \DateTimeImmutable($dto->dueDate) : null,
-            isReconciled: $dto->isReconciled,
+            balanceAfter: $dto->balance_after,
+            transactionDate: new \DateTimeImmutable($dto->transaction_date),
+            currencyId: $dto->currency_id,
+            referenceType: $dto->reference_type,
+            referenceId: $dto->reference_id,
+            dueDate: $dto->due_date !== null ? new \DateTimeImmutable($dto->due_date) : null,
+            isReconciled: $dto->is_reconciled,
         );
 
         return $this->arTransactionRepository->save($ar);

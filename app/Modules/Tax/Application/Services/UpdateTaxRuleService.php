@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Tax\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
-use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Tax\Application\Contracts\UpdateTaxRuleServiceInterface;
 use Modules\Tax\Application\DTOs\TaxRuleData;
 use Modules\Tax\Domain\RepositoryInterfaces\TaxRuleRepositoryInterface;
@@ -26,14 +25,10 @@ class UpdateTaxRuleService extends BaseService implements UpdateTaxRuleServiceIn
             throw new \InvalidArgumentException('Tax rule not found.');
         }
 
-        if ($dto->rowVersion !== $taxRule->getRowVersion()) {
-            throw new ConcurrentModificationException('TaxRule', $dto->id ?? 0);
-        }
-
         $taxRule->update(
-            taxGroupId: $dto->taxGroupId,
-            productCategoryId: $dto->productCategoryId,
-            partyType: $dto->partyType,
+            taxGroupId: $dto->tax_group_id,
+            productCategoryId: $dto->product_category_id,
+            partyType: $dto->party_type,
             region: $dto->region,
             priority: $dto->priority,
         );

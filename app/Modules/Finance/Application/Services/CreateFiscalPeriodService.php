@@ -26,31 +26,31 @@ class CreateFiscalPeriodService extends BaseService implements CreateFiscalPerio
     {
         $dto = FiscalPeriodData::fromArray($data);
 
-        $fiscalYear = $this->fiscalYearRepository->find($dto->fiscalYearId);
+        $fiscalYear = $this->fiscalYearRepository->find($dto->fiscal_year_id);
         if (! $fiscalYear) {
-            throw new FiscalYearNotFoundException($dto->fiscalYearId);
+            throw new FiscalYearNotFoundException($dto->fiscal_year_id);
         }
 
         $existing = $this->fiscalPeriodRepository->findByTenantAndYearAndPeriodNumber(
-            $dto->tenantId,
-            $dto->fiscalYearId,
-            $dto->periodNumber,
+            $dto->tenant_id,
+            $dto->fiscal_year_id,
+            $dto->period_number,
         );
         if ($existing !== null) {
             throw new FiscalPeriodAlreadyExistsException(
-                $dto->tenantId,
-                $dto->fiscalYearId,
-                $dto->periodNumber,
+                $dto->tenant_id,
+                $dto->fiscal_year_id,
+                $dto->period_number,
             );
         }
 
         $fiscalPeriod = new FiscalPeriod(
-            tenantId: $dto->tenantId,
-            fiscalYearId: $dto->fiscalYearId,
-            periodNumber: $dto->periodNumber,
+            tenantId: $dto->tenant_id,
+            fiscalYearId: $dto->fiscal_year_id,
+            periodNumber: $dto->period_number,
             name: $dto->name,
-            startDate: new \DateTimeImmutable($dto->startDate),
-            endDate: new \DateTimeImmutable($dto->endDate),
+            startDate: new \DateTimeImmutable($dto->start_date),
+            endDate: new \DateTimeImmutable($dto->end_date),
             status: $dto->status,
         );
 

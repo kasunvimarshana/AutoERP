@@ -15,7 +15,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('fiscal_year_id')->constrained('fiscal_years', 'id', 'fiscal_periods_fiscal_year_id_fk')->cascadeOnDelete();
+            $table->foreignId('fiscal_year_id')->constrained(null, 'id', 'fiscal_periods_fiscal_year_id_fk')->cascadeOnDelete();
             $table->unsignedInteger('period_number');
             $table->string('name');
             $table->date('start_date');

@@ -30,13 +30,6 @@ class UpdateProductVariantRequest extends FormRequest
                     fn ($query) => $query->where('tenant_id', $tenantId)
                 ),
             ],
-            'org_unit_id' => [
-                'nullable',
-                'integer',
-                Rule::exists('org_units', 'id')->where(
-                    fn ($query) => $query->where('tenant_id', $tenantId)
-                ),
-            ],
             'name' => 'required|string|max:255',
             'sku' => [
                 'nullable',
@@ -50,10 +43,7 @@ class UpdateProductVariantRequest extends FormRequest
             ],
             'is_default' => 'nullable|boolean',
             'is_active' => 'nullable|boolean',
-            'purchase_price' => 'nullable|numeric|min:0',
-            'sales_price' => 'nullable|numeric|min:0',
             'metadata' => 'nullable|array',
-            'row_version' => 'required|integer|min:1',
         ];
     }
 

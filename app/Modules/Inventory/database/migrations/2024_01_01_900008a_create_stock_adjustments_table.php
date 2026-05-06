@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->string('reference_number');
-            $table->foreignId('warehouse_id')->constrained('warehouses', 'id', 'stock_adjustments_warehouse_id_fk')->cascadeOnDelete();
+            $table->foreignId('warehouse_id')->constrained(null, 'id', 'stock_adjustments_warehouse_id_fk')->cascadeOnDelete();
             $table->foreignId('location_id')->nullable()->constrained('warehouse_locations', 'id', 'stock_adjustments_location_id_fk')->nullOnDelete();
             $table->enum('type', ['cycle_count', 'physical_inventory', 'write_off'])->default('cycle_count');
             $table->enum('status', ['draft', 'in_progress', 'completed', 'approved', 'cancelled'])->default('draft');

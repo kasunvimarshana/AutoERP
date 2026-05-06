@@ -11,18 +11,10 @@ use Modules\Inventory\Domain\Entities\StockReservation;
 use Modules\Inventory\Domain\Exceptions\InsufficientAvailableStockException;
 use Modules\Inventory\Domain\RepositoryInterfaces\StockReservationRepositoryInterface;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\StockReservationModel;
-use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\StockLevelModel;
 
 class EloquentStockReservationRepository implements StockReservationRepositoryInterface
 {
-    private string $stockLevelsTable;
-
-    public function __construct(
-        private readonly StockReservationModel $stockReservationModel,
-        StockLevelModel $stockLevelModel,
-    ) {
-        $this->stockLevelsTable = $stockLevelModel->getTable();
-    }
+    public function __construct(private readonly StockReservationModel $stockReservationModel) {}
 
     public function create(StockReservation $reservation): StockReservation
     {
@@ -118,7 +110,7 @@ class EloquentStockReservationRepository implements StockReservationRepositoryIn
 
     private function applyReservedDelta(StockReservation $reservation, string $op): void
     {
-        $row = DB::table($this->stockLevelsTable)
+        $row = DB::table('stock_levels')
             ->where('tenant_id', $reservation->getTenantId())
             ->where('product_id', $reservation->getProductId())
             ->where('variant_id', $reservation->getVariantId())
@@ -149,39 +141,12 @@ class EloquentStockReservationRepository implements StockReservationRepositoryIn
             throw new \RuntimeException('Reserved quantity cannot be negative.');
         }
 
-        DB::table($this->stockLevelsTable)
+        DB::table('stock_levels')
             ->where('id', $row->id)
             ->update([
                 'quantity_reserved' => $newReserved,
                 'updated_at' => now(),
             ]);
-    }
-
-    public function releaseByReference(int $tenantId, string $referenceType, int $referenceId): int
-    {
-        return DB::transaction(function () use ($tenantId, $referenceType, $referenceId): int {
-            /** @var \Illuminate\Database\Eloquent\Collection<int, StockReservationModel> $reservations */
-            $reservations = $this->stockReservationModel->newQuery()
-                ->where('tenant_id', $tenantId)
-                ->where('reserved_for_type', $referenceType)
-                ->where('reserved_for_id', $referenceId)
-                ->lockForUpdate()
-                ->get();
-
-            if ($reservations->isEmpty()) {
-                return 0;
-            }
-
-            foreach ($reservations as $reservation) {
-                $this->applyReservedDelta($this->mapToEntity($reservation), '-');
-            }
-
-            return $this->stockReservationModel->newQuery()
-                ->where('tenant_id', $tenantId)
-                ->where('reserved_for_type', $referenceType)
-                ->where('reserved_for_id', $referenceId)
-                ->delete();
-        });
     }
 
     private function mapToEntity(StockReservationModel $model): StockReservation

@@ -22,17 +22,17 @@ class CreateBankTransactionService extends BaseService implements CreateBankTran
         $dto = BankTransactionData::fromArray($data);
 
         $bt = new BankTransaction(
-            tenantId: $dto->tenantId,
-            bankAccountId: $dto->bankAccountId,
+            tenantId: $dto->tenant_id,
+            bankAccountId: $dto->bank_account_id,
             description: $dto->description,
             amount: $dto->amount,
             type: $dto->type,
-            transactionDate: new \DateTimeImmutable($dto->transactionDate),
-            externalId: $dto->externalId,
+            transactionDate: new \DateTimeImmutable($dto->transaction_date),
+            externalId: $dto->external_id,
             balance: $dto->balance,
             status: $dto->status,
-            matchedJournalEntryId: $dto->matchedJournalEntryId,
-            categoryRuleId: $dto->categoryRuleId,
+            matchedJournalEntryId: $dto->matched_journal_entry_id,
+            categoryRuleId: $dto->category_rule_id,
         );
 
         return $this->bankTransactionRepository->save($bt);

@@ -15,11 +15,11 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('product_id')->constrained('products', 'id', 'stock_levels_product_id_fk')->cascadeOnDelete();
+            $table->foreignId('product_id')->constrained(null, 'id', 'stock_levels_product_id_fk')->cascadeOnDelete();
             $table->foreignId('variant_id')->nullable()->constrained('product_variants', 'id', 'stock_levels_variant_id_fk')->nullOnDelete();
             $table->foreignId('location_id')->constrained('warehouse_locations', 'id', 'stock_levels_location_id_fk')->cascadeOnDelete();
-            $table->foreignId('batch_id')->nullable()->constrained('batches', 'id', 'stock_levels_batch_id_fk')->nullOnDelete();
-            $table->foreignId('serial_id')->nullable()->constrained('serials', 'id', 'stock_levels_serial_id_fk')->nullOnDelete();
+            $table->foreignId('batch_id')->nullable()->constrained(null, 'id', 'stock_levels_batch_id_fk')->nullOnDelete();
+            $table->foreignId('serial_id')->nullable()->constrained(null, 'id', 'stock_levels_serial_id_fk')->nullOnDelete();
             $table->foreignId('uom_id')->constrained('units_of_measure', 'id', 'stock_levels_uom_id_fk');
             $table->decimal('quantity_on_hand', 20, 6)->default(0);
             $table->decimal('quantity_reserved', 20, 6)->default(0);

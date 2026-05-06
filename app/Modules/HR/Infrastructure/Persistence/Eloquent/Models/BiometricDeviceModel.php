@@ -18,7 +18,7 @@ class BiometricDeviceModel extends BaseModel
 
     protected $fillable = ['tenant_id', 'name', 'code', 'device_type', 'ip_address', 'port', 'location', 'org_unit_id', 'status', 'metadata'];
 
-    protected $casts = ['tenant_id' => 'integer', 'org_unit_id' => 'integer', 'metadata' => 'array', 'port' => 'integer'];
+    protected $casts = ['metadata' => 'array', 'port' => 'integer'];
 
     public function orgUnit(): BelongsTo
     {

@@ -43,8 +43,8 @@ Route::middleware(['auth.configured', 'resolve.tenant'])->group(function () {
     Route::delete('tenants/{tenant}/settings/{key}', [TenantSettingController::class, 'destroy']);
 });
 
-// Internal endpoint for other services - requires authentication (machine/service OAuth token)
-Route::get('config/domain/{domain}', [TenantController::class, 'configByDomain'])->middleware(['auth.configured', 'throttle:60,1']);
+// Internal endpoint for other services
+Route::get('config/domain/{domain}', [TenantController::class, 'configByDomain']);
 
 // File serving (authenticated)
 Route::get('storage/tenant-attachments/{uuid}', [TenantAttachmentController::class, 'serve'])->middleware('auth.configured');

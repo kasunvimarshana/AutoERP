@@ -53,7 +53,6 @@ use Modules\Inventory\Domain\RepositoryInterfaces\ValuationConfigRepositoryInter
 use Modules\Inventory\Infrastructure\Console\Commands\ReleaseExpiredStockReservationsCommand;
 use Modules\Inventory\Infrastructure\Listeners\HandleGoodsReceiptPosted;
 use Modules\Inventory\Infrastructure\Listeners\HandlePurchaseReturnPosted;
-use Modules\Inventory\Infrastructure\Listeners\HandleSalesOrderConfirmed;
 use Modules\Inventory\Infrastructure\Listeners\HandleSalesReturnReceived;
 use Modules\Inventory\Infrastructure\Listeners\HandleShipmentProcessed;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentCostLayerRepository;
@@ -65,7 +64,6 @@ use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentT
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentValuationConfigRepository;
 use Modules\Purchase\Domain\Events\GoodsReceiptPosted;
 use Modules\Purchase\Domain\Events\PurchaseReturnPosted;
-use Modules\Sales\Domain\Events\SalesOrderConfirmed;
 use Modules\Sales\Domain\Events\SalesReturnReceived;
 use Modules\Sales\Domain\Events\ShipmentProcessed;
 
@@ -117,7 +115,6 @@ class InventoryServiceProvider extends ServiceProvider
         Event::listen(ShipmentProcessed::class, HandleShipmentProcessed::class);
         Event::listen(PurchaseReturnPosted::class, HandlePurchaseReturnPosted::class);
         Event::listen(SalesReturnReceived::class, HandleSalesReturnReceived::class);
-        Event::listen(SalesOrderConfirmed::class, HandleSalesOrderConfirmed::class);
 
         $this->bootModule(
             __DIR__.'/../../routes/api.php',

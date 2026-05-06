@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Support\Carbon;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 
@@ -46,7 +45,7 @@ class TenantPlanModel extends BaseModel
         'is_active' => 'boolean',
     ];
 
-    public function tenants(): HasMany
+    public function tenants()
     {
         return $this->hasMany(TenantModel::class, 'tenant_plan_id');
     }

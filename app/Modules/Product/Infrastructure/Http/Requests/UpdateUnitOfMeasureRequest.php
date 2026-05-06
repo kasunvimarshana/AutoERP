@@ -32,7 +32,6 @@ class UpdateUnitOfMeasureRequest extends FormRequest
             ],
             'type' => 'nullable|string|in:unit,mass,volume,length,time,other',
             'is_base' => 'nullable|boolean',
-            'row_version' => 'required|integer|min:1',
         ];
     }
 }

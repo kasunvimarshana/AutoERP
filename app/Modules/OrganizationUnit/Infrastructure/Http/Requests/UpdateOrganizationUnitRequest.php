@@ -27,7 +27,6 @@ class UpdateOrganizationUnitRequest extends FormRequest
             'is_active' => 'sometimes|boolean',
             'description' => 'sometimes|nullable|string',
             'avatar_file' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
-            'row_version' => 'sometimes|integer|min:1',
         ];
     }
 }

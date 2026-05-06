@@ -18,7 +18,6 @@ class BankAccount
         private ?\DateTimeInterface $lastSyncAt = null,
         private ?string $feedProvider = null,
         private bool $isActive = true,
-        private int $rowVersion = 1,
         private ?int $id = null,
         private ?\DateTimeInterface $createdAt = null,
         private ?\DateTimeInterface $updatedAt = null,
@@ -97,12 +96,8 @@ class BankAccount
         return $this->updatedAt;
     }
 
-    public function getRowVersion(): int
-    {
-        return $this->rowVersion;
-    }
-
     public function update(
+        string $name,
         string $bankName,
         string $accountNumber,
         ?string $routingNumber,
@@ -113,7 +108,6 @@ class BankAccount
         $this->accountNumber = $accountNumber;
         $this->routingNumber = $routingNumber;
         $this->isActive = $isActive;
-        $this->rowVersion++;
         $this->updatedAt = new \DateTimeImmutable;
     }
 

@@ -22,7 +22,6 @@ class ApprovalWorkflowConfigResource extends JsonResource
             'min_amount' => $this->resource->getMinAmount(),
             'max_amount' => $this->resource->getMaxAmount(),
             'is_active' => $this->resource->isActive(),
-            'row_version' => $this->resource->getRowVersion(),
             'created_at' => $this->resource->getCreatedAt(),
             'updated_at' => $this->resource->getUpdatedAt(),
         ];

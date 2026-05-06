@@ -10,8 +10,6 @@ class ProductVariant
 
     private ?int $tenantId;
 
-    private ?int $orgUnitId;
-
     private int $productId;
 
     private ?string $sku;
@@ -22,14 +20,8 @@ class ProductVariant
 
     private bool $isActive;
 
-    private ?string $purchasePrice;
-
-    private ?string $salesPrice;
-
     /** @var array<string, mixed>|null */
     private ?array $metadata;
-
-    private int $rowVersion;
 
     private \DateTimeInterface $createdAt;
 
@@ -40,34 +32,26 @@ class ProductVariant
      */
     public function __construct(
         int $productId,
-        string $name,
         ?int $tenantId = null,
-        ?int $orgUnitId = null,
+        string $name,
         ?string $sku = null,
         bool $isDefault = false,
         bool $isActive = true,
-        ?string $purchasePrice = null,
-        ?string $salesPrice = null,
         ?array $metadata = null,
-        int $rowVersion = 1,
         ?int $id = null,
         ?\DateTimeInterface $createdAt = null,
         ?\DateTimeInterface $updatedAt = null,
     ) {
         $this->id = $id;
         $this->tenantId = $tenantId;
-        $this->orgUnitId = $orgUnitId;
         $this->productId = $productId;
         $this->sku = $sku;
         $this->name = $name;
         $this->isDefault = $isDefault;
         $this->isActive = $isActive;
-        $this->purchasePrice = $purchasePrice;
-        $this->salesPrice = $salesPrice;
         $this->metadata = $metadata;
-        $this->rowVersion = $rowVersion;
-        $this->createdAt = $createdAt ?? new \DateTimeImmutable();
-        $this->updatedAt = $updatedAt ?? new \DateTimeImmutable();
+        $this->createdAt = $createdAt ?? new \DateTimeImmutable;
+        $this->updatedAt = $updatedAt ?? new \DateTimeImmutable;
     }
 
     public function getId(): ?int
@@ -83,11 +67,6 @@ class ProductVariant
     public function getTenantId(): ?int
     {
         return $this->tenantId;
-    }
-
-    public function getOrgUnitId(): ?int
-    {
-        return $this->orgUnitId;
     }
 
     public function getSku(): ?string
@@ -110,16 +89,6 @@ class ProductVariant
         return $this->isActive;
     }
 
-    public function getPurchasePrice(): ?string
-    {
-        return $this->purchasePrice;
-    }
-
-    public function getSalesPrice(): ?string
-    {
-        return $this->salesPrice;
-    }
-
     /**
      * @return array<string, mixed>|null
      */
@@ -138,34 +107,21 @@ class ProductVariant
         return $this->updatedAt;
     }
 
-
-    public function getRowVersion(): int
-    {
-        return $this->rowVersion;
-    }
-
     /**
      * @param  array<string, mixed>|null  $metadata
      */
     public function update(
-        ?int $orgUnitId,
         string $name,
         ?string $sku,
         bool $isDefault,
         bool $isActive,
-        ?string $purchasePrice,
-        ?string $salesPrice,
         ?array $metadata,
     ): void {
-        $this->orgUnitId = $orgUnitId;
         $this->name = $name;
         $this->sku = $sku;
         $this->isDefault = $isDefault;
         $this->isActive = $isActive;
-        $this->purchasePrice = $purchasePrice;
-        $this->salesPrice = $salesPrice;
         $this->metadata = $metadata;
-        $this->rowVersion++;
-        $this->updatedAt = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable;
     }
 }

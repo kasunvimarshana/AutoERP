@@ -22,7 +22,6 @@ class UpdatePaymentMethodRequest extends FormRequest
             'type' => ['sometimes', 'in:cash,bank_transfer,card,cheque,other'],
             'account_id' => ['sometimes', 'nullable', 'integer', 'exists:accounts,id'],
             'is_active' => ['sometimes', 'boolean'],
-            'row_version' => ['required', 'integer', 'min:1'],
         ];
     }
 }

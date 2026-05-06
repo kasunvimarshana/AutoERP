@@ -32,8 +32,6 @@ class TaxRate
 
     private \DateTimeInterface $updatedAt;
 
-    private int $rowVersion;
-
     public function __construct(
         int $tenantId,
         int $taxGroupId,
@@ -45,7 +43,6 @@ class TaxRate
         bool $isActive = true,
         ?\DateTimeInterface $validFrom = null,
         ?\DateTimeInterface $validTo = null,
-        int $rowVersion = 1,
         ?int $id = null,
         ?\DateTimeInterface $createdAt = null,
         ?\DateTimeInterface $updatedAt = null,
@@ -65,7 +62,6 @@ class TaxRate
         $this->isActive = $isActive;
         $this->validFrom = $validFrom;
         $this->validTo = $validTo;
-        $this->rowVersion = $rowVersion;
         $this->createdAt = $createdAt ?? new \DateTimeImmutable;
         $this->updatedAt = $updatedAt ?? new \DateTimeImmutable;
     }
@@ -135,11 +131,6 @@ class TaxRate
         return $this->updatedAt;
     }
 
-    public function getRowVersion(): int
-    {
-        return $this->rowVersion;
-    }
-
     public function update(
         string $name,
         string $rate,
@@ -162,7 +153,6 @@ class TaxRate
         $this->isActive = $isActive;
         $this->validFrom = $validFrom;
         $this->validTo = $validTo;
-        $this->rowVersion++;
         $this->updatedAt = new \DateTimeImmutable;
     }
 

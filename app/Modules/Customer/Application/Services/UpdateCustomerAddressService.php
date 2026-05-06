@@ -32,33 +32,33 @@ class UpdateCustomerAddressService extends BaseService implements UpdateCustomer
 
         $dto = CustomerAddressData::fromArray($data);
 
-        if ($address->getCustomerId() !== $dto->customerId) {
+        if ($address->getCustomerId() !== $dto->customer_id) {
             throw new CustomerAddressNotFoundException($id);
         }
 
-        $customer = $this->customerRepository->find($dto->customerId);
+        $customer = $this->customerRepository->find($dto->customer_id);
         if (! $customer || $customer->getTenantId() !== $address->getTenantId()) {
-            throw new CustomerNotFoundException($dto->customerId);
+            throw new CustomerNotFoundException($dto->customer_id);
         }
 
         $address->update(
             type: $dto->type,
             label: $dto->label,
-            addressLine1: $dto->addressLine1,
-            addressLine2: $dto->addressLine2,
+            addressLine1: $dto->address_line1,
+            addressLine2: $dto->address_line2,
             city: $dto->city,
             state: $dto->state,
-            postalCode: $dto->postalCode,
-            countryId: $dto->countryId,
-            isDefault: $dto->isDefault,
-            geoLat: $dto->geoLat,
-            geoLng: $dto->geoLng,
+            postalCode: $dto->postal_code,
+            countryId: $dto->country_id,
+            isDefault: $dto->is_default,
+            geoLat: $dto->geo_lat,
+            geoLng: $dto->geo_lng,
         );
 
-        if ($dto->isDefault) {
+        if ($dto->is_default) {
             $this->customerAddressRepository->clearDefaultByCustomerAndType(
                 tenantId: $customer->getTenantId(),
-                customerId: $dto->customerId,
+                customerId: $dto->customer_id,
                 type: $dto->type,
                 excludeId: $id,
             );

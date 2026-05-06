@@ -22,16 +22,16 @@ class CreateTaxRateService extends BaseService implements CreateTaxRateServiceIn
         $dto = TaxRateData::fromArray($data);
 
         return $this->taxRateRepository->save(new TaxRate(
-            tenantId: $dto->tenantId,
-            taxGroupId: $dto->taxGroupId,
+            tenantId: $dto->tenant_id,
+            taxGroupId: $dto->tax_group_id,
             name: $dto->name,
             rate: $dto->rate,
             type: $dto->type,
-            accountId: $dto->accountId,
-            isCompound: $dto->isCompound,
-            isActive: $dto->isActive,
-            validFrom: $this->toDate($dto->validFrom),
-            validTo: $this->toDate($dto->validTo),
+            accountId: $dto->account_id,
+            isCompound: $dto->is_compound,
+            isActive: $dto->is_active,
+            validFrom: $this->toDate($dto->valid_from),
+            validTo: $this->toDate($dto->valid_to),
         ));
     }
 

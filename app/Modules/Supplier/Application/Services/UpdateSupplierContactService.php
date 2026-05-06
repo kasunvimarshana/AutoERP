@@ -31,13 +31,13 @@ class UpdateSupplierContactService extends BaseService implements UpdateSupplier
         }
 
         $dto = SupplierContactData::fromArray($data);
-        if ($contact->getSupplierId() !== $dto->supplierId) {
+        if ($contact->getSupplierId() !== $dto->supplier_id) {
             throw new SupplierContactNotFoundException($id);
         }
 
-        $supplier = $this->supplierRepository->find($dto->supplierId);
+        $supplier = $this->supplierRepository->find($dto->supplier_id);
         if (! $supplier || $supplier->getTenantId() !== $contact->getTenantId()) {
-            throw new SupplierNotFoundException($dto->supplierId);
+            throw new SupplierNotFoundException($dto->supplier_id);
         }
 
         $contact->update(
@@ -45,13 +45,13 @@ class UpdateSupplierContactService extends BaseService implements UpdateSupplier
             role: $dto->role,
             email: $dto->email,
             phone: $dto->phone,
-            isPrimary: $dto->isPrimary,
+            isPrimary: $dto->is_primary,
         );
 
-        if ($dto->isPrimary) {
+        if ($dto->is_primary) {
             $this->supplierContactRepository->clearPrimaryBySupplier(
                 tenantId: $supplier->getTenantId(),
-                supplierId: $dto->supplierId,
+                supplierId: $dto->supplier_id,
                 excludeId: $id,
             );
         }

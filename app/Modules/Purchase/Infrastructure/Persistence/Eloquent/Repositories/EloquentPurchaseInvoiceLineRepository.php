@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories;
 
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
-use Illuminate\Support\Collection;
 use Modules\Purchase\Domain\Entities\PurchaseInvoiceLine;
 use Modules\Purchase\Domain\RepositoryInterfaces\PurchaseInvoiceLineRepositoryInterface;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\PurchaseInvoiceLineModel;
@@ -51,14 +50,15 @@ class EloquentPurchaseInvoiceLineRepository extends EloquentRepository implement
         return parent::find($id, $columns);
     }
 
-    /** @return Collection<int, PurchaseInvoiceLine> */
-    public function findByInvoiceId(int $tenantId, int $invoiceId): Collection
+    /** @return PurchaseInvoiceLine[] */
+    public function findByInvoiceId(int $tenantId, int $invoiceId): array
     {
         return $this->model->newQuery()
             ->where('tenant_id', $tenantId)
             ->where('purchase_invoice_id', $invoiceId)
             ->get()
-            ->map(fn (PurchaseInvoiceLineModel $m): PurchaseInvoiceLine => $this->mapToDomain($m));
+            ->map(fn (PurchaseInvoiceLineModel $m): PurchaseInvoiceLine => $this->mapToDomain($m))
+            ->all();
     }
 
     private function mapToDomain(PurchaseInvoiceLineModel $m): PurchaseInvoiceLine

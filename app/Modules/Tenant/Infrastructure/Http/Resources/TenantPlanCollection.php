@@ -8,5 +8,5 @@ use Illuminate\Http\Resources\Json\ResourceCollection;
 
 class TenantPlanCollection extends ResourceCollection
 {
-    public $collects = TenantPlanResource::class;
+    public string $collects = TenantPlanResource::class;
 }

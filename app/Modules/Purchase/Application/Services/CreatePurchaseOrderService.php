@@ -7,77 +7,41 @@ namespace Modules\Purchase\Application\Services;
 use Modules\Core\Application\Services\BaseService;
 use Modules\Purchase\Application\Contracts\CreatePurchaseOrderServiceInterface;
 use Modules\Purchase\Application\DTOs\PurchaseOrderData;
-use Modules\Purchase\Application\DTOs\PurchaseOrderLineData;
-use Modules\Purchase\Application\Support\PurchasePricingCalculator;
 use Modules\Purchase\Domain\Entities\PurchaseOrder;
-use Modules\Purchase\Domain\Entities\PurchaseOrderLine;
 use Modules\Purchase\Domain\RepositoryInterfaces\PurchaseOrderRepositoryInterface;
 
 class CreatePurchaseOrderService extends BaseService implements CreatePurchaseOrderServiceInterface
 {
-    public function __construct(
-        private readonly PurchaseOrderRepositoryInterface $repo,
-        private readonly PurchasePricingCalculator $pricingCalculator,
-    ) {
+    public function __construct(private readonly PurchaseOrderRepositoryInterface $repo)
+    {
         parent::__construct($repo);
     }
 
     protected function handle(array $data): PurchaseOrder
     {
-        $normalizedData = $this->pricingCalculator->normalizeOrderPayload($data);
-        $dto = PurchaseOrderData::fromArray($normalizedData);
+        $dto = PurchaseOrderData::fromArray($data);
 
         $entity = new PurchaseOrder(
-            tenantId: $dto->tenantId,
-            supplierId: $dto->supplierId,
-            warehouseId: $dto->warehouseId,
-            poNumber: $dto->poNumber,
+            tenantId: $dto->tenant_id,
+            supplierId: $dto->supplier_id,
+            warehouseId: $dto->warehouse_id,
+            poNumber: $dto->po_number,
             status: $dto->status,
-            currencyId: $dto->currencyId,
-            exchangeRate: $dto->exchangeRate,
-            orderDate: new \DateTimeImmutable($dto->orderDate),
-            createdBy: $dto->createdBy,
-            orgUnitId: $dto->orgUnitId,
-            expectedDate: $dto->expectedDate !== null ? new \DateTimeImmutable($dto->expectedDate) : null,
+            currencyId: $dto->currency_id,
+            exchangeRate: $dto->exchange_rate,
+            orderDate: new \DateTimeImmutable($dto->order_date),
+            createdBy: $dto->created_by,
+            orgUnitId: $dto->org_unit_id,
+            expectedDate: $dto->expected_date !== null ? new \DateTimeImmutable($dto->expected_date) : null,
             subtotal: $dto->subtotal,
-            taxTotal: $dto->taxTotal,
-            discountTotal: $dto->discountTotal,
-            grandTotal: $dto->grandTotal,
+            taxTotal: $dto->tax_total,
+            discountTotal: $dto->discount_total,
+            grandTotal: $dto->grand_total,
             notes: $dto->notes,
             metadata: $dto->metadata,
-            approvedBy: $dto->approvedBy,
+            approvedBy: $dto->approved_by,
         );
-
-        if ($dto->lines !== null) {
-            $lines = array_map(
-                static fn (array $lineData): PurchaseOrderLine => self::buildLine($dto->tenantId, $lineData),
-                $dto->lines
-            );
-            $entity->setLines($lines);
-        }
 
         return $this->repo->save($entity);
-    }
-
-    private static function buildLine(int $tenantId, array $lineData): PurchaseOrderLine
-    {
-        $lineData['tenant_id'] = $lineData['tenant_id'] ?? $tenantId;
-        $lineData['purchase_order_id'] = $lineData['purchase_order_id'] ?? 0;
-        $lineDto = PurchaseOrderLineData::fromArray($lineData);
-
-        return new PurchaseOrderLine(
-            tenantId: $lineDto->tenantId,
-            purchaseOrderId: $lineDto->purchaseOrderId,
-            productId: $lineDto->productId,
-            uomId: $lineDto->uomId,
-            orderedQty: $lineDto->orderedQty,
-            unitPrice: $lineDto->unitPrice,
-            receivedQty: $lineDto->receivedQty,
-            discountPct: $lineDto->discountPct,
-            variantId: $lineDto->variantId,
-            description: $lineDto->description,
-            taxGroupId: $lineDto->taxGroupId,
-            accountId: $lineDto->accountId,
-        );
     }
 }

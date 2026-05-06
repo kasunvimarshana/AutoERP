@@ -14,11 +14,9 @@ use Modules\Inventory\Infrastructure\Http\Requests\ListCycleCountRequest;
 use Modules\Inventory\Infrastructure\Http\Requests\StartCycleCountRequest;
 use Modules\Inventory\Infrastructure\Http\Requests\StoreCycleCountRequest;
 use Modules\Inventory\Infrastructure\Http\Resources\CycleCountResource;
-use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
-use Modules\Inventory\Domain\Entities\CycleCountHeader;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
-class InventoryCycleCountController extends AuthorizedController
+class InventoryCycleCountController
 {
     public function __construct(
         private readonly CreateCycleCountServiceInterface $createCycleCountService,
@@ -29,7 +27,6 @@ class InventoryCycleCountController extends AuthorizedController
 
     public function index(ListCycleCountRequest $request): JsonResponse
     {
-        $this->authorize('viewAny', CycleCountHeader::class);
         $validated = $request->validated();
 
         $counts = $this->findCycleCountService->list(
@@ -50,8 +47,6 @@ class InventoryCycleCountController extends AuthorizedController
             return response()->json(['message' => 'Cycle count not found.'], HttpResponse::HTTP_NOT_FOUND);
         }
 
-        $this->authorize('view', $count);
-
         return (new CycleCountResource($count))
             ->response()
             ->setStatusCode(HttpResponse::HTTP_OK);
@@ -59,7 +54,6 @@ class InventoryCycleCountController extends AuthorizedController
 
     public function store(StoreCycleCountRequest $request): JsonResponse
     {
-        $this->authorize('create', CycleCountHeader::class);
         $count = $this->createCycleCountService->execute($request->validated());
 
         return (new CycleCountResource($count))
@@ -69,7 +63,6 @@ class InventoryCycleCountController extends AuthorizedController
 
     public function start(StartCycleCountRequest $request, int $cycleCount): JsonResponse
     {
-        $this->authorize('update', CycleCountHeader::class);
         $validated = $request->validated();
         $count = $this->startCycleCountService->execute((int) $validated['tenant_id'], $cycleCount);
 
@@ -80,7 +73,6 @@ class InventoryCycleCountController extends AuthorizedController
 
     public function complete(CompleteCycleCountRequest $request, int $cycleCount): JsonResponse
     {
-        $this->authorize('update', CycleCountHeader::class);
         $validated = $request->validated();
         $count = $this->completeCycleCountService->execute(
             (int) $validated['tenant_id'],

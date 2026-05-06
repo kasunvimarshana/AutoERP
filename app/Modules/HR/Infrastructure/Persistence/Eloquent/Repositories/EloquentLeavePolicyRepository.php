@@ -19,7 +19,7 @@ class EloquentLeavePolicyRepository extends EloquentRepository implements LeaveP
 
     public function save(LeavePolicy $entity): LeavePolicy
     {
-        $data = ['tenant_id' => $entity->getTenantId(), 'leave_type_id' => $entity->getLeaveTypeId(), 'name' => $entity->getName(), 'accrual_type' => $entity->getAccrualType(), 'accrual_amount' => $entity->getAccrualAmount(), 'org_unit_id' => $entity->getOrgUnitId(), 'is_active' => $entity->isActive(), 'metadata' => $entity->getMetadata(), 'row_version' => $entity->getRowVersion()];
+        $data = ['tenant_id' => $entity->getTenantId(), 'leave_type_id' => $entity->getLeaveTypeId(), 'name' => $entity->getName(), 'accrual_type' => $entity->getAccrualType(), 'accrual_amount' => $entity->getAccrualAmount(), 'org_unit_id' => $entity->getOrgUnitId(), 'is_active' => $entity->isActive(), 'metadata' => $entity->getMetadata()];
         $model = $entity->getId() ? $this->update($entity->getId(), $data) : $this->create($data);
 
         return $this->toDomainEntity($model);
@@ -32,6 +32,6 @@ class EloquentLeavePolicyRepository extends EloquentRepository implements LeaveP
 
     private function mapModelToDomainEntity(LeavePolicyModel $m): LeavePolicy
     {
-        return new LeavePolicy($m->tenant_id, $m->leave_type_id, $m->name, $m->accrual_type ?? 'annual', (float) $m->accrual_amount, $m->org_unit_id, (bool) $m->is_active, $m->metadata ?? [], $m->created_at instanceof \DateTimeInterface ? $m->created_at : new \DateTimeImmutable($m->created_at ?? 'now'), $m->updated_at instanceof \DateTimeInterface ? $m->updated_at : new \DateTimeImmutable($m->updated_at ?? 'now'), (int) ($m->row_version ?? 1), $m->id);
+        return new LeavePolicy($m->tenant_id, $m->leave_type_id, $m->name, $m->accrual_type ?? 'annual', (float) $m->accrual_amount, $m->org_unit_id, (bool) $m->is_active, $m->metadata ?? [], $m->created_at instanceof \DateTimeInterface ? $m->created_at : new \DateTimeImmutable($m->created_at ?? 'now'), $m->updated_at instanceof \DateTimeInterface ? $m->updated_at : new \DateTimeImmutable($m->updated_at ?? 'now'), $m->id);
     }
 }

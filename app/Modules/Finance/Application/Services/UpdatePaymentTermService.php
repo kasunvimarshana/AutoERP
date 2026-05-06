@@ -9,7 +9,6 @@ use Modules\Finance\Application\Contracts\UpdatePaymentTermServiceInterface;
 use Modules\Finance\Application\DTOs\PaymentTermData;
 use Modules\Finance\Domain\Entities\PaymentTerm;
 use Modules\Finance\Domain\Exceptions\PaymentTermNotFoundException;
-use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Finance\Domain\RepositoryInterfaces\PaymentTermRepositoryInterface;
 
 class UpdatePaymentTermService extends BaseService implements UpdatePaymentTermServiceInterface
@@ -29,16 +28,11 @@ class UpdatePaymentTermService extends BaseService implements UpdatePaymentTermS
             throw new PaymentTermNotFoundException((int) $dto->id);
         }
 
-
-        if ($dto->rowVersion !== $paymentTerm->getRowVersion()) {
-            throw new ConcurrentModificationException('PaymentTerm', (int) $dto->id);
-        }
-
         $paymentTerm->update(
             $dto->name,
             $dto->days,
             $dto->is_default,
-            $dto->isActive,
+            $dto->is_active,
             $dto->description,
             $dto->discount_days,
             $dto->discount_rate,

@@ -12,7 +12,6 @@ class PaymentMethodData
         public readonly string $type = 'bank_transfer',
         public readonly ?int $account_id = null,
         public readonly bool $is_active = true,
-        public readonly int $rowVersion = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -27,7 +26,6 @@ class PaymentMethodData
             type: (string) ($data['type'] ?? 'bank_transfer'),
             account_id: isset($data['account_id']) ? (int) $data['account_id'] : null,
             is_active: (bool) ($data['is_active'] ?? true),
-            rowVersion: (int) ($data['row_version'] ?? 1),
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

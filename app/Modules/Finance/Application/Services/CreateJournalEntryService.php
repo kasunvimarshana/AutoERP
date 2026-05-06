@@ -27,9 +27,9 @@ class CreateJournalEntryService extends BaseService implements CreateJournalEntr
     {
         $dto = JournalEntryData::fromArray($data);
 
-        $fiscalPeriod = $this->fiscalPeriodRepository->find($dto->fiscalPeriodId);
+        $fiscalPeriod = $this->fiscalPeriodRepository->find($dto->fiscal_period_id);
         if (! $fiscalPeriod || ! $fiscalPeriod->isOpen()) {
-            throw FiscalPeriodNotFoundException::openPeriodForId($dto->fiscalPeriodId);
+            throw FiscalPeriodNotFoundException::openPeriodForId($dto->fiscal_period_id);
         }
 
         $lines = [];
@@ -38,15 +38,15 @@ class CreateJournalEntryService extends BaseService implements CreateJournalEntr
 
         foreach ($dto->lines as $lineDto) {
             $line = new JournalEntryLine(
-                accountId: $lineDto->accountId,
-                debitAmount: $lineDto->debitAmount,
-                creditAmount: $lineDto->creditAmount,
+                accountId: $lineDto->account_id,
+                debitAmount: $lineDto->debit_amount,
+                creditAmount: $lineDto->credit_amount,
                 description: $lineDto->description,
-                currencyId: $lineDto->currencyId,
-                exchangeRate: $lineDto->exchangeRate,
-                baseDebitAmount: $lineDto->baseDebitAmount,
-                baseCreditAmount: $lineDto->baseCreditAmount,
-                costCenterId: $lineDto->costCenterId,
+                currencyId: $lineDto->currency_id,
+                exchangeRate: $lineDto->exchange_rate,
+                baseDebitAmount: $lineDto->base_debit_amount,
+                baseCreditAmount: $lineDto->base_credit_amount,
+                costCenterId: $lineDto->cost_center_id,
                 metadata: $lineDto->metadata,
             );
 
@@ -60,22 +60,22 @@ class CreateJournalEntryService extends BaseService implements CreateJournalEntr
         }
 
         $journalEntry = new JournalEntry(
-            tenantId: $dto->tenantId,
-            fiscalPeriodId: $dto->fiscalPeriodId,
-            entryDate: new \DateTimeImmutable($dto->entryDate),
-            createdBy: $dto->createdBy,
+            tenantId: $dto->tenant_id,
+            fiscalPeriodId: $dto->fiscal_period_id,
+            entryDate: new \DateTimeImmutable($dto->entry_date),
+            createdBy: $dto->created_by,
             lines: $lines,
-            entryType: $dto->entryType,
-            entryNumber: $dto->entryNumber,
-            referenceType: $dto->referenceType,
-            referenceId: $dto->referenceId,
+            entryType: $dto->entry_type,
+            entryNumber: $dto->entry_number,
+            referenceType: $dto->reference_type,
+            referenceId: $dto->reference_id,
             description: $dto->description,
-            postingDate: $dto->postingDate ? new \DateTimeImmutable($dto->postingDate) : null,
+            postingDate: $dto->posting_date ? new \DateTimeImmutable($dto->posting_date) : null,
             status: $dto->status,
-            isReversed: $dto->isReversed,
-            reversalEntryId: $dto->reversalEntryId,
-            postedBy: $dto->postedBy,
-            postedAt: $dto->postedAt ? new \DateTimeImmutable($dto->postedAt) : null,
+            isReversed: $dto->is_reversed,
+            reversalEntryId: $dto->reversal_entry_id,
+            postedBy: $dto->posted_by,
+            postedAt: $dto->posted_at ? new \DateTimeImmutable($dto->posted_at) : null,
         );
 
         return $this->journalEntryRepository->save($journalEntry);

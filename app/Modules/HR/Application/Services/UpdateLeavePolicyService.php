@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\HR\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
-use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Core\Domain\Exceptions\NotFoundException;
 use Modules\HR\Application\Contracts\UpdateLeavePolicyServiceInterface;
 use Modules\HR\Application\DTOs\LeavePolicyData;
@@ -35,10 +34,6 @@ class UpdateLeavePolicyService extends BaseService implements UpdateLeavePolicyS
             throw new NotFoundException('LeavePolicy', $id);
         }
 
-        if ($dto->rowVersion !== $policy->getRowVersion()) {
-            throw new ConcurrentModificationException('LeavePolicy', $id);
-        }
-
         $updated = new LeavePolicy(
             tenantId: $policy->getTenantId(),
             leaveTypeId: $policy->getLeaveTypeId(),
@@ -50,7 +45,6 @@ class UpdateLeavePolicyService extends BaseService implements UpdateLeavePolicyS
             metadata: $dto->metadata,
             createdAt: $policy->getCreatedAt(),
             updatedAt: new \DateTimeImmutable,
-            rowVersion: $policy->getRowVersion() + 1,
             id: $policy->getId(),
         );
 

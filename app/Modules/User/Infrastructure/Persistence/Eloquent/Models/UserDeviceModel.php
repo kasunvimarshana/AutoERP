@@ -7,7 +7,6 @@ namespace Modules\User\Infrastructure\Persistence\Eloquent\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
-use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 /**
  * @property int $id
@@ -21,12 +20,9 @@ use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
  */
 class UserDeviceModel extends BaseModel
 {
-    use HasTenant;
-
     protected $table = 'user_devices';
 
     protected $fillable = [
-        'tenant_id',
         'user_id',
         'device_token',
         'platform',

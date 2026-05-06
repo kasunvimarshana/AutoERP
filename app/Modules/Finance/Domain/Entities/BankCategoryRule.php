@@ -15,7 +15,6 @@ class BankCategoryRule
         private int $priority = 0,
         private ?string $descriptionTemplate = null,
         private bool $isActive = true,
-        private int $rowVersion = 1,
         private ?int $id = null,
         private ?\DateTimeInterface $createdAt = null,
         private ?\DateTimeInterface $updatedAt = null,
@@ -79,12 +78,8 @@ class BankCategoryRule
         return $this->updatedAt;
     }
 
-    public function getRowVersion(): int
-    {
-        return $this->rowVersion;
-    }
-
     public function update(
+        string $name,
         array $conditions,
         int $accountId,
         ?int $bankAccountId,
@@ -99,7 +94,6 @@ class BankCategoryRule
         $this->priority = $priority;
         $this->descriptionTemplate = $descriptionTemplate;
         $this->isActive = $isActive;
-        $this->rowVersion++;
         $this->updatedAt = new \DateTimeImmutable;
     }
 }

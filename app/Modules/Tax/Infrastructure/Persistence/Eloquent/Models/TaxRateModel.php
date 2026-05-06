@@ -29,7 +29,6 @@ class TaxRateModel extends Model
         'is_active',
         'valid_from',
         'valid_to',
-        'row_version',
     ];
 
     protected $casts = [
@@ -40,7 +39,6 @@ class TaxRateModel extends Model
         'is_active' => 'boolean',
         'valid_from' => 'date',
         'valid_to' => 'date',
-        'row_version' => 'integer',
         'rate' => 'decimal:6',
     ];
 

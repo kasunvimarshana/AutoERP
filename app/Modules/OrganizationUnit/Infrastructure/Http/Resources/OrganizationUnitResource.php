@@ -60,7 +60,6 @@ class OrganizationUnitResource extends JsonResource
             ),
             'created_at' => $this->getCreatedAt()->format('c'),
             'updated_at' => $this->getUpdatedAt()->format('c'),
-            'row_version' => $this->getRowVersion(),
         ];
     }
 }

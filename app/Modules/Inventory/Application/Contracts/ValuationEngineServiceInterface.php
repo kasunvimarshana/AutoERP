@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Application\Contracts;
 
-use Modules\Inventory\Application\DTOs\CostLayerInboundData;
+use Modules\Inventory\Application\DTOs\CostLayerInboundDTO;
 use Modules\Inventory\Domain\Entities\InventoryCostLayer;
 
 /**
@@ -20,7 +20,7 @@ interface ValuationEngineServiceInterface
      * For weighted-average costing the existing running layer is updated
      * instead of a new layer being created.
      */
-    public function processInbound(CostLayerInboundData $dto): InventoryCostLayer;
+    public function processInbound(CostLayerInboundDTO $dto): InventoryCostLayer;
 
     /**
      * Process an outbound movement: consume layers according to the

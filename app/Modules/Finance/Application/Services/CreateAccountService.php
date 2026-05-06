@@ -22,7 +22,7 @@ class CreateAccountService extends BaseService implements CreateAccountServiceIn
         $dto = AccountData::fromArray($data);
 
         $account = new Account(
-            tenantId: $dto->tenantId,
+            tenantId: $dto->tenant_id,
             code: $dto->code,
             name: $dto->name,
             type: $dto->type,
@@ -32,9 +32,9 @@ class CreateAccountService extends BaseService implements CreateAccountServiceIn
             isSystem: $dto->is_system,
             isBankAccount: $dto->is_bank_account,
             isCreditCard: $dto->is_credit_card,
-            currencyId: $dto->currencyId,
+            currencyId: $dto->currency_id,
             description: $dto->description,
-            isActive: $dto->isActive,
+            isActive: $dto->is_active,
             path: $dto->path,
             depth: $dto->depth,
         );

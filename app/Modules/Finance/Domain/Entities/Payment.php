@@ -24,7 +24,6 @@ class Payment
         private ?string $notes = null,
         private ?string $idempotencyKey = null,
         private ?int $journalEntryId = null,
-        private int $rowVersion = 1,
         private ?int $id = null,
         private ?\DateTimeInterface $createdAt = null,
         private ?\DateTimeInterface $updatedAt = null,
@@ -136,11 +135,6 @@ class Payment
         return $this->updatedAt;
     }
 
-    public function getRowVersion(): int
-    {
-        return $this->rowVersion;
-    }
-
     public function isDraft(): bool
     {
         return $this->status === 'draft';
@@ -178,7 +172,6 @@ class Payment
         $this->paymentDate = $paymentDate;
         $this->reference = $reference;
         $this->notes = $notes;
-        $this->rowVersion++;
         $this->updatedAt = new \DateTimeImmutable;
     }
 }

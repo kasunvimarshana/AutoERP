@@ -31,7 +31,6 @@ class EloquentApprovalRequestRepository extends EloquentRepository implements Ap
             'requested_at' => $ar->getRequestedAt()->format('Y-m-d H:i:s'),
             'resolved_at' => $ar->getResolvedAt()?->format('Y-m-d H:i:s'),
             'comments' => $ar->getComments(),
-            'row_version' => $ar->getRowVersion(),
         ];
 
         $model = $ar->getId() ? $this->update($ar->getId(), $data) : $this->create($data);
@@ -54,7 +53,6 @@ class EloquentApprovalRequestRepository extends EloquentRepository implements Ap
             requestedAt: $m->requested_at,
             resolvedAt: $m->resolved_at,
             comments: $m->comments,
-            rowVersion: (int) ($m->row_version ?? 1),
             id: (int) $m->id,
             createdAt: $m->created_at,
             updatedAt: $m->updated_at,

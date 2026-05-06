@@ -17,7 +17,6 @@ class UpdateBankCategoryRuleRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'row_version' => ['required', 'integer', 'min:1'],
             'tenant_id' => ['required', 'integer', 'exists:tenants,id'],
             'bank_account_id' => ['sometimes', 'nullable', 'integer', 'exists:bank_accounts,id'],
             'name' => ['required', 'string', 'max:255'],

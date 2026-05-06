@@ -33,7 +33,7 @@ class EloquentPayrollRunRepository extends EloquentRepository implements Payroll
 
     public function findByTenantAndPeriod(int $tenantId, string $periodStart, string $periodEnd): ?PayrollRun
     {
-        $m = $this->model->where('tenant_id', $tenantId)->whereDate('period_start', $periodStart)->whereDate('period_end', $periodEnd)->first();
+        $m = $this->model->where('tenant_id', $tenantId)->where('period_start', $periodStart)->where('period_end', $periodEnd)->first();
 
         return $m ? $this->toDomainEntity($m) : null;
     }

@@ -125,11 +125,8 @@ class UpdateProductRequest extends FormRequest
                     fn ($query) => $query->where('tenant_id', $tenantId)
                 ),
             ],
-            'purchase_price' => 'nullable|numeric|min:0',
-            'sales_price' => 'nullable|numeric|min:0',
             'is_active' => 'nullable|boolean',
             'metadata' => 'nullable|array',
-            'row_version' => 'required|integer|min:1',
         ];
     }
 

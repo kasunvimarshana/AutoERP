@@ -18,8 +18,6 @@ class UnitOfMeasure
 
     private bool $isBase;
 
-    private int $rowVersion;
-
     private \DateTimeInterface $createdAt;
 
     private \DateTimeInterface $updatedAt;
@@ -30,7 +28,6 @@ class UnitOfMeasure
         string $symbol,
         string $type = 'unit',
         bool $isBase = false,
-        int $rowVersion = 1,
         ?int $id = null,
         ?\DateTimeInterface $createdAt = null,
         ?\DateTimeInterface $updatedAt = null,
@@ -41,7 +38,6 @@ class UnitOfMeasure
         $this->symbol = $symbol;
         $this->type = $type;
         $this->isBase = $isBase;
-        $this->rowVersion = $rowVersion;
         $this->createdAt = $createdAt ?? new \DateTimeImmutable;
         $this->updatedAt = $updatedAt ?? new \DateTimeImmutable;
     }
@@ -86,11 +82,6 @@ class UnitOfMeasure
         return $this->updatedAt;
     }
 
-    public function getRowVersion(): int
-    {
-        return $this->rowVersion;
-    }
-
     public function update(
         string $name,
         string $symbol,
@@ -101,7 +92,6 @@ class UnitOfMeasure
         $this->symbol = $symbol;
         $this->type = $type;
         $this->isBase = $isBase;
-        $this->rowVersion++;
         $this->updatedAt = new \DateTimeImmutable;
     }
 }

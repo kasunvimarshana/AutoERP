@@ -25,7 +25,6 @@ class EloquentUnitOfMeasureRepository extends EloquentRepository implements Unit
             'symbol' => $unitOfMeasure->getSymbol(),
             'type' => $unitOfMeasure->getType(),
             'is_base' => $unitOfMeasure->isBase(),
-            'row_version' => $unitOfMeasure->getRowVersion(),
         ];
 
         if ($unitOfMeasure->getId()) {
@@ -64,7 +63,6 @@ class EloquentUnitOfMeasureRepository extends EloquentRepository implements Unit
             symbol: (string) $model->symbol,
             type: (string) $model->type,
             isBase: (bool) $model->is_base,
-            rowVersion: (int) ($model->row_version ?? 1),
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,
         );

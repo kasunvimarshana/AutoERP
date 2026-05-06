@@ -24,8 +24,6 @@ class TaxRule
 
     private \DateTimeInterface $updatedAt;
 
-    private int $rowVersion;
-
     public function __construct(
         int $tenantId,
         int $taxGroupId,
@@ -33,7 +31,6 @@ class TaxRule
         ?string $partyType = null,
         ?string $region = null,
         int $priority = 0,
-        int $rowVersion = 1,
         ?int $id = null,
         ?\DateTimeInterface $createdAt = null,
         ?\DateTimeInterface $updatedAt = null,
@@ -47,7 +44,6 @@ class TaxRule
         $this->partyType = $partyType;
         $this->region = $region !== null ? trim($region) : null;
         $this->priority = max(0, $priority);
-        $this->rowVersion = $rowVersion;
         $this->createdAt = $createdAt ?? new \DateTimeImmutable;
         $this->updatedAt = $updatedAt ?? new \DateTimeImmutable;
     }
@@ -97,11 +93,6 @@ class TaxRule
         return $this->updatedAt;
     }
 
-    public function getRowVersion(): int
-    {
-        return $this->rowVersion;
-    }
-
     public function update(
         int $taxGroupId,
         ?int $productCategoryId,
@@ -116,7 +107,6 @@ class TaxRule
         $this->partyType = $partyType;
         $this->region = $region !== null ? trim($region) : null;
         $this->priority = max(0, $priority);
-        $this->rowVersion++;
         $this->updatedAt = new \DateTimeImmutable;
     }
 

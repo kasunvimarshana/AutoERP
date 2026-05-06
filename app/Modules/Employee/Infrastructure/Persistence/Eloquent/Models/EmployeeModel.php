@@ -27,7 +27,6 @@ class EmployeeModel extends BaseModel
         'hire_date',
         'termination_date',
         'metadata',
-        'row_version',
     ];
 
     protected $casts = [
@@ -37,7 +36,6 @@ class EmployeeModel extends BaseModel
         'hire_date' => 'date',
         'termination_date' => 'date',
         'metadata' => 'array',
-        'row_version' => 'integer',
     ];
 
     public function user(): BelongsTo

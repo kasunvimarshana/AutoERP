@@ -30,7 +30,6 @@ class PayrollRunController extends AuthorizedController
 
     public function index(): JsonResponse
     {
-        $this->authorize('viewAny', PayrollRun::class);
         $result = $this->findService->list();
 
         return Response::json(['data' => PayrollRunResource::collection($result)]);
@@ -38,7 +37,6 @@ class PayrollRunController extends AuthorizedController
 
     public function store(StorePayrollRunRequest $request): JsonResponse
     {
-        $this->authorize('create', PayrollRun::class);
         $entity = $this->createService->execute($request->validated());
 
         return (new PayrollRunResource($entity))->response()->setStatusCode(201);
@@ -46,16 +44,12 @@ class PayrollRunController extends AuthorizedController
 
     public function show(int $payrollRun): PayrollRunResource
     {
-        $entity = $this->findOrFail($payrollRun);
-        $this->authorize('view', $entity);
-
-        return new PayrollRunResource($entity);
+        return new PayrollRunResource($this->findOrFail($payrollRun));
     }
 
     public function update(UpdatePayrollRunRequest $request, int $payrollRun): PayrollRunResource
     {
-        $entity = $this->findOrFail($payrollRun);
-        $this->authorize('update', $entity);
+        $this->findOrFail($payrollRun);
         $payload = $request->validated();
         $payload['id'] = $payrollRun;
         $updated = $this->createService->execute($payload);
@@ -65,16 +59,14 @@ class PayrollRunController extends AuthorizedController
 
     public function destroy(int $payrollRun): JsonResponse
     {
-        $entity = $this->findOrFail($payrollRun);
-        $this->authorize('delete', $entity);
+        $this->findOrFail($payrollRun);
 
         return Response::json(null, 204);
     }
 
     public function approve(ApprovePayrollRunRequest $request, int $payrollRun): PayrollRunResource
     {
-        $entity = $this->findOrFail($payrollRun);
-        $this->authorize('update', $entity);
+        $this->findOrFail($payrollRun);
         $payload = $request->validated();
         $payload['id'] = $payrollRun;
         $updated = $this->approveService->execute($payload);
@@ -84,8 +76,7 @@ class PayrollRunController extends AuthorizedController
 
     public function process(ProcessPayrollRunRequest $request, int $payrollRun): PayrollRunResource
     {
-        $entity = $this->findOrFail($payrollRun);
-        $this->authorize('update', $entity);
+        $this->findOrFail($payrollRun);
         $updated = $this->processService->execute(['id' => $payrollRun]);
 
         return new PayrollRunResource($updated);

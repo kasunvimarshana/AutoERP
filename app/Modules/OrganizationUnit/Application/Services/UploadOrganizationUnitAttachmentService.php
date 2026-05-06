@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Application\Services;
 
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Application\Services\BaseService;
@@ -57,21 +56,19 @@ class UploadOrganizationUnitAttachmentService extends BaseService implements Upl
             $uuid = (string) Str::uuid();
             $storedPath = $this->storage->store($tmpPath, "organization-units/{$organizationUnitId}", $name);
 
-            return DB::transaction(function () use ($organizationUnitId, $uuid, $name, $storedPath, $mimeType, $size, $type, $metadata, $organizationUnit): OrganizationUnitAttachment {
-                $attachment = new OrganizationUnitAttachment(
-                    tenantId: $organizationUnit->getTenantId(),
-                    organizationUnitId: $organizationUnitId,
-                    uuid: $uuid,
-                    name: $name,
-                    filePath: $storedPath,
-                    mimeType: $mimeType,
-                    size: $size,
-                    type: $type,
-                    metadata: $metadata,
-                );
+            $attachment = new OrganizationUnitAttachment(
+                tenantId: $organizationUnit->getTenantId(),
+                organizationUnitId: $organizationUnitId,
+                uuid: $uuid,
+                name: $name,
+                filePath: $storedPath,
+                mimeType: $mimeType,
+                size: $size,
+                type: $type,
+                metadata: $metadata,
+            );
 
-                return $this->attachmentRepository->save($attachment);
-            });
+            return $this->attachmentRepository->save($attachment);
         } catch (\Throwable $exception) {
             if (is_string($storedPath) && $storedPath !== '') {
                 $this->storage->delete($storedPath);

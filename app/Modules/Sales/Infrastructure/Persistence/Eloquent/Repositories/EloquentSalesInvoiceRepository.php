@@ -102,7 +102,7 @@ class EloquentSalesInvoiceRepository extends EloquentRepository implements Sales
     public function find(int|string $id, array $columns = ['*']): ?SalesInvoice
     {
         /** @var SalesInvoiceModel|null $model */
-        $model = $this->newScopedQuery()->with('lines')->find($id, $columns);
+        $model = $this->model->newQuery()->with('lines')->find($id, $columns);
 
         return $model ? $this->toDomainEntity($model) : null;
     }
@@ -110,7 +110,7 @@ class EloquentSalesInvoiceRepository extends EloquentRepository implements Sales
     public function findByTenantAndInvoiceNumber(int $tenantId, string $invoiceNumber): ?SalesInvoice
     {
         /** @var SalesInvoiceModel|null $model */
-        $model = $this->newScopedQuery()->with('lines')
+        $model = $this->model->newQuery()->with('lines')
             ->where('tenant_id', $tenantId)
             ->where('invoice_number', $invoiceNumber)
             ->first();

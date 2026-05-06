@@ -38,7 +38,6 @@ class SupplierModel extends Model
         'status',
         'notes',
         'metadata',
-        'row_version',
     ];
 
     protected $casts = [
@@ -49,7 +48,6 @@ class SupplierModel extends Model
         'payment_terms_days' => 'integer',
         'ap_account_id' => 'integer',
         'metadata' => 'array',
-        'row_version' => 'integer',
     ];
 
     public function user(): BelongsTo

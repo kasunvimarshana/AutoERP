@@ -12,8 +12,7 @@ class PaymentMethod
         private string $type = 'bank_transfer',
         private ?int $accountId = null,
         private bool $isActive = true,
-            private int $rowVersion = 1,
-            private ?int $id = null,
+        private ?int $id = null,
         private ?\DateTimeInterface $createdAt = null,
         private ?\DateTimeInterface $updatedAt = null,
     ) {
@@ -54,11 +53,6 @@ class PaymentMethod
     public function getCreatedAt(): \DateTimeInterface
     {
         return $this->createdAt;
-    }
-
-    public function getRowVersion(): int
-    {
-        return $this->rowVersion;
     }
 
     public function getUpdatedAt(): \DateTimeInterface

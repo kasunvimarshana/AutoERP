@@ -238,7 +238,6 @@ class ProductEndpointsAuthenticatedTest extends TestCase
                 'name' => 'Widget',
                 'slug' => 'widget',
                 'base_uom_id' => 1,
-                'row_version' => 1,
                 'image_path' => UploadedFile::fake()->create('updated.jpg', 10, 'image/jpeg'),
             ]);
 

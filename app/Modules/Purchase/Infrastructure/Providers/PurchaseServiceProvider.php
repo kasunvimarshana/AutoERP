@@ -24,7 +24,6 @@ use Modules\Purchase\Application\Contracts\FindPurchaseReturnServiceInterface;
 use Modules\Purchase\Application\Contracts\PostGrnServiceInterface;
 use Modules\Purchase\Application\Contracts\PostPurchaseReturnServiceInterface;
 use Modules\Purchase\Application\Contracts\RecordPurchasePaymentServiceInterface;
-use Modules\Purchase\Application\Contracts\RecordPurchaseRefundServiceInterface;
 use Modules\Purchase\Application\Contracts\SendPurchaseOrderServiceInterface;
 use Modules\Purchase\Application\Contracts\UpdateGrnServiceInterface;
 use Modules\Purchase\Application\Contracts\UpdatePurchaseInvoiceServiceInterface;
@@ -48,7 +47,6 @@ use Modules\Purchase\Application\Services\FindPurchaseReturnService;
 use Modules\Purchase\Application\Services\PostGrnService;
 use Modules\Purchase\Application\Services\PostPurchaseReturnService;
 use Modules\Purchase\Application\Services\RecordPurchasePaymentService;
-use Modules\Purchase\Application\Services\RecordPurchaseRefundService;
 use Modules\Purchase\Application\Services\SendPurchaseOrderService;
 use Modules\Purchase\Application\Services\UpdateGrnService;
 use Modules\Purchase\Application\Services\UpdatePurchaseInvoiceService;
@@ -111,7 +109,6 @@ class PurchaseServiceProvider extends ServiceProvider
             DeletePurchaseInvoiceServiceInterface::class => DeletePurchaseInvoiceService::class,
             ApprovePurchaseInvoiceServiceInterface::class => ApprovePurchaseInvoiceService::class,
             RecordPurchasePaymentServiceInterface::class => RecordPurchasePaymentService::class,
-            RecordPurchaseRefundServiceInterface::class => RecordPurchaseRefundService::class,
             CreatePurchaseReturnServiceInterface::class => CreatePurchaseReturnService::class,
             FindPurchaseReturnServiceInterface::class => FindPurchaseReturnService::class,
             UpdatePurchaseReturnServiceInterface::class => UpdatePurchaseReturnService::class,

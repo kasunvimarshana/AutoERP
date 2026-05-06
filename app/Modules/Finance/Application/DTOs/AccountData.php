@@ -22,7 +22,6 @@ class AccountData
         public readonly bool $is_active = true,
         public readonly ?string $path = null,
         public readonly int $depth = 0,
-        public readonly int $rowVersion = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -47,7 +46,6 @@ class AccountData
             is_active: (bool) ($data['is_active'] ?? true),
             path: isset($data['path']) ? (string) $data['path'] : null,
             depth: (int) ($data['depth'] ?? 0),
-            rowVersion: (int) ($data['row_version'] ?? 1),
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

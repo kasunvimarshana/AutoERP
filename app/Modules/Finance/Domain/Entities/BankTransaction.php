@@ -18,7 +18,6 @@ class BankTransaction
         private string $status = 'imported',
         private ?int $matchedJournalEntryId = null,
         private ?int $categoryRuleId = null,
-        private int $rowVersion = 1,
         private ?int $id = null,
         private ?\DateTimeInterface $createdAt = null,
         private ?\DateTimeInterface $updatedAt = null,
@@ -95,11 +94,6 @@ class BankTransaction
     public function getUpdatedAt(): \DateTimeInterface
     {
         return $this->updatedAt;
-    }
-
-    public function getRowVersion(): int
-    {
-        return $this->rowVersion;
     }
 
     public function categorize(int $categoryRuleId): void

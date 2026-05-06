@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Finance\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
-use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Finance\Application\Contracts\UpdateBankReconciliationServiceInterface;
 use Modules\Finance\Application\DTOs\BankReconciliationData;
 use Modules\Finance\Domain\Entities\BankReconciliation;
@@ -27,10 +26,7 @@ class UpdateBankReconciliationService extends BaseService implements UpdateBankR
         if (! $br) {
             throw new BankReconciliationNotFoundException((int) $dto->id);
         }
-        if ($dto->rowVersion !== $br->getRowVersion()) {
-            throw new ConcurrentModificationException('BankReconciliation', (int) $dto->id);
-        }
-        $br->updateBalances($dto->openingBalance, $dto->closingBalance);
+        $br->updateBalances($dto->opening_balance, $dto->closing_balance);
 
         return $this->bankReconciliationRepository->save($br);
     }

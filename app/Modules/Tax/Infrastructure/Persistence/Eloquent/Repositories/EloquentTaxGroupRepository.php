@@ -23,7 +23,6 @@ class EloquentTaxGroupRepository extends EloquentRepository implements TaxGroupR
             'tenant_id' => $taxGroup->getTenantId(),
             'name' => $taxGroup->getName(),
             'description' => $taxGroup->getDescription(),
-            'row_version' => $taxGroup->getRowVersion(),
         ];
 
         if ($taxGroup->getId()) {
@@ -60,7 +59,6 @@ class EloquentTaxGroupRepository extends EloquentRepository implements TaxGroupR
             tenantId: (int) $model->tenant_id,
             name: (string) $model->name,
             description: $model->description !== null ? (string) $model->description : null,
-            rowVersion: (int) ($model->row_version ?? 1),
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,
         );

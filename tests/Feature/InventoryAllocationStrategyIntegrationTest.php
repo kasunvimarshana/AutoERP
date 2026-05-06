@@ -8,8 +8,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Application\Contracts\AllocationEngineServiceInterface;
 use Modules\Inventory\Application\Contracts\ValuationEngineServiceInterface;
-use Modules\Inventory\Application\DTOs\AllocationRequestData;
-use Modules\Inventory\Application\DTOs\CostLayerInboundData;
+use Modules\Inventory\Application\DTOs\AllocationRequestDTO;
+use Modules\Inventory\Application\DTOs\CostLayerInboundDTO;
 use Modules\Inventory\Domain\Exceptions\InsufficientAvailableStockException;
 use Tests\TestCase;
 
@@ -44,7 +44,7 @@ class InventoryAllocationStrategyIntegrationTest extends TestCase
         $alloc = app(AllocationEngineServiceInterface::class);
 
         // Request 6 units — layer1 has 10, so only 1 line is needed
-        $result = $alloc->allocate(new AllocationRequestData(
+        $result = $alloc->allocate(new AllocationRequestDTO(
             tenantId: $this->tenantId,
             productId: $this->productId,
             variantId: null,
@@ -74,7 +74,7 @@ class InventoryAllocationStrategyIntegrationTest extends TestCase
         /** @var AllocationEngineServiceInterface $alloc */
         $alloc = app(AllocationEngineServiceInterface::class);
 
-        $result = $alloc->allocate(new AllocationRequestData(
+        $result = $alloc->allocate(new AllocationRequestDTO(
             tenantId: $this->tenantId,
             productId: $this->productId,
             variantId: null,
@@ -101,7 +101,7 @@ class InventoryAllocationStrategyIntegrationTest extends TestCase
         $valuation->processInbound($this->makeDTO('fifo', '10.000000', '5.000000', '2024-01-01'));
 
         // Alt location: qty=10, cost=3
-        $valuation->processInbound(new CostLayerInboundData(
+        $valuation->processInbound(new CostLayerInboundDTO(
             tenantId: $this->tenantId,
             productId: $this->productId,
             variantId: null,
@@ -118,7 +118,7 @@ class InventoryAllocationStrategyIntegrationTest extends TestCase
         /** @var AllocationEngineServiceInterface $alloc */
         $alloc = app(AllocationEngineServiceInterface::class);
 
-        $result = $alloc->allocate(new AllocationRequestData(
+        $result = $alloc->allocate(new AllocationRequestDTO(
             tenantId: $this->tenantId,
             productId: $this->productId,
             variantId: null,
@@ -148,7 +148,7 @@ class InventoryAllocationStrategyIntegrationTest extends TestCase
         $alloc = app(AllocationEngineServiceInterface::class);
 
         // Manually pick layer2 (newer, more expensive) instead of FIFO order
-        $result = $alloc->allocate(new AllocationRequestData(
+        $result = $alloc->allocate(new AllocationRequestDTO(
             tenantId: $this->tenantId,
             productId: $this->productId,
             variantId: null,
@@ -177,7 +177,7 @@ class InventoryAllocationStrategyIntegrationTest extends TestCase
 
         $this->expectException(InsufficientAvailableStockException::class);
 
-        $alloc->allocate(new AllocationRequestData(
+        $alloc->allocate(new AllocationRequestDTO(
             tenantId: $this->tenantId,
             productId: $this->productId,
             variantId: null,
@@ -191,9 +191,9 @@ class InventoryAllocationStrategyIntegrationTest extends TestCase
     // Helpers
     // =========================================================================
 
-    private function makeDTO(string $method, string $quantity, string $unitCost, string $date): CostLayerInboundData
+    private function makeDTO(string $method, string $quantity, string $unitCost, string $date): CostLayerInboundDTO
     {
-        return new CostLayerInboundData(
+        return new CostLayerInboundDTO(
             tenantId: $this->tenantId,
             productId: $this->productId,
             variantId: null,

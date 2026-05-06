@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Finance\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
-use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Finance\Application\Contracts\UpdateBankAccountServiceInterface;
 use Modules\Finance\Application\DTOs\BankAccountData;
 use Modules\Finance\Domain\Entities\BankAccount;
@@ -27,15 +26,12 @@ class UpdateBankAccountService extends BaseService implements UpdateBankAccountS
         if (! $ba) {
             throw new BankAccountNotFoundException((int) $dto->id);
         }
-        if ($dto->rowVersion !== $ba->getRowVersion()) {
-            throw new ConcurrentModificationException('BankAccount', (int) $dto->id);
-        }
         $ba->update(
             name: $dto->name,
-            bankName: $dto->bankName,
-            accountNumber: $dto->accountNumber,
-            routingNumber: $dto->routingNumber,
-            isActive: $dto->isActive,
+            bankName: $dto->bank_name,
+            accountNumber: $dto->account_number,
+            routingNumber: $dto->routing_number,
+            isActive: $dto->is_active,
         );
 
         return $this->bankAccountRepository->save($ba);

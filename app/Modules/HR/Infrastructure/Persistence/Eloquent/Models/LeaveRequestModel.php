@@ -19,7 +19,7 @@ class LeaveRequestModel extends BaseModel
 
     protected $fillable = ['tenant_id', 'employee_id', 'leave_type_id', 'start_date', 'end_date', 'total_days', 'reason', 'status', 'approver_id', 'approver_note', 'attachment_path', 'metadata'];
 
-    protected $casts = ['tenant_id' => 'integer', 'employee_id' => 'integer', 'leave_type_id' => 'integer', 'approver_id' => 'integer', 'start_date' => 'date', 'end_date' => 'date', 'total_days' => 'float', 'metadata' => 'array'];
+    protected $casts = ['start_date' => 'date', 'end_date' => 'date', 'total_days' => 'float', 'metadata' => 'array'];
 
     public function employee(): BelongsTo
     {

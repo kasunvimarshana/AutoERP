@@ -8,30 +8,14 @@ use Illuminate\Support\Facades\DB;
 use Modules\Core\Infrastructure\Persistence\Repositories\EloquentRepository;
 use Modules\Pricing\Domain\Entities\PriceListItem;
 use Modules\Pricing\Domain\RepositoryInterfaces\PriceListItemRepositoryInterface;
-use Modules\Pricing\Infrastructure\Persistence\Eloquent\Models\CustomerPriceListModel;
 use Modules\Pricing\Infrastructure\Persistence\Eloquent\Models\PriceListItemModel;
-use Modules\Pricing\Infrastructure\Persistence\Eloquent\Models\PriceListModel;
-use Modules\Pricing\Infrastructure\Persistence\Eloquent\Models\SupplierPriceListModel;
 
 class EloquentPriceListItemRepository extends EloquentRepository implements PriceListItemRepositoryInterface
 {
-    private string $priceListItemsTable;
-    private string $priceListsTable;
-    private string $customerPriceListsTable;
-    private string $supplierPriceListsTable;
-
-    public function __construct(
-        PriceListItemModel $model,
-        PriceListModel $priceListModel,
-        CustomerPriceListModel $customerPriceListModel,
-        SupplierPriceListModel $supplierPriceListModel,
-    ) {
+    public function __construct(PriceListItemModel $model)
+    {
         parent::__construct($model);
         $this->setDomainEntityMapper(fn (PriceListItemModel $model): PriceListItem => $this->mapModelToDomainEntity($model));
-        $this->priceListItemsTable = $model->getTable();
-        $this->priceListsTable = $priceListModel->getTable();
-        $this->customerPriceListsTable = $customerPriceListModel->getTable();
-        $this->supplierPriceListsTable = $supplierPriceListModel->getTable();
     }
 
     public function save(PriceListItem $priceListItem): PriceListItem
@@ -47,7 +31,6 @@ class EloquentPriceListItemRepository extends EloquentRepository implements Pric
             'discount_pct' => $priceListItem->getDiscountPct(),
             'valid_from' => $priceListItem->getValidFrom()?->format('Y-m-d'),
             'valid_to' => $priceListItem->getValidTo()?->format('Y-m-d'),
-            'row_version' => $priceListItem->getRowVersion(),
         ];
 
         if ($priceListItem->getId()) {
@@ -75,14 +58,9 @@ class EloquentPriceListItemRepository extends EloquentRepository implements Pric
     ): ?array {
         $date = $priceDate->format('Y-m-d');
 
-        $pli = $this->priceListItemsTable . ' as pli';
-        $pl = $this->priceListsTable . ' as pl';
-        $cpl = $this->customerPriceListsTable . ' as cpl';
-        $spl = $this->supplierPriceListsTable . ' as spl';
-
-        $query = DB::table($pli)
-            ->join($pl, 'pl.id', '=', 'pli.price_list_id')
-            ->leftJoin($cpl, function ($join) use ($tenantId, $customerId): void {
+        $query = DB::table('price_list_items as pli')
+            ->join('price_lists as pl', 'pl.id', '=', 'pli.price_list_id')
+            ->leftJoin('customer_price_lists as cpl', function ($join) use ($tenantId, $customerId): void {
                 $join->on('cpl.price_list_id', '=', 'pl.id')
                     ->where('cpl.tenant_id', '=', $tenantId);
 
@@ -92,7 +70,7 @@ class EloquentPriceListItemRepository extends EloquentRepository implements Pric
                     $join->whereRaw('1 = 0');
                 }
             })
-            ->leftJoin($spl, function ($join) use ($tenantId, $supplierId): void {
+            ->leftJoin('supplier_price_lists as spl', function ($join) use ($tenantId, $supplierId): void {
                 $join->on('spl.price_list_id', '=', 'pl.id')
                     ->where('spl.tenant_id', '=', $tenantId);
 
@@ -198,7 +176,6 @@ class EloquentPriceListItemRepository extends EloquentRepository implements Pric
             discountPct: number_format((float) $model->discount_pct, 6, '.', ''),
             validFrom: $model->valid_from,
             validTo: $model->valid_to,
-            rowVersion: (int) ($model->row_version ?? 1),
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,
         );

@@ -27,7 +27,6 @@ class SupplierResource extends JsonResource
             'status' => $this->getStatus(),
             'notes' => $this->getNotes(),
             'metadata' => $this->getMetadata(),
-            'row_version' => $this->getRowVersion(),
             'created_at' => $this->getCreatedAt()->format('c'),
             'updated_at' => $this->getUpdatedAt()->format('c'),
         ];

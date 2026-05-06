@@ -39,8 +39,6 @@ class Customer
     /** @var array<string, mixed>|null */
     private ?array $metadata;
 
-    private int $rowVersion;
-
     private \DateTimeInterface $createdAt;
 
     private \DateTimeInterface $updatedAt;
@@ -64,7 +62,6 @@ class Customer
         string $status = 'active',
         ?string $notes = null,
         ?array $metadata = null,
-        int $rowVersion = 1,
         ?int $id = null,
         ?\DateTimeInterface $createdAt = null,
         ?\DateTimeInterface $updatedAt = null,
@@ -89,7 +86,6 @@ class Customer
         $this->status = $status;
         $this->notes = $notes;
         $this->metadata = $metadata;
-        $this->rowVersion = $rowVersion;
         $this->createdAt = $createdAt ?? new \DateTimeImmutable;
         $this->updatedAt = $updatedAt ?? new \DateTimeImmutable;
     }
@@ -177,11 +173,6 @@ class Customer
         return $this->metadata;
     }
 
-    public function getRowVersion(): int
-    {
-        return $this->rowVersion;
-    }
-
     public function getCreatedAt(): \DateTimeInterface
     {
         return $this->createdAt;
@@ -229,7 +220,6 @@ class Customer
         $this->status = $status;
         $this->notes = $notes;
         $this->metadata = $metadata;
-        $this->rowVersion++;
         $this->updatedAt = new \DateTimeImmutable;
     }
 

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\HR\Application\Services;
 
-use Illuminate\Support\Facades\DB;
 use Modules\Core\Application\Services\BaseService;
 use Modules\Core\Domain\Exceptions\DomainException;
 use Modules\HR\Application\Contracts\ApproveLeaveRequestServiceInterface;
@@ -40,31 +39,28 @@ class ApproveLeaveRequestService extends BaseService implements ApproveLeaveRequ
         }
 
         $request->approve($dto->approverId, $dto->approverNote);
+        $saved = $this->requestRepository->save($request);
 
-        return DB::transaction(function () use ($request, $dto): LeaveRequest {
-            $saved = $this->requestRepository->save($request);
+        $year = (int) $request->getStartDate()->format('Y');
+        $balance = $this->balanceRepository->findByEmployeeAndType(
+            $dto->tenantId,
+            $request->getEmployeeId(),
+            $request->getLeaveTypeId(),
+            $year,
+        );
 
-            $year = (int) $request->getStartDate()->format('Y');
-            $balance = $this->balanceRepository->findByEmployeeAndType(
-                $dto->tenantId,
-                $request->getEmployeeId(),
-                $request->getLeaveTypeId(),
-                $year,
+        if ($balance !== null) {
+            $updatedBalance = $this->withUsedAndPending(
+                $balance,
+                $balance->getUsed() + $request->getTotalDays(),
+                $balance->getPending() - $request->getTotalDays(),
             );
+            $this->balanceRepository->save($updatedBalance);
+        }
 
-            if ($balance !== null) {
-                $updatedBalance = $this->withUsedAndPending(
-                    $balance,
-                    $balance->getUsed() + $request->getTotalDays(),
-                    $balance->getPending() - $request->getTotalDays(),
-                );
-                $this->balanceRepository->save($updatedBalance);
-            }
+        $this->addEvent(new LeaveRequestApproved($saved, $dto->tenantId));
 
-            $this->addEvent(new LeaveRequestApproved($saved, $dto->tenantId));
-
-            return $saved;
-        });
+        return $saved;
     }
 
     private function withUsedAndPending(LeaveBalance $balance, float $used, float $pending): LeaveBalance

@@ -11,7 +11,7 @@ use Modules\Purchase\Domain\RepositoryInterfaces\PurchaseOrderRepositoryInterfac
 
 class FindPurchaseOrderService implements FindPurchaseOrderServiceInterface
 {
-    private const ALLOWED_FILTERS = ['tenant_id', 'supplier_id', 'warehouse_id', 'org_unit_id', 'status', 'po_number'];
+    private const ALLOWED_FILTERS = ['tenant_id', 'supplier_id', 'warehouse_id', 'status', 'po_number'];
 
     private const ALLOWED_SORTS = ['id', 'po_number', 'order_date', 'status', 'created_at'];
 

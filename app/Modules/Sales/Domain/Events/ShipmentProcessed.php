@@ -14,7 +14,6 @@ class ShipmentProcessed
         public readonly int $shipmentId,
         public readonly int $customerId,
         public readonly int $warehouseId,
-        public readonly ?int $salesOrderId = null,
         public readonly array $lines = [],
     ) {}
 }

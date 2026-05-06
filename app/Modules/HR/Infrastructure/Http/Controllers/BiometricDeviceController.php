@@ -31,7 +31,6 @@ class BiometricDeviceController extends AuthorizedController
 
     public function index(): JsonResponse
     {
-        $this->authorize('viewAny', BiometricDevice::class);
         $result = $this->findService->list();
 
         return Response::json(['data' => BiometricDeviceResource::collection($result)]);
@@ -39,7 +38,6 @@ class BiometricDeviceController extends AuthorizedController
 
     public function store(StoreBiometricDeviceRequest $request): JsonResponse
     {
-        $this->authorize('create', BiometricDevice::class);
         $entity = $this->createService->execute($request->validated());
 
         return (new BiometricDeviceResource($entity))->response()->setStatusCode(201);
@@ -47,16 +45,12 @@ class BiometricDeviceController extends AuthorizedController
 
     public function show(int $biometricDevice): BiometricDeviceResource
     {
-        $entity = $this->findOrFail($biometricDevice);
-        $this->authorize('view', $entity);
-
-        return new BiometricDeviceResource($entity);
+        return new BiometricDeviceResource($this->findOrFail($biometricDevice));
     }
 
     public function update(UpdateBiometricDeviceRequest $request, int $biometricDevice): BiometricDeviceResource
     {
-        $entity = $this->findOrFail($biometricDevice);
-        $this->authorize('update', $entity);
+        $this->findOrFail($biometricDevice);
         $payload = $request->validated();
         $payload['id'] = $biometricDevice;
         $updated = $this->updateService->execute($payload);
@@ -66,8 +60,7 @@ class BiometricDeviceController extends AuthorizedController
 
     public function destroy(int $biometricDevice): JsonResponse
     {
-        $entity = $this->findOrFail($biometricDevice);
-        $this->authorize('delete', $entity);
+        $this->findOrFail($biometricDevice);
         $this->deleteService->execute(['id' => $biometricDevice]);
 
         return Response::json(null, 204);
@@ -75,8 +68,7 @@ class BiometricDeviceController extends AuthorizedController
 
     public function sync(SyncBiometricDeviceRequest $request, int $biometricDevice): JsonResponse
     {
-        $entity = $this->findOrFail($biometricDevice);
-        $this->authorize('update', $entity);
+        $this->findOrFail($biometricDevice);
         $payload = $request->validated();
         $payload['device_id'] = $biometricDevice;
         $this->syncService->execute($payload);

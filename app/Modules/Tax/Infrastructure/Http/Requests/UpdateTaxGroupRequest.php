@@ -30,7 +30,6 @@ class UpdateTaxGroupRequest extends FormRequest
                     ->ignore($taxGroupId),
             ],
             'description' => 'nullable|string',
-            'row_version' => 'required|integer|min:1',
         ];
     }
 }

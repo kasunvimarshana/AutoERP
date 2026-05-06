@@ -32,17 +32,17 @@ class RecordPurchasePaymentService extends BaseService implements RecordPurchase
     {
         $dto = RecordPurchasePaymentData::fromArray($data);
 
-        $invoice = $this->invoiceRepository->find($dto->invoiceId);
+        $invoice = $this->invoiceRepository->find($dto->invoice_id);
 
         if (! $invoice) {
-            throw new PurchaseInvoiceNotFoundException($dto->invoiceId);
+            throw new PurchaseInvoiceNotFoundException($dto->invoice_id);
         }
 
         $existingPayment = null;
-        if ($dto->idempotencyKey !== null && $dto->idempotencyKey !== '') {
-            $existingPayment = $this->paymentRepository->findByTenantAndIdempotencyKey($dto->tenantId, $dto->idempotencyKey);
+        if ($dto->idempotency_key !== null && $dto->idempotency_key !== '') {
+            $existingPayment = $this->paymentRepository->findByTenantAndIdempotencyKey($dto->tenant_id, $dto->idempotency_key);
             if ($existingPayment !== null && $this->hasActiveAllocation(
-                (int) $dto->tenantId,
+                (int) $dto->tenant_id,
                 (int) $existingPayment->getId(),
                 'purchase_invoice',
                 (int) $invoice->getId(),
@@ -68,25 +68,25 @@ class RecordPurchasePaymentService extends BaseService implements RecordPurchase
 
         return DB::transaction(function () use ($dto, $invoice): PurchaseInvoice {
             $payment = $this->createPaymentService->execute([
-                'tenant_id' => $dto->tenantId,
-                'payment_number' => $dto->paymentNumber,
+                'tenant_id' => $dto->tenant_id,
+                'payment_number' => $dto->payment_number,
                 'direction' => 'outbound',
                 'party_type' => 'supplier',
                 'party_id' => $invoice->getSupplierId(),
-                'payment_method_id' => $dto->paymentMethodId,
-                'account_id' => $dto->accountId,
+                'payment_method_id' => $dto->payment_method_id,
+                'account_id' => $dto->account_id,
                 'amount' => (float) $dto->amount,
-                'currency_id' => $dto->currencyId,
-                'payment_date' => $dto->paymentDate,
-                'exchange_rate' => $dto->exchangeRate,
+                'currency_id' => $dto->currency_id,
+                'payment_date' => $dto->payment_date,
+                'exchange_rate' => $dto->exchange_rate,
                 'reference' => $dto->reference,
                 'notes' => $dto->notes,
                 'status' => 'posted',
-                'idempotency_key' => $dto->idempotencyKey,
+                'idempotency_key' => $dto->idempotency_key,
             ]);
 
             if ($this->hasActiveAllocation(
-                (int) $dto->tenantId,
+                (int) $dto->tenant_id,
                 (int) $payment->getId(),
                 'purchase_invoice',
                 (int) $invoice->getId(),
@@ -99,7 +99,7 @@ class RecordPurchasePaymentService extends BaseService implements RecordPurchase
                 'invoice_type' => 'purchase_invoice',
                 'invoice_id' => $invoice->getId(),
                 'allocated_amount' => (float) $dto->amount,
-                'tenant_id' => $dto->tenantId,
+                'tenant_id' => $dto->tenant_id,
             ]);
 
             $invoice->recordPayment((string) $dto->amount);
@@ -107,16 +107,16 @@ class RecordPurchasePaymentService extends BaseService implements RecordPurchase
             $saved = $this->invoiceRepository->save($invoice);
 
             $this->addEvent(new PurchasePaymentRecorded(
-                tenantId: $dto->tenantId,
+                tenantId: $dto->tenant_id,
                 purchaseInvoiceId: (int) $saved->getId(),
                 supplierId: $saved->getSupplierId(),
                 paymentId: (int) $payment->getId(),
                 apAccountId: $saved->getApAccountId(),
-                cashAccountId: $dto->accountId,
+                cashAccountId: $dto->account_id,
                 amount: (string) $dto->amount,
-                currencyId: $dto->currencyId,
-                exchangeRate: (string) $dto->exchangeRate,
-                paymentDate: $dto->paymentDate,
+                currencyId: $dto->currency_id,
+                exchangeRate: (string) $dto->exchange_rate,
+                paymentDate: $dto->payment_date,
                 createdBy: (int) (Auth::id() ?? 0),
             ));
 

@@ -20,7 +20,6 @@ class CreditMemo
         private ?string $appliedToInvoiceType = null,
         private ?string $notes = null,
         private ?int $journalEntryId = null,
-        private int $rowVersion = 1,
         private ?int $id = null,
         private ?\DateTimeInterface $createdAt = null,
         private ?\DateTimeInterface $updatedAt = null,
@@ -107,11 +106,6 @@ class CreditMemo
     public function getUpdatedAt(): \DateTimeInterface
     {
         return $this->updatedAt;
-    }
-
-    public function getRowVersion(): int
-    {
-        return $this->rowVersion;
     }
 
     public function issue(): void

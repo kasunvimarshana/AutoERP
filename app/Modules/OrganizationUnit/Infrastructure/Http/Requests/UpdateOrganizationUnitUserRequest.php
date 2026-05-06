@@ -16,7 +16,7 @@ class UpdateOrganizationUnitUserRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'role_id' => 'sometimes|nullable|integer|exists:roles,id',
+            'role' => 'sometimes|nullable|string|max:255',
             'is_primary' => 'sometimes|required|boolean',
         ];
     }

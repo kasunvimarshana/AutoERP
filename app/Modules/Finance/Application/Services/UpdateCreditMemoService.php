@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Finance\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
-use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Finance\Application\Contracts\UpdateCreditMemoServiceInterface;
 use Modules\Finance\Application\DTOs\CreditMemoData;
 use Modules\Finance\Domain\Entities\CreditMemo;
@@ -27,15 +26,12 @@ class UpdateCreditMemoService extends BaseService implements UpdateCreditMemoSer
         if (! $cm) {
             throw new CreditMemoNotFoundException((int) $dto->id);
         }
-        if ($dto->rowVersion !== $cm->getRowVersion()) {
-            throw new ConcurrentModificationException('CreditMemo', (int) $dto->id);
-        }
         if ($dto->status === 'issued') {
             $cm->issue();
         } elseif ($dto->status === 'voided') {
             $cm->void();
-        } elseif ($dto->status === 'applied' && $dto->appliedToInvoiceId !== null && $dto->appliedToInvoiceType !== null) {
-            $cm->apply($dto->appliedToInvoiceId, $dto->appliedToInvoiceType);
+        } elseif ($dto->status === 'applied' && $dto->applied_to_invoice_id !== null && $dto->applied_to_invoice_type !== null) {
+            $cm->apply($dto->applied_to_invoice_id, $dto->applied_to_invoice_type);
         }
 
         return $this->creditMemoRepository->save($cm);

@@ -9,7 +9,6 @@ use Modules\Pricing\Application\Contracts\UpdatePriceListItemServiceInterface;
 use Modules\Pricing\Application\DTOs\PriceListItemData;
 use Modules\Pricing\Domain\Entities\PriceListItem;
 use Modules\Pricing\Domain\Exceptions\PriceListItemNotFoundException;
-use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Pricing\Domain\Exceptions\PriceListNotFoundException;
 use Modules\Pricing\Domain\RepositoryInterfaces\PriceListItemRepositoryInterface;
 use Modules\Pricing\Domain\RepositoryInterfaces\PriceListRepositoryInterface;
@@ -36,11 +35,6 @@ class UpdatePriceListItemService extends BaseService implements UpdatePriceListI
         $priceList = $this->priceListRepository->find($dto->price_list_id);
         if (! $priceList || $priceList->getTenantId() !== $item->getTenantId()) {
             throw new PriceListNotFoundException($dto->price_list_id);
-        }
-
-
-        if ($dto->rowVersion !== $item->getRowVersion()) {
-            throw new ConcurrentModificationException('PriceListItem', $id);
         }
 
         $item->update(

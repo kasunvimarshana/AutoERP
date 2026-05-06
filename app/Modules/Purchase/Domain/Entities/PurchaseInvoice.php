@@ -48,9 +48,6 @@ class PurchaseInvoice
 
     private \DateTimeInterface $updatedAt;
 
-    /** @var PurchaseInvoiceLine[] */
-    private array $lines = [];
-
     public function __construct(
         int $tenantId,
         int $supplierId,
@@ -217,30 +214,6 @@ class PurchaseInvoice
         $this->updatedAt = new \DateTimeImmutable;
     }
 
-    public function recordRefund(string $amount): void
-    {
-        if (bccomp($amount, '0.000000', 6) <= 0) {
-            throw new \InvalidArgumentException('Refund amount must be greater than zero.');
-        }
-
-        if (bccomp($amount, $this->paidAmount, 6) > 0) {
-            throw new \InvalidArgumentException('Refund amount cannot exceed paid amount.');
-        }
-
-        $newPaid = bcsub($this->paidAmount, $amount, 6);
-        $this->paidAmount = $newPaid;
-
-        if (bccomp($newPaid, '0.000000', 6) === 0) {
-            $this->status = 'approved';
-        } elseif (bccomp($newPaid, $this->grandTotal, 6) >= 0) {
-            $this->status = 'paid';
-        } else {
-            $this->status = 'partial_paid';
-        }
-
-        $this->updatedAt = new \DateTimeImmutable;
-    }
-
     public function getCreatedAt(): \DateTimeInterface
     {
         return $this->createdAt;
@@ -290,21 +263,5 @@ class PurchaseInvoice
     {
         $this->status = 'approved';
         $this->updatedAt = new \DateTimeImmutable;
-    }
-
-    /**
-     * @param  PurchaseInvoiceLine[]  $lines
-     */
-    public function setLines(array $lines): void
-    {
-        $this->lines = $lines;
-    }
-
-    /**
-     * @return PurchaseInvoiceLine[]
-     */
-    public function getLines(): array
-    {
-        return $this->lines;
     }
 }

@@ -7,15 +7,14 @@ namespace Modules\Finance\Application\DTOs;
 class ApprovalWorkflowConfigData
 {
     public function __construct(
-        public readonly int $tenantId,
+        public readonly int $tenant_id,
         public readonly string $module,
-        public readonly string $entityType,
+        public readonly string $entity_type,
         public readonly string $name,
         public readonly array $steps,
-        public readonly ?float $minAmount = null,
-        public readonly ?float $maxAmount = null,
-        public readonly bool $isActive = true,
-        public readonly int $rowVersion = 1,
+        public readonly ?float $min_amount = null,
+        public readonly ?float $max_amount = null,
+        public readonly bool $is_active = true,
         public readonly ?int $id = null,
     ) {}
 
@@ -23,15 +22,14 @@ class ApprovalWorkflowConfigData
     public static function fromArray(array $data): self
     {
         return new self(
-            tenantId: (int) $data['tenant_id'],
+            tenant_id: (int) $data['tenant_id'],
             module: (string) $data['module'],
-            entityType: (string) $data['entity_type'],
+            entity_type: (string) $data['entity_type'],
             name: (string) $data['name'],
             steps: (array) $data['steps'],
-            minAmount: isset($data['min_amount']) ? (float) $data['min_amount'] : null,
-            maxAmount: isset($data['max_amount']) ? (float) $data['max_amount'] : null,
-            isActive: (bool) ($data['is_active'] ?? true),
-            rowVersion: isset($data['row_version']) ? (int) $data['row_version'] : 1,
+            min_amount: isset($data['min_amount']) ? (float) $data['min_amount'] : null,
+            max_amount: isset($data['max_amount']) ? (float) $data['max_amount'] : null,
+            is_active: (bool) ($data['is_active'] ?? true),
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

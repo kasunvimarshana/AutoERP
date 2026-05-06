@@ -33,7 +33,6 @@ class EloquentCreditMemoRepository extends EloquentRepository implements CreditM
             'applied_to_invoice_type' => $cm->getAppliedToInvoiceType(),
             'notes' => $cm->getNotes(),
             'journal_entry_id' => $cm->getJournalEntryId(),
-            'row_version' => $cm->getRowVersion(),
         ];
 
         $model = $cm->getId() ? $this->update($cm->getId(), $data) : $this->create($data);
@@ -58,7 +57,6 @@ class EloquentCreditMemoRepository extends EloquentRepository implements CreditM
             appliedToInvoiceType: $m->applied_to_invoice_type,
             notes: $m->notes,
             journalEntryId: $m->journal_entry_id !== null ? (int) $m->journal_entry_id : null,
-            rowVersion: (int) ($m->row_version ?? 1),
             id: (int) $m->id,
             createdAt: $m->created_at,
             updatedAt: $m->updated_at,

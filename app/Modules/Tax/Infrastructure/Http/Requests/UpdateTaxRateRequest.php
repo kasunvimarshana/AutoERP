@@ -41,7 +41,6 @@ class UpdateTaxRateRequest extends FormRequest
             'is_active' => 'nullable|boolean',
             'valid_from' => 'nullable|date',
             'valid_to' => 'nullable|date|after_or_equal:valid_from',
-            'row_version' => 'required|integer|min:1',
         ];
     }
 }

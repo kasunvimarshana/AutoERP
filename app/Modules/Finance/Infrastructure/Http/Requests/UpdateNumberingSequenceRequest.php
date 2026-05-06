@@ -19,7 +19,6 @@ class UpdateNumberingSequenceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'row_version' => ['required', 'integer', 'min:1'],
             'tenant_id' => ['required', 'integer', 'exists:tenants,id'],
             'module' => ['required', 'string', 'max:255'],
             'document_type' => ['required', 'string', 'max:255'],

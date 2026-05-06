@@ -37,7 +37,6 @@ class EloquentPaymentRepository extends EloquentRepository implements PaymentRep
             'notes' => $payment->getNotes(),
             'idempotency_key' => $payment->getIdempotencyKey(),
             'journal_entry_id' => $payment->getJournalEntryId(),
-            'row_version' => $payment->getRowVersion(),
         ];
 
         if ($payment->getId()) {
@@ -92,7 +91,6 @@ class EloquentPaymentRepository extends EloquentRepository implements PaymentRep
             notes: $model->notes,
             idempotencyKey: $model->idempotency_key,
             journalEntryId: $model->journal_entry_id !== null ? (int) $model->journal_entry_id : null,
-            rowVersion: (int) ($model->row_version ?? 1),
             id: (int) $model->id,
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,

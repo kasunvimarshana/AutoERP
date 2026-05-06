@@ -24,48 +24,20 @@ class TenantConfigClient implements TenantConfigClientInterface
 
     public function getConfig(int $tenantId): ?TenantConfigInterface
     {
-        // return Cache::remember(
-        //     $this->tenantIdCacheKey($tenantId),
-        //     $this->cacheTtl,
-        //     fn (): ?TenantConfigInterface => $this->configFromTenant($this->tenantRepository->find($tenantId))
-        // );
-
-        $cacheKey = $this->tenantIdCacheKey($tenantId);
-        $cached = Cache::get($cacheKey);
-
-        if ($cached instanceof TenantConfigInterface || $cached === null) {
-            return $cached;
-        }
-
-        Cache::forget($cacheKey);
-
-        $config = $this->configFromTenant($this->tenantRepository->find($tenantId));
-        Cache::put($cacheKey, $config, $this->cacheTtl);
-
-        return $config;
+        return Cache::remember(
+            $this->tenantIdCacheKey($tenantId),
+            $this->cacheTtl,
+            fn (): ?TenantConfigInterface => $this->configFromTenant($this->tenantRepository->find($tenantId))
+        );
     }
 
     public function getConfigByDomain(string $domain): ?TenantConfigInterface
     {
-        // return Cache::remember(
-        //     $this->tenantDomainCacheKey($domain),
-        //     $this->cacheTtl,
-        //     fn (): ?TenantConfigInterface => $this->configFromTenant($this->tenantRepository->findByDomain($domain))
-        // );
-
-        $cacheKey = $this->tenantDomainCacheKey($domain);
-        $cached = Cache::get($cacheKey);
-
-        if ($cached instanceof TenantConfigInterface || $cached === null) {
-            return $cached;
-        }
-
-        Cache::forget($cacheKey);
-
-        $config = $this->configFromTenant($this->tenantRepository->findByDomain($domain));
-        Cache::put($cacheKey, $config, $this->cacheTtl);
-
-        return $config;
+        return Cache::remember(
+            $this->tenantDomainCacheKey($domain),
+            $this->cacheTtl,
+            fn (): ?TenantConfigInterface => $this->configFromTenant($this->tenantRepository->findByDomain($domain))
+        );
     }
 
     public function forgetCache(int $tenantId): void

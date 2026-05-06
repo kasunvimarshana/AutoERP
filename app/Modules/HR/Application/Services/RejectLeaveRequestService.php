@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\HR\Application\Services;
 
-use Illuminate\Support\Facades\DB;
 use Modules\Core\Application\Services\BaseService;
 use Modules\Core\Domain\Exceptions\DomainException;
 use Modules\HR\Application\Contracts\RejectLeaveRequestServiceInterface;
@@ -40,30 +39,27 @@ class RejectLeaveRequestService extends BaseService implements RejectLeaveReques
         }
 
         $request->reject($dto->approverId, $dto->reason);
+        $saved = $this->requestRepository->save($request);
 
-        return DB::transaction(function () use ($request, $dto): LeaveRequest {
-            $saved = $this->requestRepository->save($request);
+        $year = (int) $request->getStartDate()->format('Y');
+        $balance = $this->balanceRepository->findByEmployeeAndType(
+            $dto->tenantId,
+            $request->getEmployeeId(),
+            $request->getLeaveTypeId(),
+            $year,
+        );
 
-            $year = (int) $request->getStartDate()->format('Y');
-            $balance = $this->balanceRepository->findByEmployeeAndType(
-                $dto->tenantId,
-                $request->getEmployeeId(),
-                $request->getLeaveTypeId(),
-                $year,
+        if ($balance !== null) {
+            $updatedBalance = $this->withPending(
+                $balance,
+                $balance->getPending() - $request->getTotalDays(),
             );
+            $this->balanceRepository->save($updatedBalance);
+        }
 
-            if ($balance !== null) {
-                $updatedBalance = $this->withPending(
-                    $balance,
-                    $balance->getPending() - $request->getTotalDays(),
-                );
-                $this->balanceRepository->save($updatedBalance);
-            }
+        $this->addEvent(new LeaveRequestRejected($saved, $dto->tenantId));
 
-            $this->addEvent(new LeaveRequestRejected($saved, $dto->tenantId));
-
-            return $saved;
-        });
+        return $saved;
     }
 
     private function withPending(LeaveBalance $balance, float $pending): LeaveBalance

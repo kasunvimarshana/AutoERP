@@ -9,9 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
-use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\AccountModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
-use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models\WarehouseModel;
 
 class OrganizationUnitModel extends BaseModel
 {
@@ -41,25 +39,14 @@ class OrganizationUnitModel extends BaseModel
         'warehouse_id',
         '_lft',
         '_rgt',
-        'row_version',
     ];
 
     protected $casts = [
-        'tenant_id' => 'integer',
-        'type_id' => 'integer',
-        'parent_id' => 'integer',
-        'manager_user_id' => 'integer',
-        'default_revenue_account_id' => 'integer',
-        'default_expense_account_id' => 'integer',
-        'default_asset_account_id' => 'integer',
-        'default_liability_account_id' => 'integer',
-        'warehouse_id' => 'integer',
         'metadata' => 'array',
         'depth' => 'integer',
         'is_active' => 'boolean',
         '_lft' => 'integer',
         '_rgt' => 'integer',
-        'row_version' => 'integer',
     ];
 
     public function type(): BelongsTo
@@ -88,31 +75,6 @@ class OrganizationUnitModel extends BaseModel
             (string) config('auth.providers.users.model'),
             'manager_user_id'
         );
-    }
-
-    public function warehouse(): BelongsTo
-    {
-        return $this->belongsTo(WarehouseModel::class, 'warehouse_id');
-    }
-
-    public function defaultRevenueAccount(): BelongsTo
-    {
-        return $this->belongsTo(AccountModel::class, 'default_revenue_account_id');
-    }
-
-    public function defaultExpenseAccount(): BelongsTo
-    {
-        return $this->belongsTo(AccountModel::class, 'default_expense_account_id');
-    }
-
-    public function defaultAssetAccount(): BelongsTo
-    {
-        return $this->belongsTo(AccountModel::class, 'default_asset_account_id');
-    }
-
-    public function defaultLiabilityAccount(): BelongsTo
-    {
-        return $this->belongsTo(AccountModel::class, 'default_liability_account_id');
     }
 
     public function organizationUnitUsers(): HasMany

@@ -31,7 +31,6 @@ class AccountResource extends JsonResource
             'is_active' => $this->resource->isActive(),
             'path' => $this->resource->getPath(),
             'depth' => $this->resource->getDepth(),
-            'row_version' => $this->resource->getRowVersion(),
             'created_at' => $this->resource->getCreatedAt(),
             'updated_at' => $this->resource->getUpdatedAt(),
         ];

@@ -7,7 +7,6 @@ namespace Modules\Pricing\Infrastructure\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Pricing\Application\Contracts\ResolvePriceServiceInterface;
-use Modules\Pricing\Domain\Entities\PriceList;
 use Modules\Pricing\Infrastructure\Http\Requests\ResolvePriceRequest;
 
 class PriceResolutionController extends AuthorizedController
@@ -16,7 +15,6 @@ class PriceResolutionController extends AuthorizedController
 
     public function resolve(ResolvePriceRequest $request): JsonResponse
     {
-        $this->authorize('viewAny', PriceList::class);
         $resolved = $this->resolvePriceService->execute($request->validated());
 
         return response()->json(['data' => $resolved]);

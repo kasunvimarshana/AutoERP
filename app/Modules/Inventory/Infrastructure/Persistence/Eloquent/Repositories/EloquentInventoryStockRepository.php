@@ -6,29 +6,12 @@ namespace Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Domain\Entities\StockMovement;
-use Modules\Inventory\Domain\Exceptions\InsufficientAvailableStockException;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryStockRepositoryInterface;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\StockMovementModel;
-use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\StockLevelModel;
-use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models\WarehouseLocationModel;
-use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models\WarehouseModel;
 
 class EloquentInventoryStockRepository implements InventoryStockRepositoryInterface
 {
-    private string $stockLevelsTable;
-    private string $warehouseLocationsTable;
-    private string $warehousesTable;
-
-    public function __construct(
-        private readonly StockMovementModel $stockMovementModel,
-        StockLevelModel $stockLevelModel,
-        WarehouseLocationModel $warehouseLocationModel,
-        WarehouseModel $warehouseModel,
-    ) {
-        $this->stockLevelsTable = $stockLevelModel->getTable();
-        $this->warehouseLocationsTable = $warehouseLocationModel->getTable();
-        $this->warehousesTable = $warehouseModel->getTable();
-    }
+    public function __construct(private readonly StockMovementModel $stockMovementModel) {}
 
     public function recordMovement(StockMovement $movement): StockMovement
     {
@@ -78,14 +61,13 @@ class EloquentInventoryStockRepository implements InventoryStockRepositoryInterf
         int $page,
         ?string $sort = null,
     ): mixed {
-        $warehouseLocationsTable = $this->warehouseLocationsTable;
         $query = $this->stockMovementModel->newQuery()
             ->where('tenant_id', $tenantId)
-            ->where(function ($builder) use ($warehouseId, $warehouseLocationsTable): void {
-                $builder->whereIn('from_location_id', function ($sub) use ($warehouseId, $warehouseLocationsTable): void {
-                    $sub->select('id')->from($warehouseLocationsTable)->where('warehouse_id', $warehouseId);
-                })->orWhereIn('to_location_id', function ($sub) use ($warehouseId, $warehouseLocationsTable): void {
-                    $sub->select('id')->from($warehouseLocationsTable)->where('warehouse_id', $warehouseId);
+            ->where(function ($builder) use ($warehouseId): void {
+                $builder->whereIn('from_location_id', function ($sub) use ($warehouseId): void {
+                    $sub->select('id')->from('warehouse_locations')->where('warehouse_id', $warehouseId);
+                })->orWhereIn('to_location_id', function ($sub) use ($warehouseId): void {
+                    $sub->select('id')->from('warehouse_locations')->where('warehouse_id', $warehouseId);
                 });
             });
 
@@ -116,22 +98,19 @@ class EloquentInventoryStockRepository implements InventoryStockRepositoryInterf
 
     public function paginateStockLevelsByWarehouse(int $tenantId, int $warehouseId, int $perPage, int $page): mixed
     {
-        $sl = $this->stockLevelsTable;
-        $wl = $this->warehouseLocationsTable;
-
-        return DB::table($sl)
-            ->join($wl, "{$wl}.id", '=', "{$sl}.location_id")
-            ->where("{$sl}.tenant_id", $tenantId)
-            ->where("{$wl}.warehouse_id", $warehouseId)
-            ->select("{$sl}.*")
-            ->orderBy("{$sl}.product_id")
-            ->orderBy("{$sl}.location_id")
+        return DB::table('stock_levels')
+            ->join('warehouse_locations', 'warehouse_locations.id', '=', 'stock_levels.location_id')
+            ->where('stock_levels.tenant_id', $tenantId)
+            ->where('warehouse_locations.warehouse_id', $warehouseId)
+            ->select('stock_levels.*')
+            ->orderBy('stock_levels.product_id')
+            ->orderBy('stock_levels.location_id')
             ->paginate($perPage, ['*'], 'page', $page);
     }
 
     public function locationBelongsToWarehouse(int $tenantId, int $warehouseId, int $locationId): bool
     {
-        return DB::table($this->warehouseLocationsTable)
+        return DB::table('warehouse_locations')
             ->where('id', $locationId)
             ->where('tenant_id', $tenantId)
             ->where('warehouse_id', $warehouseId)
@@ -140,7 +119,7 @@ class EloquentInventoryStockRepository implements InventoryStockRepositoryInterf
 
     public function warehouseExists(int $tenantId, int $warehouseId): bool
     {
-        return DB::table($this->warehousesTable)
+        return DB::table('warehouses')
             ->where('id', $warehouseId)
             ->where('tenant_id', $tenantId)
             ->exists();
@@ -148,7 +127,7 @@ class EloquentInventoryStockRepository implements InventoryStockRepositoryInterf
 
     private function applyStockDelta(StockMovement $movement, int $locationId, string $qty, string $operation): void
     {
-        $existing = DB::table($this->stockLevelsTable)
+        $existing = DB::table('stock_levels')
             ->where('tenant_id', $movement->getTenantId())
             ->where('product_id', $movement->getProductId())
             ->where('variant_id', $movement->getVariantId())
@@ -159,11 +138,7 @@ class EloquentInventoryStockRepository implements InventoryStockRepositoryInterf
             ->first();
 
         if ($existing === null) {
-            if ($operation === '-') {
-                throw new InsufficientAvailableStockException;
-            }
-
-            DB::table($this->stockLevelsTable)->insert([
+            DB::table('stock_levels')->insert([
                 'tenant_id' => $movement->getTenantId(),
                 'product_id' => $movement->getProductId(),
                 'variant_id' => $movement->getVariantId(),
@@ -185,11 +160,7 @@ class EloquentInventoryStockRepository implements InventoryStockRepositoryInterf
         $current = (string) $existing->quantity_on_hand;
         $updatedQty = $operation === '-' ? bcsub($current, $qty, 6) : bcadd($current, $qty, 6);
 
-        if ($operation === '-' && bccomp($updatedQty, '0', 6) < 0) {
-            throw new InsufficientAvailableStockException;
-        }
-
-        DB::table($this->stockLevelsTable)
+        DB::table('stock_levels')
             ->where('id', $existing->id)
             ->update([
                 'quantity_on_hand' => $updatedQty,

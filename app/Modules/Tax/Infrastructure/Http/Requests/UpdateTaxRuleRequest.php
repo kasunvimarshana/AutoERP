@@ -33,7 +33,6 @@ class UpdateTaxRuleRequest extends FormRequest
             'party_type' => 'nullable|in:customer,supplier',
             'region' => 'nullable|string|max:255',
             'priority' => 'nullable|integer|min:0',
-            'row_version' => 'required|integer|min:1',
         ];
     }
 

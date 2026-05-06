@@ -15,7 +15,6 @@ class ApprovalWorkflowConfig
         private ?float $minAmount = null,
         private ?float $maxAmount = null,
         private bool $isActive = true,
-        private int $rowVersion = 1,
         private ?int $id = null,
         private ?\DateTimeInterface $createdAt = null,
         private ?\DateTimeInterface $updatedAt = null,
@@ -79,11 +78,6 @@ class ApprovalWorkflowConfig
         return $this->updatedAt;
     }
 
-    public function getRowVersion(): int
-    {
-        return $this->rowVersion;
-    }
-
     public function update(
         string $name,
         array $steps,
@@ -96,7 +90,6 @@ class ApprovalWorkflowConfig
         $this->minAmount = $minAmount;
         $this->maxAmount = $maxAmount;
         $this->isActive = $isActive;
-        $this->rowVersion++;
         $this->updatedAt = new \DateTimeImmutable;
     }
 }

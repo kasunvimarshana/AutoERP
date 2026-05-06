@@ -15,7 +15,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('bank_account_id')->constrained('bank_accounts', 'id', 'bank_transactions_bank_account_id_fk')->cascadeOnDelete();
+            $table->foreignId('bank_account_id')->constrained(null, 'id', 'bank_transactions_bank_account_id_fk')->cascadeOnDelete();
             $table->string('external_id')->nullable();
             $table->date('transaction_date');
             $table->string('description');

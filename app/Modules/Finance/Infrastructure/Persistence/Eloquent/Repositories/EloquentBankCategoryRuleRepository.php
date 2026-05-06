@@ -28,7 +28,6 @@ class EloquentBankCategoryRuleRepository extends EloquentRepository implements B
             'account_id' => $rule->getAccountId(),
             'description_template' => $rule->getDescriptionTemplate(),
             'is_active' => $rule->isActive(),
-            'row_version' => $rule->getRowVersion(),
         ];
 
         $model = $rule->getId()
@@ -50,7 +49,6 @@ class EloquentBankCategoryRuleRepository extends EloquentRepository implements B
             priority: (int) $m->priority,
             descriptionTemplate: $m->description_template,
             isActive: (bool) $m->is_active,
-            rowVersion: (int) ($m->row_version ?? 1),
             id: (int) $m->id,
             createdAt: $m->created_at,
             updatedAt: $m->updated_at,

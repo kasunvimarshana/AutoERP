@@ -15,9 +15,9 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('product_id')->constrained('products', 'id', 'inventory_cost_layers_product_id_fk')->cascadeOnDelete();
+            $table->foreignId('product_id')->constrained(null, 'id', 'inventory_cost_layers_product_id_fk')->cascadeOnDelete();
             $table->foreignId('variant_id')->nullable()->constrained('product_variants', 'id', 'inventory_cost_layers_variant_id_fk')->nullOnDelete();
-            $table->foreignId('batch_id')->nullable()->constrained('batches', 'id', 'inventory_cost_layers_batch_id_fk')->nullOnDelete();
+            $table->foreignId('batch_id')->nullable()->constrained(null, 'id', 'inventory_cost_layers_batch_id_fk')->nullOnDelete();
             $table->foreignId('location_id')->constrained('warehouse_locations', 'id', 'inventory_cost_layers_location_id_fk')->cascadeOnDelete();
             $table->enum('valuation_method', ['fifo', 'lifo', 'fefo', 'weighted_average', 'standard', 'specific'])->default('fifo');
             $table->date('layer_date'); // Date of receipt

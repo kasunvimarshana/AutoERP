@@ -78,8 +78,7 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
                 ->filter(static fn (?int $roleId): bool => $roleId !== null)
                 ->values()
                 ->toArray();
-            $pivotData = array_fill_keys($roleIds, ['tenant_id' => $user->getTenantId()]);
-            $model->roles()->sync($pivotData);
+            $model->roles()->sync($roleIds);
         }
 
         $model->load('roles.permissions');
@@ -90,16 +89,15 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
     public function syncRoles(User $user, array $roleIds): void
     {
         /** @var UserModel|null $model */
-        $model = $this->newScopedQuery()->find($user->getId());
+        $model = $this->model->find($user->getId());
         if ($model) {
-            $pivotData = array_fill_keys($roleIds, ['tenant_id' => $user->getTenantId()]);
-            $model->roles()->sync($pivotData);
+            $model->roles()->sync($roleIds);
         }
     }
 
     public function changePassword(int $userId, string $hashedPassword): void
     {
-        $this->newScopedQuery()->where('id', $userId)->update(['password' => $hashedPassword]);
+        $this->model->where('id', $userId)->update(['password' => $hashedPassword]);
     }
 
     /**
@@ -126,13 +124,13 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
 
     public function updateAvatar(int $userId, ?string $avatarPath): void
     {
-        $this->newScopedQuery()->where('id', $userId)->update(['avatar' => $avatarPath]);
+        $this->model->where('id', $userId)->update(['avatar' => $avatarPath]);
     }
 
     public function verifyPassword(int $userId, string $plainPassword): bool
     {
         /** @var UserModel|null $model */
-        $model = $this->newScopedQuery()->find($userId);
+        $model = $this->model->find($userId);
 
         return $model && Hash::check($plainPassword, $model->password);
     }
@@ -192,14 +190,7 @@ class EloquentUserRepository extends EloquentRepository implements UserRepositor
         );
 
         foreach ($model->roles as $roleModel) {
-            $role = new Role(
-                tenantId: (int) $roleModel->tenant_id,
-                name: (string) $roleModel->name,
-                guardName: (string) $roleModel->guard_name,
-                description: $roleModel->description,
-                id: (int) $roleModel->id,
-            );
-
+            $role = new Role($roleModel->tenant_id, $roleModel->name, $roleModel->id);
             foreach ($roleModel->permissions as $permModel) {
                 $perm = new Permission(
                     tenantId: (int) $permModel->tenant_id,

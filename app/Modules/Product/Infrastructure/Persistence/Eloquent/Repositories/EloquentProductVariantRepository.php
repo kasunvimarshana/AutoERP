@@ -14,25 +14,19 @@ class EloquentProductVariantRepository extends EloquentRepository implements Pro
     public function __construct(ProductVariantModel $model)
     {
         parent::__construct($model);
-        $this->setDomainEntityMapper(
-            fn (ProductVariantModel $model): ProductVariant => $this->mapModelToDomainEntity($model)
-        );
+        $this->setDomainEntityMapper(fn (ProductVariantModel $model): ProductVariant => $this->mapModelToDomainEntity($model));
     }
 
     public function save(ProductVariant $productVariant): ProductVariant
     {
         $data = [
             'tenant_id' => $productVariant->getTenantId(),
-            'org_unit_id' => $productVariant->getOrgUnitId(),
             'product_id' => $productVariant->getProductId(),
             'sku' => $productVariant->getSku(),
             'name' => $productVariant->getName(),
             'is_default' => $productVariant->isDefault(),
             'is_active' => $productVariant->isActive(),
-            'purchase_price' => $productVariant->getPurchasePrice(),
-            'sales_price' => $productVariant->getSalesPrice(),
             'metadata' => $productVariant->getMetadata(),
-            'row_version' => $productVariant->getRowVersion(),
         ];
 
         if ($productVariant->getId()) {
@@ -48,7 +42,7 @@ class EloquentProductVariantRepository extends EloquentRepository implements Pro
 
     public function findByProductAndSku(int $productId, string $sku, ?int $tenantId = null): ?ProductVariant
     {
-        $query = $this->newScopedQuery()
+        $query = $this->model->newQuery()
             ->where('product_id', $productId)
             ->where('sku', $sku);
 
@@ -87,15 +81,11 @@ class EloquentProductVariantRepository extends EloquentRepository implements Pro
             id: (int) $model->id,
             productId: (int) $model->product_id,
             tenantId: $model->tenant_id !== null ? (int) $model->tenant_id : null,
-            orgUnitId: $model->org_unit_id !== null ? (int) $model->org_unit_id : null,
             sku: $model->sku,
             name: (string) $model->name,
             isDefault: (bool) $model->is_default,
             isActive: (bool) $model->is_active,
-            purchasePrice: $model->purchase_price !== null ? (string) $model->purchase_price : null,
-            salesPrice: $model->sales_price !== null ? (string) $model->sales_price : null,
             metadata: is_array($model->metadata) ? $model->metadata : null,
-            rowVersion: (int) ($model->row_version ?? 1),
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,
         );

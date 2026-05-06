@@ -7,7 +7,6 @@ namespace Modules\Purchase\Infrastructure\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Modules\Purchase\Domain\Entities\PurchaseOrder;
-use Modules\Purchase\Infrastructure\Http\Resources\PurchaseOrderLineResource;
 
 class PurchaseOrderResource extends JsonResource
 {
@@ -38,7 +37,6 @@ class PurchaseOrderResource extends JsonResource
             'approved_by' => $entity->getApprovedBy(),
             'created_at' => $entity->getCreatedAt()->format('c'),
             'updated_at' => $entity->getUpdatedAt()->format('c'),
-            'lines' => PurchaseOrderLineResource::collection($entity->getLines()),
         ];
     }
 }

@@ -23,8 +23,6 @@ class PurchaseRoutesTest extends TestCase
         $this->putJson('/api/purchase-orders/1', [])->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->deleteJson('/api/purchase-orders/1')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->postJson('/api/purchase-orders/1/confirm')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
-        $this->postJson('/api/purchase-orders/1/send')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
-        $this->postJson('/api/purchase-orders/1/cancel')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
     }
 
     public function test_grn_endpoints_require_authentication(): void
@@ -49,8 +47,6 @@ class PurchaseRoutesTest extends TestCase
         $this->putJson('/api/purchase-invoices/1', [])->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->deleteJson('/api/purchase-invoices/1')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
         $this->postJson('/api/purchase-invoices/1/approve')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
-        $this->postJson('/api/purchase-invoices/1/payment')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
-        $this->postJson('/api/purchase-invoices/1/refund')->assertStatus(HttpResponse::HTTP_UNAUTHORIZED);
     }
 
     public function test_purchase_return_endpoints_require_authentication(): void
@@ -78,14 +74,6 @@ class PurchaseRoutesTest extends TestCase
             ['auth.configured', 'resolve.tenant']
         );
         $this->assertRouteUsesMiddleware(
-            $this->findRoute($routes, 'api/purchase-orders/{purchaseOrder}/send', 'POST'),
-            ['auth.configured', 'resolve.tenant']
-        );
-        $this->assertRouteUsesMiddleware(
-            $this->findRoute($routes, 'api/purchase-orders/{purchaseOrder}/cancel', 'POST'),
-            ['auth.configured', 'resolve.tenant']
-        );
-        $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/grns', 'GET'),
             ['auth.configured', 'resolve.tenant']
         );
@@ -99,14 +87,6 @@ class PurchaseRoutesTest extends TestCase
         );
         $this->assertRouteUsesMiddleware(
             $this->findRoute($routes, 'api/purchase-invoices/{invoice}/approve', 'POST'),
-            ['auth.configured', 'resolve.tenant']
-        );
-        $this->assertRouteUsesMiddleware(
-            $this->findRoute($routes, 'api/purchase-invoices/{invoice}/payment', 'POST'),
-            ['auth.configured', 'resolve.tenant']
-        );
-        $this->assertRouteUsesMiddleware(
-            $this->findRoute($routes, 'api/purchase-invoices/{invoice}/refund', 'POST'),
             ['auth.configured', 'resolve.tenant']
         );
         $this->assertRouteUsesMiddleware(

@@ -17,7 +17,7 @@ class LeaveBalanceModel extends BaseModel
 
     protected $fillable = ['tenant_id', 'org_unit_id', 'row_version', 'employee_id', 'leave_type_id', 'year', 'allocated', 'used', 'pending', 'carried'];
 
-    protected $casts = ['tenant_id' => 'integer', 'org_unit_id' => 'integer', 'row_version' => 'integer', 'employee_id' => 'integer', 'leave_type_id' => 'integer', 'year' => 'integer', 'allocated' => 'decimal:2', 'used' => 'decimal:2', 'pending' => 'decimal:2', 'carried' => 'decimal:2'];
+    protected $casts = ['org_unit_id' => 'integer', 'row_version' => 'integer', 'employee_id' => 'integer', 'leave_type_id' => 'integer', 'year' => 'integer', 'allocated' => 'decimal:2', 'used' => 'decimal:2', 'pending' => 'decimal:2', 'carried' => 'decimal:2'];
 
     public function employee(): BelongsTo
     {

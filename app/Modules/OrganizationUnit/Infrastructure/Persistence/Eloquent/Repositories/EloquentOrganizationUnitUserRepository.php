@@ -23,7 +23,7 @@ class EloquentOrganizationUnitUserRepository extends EloquentRepository implemen
             'tenant_id' => $organizationUnitUser->getTenantId(),
             'org_unit_id' => $organizationUnitUser->getOrganizationUnitId(),
             'user_id' => $organizationUnitUser->getUserId(),
-            'role_id' => $organizationUnitUser->getRole(),
+            'role' => $organizationUnitUser->getRole(),
             'is_primary' => $organizationUnitUser->isPrimary(),
         ];
 
@@ -64,7 +64,7 @@ class EloquentOrganizationUnitUserRepository extends EloquentRepository implemen
             tenantId: (int) $model->tenant_id,
             organizationUnitId: (int) $model->org_unit_id,
             userId: (int) $model->user_id,
-            roleId: $model->role_id !== null ? (int) $model->role_id : null,
+            role: $model->role,
             isPrimary: (bool) $model->is_primary,
             id: (int) $model->id,
             createdAt: $model->created_at,

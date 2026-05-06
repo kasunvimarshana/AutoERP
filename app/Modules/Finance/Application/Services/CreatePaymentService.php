@@ -21,11 +21,11 @@ class CreatePaymentService extends BaseService implements CreatePaymentServiceIn
     protected function handle(array $data): Payment
     {
         $dto = PaymentData::fromArray($data);
-        $idempotencyKey = $dto->idempotencyKey;
+        $idempotencyKey = $dto->idempotency_key;
 
         if ($idempotencyKey !== null && $idempotencyKey !== '') {
             $existing = $this->paymentRepository->findByTenantAndIdempotencyKey(
-                $dto->tenantId,
+                $dto->tenant_id,
                 $idempotencyKey,
             );
 
@@ -35,23 +35,23 @@ class CreatePaymentService extends BaseService implements CreatePaymentServiceIn
         }
 
         $payment = new Payment(
-            tenantId: $dto->tenantId,
-            paymentNumber: $dto->paymentNumber,
+            tenantId: $dto->tenant_id,
+            paymentNumber: $dto->payment_number,
             direction: $dto->direction,
-            partyType: $dto->partyType,
-            partyId: $dto->partyId,
-            paymentMethodId: $dto->paymentMethodId,
-            accountId: $dto->accountId,
+            partyType: $dto->party_type,
+            partyId: $dto->party_id,
+            paymentMethodId: $dto->payment_method_id,
+            accountId: $dto->account_id,
             amount: $dto->amount,
-            currencyId: $dto->currencyId,
-            paymentDate: new \DateTimeImmutable($dto->paymentDate),
-            exchangeRate: $dto->exchangeRate,
-            baseAmount: $dto->baseAmount,
+            currencyId: $dto->currency_id,
+            paymentDate: new \DateTimeImmutable($dto->payment_date),
+            exchangeRate: $dto->exchange_rate,
+            baseAmount: $dto->base_amount,
             status: $dto->status,
             reference: $dto->reference,
             notes: $dto->notes,
             idempotencyKey: $idempotencyKey,
-            journalEntryId: $dto->journalEntryId,
+            journalEntryId: $dto->journal_entry_id,
         );
 
         try {
@@ -62,7 +62,7 @@ class CreatePaymentService extends BaseService implements CreatePaymentServiceIn
             }
 
             $existing = $this->paymentRepository->findByTenantAndIdempotencyKey(
-                $dto->tenantId,
+                $dto->tenant_id,
                 $idempotencyKey,
             );
 

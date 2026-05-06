@@ -7,7 +7,6 @@ namespace Modules\Supplier\Infrastructure\Persistence\Eloquent\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
-use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\CountryModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class SupplierAddressModel extends Model
@@ -45,10 +44,5 @@ class SupplierAddressModel extends Model
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(SupplierModel::class, 'supplier_id');
-    }
-
-    public function country(): BelongsTo
-    {
-        return $this->belongsTo(CountryModel::class, 'country_id');
     }
 }

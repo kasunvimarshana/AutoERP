@@ -26,30 +26,30 @@ class CreateCustomerService extends BaseService implements CreateCustomerService
         $dto = CustomerData::fromArray($data);
 
         $resolvedUserId = $this->customerUserSynchronizer->resolveUserIdForCreate(
-            tenantId: $dto->tenantId,
-            orgUnitId: $dto->orgUnitId,
-            requestedUserId: $dto->userId,
+            tenantId: $dto->tenant_id,
+            orgUnitId: $dto->org_unit_id,
+            requestedUserId: $dto->user_id,
             userPayload: $dto->user,
         );
 
-        $existingCustomer = $this->customerRepository->findByTenantAndUserId($dto->tenantId, $resolvedUserId);
+        $existingCustomer = $this->customerRepository->findByTenantAndUserId($dto->tenant_id, $resolvedUserId);
         if ($existingCustomer !== null) {
             throw new DomainException('The user is already linked to another customer.');
         }
 
         $customer = new Customer(
-            tenantId: $dto->tenantId,
+            tenantId: $dto->tenant_id,
             userId: $resolvedUserId,
-            customerCode: $dto->customerCode,
+            customerCode: $dto->customer_code,
             name: $dto->name,
             type: $dto->type,
-            orgUnitId: $dto->orgUnitId,
-            taxNumber: $dto->taxNumber,
-            registrationNumber: $dto->registrationNumber,
-            currencyId: $dto->currencyId,
-            creditLimit: $this->normalizeDecimal($dto->creditLimit),
-            paymentTermsDays: $dto->paymentTermsDays,
-            arAccountId: $dto->arAccountId,
+            orgUnitId: $dto->org_unit_id,
+            taxNumber: $dto->tax_number,
+            registrationNumber: $dto->registration_number,
+            currencyId: $dto->currency_id,
+            creditLimit: $this->normalizeDecimal($dto->credit_limit),
+            paymentTermsDays: $dto->payment_terms_days,
+            arAccountId: $dto->ar_account_id,
             status: $dto->status,
             notes: $dto->notes,
             metadata: $dto->metadata,

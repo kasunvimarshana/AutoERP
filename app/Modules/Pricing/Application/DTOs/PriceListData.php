@@ -15,7 +15,6 @@ class PriceListData
         public readonly ?string $valid_from = null,
         public readonly ?string $valid_to = null,
         public readonly bool $is_active = true,
-        public readonly int $rowVersion = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -30,7 +29,6 @@ class PriceListData
             valid_from: isset($data['valid_from']) ? (string) $data['valid_from'] : null,
             valid_to: isset($data['valid_to']) ? (string) $data['valid_to'] : null,
             is_active: (bool) ($data['is_active'] ?? true),
-            rowVersion: (int) ($data['row_version'] ?? 1),
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

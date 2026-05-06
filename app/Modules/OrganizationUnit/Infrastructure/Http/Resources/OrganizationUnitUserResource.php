@@ -16,7 +16,7 @@ class OrganizationUnitUserResource extends JsonResource
             'tenant_id' => $this->getTenantId(),
             'org_unit_id' => $this->getOrganizationUnitId(),
             'user_id' => $this->getUserId(),
-            'role_id' => $this->getRole(),
+            'role' => $this->getRole(),
             'is_primary' => $this->isPrimary(),
             'created_at' => $this->getCreatedAt()->format('c'),
             'updated_at' => $this->getUpdatedAt()->format('c'),

@@ -77,7 +77,6 @@ use Modules\HR\Domain\ValueObjects\PayrollRunStatus;
 use Modules\HR\Domain\ValueObjects\ShiftType;
 use Modules\Tenant\Application\Contracts\TenantConfigClientInterface;
 use Modules\Tenant\Application\Contracts\TenantConfigManagerInterface;
-use Modules\Auth\Application\Contracts\AuthorizationServiceInterface;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use PHPUnit\Framework\MockObject\MockObject;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
@@ -369,11 +368,6 @@ class HREndpointsAuthenticatedTest extends TestCase
         $presenceVerifier->method('getMultiCount')->willReturn(1);
         $this->app->instance(PresenceVerifierInterface::class, $presenceVerifier);
         $this->app['validator']->setPresenceVerifier($presenceVerifier);
-
-        // — Authorization service mock —
-        $authorizationService = $this->createMock(AuthorizationServiceInterface::class);
-        $authorizationService->method('can')->willReturn(true);
-        $this->app->instance(AuthorizationServiceInterface::class, $authorizationService);
 
         config()->set('auth.guards.api.driver', 'session');
 
@@ -1754,7 +1748,7 @@ class HREndpointsAuthenticatedTest extends TestCase
         $this->updateShiftService->expects($this->once())->method('execute')->willReturn($this->buildShift(id: 1));
 
         $this->withHeader('X-Tenant-ID', '7')
-            ->putJson('/api/hr/shifts/1', ['name' => 'Updated Morning Shift', 'row_version' => 1])
+            ->putJson('/api/hr/shifts/1', ['name' => 'Updated Morning Shift'])
             ->assertStatus(HttpResponse::HTTP_OK)
             ->assertJsonPath('data.id', 1);
     }
@@ -1765,7 +1759,7 @@ class HREndpointsAuthenticatedTest extends TestCase
         $this->updateShiftService->expects($this->never())->method('execute');
 
         $this->withHeader('X-Tenant-ID', '7')
-            ->putJson('/api/hr/shifts/9999', ['name' => 'Ghost Shift', 'row_version' => 1])
+            ->putJson('/api/hr/shifts/9999', ['name' => 'Ghost Shift'])
             ->assertStatus(HttpResponse::HTTP_NOT_FOUND);
     }
 
@@ -1787,7 +1781,7 @@ class HREndpointsAuthenticatedTest extends TestCase
         $this->updateLeaveTypeService->expects($this->once())->method('execute')->willReturn($this->buildLeaveType(id: 10));
 
         $this->withHeader('X-Tenant-ID', '7')
-            ->putJson('/api/hr/leave-types/10', ['name' => 'Updated Annual Leave', 'row_version' => 1])
+            ->putJson('/api/hr/leave-types/10', ['name' => 'Updated Annual Leave'])
             ->assertStatus(HttpResponse::HTTP_OK)
             ->assertJsonPath('data.id', 10);
     }
@@ -1798,7 +1792,7 @@ class HREndpointsAuthenticatedTest extends TestCase
         $this->updateLeaveTypeService->expects($this->never())->method('execute');
 
         $this->withHeader('X-Tenant-ID', '7')
-            ->putJson('/api/hr/leave-types/9999', ['name' => 'Ghost', 'row_version' => 1])
+            ->putJson('/api/hr/leave-types/9999', ['name' => 'Ghost'])
             ->assertStatus(HttpResponse::HTTP_NOT_FOUND);
     }
 
@@ -1830,7 +1824,7 @@ class HREndpointsAuthenticatedTest extends TestCase
         $this->updateLeavePolicyService->expects($this->once())->method('execute')->willReturn($this->buildLeavePolicy(id: 1));
 
         $this->withHeader('X-Tenant-ID', '7')
-            ->putJson('/api/hr/leave-policies/1', ['name' => 'Updated Leave Policy', 'row_version' => 1])
+            ->putJson('/api/hr/leave-policies/1', ['name' => 'Updated Leave Policy'])
             ->assertStatus(HttpResponse::HTTP_OK)
             ->assertJsonPath('data.id', 1);
     }
@@ -1841,7 +1835,7 @@ class HREndpointsAuthenticatedTest extends TestCase
         $this->updateLeavePolicyService->expects($this->never())->method('execute');
 
         $this->withHeader('X-Tenant-ID', '7')
-            ->putJson('/api/hr/leave-policies/9999', ['name' => 'Ghost', 'row_version' => 1])
+            ->putJson('/api/hr/leave-policies/9999', ['name' => 'Ghost'])
             ->assertStatus(HttpResponse::HTTP_NOT_FOUND);
     }
 

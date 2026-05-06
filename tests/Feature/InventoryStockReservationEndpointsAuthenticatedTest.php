@@ -13,7 +13,6 @@ use Modules\Inventory\Application\Contracts\ReleaseStockReservationServiceInterf
 use Modules\Inventory\Domain\Exceptions\InsufficientAvailableStockException;
 use Modules\Tenant\Application\Contracts\TenantConfigClientInterface;
 use Modules\Tenant\Application\Contracts\TenantConfigManagerInterface;
-use Modules\Auth\Application\Contracts\AuthorizationServiceInterface;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use PHPUnit\Framework\MockObject\MockObject;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
@@ -46,11 +45,6 @@ class InventoryStockReservationEndpointsAuthenticatedTest extends TestCase
         $presenceVerifier->method('getMultiCount')->willReturn(1);
         $this->app->instance(PresenceVerifierInterface::class, $presenceVerifier);
         $this->app['validator']->setPresenceVerifier($presenceVerifier);
-
-        // — Authorization service mock —
-        $authorizationService = $this->createMock(AuthorizationServiceInterface::class);
-        $authorizationService->method('can')->willReturn(true);
-        $this->app->instance(AuthorizationServiceInterface::class, $authorizationService);
 
         $user = new UserModel([
             'id' => 301,

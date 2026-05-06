@@ -25,7 +25,6 @@ class EmployeeDocumentController extends AuthorizedController
 
     public function index(): JsonResponse
     {
-        $this->authorize('viewAny', EmployeeDocument::class);
         $result = $this->findService->list();
 
         return Response::json(['data' => EmployeeDocumentResource::collection($result)]);
@@ -33,7 +32,6 @@ class EmployeeDocumentController extends AuthorizedController
 
     public function store(StoreEmployeeDocumentRequest $request): JsonResponse
     {
-        $this->authorize('create', EmployeeDocument::class);
         $entity = $this->storeService->execute($request->validated());
 
         return (new EmployeeDocumentResource($entity))->response()->setStatusCode(201);
@@ -41,16 +39,12 @@ class EmployeeDocumentController extends AuthorizedController
 
     public function show(int $employeeDocument): EmployeeDocumentResource
     {
-        $entity = $this->findOrFail($employeeDocument);
-        $this->authorize('view', $entity);
-
-        return new EmployeeDocumentResource($entity);
+        return new EmployeeDocumentResource($this->findOrFail($employeeDocument));
     }
 
     public function update(StoreEmployeeDocumentRequest $request, int $employeeDocument): EmployeeDocumentResource
     {
-        $entity = $this->findOrFail($employeeDocument);
-        $this->authorize('update', $entity);
+        $this->findOrFail($employeeDocument);
         $payload = $request->validated();
         $payload['id'] = $employeeDocument;
         $updated = $this->storeService->execute($payload);
@@ -60,8 +54,7 @@ class EmployeeDocumentController extends AuthorizedController
 
     public function destroy(int $employeeDocument): JsonResponse
     {
-        $entity = $this->findOrFail($employeeDocument);
-        $this->authorize('delete', $entity);
+        $this->findOrFail($employeeDocument);
         $this->deleteService->execute(['id' => $employeeDocument]);
 
         return Response::json(null, 204);

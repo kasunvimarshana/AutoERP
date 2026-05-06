@@ -31,7 +31,6 @@ class EloquentBankTransactionRepository extends EloquentRepository implements Ba
             'status' => $bt->getStatus(),
             'matched_journal_entry_id' => $bt->getMatchedJournalEntryId(),
             'category_rule_id' => $bt->getCategoryRuleId(),
-            'row_version' => $bt->getRowVersion(),
         ];
 
         $model = $bt->getId() ? $this->update($bt->getId(), $data) : $this->create($data);
@@ -54,7 +53,6 @@ class EloquentBankTransactionRepository extends EloquentRepository implements Ba
             status: (string) $m->status,
             matchedJournalEntryId: $m->matched_journal_entry_id !== null ? (int) $m->matched_journal_entry_id : null,
             categoryRuleId: $m->category_rule_id !== null ? (int) $m->category_rule_id : null,
-            rowVersion: (int) ($m->row_version ?? 1),
             id: (int) $m->id,
             createdAt: $m->created_at,
             updatedAt: $m->updated_at,

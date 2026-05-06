@@ -24,7 +24,6 @@ class UpdatePriceListItemRequest extends FormRequest
             'discount_pct' => 'nullable|numeric|min:0|max:100',
             'valid_from' => 'nullable|date',
             'valid_to' => 'nullable|date|after_or_equal:valid_from',
-            'row_version' => 'required|integer|min:1',
         ];
     }
 }

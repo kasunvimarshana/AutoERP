@@ -44,7 +44,6 @@ class PaymentModel extends BaseModel
         'exchange_rate' => 'decimal:10',
         'base_amount' => 'decimal:6',
         'payment_date' => 'date',
-        'row_version' => 'integer',
     ];
 
     public function paymentMethod(): BelongsTo

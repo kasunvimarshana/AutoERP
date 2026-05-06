@@ -32,9 +32,6 @@ class EloquentGrnHeaderRepository extends EloquentRepository implements GrnHeade
             'notes' => $entity->getNotes(),
             'metadata' => $entity->getMetadata(),
             'created_by' => $entity->getCreatedBy(),
-            'subtotal' => $entity->getSubtotal(),
-            'tax_total' => $entity->getTaxTotal(),
-            'grand_total' => $entity->getGrandTotal(),
         ];
 
         if ($entity->getId()) {
@@ -69,9 +66,6 @@ class EloquentGrnHeaderRepository extends EloquentRepository implements GrnHeade
             id: (int) $m->id,
             createdAt: $m->created_at,
             updatedAt: $m->updated_at,
-            subtotal: isset($m->subtotal) ? (string) $m->subtotal : '0',
-            taxTotal: isset($m->tax_total) ? (string) $m->tax_total : '0',
-            grandTotal: isset($m->grand_total) ? (string) $m->grand_total : '0',
         );
     }
 }

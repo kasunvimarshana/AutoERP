@@ -22,14 +22,14 @@ class CreateNumberingSequenceService extends BaseService implements CreateNumber
         $dto = NumberingSequenceData::fromArray($data);
 
         $sequence = new NumberingSequence(
-            tenantId: $dto->tenantId,
+            tenantId: $dto->tenant_id,
             module: $dto->module,
-            documentType: $dto->documentType,
+            documentType: $dto->document_type,
             prefix: $dto->prefix,
             suffix: $dto->suffix,
-            nextNumber: $dto->nextNumber,
+            nextNumber: $dto->next_number,
             padding: $dto->padding,
-            isActive: $dto->isActive,
+            isActive: $dto->is_active,
         );
 
         return $this->numberingSequenceRepository->save($sequence);

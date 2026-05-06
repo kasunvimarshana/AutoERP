@@ -33,7 +33,6 @@ class EloquentWarehouseRepository extends EloquentRepository implements Warehous
             'is_active' => $warehouse->isActive(),
             'is_default' => $warehouse->isDefault(),
             'metadata' => $warehouse->getMetadata(),
-            'row_version' => $warehouse->getRowVersion(),
         ];
 
         if ($warehouse->getId() !== null) {
@@ -82,7 +81,6 @@ class EloquentWarehouseRepository extends EloquentRepository implements Warehous
             isActive: (bool) $model->is_active,
             isDefault: (bool) $model->is_default,
             metadata: is_array($model->metadata) ? $model->metadata : null,
-            rowVersion: (int) ($model->row_version ?? 1),
             id: (int) $model->id,
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,

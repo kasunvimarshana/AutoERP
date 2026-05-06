@@ -22,14 +22,14 @@ class CreateBankCategoryRuleService extends BaseService implements CreateBankCat
         $dto = BankCategoryRuleData::fromArray($data);
 
         $rule = new BankCategoryRule(
-            tenantId: $dto->tenantId,
+            tenantId: $dto->tenant_id,
             name: $dto->name,
             conditions: $dto->conditions,
-            accountId: $dto->accountId,
-            bankAccountId: $dto->bankAccountId,
+            accountId: $dto->account_id,
+            bankAccountId: $dto->bank_account_id,
             priority: $dto->priority,
-            descriptionTemplate: $dto->descriptionTemplate,
-            isActive: $dto->isActive,
+            descriptionTemplate: $dto->description_template,
+            isActive: $dto->is_active,
         );
 
         return $this->bankCategoryRuleRepository->save($rule);

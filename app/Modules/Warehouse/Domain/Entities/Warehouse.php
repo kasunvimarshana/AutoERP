@@ -28,8 +28,6 @@ class Warehouse
 
     private ?array $metadata;
 
-    private int $rowVersion;
-
     private \DateTimeInterface $createdAt;
 
     private \DateTimeInterface $updatedAt;
@@ -45,7 +43,6 @@ class Warehouse
         bool $isActive = true,
         bool $isDefault = false,
         ?array $metadata = null,
-        int $rowVersion = 1,
         ?int $id = null,
         ?\DateTimeInterface $createdAt = null,
         ?\DateTimeInterface $updatedAt = null,
@@ -63,7 +60,6 @@ class Warehouse
         $this->isActive = $isActive;
         $this->isDefault = $isDefault;
         $this->metadata = $metadata;
-        $this->rowVersion = $rowVersion;
         $this->createdAt = $createdAt ?? new \DateTimeImmutable;
         $this->updatedAt = $updatedAt ?? new \DateTimeImmutable;
     }
@@ -123,11 +119,6 @@ class Warehouse
         return $this->metadata;
     }
 
-    public function getRowVersion(): int
-    {
-        return $this->rowVersion;
-    }
-
     public function getCreatedAt(): \DateTimeInterface
     {
         return $this->createdAt;
@@ -160,7 +151,6 @@ class Warehouse
         $this->isActive = $isActive;
         $this->isDefault = $isDefault;
         $this->metadata = $metadata;
-        $this->rowVersion++;
         $this->updatedAt = new \DateTimeImmutable;
     }
 

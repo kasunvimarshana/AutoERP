@@ -17,16 +17,13 @@ return new class extends Migration
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('supplier_id');
             $table->foreignId('warehouse_id');
-            $table->foreignId('purchase_order_id')->nullable()->constrained('purchase_orders', 'id', 'grn_headers_purchase_order_id_fk')->nullOnDelete();
+            $table->foreignId('purchase_order_id')->nullable()->constrained(null, 'id', 'grn_headers_purchase_order_id_fk')->nullOnDelete();
             $table->string('grn_number');
             $table->enum('status', ['draft', 'partial', 'complete', 'posted'])->default('draft');
             $table->date('received_date');
             $table->foreignId('currency_id')->constrained('currencies', 'id', 'grn_headers_currency_id_fk');
             $table->decimal('exchange_rate', 20, 10)->default(1);
             $table->text('notes')->nullable();
-                        $table->decimal('subtotal', 20, 6)->default(0)->comment('Sum of line costs before tax');
-                        $table->decimal('tax_total', 20, 6)->default(0)->comment('Total tax amount across all lines');
-                        $table->decimal('grand_total', 20, 6)->default(0)->comment('subtotal + tax_total');
             $table->json('metadata')->nullable();
             $table->foreignId('created_by');
 

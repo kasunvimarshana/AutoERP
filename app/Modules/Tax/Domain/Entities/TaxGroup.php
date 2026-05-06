@@ -14,8 +14,6 @@ class TaxGroup
 
     private ?string $description;
 
-    private int $rowVersion;
-
     private \DateTimeInterface $createdAt;
 
     private \DateTimeInterface $updatedAt;
@@ -24,7 +22,6 @@ class TaxGroup
         int $tenantId,
         string $name,
         ?string $description = null,
-        int $rowVersion = 1,
         ?int $id = null,
         ?\DateTimeInterface $createdAt = null,
         ?\DateTimeInterface $updatedAt = null,
@@ -33,7 +30,6 @@ class TaxGroup
         $this->tenantId = $tenantId;
         $this->name = trim($name);
         $this->description = $description !== null ? trim($description) : null;
-        $this->rowVersion = $rowVersion;
         $this->createdAt = $createdAt ?? new \DateTimeImmutable;
         $this->updatedAt = $updatedAt ?? new \DateTimeImmutable;
     }
@@ -68,16 +64,10 @@ class TaxGroup
         return $this->updatedAt;
     }
 
-    public function getRowVersion(): int
-    {
-        return $this->rowVersion;
-    }
-
     public function update(string $name, ?string $description = null): void
     {
         $this->name = trim($name);
         $this->description = $description !== null ? trim($description) : null;
-        $this->rowVersion++;
         $this->updatedAt = new \DateTimeImmutable;
     }
 }

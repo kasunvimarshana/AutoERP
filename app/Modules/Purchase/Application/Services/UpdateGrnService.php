@@ -30,13 +30,13 @@ class UpdateGrnService extends BaseService implements UpdateGrnServiceInterface
         $dto = GrnHeaderData::fromArray($data);
 
         $entity->update(
-            supplierId: $dto->supplierId,
-            warehouseId: $dto->warehouseId,
-            grnNumber: $dto->grnNumber,
-            receivedDate: new \DateTimeImmutable($dto->receivedDate),
-            currencyId: $dto->currencyId,
-            exchangeRate: $dto->exchangeRate,
-            purchaseOrderId: $dto->purchaseOrderId,
+            supplierId: $dto->supplier_id,
+            warehouseId: $dto->warehouse_id,
+            grnNumber: $dto->grn_number,
+            receivedDate: new \DateTimeImmutable($dto->received_date),
+            currencyId: $dto->currency_id,
+            exchangeRate: $dto->exchange_rate,
+            purchaseOrderId: $dto->purchase_order_id,
             notes: $dto->notes,
             metadata: $dto->metadata,
         );

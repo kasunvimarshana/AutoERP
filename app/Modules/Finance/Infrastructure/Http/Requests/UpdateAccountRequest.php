@@ -34,7 +34,6 @@ class UpdateAccountRequest extends FormRequest
             'is_active' => ['sometimes', 'boolean'],
             'path' => ['sometimes', 'nullable', 'string', 'max:255'],
             'depth' => ['sometimes', 'integer', 'min:0'],
-            'row_version' => ['required', 'integer', 'min:1'],
         ];
     }
 }

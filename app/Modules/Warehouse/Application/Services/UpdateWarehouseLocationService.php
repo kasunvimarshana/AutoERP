@@ -7,7 +7,7 @@ namespace Modules\Warehouse\Application\Services;
 use Modules\Core\Application\Services\BaseService;
 use Modules\Core\Domain\Exceptions\NotFoundException;
 use Modules\Warehouse\Application\Contracts\UpdateWarehouseLocationServiceInterface;
-use Modules\Warehouse\Application\DTOs\UpdateWarehouseLocationData;
+use Modules\Warehouse\Application\DTOs\UpdateWarehouseLocationDTO;
 use Modules\Warehouse\Application\Services\Concerns\BuildsLocationPath;
 use Modules\Warehouse\Domain\Entities\WarehouseLocation;
 use Modules\Warehouse\Domain\RepositoryInterfaces\WarehouseLocationRepositoryInterface;
@@ -23,7 +23,7 @@ class UpdateWarehouseLocationService extends BaseService implements UpdateWareho
 
     protected function handle(array $data): WarehouseLocation
     {
-        $dto = new UpdateWarehouseLocationData(
+        $dto = new UpdateWarehouseLocationDTO(
             id: (int) $data['id'],
             tenantId: (int) $data['tenant_id'],
             warehouseId: (int) $data['warehouse_id'],

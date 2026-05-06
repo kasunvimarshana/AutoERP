@@ -32,40 +32,30 @@ class ProductVariantRepositoryIntegrationTest extends TestCase
         $created = $repository->save(new ProductVariant(
             productId: 8001,
             tenantId: 81,
-            orgUnitId: null,
             name: 'Blue Variant',
             sku: 'BLU-001',
             isDefault: false,
             isActive: true,
-            purchasePrice: '7.500000',
-            salesPrice: '15.250000',
             metadata: ['color' => 'blue'],
         ));
 
         $this->assertNotNull($created->getId());
         $this->assertSame('Blue Variant', $created->getName());
-        $this->assertSame('7.500000', $created->getPurchasePrice());
-        $this->assertSame('15.250000', $created->getSalesPrice());
 
         $updated = $repository->save(new ProductVariant(
             id: $created->getId(),
             productId: 8001,
             tenantId: 81,
-            orgUnitId: null,
             name: 'Blue Variant Updated',
             sku: 'BLU-001',
             isDefault: true,
             isActive: true,
-            purchasePrice: '8.000000',
-            salesPrice: '16.000000',
             metadata: ['color' => 'blue', 'updated' => true],
         ));
 
         $this->assertSame($created->getId(), $updated->getId());
         $this->assertSame('Blue Variant Updated', $updated->getName());
         $this->assertTrue($updated->isDefault());
-        $this->assertSame('8.000000', $updated->getPurchasePrice());
-        $this->assertSame('16.000000', $updated->getSalesPrice());
     }
 
     public function test_find_by_product_and_sku_returns_domain_entity(): void
@@ -121,14 +111,11 @@ class ProductVariantRepositoryIntegrationTest extends TestCase
         DB::table('product_variants')->insert([
             'id' => $id,
             'tenant_id' => $tenantId,
-            'org_unit_id' => null,
             'product_id' => $productId,
             'sku' => $sku,
             'name' => $name,
             'is_default' => false,
             'is_active' => true,
-            'purchase_price' => '5.000000',
-            'sales_price' => '9.000000',
             'metadata' => null,
             'created_at' => now(),
             'updated_at' => now(),
@@ -208,8 +195,6 @@ class ProductVariantRepositoryIntegrationTest extends TestCase
             'cogs_account_id' => null,
             'inventory_account_id' => null,
             'expense_account_id' => null,
-            'purchase_price' => null,
-            'sales_price' => null,
             'is_active' => true,
             'metadata' => null,
             'created_at' => now(),

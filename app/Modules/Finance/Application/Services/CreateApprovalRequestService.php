@@ -22,13 +22,13 @@ class CreateApprovalRequestService extends BaseService implements CreateApproval
         $dto = ApprovalRequestData::fromArray($data);
 
         $request = new ApprovalRequest(
-            tenantId: $dto->tenantId,
-            workflowConfigId: $dto->workflowConfigId,
-            entityType: $dto->entityType,
-            entityId: $dto->entityId,
-            requestedByUserId: $dto->requestedByUserId,
+            tenantId: $dto->tenant_id,
+            workflowConfigId: $dto->workflow_config_id,
+            entityType: $dto->entity_type,
+            entityId: $dto->entity_id,
+            requestedByUserId: $dto->requested_by_user_id,
             status: $dto->status,
-            currentStepOrder: $dto->currentStepOrder,
+            currentStepOrder: $dto->current_step_order,
         );
 
         return $this->approvalRequestRepository->save($request);

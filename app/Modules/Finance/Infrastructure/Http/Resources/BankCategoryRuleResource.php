@@ -22,7 +22,6 @@ class BankCategoryRuleResource extends JsonResource
             'account_id' => $this->resource->getAccountId(),
             'description_template' => $this->resource->getDescriptionTemplate(),
             'is_active' => $this->resource->isActive(),
-            'row_version' => $this->resource->getRowVersion(),
             'created_at' => $this->resource->getCreatedAt(),
             'updated_at' => $this->resource->getUpdatedAt(),
         ];

@@ -25,8 +25,6 @@ class Employee
     /** @var array<string, mixed>|null */
     private ?array $metadata;
 
-    private int $rowVersion;
-
     private \DateTimeInterface $createdAt;
 
     private \DateTimeInterface $updatedAt;
@@ -43,7 +41,6 @@ class Employee
         ?\DateTimeInterface $hireDate = null,
         ?\DateTimeInterface $terminationDate = null,
         ?array $metadata = null,
-        int $rowVersion = 1,
         ?int $id = null,
         ?\DateTimeInterface $createdAt = null,
         ?\DateTimeInterface $updatedAt = null,
@@ -59,7 +56,6 @@ class Employee
         $this->hireDate = $hireDate;
         $this->terminationDate = $terminationDate;
         $this->metadata = $metadata;
-        $this->rowVersion = $rowVersion;
         $this->createdAt = $createdAt ?? new \DateTimeImmutable;
         $this->updatedAt = $updatedAt ?? new \DateTimeImmutable;
     }
@@ -112,11 +108,6 @@ class Employee
         return $this->metadata;
     }
 
-    public function getRowVersion(): int
-    {
-        return $this->rowVersion;
-    }
-
     public function getCreatedAt(): \DateTimeInterface
     {
         return $this->createdAt;
@@ -148,7 +139,6 @@ class Employee
         $this->hireDate = $hireDate;
         $this->terminationDate = $terminationDate;
         $this->metadata = $metadata;
-        $this->rowVersion++;
         $this->updatedAt = new \DateTimeImmutable;
     }
 

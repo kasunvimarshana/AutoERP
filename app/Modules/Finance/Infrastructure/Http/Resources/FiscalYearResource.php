@@ -21,7 +21,6 @@ class FiscalYearResource extends JsonResource
             'start_date' => $this->resource->getStartDate()->format('Y-m-d'),
             'end_date' => $this->resource->getEndDate()->format('Y-m-d'),
             'status' => $this->resource->getStatus(),
-            'row_version' => $this->resource->getRowVersion(),
             'created_at' => $this->resource->getCreatedAt(),
             'updated_at' => $this->resource->getUpdatedAt(),
         ];

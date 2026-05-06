@@ -14,7 +14,7 @@ class OrganizationUnitUser
 
     private int $userId;
 
-    private ?int $roleId;
+    private ?string $role;
 
     private bool $isPrimary;
 
@@ -26,7 +26,7 @@ class OrganizationUnitUser
         int $tenantId,
         int $organizationUnitId,
         int $userId,
-        ?int $roleId = null,
+        ?string $role = null,
         bool $isPrimary = false,
         ?int $id = null,
         ?\DateTimeInterface $createdAt = null,
@@ -36,7 +36,7 @@ class OrganizationUnitUser
         $this->tenantId = $tenantId;
         $this->organizationUnitId = $organizationUnitId;
         $this->userId = $userId;
-        $this->roleId = $roleId;
+        $this->role = $role;
         $this->isPrimary = $isPrimary;
         $this->createdAt = $createdAt ?? new \DateTimeImmutable;
         $this->updatedAt = $updatedAt ?? new \DateTimeImmutable;
@@ -62,9 +62,9 @@ class OrganizationUnitUser
         return $this->userId;
     }
 
-    public function getRole(): ?int
+    public function getRole(): ?string
     {
-        return $this->roleId;
+        return $this->role;
     }
 
     public function isPrimary(): bool
@@ -82,9 +82,9 @@ class OrganizationUnitUser
         return $this->updatedAt;
     }
 
-    public function update(?int $roleId, bool $isPrimary): void
+    public function update(?string $role, bool $isPrimary): void
     {
-        $this->roleId = $roleId;
+        $this->role = $role;
         $this->isPrimary = $isPrimary;
         $this->updatedAt = new \DateTimeImmutable;
     }

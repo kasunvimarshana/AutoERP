@@ -14,7 +14,7 @@ class OrganizationUnitUserData extends BaseDto
 
     public int $user_id;
 
-    public ?int $role_id = null;
+    public ?string $role = null;
 
     public bool $is_primary = false;
 
@@ -24,7 +24,7 @@ class OrganizationUnitUserData extends BaseDto
             'tenant_id' => 'required|integer|exists:tenants,id',
             'org_unit_id' => 'required|integer|exists:org_units,id',
             'user_id' => 'required|integer|exists:users,id',
-            'role_id' => 'nullable|integer|exists:roles,id',
+            'role' => 'nullable|string|max:255',
             'is_primary' => 'required|boolean',
         ];
     }

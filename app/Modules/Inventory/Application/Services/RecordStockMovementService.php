@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Modules\Core\Domain\Exceptions\NotFoundException;
 use Modules\Inventory\Application\Contracts\RecordStockMovementServiceInterface;
-use Modules\Inventory\Application\DTOs\RecordStockMovementData;
+use Modules\Inventory\Application\DTOs\RecordStockMovementDTO;
 use Modules\Inventory\Domain\Entities\StockMovement;
 use Modules\Inventory\Domain\Events\StockAdjustmentRecorded;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryStockRepositoryInterface;
@@ -26,7 +26,7 @@ class RecordStockMovementService implements RecordStockMovementServiceInterface
     public function execute(array $data): StockMovement
     {
         return DB::transaction(function () use ($data): StockMovement {
-            $dto = new RecordStockMovementData(
+            $dto = new RecordStockMovementDTO(
                 tenantId: (int) $data['tenant_id'],
                 warehouseId: (int) $data['warehouse_id'],
                 productId: (int) $data['product_id'],

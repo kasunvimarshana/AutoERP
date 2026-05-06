@@ -26,12 +26,6 @@ class GrnHeader
 
     private string $exchangeRate;
 
-    private string $subtotal;
-
-    private string $taxTotal;
-
-    private string $grandTotal;
-
     private ?string $notes;
 
     private ?array $metadata;
@@ -58,9 +52,6 @@ class GrnHeader
         ?int $id = null,
         ?\DateTimeInterface $createdAt = null,
         ?\DateTimeInterface $updatedAt = null,
-        string $subtotal = '0',
-        string $taxTotal = '0',
-        string $grandTotal = '0',
     ) {
         $this->tenantId = $tenantId;
         $this->supplierId = $supplierId;
@@ -77,9 +68,6 @@ class GrnHeader
         $this->id = $id;
         $this->createdAt = $createdAt ?? new \DateTimeImmutable;
         $this->updatedAt = $updatedAt ?? new \DateTimeImmutable;
-        $this->subtotal = $subtotal;
-        $this->taxTotal = $taxTotal;
-        $this->grandTotal = $grandTotal;
     }
 
     public function getId(): ?int
@@ -180,33 +168,9 @@ class GrnHeader
         $this->updatedAt = new \DateTimeImmutable;
     }
 
-    public function getSubtotal(): string
-    {
-        return $this->subtotal;
-    }
-
-    public function getTaxTotal(): string
-    {
-        return $this->taxTotal;
-    }
-
-    public function getGrandTotal(): string
-    {
-        return $this->grandTotal;
-    }
-
-    public function setTotals(string $subtotal, string $taxTotal, string $grandTotal): void
-    {
-        $this->subtotal = $subtotal;
-        $this->taxTotal = $taxTotal;
-        $this->grandTotal = $grandTotal;
-        $this->updatedAt = new \DateTimeImmutable;
-    }
-
     public function post(): void
     {
         $this->status = 'posted';
         $this->updatedAt = new \DateTimeImmutable;
     }
-
 }

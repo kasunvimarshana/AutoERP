@@ -10,27 +10,24 @@ class JournalEntryData
      * @param  array<JournalEntryLineData>  $lines
      */
     public function __construct(
-        public readonly int $tenantId,
-        public readonly int $fiscalPeriodId,
-        public readonly string $entryDate,
-        public readonly int $createdBy,
+        public readonly int $tenant_id,
+        public readonly int $fiscal_period_id,
+        public readonly string $entry_date,
+        public readonly int $created_by,
         public readonly array $lines,
-        public readonly string $entryType = 'manual',
-        public readonly ?string $entryNumber = null,
-        public readonly ?string $referenceType = null,
-        public readonly ?int $referenceId = null,
+        public readonly string $entry_type = 'manual',
+        public readonly ?string $entry_number = null,
+        public readonly ?string $reference_type = null,
+        public readonly ?int $reference_id = null,
         public readonly ?string $description = null,
-        public readonly ?string $postingDate = null,
+        public readonly ?string $posting_date = null,
         public readonly string $status = 'draft',
-        public readonly bool $isReversed = false,
-        public readonly ?int $reversalEntryId = null,
-        public readonly ?int $postedBy = null,
-        public readonly ?string $postedAt = null,
-        public readonly int $rowVersion = 1,
+        public readonly bool $is_reversed = false,
+        public readonly ?int $reversal_entry_id = null,
+        public readonly ?int $posted_by = null,
+        public readonly ?string $posted_at = null,
         public readonly ?int $id = null,
-    )
-    {
-    }
+    ) {}
 
     /**
      * @param  array<string, mixed>  $data
@@ -47,23 +44,22 @@ class JournalEntryData
         }
 
         return new self(
-            tenantId: (int) $data['tenant_id'],
-            fiscalPeriodId: (int) $data['fiscal_period_id'],
-            entryDate: (string) $data['entry_date'],
-            createdBy: (int) $data['created_by'],
+            tenant_id: (int) $data['tenant_id'],
+            fiscal_period_id: (int) $data['fiscal_period_id'],
+            entry_date: (string) $data['entry_date'],
+            created_by: (int) $data['created_by'],
             lines: $lines,
-            entryType: (string) ($data['entry_type'] ?? 'manual'),
-            entryNumber: isset($data['entry_number']) ? (string) $data['entry_number'] : null,
-            referenceType: isset($data['reference_type']) ? (string) $data['reference_type'] : null,
-            referenceId: isset($data['reference_id']) ? (int) $data['reference_id'] : null,
+            entry_type: (string) ($data['entry_type'] ?? 'manual'),
+            entry_number: isset($data['entry_number']) ? (string) $data['entry_number'] : null,
+            reference_type: isset($data['reference_type']) ? (string) $data['reference_type'] : null,
+            reference_id: isset($data['reference_id']) ? (int) $data['reference_id'] : null,
             description: isset($data['description']) ? (string) $data['description'] : null,
-            postingDate: isset($data['posting_date']) ? (string) $data['posting_date'] : null,
+            posting_date: isset($data['posting_date']) ? (string) $data['posting_date'] : null,
             status: (string) ($data['status'] ?? 'draft'),
-            isReversed: (bool) ($data['is_reversed'] ?? false),
-            reversalEntryId: isset($data['reversal_entry_id']) ? (int) $data['reversal_entry_id'] : null,
-            postedBy: isset($data['posted_by']) ? (int) $data['posted_by'] : null,
-            postedAt: isset($data['posted_at']) ? (string) $data['posted_at'] : null,
-            rowVersion: isset($data['row_version']) ? (int) $data['row_version'] : 1,
+            is_reversed: (bool) ($data['is_reversed'] ?? false),
+            reversal_entry_id: isset($data['reversal_entry_id']) ? (int) $data['reversal_entry_id'] : null,
+            posted_by: isset($data['posted_by']) ? (int) $data['posted_by'] : null,
+            posted_at: isset($data['posted_at']) ? (string) $data['posted_at'] : null,
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

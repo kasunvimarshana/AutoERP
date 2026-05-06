@@ -9,6 +9,7 @@ class PurchaseOrderLine
     private ?int $id;
 
     private int $tenantId;
+
     private int $purchaseOrderId;
 
     private int $productId;
@@ -34,7 +35,6 @@ class PurchaseOrderLine
     private \DateTimeInterface $createdAt;
 
     private \DateTimeInterface $updatedAt;
-    private string $lineTotal;
 
     public function __construct(
         int $tenantId,
@@ -52,7 +52,6 @@ class PurchaseOrderLine
         ?int $id = null,
         ?\DateTimeInterface $createdAt = null,
         ?\DateTimeInterface $updatedAt = null,
-        ?string $lineTotal = null,
     ) {
         $this->tenantId = $tenantId;
         $this->purchaseOrderId = $purchaseOrderId;
@@ -69,14 +68,6 @@ class PurchaseOrderLine
         $this->id = $id;
         $this->createdAt = $createdAt ?? new \DateTimeImmutable;
         $this->updatedAt = $updatedAt ?? new \DateTimeImmutable;
-            // Use provided lineTotal or compute from orderedQty × unitPrice × (1 - discountPct/100)
-            if ($lineTotal !== null) {
-                $this->lineTotal = $lineTotal;
-            } else {
-                $gross = bcmul($orderedQty, $unitPrice, 6);
-                $discountAmount = bcdiv(bcmul($gross, $discountPct, 6), '100', 6);
-                $this->lineTotal = bcsub($gross, $discountAmount, 6);
-            }
     }
 
     public function getId(): ?int
@@ -183,9 +174,3 @@ class PurchaseOrderLine
         $this->updatedAt = new \DateTimeImmutable;
     }
 }
-    public function getLineTotal(): string
-    {
-        return $this->lineTotal;
-    }
-
-    public function getCreatedAt(): \DateTimeInterface

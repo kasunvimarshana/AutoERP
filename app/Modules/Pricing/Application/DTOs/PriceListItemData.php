@@ -16,7 +16,6 @@ class PriceListItemData
         public readonly string $discount_pct = '0.000000',
         public readonly ?string $valid_from = null,
         public readonly ?string $valid_to = null,
-        public readonly int $rowVersion = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -32,7 +31,6 @@ class PriceListItemData
             discount_pct: isset($data['discount_pct']) ? (string) $data['discount_pct'] : '0.000000',
             valid_from: isset($data['valid_from']) ? (string) $data['valid_from'] : null,
             valid_to: isset($data['valid_to']) ? (string) $data['valid_to'] : null,
-            rowVersion: (int) ($data['row_version'] ?? 1),
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

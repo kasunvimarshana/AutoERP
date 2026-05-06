@@ -15,7 +15,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('payment_id')->constrained('payments', 'id', 'payment_allocations_payment_id_fk')->cascadeOnDelete();
+            $table->foreignId('payment_id')->constrained(null, 'id', 'payment_allocations_payment_id_fk')->cascadeOnDelete();
             $table->morphs('invoice');
             $table->decimal('allocated_amount', 20, 6);
             $table->softDeletes();

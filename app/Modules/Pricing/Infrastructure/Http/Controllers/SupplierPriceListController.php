@@ -8,7 +8,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Response;
 use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Pricing\Application\Contracts\CreateSupplierPriceListServiceInterface;
-use Modules\Pricing\Domain\Entities\SupplierPriceList;
 use Modules\Pricing\Application\Contracts\DeleteSupplierPriceListServiceInterface;
 use Modules\Pricing\Application\Contracts\FindSupplierPriceListServiceInterface;
 use Modules\Pricing\Infrastructure\Http\Requests\ListAssignmentRequest;
@@ -28,7 +27,6 @@ class SupplierPriceListController extends AuthorizedController
 
     public function index(int $supplier, ListAssignmentRequest $request): SupplierPriceListCollection
     {
-        $this->authorize('viewAny', SupplierPriceList::class);
         $validated = $request->validated();
 
         $assignments = $this->findSupplierPriceListService->paginateBySupplier(
@@ -43,7 +41,6 @@ class SupplierPriceListController extends AuthorizedController
 
     public function store(StoreSupplierPriceListRequest $request, int $supplier): JsonResponse
     {
-        $this->authorize('create', SupplierPriceList::class);
         $payload = $request->validated();
         $payload['supplier_id'] = $supplier;
 
@@ -62,7 +59,6 @@ class SupplierPriceListController extends AuthorizedController
             throw new NotFoundHttpException('Supplier price list assignment not found.');
         }
 
-        $this->authorize('delete', $foundAssignment);
         $this->deleteSupplierPriceListService->execute(['id' => $assignment]);
 
         return Response::json(['message' => 'Supplier price list assignment deleted successfully']);

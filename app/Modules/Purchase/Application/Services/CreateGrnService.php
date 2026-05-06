@@ -22,16 +22,16 @@ class CreateGrnService extends BaseService implements CreateGrnServiceInterface
         $dto = GrnHeaderData::fromArray($data);
 
         $entity = new GrnHeader(
-            tenantId: $dto->tenantId,
-            supplierId: $dto->supplierId,
-            warehouseId: $dto->warehouseId,
-            grnNumber: $dto->grnNumber,
+            tenantId: $dto->tenant_id,
+            supplierId: $dto->supplier_id,
+            warehouseId: $dto->warehouse_id,
+            grnNumber: $dto->grn_number,
             status: $dto->status,
-            receivedDate: new \DateTimeImmutable($dto->receivedDate),
-            currencyId: $dto->currencyId,
-            exchangeRate: $dto->exchangeRate,
-            createdBy: $dto->createdBy,
-            purchaseOrderId: $dto->purchaseOrderId,
+            receivedDate: new \DateTimeImmutable($dto->received_date),
+            currencyId: $dto->currency_id,
+            exchangeRate: $dto->exchange_rate,
+            createdBy: $dto->created_by,
+            purchaseOrderId: $dto->purchase_order_id,
             notes: $dto->notes,
             metadata: $dto->metadata,
         );

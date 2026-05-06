@@ -8,7 +8,6 @@ use Modules\Core\Application\Services\BaseService;
 use Modules\Sales\Application\Contracts\UpdateSalesOrderServiceInterface;
 use Modules\Sales\Application\DTOs\SalesOrderData;
 use Modules\Sales\Application\DTOs\SalesOrderLineData;
-use Modules\Sales\Application\Support\SalesPricingCalculator;
 use Modules\Sales\Domain\Entities\SalesOrder;
 use Modules\Sales\Domain\Entities\SalesOrderLine;
 use Modules\Sales\Domain\Exceptions\SalesOrderNotFoundException;
@@ -16,10 +15,8 @@ use Modules\Sales\Domain\RepositoryInterfaces\SalesOrderRepositoryInterface;
 
 class UpdateSalesOrderService extends BaseService implements UpdateSalesOrderServiceInterface
 {
-    public function __construct(
-        private readonly SalesOrderRepositoryInterface $salesOrderRepository,
-        private readonly SalesPricingCalculator $pricingCalculator,
-    ) {
+    public function __construct(private readonly SalesOrderRepositoryInterface $salesOrderRepository)
+    {
         parent::__construct($salesOrderRepository);
     }
 
@@ -32,9 +29,7 @@ class UpdateSalesOrderService extends BaseService implements UpdateSalesOrderSer
             throw new SalesOrderNotFoundException($id);
         }
 
-        $payload = $this->mergePayloadWithExistingOrder($order, $data);
-        $payload = $this->pricingCalculator->normalizeOrderPayload($payload);
-        $dto = SalesOrderData::fromArray($payload);
+        $dto = SalesOrderData::fromArray($data);
 
         if ($order->getTenantId() !== $dto->tenantId) {
             throw new SalesOrderNotFoundException($id);
@@ -77,37 +72,6 @@ class UpdateSalesOrderService extends BaseService implements UpdateSalesOrderSer
         }
 
         return $this->salesOrderRepository->save($order);
-    }
-
-    /**
-     * @param array<string, mixed> $payload
-     * @return array<string, mixed>
-     */
-    private function mergePayloadWithExistingOrder(SalesOrder $order, array $payload): array
-    {
-        $merged = [
-            'tenant_id' => $order->getTenantId(),
-            'customer_id' => $order->getCustomerId(),
-            'warehouse_id' => $order->getWarehouseId(),
-            'currency_id' => $order->getCurrencyId(),
-            'org_unit_id' => $order->getOrgUnitId(),
-            'so_number' => $order->getSoNumber(),
-            'status' => $order->getStatus(),
-            'exchange_rate' => $order->getExchangeRate(),
-            'order_date' => $order->getOrderDate()->format('Y-m-d'),
-            'requested_delivery_date' => $order->getRequestedDeliveryDate()?->format('Y-m-d'),
-            'price_list_id' => $order->getPriceListId(),
-            'subtotal' => $order->getSubtotal(),
-            'tax_total' => $order->getTaxTotal(),
-            'discount_total' => $order->getDiscountTotal(),
-            'grand_total' => $order->getGrandTotal(),
-            'notes' => $order->getNotes(),
-            'metadata' => $order->getMetadata(),
-            'created_by' => $order->getCreatedBy(),
-            'approved_by' => $order->getApprovedBy(),
-        ];
-
-        return array_replace($merged, $payload);
     }
 
     private static function buildLine(int $tenantId, array $lineData): SalesOrderLine

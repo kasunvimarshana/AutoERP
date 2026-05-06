@@ -5,13 +5,9 @@ declare(strict_types=1);
 namespace Modules\Sales\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
-use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\CurrencyModel;
-use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
-use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models\WarehouseModel;
 
 class SalesOrderModel extends Model
 {
@@ -66,20 +62,5 @@ class SalesOrderModel extends Model
     public function lines(): HasMany
     {
         return $this->hasMany(SalesOrderLineModel::class, 'sales_order_id');
-    }
-
-    public function customer(): BelongsTo
-    {
-        return $this->belongsTo(CustomerModel::class, 'customer_id');
-    }
-
-    public function warehouse(): BelongsTo
-    {
-        return $this->belongsTo(WarehouseModel::class, 'warehouse_id');
-    }
-
-    public function currency(): BelongsTo
-    {
-        return $this->belongsTo(CurrencyModel::class, 'currency_id');
     }
 }

@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Domain\Exceptions;
 
-use Modules\Core\Domain\Exceptions\DomainException;
-
-class OrganizationUnitAttachmentNotFoundException extends DomainException
+class OrganizationUnitAttachmentNotFoundException extends \RuntimeException
 {
     public function __construct(int $id)
     {
-        parent::__construct("Organization unit attachment with ID {$id} was not found.", 404);
+        parent::__construct("Organization unit attachment with ID {$id} was not found.");
     }
 }

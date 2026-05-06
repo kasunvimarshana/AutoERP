@@ -15,7 +15,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('product_id')->constrained('products', 'id', 'product_variants_product_id_fk')->cascadeOnDelete();
+            $table->foreignId('product_id')->constrained(null, 'id', 'product_variants_product_id_fk')->cascadeOnDelete();
             $table->string('sku')->nullable();
             $table->string('name');
             $table->boolean('is_default')->default(false);

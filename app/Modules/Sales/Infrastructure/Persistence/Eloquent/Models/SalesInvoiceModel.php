@@ -5,13 +5,8 @@ declare(strict_types=1);
 namespace Modules\Sales\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
-use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\CurrencyModel;
-use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerModel;
-use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\AccountModel;
-use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\JournalEntryModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class SalesInvoiceModel extends Model
@@ -46,8 +41,6 @@ class SalesInvoiceModel extends Model
 
     protected $casts = [
         'tenant_id' => 'integer',
-        'org_unit_id' => 'integer',
-        'row_version' => 'integer',
         'customer_id' => 'integer',
         'sales_order_id' => 'integer',
         'shipment_id' => 'integer',
@@ -68,35 +61,5 @@ class SalesInvoiceModel extends Model
     public function lines(): HasMany
     {
         return $this->hasMany(SalesInvoiceLineModel::class, 'sales_invoice_id');
-    }
-
-    public function customer(): BelongsTo
-    {
-        return $this->belongsTo(CustomerModel::class, 'customer_id');
-    }
-
-    public function salesOrder(): BelongsTo
-    {
-        return $this->belongsTo(SalesOrderModel::class, 'sales_order_id');
-    }
-
-    public function shipment(): BelongsTo
-    {
-        return $this->belongsTo(ShipmentModel::class, 'shipment_id');
-    }
-
-    public function currency(): BelongsTo
-    {
-        return $this->belongsTo(CurrencyModel::class, 'currency_id');
-    }
-
-    public function arAccount(): BelongsTo
-    {
-        return $this->belongsTo(AccountModel::class, 'ar_account_id');
-    }
-
-    public function journalEntry(): BelongsTo
-    {
-        return $this->belongsTo(JournalEntryModel::class, 'journal_entry_id');
     }
 }

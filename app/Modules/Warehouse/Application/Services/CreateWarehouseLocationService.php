@@ -7,7 +7,7 @@ namespace Modules\Warehouse\Application\Services;
 use Modules\Core\Application\Services\BaseService;
 use Modules\Core\Domain\Exceptions\NotFoundException;
 use Modules\Warehouse\Application\Contracts\CreateWarehouseLocationServiceInterface;
-use Modules\Warehouse\Application\DTOs\CreateWarehouseLocationData;
+use Modules\Warehouse\Application\DTOs\CreateWarehouseLocationDTO;
 use Modules\Warehouse\Application\Services\Concerns\BuildsLocationPath;
 use Modules\Warehouse\Domain\Entities\Warehouse;
 use Modules\Warehouse\Domain\Entities\WarehouseLocation;
@@ -27,7 +27,7 @@ class CreateWarehouseLocationService extends BaseService implements CreateWareho
 
     protected function handle(array $data): WarehouseLocation
     {
-        $dto = new CreateWarehouseLocationData(
+        $dto = new CreateWarehouseLocationDTO(
             tenantId: (int) $data['tenant_id'],
             warehouseId: (int) $data['warehouse_id'],
             parentId: isset($data['parent_id']) ? (int) $data['parent_id'] : null,

@@ -32,6 +32,5 @@ class NumberingSequenceModel extends BaseModel
         'next_number' => 'integer',
         'padding' => 'integer',
         'is_active' => 'boolean',
-        'row_version' => 'integer',
     ];
 }

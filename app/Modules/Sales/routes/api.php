@@ -19,7 +19,6 @@ Route::middleware(['auth.configured', 'resolve.tenant'])->group(function (): voi
     Route::apiResource('sales-invoices', SalesInvoiceController::class);
     Route::post('sales-invoices/{salesInvoice}/post', [SalesInvoiceController::class, 'post']);
     Route::post('sales-invoices/{salesInvoice}/record-payment', [SalesInvoiceController::class, 'recordPayment']);
-    Route::post('sales-invoices/{salesInvoice}/record-refund', [SalesInvoiceController::class, 'recordRefund']);
 
     Route::apiResource('sales-returns', SalesReturnController::class);
     Route::post('sales-returns/{salesReturn}/approve', [SalesReturnController::class, 'approve']);

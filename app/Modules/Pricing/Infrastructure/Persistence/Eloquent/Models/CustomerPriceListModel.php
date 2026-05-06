@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerModel;
-use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class CustomerPriceListModel extends Model
@@ -44,10 +43,5 @@ class CustomerPriceListModel extends Model
     public function priceList(): BelongsTo
     {
         return $this->belongsTo(PriceListModel::class, 'price_list_id');
-    }
-
-    public function orgUnit(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationUnitModel::class, 'org_unit_id');
     }
 }

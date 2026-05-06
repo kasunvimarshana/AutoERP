@@ -7,7 +7,6 @@ namespace Modules\Customer\Infrastructure\Persistence\Eloquent\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
-use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\CountryModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class CustomerAddressModel extends Model
@@ -45,10 +44,5 @@ class CustomerAddressModel extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(CustomerModel::class, 'customer_id');
-    }
-
-    public function country(): BelongsTo
-    {
-        return $this->belongsTo(CountryModel::class, 'country_id');
     }
 }

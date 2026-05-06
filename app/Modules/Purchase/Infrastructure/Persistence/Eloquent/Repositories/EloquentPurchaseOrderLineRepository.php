@@ -77,7 +77,6 @@ class EloquentPurchaseOrderLineRepository extends EloquentRepository implements 
             id: (int) $m->id,
             createdAt: $m->created_at,
             updatedAt: $m->updated_at,
-            lineTotal: isset($m->line_total) ? (string) $m->line_total : null,
         );
     }
 }

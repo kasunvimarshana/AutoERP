@@ -103,11 +103,12 @@ class AuthController extends AuthorizedController
 
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
-        $this->forgotPassword->execute($request->validated()['email']);
+        $sent = $this->forgotPassword->execute($request->validated()['email']);
 
-        // Always return the same generic message to prevent account enumeration.
         return response()->json([
-            'message' => 'If that email address is registered, a password reset link has been sent.',
+            'message' => $sent
+                ? 'Password reset link sent to your email address.'
+                : 'If that email exists, a reset link has been sent.',
         ]);
     }
 

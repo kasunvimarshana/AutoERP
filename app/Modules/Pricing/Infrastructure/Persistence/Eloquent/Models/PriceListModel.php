@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Audit\Infrastructure\Persistence\Eloquent\Traits\HasAudit;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\CurrencyModel;
-use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
 
 class PriceListModel extends Model
@@ -47,11 +46,6 @@ class PriceListModel extends Model
     public function currency(): BelongsTo
     {
         return $this->belongsTo(CurrencyModel::class, 'currency_id');
-    }
-
-    public function orgUnit(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationUnitModel::class, 'org_unit_id');
     }
 
     public function items(): HasMany

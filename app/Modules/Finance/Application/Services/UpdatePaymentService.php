@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Finance\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
-use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Finance\Application\Contracts\UpdatePaymentServiceInterface;
 use Modules\Finance\Application\DTOs\PaymentData;
 use Modules\Finance\Domain\Entities\Payment;
@@ -28,17 +27,14 @@ class UpdatePaymentService extends BaseService implements UpdatePaymentServiceIn
         if (! $payment) {
             throw new PaymentNotFoundException((int) $dto->id);
         }
-        if ($dto->rowVersion !== $payment->getRowVersion()) {
-            throw new ConcurrentModificationException('Payment', (int) $dto->id);
-        }
 
         $payment->update(
-            paymentMethodId: $dto->paymentMethodId,
-            accountId: $dto->accountId,
+            paymentMethodId: $dto->payment_method_id,
+            accountId: $dto->account_id,
             amount: $dto->amount,
-            currencyId: $dto->currencyId,
-            exchangeRate: $dto->exchangeRate,
-            paymentDate: new \DateTimeImmutable($dto->paymentDate),
+            currencyId: $dto->currency_id,
+            exchangeRate: $dto->exchange_rate,
+            paymentDate: new \DateTimeImmutable($dto->payment_date),
             reference: $dto->reference,
             notes: $dto->notes,
         );

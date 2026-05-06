@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Persistence\Eloquent\Models;
 
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BaseModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Traits\HasTenant;
@@ -33,9 +32,4 @@ class FiscalPeriodModel extends BaseModel
         'start_date' => 'date',
         'end_date' => 'date',
     ];
-
-    public function fiscalYear(): BelongsTo
-    {
-        return $this->belongsTo(FiscalYearModel::class, 'fiscal_year_id');
-    }
 }

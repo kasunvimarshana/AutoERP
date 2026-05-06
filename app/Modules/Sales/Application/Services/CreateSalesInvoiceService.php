@@ -8,24 +8,20 @@ use Modules\Core\Application\Services\BaseService;
 use Modules\Sales\Application\Contracts\CreateSalesInvoiceServiceInterface;
 use Modules\Sales\Application\DTOs\SalesInvoiceData;
 use Modules\Sales\Application\DTOs\SalesInvoiceLineData;
-use Modules\Sales\Application\Support\SalesPricingCalculator;
 use Modules\Sales\Domain\Entities\SalesInvoice;
 use Modules\Sales\Domain\Entities\SalesInvoiceLine;
 use Modules\Sales\Domain\RepositoryInterfaces\SalesInvoiceRepositoryInterface;
 
 class CreateSalesInvoiceService extends BaseService implements CreateSalesInvoiceServiceInterface
 {
-    public function __construct(
-        private readonly SalesInvoiceRepositoryInterface $salesInvoiceRepository,
-        private readonly SalesPricingCalculator $pricingCalculator,
-    ) {
+    public function __construct(private readonly SalesInvoiceRepositoryInterface $salesInvoiceRepository)
+    {
         parent::__construct($salesInvoiceRepository);
     }
 
     protected function handle(array $data): SalesInvoice
     {
-        $normalizedData = $this->pricingCalculator->normalizeInvoicePayload($data);
-        $dto = SalesInvoiceData::fromArray($normalizedData);
+        $dto = SalesInvoiceData::fromArray($data);
 
         $invoiceDate = $dto->invoiceDate !== null
             ? new \DateTimeImmutable($dto->invoiceDate)

@@ -35,7 +35,6 @@ class EloquentAccountRepository extends EloquentRepository implements AccountRep
             'is_active' => $account->isActive(),
             'path' => $account->getPath(),
             'depth' => $account->getDepth(),
-            'row_version' => $account->getRowVersion(),
         ];
 
         if ($account->getId()) {
@@ -83,7 +82,6 @@ class EloquentAccountRepository extends EloquentRepository implements AccountRep
             isActive: (bool) $model->is_active,
             path: $model->path,
             depth: (int) ($model->depth ?? 0),
-            rowVersion: (int) ($model->row_version ?? 1),
             id: (int) $model->id,
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Application\Services;
 
-use Illuminate\Support\Facades\DB;
 use Modules\Core\Application\Services\BaseService;
 use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitTypeServiceInterface;
 use Modules\OrganizationUnit\Domain\Exceptions\OrganizationUnitTypeNotFoundException;
@@ -20,14 +19,11 @@ class DeleteOrganizationUnitTypeService extends BaseService implements DeleteOrg
     protected function handle(array $data): bool
     {
         $organizationUnitTypeId = (int) $data['id'];
+        $organizationUnitType = $this->organizationUnitTypeRepository->find($organizationUnitTypeId);
+        if (! $organizationUnitType || $organizationUnitType->getId() === null) {
+            throw new OrganizationUnitTypeNotFoundException($organizationUnitTypeId);
+        }
 
-        return DB::transaction(function () use ($organizationUnitTypeId): bool {
-            $organizationUnitType = $this->organizationUnitTypeRepository->find($organizationUnitTypeId);
-            if (! $organizationUnitType || $organizationUnitType->getId() === null) {
-                throw new OrganizationUnitTypeNotFoundException($organizationUnitTypeId);
-            }
-
-            return $this->organizationUnitTypeRepository->delete($organizationUnitType->getId());
-        });
+        return $this->organizationUnitTypeRepository->delete($organizationUnitType->getId());
     }
 }

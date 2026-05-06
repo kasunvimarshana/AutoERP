@@ -55,28 +55,13 @@ class WarehouseRoutesTest extends TestCase
     {
         $routes = app('router')->getRoutes();
 
-        $warehouseRoutes = [
-            ['GET', 'api/warehouses'],
-            ['POST', 'api/warehouses'],
-            ['GET', 'api/warehouses/{warehouse}'],
-            ['PUT', 'api/warehouses/{warehouse}'],
-            ['DELETE', 'api/warehouses/{warehouse}'],
-            ['GET', 'api/warehouses/{warehouse}/locations'],
-            ['POST', 'api/warehouses/{warehouse}/locations'],
-            ['GET', 'api/warehouses/{warehouse}/locations/{location}'],
-            ['PUT', 'api/warehouses/{warehouse}/locations/{location}'],
-            ['DELETE', 'api/warehouses/{warehouse}/locations/{location}'],
-            ['GET', 'api/warehouses/{warehouse}/stock-movements'],
-            ['POST', 'api/warehouses/{warehouse}/stock-movements'],
-            ['GET', 'api/warehouses/{warehouse}/stock-levels'],
-        ];
-
-        foreach ($warehouseRoutes as [$method, $uri]) {
-            $this->assertRouteUsesMiddleware(
-                $this->findRoute($routes, $uri, $method),
-                ['auth.configured', 'resolve.tenant']
-            );
-        }
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/warehouses', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/warehouses/{warehouse}', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/warehouses/{warehouse}/locations', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/warehouses/{warehouse}/locations/{location}', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/warehouses/{warehouse}/stock-movements', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/warehouses/{warehouse}/stock-movements', 'POST'), ['auth.configured', 'resolve.tenant']);
+        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/warehouses/{warehouse}/stock-levels', 'GET'), ['auth.configured', 'resolve.tenant']);
     }
 
     /**

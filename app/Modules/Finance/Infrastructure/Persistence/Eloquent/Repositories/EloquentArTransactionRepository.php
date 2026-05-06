@@ -32,7 +32,6 @@ class EloquentArTransactionRepository extends EloquentRepository implements ArTr
             'due_date' => $ar->getDueDate()?->format('Y-m-d'),
             'currency_id' => $ar->getCurrencyId(),
             'is_reconciled' => $ar->isReconciled(),
-            'row_version' => $ar->getRowVersion(),
         ];
 
         $model = $ar->getId() ? $this->update($ar->getId(), $data) : $this->create($data);
@@ -67,7 +66,6 @@ class EloquentArTransactionRepository extends EloquentRepository implements ArTr
             referenceId: $m->reference_id !== null ? (int) $m->reference_id : null,
             dueDate: $m->due_date,
             isReconciled: (bool) $m->is_reconciled,
-            rowVersion: (int) ($m->row_version ?? 1),
             id: (int) $m->id,
             createdAt: $m->created_at,
             updatedAt: $m->updated_at,

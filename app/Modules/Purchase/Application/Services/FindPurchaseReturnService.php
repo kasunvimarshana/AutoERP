@@ -11,7 +11,7 @@ use Modules\Purchase\Domain\RepositoryInterfaces\PurchaseReturnRepositoryInterfa
 
 class FindPurchaseReturnService implements FindPurchaseReturnServiceInterface
 {
-    private const ALLOWED_FILTERS = ['tenant_id', 'supplier_id', 'org_unit_id', 'status', 'return_number'];
+    private const ALLOWED_FILTERS = ['tenant_id', 'supplier_id', 'status', 'return_number'];
 
     private const ALLOWED_SORTS = ['id', 'return_number', 'return_date', 'status', 'created_at'];
 

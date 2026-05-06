@@ -32,7 +32,6 @@ class LeaveRequestController extends AuthorizedController
 
     public function index(): JsonResponse
     {
-        $this->authorize('viewAny', LeaveRequest::class);
         $result = $this->findService->list();
 
         return Response::json(['data' => LeaveRequestResource::collection($result)]);
@@ -40,7 +39,6 @@ class LeaveRequestController extends AuthorizedController
 
     public function store(StoreLeaveRequestRequest $request): JsonResponse
     {
-        $this->authorize('create', LeaveRequest::class);
         $entity = $this->submitService->execute($request->validated());
 
         return (new LeaveRequestResource($entity))->response()->setStatusCode(201);
@@ -48,16 +46,12 @@ class LeaveRequestController extends AuthorizedController
 
     public function show(int $leaveRequest): LeaveRequestResource
     {
-        $entity = $this->findOrFail($leaveRequest);
-        $this->authorize('view', $entity);
-
-        return new LeaveRequestResource($entity);
+        return new LeaveRequestResource($this->findOrFail($leaveRequest));
     }
 
     public function update(UpdateLeaveRequestRequest $request, int $leaveRequest): LeaveRequestResource
     {
-        $entity = $this->findOrFail($leaveRequest);
-        $this->authorize('update', $entity);
+        $this->findOrFail($leaveRequest);
         $payload = $request->validated();
         $payload['id'] = $leaveRequest;
         $updated = $this->submitService->execute($payload);
@@ -67,8 +61,7 @@ class LeaveRequestController extends AuthorizedController
 
     public function destroy(int $leaveRequest): JsonResponse
     {
-        $entity = $this->findOrFail($leaveRequest);
-        $this->authorize('delete', $entity);
+        $this->findOrFail($leaveRequest);
         $this->cancelService->execute(['id' => $leaveRequest]);
 
         return Response::json(null, 204);
@@ -76,8 +69,7 @@ class LeaveRequestController extends AuthorizedController
 
     public function approve(ApproveLeaveRequestRequest $request, int $leaveRequest): LeaveRequestResource
     {
-        $entity = $this->findOrFail($leaveRequest);
-        $this->authorize('update', $entity);
+        $this->findOrFail($leaveRequest);
         $payload = $request->validated();
         $payload['id'] = $leaveRequest;
         $updated = $this->approveService->execute($payload);
@@ -87,8 +79,7 @@ class LeaveRequestController extends AuthorizedController
 
     public function reject(RejectLeaveRequestRequest $request, int $leaveRequest): LeaveRequestResource
     {
-        $entity = $this->findOrFail($leaveRequest);
-        $this->authorize('update', $entity);
+        $this->findOrFail($leaveRequest);
         $payload = $request->validated();
         $payload['id'] = $leaveRequest;
         $updated = $this->rejectService->execute($payload);
@@ -98,8 +89,7 @@ class LeaveRequestController extends AuthorizedController
 
     public function cancel(int $leaveRequest): JsonResponse
     {
-        $entity = $this->findOrFail($leaveRequest);
-        $this->authorize('update', $entity);
+        $this->findOrFail($leaveRequest);
         $this->cancelService->execute(['id' => $leaveRequest]);
 
         return Response::json(['message' => 'Leave request cancelled.']);

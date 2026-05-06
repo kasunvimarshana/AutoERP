@@ -28,7 +28,6 @@ class EloquentEmployeeRepository extends EloquentRepository implements EmployeeR
             'hire_date' => $employee->getHireDate()?->format('Y-m-d'),
             'termination_date' => $employee->getTerminationDate()?->format('Y-m-d'),
             'metadata' => $employee->getMetadata(),
-            'row_version' => $employee->getRowVersion(),
         ];
 
         if ($employee->getId()) {
@@ -81,7 +80,6 @@ class EloquentEmployeeRepository extends EloquentRepository implements EmployeeR
             hireDate: $model->hire_date,
             terminationDate: $model->termination_date,
             metadata: is_array($model->metadata) ? $model->metadata : null,
-            rowVersion: (int) ($model->row_version ?? 1),
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,
         );

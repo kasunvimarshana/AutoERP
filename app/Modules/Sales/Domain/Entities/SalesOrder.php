@@ -296,16 +296,6 @@ class SalesOrder
         $this->updatedAt = new \DateTimeImmutable;
     }
 
-    public function markPartial(): void
-    {
-        if ($this->status !== 'confirmed') {
-            throw new \InvalidArgumentException('Only confirmed orders can be marked as partial.');
-        }
-
-        $this->status = 'partial';
-        $this->updatedAt = new \DateTimeImmutable;
-    }
-
     public function markShipped(): void
     {
         if (! in_array($this->status, ['confirmed', 'partial'], true)) {

@@ -22,14 +22,14 @@ class CreateApprovalWorkflowConfigService extends BaseService implements CreateA
         $dto = ApprovalWorkflowConfigData::fromArray($data);
 
         $config = new ApprovalWorkflowConfig(
-            tenantId: $dto->tenantId,
+            tenantId: $dto->tenant_id,
             module: $dto->module,
-            entityType: $dto->entityType,
+            entityType: $dto->entity_type,
             name: $dto->name,
             steps: $dto->steps,
-            minAmount: $dto->minAmount,
-            maxAmount: $dto->maxAmount,
-            isActive: $dto->isActive,
+            minAmount: $dto->min_amount,
+            maxAmount: $dto->max_amount,
+            isActive: $dto->is_active,
         );
 
         return $this->configRepository->save($config);

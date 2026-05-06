@@ -19,7 +19,7 @@ class EloquentLeaveTypeRepository extends EloquentRepository implements LeaveTyp
 
     public function save(LeaveType $entity): LeaveType
     {
-        $data = ['tenant_id' => $entity->getTenantId(), 'name' => $entity->getName(), 'code' => $entity->getCode(), 'description' => $entity->getDescription(), 'max_days_per_year' => $entity->getMaxDaysPerYear(), 'carry_forward_days' => $entity->getCarryForwardDays(), 'is_paid' => $entity->isPaid(), 'requires_approval' => $entity->requiresApproval(), 'applicable_gender' => $entity->getApplicableGender(), 'min_service_days' => $entity->getMinServiceDays(), 'is_active' => $entity->isActive(), 'metadata' => $entity->getMetadata(), 'row_version' => $entity->getRowVersion()];
+        $data = ['tenant_id' => $entity->getTenantId(), 'name' => $entity->getName(), 'code' => $entity->getCode(), 'description' => $entity->getDescription(), 'max_days_per_year' => $entity->getMaxDaysPerYear(), 'carry_forward_days' => $entity->getCarryForwardDays(), 'is_paid' => $entity->isPaid(), 'requires_approval' => $entity->requiresApproval(), 'applicable_gender' => $entity->getApplicableGender(), 'min_service_days' => $entity->getMinServiceDays(), 'is_active' => $entity->isActive(), 'metadata' => $entity->getMetadata()];
         $model = $entity->getId() ? $this->update($entity->getId(), $data) : $this->create($data);
 
         return $this->toDomainEntity($model);
@@ -39,6 +39,6 @@ class EloquentLeaveTypeRepository extends EloquentRepository implements LeaveTyp
 
     private function mapModelToDomainEntity(LeaveTypeModel $m): LeaveType
     {
-        return new LeaveType($m->tenant_id, $m->name, $m->code, $m->description ?? '', (float) $m->max_days_per_year, (float) $m->carry_forward_days, (bool) $m->is_paid, (bool) $m->requires_approval, $m->applicable_gender, (int) $m->min_service_days, (bool) $m->is_active, $m->metadata ?? [], $m->created_at instanceof \DateTimeInterface ? $m->created_at : new \DateTimeImmutable($m->created_at ?? 'now'), $m->updated_at instanceof \DateTimeInterface ? $m->updated_at : new \DateTimeImmutable($m->updated_at ?? 'now'), (int) ($m->row_version ?? 1), $m->id);
+        return new LeaveType($m->tenant_id, $m->name, $m->code, $m->description ?? '', (float) $m->max_days_per_year, (float) $m->carry_forward_days, (bool) $m->is_paid, (bool) $m->requires_approval, $m->applicable_gender, (int) $m->min_service_days, (bool) $m->is_active, $m->metadata ?? [], $m->created_at instanceof \DateTimeInterface ? $m->created_at : new \DateTimeImmutable($m->created_at ?? 'now'), $m->updated_at instanceof \DateTimeInterface ? $m->updated_at : new \DateTimeImmutable($m->updated_at ?? 'now'), $m->id);
     }
 }

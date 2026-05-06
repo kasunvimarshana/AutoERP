@@ -11,7 +11,6 @@ use Modules\Sales\Domain\Entities\SalesReturn;
 use Modules\Sales\Domain\Events\SalesReturnReceived;
 use Modules\Sales\Domain\Exceptions\SalesReturnNotFoundException;
 use Modules\Sales\Domain\RepositoryInterfaces\SalesInvoiceRepositoryInterface;
-use Modules\Sales\Domain\RepositoryInterfaces\SalesOrderRepositoryInterface;
 use Modules\Sales\Domain\RepositoryInterfaces\SalesReturnRepositoryInterface;
 
 class ReceiveSalesReturnService extends BaseService implements ReceiveSalesReturnServiceInterface
@@ -19,7 +18,6 @@ class ReceiveSalesReturnService extends BaseService implements ReceiveSalesRetur
     public function __construct(
         private readonly SalesReturnRepositoryInterface $salesReturnRepository,
         private readonly SalesInvoiceRepositoryInterface $salesInvoiceRepository,
-        private readonly SalesOrderRepositoryInterface $salesOrderRepository,
     ) {
         parent::__construct($salesReturnRepository);
     }
@@ -45,20 +43,6 @@ class ReceiveSalesReturnService extends BaseService implements ReceiveSalesRetur
             }
         }
 
-        $incomeAccountMap = [];
-        if ($saved->getOriginalSalesOrderId() !== null) {
-            $originalSalesOrder = $this->salesOrderRepository->find($saved->getOriginalSalesOrderId());
-            if ($originalSalesOrder !== null) {
-                foreach ($originalSalesOrder->getLines() as $originalLine) {
-                    if ($originalLine->getId() === null) {
-                        continue;
-                    }
-
-                    $incomeAccountMap[$originalLine->getId()] = $originalLine->getIncomeAccountId();
-                }
-            }
-        }
-
         $this->addEvent(new SalesReturnReceived(
             tenantId: $saved->getTenantId(),
             salesReturnId: (int) $saved->getId(),
@@ -77,7 +61,7 @@ class ReceiveSalesReturnService extends BaseService implements ReceiveSalesRetur
                 'variant_id' => $l->getVariantId(),
                 'batch_id' => $l->getBatchId(),
                 'serial_id' => $l->getSerialId(),
-                'income_account_id' => $incomeAccountMap[$l->getOriginalSalesOrderLineId() ?? 0] ?? null,
+                'income_account_id' => null,
                 'line_total' => $l->getLineTotal(),
             ], $saved->getLines()),
             createdBy: (int) (Auth::id() ?? 0),

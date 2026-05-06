@@ -12,7 +12,6 @@ class FiscalYear
         private \DateTimeInterface $startDate,
         private \DateTimeInterface $endDate,
         private string $status = 'open',
-        private int $rowVersion = 1,
         private ?int $id = null,
         private ?\DateTimeInterface $createdAt = null,
         private ?\DateTimeInterface $updatedAt = null,
@@ -61,12 +60,6 @@ class FiscalYear
         return $this->updatedAt;
     }
 
-
-    public function getRowVersion(): int
-    {
-        return $this->rowVersion;
-    }
-
     public function isOpen(): bool
     {
         return $this->status === 'open';
@@ -82,7 +75,6 @@ class FiscalYear
         $this->startDate = $startDate;
         $this->endDate = $endDate;
         $this->status = $status;
-        $this->rowVersion++;
         $this->updatedAt = new \DateTimeImmutable;
     }
 }

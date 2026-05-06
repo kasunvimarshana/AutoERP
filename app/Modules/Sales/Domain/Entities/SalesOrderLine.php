@@ -163,11 +163,6 @@ class SalesOrderLine
         return $this->serialId;
     }
 
-    public function addShippedQty(string $qty): void
-    {
-        $this->shippedQty = bcadd($this->shippedQty, $qty, 6);
-    }
-
     public function update(
         int $productId,
         int $uomId,

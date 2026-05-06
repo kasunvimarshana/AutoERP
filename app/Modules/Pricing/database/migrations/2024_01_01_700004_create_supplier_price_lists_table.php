@@ -15,12 +15,8 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('supplier_id')
-                ->constrained('suppliers', 'id', 'supplier_price_lists_supplier_id_fk')
-                ->cascadeOnDelete();
-            $table->foreignId('price_list_id')
-                ->constrained('price_lists', 'id', 'supplier_price_lists_price_list_id_fk')
-                ->cascadeOnDelete();
+            $table->foreignId('supplier_id')->constrained(null, 'id', 'supplier_price_lists_supplier_id_fk')->cascadeOnDelete();
+            $table->foreignId('price_list_id')->constrained(null, 'id', 'supplier_price_lists_price_list_id_fk')->cascadeOnDelete();
             $table->unsignedInteger('priority')->default(0);
             $table->timestamps();
             $table->unique(['tenant_id', 'org_unit_id', 'supplier_id', 'price_list_id'], 'supplier_price_lists_tenant_supplier_pricelist_uk');

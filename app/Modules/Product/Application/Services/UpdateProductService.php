@@ -10,7 +10,6 @@ use Modules\Product\Application\Contracts\UpdateProductServiceInterface;
 use Modules\Product\Application\DTOs\ProductData;
 use Modules\Product\Domain\Entities\Product;
 use Modules\Product\Domain\Exceptions\ProductNotFoundException;
-use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Product\Domain\RepositoryInterfaces\ProductRepositoryInterface;
 
 class UpdateProductService extends BaseService implements UpdateProductServiceInterface
@@ -39,11 +38,6 @@ class UpdateProductService extends BaseService implements UpdateProductServiceIn
 
         $dto = ProductData::fromArray($data);
 
-
-        if ($dto->rowVersion !== $product->getRowVersion()) {
-            throw new ConcurrentModificationException('Product', $id);
-        }
-
         $product->update(
             type: $dto->type,
             name: $dto->name,
@@ -68,8 +62,6 @@ class UpdateProductService extends BaseService implements UpdateProductServiceIn
             cogsAccountId: $dto->cogs_account_id,
             inventoryAccountId: $dto->inventory_account_id,
             expenseAccountId: $dto->expense_account_id,
-            purchasePrice: $dto->purchase_price,
-            salesPrice: $dto->sales_price,
             isActive: $dto->is_active,
             metadata: $dto->metadata,
         );

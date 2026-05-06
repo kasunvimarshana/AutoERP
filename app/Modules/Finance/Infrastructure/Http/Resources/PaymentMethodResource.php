@@ -19,7 +19,6 @@ class PaymentMethodResource extends JsonResource
             'type' => $this->resource->getType(),
             'account_id' => $this->resource->getAccountId(),
             'is_active' => $this->resource->isActive(),
-            'row_version' => $this->resource->getRowVersion(),
             'created_at' => $this->resource->getCreatedAt(),
             'updated_at' => $this->resource->getUpdatedAt(),
         ];

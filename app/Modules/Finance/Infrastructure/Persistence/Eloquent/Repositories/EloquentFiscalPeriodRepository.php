@@ -27,7 +27,6 @@ class EloquentFiscalPeriodRepository extends EloquentRepository implements Fisca
             'start_date' => $fiscalPeriod->getStartDate()->format('Y-m-d'),
             'end_date' => $fiscalPeriod->getEndDate()->format('Y-m-d'),
             'status' => $fiscalPeriod->getStatus(),
-            'row_version' => $fiscalPeriod->getRowVersion(),
         ];
 
         if ($fiscalPeriod->getId()) {
@@ -81,7 +80,6 @@ class EloquentFiscalPeriodRepository extends EloquentRepository implements Fisca
             startDate: $model->start_date,
             endDate: $model->end_date,
             status: (string) $model->status,
-            rowVersion: (int) ($model->row_version ?? 1),
             id: (int) $model->id,
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,

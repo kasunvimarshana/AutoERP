@@ -7,9 +7,7 @@ namespace Modules\Finance\Infrastructure\Listeners;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Modules\Finance\Application\Contracts\CreateArTransactionServiceInterface;
 use Modules\Finance\Application\Contracts\CreateJournalEntryServiceInterface;
-use Modules\Finance\Domain\RepositoryInterfaces\ArTransactionRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\FiscalPeriodRepositoryInterface;
 use Modules\Finance\Infrastructure\Listeners\Concerns\HandlesReplayConflicts;
 use Modules\Sales\Domain\Events\SalesInvoicePosted;
@@ -21,8 +19,6 @@ class HandleSalesInvoicePosted
     public function __construct(
         private readonly FiscalPeriodRepositoryInterface $fiscalPeriodRepository,
         private readonly CreateJournalEntryServiceInterface $createJournalEntryService,
-        private readonly CreateArTransactionServiceInterface $createArTransactionService,
-        private readonly ArTransactionRepositoryInterface $arTransactionRepository,
     ) {}
 
     public function handle(SalesInvoicePosted $event): void
@@ -45,8 +41,8 @@ class HandleSalesInvoicePosted
             return;
         }
 
-        if ($this->artifactsAlreadyPosted($event->tenantId, 'sales_invoice', $event->salesInvoiceId, 'ar_transactions')) {
-            Log::info('HandleSalesInvoicePosted: replay detected; finance artifacts already exist, skipping', [
+        if ($this->journalAlreadyPosted($event->tenantId, 'sales_invoice', $event->salesInvoiceId)) {
+            Log::info('HandleSalesInvoicePosted: replay detected; journal entry already exists, skipping', [
                 'sales_invoice_id' => $event->salesInvoiceId,
                 'tenant_id' => $event->tenantId,
             ]);
@@ -145,37 +141,15 @@ class HandleSalesInvoicePosted
                     'description' => $description,
                     'lines' => $jeLines,
                 ]);
-
-                // Record AR invoice transaction (increases amount owed by customer)
-                $currentBalance = $this->arTransactionRepository
-                    ->getCustomerBalance($event->tenantId, $event->customerId);
-
-                $newBalance = (float) bcadd($currentBalance, $event->grandTotal, 6);
-
-                $this->createArTransactionService->execute([
-                    'tenant_id' => $event->tenantId,
-                    'customer_id' => $event->customerId,
-                    'account_id' => $event->arAccountId,
-                    'transaction_type' => 'invoice',
-                    'amount' => (float) $event->grandTotal,
-                    'balance_after' => $newBalance,
-                    'transaction_date' => $invoiceDate->format('Y-m-d'),
-                    'currency_id' => $event->currencyId,
-                    'reference_type' => 'sales_invoice',
-                    'reference_id' => $event->salesInvoiceId,
-                ]);
             });
         } catch (QueryException $exception) {
-            if (! $this->isReplayConflict($exception, [
-                'ar_transactions_tenant_reference_uk',
-                'ar_transactions.tenant_id, ar_transactions.reference_type, ar_transactions.reference_id',
-            ])) {
+            if (! $this->isReplayConflict($exception)) {
                 throw $exception;
             }
 
-            if (! $this->artifactsAlreadyPosted($event->tenantId, 'sales_invoice', $event->salesInvoiceId, 'ar_transactions')) {
+            if (! $this->journalAlreadyPosted($event->tenantId, 'sales_invoice', $event->salesInvoiceId)) {
                 throw new \RuntimeException(
-                    'HandleSalesInvoicePosted: replay conflict detected with incomplete finance artifacts for sales_invoice_id '.$event->salesInvoiceId,
+                    'HandleSalesInvoicePosted: replay conflict detected with missing journal artifact for sales_invoice_id '.$event->salesInvoiceId,
                     0,
                     $exception
                 );

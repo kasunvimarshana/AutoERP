@@ -31,30 +31,30 @@ class UpdateSupplierProductService extends BaseService implements UpdateSupplier
         }
 
         $dto = SupplierProductData::fromArray($data);
-        if ($supplierProduct->getSupplierId() !== $dto->supplierId) {
+        if ($supplierProduct->getSupplierId() !== $dto->supplier_id) {
             throw new SupplierProductNotFoundException($id);
         }
 
-        $supplier = $this->supplierRepository->find($dto->supplierId);
+        $supplier = $this->supplierRepository->find($dto->supplier_id);
         if (! $supplier || $supplier->getTenantId() !== $supplierProduct->getTenantId()) {
-            throw new SupplierNotFoundException($dto->supplierId);
+            throw new SupplierNotFoundException($dto->supplier_id);
         }
 
         $supplierProduct->update(
-            productId: $dto->productId,
-            variantId: $dto->variantId,
-            supplierSku: $dto->supplierSku,
-            leadTimeDays: $dto->leadTimeDays,
-            minOrderQty: $dto->minOrderQty,
-            isPreferred: $dto->isPreferred,
-            lastPurchasePrice: $dto->lastPurchasePrice,
+            productId: $dto->product_id,
+            variantId: $dto->variant_id,
+            supplierSku: $dto->supplier_sku,
+            leadTimeDays: $dto->lead_time_days,
+            minOrderQty: $dto->min_order_qty,
+            isPreferred: $dto->is_preferred,
+            lastPurchasePrice: $dto->last_purchase_price,
         );
 
-        if ($dto->isPreferred) {
+        if ($dto->is_preferred) {
             $this->supplierProductRepository->clearPreferredByProductVariant(
                 tenantId: $supplier->getTenantId(),
-                productId: $dto->productId,
-                variantId: $dto->variantId,
+                productId: $dto->product_id,
+                variantId: $dto->variant_id,
                 excludeId: $id,
             );
         }

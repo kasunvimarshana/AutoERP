@@ -29,7 +29,6 @@ class LeaveTypeResource extends JsonResource
             'min_service_days' => $entity->getMinServiceDays(),
             'is_active' => $entity->isActive(),
             'metadata' => $entity->getMetadata(),
-            'row_version' => $entity->getRowVersion(),
             'created_at' => $entity->getCreatedAt()->format('c'),
             'updated_at' => $entity->getUpdatedAt()->format('c'),
         ];

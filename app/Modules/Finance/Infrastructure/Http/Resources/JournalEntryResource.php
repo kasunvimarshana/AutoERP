@@ -44,7 +44,6 @@ class JournalEntryResource extends JsonResource
                 'cost_center_id' => $line->getCostCenterId(),
                 'metadata' => $line->getMetadata(),
             ], $this->resource->getLines()),
-            'row_version' => $this->resource->getRowVersion(),
             'created_at' => $this->resource->getCreatedAt(),
             'updated_at' => $this->resource->getUpdatedAt(),
         ];

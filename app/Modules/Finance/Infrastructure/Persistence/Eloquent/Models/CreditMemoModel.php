@@ -25,6 +25,5 @@ class CreditMemoModel extends BaseModel
     protected $casts = [
         'amount' => 'decimal:6',
         'issued_date' => 'date',
-        'row_version' => 'integer',
     ];
 }

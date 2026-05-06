@@ -33,7 +33,6 @@ class PurchaseReturn
     private string $taxTotal;
 
     private string $grandTotal;
-    private string $discountTotal;
 
     private ?string $debitNoteNumber;
 
@@ -61,7 +60,6 @@ class PurchaseReturn
         string $subtotal = '0',
         string $taxTotal = '0',
         string $grandTotal = '0',
-            string $discountTotal = '0',
         ?string $debitNoteNumber = null,
         ?int $journalEntryId = null,
         ?string $notes = null,
@@ -83,7 +81,6 @@ class PurchaseReturn
         $this->subtotal = $subtotal;
         $this->taxTotal = $taxTotal;
         $this->grandTotal = $grandTotal;
-            $this->discountTotal = $discountTotal;
         $this->debitNoteNumber = $debitNoteNumber;
         $this->journalEntryId = $journalEntryId;
         $this->notes = $notes;
@@ -232,11 +229,6 @@ class PurchaseReturn
     {
         $this->status = 'approved';
         $this->updatedAt = new \DateTimeImmutable;
-    }
-
-    public function getDiscountTotal(): string
-    {
-        return $this->discountTotal;
     }
 
     public function setJournalEntryId(int $journalEntryId): void

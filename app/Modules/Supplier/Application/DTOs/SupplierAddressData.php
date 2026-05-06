@@ -7,18 +7,18 @@ namespace Modules\Supplier\Application\DTOs;
 class SupplierAddressData
 {
     public function __construct(
-        public readonly int $supplierId,
+        public readonly int $supplier_id,
         public readonly string $type,
-        public readonly string $addressLine1,
+        public readonly string $address_line1,
         public readonly string $city,
-        public readonly string $postalCode,
-        public readonly int $countryId,
+        public readonly string $postal_code,
+        public readonly int $country_id,
         public readonly ?string $label = null,
-        public readonly ?string $addressLine2 = null,
+        public readonly ?string $address_line2 = null,
         public readonly ?string $state = null,
-        public readonly bool $isDefault = false,
-        public readonly ?string $geoLat = null,
-        public readonly ?string $geoLng = null,
+        public readonly bool $is_default = false,
+        public readonly ?string $geo_lat = null,
+        public readonly ?string $geo_lng = null,
         public readonly ?int $id = null,
     ) {}
 
@@ -28,12 +28,12 @@ class SupplierAddressData
     public static function fromArray(array $data): self
     {
         return new self(
-            supplierId: (int) $data['supplier_id'],
+            supplier_id: (int) $data['supplier_id'],
             type: (string) ($data['type'] ?? 'billing'),
-            addressLine1: (string) $data['address_line1'],
+            address_line1: (string) $data['address_line1'],
             city: (string) $data['city'],
-            postalCode: (string) $data['postal_code'],
-            countryId: (int) $data['country_id'],
+            postal_code: (string) $data['postal_code'],
+            country_id: (int) $data['country_id'],
             label: isset($data['label']) ? (string) $data['label'] : null,
             address_line2: isset($data['address_line2']) ? (string) $data['address_line2'] : null,
             state: isset($data['state']) ? (string) $data['state'] : null,

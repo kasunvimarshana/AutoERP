@@ -19,7 +19,6 @@ class TaxRuleResource extends JsonResource
             'party_type' => $this->getPartyType(),
             'region' => $this->getRegion(),
             'priority' => $this->getPriority(),
-            'row_version' => $this->getRowVersion(),
             'created_at' => $this->getCreatedAt()->format('c'),
             'updated_at' => $this->getUpdatedAt()->format('c'),
         ];

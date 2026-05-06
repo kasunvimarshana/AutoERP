@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->cascadeOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('user_id')->constrained('users', 'id', 'org_unit_users_user_id_fk')->cascadeOnDelete();
-            $table->foreignId('role_id')->nullable()->constrained('roles', 'id', 'org_unit_users_role_id_fk')->cascadeOnDelete();
+            $table->string('role')->nullable();
             $table->boolean('is_primary')->default(false);
             $table->softDeletes();
             $table->timestamps();

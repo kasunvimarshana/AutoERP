@@ -16,7 +16,6 @@ class UpdateLeavePolicyRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'row_version' => 'required|integer|min:1',
             'name' => 'sometimes|string|max:255',
             'accrual_type' => 'nullable|string|max:20',
             'accrual_amount' => 'nullable|numeric|min:0',

@@ -22,18 +22,18 @@ class CreateApTransactionService extends BaseService implements CreateApTransact
         $dto = ApTransactionData::fromArray($data);
 
         $ap = new ApTransaction(
-            tenantId: $dto->tenantId,
-            supplierId: $dto->supplierId,
-            accountId: $dto->accountId,
-            transactionType: $dto->transactionType,
+            tenantId: $dto->tenant_id,
+            supplierId: $dto->supplier_id,
+            accountId: $dto->account_id,
+            transactionType: $dto->transaction_type,
             amount: $dto->amount,
-            balanceAfter: $dto->balanceAfter,
-            transactionDate: new \DateTimeImmutable($dto->transactionDate),
-            currencyId: $dto->currencyId,
-            referenceType: $dto->referenceType,
-            referenceId: $dto->referenceId,
-            dueDate: $dto->dueDate !== null ? new \DateTimeImmutable($dto->dueDate) : null,
-            isReconciled: $dto->isReconciled,
+            balanceAfter: $dto->balance_after,
+            transactionDate: new \DateTimeImmutable($dto->transaction_date),
+            currencyId: $dto->currency_id,
+            referenceType: $dto->reference_type,
+            referenceId: $dto->reference_id,
+            dueDate: $dto->due_date !== null ? new \DateTimeImmutable($dto->due_date) : null,
+            isReconciled: $dto->is_reconciled,
         );
 
         return $this->apTransactionRepository->save($ap);

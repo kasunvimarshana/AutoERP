@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Tax\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
-use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Tax\Application\Contracts\UpdateTaxGroupServiceInterface;
 use Modules\Tax\Application\DTOs\TaxGroupData;
 use Modules\Tax\Domain\RepositoryInterfaces\TaxGroupRepositoryInterface;
@@ -24,10 +23,6 @@ class UpdateTaxGroupService extends BaseService implements UpdateTaxGroupService
         $taxGroup = $this->taxGroupRepository->find($dto->id ?? 0);
         if (! $taxGroup) {
             throw new \InvalidArgumentException('Tax group not found.');
-        }
-
-        if ($dto->rowVersion !== $taxGroup->getRowVersion()) {
-            throw new ConcurrentModificationException('TaxGroup', $dto->id ?? 0);
         }
 
         $taxGroup->update(

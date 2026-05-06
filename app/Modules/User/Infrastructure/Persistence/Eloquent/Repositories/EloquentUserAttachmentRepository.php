@@ -20,14 +20,14 @@ class EloquentUserAttachmentRepository extends EloquentRepository implements Use
 
     public function findByUuid(string $uuid): ?UserAttachment
     {
-        $model = $this->newScopedQuery()->where('uuid', $uuid)->first();
+        $model = $this->model->where('uuid', $uuid)->first();
 
         return $model ? $this->toDomainEntity($model) : null;
     }
 
     public function getByUser(int $userId, ?string $type = null): Collection
     {
-        $query = $this->newScopedQuery()->where('user_id', $userId);
+        $query = $this->model->where('user_id', $userId);
         if ($type !== null) {
             $query->where('type', $type);
         }

@@ -32,33 +32,33 @@ class UpdateSupplierAddressService extends BaseService implements UpdateSupplier
 
         $dto = SupplierAddressData::fromArray($data);
 
-        if ($address->getSupplierId() !== $dto->supplierId) {
+        if ($address->getSupplierId() !== $dto->supplier_id) {
             throw new SupplierAddressNotFoundException($id);
         }
 
-        $supplier = $this->supplierRepository->find($dto->supplierId);
+        $supplier = $this->supplierRepository->find($dto->supplier_id);
         if (! $supplier || $supplier->getTenantId() !== $address->getTenantId()) {
-            throw new SupplierNotFoundException($dto->supplierId);
+            throw new SupplierNotFoundException($dto->supplier_id);
         }
 
         $address->update(
             type: $dto->type,
             label: $dto->label,
-            addressLine1: $dto->addressLine1,
-            addressLine2: $dto->addressLine2,
+            addressLine1: $dto->address_line1,
+            addressLine2: $dto->address_line2,
             city: $dto->city,
             state: $dto->state,
-            postalCode: $dto->postalCode,
-            countryId: $dto->countryId,
-            isDefault: $dto->isDefault,
-            geoLat: $dto->geoLat,
-            geoLng: $dto->geoLng,
+            postalCode: $dto->postal_code,
+            countryId: $dto->country_id,
+            isDefault: $dto->is_default,
+            geoLat: $dto->geo_lat,
+            geoLng: $dto->geo_lng,
         );
 
-        if ($dto->isDefault) {
+        if ($dto->is_default) {
             $this->supplierAddressRepository->clearDefaultBySupplierAndType(
                 tenantId: $supplier->getTenantId(),
-                supplierId: $dto->supplierId,
+                supplierId: $dto->supplier_id,
                 type: $dto->type,
                 excludeId: $id,
             );

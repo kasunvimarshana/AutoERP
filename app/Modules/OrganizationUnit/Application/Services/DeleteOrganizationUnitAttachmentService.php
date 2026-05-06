@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Application\Services;
 
-use Illuminate\Support\Facades\DB;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Application\Services\BaseService;
 use Modules\OrganizationUnit\Application\Contracts\DeleteOrganizationUnitAttachmentServiceInterface;
@@ -23,26 +22,21 @@ class DeleteOrganizationUnitAttachmentService extends BaseService implements Del
     protected function handle(array $data): bool
     {
         $attachmentId = (int) $data['attachment_id'];
+        $attachment = $this->attachmentRepository->find($attachmentId);
+        if (! $attachment) {
+            throw new OrganizationUnitAttachmentNotFoundException($attachmentId);
+        }
 
-        return DB::transaction(function () use ($attachmentId): bool {
-            $attachment = $this->attachmentRepository->find($attachmentId);
-            if (! $attachment) {
-                throw new OrganizationUnitAttachmentNotFoundException($attachmentId);
-            }
+        $deleted = $this->attachmentRepository->delete($attachmentId);
+        if (! $deleted) {
+            return false;
+        }
 
-            $filePath = $attachment->getFilePath();
+        $fileDeleted = $this->storage->delete($attachment->getFilePath());
+        if (! $fileDeleted) {
+            throw new \RuntimeException('Failed to delete organization unit attachment file from storage.');
+        }
 
-            $deleted = $this->attachmentRepository->delete($attachmentId);
-            if (! $deleted) {
-                return false;
-            }
-
-            $fileDeleted = $this->storage->delete($filePath);
-            if (! $fileDeleted) {
-                throw new \RuntimeException('Failed to delete organization unit attachment file from storage.');
-            }
-
-            return true;
-        });
+        return true;
     }
 }

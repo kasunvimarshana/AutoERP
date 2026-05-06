@@ -20,7 +20,7 @@ class EloquentTenantAttachmentRepository extends EloquentRepository implements T
 
     public function findByUuid(string $uuid): ?TenantAttachment
     {
-        $model = $this->newScopedQuery()->where('uuid', $uuid)->first();
+        $model = $this->model->where('uuid', $uuid)->first();
 
         return $model ? $this->toDomainEntity($model) : null;
     }

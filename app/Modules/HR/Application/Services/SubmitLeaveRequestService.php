@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\HR\Application\Services;
 
-use Illuminate\Support\Facades\DB;
 use Modules\Core\Application\Services\BaseService;
 use Modules\HR\Application\Contracts\SubmitLeaveRequestServiceInterface;
 use Modules\HR\Application\DTOs\LeaveRequestData;
@@ -71,16 +70,14 @@ class SubmitLeaveRequestService extends BaseService implements SubmitLeaveReques
             updatedAt: $now,
         );
 
-        return DB::transaction(function () use ($request, $balance, $dto): LeaveRequest {
-            $saved = $this->requestRepository->save($request);
+        $saved = $this->requestRepository->save($request);
 
-            $updatedBalance = $this->withPending($balance, $balance->getPending() + $dto->totalDays);
-            $this->balanceRepository->save($updatedBalance);
+        $updatedBalance = $this->withPending($balance, $balance->getPending() + $dto->totalDays);
+        $this->balanceRepository->save($updatedBalance);
 
-            $this->addEvent(new LeaveRequestSubmitted($saved, $dto->tenantId));
+        $this->addEvent(new LeaveRequestSubmitted($saved, $dto->tenantId));
 
-            return $saved;
-        });
+        return $saved;
     }
 
     private function withPending(LeaveBalance $balance, float $pending): LeaveBalance

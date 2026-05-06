@@ -28,7 +28,6 @@ class EloquentCostCenterRepository extends EloquentRepository implements CostCen
             'is_active' => $costCenter->isActive(),
             'path' => $costCenter->getPath(),
             'depth' => $costCenter->getDepth(),
-            'row_version' => $costCenter->getRowVersion(),
         ];
 
         if ($costCenter->getId()) {
@@ -64,7 +63,6 @@ class EloquentCostCenterRepository extends EloquentRepository implements CostCen
             isActive: (bool) $model->is_active,
             path: $model->path,
             depth: (int) ($model->depth ?? 0),
-            rowVersion: (int) ($model->row_version ?? 1),
             id: (int) $model->id,
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,

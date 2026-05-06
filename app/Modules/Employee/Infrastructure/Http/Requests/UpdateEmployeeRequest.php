@@ -49,7 +49,6 @@ class UpdateEmployeeRequest extends FormRequest
             'hire_date' => 'nullable|date',
             'termination_date' => 'nullable|date',
             'metadata' => 'nullable|array',
-            'row_version' => 'required|integer|min:1',
         ];
     }
 

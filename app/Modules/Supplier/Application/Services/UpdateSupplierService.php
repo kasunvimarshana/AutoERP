@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Supplier\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
-use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Core\Domain\Exceptions\DomainException;
 use Modules\Supplier\Application\Contracts\UpdateSupplierServiceInterface;
 use Modules\Supplier\Application\DTOs\SupplierData;
@@ -34,29 +33,25 @@ class UpdateSupplierService extends BaseService implements UpdateSupplierService
 
         $dto = SupplierData::fromArray($data);
 
-        if ($supplier->getTenantId() !== $dto->tenantId) {
+        if ($supplier->getTenantId() !== $dto->tenant_id) {
             throw new SupplierNotFoundException($id);
         }
 
-        if ($dto->rowVersion !== $supplier->getRowVersion()) {
-            throw new ConcurrentModificationException('Supplier', $id);
-        }
-
-        if ($dto->userId !== null && $dto->userId !== $supplier->getUserId()) {
+        if ($dto->user_id !== null && $dto->user_id !== $supplier->getUserId()) {
             throw new DomainException('Changing supplier user association is not allowed.');
         }
 
         $supplier->update(
             userId: $supplier->getUserId(),
-            supplierCode: $dto->supplierCode,
+            supplierCode: $dto->supplier_code,
             name: $dto->name,
             type: $dto->type,
-            orgUnitId: $dto->orgUnitId,
-            taxNumber: $dto->taxNumber,
-            registrationNumber: $dto->registrationNumber,
-            currencyId: $dto->currencyId,
-            paymentTermsDays: $dto->paymentTermsDays,
-            apAccountId: $dto->apAccountId,
+            orgUnitId: $dto->org_unit_id,
+            taxNumber: $dto->tax_number,
+            registrationNumber: $dto->registration_number,
+            currencyId: $dto->currency_id,
+            paymentTermsDays: $dto->payment_terms_days,
+            apAccountId: $dto->ap_account_id,
             status: $dto->status,
             notes: $dto->notes,
             metadata: $dto->metadata,

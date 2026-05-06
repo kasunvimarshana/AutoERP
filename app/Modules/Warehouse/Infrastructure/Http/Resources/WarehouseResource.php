@@ -23,7 +23,6 @@ class WarehouseResource extends JsonResource
             'is_active' => $this->isActive(),
             'is_default' => $this->isDefault(),
             'metadata' => $this->getMetadata(),
-            'row_version' => $this->getRowVersion(),
             'created_at' => $this->getCreatedAt()->format('c'),
             'updated_at' => $this->getUpdatedAt()->format('c'),
         ];

@@ -58,9 +58,9 @@ class PostPurchaseReturnService extends BaseService implements PostPurchaseRetur
                 $exchangeRate = $originalInvoice->getExchangeRate();
 
                 $invoiceLines = $this->purchaseInvoiceLineRepository->findByInvoiceId($saved->getTenantId(), (int) $originalInvoice->getId());
-                $invoiceLines->each(function ($invoiceLine) use (&$productAccountMap): void {
+                foreach ($invoiceLines as $invoiceLine) {
                     $productAccountMap[$invoiceLine->getProductId()] = $invoiceLine->getAccountId();
-                });
+                }
             }
         }
 

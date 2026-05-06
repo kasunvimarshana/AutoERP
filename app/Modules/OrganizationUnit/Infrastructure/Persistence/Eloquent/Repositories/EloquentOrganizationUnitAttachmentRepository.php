@@ -46,14 +46,14 @@ class EloquentOrganizationUnitAttachmentRepository extends EloquentRepository im
     public function findByUuid(string $uuid): ?OrganizationUnitAttachment
     {
         /** @var OrganizationUnitAttachmentModel|null $model */
-        $model = $this->newScopedQuery()->where('uuid', $uuid)->first();
+        $model = $this->model->newQuery()->where('uuid', $uuid)->first();
 
         return $model ? $this->toDomainEntity($model) : null;
     }
 
     public function getByOrganizationUnit(int $organizationUnitId, ?string $type = null): Collection
     {
-        $query = $this->newScopedQuery()->where('org_unit_id', $organizationUnitId);
+        $query = $this->model->newQuery()->where('org_unit_id', $organizationUnitId);
         if ($type !== null) {
             $query->where('type', $type);
         }

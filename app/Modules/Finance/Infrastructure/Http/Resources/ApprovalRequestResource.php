@@ -25,7 +25,6 @@ class ApprovalRequestResource extends JsonResource
             'requested_at' => $this->resource->getRequestedAt()->format(\DateTimeInterface::ATOM),
             'resolved_at' => $this->resource->getResolvedAt()?->format(\DateTimeInterface::ATOM),
             'comments' => $this->resource->getComments(),
-            'row_version' => $this->resource->getRowVersion(),
             'created_at' => $this->resource->getCreatedAt(),
             'updated_at' => $this->resource->getUpdatedAt(),
         ];
