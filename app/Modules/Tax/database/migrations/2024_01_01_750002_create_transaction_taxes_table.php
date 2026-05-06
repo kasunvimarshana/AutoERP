@@ -12,9 +12,11 @@ return new class extends Migration
     {
         Schema::create('transaction_taxes', function (Blueprint $table) {
             $table->id();
+
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+
             $table->string('reference_type');
             $table->unsignedBigInteger('reference_id');
             $table->foreignId('tax_rate_id')->constrained('tax_rates', 'id', 'transaction_taxes_tax_rate_id_fk');

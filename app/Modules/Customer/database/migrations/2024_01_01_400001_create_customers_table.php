@@ -12,9 +12,11 @@ return new class extends Migration
     {
         Schema::create('customers', function (Blueprint $table) {
             $table->id();
+
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+
             $table->foreignId('user_id')->nullable()->unique('customers_user_id_uk')->constrained('users', 'id', 'customers_user_id_fk')->nullOnDelete(); // for portal access
             $table->string('customer_code')->nullable();
             $table->string('name');

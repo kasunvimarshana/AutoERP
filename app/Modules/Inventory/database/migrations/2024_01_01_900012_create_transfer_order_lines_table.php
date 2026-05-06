@@ -12,9 +12,11 @@ return new class extends Migration
     {
         Schema::create('transfer_order_lines', function (Blueprint $table) {
             $table->id();
+
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+
             $table->foreignId('transfer_order_id')->constrained('transfer_orders', 'id', 'transfer_order_lines_transfer_order_id_fk')->cascadeOnDelete();
             $table->foreignId('product_id')->constrained('products', 'id', 'transfer_order_lines_product_id_fk')->cascadeOnDelete();
             $table->foreignId('variant_id')->nullable()->constrained('product_variants', 'id', 'transfer_order_lines_variant_id_fk')->nullOnDelete();

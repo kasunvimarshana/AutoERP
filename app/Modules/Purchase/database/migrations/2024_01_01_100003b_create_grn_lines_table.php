@@ -12,9 +12,11 @@ return new class extends Migration
     {
         Schema::create('grn_lines', function (Blueprint $table) {
             $table->id();
+
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+
             $table->foreignId('grn_header_id')->constrained('grn_headers', 'id', 'grn_lines_grn_header_id_fk')->cascadeOnDelete();
             $table->foreignId('purchase_order_line_id')->nullable()->constrained('purchase_order_lines', 'id', 'grn_lines_purchase_order_line_id_fk')->nullOnDelete();
             $table->foreignId('product_id');

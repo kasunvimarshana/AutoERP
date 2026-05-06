@@ -12,9 +12,11 @@ return new class extends Migration
     {
         Schema::create('sales_invoice_lines', function (Blueprint $table) {
             $table->id();
+
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+
             $table->foreignId('sales_invoice_id')
                 ->constrained('sales_invoices', 'id', 'sales_invoice_lines_sales_invoice_id_fk')
                 ->cascadeOnDelete();

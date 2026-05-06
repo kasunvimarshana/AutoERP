@@ -12,9 +12,11 @@ return new class extends Migration
     {
         Schema::create('product_identifiers', function (Blueprint $table) {
             $table->id();
+
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+
             // $table->morphs('identifiable'); // product, variant, batch, serial, location, etc.
             $table->foreignId('product_id')->constrained('products', 'id', 'product_identifiers_product_id_fk');
             $table->foreignId('variant_id')->nullable()->constrained('product_variants', 'id', 'product_identifiers_variant_id_fk');

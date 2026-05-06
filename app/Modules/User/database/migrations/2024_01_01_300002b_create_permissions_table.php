@@ -14,9 +14,11 @@ return new class extends Migration
 
         Schema::create('permissions', function (Blueprint $table) use ($guardName) {
             $table->id();
+
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+
             $table->string('name');
             $table->string('guard_name')->default($guardName);
             $table->string('module')->nullable();

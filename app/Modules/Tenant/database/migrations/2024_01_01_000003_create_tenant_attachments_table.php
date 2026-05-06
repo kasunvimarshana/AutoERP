@@ -12,8 +12,10 @@ return new class extends Migration
     {
         Schema::create('tenant_attachments', function (Blueprint $table) {
             $table->id();
+
             $table->foreignId('tenant_id')->constrained('tenants', 'id', 'tenant_attachments_tenant_id_fk')->cascadeOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+
             $table->string('uuid', 36)->unique('tenant_attachments_uuid_uk');
             $table->string('name');
             $table->string('file_path');

@@ -12,9 +12,11 @@ return new class extends Migration
     {
         Schema::create('uom_conversions', function (Blueprint $table) {
             $table->id();
+
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+
             $table->foreignId('from_uom_id')->constrained('units_of_measure', 'id', 'uom_conversions_from_uom_id_fk')->cascadeOnDelete();
             $table->foreignId('to_uom_id')->constrained('units_of_measure', 'id', 'uom_conversions_to_uom_id_fk')->cascadeOnDelete();
             $table->decimal('factor', 20, 10);

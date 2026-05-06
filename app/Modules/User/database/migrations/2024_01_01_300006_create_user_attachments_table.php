@@ -12,7 +12,11 @@ return new class extends Migration
     {
         Schema::create('user_attachments', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('tenant_id');
+
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+
             $table->unsignedBigInteger('user_id');
             $table->string('uuid')->unique('user_attachments_uuid_uk');
             $table->string('name');
@@ -21,8 +25,6 @@ return new class extends Migration
             $table->unsignedInteger('size');
             $table->string('type')->nullable();
             $table->json('metadata')->nullable();
-
-            $table->foreign('tenant_id')->references('id')->on('tenants')->cascadeOnDelete();
 
             $table->timestamps();
             $table->softDeletes();

@@ -12,7 +12,9 @@ return new class extends Migration
     {
         Schema::create('tenants', function (Blueprint $table) {
             $table->id();
+
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+
             $table->string('name');
             $table->string('slug')->unique('tenants_slug_uk');
             $table->string('domain')->unique('tenants_domain_uk')->nullable();
