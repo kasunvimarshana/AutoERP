@@ -69,14 +69,14 @@ class PurchaseOrderLine
         $this->id = $id;
         $this->createdAt = $createdAt ?? new \DateTimeImmutable;
         $this->updatedAt = $updatedAt ?? new \DateTimeImmutable;
-            // Use provided lineTotal or compute from orderedQty × unitPrice × (1 - discountPct/100)
-            if ($lineTotal !== null) {
-                $this->lineTotal = $lineTotal;
-            } else {
-                $gross = bcmul($orderedQty, $unitPrice, 6);
-                $discountAmount = bcdiv(bcmul($gross, $discountPct, 6), '100', 6);
-                $this->lineTotal = bcsub($gross, $discountAmount, 6);
-            }
+        // Use provided lineTotal or compute from orderedQty × unitPrice × (1 - discountPct/100)
+        if ($lineTotal !== null) {
+            $this->lineTotal = $lineTotal;
+        } else {
+            $gross = bcmul($orderedQty, $unitPrice, 6);
+            $discountAmount = bcdiv(bcmul($gross, $discountPct, 6), '100', 6);
+            $this->lineTotal = bcsub($gross, $discountAmount, 6);
+        }
     }
 
     public function getId(): ?int
@@ -182,10 +182,9 @@ class PurchaseOrderLine
         $this->receivedQty = bcadd($this->receivedQty, $qty, 6);
         $this->updatedAt = new \DateTimeImmutable;
     }
-}
+
     public function getLineTotal(): string
     {
         return $this->lineTotal;
     }
-
-    public function getCreatedAt(): \DateTimeInterface
+}
