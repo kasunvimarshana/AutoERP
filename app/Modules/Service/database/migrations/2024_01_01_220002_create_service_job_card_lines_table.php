@@ -39,7 +39,7 @@ return new class extends Migration
             $table->foreignId('purchase_order_id')->nullable()->constrained('purchase_orders')->nullOnDelete();
             $table->json('metadata')->nullable();
             $table->timestamps();
-            $table->unique(['tenant_id','job_card_id','line_number'], 'job_card_lines_number_uk');
+            $table->unique(['tenant_id','org_unit_id','job_card_id','line_number'], 'job_card_lines_number_uk');
         });
     }
 

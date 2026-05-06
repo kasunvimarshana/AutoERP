@@ -25,7 +25,7 @@ return new class extends Migration
             $table->json('component_health')->nullable();
             $table->enum('risk_level', ['low','medium','high','critical'])->default('low');
             $table->timestamps();
-            $table->index(['tenant_id','vehicle_id'], 'asset_health_vehicle_idx');
+            $table->index(['tenant_id','org_unit_id','vehicle_id'], 'asset_health_vehicle_idx');
         });
     }
 

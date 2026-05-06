@@ -29,7 +29,7 @@ return new class extends Migration
             $table->enum('status', ['filed','under_review','approved','rejected','paid'])->default('filed');
             $table->foreignId('receivable_account_id')->nullable()->constrained('accounts')->nullOnDelete();
             $table->timestamps();
-            $table->unique(['tenant_id','claim_number'], 'warranty_claims_number_uk');
+            $table->unique(['tenant_id','org_unit_id','claim_number'], 'warranty_claims_number_uk');
         });
     }
 

@@ -28,7 +28,7 @@ return new class extends Migration
             $table->foreignId('inventory_movement_id')->nullable()->constrained('stock_movements')->nullOnDelete();
             $table->enum('status', ['pending','received','inspected','refunded'])->default('pending');
             $table->timestamps();
-            $table->unique(['tenant_id','return_number'], 'service_returns_number_uk');
+            $table->unique(['tenant_id','org_unit_id','return_number'], 'service_returns_number_uk');
         });
     }
 

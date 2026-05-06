@@ -28,7 +28,7 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->date('manufacture_date')->nullable();
             // $table->decimal('purchase_price', 20, 6)->nullable();
-            // $table->decimal('sales_price', 20, 6)->nullable();
+            $table->decimal('sales_price', 20, 6)->nullable();
             $table->timestamps();
 
             $table->unique(['tenant_id', 'org_unit_id', 'serial_number'], 'serials_tenant_number_uk');

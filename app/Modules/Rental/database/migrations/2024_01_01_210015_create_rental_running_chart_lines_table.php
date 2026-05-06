@@ -33,7 +33,7 @@ return new class extends Migration
             $table->foreignId('credit_account_id')->nullable()->constrained('accounts')->nullOnDelete();
             $table->json('metadata')->nullable();
             $table->timestamps();
-            $table->unique(['tenant_id','running_chart_id','line_number'], 'chart_lines_number_uk');
+            $table->unique(['tenant_id','org_unit_id','running_chart_id','line_number'], 'chart_lines_number_uk');
         });
     }
 
