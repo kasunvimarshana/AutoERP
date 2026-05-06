@@ -26,6 +26,7 @@ class PerformanceCycleController extends AuthorizedController
 
     public function index(): JsonResponse
     {
+        $this->authorize('viewAny', PerformanceCycle::class);
         $result = $this->findService->list();
 
         return Response::json(['data' => PerformanceCycleResource::collection($result)]);
@@ -33,6 +34,7 @@ class PerformanceCycleController extends AuthorizedController
 
     public function store(StorePerformanceCycleRequest $request): JsonResponse
     {
+        $this->authorize('create', PerformanceCycle::class);
         $entity = $this->createService->execute($request->validated());
 
         return (new PerformanceCycleResource($entity))->response()->setStatusCode(201);
@@ -40,12 +42,16 @@ class PerformanceCycleController extends AuthorizedController
 
     public function show(int $performanceCycle): PerformanceCycleResource
     {
-        return new PerformanceCycleResource($this->findOrFail($performanceCycle));
+        $entity = $this->findOrFail($performanceCycle);
+        $this->authorize('view', $entity);
+
+        return new PerformanceCycleResource($entity);
     }
 
     public function update(UpdatePerformanceCycleRequest $request, int $performanceCycle): PerformanceCycleResource
     {
-        $this->findOrFail($performanceCycle);
+        $entity = $this->findOrFail($performanceCycle);
+        $this->authorize('update', $entity);
         $payload = $request->validated();
         $payload['id'] = $performanceCycle;
         $updated = $this->updateService->execute($payload);
@@ -55,7 +61,8 @@ class PerformanceCycleController extends AuthorizedController
 
     public function destroy(int $performanceCycle): JsonResponse
     {
-        $this->findOrFail($performanceCycle);
+        $entity = $this->findOrFail($performanceCycle);
+        $this->authorize('delete', $entity);
 
         return Response::json(null, 204);
     }

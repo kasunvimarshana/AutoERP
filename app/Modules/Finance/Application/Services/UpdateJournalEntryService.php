@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Finance\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Core\Domain\Exceptions\DomainException;
 use Modules\Finance\Application\Contracts\UpdateJournalEntryServiceInterface;
 use Modules\Finance\Application\DTOs\JournalEntryData;
@@ -34,15 +35,19 @@ class UpdateJournalEntryService extends BaseService implements UpdateJournalEntr
             throw new JournalEntryNotFoundException($id);
         }
 
+        if (isset($data['row_version']) && (int) $data['row_version'] !== $journalEntry->getRowVersion()) {
+            throw new ConcurrentModificationException('JournalEntry', $id);
+        }
+
         if (! $journalEntry->isDraft()) {
             throw new DomainException('Only draft journal entries can be updated.');
         }
 
         $dto = JournalEntryData::fromArray($data);
 
-        $fiscalPeriod = $this->fiscalPeriodRepository->find($dto->fiscal_period_id);
+        $fiscalPeriod = $this->fiscalPeriodRepository->find($dto->fiscalPeriodId);
         if (! $fiscalPeriod || ! $fiscalPeriod->isOpen()) {
-            throw FiscalPeriodNotFoundException::openPeriodForId($dto->fiscal_period_id);
+            throw FiscalPeriodNotFoundException::openPeriodForId($dto->fiscalPeriodId);
         }
 
         $lines = [];
@@ -51,15 +56,15 @@ class UpdateJournalEntryService extends BaseService implements UpdateJournalEntr
 
         foreach ($dto->lines as $lineDto) {
             $line = new JournalEntryLine(
-                accountId: $lineDto->account_id,
-                debitAmount: $lineDto->debit_amount,
-                creditAmount: $lineDto->credit_amount,
+                accountId: $lineDto->accountId,
+                debitAmount: $lineDto->debitAmount,
+                creditAmount: $lineDto->creditAmount,
                 description: $lineDto->description,
-                currencyId: $lineDto->currency_id,
-                exchangeRate: $lineDto->exchange_rate,
-                baseDebitAmount: $lineDto->base_debit_amount,
-                baseCreditAmount: $lineDto->base_credit_amount,
-                costCenterId: $lineDto->cost_center_id,
+                currencyId: $lineDto->currencyId,
+                exchangeRate: $lineDto->exchangeRate,
+                baseDebitAmount: $lineDto->baseDebitAmount,
+                baseCreditAmount: $lineDto->baseCreditAmount,
+                costCenterId: $lineDto->costCenterId,
                 metadata: $lineDto->metadata,
             );
 
@@ -73,13 +78,13 @@ class UpdateJournalEntryService extends BaseService implements UpdateJournalEntr
         }
 
         $journalEntry->update(
-            fiscalPeriodId: $dto->fiscal_period_id,
-            entryType: $dto->entry_type,
-            referenceType: $dto->reference_type,
-            referenceId: $dto->reference_id,
+            fiscalPeriodId: $dto->fiscalPeriodId,
+            entryType: $dto->entryType,
+            referenceType: $dto->referenceType,
+            referenceId: $dto->referenceId,
             description: $dto->description,
-            entryDate: new \DateTimeImmutable($dto->entry_date),
-            postingDate: $dto->posting_date ? new \DateTimeImmutable($dto->posting_date) : null,
+            entryDate: new \DateTimeImmutable($dto->entryDate),
+            postingDate: $dto->postingDate ? new \DateTimeImmutable($dto->postingDate) : null,
             lines: $lines,
         );
 

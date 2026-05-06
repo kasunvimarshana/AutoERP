@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Finance\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Finance\Application\Contracts\UpdateApprovalRequestServiceInterface;
 use Modules\Finance\Application\DTOs\ApprovalRequestData;
 use Modules\Finance\Domain\Entities\ApprovalRequest;
@@ -26,10 +27,13 @@ class UpdateApprovalRequestService extends BaseService implements UpdateApproval
         if (! $ar) {
             throw new ApprovalRequestNotFoundException((int) $dto->id);
         }
-        if ($dto->status === 'approved' && $dto->resolved_by_user_id !== null) {
-            $ar->approve($dto->resolved_by_user_id, $dto->comments);
-        } elseif ($dto->status === 'rejected' && $dto->resolved_by_user_id !== null) {
-            $ar->reject($dto->resolved_by_user_id, $dto->comments);
+        if ($dto->rowVersion !== $ar->getRowVersion()) {
+            throw new ConcurrentModificationException('ApprovalRequest', (int) $dto->id);
+        }
+        if ($dto->status === 'approved' && $dto->resolvedByUserId !== null) {
+            $ar->approve($dto->resolvedByUserId, $dto->comments);
+        } elseif ($dto->status === 'rejected' && $dto->resolvedByUserId !== null) {
+            $ar->reject($dto->resolvedByUserId, $dto->comments);
         } elseif ($dto->status === 'cancelled') {
             $ar->cancel($dto->comments);
         }

@@ -29,6 +29,7 @@ class EloquentNumberingSequenceRepository extends EloquentRepository implements 
             'next_number' => $sequence->getNextNumber(),
             'padding' => $sequence->getPadding(),
             'is_active' => $sequence->isActive(),
+            'row_version' => $sequence->getRowVersion(),
         ];
 
         if ($sequence->getId()) {
@@ -92,6 +93,7 @@ class EloquentNumberingSequenceRepository extends EloquentRepository implements 
             nextNumber: (int) $model->next_number,
             padding: (int) $model->padding,
             isActive: (bool) $model->is_active,
+            rowVersion: (int) ($model->row_version ?? 1),
             id: (int) $model->id,
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,

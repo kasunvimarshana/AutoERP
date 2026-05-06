@@ -32,6 +32,7 @@ class EloquentApTransactionRepository extends EloquentRepository implements ApTr
             'due_date' => $ap->getDueDate()?->format('Y-m-d'),
             'currency_id' => $ap->getCurrencyId(),
             'is_reconciled' => $ap->isReconciled(),
+            'row_version' => $ap->getRowVersion(),
         ];
 
         $model = $ap->getId() ? $this->update($ap->getId(), $data) : $this->create($data);
@@ -66,6 +67,7 @@ class EloquentApTransactionRepository extends EloquentRepository implements ApTr
             referenceId: $m->reference_id !== null ? (int) $m->reference_id : null,
             dueDate: $m->due_date,
             isReconciled: (bool) $m->is_reconciled,
+            rowVersion: (int) ($m->row_version ?? 1),
             id: (int) $m->id,
             createdAt: $m->created_at,
             updatedAt: $m->updated_at,

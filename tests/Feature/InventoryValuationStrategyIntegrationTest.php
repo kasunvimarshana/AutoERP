@@ -8,7 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Application\Contracts\ManageValuationConfigServiceInterface;
 use Modules\Inventory\Application\Contracts\ValuationEngineServiceInterface;
-use Modules\Inventory\Application\DTOs\CostLayerInboundDTO;
+use Modules\Inventory\Application\DTOs\CostLayerInboundData;
 use Modules\Inventory\Domain\Exceptions\InsufficientAvailableStockException;
 use Tests\TestCase;
 
@@ -182,7 +182,7 @@ class InventoryValuationStrategyIntegrationTest extends TestCase
         /** @var ValuationEngineServiceInterface $engine */
         $engine = app(ValuationEngineServiceInterface::class);
 
-        $dto1 = new CostLayerInboundDTO(
+        $dto1 = new CostLayerInboundData(
             tenantId: $this->tenantId,
             productId: $this->productId,
             variantId: null,
@@ -197,7 +197,7 @@ class InventoryValuationStrategyIntegrationTest extends TestCase
         );
         $layer1 = $engine->processInbound($dto1);
 
-        $dto2 = new CostLayerInboundDTO(
+        $dto2 = new CostLayerInboundData(
             tenantId: $this->tenantId,
             productId: $this->productId,
             variantId: null,
@@ -302,8 +302,8 @@ class InventoryValuationStrategyIntegrationTest extends TestCase
         string $quantity,
         string $unitCost,
         string $layerDate,
-    ): CostLayerInboundDTO {
-        return new CostLayerInboundDTO(
+    ): CostLayerInboundData {
+        return new CostLayerInboundData(
             tenantId: $this->tenantId,
             productId: $this->productId,
             variantId: null,

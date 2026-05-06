@@ -11,7 +11,7 @@ use Modules\Purchase\Domain\RepositoryInterfaces\PurchaseInvoiceRepositoryInterf
 
 class FindPurchaseInvoiceService implements FindPurchaseInvoiceServiceInterface
 {
-    private const ALLOWED_FILTERS = ['tenant_id', 'supplier_id', 'purchase_order_id', 'status', 'invoice_number'];
+    private const ALLOWED_FILTERS = ['tenant_id', 'supplier_id', 'org_unit_id', 'purchase_order_id', 'status', 'invoice_number'];
 
     private const ALLOWED_SORTS = ['id', 'invoice_number', 'invoice_date', 'status', 'created_at'];
 

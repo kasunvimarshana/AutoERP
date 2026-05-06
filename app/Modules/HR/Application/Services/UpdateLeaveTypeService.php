@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\HR\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\HR\Application\Contracts\UpdateLeaveTypeServiceInterface;
 use Modules\HR\Application\DTOs\LeaveTypeData;
 use Modules\HR\Domain\Entities\LeaveType;
@@ -34,6 +35,10 @@ class UpdateLeaveTypeService extends BaseService implements UpdateLeaveTypeServi
             throw new LeaveTypeNotFoundException($id);
         }
 
+        if ($dto->rowVersion !== $leaveType->getRowVersion()) {
+            throw new ConcurrentModificationException('LeaveType', $id);
+        }
+
         $updated = new LeaveType(
             tenantId: $leaveType->getTenantId(),
             name: $dto->name,
@@ -49,6 +54,7 @@ class UpdateLeaveTypeService extends BaseService implements UpdateLeaveTypeServi
             metadata: $dto->metadata,
             createdAt: $leaveType->getCreatedAt(),
             updatedAt: new \DateTimeImmutable,
+            rowVersion: $leaveType->getRowVersion() + 1,
             id: $leaveType->getId(),
         );
 

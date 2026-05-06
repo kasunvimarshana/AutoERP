@@ -20,11 +20,15 @@ class OrganizationUnitUserModel extends BaseModel
         'tenant_id',
         'org_unit_id',
         'user_id',
-        'role',
+        'role_id',
         'is_primary',
     ];
 
     protected $casts = [
+        'tenant_id' => 'integer',
+        'org_unit_id' => 'integer',
+        'user_id' => 'integer',
+        'role_id' => 'integer',
         'is_primary' => 'boolean',
     ];
 

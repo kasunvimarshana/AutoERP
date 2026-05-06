@@ -19,7 +19,7 @@ class PayslipModel extends BaseModel
 
     protected $fillable = ['tenant_id', 'org_unit_id', 'row_version', 'employee_id', 'payroll_run_id', 'period_start', 'period_end', 'gross_salary', 'total_deductions', 'net_salary', 'base_salary', 'worked_days', 'status', 'journal_entry_id', 'metadata'];
 
-    protected $casts = ['org_unit_id' => 'integer', 'row_version' => 'integer', 'journal_entry_id' => 'integer', 'status' => 'string', 'period_start' => 'date', 'period_end' => 'date', 'gross_salary' => 'decimal:6', 'total_deductions' => 'decimal:6', 'net_salary' => 'decimal:6', 'base_salary' => 'decimal:6', 'worked_days' => 'decimal:2', 'metadata' => 'array'];
+    protected $casts = ['tenant_id' => 'integer', 'org_unit_id' => 'integer', 'row_version' => 'integer', 'employee_id' => 'integer', 'payroll_run_id' => 'integer', 'journal_entry_id' => 'integer', 'status' => 'string', 'period_start' => 'date', 'period_end' => 'date', 'gross_salary' => 'decimal:6', 'total_deductions' => 'decimal:6', 'net_salary' => 'decimal:6', 'base_salary' => 'decimal:6', 'worked_days' => 'decimal:2', 'metadata' => 'array'];
 
     public function employee(): BelongsTo
     {

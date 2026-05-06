@@ -49,6 +49,7 @@ class EloquentBankReconciliationRepository extends EloquentRepository implements
             status: (string) $m->status,
             completedBy: $m->completed_by !== null ? (int) $m->completed_by : null,
             completedAt: $m->completed_at,
+            rowVersion: (int) ($m->row_version ?? 1),
             id: (int) $m->id,
             createdAt: $m->created_at,
             updatedAt: $m->updated_at,

@@ -12,11 +12,13 @@ use Modules\Purchase\Application\Contracts\CreatePurchaseInvoiceServiceInterface
 use Modules\Purchase\Application\Contracts\DeletePurchaseInvoiceServiceInterface;
 use Modules\Purchase\Application\Contracts\FindPurchaseInvoiceServiceInterface;
 use Modules\Purchase\Application\Contracts\RecordPurchasePaymentServiceInterface;
+use Modules\Purchase\Application\Contracts\RecordPurchaseRefundServiceInterface;
 use Modules\Purchase\Application\Contracts\UpdatePurchaseInvoiceServiceInterface;
 use Modules\Purchase\Domain\Entities\PurchaseInvoice;
 use Modules\Purchase\Infrastructure\Http\Requests\ApprovePurchaseInvoiceRequest;
 use Modules\Purchase\Infrastructure\Http\Requests\ListPurchaseInvoiceRequest;
 use Modules\Purchase\Infrastructure\Http\Requests\RecordPurchasePaymentRequest;
+use Modules\Purchase\Infrastructure\Http\Requests\RecordPurchaseRefundRequest;
 use Modules\Purchase\Infrastructure\Http\Requests\StorePurchaseInvoiceRequest;
 use Modules\Purchase\Infrastructure\Http\Requests\UpdatePurchaseInvoiceRequest;
 use Modules\Purchase\Infrastructure\Http\Resources\PurchaseInvoiceCollection;
@@ -32,6 +34,7 @@ class PurchaseInvoiceController extends AuthorizedController
         protected FindPurchaseInvoiceServiceInterface $findService,
         protected ApprovePurchaseInvoiceServiceInterface $approveService,
         protected RecordPurchasePaymentServiceInterface $recordPaymentService,
+        protected RecordPurchaseRefundServiceInterface $recordRefundService,
     ) {}
 
     public function index(ListPurchaseInvoiceRequest $request): JsonResponse
@@ -109,6 +112,18 @@ class PurchaseInvoiceController extends AuthorizedController
         $payload['invoice_id'] = $invoice;
         $payload['tenant_id'] = $entity->getTenantId();
         $updated = $this->recordPaymentService->execute($payload);
+
+        return new PurchaseInvoiceResource($updated);
+    }
+
+    public function recordRefund(RecordPurchaseRefundRequest $request, int $invoice): PurchaseInvoiceResource
+    {
+        $entity = $this->findOrFail($invoice);
+        $this->authorize('update', $entity);
+        $payload = $request->validated();
+        $payload['invoice_id'] = $invoice;
+        $payload['tenant_id'] = $entity->getTenantId();
+        $updated = $this->recordRefundService->execute($payload);
 
         return new PurchaseInvoiceResource($updated);
     }

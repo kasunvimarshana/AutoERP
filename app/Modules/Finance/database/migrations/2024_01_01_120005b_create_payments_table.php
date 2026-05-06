@@ -19,8 +19,8 @@ return new class extends Migration
             $table->enum('direction', ['inbound', 'outbound']);
             $table->enum('party_type', ['customer', 'supplier']);
             $table->unsignedBigInteger('party_id');
-            $table->foreignId('payment_method_id')->constrained(null, 'id', 'payments_payment_method_id_fk');
-            $table->foreignId('account_id')->constrained(null, 'id', 'payments_account_id_fk');
+            $table->foreignId('payment_method_id')->constrained('payment_methods', 'id', 'payments_payment_method_id_fk');
+            $table->foreignId('account_id')->constrained('accounts', 'id', 'payments_account_id_fk');
             $table->decimal('amount', 20, 6);
             $table->foreignId('currency_id')->constrained('currencies', 'id', 'payments_currency_id_fk');
             $table->decimal('exchange_rate', 20, 10)->default(1);

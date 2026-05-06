@@ -11,7 +11,7 @@ use Modules\Purchase\Domain\RepositoryInterfaces\GrnHeaderRepositoryInterface;
 
 class FindGrnService implements FindGrnServiceInterface
 {
-    private const ALLOWED_FILTERS = ['tenant_id', 'supplier_id', 'warehouse_id', 'purchase_order_id', 'status'];
+    private const ALLOWED_FILTERS = ['tenant_id', 'supplier_id', 'warehouse_id', 'org_unit_id', 'purchase_order_id', 'status'];
 
     private const ALLOWED_SORTS = ['id', 'grn_number', 'received_date', 'status', 'created_at'];
 

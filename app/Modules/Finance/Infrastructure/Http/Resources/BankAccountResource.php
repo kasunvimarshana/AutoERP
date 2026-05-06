@@ -25,6 +25,7 @@ class BankAccountResource extends JsonResource
             'last_sync_at' => $this->resource->getLastSyncAt()?->format(\DateTimeInterface::ATOM),
             'feed_provider' => $this->resource->getFeedProvider(),
             'is_active' => $this->resource->isActive(),
+            'row_version' => $this->resource->getRowVersion(),
             'created_at' => $this->resource->getCreatedAt(),
             'updated_at' => $this->resource->getUpdatedAt(),
         ];

@@ -14,12 +14,16 @@ class ProductVariantResource extends JsonResource
         return [
             'id' => $this->getId(),
             'tenant_id' => $this->getTenantId(),
+            'org_unit_id' => $this->getOrgUnitId(),
             'product_id' => $this->getProductId(),
             'name' => $this->getName(),
             'sku' => $this->getSku(),
             'is_default' => $this->isDefault(),
             'is_active' => $this->isActive(),
+            'purchase_price' => $this->getPurchasePrice(),
+            'sales_price' => $this->getSalesPrice(),
             'metadata' => $this->getMetadata(),
+            'row_version' => $this->getRowVersion(),
             'created_at' => $this->getCreatedAt()->format('c'),
             'updated_at' => $this->getUpdatedAt()->format('c'),
         ];

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Providers\AppServiceProvider;
+use Modules\Asset\Infrastructure\Providers\AssetServiceProvider;
 use Modules\Audit\Infrastructure\Providers\AuditServiceProvider;
 use Modules\Auth\Infrastructure\Providers\AuthModuleServiceProvider;
 use Modules\Configuration\Infrastructure\Providers\ConfigurationServiceProvider;
@@ -16,7 +17,9 @@ use Modules\Pricing\Infrastructure\Providers\PricingServiceProvider;
 use Modules\Product\Infrastructure\Providers\ProductServiceProvider;
 use Modules\Purchase\Infrastructure\Providers\PurchaseServiceProvider;
 use Modules\HR\Infrastructure\Providers\HRServiceProvider;
+use Modules\Rental\Infrastructure\Providers\RentalServiceProvider;
 use Modules\Sales\Infrastructure\Providers\SalesServiceProvider;
+use Modules\Service\Infrastructure\Providers\ServiceServiceProvider;
 use Modules\Shared\Infrastructure\Providers\SharedServiceProvider;
 use Modules\Supplier\Infrastructure\Providers\SupplierServiceProvider;
 use Modules\Tax\Infrastructure\Providers\TaxServiceProvider;
@@ -30,6 +33,7 @@ return [
     CoreServiceProvider::class,
     ConfigurationServiceProvider::class,
     SharedServiceProvider::class,
+    AssetServiceProvider::class,
     AuditServiceProvider::class,
     AuthModuleServiceProvider::class,
     TenantServiceProvider::class,
@@ -47,5 +51,7 @@ return [
     WarehouseServiceProvider::class,
     PurchaseServiceProvider::class,
     SalesServiceProvider::class,
+    RentalServiceProvider::class,
     HRServiceProvider::class,
+    ServiceServiceProvider::class,
 ];

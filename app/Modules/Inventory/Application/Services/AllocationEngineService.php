@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Inventory\Application\Services;
 
 use Modules\Inventory\Application\Contracts\AllocationEngineServiceInterface;
-use Modules\Inventory\Application\DTOs\AllocationRequestDTO;
+use Modules\Inventory\Application\DTOs\AllocationRequestData;
 use Modules\Inventory\Application\Strategies\Allocation\FefoAllocationStrategy;
 use Modules\Inventory\Application\Strategies\Allocation\FifoAllocationStrategy;
 use Modules\Inventory\Application\Strategies\Allocation\LifoAllocationStrategy;
@@ -38,7 +38,7 @@ class AllocationEngineService implements AllocationEngineServiceInterface
         ];
     }
 
-    public function allocate(AllocationRequestDTO $request): AllocationResult
+    public function allocate(AllocationRequestData $request): AllocationResult
     {
         $strategy = $this->resolveStrategyByName($request->allocationStrategy);
 

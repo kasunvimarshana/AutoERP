@@ -15,6 +15,7 @@ class NumberingSequence
         private int $nextNumber = 1,
         private int $padding = 5,
         private bool $isActive = true,
+        private int $rowVersion = 1,
         private ?int $id = null,
         private ?\DateTimeInterface $createdAt = null,
         private ?\DateTimeInterface $updatedAt = null,
@@ -78,6 +79,11 @@ class NumberingSequence
         return $this->updatedAt;
     }
 
+    public function getRowVersion(): int
+    {
+        return $this->rowVersion;
+    }
+
     public function generateNext(): string
     {
         $number = str_pad((string) $this->nextNumber, $this->padding, '0', STR_PAD_LEFT);
@@ -97,6 +103,7 @@ class NumberingSequence
         $this->suffix = $suffix;
         $this->padding = $padding;
         $this->isActive = $isActive;
+        $this->rowVersion++;
         $this->updatedAt = new \DateTimeImmutable;
     }
 }

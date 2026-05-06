@@ -7,7 +7,7 @@ namespace Modules\Inventory\Application\Services;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Domain\Exceptions\NotFoundException;
 use Modules\Inventory\Application\Contracts\ManageValuationConfigServiceInterface;
-use Modules\Inventory\Application\DTOs\ValuationConfigDTO;
+use Modules\Inventory\Application\DTOs\ValuationConfigData;
 use Modules\Inventory\Domain\Entities\ValuationConfig;
 use Modules\Inventory\Domain\RepositoryInterfaces\ValuationConfigRepositoryInterface;
 
@@ -19,7 +19,7 @@ class ManageValuationConfigService implements ManageValuationConfigServiceInterf
 
     public function create(array $data): ValuationConfig
     {
-        $dto = new ValuationConfigDTO(
+        $dto = new ValuationConfigData(
             tenantId: (int) $data['tenant_id'],
             orgUnitId: isset($data['org_unit_id']) ? (int) $data['org_unit_id'] : null,
             warehouseId: isset($data['warehouse_id']) ? (int) $data['warehouse_id'] : null,

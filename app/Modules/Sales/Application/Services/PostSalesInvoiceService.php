@@ -11,11 +11,14 @@ use Modules\Sales\Domain\Entities\SalesInvoice;
 use Modules\Sales\Domain\Events\SalesInvoicePosted;
 use Modules\Sales\Domain\Exceptions\SalesInvoiceNotFoundException;
 use Modules\Sales\Domain\RepositoryInterfaces\SalesInvoiceRepositoryInterface;
+use Modules\Sales\Domain\RepositoryInterfaces\SalesOrderRepositoryInterface;
 
 class PostSalesInvoiceService extends BaseService implements PostSalesInvoiceServiceInterface
 {
-    public function __construct(private readonly SalesInvoiceRepositoryInterface $salesInvoiceRepository)
-    {
+    public function __construct(
+        private readonly SalesInvoiceRepositoryInterface $salesInvoiceRepository,
+        private readonly SalesOrderRepositoryInterface $salesOrderRepository,
+    ) {
         parent::__construct($salesInvoiceRepository);
     }
 
@@ -30,6 +33,14 @@ class PostSalesInvoiceService extends BaseService implements PostSalesInvoiceSer
 
         $invoice->post();
         $saved = $this->salesInvoiceRepository->save($invoice);
+
+        if ($saved->getSalesOrderId() !== null) {
+            $salesOrder = $this->salesOrderRepository->find($saved->getSalesOrderId());
+            if ($salesOrder !== null && in_array($salesOrder->getStatus(), ['shipped', 'partial'], true)) {
+                $salesOrder->markInvoiced();
+                $this->salesOrderRepository->save($salesOrder);
+            }
+        }
 
         $lines = array_map(static fn ($line): array => [
             'income_account_id' => $line->getIncomeAccountId(),

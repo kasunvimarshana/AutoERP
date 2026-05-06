@@ -62,10 +62,16 @@ class Product
 
     private ?int $expenseAccountId;
 
+    private ?string $purchasePrice;
+
+    private ?string $salesPrice;
+
     private bool $isActive;
 
     /** @var array<string, mixed>|null */
     private ?array $metadata;
+
+    private int $rowVersion;
 
     private \DateTimeInterface $createdAt;
 
@@ -99,8 +105,11 @@ class Product
         ?int $cogsAccountId = null,
         ?int $inventoryAccountId = null,
         ?int $expenseAccountId = null,
+        ?string $purchasePrice = null,
+        ?string $salesPrice = null,
         bool $isActive = true,
         ?array $metadata = null,
+        int $rowVersion = 1,
         ?int $id = null,
         ?\DateTimeInterface $createdAt = null,
         ?\DateTimeInterface $updatedAt = null,
@@ -113,6 +122,8 @@ class Product
             isLotTracked: $isLotTracked,
             isSerialTracked: $isSerialTracked,
             standardCost: $standardCost,
+            purchasePrice: $purchasePrice,
+            salesPrice: $salesPrice,
         );
 
         $this->id = $id;
@@ -140,10 +151,13 @@ class Product
         $this->cogsAccountId = $cogsAccountId;
         $this->inventoryAccountId = $inventoryAccountId;
         $this->expenseAccountId = $expenseAccountId;
+        $this->purchasePrice = $purchasePrice;
+        $this->salesPrice = $salesPrice;
         $this->isActive = $isActive;
         $this->metadata = $metadata;
-        $this->createdAt = $createdAt ?? new \DateTimeImmutable;
-        $this->updatedAt = $updatedAt ?? new \DateTimeImmutable;
+        $this->rowVersion = $rowVersion;
+        $this->createdAt = $createdAt ?? new \DateTimeImmutable();
+        $this->updatedAt = $updatedAt ?? new \DateTimeImmutable();
     }
 
     public function getId(): ?int
@@ -271,6 +285,16 @@ class Product
         return $this->expenseAccountId;
     }
 
+    public function getPurchasePrice(): ?string
+    {
+        return $this->purchasePrice;
+    }
+
+    public function getSalesPrice(): ?string
+    {
+        return $this->salesPrice;
+    }
+
     public function isActive(): bool
     {
         return $this->isActive;
@@ -292,6 +316,12 @@ class Product
     public function getUpdatedAt(): \DateTimeInterface
     {
         return $this->updatedAt;
+    }
+
+
+    public function getRowVersion(): int
+    {
+        return $this->rowVersion;
     }
 
     /**
@@ -321,9 +351,11 @@ class Product
         ?int $cogsAccountId,
         ?int $inventoryAccountId,
         ?int $expenseAccountId,
+        ?string $purchasePrice,
+        ?string $salesPrice,
         bool $isActive,
         ?array $metadata,
-    ): void {
+        ): void {
         $this->assertInvariants(
             type: $type,
             valuationMethod: $valuationMethod,
@@ -332,6 +364,8 @@ class Product
             isLotTracked: $isLotTracked,
             isSerialTracked: $isSerialTracked,
             standardCost: $standardCost,
+            purchasePrice: $purchasePrice,
+            salesPrice: $salesPrice,
         );
 
         $this->type = $type;
@@ -357,9 +391,12 @@ class Product
         $this->cogsAccountId = $cogsAccountId;
         $this->inventoryAccountId = $inventoryAccountId;
         $this->expenseAccountId = $expenseAccountId;
+        $this->purchasePrice = $purchasePrice;
+        $this->salesPrice = $salesPrice;
         $this->isActive = $isActive;
         $this->metadata = $metadata;
-        $this->updatedAt = new \DateTimeImmutable;
+        $this->rowVersion++;
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
     private function assertInvariants(
@@ -370,6 +407,8 @@ class Product
         bool $isLotTracked,
         bool $isSerialTracked,
         ?string $standardCost,
+        ?string $purchasePrice,
+        ?string $salesPrice,
     ): void {
         if (! in_array($type, self::SUPPORTED_TYPES, true)) {
             throw new \InvalidArgumentException('Unsupported product type.');
@@ -389,6 +428,14 @@ class Product
 
         if ($valuationMethod === 'standard' && $standardCost === null) {
             throw new \InvalidArgumentException('Standard cost is required when valuation method is standard.');
+        }
+
+        if ($purchasePrice !== null && (! is_numeric($purchasePrice) || (float) $purchasePrice < 0)) {
+            throw new \InvalidArgumentException('Purchase price must be zero or greater.');
+        }
+
+        if ($salesPrice !== null && (! is_numeric($salesPrice) || (float) $salesPrice < 0)) {
+            throw new \InvalidArgumentException('Sales price must be zero or greater.');
         }
     }
 }

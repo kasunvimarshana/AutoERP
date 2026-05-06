@@ -25,6 +25,7 @@ class UpdateCostCenterRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string'],
             'is_active' => ['sometimes', 'boolean'],
+            'row_version' => ['required', 'integer', 'min:1'],
         ];
     }
 }

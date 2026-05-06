@@ -9,6 +9,7 @@ use Modules\Finance\Application\Contracts\UpdateFiscalPeriodServiceInterface;
 use Modules\Finance\Application\DTOs\FiscalPeriodData;
 use Modules\Finance\Domain\Entities\FiscalPeriod;
 use Modules\Finance\Domain\Exceptions\FiscalPeriodAlreadyExistsException;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Finance\Domain\Exceptions\FiscalPeriodNotFoundException;
 use Modules\Finance\Domain\Exceptions\FiscalYearNotFoundException;
 use Modules\Finance\Domain\RepositoryInterfaces\FiscalPeriodRepositoryInterface;
@@ -34,30 +35,35 @@ class UpdateFiscalPeriodService extends BaseService implements UpdateFiscalPerio
 
         $dto = FiscalPeriodData::fromArray($data);
 
-        $fiscalYear = $this->fiscalYearRepository->find($dto->fiscal_year_id);
+
+        if ($dto->rowVersion !== $fiscalPeriod->getRowVersion()) {
+            throw new ConcurrentModificationException('FiscalPeriod', $id);
+        }
+
+        $fiscalYear = $this->fiscalYearRepository->find($dto->fiscalYearId);
         if (! $fiscalYear) {
-            throw new FiscalYearNotFoundException($dto->fiscal_year_id);
+            throw new FiscalYearNotFoundException($dto->fiscalYearId);
         }
 
         $existing = $this->fiscalPeriodRepository->findByTenantAndYearAndPeriodNumber(
-            $dto->tenant_id,
-            $dto->fiscal_year_id,
-            $dto->period_number,
+            $dto->tenantId,
+            $dto->fiscalYearId,
+            $dto->periodNumber,
         );
         if ($existing !== null && $existing->getId() !== $fiscalPeriod->getId()) {
             throw new FiscalPeriodAlreadyExistsException(
-                $dto->tenant_id,
-                $dto->fiscal_year_id,
-                $dto->period_number,
+                $dto->tenantId,
+                $dto->fiscalYearId,
+                $dto->periodNumber,
             );
         }
 
         $fiscalPeriod->update(
-            fiscalYearId: $dto->fiscal_year_id,
-            periodNumber: $dto->period_number,
+            fiscalYearId: $dto->fiscalYearId,
+            periodNumber: $dto->periodNumber,
             name: $dto->name,
-            startDate: new \DateTimeImmutable($dto->start_date),
-            endDate: new \DateTimeImmutable($dto->end_date),
+            startDate: new \DateTimeImmutable($dto->startDate),
+            endDate: new \DateTimeImmutable($dto->endDate),
             status: $dto->status,
         );
 

@@ -9,6 +9,7 @@ use Modules\Finance\Application\Contracts\UpdateFiscalYearServiceInterface;
 use Modules\Finance\Application\DTOs\FiscalYearData;
 use Modules\Finance\Domain\Entities\FiscalYear;
 use Modules\Finance\Domain\Exceptions\FiscalYearAlreadyExistsException;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Finance\Domain\Exceptions\FiscalYearNotFoundException;
 use Modules\Finance\Domain\RepositoryInterfaces\FiscalYearRepositoryInterface;
 
@@ -30,15 +31,19 @@ class UpdateFiscalYearService extends BaseService implements UpdateFiscalYearSer
 
         $dto = FiscalYearData::fromArray($data);
 
-        $existing = $this->fiscalYearRepository->findByTenantAndName($dto->tenant_id, $dto->name);
+        if ($dto->rowVersion !== $fiscalYear->getRowVersion()) {
+            throw new ConcurrentModificationException('FiscalYear', $id);
+        }
+
+        $existing = $this->fiscalYearRepository->findByTenantAndName($dto->tenantId, $dto->name);
         if ($existing !== null && $existing->getId() !== $fiscalYear->getId()) {
-            throw new FiscalYearAlreadyExistsException($dto->tenant_id, $dto->name);
+            throw new FiscalYearAlreadyExistsException($dto->tenantId, $dto->name);
         }
 
         $fiscalYear->update(
             name: $dto->name,
-            startDate: new \DateTimeImmutable($dto->start_date),
-            endDate: new \DateTimeImmutable($dto->end_date),
+            startDate: new \DateTimeImmutable($dto->startDate),
+            endDate: new \DateTimeImmutable($dto->endDate),
             status: $dto->status,
         );
 

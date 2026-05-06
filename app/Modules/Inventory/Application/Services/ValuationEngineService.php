@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Inventory\Application\Services;
 
 use Modules\Inventory\Application\Contracts\ValuationEngineServiceInterface;
-use Modules\Inventory\Application\DTOs\CostLayerInboundDTO;
+use Modules\Inventory\Application\DTOs\CostLayerInboundData;
 use Modules\Inventory\Application\Strategies\Valuation\FefoValuationStrategy;
 use Modules\Inventory\Application\Strategies\Valuation\FifoValuationStrategy;
 use Modules\Inventory\Application\Strategies\Valuation\LifoValuationStrategy;
@@ -40,7 +40,7 @@ class ValuationEngineService implements ValuationEngineServiceInterface
         ];
     }
 
-    public function processInbound(CostLayerInboundDTO $dto): InventoryCostLayer
+    public function processInbound(CostLayerInboundData $dto): InventoryCostLayer
     {
         $strategy = $this->resolveStrategy($dto->valuationMethod);
 

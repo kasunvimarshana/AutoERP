@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\HR\Domain\Exceptions;
 
-class LeaveRequestConflictException extends \RuntimeException
+use Modules\Core\Domain\Exceptions\DomainException;
+
+class LeaveRequestConflictException extends DomainException
 {
     public function __construct()
     {
-        parent::__construct('Leave request conflicts with an existing approved or pending request.');
+        parent::__construct('Leave request conflicts with an existing approved or pending request.', 409);
     }
 }

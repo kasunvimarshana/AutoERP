@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Application\Services;
 
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Modules\Core\Application\Services\BaseService;
 use Modules\OrganizationUnit\Application\Contracts\CreateOrganizationUnitUserServiceInterface;
 use Modules\OrganizationUnit\Application\DTOs\OrganizationUnitUserData;
 use Modules\OrganizationUnit\Domain\Entities\OrganizationUnitUser;
+use Modules\OrganizationUnit\Domain\Events\OrganizationUnitUserAdded;
 use Modules\OrganizationUnit\Domain\RepositoryInterfaces\OrganizationUnitUserRepositoryInterface;
 
 class CreateOrganizationUnitUserService extends BaseService implements CreateOrganizationUnitUserServiceInterface
@@ -21,14 +24,27 @@ class CreateOrganizationUnitUserService extends BaseService implements CreateOrg
     {
         $dto = OrganizationUnitUserData::fromArray($data);
 
-        $organizationUnitUser = new OrganizationUnitUser(
-            tenantId: $dto->tenant_id,
-            organizationUnitId: $dto->org_unit_id,
-            userId: $dto->user_id,
-            role: $dto->role,
-            isPrimary: $dto->is_primary,
-        );
+        return DB::transaction(function () use ($dto): OrganizationUnitUser {
+            $organizationUnitUser = new OrganizationUnitUser(
+                tenantId: $dto->tenant_id,
+                organizationUnitId: $dto->org_unit_id,
+                userId: $dto->user_id,
+                roleId: $dto->role_id,
+                isPrimary: $dto->is_primary,
+            );
 
-        return $this->organizationUnitUserRepository->save($organizationUnitUser);
+            $saved = $this->organizationUnitUserRepository->save($organizationUnitUser);
+
+            // Dispatch event
+            Event::dispatch(new OrganizationUnitUserAdded(
+                organizationUnitId: $saved->getOrganizationUnitId(),
+                tenantId: $saved->getTenantId(),
+                userId: $saved->getUserId(),
+                roleId: $saved->getRole(),
+                isPrimary: $saved->isPrimary(),
+            ));
+
+            return $saved;
+        });
     }
 }

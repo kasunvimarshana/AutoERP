@@ -16,6 +16,7 @@ class TaxGroupResource extends JsonResource
             'tenant_id' => $this->getTenantId(),
             'name' => $this->getName(),
             'description' => $this->getDescription(),
+            'row_version' => $this->getRowVersion(),
             'created_at' => $this->getCreatedAt()->format('c'),
             'updated_at' => $this->getUpdatedAt()->format('c'),
         ];

@@ -28,10 +28,13 @@ class CreateProductVariantService extends BaseService implements CreateProductVa
         $productVariant = new ProductVariant(
             productId: $dto->product_id,
             tenantId: $dto->tenant_id,
+            orgUnitId: $dto->org_unit_id,
             name: $dto->name,
             sku: $dto->sku,
             isDefault: $dto->is_default,
             isActive: $dto->is_active,
+            purchasePrice: $dto->purchase_price,
+            salesPrice: $dto->sales_price,
             metadata: $dto->metadata,
         );
 

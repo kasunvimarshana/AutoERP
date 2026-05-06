@@ -9,6 +9,7 @@ use Modules\Product\Application\Contracts\UpdateProductVariantServiceInterface;
 use Modules\Product\Application\DTOs\ProductVariantData;
 use Modules\Product\Domain\Entities\ProductVariant;
 use Modules\Product\Domain\Exceptions\ProductVariantNotFoundException;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Product\Domain\RepositoryInterfaces\ProductVariantRepositoryInterface;
 
 class UpdateProductVariantService extends BaseService implements UpdateProductVariantServiceInterface
@@ -29,6 +30,11 @@ class UpdateProductVariantService extends BaseService implements UpdateProductVa
 
         $dto = ProductVariantData::fromArray($data);
 
+
+        if ($dto->rowVersion !== $productVariant->getRowVersion()) {
+            throw new ConcurrentModificationException('ProductVariant', $id);
+        }
+
         if ($productVariant->getTenantId() !== null && $productVariant->getTenantId() !== $dto->tenant_id) {
             throw new ProductVariantNotFoundException($id);
         }
@@ -42,10 +48,13 @@ class UpdateProductVariantService extends BaseService implements UpdateProductVa
         }
 
         $productVariant->update(
+            orgUnitId: $dto->org_unit_id,
             name: $dto->name,
             sku: $dto->sku,
             isDefault: $dto->is_default,
             isActive: $dto->is_active,
+            purchasePrice: $dto->purchase_price,
+            salesPrice: $dto->sales_price,
             metadata: $dto->metadata,
         );
 

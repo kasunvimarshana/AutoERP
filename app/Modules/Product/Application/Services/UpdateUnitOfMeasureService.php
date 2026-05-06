@@ -9,6 +9,7 @@ use Modules\Product\Application\Contracts\UpdateUnitOfMeasureServiceInterface;
 use Modules\Product\Application\DTOs\UnitOfMeasureData;
 use Modules\Product\Domain\Entities\UnitOfMeasure;
 use Modules\Product\Domain\Exceptions\UnitOfMeasureNotFoundException;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Product\Domain\RepositoryInterfaces\UnitOfMeasureRepositoryInterface;
 
 class UpdateUnitOfMeasureService extends BaseService implements UpdateUnitOfMeasureServiceInterface
@@ -29,11 +30,16 @@ class UpdateUnitOfMeasureService extends BaseService implements UpdateUnitOfMeas
 
         $dto = UnitOfMeasureData::fromArray($data);
 
+
+        if ($dto->rowVersion !== $unitOfMeasure->getRowVersion()) {
+            throw new ConcurrentModificationException('UnitOfMeasure', $id);
+        }
+
         $unitOfMeasure->update(
             name: $dto->name,
             symbol: $dto->symbol,
             type: $dto->type,
-            isBase: $dto->is_base,
+            isBase: $dto->isBase,
         );
 
         return $this->unitOfMeasureRepository->save($unitOfMeasure);

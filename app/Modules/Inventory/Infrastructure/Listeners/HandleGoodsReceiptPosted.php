@@ -7,6 +7,7 @@ namespace Modules\Inventory\Infrastructure\Listeners;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Inventory\Domain\Entities\StockMovement;
+use Modules\Inventory\Domain\Exceptions\InsufficientAvailableStockException;
 use Modules\Inventory\Domain\RepositoryInterfaces\InventoryStockRepositoryInterface;
 use Modules\Inventory\Domain\RepositoryInterfaces\TraceLogRepositoryInterface;
 use Modules\Purchase\Domain\Events\GoodsReceiptPosted;
@@ -57,7 +58,18 @@ class HandleGoodsReceiptPosted
                 );
 
                 $saved = $this->inventoryStockRepository->recordMovement($movement);
-                $this->inventoryStockRepository->adjustStockLevel($saved);
+
+                try {
+                    $this->inventoryStockRepository->adjustStockLevel($saved);
+                } catch (InsufficientAvailableStockException $e) {
+                    Log::warning('HandleGoodsReceiptPosted: stock level adjustment failed for GRN line', [
+                        'grn_header_id' => $event->grnHeaderId,
+                        'product_id'    => $line['product_id'],
+                        'location_id'   => $locationId,
+                        'received_qty'  => $line['received_qty'],
+                    ]);
+                }
+
                 $this->traceLogRepository->recordForMovement($saved);
             }
         });

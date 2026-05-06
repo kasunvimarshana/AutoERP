@@ -48,6 +48,9 @@ class PurchaseOrder
 
     private \DateTimeInterface $updatedAt;
 
+    /** @var PurchaseOrderLine[] */
+    private array $lines = [];
+
     public function __construct(
         int $tenantId,
         int $supplierId,
@@ -268,5 +271,21 @@ class PurchaseOrder
     {
         $this->status = 'partial';
         $this->updatedAt = new \DateTimeImmutable;
+    }
+
+    /**
+     * @param  PurchaseOrderLine[]  $lines
+     */
+    public function setLines(array $lines): void
+    {
+        $this->lines = $lines;
+    }
+
+    /**
+     * @return PurchaseOrderLine[]
+     */
+    public function getLines(): array
+    {
+        return $this->lines;
     }
 }

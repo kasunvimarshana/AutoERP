@@ -28,6 +28,7 @@ class EloquentPriceListRepository extends EloquentRepository implements PriceLis
             'valid_from' => $priceList->getValidFrom()?->format('Y-m-d'),
             'valid_to' => $priceList->getValidTo()?->format('Y-m-d'),
             'is_active' => $priceList->isActive(),
+            'row_version' => $priceList->getRowVersion(),
         ];
 
         if ($priceList->getId()) {
@@ -83,6 +84,7 @@ class EloquentPriceListRepository extends EloquentRepository implements PriceLis
             validFrom: $model->valid_from,
             validTo: $model->valid_to,
             isActive: (bool) $model->is_active,
+            rowVersion: (int) ($model->row_version ?? 1),
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,
         );

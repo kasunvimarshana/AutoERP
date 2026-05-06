@@ -7,14 +7,15 @@ namespace Modules\Finance\Application\DTOs;
 class BankReconciliationData
 {
     public function __construct(
-        public readonly int $tenant_id,
-        public readonly int $bank_account_id,
-        public readonly string $period_start,
-        public readonly string $period_end,
-        public readonly float $opening_balance,
-        public readonly float $closing_balance,
+        public readonly int $tenantId,
+        public readonly int $bankAccountId,
+        public readonly string $periodStart,
+        public readonly string $periodEnd,
+        public readonly float $openingBalance,
+        public readonly float $closingBalance,
         public readonly string $status = 'draft',
-        public readonly ?int $completed_by = null,
+        public readonly ?int $completedBy = null,
+        public readonly int $rowVersion = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -22,14 +23,15 @@ class BankReconciliationData
     public static function fromArray(array $data): self
     {
         return new self(
-            tenant_id: (int) $data['tenant_id'],
-            bank_account_id: (int) $data['bank_account_id'],
-            period_start: (string) $data['period_start'],
-            period_end: (string) $data['period_end'],
-            opening_balance: (float) $data['opening_balance'],
-            closing_balance: (float) $data['closing_balance'],
+            tenantId: (int) $data['tenant_id'],
+            bankAccountId: (int) $data['bank_account_id'],
+            periodStart: (string) $data['period_start'],
+            periodEnd: (string) $data['period_end'],
+            openingBalance: (float) $data['opening_balance'],
+            closingBalance: (float) $data['closing_balance'],
             status: (string) ($data['status'] ?? 'draft'),
-            completed_by: isset($data['completed_by']) ? (int) $data['completed_by'] : null,
+            completedBy: isset($data['completed_by']) ? (int) $data['completed_by'] : null,
+            rowVersion: isset($data['row_version']) ? (int) $data['row_version'] : 1,
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Customer\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Core\Domain\Exceptions\DomainException;
 use Modules\Customer\Application\Contracts\UpdateCustomerServiceInterface;
 use Modules\Customer\Application\DTOs\CustomerData;
@@ -33,26 +34,30 @@ class UpdateCustomerService extends BaseService implements UpdateCustomerService
 
         $dto = CustomerData::fromArray($data);
 
-        if ($customer->getTenantId() !== $dto->tenant_id) {
+        if ($customer->getTenantId() !== $dto->tenantId) {
             throw new CustomerNotFoundException($id);
         }
 
-        if ($dto->user_id !== null && $dto->user_id !== $customer->getUserId()) {
+        if ($dto->rowVersion !== $customer->getRowVersion()) {
+            throw new ConcurrentModificationException('Customer', $id);
+        }
+
+        if ($dto->userId !== null && $dto->userId !== $customer->getUserId()) {
             throw new DomainException('Changing customer user association is not allowed.');
         }
 
         $customer->update(
             userId: $customer->getUserId(),
-            customerCode: $dto->customer_code,
+            customerCode: $dto->customerCode,
             name: $dto->name,
             type: $dto->type,
-            orgUnitId: $dto->org_unit_id,
-            taxNumber: $dto->tax_number,
-            registrationNumber: $dto->registration_number,
-            currencyId: $dto->currency_id,
-            creditLimit: $this->normalizeDecimal($dto->credit_limit),
-            paymentTermsDays: $dto->payment_terms_days,
-            arAccountId: $dto->ar_account_id,
+            orgUnitId: $dto->orgUnitId,
+            taxNumber: $dto->taxNumber,
+            registrationNumber: $dto->registrationNumber,
+            currencyId: $dto->currencyId,
+            creditLimit: $this->normalizeDecimal($dto->creditLimit),
+            paymentTermsDays: $dto->paymentTermsDays,
+            arAccountId: $dto->arAccountId,
             status: $dto->status,
             notes: $dto->notes,
             metadata: $dto->metadata,

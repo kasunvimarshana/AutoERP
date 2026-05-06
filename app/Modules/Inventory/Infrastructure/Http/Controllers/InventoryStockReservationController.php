@@ -15,9 +15,11 @@ use Modules\Inventory\Infrastructure\Http\Requests\ListStockReservationRequest;
 use Modules\Inventory\Infrastructure\Http\Requests\ReleaseExpiredStockReservationRequest;
 use Modules\Inventory\Infrastructure\Http\Requests\StoreStockReservationRequest;
 use Modules\Inventory\Infrastructure\Http\Resources\StockReservationResource;
+use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
+use Modules\Inventory\Domain\Entities\StockReservation;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
-class InventoryStockReservationController
+class InventoryStockReservationController extends AuthorizedController
 {
     public function __construct(
         private readonly CreateStockReservationServiceInterface $createStockReservationService,
@@ -28,6 +30,7 @@ class InventoryStockReservationController
 
     public function index(ListStockReservationRequest $request): JsonResponse
     {
+        $this->authorize('viewAny', StockReservation::class);
         $validated = $request->validated();
 
         $reservations = $this->findStockReservationService->list(
@@ -48,6 +51,8 @@ class InventoryStockReservationController
             return response()->json(['message' => 'Stock reservation not found.'], HttpResponse::HTTP_NOT_FOUND);
         }
 
+        $this->authorize('view', $item);
+
         return (new StockReservationResource($item))
             ->response()
             ->setStatusCode(HttpResponse::HTTP_OK);
@@ -55,6 +60,7 @@ class InventoryStockReservationController
 
     public function store(StoreStockReservationRequest $request): JsonResponse
     {
+        $this->authorize('create', StockReservation::class);
         try {
             $reservation = $this->createStockReservationService->execute($request->validated());
         } catch (InsufficientAvailableStockException $exception) {
@@ -70,6 +76,7 @@ class InventoryStockReservationController
 
     public function destroy(DeleteStockReservationRequest $request, int $reservation): JsonResponse
     {
+        $this->authorize('delete', StockReservation::class);
         $validated = $request->validated();
         $deleted = $this->releaseStockReservationService->execute((int) $validated['tenant_id'], $reservation);
 
@@ -82,6 +89,7 @@ class InventoryStockReservationController
 
     public function releaseExpired(ReleaseExpiredStockReservationRequest $request): JsonResponse
     {
+        $this->authorize('delete', StockReservation::class);
         $validated = $request->validated();
 
         $releasedCount = $this->releaseExpiredStockReservationsService->execute(

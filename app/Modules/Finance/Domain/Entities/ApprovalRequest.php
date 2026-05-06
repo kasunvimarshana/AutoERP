@@ -18,6 +18,7 @@ class ApprovalRequest
         private ?\DateTimeInterface $requestedAt = null,
         private ?\DateTimeInterface $resolvedAt = null,
         private ?string $comments = null,
+        private int $rowVersion = 1,
         private ?int $id = null,
         private ?\DateTimeInterface $createdAt = null,
         private ?\DateTimeInterface $updatedAt = null,
@@ -95,6 +96,11 @@ class ApprovalRequest
     public function getUpdatedAt(): \DateTimeInterface
     {
         return $this->updatedAt;
+    }
+
+    public function getRowVersion(): int
+    {
+        return $this->rowVersion;
     }
 
     public function approve(int $resolvedByUserId, ?string $comments = null): void

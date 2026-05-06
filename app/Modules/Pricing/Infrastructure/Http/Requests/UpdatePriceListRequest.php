@@ -35,6 +35,7 @@ class UpdatePriceListRequest extends FormRequest
             'valid_from' => 'nullable|date',
             'valid_to' => 'nullable|date|after_or_equal:valid_from',
             'is_active' => 'nullable|boolean',
+            'row_version' => 'required|integer|min:1',
         ];
     }
 }

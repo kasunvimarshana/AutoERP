@@ -29,6 +29,7 @@ class PurchaseOrderLineResource extends JsonResource
             'discount_pct' => $entity->getDiscountPct(),
             'tax_group_id' => $entity->getTaxGroupId(),
             'account_id' => $entity->getAccountId(),
+                        'line_total' => $entity->getLineTotal(),
             'created_at' => $entity->getCreatedAt()->format('c'),
             'updated_at' => $entity->getUpdatedAt()->format('c'),
         ];

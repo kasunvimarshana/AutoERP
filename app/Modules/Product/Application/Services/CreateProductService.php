@@ -55,6 +55,8 @@ class CreateProductService extends BaseService implements CreateProductServiceIn
             cogsAccountId: $dto->cogs_account_id,
             inventoryAccountId: $dto->inventory_account_id,
             expenseAccountId: $dto->expense_account_id,
+            purchasePrice: $dto->purchase_price,
+            salesPrice: $dto->sales_price,
             isActive: $dto->is_active,
             metadata: $dto->metadata,
         );

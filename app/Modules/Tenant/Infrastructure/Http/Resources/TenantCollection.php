@@ -9,7 +9,14 @@ use Illuminate\Http\Resources\Json\ResourceCollection;
 
 class TenantCollection extends ResourceCollection
 {
-    public $collects = TenantResource::class;
+    /**
+     * Disable automatic resource class inference to prevent mapInto from passing
+     * collection keys as the second constructor argument of TenantResource.
+     */
+    protected function collects(): ?string
+    {
+        return null;
+    }
 
     public function toArray(Request $request): array
     {

@@ -17,6 +17,7 @@ class UpdateBankTransactionRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'row_version' => ['required', 'integer', 'min:1'],
             'tenant_id' => ['sometimes', 'nullable', 'integer', 'exists:tenants,id'],
             'bank_account_id' => ['required', 'integer', 'exists:bank_accounts,id'],
             'description' => ['required', 'string', 'max:1000'],

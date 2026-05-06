@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Application\Contracts;
 
-use Modules\Inventory\Application\DTOs\AllocationRequestDTO;
+use Modules\Inventory\Application\DTOs\AllocationRequestData;
 use Modules\Inventory\Domain\Entities\AllocationResult;
 
 /**
@@ -16,7 +16,7 @@ interface AllocationEngineServiceInterface
     /**
      * Allocate stock for the given request and return the result.
      */
-    public function allocate(AllocationRequestDTO $request): AllocationResult;
+    public function allocate(AllocationRequestData $request): AllocationResult;
 
     /**
      * Resolve the effective allocation strategy for a given context.

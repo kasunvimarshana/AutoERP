@@ -25,25 +25,25 @@ class CreateCustomerContactService extends BaseService implements CreateCustomer
     {
         $dto = CustomerContactData::fromArray($data);
 
-        $customer = $this->customerRepository->find($dto->customer_id);
+        $customer = $this->customerRepository->find($dto->customerId);
         if (! $customer) {
-            throw new CustomerNotFoundException($dto->customer_id);
+            throw new CustomerNotFoundException($dto->customerId);
         }
 
         $contact = new CustomerContact(
             tenantId: $customer->getTenantId(),
-            customerId: $dto->customer_id,
+            customerId: $dto->customerId,
             name: $dto->name,
             role: $dto->role,
             email: $dto->email,
             phone: $dto->phone,
-            isPrimary: $dto->is_primary,
+            isPrimary: $dto->isPrimary,
         );
 
-        if ($dto->is_primary) {
+        if ($dto->isPrimary) {
             $this->customerContactRepository->clearPrimaryByCustomer(
                 tenantId: $customer->getTenantId(),
-                customerId: $dto->customer_id,
+                customerId: $dto->customerId,
             );
         }
 

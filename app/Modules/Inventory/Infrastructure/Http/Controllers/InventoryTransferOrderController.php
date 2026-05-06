@@ -14,9 +14,11 @@ use Modules\Inventory\Infrastructure\Http\Requests\ListTransferOrderRequest;
 use Modules\Inventory\Infrastructure\Http\Requests\ReceiveTransferOrderRequest;
 use Modules\Inventory\Infrastructure\Http\Requests\StoreTransferOrderRequest;
 use Modules\Inventory\Infrastructure\Http\Resources\TransferOrderResource;
+use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
+use Modules\Inventory\Domain\Entities\TransferOrder;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
-class InventoryTransferOrderController
+class InventoryTransferOrderController extends AuthorizedController
 {
     public function __construct(
         private readonly CreateTransferOrderServiceInterface $createTransferOrderService,
@@ -27,6 +29,7 @@ class InventoryTransferOrderController
 
     public function index(ListTransferOrderRequest $request): JsonResponse
     {
+        $this->authorize('viewAny', TransferOrder::class);
         $validated = $request->validated();
 
         $orders = $this->findTransferOrderService->list(
@@ -47,6 +50,8 @@ class InventoryTransferOrderController
             return response()->json(['message' => 'Transfer order not found.'], HttpResponse::HTTP_NOT_FOUND);
         }
 
+        $this->authorize('view', $order);
+
         return (new TransferOrderResource($order))
             ->response()
             ->setStatusCode(HttpResponse::HTTP_OK);
@@ -54,6 +59,7 @@ class InventoryTransferOrderController
 
     public function store(StoreTransferOrderRequest $request): JsonResponse
     {
+        $this->authorize('create', TransferOrder::class);
         $order = $this->createTransferOrderService->execute($request->validated());
 
         return (new TransferOrderResource($order))
@@ -63,6 +69,7 @@ class InventoryTransferOrderController
 
     public function approve(ApproveTransferOrderRequest $request, int $transferOrder): JsonResponse
     {
+        $this->authorize('update', TransferOrder::class);
         $validated = $request->validated();
         $order = $this->approveTransferOrderService->execute((int) $validated['tenant_id'], $transferOrder);
 
@@ -73,6 +80,7 @@ class InventoryTransferOrderController
 
     public function receive(ReceiveTransferOrderRequest $request, int $transferOrder): JsonResponse
     {
+        $this->authorize('update', TransferOrder::class);
         $validated = $request->validated();
         $order = $this->receiveTransferOrderService->execute(
             (int) $validated['tenant_id'],

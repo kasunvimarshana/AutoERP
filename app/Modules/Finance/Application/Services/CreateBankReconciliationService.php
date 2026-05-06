@@ -22,12 +22,12 @@ class CreateBankReconciliationService extends BaseService implements CreateBankR
         $dto = BankReconciliationData::fromArray($data);
 
         $br = new BankReconciliation(
-            tenantId: $dto->tenant_id,
-            bankAccountId: $dto->bank_account_id,
-            periodStart: new \DateTimeImmutable($dto->period_start),
-            periodEnd: new \DateTimeImmutable($dto->period_end),
-            openingBalance: $dto->opening_balance,
-            closingBalance: $dto->closing_balance,
+            tenantId: $dto->tenantId,
+            bankAccountId: $dto->bankAccountId,
+            periodStart: new \DateTimeImmutable($dto->periodStart),
+            periodEnd: new \DateTimeImmutable($dto->periodEnd),
+            openingBalance: $dto->openingBalance,
+            closingBalance: $dto->closingBalance,
             status: $dto->status,
         );
 

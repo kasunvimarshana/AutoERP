@@ -32,6 +32,7 @@ class ShiftController extends AuthorizedController
 
     public function index(): JsonResponse
     {
+        $this->authorize('viewAny', Shift::class);
         $result = $this->findService->list();
 
         return Response::json(['data' => ShiftResource::collection($result)]);
@@ -39,6 +40,7 @@ class ShiftController extends AuthorizedController
 
     public function store(StoreShiftRequest $request): JsonResponse
     {
+        $this->authorize('create', Shift::class);
         $entity = $this->createService->execute($request->validated());
 
         return (new ShiftResource($entity))->response()->setStatusCode(201);
@@ -46,12 +48,16 @@ class ShiftController extends AuthorizedController
 
     public function show(int $shift): ShiftResource
     {
-        return new ShiftResource($this->findOrFail($shift));
+        $entity = $this->findOrFail($shift);
+        $this->authorize('view', $entity);
+
+        return new ShiftResource($entity);
     }
 
     public function update(UpdateShiftRequest $request, int $shift): ShiftResource
     {
-        $this->findOrFail($shift);
+        $entity = $this->findOrFail($shift);
+        $this->authorize('update', $entity);
         $payload = $request->validated();
         $payload['id'] = $shift;
         $updated = $this->updateService->execute($payload);
@@ -61,7 +67,8 @@ class ShiftController extends AuthorizedController
 
     public function destroy(int $shift): JsonResponse
     {
-        $this->findOrFail($shift);
+        $entity = $this->findOrFail($shift);
+        $this->authorize('delete', $entity);
         $this->deleteService->execute(['id' => $shift]);
 
         return Response::json(null, 204);
@@ -69,7 +76,8 @@ class ShiftController extends AuthorizedController
 
     public function assign(AssignShiftRequest $request, int $shift): JsonResponse
     {
-        $this->findOrFail($shift);
+        $entity = $this->findOrFail($shift);
+        $this->authorize('update', $entity);
         $payload = $request->validated();
         $payload['shift_id'] = $shift;
         $assignment = $this->assignService->execute($payload);

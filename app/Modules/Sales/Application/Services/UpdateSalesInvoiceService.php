@@ -8,6 +8,7 @@ use Modules\Core\Application\Services\BaseService;
 use Modules\Sales\Application\Contracts\UpdateSalesInvoiceServiceInterface;
 use Modules\Sales\Application\DTOs\SalesInvoiceData;
 use Modules\Sales\Application\DTOs\SalesInvoiceLineData;
+use Modules\Sales\Application\Support\SalesPricingCalculator;
 use Modules\Sales\Domain\Entities\SalesInvoice;
 use Modules\Sales\Domain\Entities\SalesInvoiceLine;
 use Modules\Sales\Domain\Exceptions\SalesInvoiceNotFoundException;
@@ -15,8 +16,10 @@ use Modules\Sales\Domain\RepositoryInterfaces\SalesInvoiceRepositoryInterface;
 
 class UpdateSalesInvoiceService extends BaseService implements UpdateSalesInvoiceServiceInterface
 {
-    public function __construct(private readonly SalesInvoiceRepositoryInterface $salesInvoiceRepository)
-    {
+    public function __construct(
+        private readonly SalesInvoiceRepositoryInterface $salesInvoiceRepository,
+        private readonly SalesPricingCalculator $pricingCalculator,
+    ) {
         parent::__construct($salesInvoiceRepository);
     }
 
@@ -29,7 +32,9 @@ class UpdateSalesInvoiceService extends BaseService implements UpdateSalesInvoic
             throw new SalesInvoiceNotFoundException($id);
         }
 
-        $dto = SalesInvoiceData::fromArray($data);
+        $payload = $this->mergePayloadWithExistingInvoice($invoice, $data);
+        $payload = $this->pricingCalculator->normalizeInvoicePayload($payload);
+        $dto = SalesInvoiceData::fromArray($payload);
 
         if ($invoice->getTenantId() !== $dto->tenantId) {
             throw new SalesInvoiceNotFoundException($id);
@@ -71,6 +76,36 @@ class UpdateSalesInvoiceService extends BaseService implements UpdateSalesInvoic
         }
 
         return $this->salesInvoiceRepository->save($invoice);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function mergePayloadWithExistingInvoice(SalesInvoice $invoice, array $payload): array
+    {
+        $merged = [
+            'tenant_id' => $invoice->getTenantId(),
+            'customer_id' => $invoice->getCustomerId(),
+            'currency_id' => $invoice->getCurrencyId(),
+            'sales_order_id' => $invoice->getSalesOrderId(),
+            'shipment_id' => $invoice->getShipmentId(),
+            'invoice_number' => $invoice->getInvoiceNumber(),
+            'status' => $invoice->getStatus(),
+            'invoice_date' => $invoice->getInvoiceDate()->format('Y-m-d'),
+            'due_date' => $invoice->getDueDate()->format('Y-m-d'),
+            'exchange_rate' => $invoice->getExchangeRate(),
+            'subtotal' => $invoice->getSubtotal(),
+            'tax_total' => $invoice->getTaxTotal(),
+            'discount_total' => $invoice->getDiscountTotal(),
+            'grand_total' => $invoice->getGrandTotal(),
+            'ar_account_id' => $invoice->getArAccountId(),
+            'journal_entry_id' => $invoice->getJournalEntryId(),
+            'notes' => $invoice->getNotes(),
+            'metadata' => $invoice->getMetadata(),
+        ];
+
+        return array_replace($merged, $payload);
     }
 
     private static function buildLine(int $tenantId, array $lineData): SalesInvoiceLine

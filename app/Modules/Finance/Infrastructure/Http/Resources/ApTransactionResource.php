@@ -26,6 +26,7 @@ class ApTransactionResource extends JsonResource
             'reference_type' => $this->resource->getReferenceType(),
             'reference_id' => $this->resource->getReferenceId(),
             'is_reconciled' => $this->resource->isReconciled(),
+            'row_version' => $this->resource->getRowVersion(),
             'created_at' => $this->resource->getCreatedAt(),
             'updated_at' => $this->resource->getUpdatedAt(),
         ];

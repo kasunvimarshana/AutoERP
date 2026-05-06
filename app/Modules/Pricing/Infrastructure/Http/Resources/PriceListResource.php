@@ -21,6 +21,7 @@ class PriceListResource extends JsonResource
             'valid_from' => $this->getValidFrom()?->format('Y-m-d'),
             'valid_to' => $this->getValidTo()?->format('Y-m-d'),
             'is_active' => $this->isActive(),
+            'row_version' => $this->getRowVersion(),
             'created_at' => $this->getCreatedAt()->format('c'),
             'updated_at' => $this->getUpdatedAt()->format('c'),
         ];

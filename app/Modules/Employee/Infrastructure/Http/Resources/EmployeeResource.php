@@ -21,6 +21,7 @@ class EmployeeResource extends JsonResource
             'hire_date' => $this->getHireDate()?->format('Y-m-d'),
             'termination_date' => $this->getTerminationDate()?->format('Y-m-d'),
             'metadata' => $this->getMetadata(),
+            'row_version' => $this->getRowVersion(),
             'created_at' => $this->getCreatedAt()->format('c'),
             'updated_at' => $this->getUpdatedAt()->format('c'),
         ];

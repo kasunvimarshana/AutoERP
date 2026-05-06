@@ -22,16 +22,16 @@ class CreateBankAccountService extends BaseService implements CreateBankAccountS
         $dto = BankAccountData::fromArray($data);
 
         $bankAccount = new BankAccount(
-            tenantId: $dto->tenant_id,
-            accountId: $dto->account_id,
+            tenantId: $dto->tenantId,
+            accountId: $dto->accountId,
             name: $dto->name,
-            bankName: $dto->bank_name,
-            accountNumber: $dto->account_number,
-            currencyId: $dto->currency_id,
-            routingNumber: $dto->routing_number,
-            currentBalance: $dto->current_balance,
-            feedProvider: $dto->feed_provider,
-            isActive: $dto->is_active,
+            bankName: $dto->bankName,
+            accountNumber: $dto->accountNumber,
+            currencyId: $dto->currencyId,
+            routingNumber: $dto->routingNumber,
+            currentBalance: $dto->currentBalance,
+            feedProvider: $dto->feedProvider,
+            isActive: $dto->isActive,
         );
 
         return $this->bankAccountRepository->save($bankAccount);

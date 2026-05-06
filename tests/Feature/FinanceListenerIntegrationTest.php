@@ -332,7 +332,7 @@ class FinanceListenerIntegrationTest extends TestCase
         $event = new SalesInvoicePosted(
             tenantId: $this->tenantId,
             salesInvoiceId: 200,
-            customerId: 1,
+            customerId: $this->customerId,
             arAccountId: $this->arAccountId,
             grandTotal: '220.000000',
             currencyId: 1,
@@ -364,6 +364,18 @@ class FinanceListenerIntegrationTest extends TestCase
         $creditLine = $lines[1];
         $this->assertSame($this->revenueAccountId, (int) $creditLine->account_id);
         $this->assertEqualsWithDelta(220.0, (float) $creditLine->credit_amount, 0.001);
+
+        // AR transaction created for the customer
+        $arTx = DB::table('ar_transactions')
+            ->where('tenant_id', $this->tenantId)
+            ->where('reference_type', 'sales_invoice')
+            ->where('reference_id', 200)
+            ->first();
+        $this->assertNotNull($arTx, 'Expected an AR transaction for the posted sales invoice');
+        $this->assertSame('invoice', $arTx->transaction_type);
+        $this->assertEqualsWithDelta(220.0, (float) $arTx->amount, 0.001);
+        $this->assertEqualsWithDelta(220.0, (float) $arTx->balance_after, 0.001);
+        $this->assertSame($this->customerId, (int) $arTx->customer_id);
     }
 
     public function test_handle_sales_invoice_posted_skips_when_ar_account_is_null(): void
@@ -371,7 +383,7 @@ class FinanceListenerIntegrationTest extends TestCase
         $event = new SalesInvoicePosted(
             tenantId: $this->tenantId,
             salesInvoiceId: 201,
-            customerId: 1,
+            customerId: $this->customerId,
             arAccountId: null,
             grandTotal: '100.000000',
             invoiceDate: '2026-01-20',
@@ -390,7 +402,7 @@ class FinanceListenerIntegrationTest extends TestCase
         $event = new SalesInvoicePosted(
             tenantId: $this->tenantId,
             salesInvoiceId: 202,
-            customerId: 1,
+            customerId: $this->customerId,
             arAccountId: $this->arAccountId,
             grandTotal: '100.000000',
             invoiceDate: '2026-01-20',
@@ -409,7 +421,7 @@ class FinanceListenerIntegrationTest extends TestCase
         $event = new SalesInvoicePosted(
             tenantId: $this->tenantId,
             salesInvoiceId: 203,
-            customerId: 1,
+            customerId: $this->customerId,
             arAccountId: $this->arAccountId,
             grandTotal: '200.000000',
             invoiceDate: '2026-01-20',
@@ -428,7 +440,7 @@ class FinanceListenerIntegrationTest extends TestCase
         $event = new SalesInvoicePosted(
             tenantId: $this->tenantId,
             salesInvoiceId: 204,
-            customerId: 1,
+            customerId: $this->customerId,
             arAccountId: $this->arAccountId,
             grandTotal: '220.000000',
             currencyId: 1,
@@ -443,6 +455,7 @@ class FinanceListenerIntegrationTest extends TestCase
         $this->makeArListener()->handle($event);
 
         $this->assertSame(1, DB::table('journal_entries')->where('reference_type', 'sales_invoice')->where('reference_id', 204)->count());
+        $this->assertSame(1, DB::table('ar_transactions')->where('reference_type', 'sales_invoice')->where('reference_id', 204)->count());
     }
 
     // ──────────────────────────────────────────────────────────────────
@@ -2355,6 +2368,8 @@ class FinanceListenerIntegrationTest extends TestCase
         return new HandleSalesInvoicePosted(
             fiscalPeriodRepository: app(FiscalPeriodRepositoryInterface::class),
             createJournalEntryService: app(CreateJournalEntryServiceInterface::class),
+            createArTransactionService: app(CreateArTransactionServiceInterface::class),
+            arTransactionRepository: app(ArTransactionRepositoryInterface::class),
         );
     }
 

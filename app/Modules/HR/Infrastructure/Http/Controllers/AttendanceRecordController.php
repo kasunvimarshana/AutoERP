@@ -26,6 +26,7 @@ class AttendanceRecordController extends AuthorizedController
 
     public function index(): JsonResponse
     {
+        $this->authorize('viewAny', AttendanceRecord::class);
         $result = $this->findService->list();
 
         return Response::json(['data' => AttendanceRecordResource::collection($result)]);
@@ -33,12 +34,16 @@ class AttendanceRecordController extends AuthorizedController
 
     public function show(int $attendanceRecord): AttendanceRecordResource
     {
-        return new AttendanceRecordResource($this->findOrFail($attendanceRecord));
+        $entity = $this->findOrFail($attendanceRecord);
+        $this->authorize('view', $entity);
+
+        return new AttendanceRecordResource($entity);
     }
 
     public function update(UpdateAttendanceRecordRequest $request, int $attendanceRecord): AttendanceRecordResource
     {
-        $this->findOrFail($attendanceRecord);
+        $entity = $this->findOrFail($attendanceRecord);
+        $this->authorize('update', $entity);
         $payload = $request->validated();
         $payload['id'] = $attendanceRecord;
         $updated = $this->updateService->execute($payload);
@@ -48,6 +53,7 @@ class AttendanceRecordController extends AuthorizedController
 
     public function process(ProcessAttendanceRequest $request): JsonResponse
     {
+        $this->authorize('create', AttendanceRecord::class);
         $this->processService->execute($request->validated());
 
         return Response::json(['message' => 'Attendance processed successfully.']);

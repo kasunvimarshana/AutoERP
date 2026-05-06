@@ -94,7 +94,7 @@ class EloquentWarehouseLocationRepository extends EloquentRepository implements 
 
             $depth = substr_count($updatedPath, '/');
 
-            DB::table('warehouse_locations')
+            DB::table($this->warehouseLocationModel->getTable())
                 ->where('id', $descendant->id)
                 ->update([
                     'path' => $updatedPath,

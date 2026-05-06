@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Response;
 use Modules\Core\Infrastructure\Http\Controllers\AuthorizedController;
 use Modules\Pricing\Application\Contracts\CreateCustomerPriceListServiceInterface;
+use Modules\Pricing\Domain\Entities\CustomerPriceList;
 use Modules\Pricing\Application\Contracts\DeleteCustomerPriceListServiceInterface;
 use Modules\Pricing\Application\Contracts\FindCustomerPriceListServiceInterface;
 use Modules\Pricing\Infrastructure\Http\Requests\ListAssignmentRequest;
@@ -27,6 +28,7 @@ class CustomerPriceListController extends AuthorizedController
 
     public function index(int $customer, ListAssignmentRequest $request): CustomerPriceListCollection
     {
+        $this->authorize('viewAny', CustomerPriceList::class);
         $validated = $request->validated();
 
         $assignments = $this->findCustomerPriceListService->paginateByCustomer(
@@ -41,6 +43,7 @@ class CustomerPriceListController extends AuthorizedController
 
     public function store(StoreCustomerPriceListRequest $request, int $customer): JsonResponse
     {
+        $this->authorize('create', CustomerPriceList::class);
         $payload = $request->validated();
         $payload['customer_id'] = $customer;
 
@@ -59,6 +62,7 @@ class CustomerPriceListController extends AuthorizedController
             throw new NotFoundHttpException('Customer price list assignment not found.');
         }
 
+        $this->authorize('delete', $foundAssignment);
         $this->deleteCustomerPriceListService->execute(['id' => $assignment]);
 
         return Response::json(['message' => 'Customer price list assignment deleted successfully']);

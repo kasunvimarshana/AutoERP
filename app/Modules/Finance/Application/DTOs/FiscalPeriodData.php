@@ -7,13 +7,14 @@ namespace Modules\Finance\Application\DTOs;
 class FiscalPeriodData
 {
     public function __construct(
-        public readonly int $tenant_id,
-        public readonly int $fiscal_year_id,
-        public readonly int $period_number,
+        public readonly int $tenantId,
+        public readonly int $fiscalYearId,
+        public readonly int $periodNumber,
         public readonly string $name,
-        public readonly string $start_date,
-        public readonly string $end_date,
+        public readonly string $startDate,
+        public readonly string $endDate,
         public readonly string $status = 'open',
+        public readonly int $rowVersion = 1,
         public readonly ?int $id = null,
     ) {}
 
@@ -23,13 +24,14 @@ class FiscalPeriodData
     public static function fromArray(array $data): self
     {
         return new self(
-            tenant_id: (int) $data['tenant_id'],
-            fiscal_year_id: (int) $data['fiscal_year_id'],
-            period_number: (int) $data['period_number'],
+            tenantId: (int) $data['tenant_id'],
+            fiscalYearId: (int) $data['fiscal_year_id'],
+            periodNumber: (int) $data['period_number'],
             name: (string) $data['name'],
-            start_date: (string) $data['start_date'],
-            end_date: (string) $data['end_date'],
+            startDate: (string) $data['start_date'],
+            endDate: (string) $data['end_date'],
             status: (string) ($data['status'] ?? 'open'),
+            rowVersion: (int) ($data['row_version'] ?? 1),
             id: isset($data['id']) ? (int) $data['id'] : null,
         );
     }

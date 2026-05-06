@@ -39,6 +39,7 @@ class CustomerModel extends Model
         'status',
         'notes',
         'metadata',
+        'row_version',
     ];
 
     protected $casts = [
@@ -52,6 +53,7 @@ class CustomerModel extends Model
         'status' => 'string',
         'credit_limit' => 'decimal:6',
         'metadata' => 'array',
+        'row_version' => 'integer',
     ];
 
     public function user(): BelongsTo

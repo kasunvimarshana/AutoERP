@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Application\Services;
 
+use Illuminate\Support\Facades\DB;
 use Modules\Core\Application\Services\BaseService;
 use Modules\Purchase\Application\Contracts\PostGrnServiceInterface;
 use Modules\Purchase\Domain\Entities\GrnHeader;
@@ -40,39 +41,81 @@ class PostGrnService extends BaseService implements PostGrnServiceInterface
 
         $lines = $this->grnLineRepository->findByGrnHeaderId($grnHeader->getTenantId(), $id);
 
-        if ($grnHeader->getPurchaseOrderId() !== null) {
-            foreach ($lines as $grnLine) {
-                if ($grnLine->getPurchaseOrderLineId() !== null) {
-                    $poLine = $this->purchaseOrderLineRepository->find($grnLine->getPurchaseOrderLineId());
-                    if ($poLine && $poLine->getTenantId() === $grnHeader->getTenantId()) {
-                        $poLine->addReceivedQty($grnLine->getReceivedQty());
-                        $this->purchaseOrderLineRepository->save($poLine);
+        return DB::transaction(function () use ($grnHeader, $lines): GrnHeader {
+            if ($grnHeader->getPurchaseOrderId() !== null) {
+                foreach ($lines as $grnLine) {
+                    if ($grnLine->getPurchaseOrderLineId() !== null) {
+                        $poLine = $this->purchaseOrderLineRepository->find($grnLine->getPurchaseOrderLineId());
+                        if ($poLine && $poLine->getTenantId() === $grnHeader->getTenantId()) {
+                            $poLine->addReceivedQty($grnLine->getReceivedQty());
+                            $this->purchaseOrderLineRepository->save($poLine);
+                        }
                     }
                 }
+
+                $this->updatePurchaseOrderStatus(
+                    $grnHeader->getTenantId(),
+                    $grnHeader->getPurchaseOrderId(),
+                );
+            }
+
+            $grnHeader->post();
+            $saved = $this->grnHeaderRepository->save($grnHeader);
+
+            $this->addEvent(new GoodsReceiptPosted(
+                tenantId: $saved->getTenantId(),
+                grnHeaderId: (int) $saved->getId(),
+                supplierId: $saved->getSupplierId(),
+                warehouseId: $saved->getWarehouseId(),
+                lines: $lines->map(fn ($l) => [
+                    'id' => $l->getId(),
+                    'product_id' => $l->getProductId(),
+                    'location_id' => $l->getLocationId(),
+                    'uom_id' => $l->getUomId(),
+                    'received_qty' => $l->getReceivedQty(),
+                    'unit_cost' => $l->getUnitCost(),
+                    'variant_id' => $l->getVariantId(),
+                    'batch_id' => $l->getBatchId(),
+                    'serial_id' => $l->getSerialId(),
+                ])->values()->all(),
+                createdBy: (int) ($data['created_by'] ?? 0),
+            ));
+
+            return $saved;
+        });
+    }
+
+    private function updatePurchaseOrderStatus(int $tenantId, int $purchaseOrderId): void
+    {
+        $purchaseOrder = $this->purchaseOrderRepository->find($purchaseOrderId);
+        if ($purchaseOrder === null || ! in_array($purchaseOrder->getStatus(), ['confirmed', 'sent', 'partial'], true)) {
+            return;
+        }
+
+        $allPoLines = $this->purchaseOrderLineRepository->findByPurchaseOrderId($tenantId, $purchaseOrderId);
+
+        if ($allPoLines->isEmpty()) {
+            return;
+        }
+
+        $fullyReceived = true;
+        $anyReceived   = false;
+
+        foreach ($allPoLines as $poLine) {
+            if (bccomp($poLine->getReceivedQty(), '0.000000', 6) > 0) {
+                $anyReceived = true;
+            }
+            if (bccomp($poLine->getReceivedQty(), $poLine->getOrderedQty(), 6) < 0) {
+                $fullyReceived = false;
             }
         }
 
-        $grnHeader->post();
-        $saved = $this->grnHeaderRepository->save($grnHeader);
+        if ($fullyReceived) {
+            $purchaseOrder->receive();
+        } elseif ($anyReceived) {
+            $purchaseOrder->markPartial();
+        }
 
-        $this->addEvent(new GoodsReceiptPosted(
-            tenantId: $saved->getTenantId(),
-            grnHeaderId: (int) $saved->getId(),
-            supplierId: $saved->getSupplierId(),
-            warehouseId: $saved->getWarehouseId(),
-            lines: $lines->map(fn ($l) => [
-                'id' => $l->getId(),
-                'product_id' => $l->getProductId(),
-                'location_id' => $l->getLocationId(),
-                'uom_id' => $l->getUomId(),
-                'received_qty' => $l->getReceivedQty(),
-                'unit_cost' => $l->getUnitCost(),
-                'variant_id' => $l->getVariantId(),
-                'batch_id' => $l->getBatchId(),
-                'serial_id' => $l->getSerialId(),
-            ])->values()->all(),
-        ));
-
-        return $saved;
+        $this->purchaseOrderRepository->save($purchaseOrder);
     }
 }

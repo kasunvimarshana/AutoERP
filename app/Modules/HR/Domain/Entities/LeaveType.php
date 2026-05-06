@@ -21,6 +21,7 @@ class LeaveType
         private array $metadata,
         private readonly \DateTimeInterface $createdAt,
         private \DateTimeInterface $updatedAt,
+        private int $rowVersion = 1,
         private ?int $id = null,
     ) {}
 
@@ -97,5 +98,10 @@ class LeaveType
     public function getUpdatedAt(): \DateTimeInterface
     {
         return $this->updatedAt;
+    }
+
+    public function getRowVersion(): int
+    {
+        return $this->rowVersion;
     }
 }

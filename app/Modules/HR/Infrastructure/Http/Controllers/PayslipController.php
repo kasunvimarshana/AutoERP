@@ -20,6 +20,7 @@ class PayslipController extends AuthorizedController
 
     public function index(): JsonResponse
     {
+        $this->authorize('viewAny', Payslip::class);
         $result = $this->findService->list();
 
         return Response::json(['data' => PayslipResource::collection($result)]);
@@ -27,7 +28,10 @@ class PayslipController extends AuthorizedController
 
     public function show(int $payslip): PayslipResource
     {
-        return new PayslipResource($this->findOrFail($payslip));
+        $entity = $this->findOrFail($payslip);
+        $this->authorize('view', $entity);
+
+        return new PayslipResource($entity);
     }
 
     private function findOrFail(int $id): Payslip

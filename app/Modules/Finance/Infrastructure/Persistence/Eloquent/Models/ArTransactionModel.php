@@ -32,6 +32,7 @@ class ArTransactionModel extends BaseModel
         'transaction_date' => 'date',
         'due_date' => 'date',
         'is_reconciled' => 'boolean',
+        'row_version' => 'integer',
     ];
 
     public function account(): BelongsTo

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Finance\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Finance\Application\Contracts\UpdateNumberingSequenceServiceInterface;
 use Modules\Finance\Application\DTOs\NumberingSequenceData;
 use Modules\Finance\Domain\Entities\NumberingSequence;
@@ -27,12 +28,15 @@ class UpdateNumberingSequenceService extends BaseService implements UpdateNumber
         if (! $sequence) {
             throw new NumberingSequenceNotFoundException((int) $dto->id);
         }
+        if ($dto->rowVersion !== $sequence->getRowVersion()) {
+            throw new ConcurrentModificationException('NumberingSequence', (int) $dto->id);
+        }
 
         $sequence->update(
             prefix: $dto->prefix,
             suffix: $dto->suffix,
             padding: $dto->padding,
-            isActive: $dto->is_active,
+            isActive: $dto->isActive,
         );
 
         return $this->numberingSequenceRepository->save($sequence);

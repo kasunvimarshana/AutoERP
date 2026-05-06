@@ -14,6 +14,14 @@ class StoreOrganizationUnitUserRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $organizationUnitId = (int) $this->route('organization_unit');
+        if ($organizationUnitId > 0 && ! $this->has('org_unit_id')) {
+            $this->merge(['org_unit_id' => $organizationUnitId]);
+        }
+    }
+
     public function rules(): array
     {
         $tenantId = (int) $this->input('tenant_id');
@@ -32,7 +40,7 @@ class StoreOrganizationUnitUserRequest extends FormRequest
                         ->where('org_unit_id', $organizationUnitId)
                 ),
             ],
-            'role' => 'nullable|string|max:255',
+            'role_id' => 'nullable|integer|exists:roles,id',
             'is_primary' => 'required|boolean',
         ];
     }

@@ -20,6 +20,7 @@ class LeaveBalanceController extends AuthorizedController
 
     public function index(): JsonResponse
     {
+        $this->authorize('viewAny', LeaveBalance::class);
         $result = $this->findService->list();
 
         return Response::json(['data' => LeaveBalanceResource::collection($result)]);
@@ -27,7 +28,10 @@ class LeaveBalanceController extends AuthorizedController
 
     public function show(int $leaveBalance): LeaveBalanceResource
     {
-        return new LeaveBalanceResource($this->findOrFail($leaveBalance));
+        $entity = $this->findOrFail($leaveBalance);
+        $this->authorize('view', $entity);
+
+        return new LeaveBalanceResource($entity);
     }
 
     private function findOrFail(int $id): LeaveBalance

@@ -41,6 +41,7 @@ class UpdateWarehouseRequest extends FormRequest
             'is_active' => 'nullable|boolean',
             'is_default' => 'nullable|boolean',
             'metadata' => 'nullable|array',
+            'row_version' => 'required|integer|min:1',
         ];
     }
 }

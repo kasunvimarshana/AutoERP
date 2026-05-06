@@ -36,11 +36,33 @@ class SupplierRoutesTest extends TestCase
     {
         $routes = app('router')->getRoutes();
 
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/suppliers', 'GET'), ['auth.configured', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/suppliers/{supplier}', 'GET'), ['auth.configured', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/suppliers/{supplier}/addresses', 'GET'), ['auth.configured', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/suppliers/{supplier}/contacts', 'GET'), ['auth.configured', 'resolve.tenant']);
-        $this->assertRouteUsesMiddleware($this->findRoute($routes, 'api/suppliers/{supplier}/products', 'GET'), ['auth.configured', 'resolve.tenant']);
+        $supplierRoutes = [
+            ['GET', 'api/suppliers'],
+            ['POST', 'api/suppliers'],
+            ['GET', 'api/suppliers/{supplier}'],
+            ['PUT', 'api/suppliers/{supplier}'],
+            ['PATCH', 'api/suppliers/{supplier}'],
+            ['DELETE', 'api/suppliers/{supplier}'],
+            ['GET', 'api/suppliers/{supplier}/addresses'],
+            ['POST', 'api/suppliers/{supplier}/addresses'],
+            ['PUT', 'api/suppliers/{supplier}/addresses/{address}'],
+            ['DELETE', 'api/suppliers/{supplier}/addresses/{address}'],
+            ['GET', 'api/suppliers/{supplier}/contacts'],
+            ['POST', 'api/suppliers/{supplier}/contacts'],
+            ['PUT', 'api/suppliers/{supplier}/contacts/{contact}'],
+            ['DELETE', 'api/suppliers/{supplier}/contacts/{contact}'],
+            ['GET', 'api/suppliers/{supplier}/products'],
+            ['POST', 'api/suppliers/{supplier}/products'],
+            ['PUT', 'api/suppliers/{supplier}/products/{supplierProduct}'],
+            ['DELETE', 'api/suppliers/{supplier}/products/{supplierProduct}'],
+        ];
+
+        foreach ($supplierRoutes as [$method, $uri]) {
+            $this->assertRouteUsesMiddleware(
+                $this->findRoute($routes, $uri, $method),
+                ['auth.configured', 'resolve.tenant']
+            );
+        }
     }
 
     /**

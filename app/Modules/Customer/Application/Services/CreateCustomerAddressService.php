@@ -25,31 +25,31 @@ class CreateCustomerAddressService extends BaseService implements CreateCustomer
     {
         $dto = CustomerAddressData::fromArray($data);
 
-        $customer = $this->customerRepository->find($dto->customer_id);
+        $customer = $this->customerRepository->find($dto->customerId);
         if (! $customer) {
-            throw new CustomerNotFoundException($dto->customer_id);
+            throw new CustomerNotFoundException($dto->customerId);
         }
 
         $address = new CustomerAddress(
             tenantId: $customer->getTenantId(),
-            customerId: $dto->customer_id,
+            customerId: $dto->customerId,
             type: $dto->type,
             label: $dto->label,
-            addressLine1: $dto->address_line1,
-            addressLine2: $dto->address_line2,
+            addressLine1: $dto->addressLine1,
+            addressLine2: $dto->addressLine2,
             city: $dto->city,
             state: $dto->state,
-            postalCode: $dto->postal_code,
-            countryId: $dto->country_id,
-            isDefault: $dto->is_default,
-            geoLat: $dto->geo_lat,
-            geoLng: $dto->geo_lng,
+            postalCode: $dto->postalCode,
+            countryId: $dto->countryId,
+            isDefault: $dto->isDefault,
+            geoLat: $dto->geoLat,
+            geoLng: $dto->geoLng,
         );
 
-        if ($dto->is_default) {
+        if ($dto->isDefault) {
             $this->customerAddressRepository->clearDefaultByCustomerAndType(
                 tenantId: $customer->getTenantId(),
-                customerId: $dto->customer_id,
+                customerId: $dto->customerId,
                 type: $dto->type,
             );
         }

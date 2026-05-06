@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Finance\Application\Services;
 
 use Modules\Core\Application\Services\BaseService;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Finance\Application\Contracts\UpdateApTransactionServiceInterface;
 use Modules\Finance\Application\DTOs\ApTransactionData;
 use Modules\Finance\Domain\Entities\ApTransaction;
@@ -26,7 +27,10 @@ class UpdateApTransactionService extends BaseService implements UpdateApTransact
         if (! $ap) {
             throw new ApTransactionNotFoundException((int) $dto->id);
         }
-        if ($dto->is_reconciled) {
+        if ($dto->rowVersion !== $ap->getRowVersion()) {
+            throw new ConcurrentModificationException('ApTransaction', (int) $dto->id);
+        }
+        if ($dto->isReconciled) {
             $ap->reconcile();
         }
 

@@ -18,7 +18,7 @@ class AttendanceRecordModel extends BaseModel
 
     protected $fillable = ['tenant_id', 'org_unit_id', 'row_version', 'employee_id', 'attendance_date', 'check_in', 'check_out', 'break_duration', 'worked_minutes', 'overtime_minutes', 'status', 'shift_id', 'remarks', 'metadata'];
 
-    protected $casts = ['org_unit_id' => 'integer', 'row_version' => 'integer', 'status' => 'string', 'attendance_date' => 'date', 'check_in' => 'datetime', 'check_out' => 'datetime', 'metadata' => 'array', 'break_duration' => 'integer', 'worked_minutes' => 'integer', 'overtime_minutes' => 'integer'];
+    protected $casts = ['tenant_id' => 'integer', 'org_unit_id' => 'integer', 'row_version' => 'integer', 'employee_id' => 'integer', 'shift_id' => 'integer', 'status' => 'string', 'attendance_date' => 'date', 'check_in' => 'datetime', 'check_out' => 'datetime', 'metadata' => 'array', 'break_duration' => 'integer', 'worked_minutes' => 'integer', 'overtime_minutes' => 'integer'];
 
     public function employee(): BelongsTo
     {

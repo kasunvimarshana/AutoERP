@@ -7,6 +7,7 @@ namespace Modules\Purchase\Infrastructure\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Modules\Purchase\Domain\Entities\PurchaseInvoice;
+use Modules\Purchase\Infrastructure\Http\Resources\PurchaseInvoiceLineResource;
 
 class PurchaseInvoiceResource extends JsonResource
 {
@@ -38,6 +39,7 @@ class PurchaseInvoiceResource extends JsonResource
             'balance_due' => $entity->getBalanceDue(),
             'created_at' => $entity->getCreatedAt()->format('c'),
             'updated_at' => $entity->getUpdatedAt()->format('c'),
+            'lines' => PurchaseInvoiceLineResource::collection($entity->getLines()),
         ];
     }
 }

@@ -17,7 +17,7 @@ return new class extends Migration
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->string('name');
             $table->enum('type', ['cash', 'bank_transfer', 'card', 'cheque', 'other'])->default('bank_transfer');
-            $table->foreignId('account_id')->nullable()->constrained(null, 'id', 'payment_methods_account_id_fk')->nullOnDelete();
+            $table->foreignId('account_id')->nullable()->constrained('accounts', 'id', 'payment_methods_account_id_fk')->nullOnDelete();
             $table->boolean('is_active')->default(true);
             $table->softDeletes();
             $table->timestamps();

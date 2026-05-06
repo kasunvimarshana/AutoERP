@@ -25,6 +25,7 @@ class BankTransactionResource extends JsonResource
             'status' => $this->resource->getStatus(),
             'matched_journal_entry_id' => $this->resource->getMatchedJournalEntryId(),
             'category_rule_id' => $this->resource->getCategoryRuleId(),
+            'row_version' => $this->resource->getRowVersion(),
             'created_at' => $this->resource->getCreatedAt(),
             'updated_at' => $this->resource->getUpdatedAt(),
         ];

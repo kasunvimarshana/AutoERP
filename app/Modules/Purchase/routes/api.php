@@ -20,6 +20,7 @@ Route::middleware(['auth.configured', 'resolve.tenant'])->group(function (): voi
     Route::apiResource('purchase-invoices', PurchaseInvoiceController::class);
     Route::post('purchase-invoices/{invoice}/approve', [PurchaseInvoiceController::class, 'approve']);
     Route::post('purchase-invoices/{invoice}/payment', [PurchaseInvoiceController::class, 'recordPayment']);
+    Route::post('purchase-invoices/{invoice}/refund', [PurchaseInvoiceController::class, 'recordRefund']);
 
     Route::apiResource('purchase-returns', PurchaseReturnController::class);
     Route::post('purchase-returns/{purchaseReturn}/post', [PurchaseReturnController::class, 'post']);

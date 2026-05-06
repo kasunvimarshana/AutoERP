@@ -9,6 +9,7 @@ use Modules\Finance\Application\Contracts\UpdateAccountServiceInterface;
 use Modules\Finance\Application\DTOs\AccountData;
 use Modules\Finance\Domain\Entities\Account;
 use Modules\Finance\Domain\Exceptions\AccountNotFoundException;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Finance\Domain\RepositoryInterfaces\AccountRepositoryInterface;
 
 class UpdateAccountService extends BaseService implements UpdateAccountServiceInterface
@@ -29,6 +30,11 @@ class UpdateAccountService extends BaseService implements UpdateAccountServiceIn
 
         $dto = AccountData::fromArray($data);
 
+
+        if ($dto->rowVersion !== $account->getRowVersion()) {
+            throw new ConcurrentModificationException('Account', $id);
+        }
+
         $account->update(
             code: $dto->code,
             name: $dto->name,
@@ -39,9 +45,9 @@ class UpdateAccountService extends BaseService implements UpdateAccountServiceIn
             isSystem: $dto->is_system,
             isBankAccount: $dto->is_bank_account,
             isCreditCard: $dto->is_credit_card,
-            currencyId: $dto->currency_id,
+            currencyId: $dto->currencyId,
             description: $dto->description,
-            isActive: $dto->is_active,
+            isActive: $dto->isActive,
         );
 
         $account->setHierarchy($dto->path, $dto->depth);

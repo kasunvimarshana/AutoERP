@@ -62,20 +62,21 @@ class UploadTenantAttachmentService extends BaseService implements UploadTenantA
                 metadata: $metadata,
             );
 
-            $saved = $this->attachmentRepository->save($attachment);
+            return DB::transaction(function () use ($attachment, $type, $tenant, $storedPath): TenantAttachment {
+                $saved = $this->attachmentRepository->save($attachment);
 
-            // If this is a logo, update the tenant's logo_path inside the same transaction.
-            if ($type === 'logo') {
-                $previousLogoPath = $tenant->getLogoPath();
-                $tenant->setLogoPath($storedPath);
-                $this->tenantRepository->save($tenant);
+                if ($type === 'logo') {
+                    $previousLogoPath = $tenant->getLogoPath();
+                    $tenant->setLogoPath($storedPath);
+                    $this->tenantRepository->save($tenant);
 
-                if ($previousLogoPath !== null && $previousLogoPath !== '' && $previousLogoPath !== $storedPath) {
-                    DB::afterCommit(fn (): bool => $this->storageStrategy->delete($previousLogoPath));
+                    if ($previousLogoPath !== null && $previousLogoPath !== '' && $previousLogoPath !== $storedPath) {
+                        DB::afterCommit(fn (): bool => $this->storageStrategy->delete($previousLogoPath));
+                    }
                 }
-            }
 
-            return $saved;
+                return $saved;
+            });
         } catch (\Throwable $exception) {
             if (is_string($storedPath) && $storedPath !== '') {
                 $this->storageStrategy->delete($storedPath);

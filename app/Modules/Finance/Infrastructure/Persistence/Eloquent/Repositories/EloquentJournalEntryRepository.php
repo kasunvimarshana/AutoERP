@@ -38,6 +38,7 @@ class EloquentJournalEntryRepository extends EloquentRepository implements Journ
             'created_by' => $journalEntry->getCreatedBy(),
             'posted_by' => $journalEntry->getPostedBy(),
             'posted_at' => $journalEntry->getPostedAt(),
+            'row_version' => $journalEntry->getRowVersion(),
         ];
 
         $model = DB::transaction(function () use ($journalEntry, $data): JournalEntryModel {
@@ -137,6 +138,7 @@ class EloquentJournalEntryRepository extends EloquentRepository implements Journ
             reversalEntryId: $model->reversal_entry_id !== null ? (int) $model->reversal_entry_id : null,
             postedBy: $model->posted_by !== null ? (int) $model->posted_by : null,
             postedAt: $model->posted_at,
+            rowVersion: (int) ($model->row_version ?? 1),
             id: (int) $model->id,
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,

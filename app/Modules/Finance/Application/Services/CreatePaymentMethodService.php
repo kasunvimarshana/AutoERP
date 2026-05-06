@@ -22,11 +22,11 @@ class CreatePaymentMethodService extends BaseService implements CreatePaymentMet
         $dto = PaymentMethodData::fromArray($data);
 
         $paymentMethod = new PaymentMethod(
-            tenantId: $dto->tenant_id,
+            tenantId: $dto->tenantId,
             name: $dto->name,
             type: $dto->type,
-            accountId: $dto->account_id,
-            isActive: $dto->is_active,
+            accountId: $dto->accountId,
+            isActive: $dto->isActive,
         );
 
         return $this->paymentMethodRepository->save($paymentMethod);

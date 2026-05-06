@@ -9,6 +9,7 @@ use Modules\Finance\Application\Contracts\UpdateCostCenterServiceInterface;
 use Modules\Finance\Application\DTOs\CostCenterData;
 use Modules\Finance\Domain\Entities\CostCenter;
 use Modules\Finance\Domain\Exceptions\CostCenterNotFoundException;
+use Modules\Core\Domain\Exceptions\ConcurrentModificationException;
 use Modules\Finance\Domain\RepositoryInterfaces\CostCenterRepositoryInterface;
 
 class UpdateCostCenterService extends BaseService implements UpdateCostCenterServiceInterface
@@ -28,12 +29,17 @@ class UpdateCostCenterService extends BaseService implements UpdateCostCenterSer
             throw new CostCenterNotFoundException((int) $dto->id);
         }
 
+
+        if ($dto->rowVersion !== $costCenter->getRowVersion()) {
+            throw new ConcurrentModificationException('CostCenter', (int) $dto->id);
+        }
+
         $costCenter->update(
             code: $dto->code,
             name: $dto->name,
             parentId: $dto->parent_id,
             description: $dto->description,
-            isActive: $dto->is_active,
+            isActive: $dto->isActive,
         );
 
         return $this->costCenterRepository->save($costCenter);

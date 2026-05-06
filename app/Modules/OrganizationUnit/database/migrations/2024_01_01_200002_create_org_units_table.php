@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('org_units', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained(null, 'id', 'org_units_tenant_id_fk')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id', 'org_units_tenant_id_fk')->cascadeOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('type_id')->nullable()->constrained('org_unit_types', 'id', 'org_units_type_id_fk')->nullOnDelete();
             $table->foreignId('parent_id')->nullable()->constrained('org_units', 'id', 'org_units_parent_id_fk')->nullOnDelete();
@@ -39,12 +39,14 @@ return new class extends Migration
             $table->foreignId('warehouse_id')->nullable(); // will reference warehouses later
             $table->foreignId('manager_user_id')->nullable(); // will reference users later
 
-            $table->foreign('default_revenue_account_id')->references('id')->on('accounts')->nullOnDelete();
-            $table->foreign('default_expense_account_id')->references('id')->on('accounts')->nullOnDelete();
-            $table->foreign('default_asset_account_id')->references('id')->on('accounts')->nullOnDelete();
-            $table->foreign('default_liability_account_id')->references('id')->on('accounts')->nullOnDelete();
-            $table->foreign('warehouse_id')->references('id')->on('warehouses')->nullOnDelete();
-            $table->foreign('manager_user_id')->references('id')->on('users')->nullOnDelete();
+            // Keep these as nullable indexed links to avoid cross-module circular FK dependencies:
+            // accounts <-> org_units, users <-> org_units, warehouses <-> org_units.
+            $table->index(['tenant_id', 'default_revenue_account_id'], 'org_units_tenant_default_revenue_account_idx');
+            $table->index(['tenant_id', 'default_expense_account_id'], 'org_units_tenant_default_expense_account_idx');
+            $table->index(['tenant_id', 'default_asset_account_id'], 'org_units_tenant_default_asset_account_idx');
+            $table->index(['tenant_id', 'default_liability_account_id'], 'org_units_tenant_default_liability_account_idx');
+            $table->index(['tenant_id', 'warehouse_id'], 'org_units_tenant_warehouse_idx');
+            $table->index(['tenant_id', 'manager_user_id'], 'org_units_tenant_manager_user_idx');
 
             $table->unique(['tenant_id', 'code'], 'org_units_tenant_id_code_uk');
             $table->index(['tenant_id', 'parent_id'], 'org_units_tenant_parent_idx');

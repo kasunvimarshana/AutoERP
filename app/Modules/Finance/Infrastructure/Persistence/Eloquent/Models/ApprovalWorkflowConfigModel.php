@@ -25,5 +25,6 @@ class ApprovalWorkflowConfigModel extends BaseModel
         'min_amount' => 'decimal:6',
         'max_amount' => 'decimal:6',
         'is_active' => 'boolean',
+        'row_version' => 'integer',
     ];
 }

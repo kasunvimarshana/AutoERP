@@ -22,7 +22,7 @@ class CreateTaxGroupService extends BaseService implements CreateTaxGroupService
         $dto = TaxGroupData::fromArray($data);
 
         return $this->taxGroupRepository->save(new TaxGroup(
-            tenantId: $dto->tenant_id,
+            tenantId: $dto->tenantId,
             name: $dto->name,
             description: $dto->description,
         ));

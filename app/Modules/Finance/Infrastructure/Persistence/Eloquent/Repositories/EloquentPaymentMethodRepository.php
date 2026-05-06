@@ -25,6 +25,7 @@ class EloquentPaymentMethodRepository extends EloquentRepository implements Paym
             'type' => $paymentMethod->getType(),
             'account_id' => $paymentMethod->getAccountId(),
             'is_active' => $paymentMethod->isActive(),
+            'row_version' => $paymentMethod->getRowVersion(),
         ];
 
         if ($paymentMethod->getId()) {
@@ -45,6 +46,7 @@ class EloquentPaymentMethodRepository extends EloquentRepository implements Paym
             type: (string) $model->type,
             accountId: $model->account_id !== null ? (int) $model->account_id : null,
             isActive: (bool) $model->is_active,
+            rowVersion: (int) ($model->row_version ?? 1),
             id: (int) $model->id,
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,

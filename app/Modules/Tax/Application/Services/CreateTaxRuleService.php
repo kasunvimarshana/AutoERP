@@ -22,10 +22,10 @@ class CreateTaxRuleService extends BaseService implements CreateTaxRuleServiceIn
         $dto = TaxRuleData::fromArray($data);
 
         return $this->taxRuleRepository->save(new TaxRule(
-            tenantId: $dto->tenant_id,
-            taxGroupId: $dto->tax_group_id,
-            productCategoryId: $dto->product_category_id,
-            partyType: $dto->party_type,
+            tenantId: $dto->tenantId,
+            taxGroupId: $dto->taxGroupId,
+            productCategoryId: $dto->productCategoryId,
+            partyType: $dto->partyType,
             region: $dto->region,
             priority: $dto->priority,
         ));

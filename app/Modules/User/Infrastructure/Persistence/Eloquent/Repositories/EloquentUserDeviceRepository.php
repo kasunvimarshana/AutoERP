@@ -58,6 +58,8 @@ class EloquentUserDeviceRepository extends EloquentRepository implements UserDev
 
     public function save(UserDevice $device): UserDevice
     {
+        $tenantId = $this->resolveCurrentTenantId();
+
         $data = [
             'user_id' => $device->getUserId(),
             'device_token' => $device->getDeviceToken(),
@@ -69,6 +71,9 @@ class EloquentUserDeviceRepository extends EloquentRepository implements UserDev
         if ($device->getId()) {
             $model = $this->update($device->getId(), $data);
         } else {
+            if ($tenantId !== null) {
+                $data['tenant_id'] = $tenantId;
+            }
             $model = $this->create($data);
         }
 

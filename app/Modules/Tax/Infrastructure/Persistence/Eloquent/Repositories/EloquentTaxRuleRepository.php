@@ -27,6 +27,7 @@ class EloquentTaxRuleRepository extends EloquentRepository implements TaxRuleRep
             'party_type' => $taxRule->getPartyType(),
             'region' => $taxRule->getRegion(),
             'priority' => $taxRule->getPriority(),
+            'row_version' => $taxRule->getRowVersion(),
         ];
 
         if ($taxRule->getId()) {
@@ -106,6 +107,7 @@ class EloquentTaxRuleRepository extends EloquentRepository implements TaxRuleRep
             partyType: $model->party_type !== null ? (string) $model->party_type : null,
             region: $model->region !== null ? (string) $model->region : null,
             priority: (int) $model->priority,
+            rowVersion: (int) ($model->row_version ?? 1),
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,
         );

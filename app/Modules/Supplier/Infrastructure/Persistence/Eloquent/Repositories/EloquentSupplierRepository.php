@@ -34,6 +34,7 @@ class EloquentSupplierRepository extends EloquentRepository implements SupplierR
             'status' => $supplier->getStatus(),
             'notes' => $supplier->getNotes(),
             'metadata' => $supplier->getMetadata(),
+            'row_version' => $supplier->getRowVersion(),
         ];
 
         if ($supplier->getId()) {
@@ -92,6 +93,7 @@ class EloquentSupplierRepository extends EloquentRepository implements SupplierR
             status: (string) $model->status,
             notes: $model->notes,
             metadata: is_array($model->metadata) ? $model->metadata : null,
+            rowVersion: (int) ($model->row_version ?? 1),
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,
         );

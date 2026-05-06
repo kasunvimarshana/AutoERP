@@ -59,6 +59,7 @@ class UpdateSupplierRequest extends FormRequest
             'status' => 'nullable|in:active,inactive',
             'notes' => 'nullable|string',
             'metadata' => 'nullable|array',
+            'row_version' => 'required|integer|min:1',
         ];
     }
 

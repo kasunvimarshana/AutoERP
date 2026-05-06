@@ -44,8 +44,11 @@ class EloquentProductRepository extends EloquentRepository implements ProductRep
             'cogs_account_id' => $product->getCogsAccountId(),
             'inventory_account_id' => $product->getInventoryAccountId(),
             'expense_account_id' => $product->getExpenseAccountId(),
+            'purchase_price' => $product->getPurchasePrice(),
+            'sales_price' => $product->getSalesPrice(),
             'is_active' => $product->isActive(),
             'metadata' => $product->getMetadata(),
+            'row_version' => $product->getRowVersion(),
         ];
 
         if ($product->getId()) {
@@ -102,8 +105,11 @@ class EloquentProductRepository extends EloquentRepository implements ProductRep
             cogsAccountId: $model->cogs_account_id !== null ? (int) $model->cogs_account_id : null,
             inventoryAccountId: $model->inventory_account_id !== null ? (int) $model->inventory_account_id : null,
             expenseAccountId: $model->expense_account_id !== null ? (int) $model->expense_account_id : null,
+            purchasePrice: $model->purchase_price !== null ? (string) $model->purchase_price : null,
+            salesPrice: $model->sales_price !== null ? (string) $model->sales_price : null,
             isActive: (bool) $model->is_active,
             metadata: is_array($model->metadata) ? $model->metadata : null,
+            rowVersion: (int) ($model->row_version ?? 1),
             id: (int) $model->id,
             createdAt: $model->created_at,
             updatedAt: $model->updated_at,

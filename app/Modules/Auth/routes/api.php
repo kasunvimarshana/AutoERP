@@ -25,9 +25,9 @@ Route::prefix('auth')->middleware('throttle:60,1')->group(function () {
     // SSO token exchange
     Route::post('/sso/{provider}', [AuthController::class, 'ssoExchange']);
 
-    // Password reset flow (public, no auth required)
-    Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
-    Route::post('/reset-password', [AuthController::class, 'resetPassword']);
+    // Password reset flow — stricter limit to prevent account enumeration and token brute-force
+    Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
+    Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:5,1');
 });
 
 // Protected auth endpoints

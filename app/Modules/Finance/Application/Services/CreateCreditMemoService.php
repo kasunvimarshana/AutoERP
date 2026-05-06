@@ -22,19 +22,19 @@ class CreateCreditMemoService extends BaseService implements CreateCreditMemoSer
         $dto = CreditMemoData::fromArray($data);
 
         $cm = new CreditMemo(
-            tenantId: $dto->tenant_id,
-            partyId: $dto->party_id,
-            partyType: $dto->party_type,
-            creditMemoNumber: $dto->credit_memo_number,
+            tenantId: $dto->tenantId,
+            partyId: $dto->partyId,
+            partyType: $dto->partyType,
+            creditMemoNumber: $dto->creditMemoNumber,
             amount: $dto->amount,
-            issuedDate: new \DateTimeImmutable($dto->issued_date),
+            issuedDate: new \DateTimeImmutable($dto->issuedDate),
             status: $dto->status,
-            returnOrderId: $dto->return_order_id,
-            returnOrderType: $dto->return_order_type,
-            appliedToInvoiceId: $dto->applied_to_invoice_id,
-            appliedToInvoiceType: $dto->applied_to_invoice_type,
+            returnOrderId: $dto->returnOrderId,
+            returnOrderType: $dto->returnOrderType,
+            appliedToInvoiceId: $dto->appliedToInvoiceId,
+            appliedToInvoiceType: $dto->appliedToInvoiceType,
             notes: $dto->notes,
-            journalEntryId: $dto->journal_entry_id,
+            journalEntryId: $dto->journalEntryId,
         );
 
         return $this->creditMemoRepository->save($cm);
