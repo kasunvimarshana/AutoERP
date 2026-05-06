@@ -27,7 +27,9 @@ return new class extends Migration
             $table->foreignId('uom_id')->constrained('units_of_measure', 'id', 'price_list_items_uom_id_fk');
             $table->decimal('min_quantity', 20, 6)->default(1);
             $table->decimal('price', 20, 6);
-            $table->decimal('discount_pct', 10, 6)->default(0);
+            // $table->decimal('discount_pct', 10, 6)->default(0);
+            $table->enum('discount_type', ['percentage', 'fixed'])->default('percentage');
+            $table->decimal('discount_value', 10, 6)->default(0);
             $table->date('valid_from')->nullable();
             $table->date('valid_to')->nullable();
             $table->timestamps();

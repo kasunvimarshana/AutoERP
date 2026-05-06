@@ -25,10 +25,25 @@ return new class extends Migration
             $table->foreignId('uom_id');
             $table->decimal('quantity', 20, 6);
             $table->decimal('unit_price', 20, 6);
-            $table->decimal('discount_pct', 10, 6)->default(0);
+            // $table->decimal('discount_pct', 10, 6)->default(0);
+            $table->enum('discount_type', ['percentage', 'fixed'])->default('percentage');
+            $table->decimal('discount_value', 10, 6)->default(0);
             $table->foreignId('tax_group_id')->nullable();
             $table->decimal('tax_amount', 20, 6)->default(0);
             $table->decimal('line_total', 20, 6);
+            // $table->decimal('line_total', 20, 6)->storedAs('(quantity * unit_price) * (1 - discount_pct/100)');
+            // $table->decimal('line_total', 20, 6)
+            //     ->storedAs("
+            //         (
+            //             CASE
+            //                 WHEN discount_type = 'percentage'
+            //                     THEN (quantity * unit_price) - ((quantity * unit_price) * discount_value / 100)
+            //                 WHEN discount_type = 'fixed'
+            //                     THEN (quantity * unit_price) - discount_value
+            //                 ELSE (quantity * unit_price)
+            //             END
+            //         )
+            //     ");
             $table->foreignId('account_id')->nullable();
 
             $table->foreign('product_id')->references('id')->on('products')->cascadeOnDelete();

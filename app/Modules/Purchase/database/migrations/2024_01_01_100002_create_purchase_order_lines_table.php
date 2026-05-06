@@ -25,9 +25,25 @@ return new class extends Migration
             $table->decimal('ordered_qty', 20, 6);
             $table->decimal('received_qty', 20, 6)->default(0);
             $table->decimal('unit_price', 20, 6);
-            $table->decimal('discount_pct', 10, 6)->default(0);
+            // $table->decimal('discount_pct', 10, 6)->default(0);
+            $table->enum('discount_type', ['percentage', 'fixed'])->default('percentage');
+            $table->decimal('discount_value', 10, 6)->default(0);
             $table->foreignId('tax_group_id')->nullable();
-            $table->decimal('line_total', 20, 6)->storedAs('(ordered_qty * unit_price) * (1 - discount_pct/100)');
+            $table->decimal('line_total', 20, 6);
+            // $table->decimal('line_total', 20, 6)->storedAs('(ordered_qty * unit_price) * (1 - discount_pct/100)');
+            // $table->decimal('line_total', 20, 6)
+            //     ->storedAs("
+            //         (
+            //             CASE
+            //                 WHEN discount_type = 'percentage'
+            //                     THEN (ordered_qty * unit_price) - ((ordered_qty * unit_price) * discount_value / 100)
+            //                 WHEN discount_type = 'fixed'
+            //                     THEN (ordered_qty * unit_price) - discount_value
+            //                 ELSE (ordered_qty * unit_price)
+            //             END
+            //         )
+            //     ");
+
             // Purchase order lines account
             $table->foreignId('account_id')->nullable()->constrained('accounts', 'id', 'purchase_order_lines_account_id_fk')->nullOnDelete(); // expense/asset account for posting
 
