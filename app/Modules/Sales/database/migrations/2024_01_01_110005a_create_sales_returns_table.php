@@ -30,6 +30,8 @@ return new class extends Migration
             $table->decimal('tax_total', 20, 6)->default(0);
             $table->decimal('restocking_fee_total', 20, 6)->default(0);
             $table->decimal('grand_total', 20, 6)->default(0);
+            $table->decimal('surcharge_total', 20, 6)->default(0);   // debit notes sum
+            $table->decimal('credit_total', 20, 6)->default(0);      // credit notes sum
             $table->string('credit_memo_number')->nullable();
             $table->foreignId('journal_entry_id')->nullable();
             $table->text('notes')->nullable();

@@ -29,7 +29,10 @@ return new class extends Migration
             $table->decimal('subtotal', 20, 6)->default(0);
             $table->decimal('tax_total', 20, 6)->default(0);
             $table->decimal('discount_total', 20, 6)->default(0);
+            $table->decimal('surcharge_total', 20, 6)->default(0)->comment('Sum of debit notes');
+            $table->decimal('credit_total', 20, 6)->default(0)->comment('Sum of credit notes');
             $table->decimal('grand_total', 20, 6)->default(0);
+            // $table->decimal('grand_total', 20, 6)->storedAs('subtotal + tax_total - discount_total + surcharge_total - credit_total');
             $table->text('notes')->nullable();
             $table->json('metadata')->nullable();
             $table->foreignId('created_by');
@@ -37,15 +40,15 @@ return new class extends Migration
 
             $table->foreign('customer_id')->references('id')->on('customers')->cascadeOnDelete();
             $table->foreign('warehouse_id')->references('id')->on('warehouses')->cascadeOnDelete();
-            $table->foreign('price_list_id')->references('id')->on('price_lists')->nullOnDelete();
-            $table->foreign('created_by')->references('id')->on('users');
-            $table->foreign('approved_by')->references('id')->on('users')->nullOnDelete();
+            $table->foreign('price_list_id')->references('id')->on('price_lists')->nullable()->nullOnDelete();
+            $table->foreign('created_by')->references('id')->on('users')->nullable()->nullOnDelete();
+            $table->foreign('approved_by')->references('id')->on('users')->nullable()->nullOnDelete();
 
             $table->timestamps();
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'org_unit_id', 'so_number'], 'sales_orders_tenant_so_number_uk');
-            $table->index(['tenant_id', 'customer_id', 'status'], 'sales_orders_tenant_customer_status_idx');
+            $table->index(['tenant_id', 'org_unit_id', 'customer_id', 'status'], 'sales_orders_tenant_customer_status_idx');
         });
     }
 

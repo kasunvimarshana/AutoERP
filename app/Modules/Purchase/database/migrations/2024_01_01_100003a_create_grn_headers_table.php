@@ -29,6 +29,8 @@ return new class extends Migration
             $table->decimal('subtotal', 20, 6)->default(0)->comment('Sum of line costs before tax');
             $table->decimal('tax_total', 20, 6)->default(0)->comment('Total tax amount across all lines');
             $table->decimal('grand_total', 20, 6)->default(0)->comment('subtotal + tax_total');
+            $table->decimal('surcharge_total', 20, 6)->default(0);   // debit notes sum
+            $table->decimal('credit_total', 20, 6)->default(0);      // credit notes sum
             $table->json('metadata')->nullable();
             $table->foreignId('created_by');
 

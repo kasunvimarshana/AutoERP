@@ -31,6 +31,8 @@ return new class extends Migration
             $table->decimal('tax_total', 20, 6)->default(0);
             $table->decimal('discount_total', 20, 6)->default(0);
             $table->decimal('grand_total', 20, 6)->default(0);
+            $table->decimal('surcharge_total', 20, 6)->default(0);   // debit notes sum
+            $table->decimal('credit_total', 20, 6)->default(0);      // credit notes sum
             $table->decimal('paid_amount', 20, 6)->default(0);
             $table->foreignId('ap_account_id')->nullable();
             $table->foreignId('journal_entry_id')->nullable();

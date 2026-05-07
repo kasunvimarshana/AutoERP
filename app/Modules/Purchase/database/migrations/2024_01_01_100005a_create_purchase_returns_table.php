@@ -29,7 +29,9 @@ return new class extends Migration
             $table->decimal('subtotal', 20, 6)->default(0);
             $table->decimal('tax_total', 20, 6)->default(0);
             $table->decimal('grand_total', 20, 6)->default(0);
-                        $table->decimal('discount_total', 20, 6)->default(0);
+            $table->decimal('surcharge_total', 20, 6)->default(0);   // debit notes sum
+            $table->decimal('credit_total', 20, 6)->default(0);      // credit notes sum
+            $table->decimal('discount_total', 20, 6)->default(0);
             $table->string('debit_note_number')->nullable();
             $table->foreignId('journal_entry_id')->nullable();
             $table->text('notes')->nullable();
