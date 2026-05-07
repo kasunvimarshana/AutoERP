@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('party_id'); // customer or supplier
-            $table->enum('party_type', ['customer', 'supplier']); // customer, supplier
+            $table->string('party_type'); // customer, supplier
             $table->foreignId('return_order_id')->nullable(); // polymorphic to purchase_return or sales_return
             $table->string('return_order_type')->nullable();
             $table->string('credit_memo_number');
