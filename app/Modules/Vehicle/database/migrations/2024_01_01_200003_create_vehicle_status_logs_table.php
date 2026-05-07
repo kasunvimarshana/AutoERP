@@ -20,13 +20,13 @@ return new class extends Migration
             $table->foreignId('vehicle_id')->constrained('vehicles')->cascadeOnDelete();
             $table->string('from_status');
             $table->string('to_status');
-            $table->foreignId('changed_by')->constrained('users');
+            $table->foreignId('changed_by')->nullable()->constrained('users');
             $table->dateTime('changed_at');
             $table->string('reason')->nullable();
             $table->string('reference_type')->nullable();
             $table->unsignedBigInteger('reference_id')->nullable();
             $table->timestamps();
-            $table->index(['vehicle_id','changed_at']);
+            $table->index(['vehicle_id', 'changed_at']);
         });
     }
 

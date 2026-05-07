@@ -25,24 +25,20 @@ return new class extends Migration
             $table->year('year');
             $table->string('color')->nullable();
             $table->string('category');
-            $table->enum('ownership', ['owned','third_party','leased'])->default('owned');
+
             $table->enum('usage_profile', ['rent_only','service_only','dual','internal'])->default('dual');
             $table->enum('current_status', ['available','rented','in_service','reserved','decommissioned'])->default('available');
 
+            // Operational data
             $table->unsignedBigInteger('current_odometer')->default(0);
             $table->string('fuel_type')->nullable();
             $table->string('transmission')->nullable();
             $table->unsignedTinyInteger('seating_capacity')->nullable();
 
-            $table->decimal('daily_rental_rate', 20, 6)->nullable();
-            $table->decimal('weekly_rental_rate', 20, 6)->nullable();
-            $table->decimal('monthly_rental_rate', 20, 6)->nullable();
+            // $table->string('owner_type')->nullable()
+            //       ->comment('Polymorphic owner: customer, supplier, partner, org_unit, employee');
+            // $table->unsignedBigInteger('owner_id')->nullable();
 
-            $table->foreignId('supplier_id')->nullable()->constrained('suppliers')->nullOnDelete();
-            $table->foreignId('owner_org_unit_id')->nullable()->constrained('org_units')->nullOnDelete();
-            $table->foreignId('default_warehouse_id')->nullable()->constrained('warehouses')->nullOnDelete();
-
-            $table->date('purchase_date')->nullable();
             $table->date('registration_expiry')->nullable();
             $table->date('insurance_expiry')->nullable();
             $table->date('last_service_date')->nullable();
@@ -55,7 +51,7 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id','org_unit_id','vehicle_code'], 'vehicles_code_uk');
-            $table->unique(['tenant_id','vin'], 'vehicles_vin_uk');
+            $table->unique(['tenant_id','org_unit_id','vin'], 'vehicles_vin_uk');
             $table->index(['tenant_id','current_status'], 'vehicles_status_idx');
             $table->index(['tenant_id','usage_profile'], 'vehicles_usage_idx');
             $table->index(['tenant_id','category'], 'vehicles_category_idx');
