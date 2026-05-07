@@ -20,6 +20,19 @@ return new class extends Migration
             $table->foreignId('combo_product_id')->constrained('products', 'id', 'combo_items_combo_product_id_fk')->cascadeOnDelete();
             $table->foreignId('component_product_id')->constrained('products', 'id', 'combo_items_component_product_id_fk')->cascadeOnDelete();
             $table->foreignId('component_variant_id')->nullable()->constrained('product_variants', 'id', 'combo_items_component_variant_id_fk')->nullOnDelete();
+
+            $table->integer('sort_order')->default(0);
+            $table->decimal('unit_price', 20, 6)->nullable();
+            $table->decimal('estimated_service_time_hours', 8, 2)
+                  ->nullable()
+                  ->comment('Standard duration for labour operations');
+
+            $table->enum('incentive_type', ['percentage', 'fixed'])
+                ->default('fixed')
+                ->nullable()
+                ->comment('% of sales price, or a flat amount per unit');
+            $table->decimal('incentive_value', 10, 6)->default(0);
+
             $table->decimal('quantity', 20, 6);
             $table->foreignId('uom_id')->constrained('units_of_measure', 'id', 'combo_items_uom_id_fk');
             $table->json('metadata')->nullable();
