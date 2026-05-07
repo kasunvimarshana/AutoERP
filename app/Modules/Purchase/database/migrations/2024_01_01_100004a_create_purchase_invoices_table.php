@@ -27,19 +27,39 @@ return new class extends Migration
             $table->date('due_date');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'purchase_invoices_currency_id_fk')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 10)->default(1);
-            $table->decimal('subtotal', 20, 6)->default(0);
-            $table->decimal('tax_total', 20, 6)->default(0);
-            $table->decimal('discount_total', 20, 6)->default(0);
-            $table->decimal('grand_total', 20, 6)->default(0);
-            $table->decimal('surcharge_total', 20, 6)->default(0);   // debit notes sum
-            $table->decimal('credit_total', 20, 6)->default(0);      // credit notes sum
+
+            // ── Line‑derived totals – strictly SUM over lines ──
+            $table->decimal('subtotal', 20, 6)->default(0)->comment('SUM(line.gross_amount)');
+            $table->decimal('line_tax_total', 20, 6)->default(0)->comment('SUM(line.tax_amount)');
+            $table->decimal('line_discount_total', 20, 6)->default(0)->comment('SUM(line.discount_amount)');
+
+            // ── Header‑level adjustments (applied on top of the order) ──
+            $table->enum('header_discount_type', ['percentage', 'fixed'])->nullable();
+            $table->decimal('header_discount_value', 10, 6)->nullable();
+            $table->decimal('header_discount_amount', 20, 6)->default(0);
+            $table->foreignId('header_tax_group_id')->nullable()->constrained('tax_groups', 'id')->nullOnDelete();
+            $table->decimal('header_tax_amount', 20, 6)->default(0);
+
+            // ── Final totals (combine line + header) ──
+            $table->decimal('discount_total', 20, 6)->default(0)->comment('line_discount_total + header_discount_amount');
+            $table->decimal('tax_total', 20, 6)->default(0)->comment('line_tax_total + header_tax_amount');
+            $table->decimal('surcharge_total', 20, 6)->default(0)->comment('SUM of surcharge notes');
+            $table->decimal('credit_total', 20, 6)->default(0)->comment('SUM of credit notes');
+            $table->decimal('grand_total', 20, 6)->default(0)->comment('subtotal - discount_total + tax_total + surcharge_total - credit_total');
+
             $table->decimal('paid_amount', 20, 6)->default(0);
+            $table->decimal('balance', 20, 6)->default(0)->comment('grand_total - paid_amount');
             $table->foreignId('ap_account_id')->nullable();
             $table->foreignId('journal_entry_id')->nullable();
+
+            $table->text('notes')->nullable();
+            $table->json('metadata')->nullable();
+            $table->foreignId('created_by');
 
             $table->foreign('supplier_id')->references('id')->on('suppliers')->cascadeOnDelete();
             $table->foreign('ap_account_id')->references('id')->on('accounts')->nullOnDelete();
             $table->foreign('journal_entry_id')->references('id')->on('journal_entries')->nullOnDelete();
+            $table->foreign('created_by')->references('id')->on('users')->nullable()->nullOnDelete();
 
             $table->timestamps();
             $table->softDeletes();
