@@ -23,19 +23,47 @@ return new class extends Migration
             $table->foreignId('variant_id')->nullable();
             $table->foreignId('batch_id')->nullable();
             $table->foreignId('serial_id')->nullable();
-            $table->foreignId('location_id');
+            $table->foreignId('warehouse_id')->nullable();
+            $table->foreignId('location_id')->nullable();
+            $table->text('description')->nullable();
             $table->foreignId('uom_id');
             $table->decimal('expected_qty', 20, 6)->default(0);
             $table->decimal('received_qty', 20, 6);
             $table->decimal('rejected_qty', 20, 6)->default(0);
-            $table->decimal('unit_cost', 20, 6);
-            $table->decimal('line_cost', 20, 6)->storedAs('received_qty * unit_cost');
+            $table->decimal('unit_price', 20, 6);
+
+            // Discount – stored both as configuration and as absolute amount
+            $table->enum('discount_type', ['percentage', 'fixed'])->default('percentage');
+            $table->decimal('discount_value', 10, 6)->default(0);
+            $table->decimal('discount_amount', 20, 6)->default(0)->comment('Calculated discount amount');
+
+            // Line net (before tax)
+            $table->decimal('gross_amount', 20, 6)
+                  ->storedAs('received_qty * unit_price')
+                  ->comment('Gross = qty * unit price');
+            $table->decimal('line_total', 20, 6)
+                  ->storedAs('gross_amount - discount_amount')
+                  ->comment('Net after discount before tax');
+
+            // Tax
+            $table->foreignId('tax_group_id')->nullable();
+            $table->decimal('tax_amount', 20, 6)->default(0)
+                  ->comment('Calculated tax amount; line_total_with_tax = line_total + tax_amount');
+
+            // Optional – if you want a stored line total including tax
+            $table->decimal('line_total_with_tax', 20, 6)
+                  ->storedAs('line_total + tax_amount')
+                  ->comment('total including tax');
+
+            // Grn lines account
+            $table->foreignId('account_id')->nullable()->constrained('accounts', 'id', 'grn_lines_account_id_fk')->nullOnDelete()->comment('expense/asset account for posting');
 
             $table->foreign('product_id')->references('id')->on('products')->cascadeOnDelete();
             $table->foreign('variant_id')->references('id')->on('product_variants')->nullOnDelete();
             $table->foreign('batch_id')->references('id')->on('batches')->nullOnDelete();
             $table->foreign('serial_id')->references('id')->on('serials')->nullOnDelete();
-            $table->foreign('location_id')->references('id')->on('warehouse_locations')->cascadeOnDelete();
+            $table->foreign('warehouse_id')->references('id')->on('warehouses')->nullOnDelete();
+            $table->foreign('location_id')->references('id')->on('warehouse_locations')->nullOnDelete();
             $table->foreign('uom_id')->references('id')->on('units_of_measure');
 
             $table->timestamps();

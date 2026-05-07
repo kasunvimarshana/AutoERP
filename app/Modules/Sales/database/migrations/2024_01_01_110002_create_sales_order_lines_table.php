@@ -22,6 +22,8 @@ return new class extends Migration
             $table->foreignId('variant_id')->nullable();
             $table->foreignId('batch_id')->nullable();
             $table->foreignId('serial_id')->nullable();
+            $table->foreignId('warehouse_id')->nullable();
+            $table->foreignId('location_id')->nullable();
             $table->text('description')->nullable();
             $table->foreignId('uom_id');
             $table->decimal('ordered_qty', 20, 6);
@@ -61,6 +63,8 @@ return new class extends Migration
             $table->foreign('tax_group_id')->references('id')->on('tax_groups')->nullOnDelete();
             $table->foreign('batch_id')->references('id')->on('batches')->nullOnDelete();
             $table->foreign('serial_id')->references('id')->on('serials')->nullOnDelete();
+            $table->foreign('warehouse_id')->references('id')->on('warehouses')->nullOnDelete();
+            $table->foreign('location_id')->references('id')->on('warehouse_locations')->nullOnDelete();
 
             $table->timestamps();
             $table->softDeletes();
