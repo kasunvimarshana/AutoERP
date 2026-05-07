@@ -26,13 +26,26 @@ return new class extends Migration
             $table->date('order_date');
             $table->date('requested_delivery_date')->nullable();
             $table->foreignId('price_list_id')->nullable();
-            $table->decimal('subtotal', 20, 6)->default(0);
-            $table->decimal('tax_total', 20, 6)->default(0);
-            $table->decimal('discount_total', 20, 6)->default(0);
-            $table->decimal('surcharge_total', 20, 6)->default(0)->comment('Sum of debit notes');
-            $table->decimal('credit_total', 20, 6)->default(0)->comment('Sum of credit notes');
-            $table->decimal('grand_total', 20, 6)->default(0);
-            // $table->decimal('grand_total', 20, 6)->storedAs('subtotal + tax_total - discount_total + surcharge_total - credit_total');
+
+            // ── Line‑derived totals – strictly SUM over lines ──
+            $table->decimal('subtotal', 20, 6)->default(0)->comment('SUM(line.gross_amount)');
+            $table->decimal('line_tax_total', 20, 6)->default(0)->comment('SUM(line.tax_amount)');
+            $table->decimal('line_discount_total', 20, 6)->default(0)->comment('SUM(line.discount_amount)');
+
+            // ── Header‑level adjustments (applied on top of the order) ──
+            $table->enum('header_discount_type', ['percentage', 'fixed'])->nullable();
+            $table->decimal('header_discount_value', 10, 6)->nullable();
+            $table->decimal('header_discount_amount', 20, 6)->default(0);
+            $table->foreignId('header_tax_group_id')->nullable()->constrained('tax_groups', 'id')->nullOnDelete();
+            $table->decimal('header_tax_amount', 20, 6)->default(0);
+
+            // ── Final totals (combine line + header) ──
+            $table->decimal('discount_total', 20, 6)->default(0)->comment('line_discount_total + header_discount_amount');
+            $table->decimal('tax_total', 20, 6)->default(0)->comment('line_tax_total + header_tax_amount');
+            $table->decimal('surcharge_total', 20, 6)->default(0)->comment('SUM of surcharge notes');
+            $table->decimal('credit_total', 20, 6)->default(0)->comment('SUM of credit notes');
+            $table->decimal('grand_total', 20, 6)->default(0)->comment('subtotal - discount_total + tax_total + surcharge_total - credit_total');
+
             $table->text('notes')->nullable();
             $table->json('metadata')->nullable();
             $table->foreignId('created_by');

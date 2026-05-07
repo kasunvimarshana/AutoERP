@@ -25,6 +25,7 @@ return new class extends Migration
             $table->decimal('exchange_rate', 20, 10)->default(1);
             $table->date('order_date');
             $table->date('expected_date')->nullable();
+            $table->foreignId('price_list_id')->nullable();
 
             // ── Line‑derived totals – strictly SUM over lines ──
             $table->decimal('subtotal', 20, 6)->default(0)->comment('SUM(line.gross_amount)');
