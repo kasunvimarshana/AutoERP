@@ -18,9 +18,9 @@ return new class extends Migration
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
 
             $table->string('job_card_number');
-            $table->foreignId('vehicle_id')->constrained('vehicles');
+            $table->foreignId('vehicle_id')->nullable()->constrained('vehicles')->nullOnDelete();
             $table->foreignId('customer_id')->nullable()->constrained('customers')->nullOnDelete();
-            $table->enum('service_type', ['preventive','corrective','diagnostic','recall','warranty'])->default('corrective');
+            $table->foreignId('service_type_id')->nullable()->constrained('service_types', 'id')->nullOnDelete(); // preventive, corrective, diagnostic, recall, warranty
             $table->enum('priority', ['low','medium','high','critical'])->default('medium');
             $table->enum('status', ['open','in_progress','waiting_parts','completed','invoiced','cancelled'])->default('open');
             $table->text('reported_issue')->nullable();
