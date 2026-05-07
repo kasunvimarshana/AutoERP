@@ -23,21 +23,36 @@ return new class extends Migration
             $table->foreignId('variant_id')->nullable();
             $table->foreignId('batch_id')->nullable();
             $table->foreignId('serial_id')->nullable();
-            $table->foreignId('from_location_id');
+            $table->foreignId('warehouse_id')->nullable();
+            $table->foreignId('location_id')->nullable();
+            $table->text('description')->nullable();
             $table->foreignId('uom_id');
             $table->decimal('return_qty', 20, 6);
-            $table->decimal('unit_cost', 20, 6);
-            $table->decimal('line_cost', 20, 6)->storedAs('return_qty * unit_cost');
+            $table->decimal('unit_price', 20, 6);
+
+            $table->decimal('restocking_fee', 20, 6)->default(0);
+
+            // Line net
+            $table->decimal('gross_amount', 20, 6)
+                  ->storedAs('return_qty * unit_price')
+                  ->comment('Gross = qty * unit price');
+
+            $table->decimal('line_total', 20, 6)
+                  ->storedAs('gross_amount - restocking_fee')
+                  ->comment('Net after discount before tax');
+
+
             $table->enum('condition', ['good', 'damaged', 'expired', 'defective'])->default('good');
             $table->enum('disposition', ['restock', 'scrap', 'return_to_vendor'])->default('return_to_vendor');
-            $table->decimal('restocking_fee', 20, 6)->default(0);
+
             $table->text('quality_check_notes')->nullable();
 
             $table->foreign('product_id')->references('id')->on('products')->cascadeOnDelete();
             $table->foreign('variant_id')->references('id')->on('product_variants')->nullOnDelete();
             $table->foreign('batch_id')->references('id')->on('batches')->nullOnDelete();
+            $table->foreign('warehouse_id')->references('id')->on('warehouses')->nullOnDelete();
+            $table->foreign('location_id')->references('id')->on('warehouse_locations')->nullOnDelete();
             $table->foreign('serial_id')->references('id')->on('serials')->nullOnDelete();
-            $table->foreign('from_location_id')->references('id')->on('warehouse_locations')->cascadeOnDelete();
             $table->foreign('uom_id')->references('id')->on('units_of_measure');
 
             $table->timestamps();
