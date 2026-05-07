@@ -22,21 +22,24 @@ return new class extends Migration
             $table->foreignId('purchase_order_id')->nullable()->constrained('purchase_orders', 'id', 'grn_headers_purchase_order_id_fk')->nullOnDelete();
             $table->string('grn_number');
             $table->enum('status', ['draft', 'partial', 'complete', 'posted'])->default('draft');
-            $table->date('received_date');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'grn_headers_currency_id_fk')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 10)->default(1);
+            $table->date('received_date');
+            $table->decimal('subtotal', 20, 6)->default(0);
+            $table->decimal('tax_total', 20, 6)->default(0);
+            $table->decimal('discount_total', 20, 6)->default(0);
+            $table->decimal('surcharge_total', 20, 6)->default(0)->comment('Sum of debit notes');
+            $table->decimal('credit_total', 20, 6)->default(0)->comment('Sum of credit notes');
+            $table->decimal('grand_total', 20, 6)->default(0);
+            // $table->decimal('grand_total', 20, 6)->storedAs('subtotal + tax_total - discount_total + surcharge_total - credit_total');
             $table->text('notes')->nullable();
-            $table->decimal('subtotal', 20, 6)->default(0)->comment('Sum of line costs before tax');
-            $table->decimal('tax_total', 20, 6)->default(0)->comment('Total tax amount across all lines');
-            $table->decimal('grand_total', 20, 6)->default(0)->comment('subtotal + tax_total');
-            $table->decimal('surcharge_total', 20, 6)->default(0);   // debit notes sum
-            $table->decimal('credit_total', 20, 6)->default(0);      // credit notes sum
             $table->json('metadata')->nullable();
             $table->foreignId('created_by');
 
             $table->foreign('supplier_id')->references('id')->on('suppliers')->cascadeOnDelete();
             $table->foreign('warehouse_id')->references('id')->on('warehouses')->cascadeOnDelete();
-            $table->foreign('created_by')->references('id')->on('users');
+            $table->foreign('price_list_id')->references('id')->on('price_lists')->nullable()->nullOnDelete();
+            $table->foreign('created_by')->references('id')->on('users')->nullable()->nullOnDelete();
 
             $table->timestamps();
             $table->softDeletes();
