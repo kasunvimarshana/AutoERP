@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('service_labor', function (Blueprint $table) {
+        Schema::create('service_labor_items', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->unsignedBigInteger('row_version')->default(1);

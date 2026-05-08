@@ -17,29 +17,57 @@ return new class extends Migration
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
 
-            $table->foreignId('job_card_id')->constrained('service_job_cards')->cascadeOnDelete();
-            $table->integer('line_number');
-            $table->enum('line_type', ['labor','part','non_inventory','fee'])->default('part');
-            $table->string('description')->nullable();
-            $table->decimal('quantity', 12, 2)->default(1);
+            $table->foreignId('job_card_id')->constrained('service_job_cards', 'id', 'service_job_card_lines_job_card_id_fk')->cascadeOnDelete();
+            $table->foreignId('product_id');
+            $table->foreignId('variant_id')->nullable();
+            $table->foreignId('batch_id')->nullable();
+            $table->foreignId('serial_id')->nullable();
+            $table->foreignId('warehouse_id')->nullable();
+            $table->foreignId('location_id')->nullable();
+            $table->text('description')->nullable();
+            $table->foreignId('uom_id');
+            $table->decimal('quantity', 20, 6)->default(0);
             $table->decimal('unit_price', 20, 6);
-            $table->decimal('amount', 20, 6);
-            $table->foreignId('tax_rate_id')->nullable()->constrained('tax_rates')->nullOnDelete();
-            $table->decimal('tax_amount', 20, 6)->default(0);
-            $table->foreignId('product_id')->nullable()->constrained('products')->nullOnDelete();
-            $table->foreignId('variant_id')->nullable()->constrained('product_variants')->nullOnDelete();
-            $table->boolean('is_warranty_replacement')->default(false);
-            $table->foreignId('inventory_movement_id')->nullable()->constrained('stock_movements')->nullOnDelete();
-            $table->foreignId('technician_id')->nullable()->constrained('employees')->nullOnDelete();
-            $table->decimal('hours_worked', 8, 2)->nullable();
-            $table->string('labor_type')->nullable();
-            $table->decimal('commission_percentage', 7, 4)->nullable();
-            $table->decimal('commission_amount', 20, 6)->nullable();
-            $table->decimal('incentive_amount', 20, 6)->nullable();
-            $table->foreignId('purchase_order_id')->nullable()->constrained('purchase_orders')->nullOnDelete();
+
+            // Discount – stored both as configuration and as absolute amount
+            $table->enum('discount_type', ['percentage', 'fixed'])->default('percentage');
+            $table->decimal('discount_value', 10, 6)->default(0);
+            $table->decimal('discount_amount', 20, 6)->default(0)->comment('Calculated discount amount');
+
+            // Line net (before tax)
+            $table->decimal('gross_amount', 20, 6)
+                  ->storedAs('quantity * unit_price')
+                  ->comment('Gross = qty * unit price');
+            $table->decimal('line_total', 20, 6)
+                  ->storedAs('gross_amount - discount_amount')
+                  ->comment('Net after discount before tax');
+
+            // Tax
+            $table->foreignId('tax_group_id')->nullable();
+            $table->decimal('tax_amount', 20, 6)->default(0)
+                  ->comment('Calculated tax amount; line_total_with_tax = line_total + tax_amount');
+
+            // Optional – if you want a stored line total including tax
+            $table->decimal('line_total_with_tax', 20, 6)
+                  ->storedAs('line_total + tax_amount')
+                  ->comment('total including tax');
+
+            // Service job card lines account
+            $table->foreignId('account_id')->nullable()->constrained('accounts', 'id', 'service_job_card_lines_account_id_fk')->nullOnDelete()->comment('income/asset account for posting');
+
+            $table->foreign('product_id')->references('id')->on('products')->cascadeOnDelete();
+            $table->foreign('variant_id')->references('id')->on('product_variants')->nullOnDelete();
+            $table->foreign('uom_id')->references('id')->on('units_of_measure');
+            $table->foreign('tax_group_id')->references('id')->on('tax_groups')->nullOnDelete();
+            $table->foreign('batch_id')->references('id')->on('batches')->nullOnDelete();
+            $table->foreign('serial_id')->references('id')->on('serials')->nullOnDelete();
+            $table->foreign('warehouse_id')->references('id')->on('warehouses')->nullOnDelete();
+            $table->foreign('location_id')->references('id')->on('warehouse_locations')->nullOnDelete();
+
             $table->json('metadata')->nullable();
+
             $table->timestamps();
-            $table->unique(['tenant_id','org_unit_id','job_card_id','line_number'], 'job_card_lines_number_uk');
+            $table->softDeletes();
         });
     }
 
