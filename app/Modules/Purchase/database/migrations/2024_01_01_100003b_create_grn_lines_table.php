@@ -56,7 +56,7 @@ return new class extends Migration
                   ->comment('total including tax');
 
             // Grn lines account
-            $table->foreignId('account_id')->nullable()->constrained('accounts', 'id', 'grn_lines_account_id_fk')->nullOnDelete()->comment('expense/asset account for posting');
+            $table->foreignId('account_id')->nullable()->constrained('accounts', 'id', 'grn_lines_account_id_fk')->nullOnDelete()->comment('account for posting');
 
             $table->foreign('product_id')->references('id')->on('products')->cascadeOnDelete();
             $table->foreign('variant_id')->references('id')->on('product_variants')->nullOnDelete();

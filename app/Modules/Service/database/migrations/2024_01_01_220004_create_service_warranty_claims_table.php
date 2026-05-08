@@ -27,7 +27,10 @@ return new class extends Migration
             $table->decimal('rejected_amount', 20, 6)->nullable();
             $table->text('rejection_reason')->nullable();
             $table->enum('status', ['filed','under_review','approved','rejected','paid'])->default('filed');
-            $table->foreignId('receivable_account_id')->nullable()->constrained('accounts')->nullOnDelete();
+
+            // Service warranty claim account
+            $table->foreignId('account_id')->nullable()->constrained('accounts', 'id', 'service_job_card_lines_account_id_fk')->nullOnDelete()->comment('account for posting'); // receivable_account_id
+
             $table->timestamps();
             $table->unique(['tenant_id','org_unit_id','claim_number'], 'warranty_claims_number_uk');
         });

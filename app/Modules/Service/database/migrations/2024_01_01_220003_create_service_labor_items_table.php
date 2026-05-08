@@ -60,7 +60,7 @@ return new class extends Migration
             $table->decimal('incentive_amount', 20, 6)->default(0)->comment('Calculated incentive amount');
 
             // Service job card lines account
-            $table->foreignId('account_id')->nullable()->constrained('accounts', 'id', 'service_job_card_lines_account_id_fk')->nullOnDelete()->comment('income/asset account for posting');
+            $table->foreignId('account_id')->nullable()->constrained('accounts', 'id', 'service_job_card_lines_account_id_fk')->nullOnDelete()->comment('account for posting');
 
             $table->foreign('combo_product_id')->references('id')->on('products')->nullOnDelete();
             $table->foreign('product_id')->references('id')->on('products')->cascadeOnDelete();

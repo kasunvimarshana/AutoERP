@@ -17,18 +17,45 @@ return new class extends Migration
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
 
-            $table->string('return_number');
-            $table->foreignId('job_card_id')->nullable()->constrained('service_job_cards')->nullOnDelete();
-            $table->enum('return_type', ['part','core','warranty'])->default('part');
-            $table->foreignId('product_id')->constrained('products');
-            $table->decimal('quantity', 20, 6);
-            $table->text('return_reason');
-            $table->decimal('refund_amount', 20, 6)->nullable();
-            $table->decimal('restocking_fee', 20, 6)->nullable();
-            $table->foreignId('inventory_movement_id')->nullable()->constrained('stock_movements')->nullOnDelete();
-            $table->enum('status', ['pending','received','inspected','refunded'])->default('pending');
+            $table->foreignId('job_card_id')->constrained('service_job_cards', 'id', 'service_returns_job_card_id_fk')->cascadeOnDelete();
+            $table->foreignId('original_service_job_card_line_id')->nullable()->constrained('service_job_card_lines', 'id', 'service_returns_original_service_job_card_line_id_fk')->nullOnDelete();
+            $table->foreignId('product_id');
+            $table->foreignId('variant_id')->nullable();
+            $table->foreignId('batch_id')->nullable();
+            $table->foreignId('serial_id')->nullable();
+            $table->foreignId('warehouse_id')->nullable();
+            $table->foreignId('location_id')->nullable();
+            $table->text('description')->nullable();
+            $table->foreignId('uom_id');
+            $table->decimal('return_qty', 20, 6);
+            $table->decimal('unit_price', 20, 6);
+
+            $table->decimal('restocking_fee', 20, 6)->default(0);
+
+            // Line net
+            $table->decimal('gross_amount', 20, 6)
+                  ->storedAs('return_qty * unit_price')
+                  ->comment('Gross = qty * unit price');
+
+            $table->decimal('line_total', 20, 6)
+                  ->storedAs('gross_amount - restocking_fee')
+                  ->comment('Net after discount before tax');
+
+            $table->enum('condition', ['good', 'damaged', 'expired', 'defective'])->default('good');
+            $table->enum('disposition', ['restock', 'scrap', 'quarantine'])->default('restock');
+
+            $table->text('quality_check_notes')->nullable();
+
+            $table->foreign('product_id')->references('id')->on('products')->cascadeOnDelete();
+            $table->foreign('variant_id')->references('id')->on('product_variants')->nullOnDelete();
+            $table->foreign('batch_id')->references('id')->on('batches')->nullOnDelete();
+            $table->foreign('warehouse_id')->references('id')->on('warehouses')->nullOnDelete();
+            $table->foreign('location_id')->references('id')->on('warehouse_locations')->nullOnDelete();
+            $table->foreign('serial_id')->references('id')->on('serials')->nullOnDelete();
+            $table->foreign('uom_id')->references('id')->on('units_of_measure');
+
             $table->timestamps();
-            $table->unique(['tenant_id','org_unit_id','return_number'], 'service_returns_number_uk');
+            $table->softDeletes();
         });
     }
 
