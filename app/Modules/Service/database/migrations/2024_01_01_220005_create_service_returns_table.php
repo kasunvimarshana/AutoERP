@@ -17,45 +17,49 @@ return new class extends Migration
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
 
-            $table->foreignId('job_card_id')->constrained('service_job_cards', 'id', 'service_returns_job_card_id_fk')->cascadeOnDelete();
-            $table->foreignId('original_service_job_card_line_id')->nullable()->constrained('service_job_card_lines', 'id', 'service_returns_original_service_job_card_line_id_fk')->nullOnDelete();
-            $table->foreignId('product_id');
-            $table->foreignId('variant_id')->nullable();
-            $table->foreignId('batch_id')->nullable();
-            $table->foreignId('serial_id')->nullable();
-            $table->foreignId('warehouse_id')->nullable();
-            $table->foreignId('location_id')->nullable();
-            $table->text('description')->nullable();
-            $table->foreignId('uom_id');
-            $table->decimal('return_qty', 20, 6);
-            $table->decimal('unit_price', 20, 6);
+            $table->foreignId('customer_id');
+            $table->foreignId('original_job_card_id')->nullable()->constrained('service_job_cards', 'id', 'service_returns_original_job_card_id_fk')->nullOnDelete();
+            $table->foreignId('original_invoice_id')->nullable()->constrained('service_invoices', 'id', 'service_returns_original_invoice_id_fk')->nullOnDelete();
+            $table->string('return_number');
+            $table->enum('status', ['draft', 'approved', 'received', 'closed', 'cancelled'])->default('draft');
+            $table->date('return_date');
+            $table->string('return_reason')->nullable();
+            $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'sales_returns_currency_id_fk')->nullOnDelete();
+            $table->decimal('exchange_rate', 20, 10)->default(1);
 
-            $table->decimal('restocking_fee', 20, 6)->default(0);
+            // ── Line‑derived totals – strictly SUM over lines ──
+            $table->decimal('subtotal', 20, 6)->default(0)->comment('SUM(line.gross_amount)');
+            $table->decimal('line_restocking_total', 20, 6)->default(0)->comment('SUM(line.restocking_fee)');
 
-            // Line net
-            $table->decimal('gross_amount', 20, 6)
-                  ->storedAs('return_qty * unit_price')
-                  ->comment('Gross = qty * unit price');
+            // ── Header‑level adjustments (applied on top of the order) ──
+            $table->enum('header_discount_type', ['percentage', 'fixed'])->nullable();
+            $table->decimal('header_discount_value', 10, 6)->nullable();
+            $table->decimal('header_discount_amount', 20, 6)->default(0);
+            $table->foreignId('header_tax_group_id')->nullable()->constrained('tax_groups', 'id')->nullOnDelete();
+            $table->decimal('header_tax_amount', 20, 6)->default(0);
 
-            $table->decimal('line_total', 20, 6)
-                  ->storedAs('gross_amount - restocking_fee')
-                  ->comment('Net after discount before tax');
+            // ── Final totals (combine line + header) ──
+            $table->decimal('discount_total', 20, 6)->default(0)->comment('header_discount_amount');
+            $table->decimal('tax_total', 20, 6)->default(0)->comment('header_tax_amount');
+            $table->decimal('surcharge_total', 20, 6)->default(0)->comment('SUM of surcharge notes');
+            $table->decimal('credit_total', 20, 6)->default(0)->comment('SUM of credit notes');
+            $table->decimal('grand_total', 20, 6)->default(0)->comment('subtotal - discount_total + tax_total + surcharge_total - credit_total - line_restocking_total');
 
-            $table->enum('condition', ['good', 'damaged', 'expired', 'defective'])->default('good');
-            $table->enum('disposition', ['restock', 'scrap', 'quarantine'])->default('restock');
+            $table->string('credit_note_number')->nullable();
+            $table->foreignId('journal_entry_id')->nullable();
 
-            $table->text('quality_check_notes')->nullable();
+            $table->text('notes')->nullable();
+            $table->json('metadata')->nullable();
+            $table->foreignId('created_by');
 
-            $table->foreign('product_id')->references('id')->on('products')->cascadeOnDelete();
-            $table->foreign('variant_id')->references('id')->on('product_variants')->nullOnDelete();
-            $table->foreign('batch_id')->references('id')->on('batches')->nullOnDelete();
-            $table->foreign('warehouse_id')->references('id')->on('warehouses')->nullOnDelete();
-            $table->foreign('location_id')->references('id')->on('warehouse_locations')->nullOnDelete();
-            $table->foreign('serial_id')->references('id')->on('serials')->nullOnDelete();
-            $table->foreign('uom_id')->references('id')->on('units_of_measure');
+            $table->foreign('customer_id')->references('id')->on('customers')->cascadeOnDelete();
+            $table->foreign('journal_entry_id')->references('id')->on('journal_entries')->nullOnDelete();
+            $table->foreign('created_by')->references('id')->on('users')->nullable()->nullOnDelete();
 
             $table->timestamps();
             $table->softDeletes();
+
+            $table->unique(['tenant_id', 'org_unit_id', 'return_number'], 'sales_returns_tenant_return_uk');
         });
     }
 
