@@ -47,7 +47,7 @@ return new class extends Migration
             // Tax
             $table->foreignId('tax_group_id')->nullable();
             $table->decimal('tax_amount', 20, 6)->default(0)
-                  ->comment('Calculated tax amount; line_total_with_tax = line_total + tax_amount');
+                  ->comment('Calculated tax amount');
 
             // Optional – if you want a stored line total including tax
             $table->decimal('line_total_with_tax', 20, 6)
