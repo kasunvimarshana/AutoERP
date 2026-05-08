@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('service_diagnostics', function (Blueprint $table) {
+        Schema::create('service_inspections', function (Blueprint $table) {
             $table->id();
 
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
@@ -19,9 +19,9 @@ return new class extends Migration
 
             $table->foreignId('job_card_id')->constrained('service_job_cards')->cascadeOnDelete();
 
-            $table->string('diagnostic_number');
-            $table->enum('diagnostic_phase', ['pre', 'post'])->nullable();
-            $table->string('diagnostic_type')->comment('engine, transmission, electrical, etc.');
+            $table->string('inspection_number');
+            $table->enum('inspection_phase', ['pre', 'post'])->nullable();
+            $table->string('inspection_type')->comment('safety, emissions, pre_purchase, periodic, etc.');
             $table->enum('overall_result', ['pass', 'fail', 'warning', 'not_applicable'])->default('pass');
             $table->text('notes')->nullable();
 
@@ -29,14 +29,14 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'org_unit_id', 'diagnostic_number'], 'service_diagnostics_number_uk');
-            $table->index(['tenant_id', 'vehicle_id'], 'diagnostic_vehicle_idx');
-            $table->index(['tenant_id', 'job_card_id'], 'diagnostic_job_card_idx');
+            $table->unique(['tenant_id', 'org_unit_id', 'inspection_number'], 'service_inspections_number_uk');
+            $table->index(['tenant_id', 'vehicle_id'], 'inspection_vehicle_idx');
+            $table->index(['tenant_id', 'job_card_id'], 'inspection_job_card_idx');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('service_diagnostics');
+        Schema::dropIfExists('service_inspections');
     }
 };
