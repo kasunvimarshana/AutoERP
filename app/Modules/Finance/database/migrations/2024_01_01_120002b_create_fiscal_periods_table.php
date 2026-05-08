@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('name');
             $table->date('start_date');
             $table->date('end_date');
-            $table->enum('status', ['open', 'closed'])->default('open');
+            $table->string('status')->default('open')->comment('open, closed');
             $table->timestamps();
             $table->softDeletes();
 

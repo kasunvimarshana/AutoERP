@@ -19,12 +19,12 @@ return new class extends Migration
 
             $table->foreignId('fiscal_period_id')->nullable()->constrained('fiscal_periods', 'id', 'journal_entries_fiscal_period_id_fk')->cascadeOnDelete();
             $table->string('entry_number')->nullable();
-            $table->enum('entry_type', ['manual', 'auto', 'system'])->default('manual');
+            $table->string('entry_type')->default('manual')->comment('manual, auto, system');
             $table->nullableMorphs('reference');
             $table->text('description')->nullable();
             $table->date('entry_date');
             $table->date('posting_date')->nullable();
-            $table->enum('status', ['draft', 'posted', 'reversed'])->default('draft');
+            $table->string('status')->default('draft')->comment('draft, posted, reversed');
             $table->boolean('is_reversed')->default(false);
             $table->foreignId('reversal_entry_id')->nullable()->constrained('journal_entries', 'id', 'journal_entries_reversal_entry_id_fk')->nullOnDelete();
             $table->foreignId('created_by');

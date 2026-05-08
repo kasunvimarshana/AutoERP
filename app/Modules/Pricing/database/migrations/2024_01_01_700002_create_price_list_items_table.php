@@ -28,7 +28,7 @@ return new class extends Migration
             $table->decimal('min_quantity', 20, 6)->default(1);
             $table->decimal('price', 20, 6);
             // $table->decimal('discount_pct', 10, 6)->default(0);
-            $table->enum('discount_type', ['percentage', 'fixed'])->default('percentage');
+            $table->string('discount_type')->default('percentage')->comment('percentage, fixed');
             $table->decimal('discount_value', 10, 6)->default(0);
             $table->date('valid_from')->nullable();
             $table->date('valid_to')->nullable();

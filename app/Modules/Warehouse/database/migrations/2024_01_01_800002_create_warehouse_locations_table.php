@@ -28,7 +28,7 @@ return new class extends Migration
             $table->string('code')->nullable();
             $table->string('path')->nullable();
             $table->unsignedInteger('depth')->default(0);
-            $table->enum('type', ['zone', 'aisle', 'rack', 'shelf', 'bin', 'staging', 'dispatch'])->default('bin');
+            $table->string('type')->default('bin')->comment('zone, aisle, rack, shelf, bin, staging, dispatch');
             $table->boolean('is_active')->default(true);
             $table->boolean('is_pickable')->default(true);
             $table->boolean('is_receivable')->default(true);

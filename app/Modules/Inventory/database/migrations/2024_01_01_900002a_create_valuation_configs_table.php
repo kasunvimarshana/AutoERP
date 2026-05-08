@@ -40,13 +40,9 @@ return new class extends Migration
             $table->string('transaction_type', 50)->nullable();
 
             // Strategy configuration
-            $table->enum('valuation_method', [
-                'fifo', 'lifo', 'fefo', 'weighted_average', 'standard', 'specific',
-            ])->default('fifo');
+            $table->string('valuation_method')->nullable()->comment('fifo, lifo, fefo, weighted_average, standard, specific');
 
-            $table->enum('allocation_strategy', [
-                'fifo', 'lifo', 'fefo', 'nearest_bin', 'manual',
-            ])->default('fifo');
+            $table->string('allocation_strategy')->nullable()->comment('fifo, lifo, fefo, nearest_bin, manual')->default('fifo');
 
             $table->boolean('is_active')->default(true);
 

@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('reference_number');
             $table->foreignId('from_location_id')->constrained('warehouse_locations', 'id', 'stock_transfers_from_location_id_fk')->cascadeOnDelete();
             $table->foreignId('to_location_id')->constrained('warehouse_locations', 'id', 'stock_transfers_to_location_id_fk')->cascadeOnDelete();
-            $table->enum('status', ['draft', 'pending', 'in_transit', 'completed', 'cancelled'])->default('draft');
+            $table->string('status')->default('draft')->comment('draft, pending, in_transit, completed, cancelled');
             $table->foreignId('requested_by')->constrained('users', 'id', 'stock_transfers_requested_by_fk');
             $table->foreignId('approved_by')->nullable()->constrained('users', 'id', 'stock_transfers_approved_by_fk')->nullOnDelete();
             $table->timestamp('transferred_at')->nullable();

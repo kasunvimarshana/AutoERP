@@ -23,11 +23,7 @@ return new class extends Migration
             $table->foreignId('serial_id')->nullable()->constrained('serials', 'id', 'stock_movements_serial_id_fk')->nullOnDelete();
             $table->foreignId('from_location_id')->nullable()->constrained('warehouse_locations', 'id', 'stock_movements_from_location_id_fk')->nullOnDelete();
             $table->foreignId('to_location_id')->nullable()->constrained('warehouse_locations', 'id', 'stock_movements_to_location_id_fk')->nullOnDelete();
-            $table->enum('movement_type', ['receipt', 'shipment', 'transfer', 'adjustment',
-                'adjustment_in', 'adjustment_out', 'opening',
-                'return_in', 'return_out', 'reservation', 'reservation_release',
-                'write_off', 'cycle_count',
-            ]);
+            $table->string('movement_type')->comment('receipt, shipment, transfer, adjustment, adjustment_in, adjustment_out, opening,return_in, return_out, reservation, reservation_release, write_off, cycle_count');
             $table->nullableMorphs('reference'); // link to PO line, GRN line, shipment line, etc.
             $table->foreignId('uom_id')->constrained('units_of_measure', 'id', 'stock_movements_uom_id_fk');
             $table->decimal('quantity', 20, 6);

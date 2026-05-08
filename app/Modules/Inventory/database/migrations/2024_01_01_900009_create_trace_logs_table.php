@@ -19,10 +19,7 @@ return new class extends Migration
 
             $table->morphs('entity'); // Product, Variant, Batch, Serial, Location, etc.
             $table->foreignId('identifier_id')->nullable()->constrained('product_identifiers', 'id', 'trace_logs_identifier_id_fk')->nullOnDelete();
-            $table->enum('action_type', [
-                'scan', 'receive', 'transfer', 'pick', 'pack', 'ship',
-                'return', 'adjust', 'dispose', 'count',
-            ]);
+            $table->string('action_type')->comment('scan, receive, transfer, pick, pack, ship, return, adjust, dispose, count');
             $table->nullableMorphs('reference'); // GRN, shipment, transfer, etc.
             $table->foreignId('source_location_id')->nullable()->constrained('warehouse_locations', 'id', 'trace_logs_source_location_id_fk')->nullOnDelete();
             $table->foreignId('destination_location_id')->nullable()->constrained('warehouse_locations', 'id', 'trace_logs_destination_location_id_fk')->nullOnDelete();

@@ -20,9 +20,9 @@ return new class extends Migration
             $table->foreignId('job_card_id')->constrained('service_job_cards')->cascadeOnDelete();
 
             $table->string('inspection_number');
-            $table->enum('inspection_phase', ['pre', 'post'])->nullable();
+            $table->string('inspection_phase')->nullable()->comment('pre, post');
             $table->string('inspection_type')->comment('safety, emissions, pre_purchase, periodic, etc.');
-            $table->enum('overall_result', ['pass', 'fail', 'warning', 'not_applicable'])->default('pass');
+            $table->string('overall_result')->default('pass')->comment('pass, fail, warning, not_applicable');
             $table->text('notes')->nullable();
 
             $table->json('metadata')->nullable();

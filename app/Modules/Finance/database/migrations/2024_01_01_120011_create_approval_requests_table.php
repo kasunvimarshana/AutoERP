@@ -18,7 +18,7 @@ return new class extends Migration
             $table->foreignId('workflow_config_id')->constrained('approval_workflow_configs', 'id', 'approval_requests_workflow_config_id_fk')->cascadeOnDelete();
             $table->string('entity_type');
             $table->unsignedBigInteger('entity_id');
-            $table->enum('status', ['pending', 'approved', 'rejected', 'cancelled'])->default('pending');
+            $table->string('status')->default('pending')->comment('pending, approved, rejected, cancelled');
             $table->unsignedInteger('current_step_order')->default(1);
             $table->foreignId('requested_by_user_id')->constrained('users', 'id', 'approval_requests_requested_by_user_id_fk')->cascadeOnDelete();
             $table->foreignId('resolved_by_user_id')->nullable()->constrained('users', 'id', 'approval_requests_resolved_by_user_id_fk')->nullOnDelete();

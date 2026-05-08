@@ -23,7 +23,7 @@ return new class extends Migration
             $table->string('diagnostic_type');
             $table->text('findings')->nullable();
             $table->text('recommendations')->nullable();
-            $table->enum('severity', ['info','warning','critical'])->default('info');
+            $table->string('severity')->default('info')->comment('info, warning, critical');
 
             $table->text('comment')->nullable();
 

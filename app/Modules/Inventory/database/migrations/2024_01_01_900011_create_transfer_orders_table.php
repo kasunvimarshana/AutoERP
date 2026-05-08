@@ -20,7 +20,7 @@ return new class extends Migration
             $table->foreignId('from_warehouse_id')->constrained('warehouses', 'id', 'transfer_orders_from_warehouse_id_fk')->cascadeOnDelete();
             $table->foreignId('to_warehouse_id')->constrained('warehouses', 'id', 'transfer_orders_to_warehouse_id_fk')->cascadeOnDelete();
             $table->string('transfer_number');
-            $table->enum('status', ['draft', 'approved', 'in_transit', 'received', 'cancelled'])->default('draft');
+            $table->string('status')->default('draft')->comment('draft, approved, in_transit, received, cancelled');
             $table->date('request_date');
             $table->date('expected_date')->nullable();
             $table->date('shipped_date')->nullable();

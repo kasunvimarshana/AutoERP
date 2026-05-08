@@ -21,7 +21,7 @@ return new class extends Migration
             $table->foreignId('variant_id')->nullable()->constrained('product_variants', 'id', 'serials_variant_id_fk')->nullOnDelete();
             $table->string('serial_number');
             $table->foreignId('batch_id')->nullable()->constrained('batches', 'id', 'serials_batch_id_fk')->nullOnDelete();
-            $table->enum('status', ['available', 'reserved', 'sold', 'returned', 'scrapped', 'in_transit'])->default('available');
+            $table->string('status')->default('available')->comment('available, reserved, sold, returned, scrapped, in_transit');
             $table->foreignId('current_location_id')->nullable()->constrained('warehouse_locations', 'id', 'serials_current_location_id_fk')->nullOnDelete();
             $table->nullableMorphs('current_owner'); // e.g., customer, supplier, employee
             $table->date('warranty_expiry')->nullable();

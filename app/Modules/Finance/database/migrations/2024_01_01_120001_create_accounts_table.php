@@ -23,7 +23,7 @@ return new class extends Migration
             $table->string('type')->comment('asset, liability, equity, revenue, expense');
             $table->string('sub_type')->nullable()->comment('current_asset, accounts_receivable, accounts_payable, etc.');
             $table->boolean('is_control_account')->default(false)->comment('AR, AP, Bank, Cash, etc.');
-            $table->enum('normal_balance', ['debit', 'credit']);
+            $table->string('normal_balance')->comment('debit, credit');
             $table->boolean('is_system')->default(false);
             $table->boolean('is_bank_account')->default(false);
             $table->boolean('is_credit_card')->default(false);

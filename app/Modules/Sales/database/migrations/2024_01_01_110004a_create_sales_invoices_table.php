@@ -21,7 +21,7 @@ return new class extends Migration
             $table->foreignId('shipment_id')->nullable()->constrained('shipments', 'id', 'sales_invoices_shipment_id_fk')->nullOnDelete();
             $table->foreignId('sales_order_id')->nullable()->constrained('sales_orders', 'id', 'sales_invoices_sales_order_id_fk')->nullOnDelete();
             $table->string('invoice_number');
-            $table->enum('status', ['draft', 'sent', 'partial_paid', 'paid', 'overdue', 'cancelled'])->default('draft');
+            $table->string('status')->default('draft')->comment('draft, sent, partial_paid, paid, overdue, cancelled');
             $table->date('invoice_date');
             $table->date('due_date');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'sales_invoices_currency_id_fk')->nullOnDelete();

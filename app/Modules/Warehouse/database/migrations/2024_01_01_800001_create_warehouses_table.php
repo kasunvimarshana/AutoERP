@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('code')->nullable();
             $table->string('image_path')->nullable();
-            $table->enum('type', ['standard', 'virtual', 'transit', 'quarantine'])->default('standard');
+            $table->string('type')->default('standard')->comment('standard, virtual, transit, quarantine');
             $table->foreignId('address_id')->nullable(); // can reference a polymorphic address later
             $table->boolean('is_active')->default(true);
             $table->boolean('is_default')->default(false);

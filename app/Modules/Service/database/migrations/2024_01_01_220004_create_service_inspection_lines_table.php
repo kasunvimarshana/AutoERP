@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('inspection_item');      // e.g. "Tyre tread depth", "Brake fluid level"
             $table->string('expected_value')->nullable();
             $table->string('actual_value')->nullable();
-            $table->enum('result', ['pass', 'fail', 'flag', 'not_tested'])->default('not_tested');
+            $table->string('result')->default('not_tested')->comment('pass, fail, flag, not_tested');
             $table->text('comment')->nullable();
 
             $table->json('metadata')->nullable();

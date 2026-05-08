@@ -25,7 +25,7 @@ return new class extends Migration
             $table->date('expiry_date')->nullable();
             $table->date('received_date')->nullable();
             $table->foreignId('supplier_id')->nullable()->constrained('suppliers', 'id', 'batches_supplier_id_fk')->nullOnDelete();
-            $table->enum('status', ['active', 'quarantine', 'expired', 'depleted'])->default('active');
+            $table->string('status')->default('active')->comment('active, quarantine, expired, depleted');
             $table->text('notes')->nullable();
             $table->json('metadata')->nullable();
             // $table->decimal('purchase_price', 20, 6)->nullable();

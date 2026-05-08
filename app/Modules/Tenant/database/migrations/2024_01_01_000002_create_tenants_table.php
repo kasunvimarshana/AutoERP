@@ -32,9 +32,7 @@ return new class extends Migration
                 ->references('id')
                 ->on('tenant_plans')
                 ->nullOnDelete();
-            $table->enum('status', ['active', 'suspended', 'pending', 'cancelled'])
-                ->default('active')
-                ->index('tenants_status_idx');
+            $table->string('status')->default('active')->comment('active, suspended, pending, cancelled')->index('tenants_status_idx');
             $table->boolean('active')->default(true)->index('tenants_active_idx');
             $table->timestamp('trial_ends_at')->nullable();
             $table->timestamp('subscription_ends_at')->nullable();

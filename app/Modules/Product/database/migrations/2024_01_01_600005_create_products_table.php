@@ -47,7 +47,7 @@ return new class extends Migration
             //       ->storedAs('inventory_account_id IS NOT NULL')
             //       ->comment('TRUE = inventory item (generates stock movements), FALSE = non‑inventory');
 
-            $table->enum('valuation_method', ['fifo', 'lifo', 'fefo', 'weighted_average', 'standard'])->default('fifo');
+            $table->string('valuation_method')->nullable()->comment('fifo, lifo, fefo, weighted_average, standard');
             $table->decimal('standard_cost', 20, 6)->nullable();
             // Products account references
             $table->foreignId('income_account_id')->nullable(); // will reference accounts later

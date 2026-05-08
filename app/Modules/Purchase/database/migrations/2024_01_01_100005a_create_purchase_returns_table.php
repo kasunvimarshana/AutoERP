@@ -21,7 +21,7 @@ return new class extends Migration
             $table->foreignId('original_grn_id')->nullable()->constrained('grn_headers', 'id', 'purchase_returns_original_grn_id_fk')->nullOnDelete();
             $table->foreignId('original_invoice_id')->nullable()->constrained('purchase_invoices', 'id', 'purchase_returns_original_invoice_id_fk')->nullOnDelete();
             $table->string('return_number');
-            $table->enum('status', ['draft', 'approved', 'shipped', 'closed', 'cancelled'])->default('draft');
+            $table->string('status')->default('draft')->comment('draft, approved, shipped, closed, cancelled');
             $table->date('return_date');
             $table->string('return_reason')->nullable();
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'purchase_returns_currency_id_fk')->nullOnDelete();

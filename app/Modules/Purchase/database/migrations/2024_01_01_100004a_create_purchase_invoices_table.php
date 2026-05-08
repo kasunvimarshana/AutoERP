@@ -22,7 +22,7 @@ return new class extends Migration
             $table->foreignId('purchase_order_id')->nullable()->constrained('purchase_orders', 'id', 'purchase_invoices_purchase_order_id_fk')->nullOnDelete();
             $table->string('invoice_number');
             $table->string('supplier_invoice_number')->nullable();
-            $table->enum('status', ['draft', 'approved', 'partial_paid', 'paid', 'disputed', 'cancelled'])->default('draft');
+            $table->string('status')->default('draft')->comment('draft, approved, partial_paid, paid, disputed, cancelled');
             $table->date('invoice_date');
             $table->date('due_date');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'purchase_invoices_currency_id_fk')->nullOnDelete();

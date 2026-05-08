@@ -24,7 +24,7 @@ return new class extends Migration
             $table->string('password');
             $table->string('phone', 30)->nullable();
             $table->string('avatar')->nullable();
-            $table->enum('status', ['active', 'inactive', 'suspended'])->default('active');
+            $table->string('status')->default('active')->comment('active, inactive, suspended');
             $table->json('preferences')->nullable();
             $table->json('address')->nullable();
             $table->rememberToken();

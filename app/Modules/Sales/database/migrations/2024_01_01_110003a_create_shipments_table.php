@@ -21,7 +21,7 @@ return new class extends Migration
             $table->foreignId('warehouse_id');
             $table->foreignId('sales_order_id')->nullable()->constrained('sales_orders', 'id', 'shipments_sales_order_id_fk')->nullOnDelete();
             $table->string('shipment_number');
-            $table->enum('status', ['draft', 'picking', 'packed', 'shipped', 'delivered', 'cancelled'])->default('draft');
+            $table->string('status')->default('draft')->comment('draft, picking, packed, shipped, delivered, cancelled');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'shipments_currency_id_fk')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 10)->default(1);
             $table->date('shipped_date')->nullable();

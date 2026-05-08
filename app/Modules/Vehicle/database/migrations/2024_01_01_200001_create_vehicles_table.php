@@ -26,8 +26,8 @@ return new class extends Migration
             $table->string('color')->nullable();
             $table->string('category');
 
-            $table->enum('usage_profile', ['rent_only','service_only','dual','internal'])->default('dual');
-            $table->enum('current_status', ['available','rented','in_service','reserved','decommissioned'])->default('available');
+            $table->string('usage_profile')->default('dual')->comment('rent_only, service_only, dual, internal');
+            $table->string('current_status')->default('available')->comment('available, rented, in_service, reserved, decommissioned');
 
             // Operational data
             $table->unsignedBigInteger('current_odometer')->default(0);

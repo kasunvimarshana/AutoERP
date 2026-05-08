@@ -20,8 +20,8 @@ return new class extends Migration
             $table->string('reference_number');
             $table->foreignId('warehouse_id')->constrained('warehouses', 'id', 'stock_adjustments_warehouse_id_fk')->cascadeOnDelete();
             $table->foreignId('location_id')->nullable()->constrained('warehouse_locations', 'id', 'stock_adjustments_location_id_fk')->nullOnDelete();
-            $table->enum('type', ['cycle_count', 'physical_inventory', 'write_off'])->default('cycle_count');
-            $table->enum('status', ['draft', 'in_progress', 'completed', 'approved', 'cancelled'])->default('draft');
+            $table->string('type')->default('cycle_count')->comment('cycle_count', 'physical_inventory', 'write_off');
+            $table->string('status')->default('draft')->comment('draft, in_progress, completed, approved, cancelled');
             $table->foreignId('counted_by')->nullable()->constrained('users', 'id', 'stock_adjustments_counted_by_fk')->nullOnDelete();
             $table->timestamp('counted_at')->nullable();
             $table->foreignId('approved_by')->nullable()->constrained('users', 'id', 'stock_adjustments_approved_by_fk')->nullOnDelete();

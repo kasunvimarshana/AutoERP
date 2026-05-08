@@ -21,7 +21,7 @@ return new class extends Migration
             $table->json('limits')->nullable();
             $table->decimal('price', 20, 6)->default(0);
             $table->string('currency_code', 3)->default('USD');
-            $table->enum('billing_interval', ['month', 'year'])->default('month');
+            $table->string('billing_interval')->default('month')->comment('day, week, month, year');
             $table->boolean('is_active')->default(true)->index('tenant_plans_active_idx');
             $table->softDeletes();
             $table->timestamps();

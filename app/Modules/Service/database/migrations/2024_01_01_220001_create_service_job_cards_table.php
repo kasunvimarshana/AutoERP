@@ -22,8 +22,8 @@ return new class extends Migration
             $table->foreignId('vehicle_id')->nullable();
             $table->foreignId('warehouse_id');
             $table->string('job_card_number');
-            $table->enum('priority', ['low','medium','high','critical'])->default('medium');
-            $table->enum('status', ['open','in_progress','waiting_parts','completed','invoiced','cancelled'])->default('open');
+            $table->string('priority')->default('medium')->comment('low, medium, high, critical');
+            $table->string('status')->default('open')->comment('open, in_progress, waiting_parts, completed, invoiced, cancelled');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'sales_orders_currency_id_fk')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 10)->default(1);
             $table->text('reported_issue')->nullable();

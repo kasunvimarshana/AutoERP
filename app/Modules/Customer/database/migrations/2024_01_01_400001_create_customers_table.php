@@ -20,14 +20,14 @@ return new class extends Migration
             $table->foreignId('user_id')->nullable()->unique('customers_user_id_uk')->constrained('users', 'id', 'customers_user_id_fk')->nullOnDelete(); // for portal access
             $table->string('customer_code')->nullable();
             $table->string('name');
-            $table->enum('type', ['individual', 'company'])->default('company');
+            $table->string('type')->default('company')->comment('individual, company');
             $table->string('tax_number')->nullable();
             $table->string('registration_number')->nullable();
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'customers_currency_id_fk')->nullOnDelete();
             $table->decimal('credit_limit', 20, 6)->default(0);
             $table->unsignedInteger('payment_terms_days')->default(30);
             $table->foreignId('ar_account_id')->nullable(); // accounts_receivable_account_id will reference accounts later
-            $table->enum('status', ['active', 'inactive', 'blocked'])->default('active');
+            $table->string('status')->default('active')->comment('active, inactive, blocked');
             $table->text('notes')->nullable();
             $table->json('metadata')->nullable();
             // Customers AR account

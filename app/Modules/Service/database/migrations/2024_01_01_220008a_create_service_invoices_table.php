@@ -20,7 +20,7 @@ return new class extends Migration
             $table->foreignId('customer_id');
             $table->foreignId('job_card_id')->nullable()->constrained('service_job_cards', 'id', 'service_invoices_job_card_id_fk')->nullOnDelete();
             $table->string('invoice_number');
-            $table->enum('status', ['draft', 'sent', 'partial_paid', 'paid', 'overdue', 'cancelled'])->default('draft');
+            $table->string('status')->default('draft')->comment('draft, sent, partial_paid, paid, overdue, cancelled');
             $table->date('invoice_date');
             $table->date('due_date');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'sales_invoices_currency_id_fk')->nullOnDelete();

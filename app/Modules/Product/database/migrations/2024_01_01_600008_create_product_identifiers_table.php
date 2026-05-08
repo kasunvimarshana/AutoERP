@@ -24,14 +24,8 @@ return new class extends Migration
             $table->foreignId('serial_id')->nullable()->constrained('serials', 'id', 'product_identifiers_serial_id_fk');
             // $table->enum('identifier_type', ['barcode', 'qr', 'rfid', 'nfc', 'epc', 'gtin', 'gln', 'sscc', 'custom']);
             // $table->string('identifier_value');
-            $table->enum('technology', [
-                'barcode_1d', 'barcode_2d', 'qr_code',
-                'rfid_hf', 'rfid_uhf', 'nfc', 'gs1_epc', 'custom',
-            ])->default('barcode_1d');
-            $table->enum('format', [
-                'ean13', 'ean8', 'upc_a', 'code128', 'code39',
-                'qr', 'datamatrix', 'gs1_128', 'epc_sgtin', 'other',
-            ])->nullable();
+            $table->string('technology')->default('barcode_1d')->comment('barcode_1d, barcode_2d, qr_code, rfid_hf, rfid_uhf, nfc, gs1_epc, custom');
+            $table->string('format')->nullable()->comment('ean13, ean8, upc_a, code128, code39, qr, datamatrix, gs1_128, epc_sgtin, other');
             $table->string('value'); // The actual identifier string
             $table->string('gs1_company_prefix')->nullable();
             $table->json('gs1_application_identifiers')->nullable(); // Parsed AI data

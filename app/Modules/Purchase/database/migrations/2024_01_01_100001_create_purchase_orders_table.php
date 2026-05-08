@@ -20,7 +20,7 @@ return new class extends Migration
             $table->foreignId('supplier_id');
             $table->foreignId('warehouse_id');
             $table->string('po_number');
-            $table->enum('status', ['draft', 'confirmed', 'partial', 'received', 'invoiced', 'closed', 'cancelled'])->default('draft');
+            $table->string('status')->default('draft')->comment('draft, confirmed, partial, received, invoiced, closed, cancelled');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'purchase_orders_currency_id_fk')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 10)->default(1);
             $table->date('order_date');

@@ -41,8 +41,8 @@ return new class extends Migration
                   ->storedAs('gross_amount - restocking_fee')
                   ->comment('Net after discount before tax');
 
-            $table->enum('condition', ['good', 'damaged', 'expired', 'defective'])->default('good');
-            $table->enum('disposition', ['restock', 'scrap', 'quarantine'])->default('restock');
+            $table->string('condition')->default('good')->comment('good, damaged, expired, defective');
+            $table->string('disposition')->default('restock')->comment('restock, scrap, quarantine');
 
             $table->text('quality_check_notes')->nullable();
 

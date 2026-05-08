@@ -20,7 +20,7 @@ return new class extends Migration
             $table->date('period_end');
             $table->decimal('opening_balance', 20, 6);
             $table->decimal('closing_balance', 20, 6);
-            $table->enum('status', ['draft', 'completed'])->default('draft');
+            $table->string('status')->default('draft')->comment('draft, completed');
             $table->foreignId('completed_by')->nullable()->constrained('users', 'id', 'bank_reconciliations_completed_by_fk')->nullOnDelete();
             $table->timestamp('completed_at')->nullable();
             $table->softDeletes();

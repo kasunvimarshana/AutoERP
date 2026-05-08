@@ -18,7 +18,7 @@ return new class extends Migration
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
 
             $table->string('name');
-            $table->enum('type', ['purchase', 'sales'])->default('sales');
+            $table->string('type')->default('sales')->comment('purchase, sales');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'price_lists_currency_id_fk')->nullOnDelete();
             $table->boolean('is_default')->default(false);
             $table->date('valid_from')->nullable();

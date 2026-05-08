@@ -20,8 +20,10 @@ return new class extends Migration
             $table->foreignId('product_id')->constrained('products', 'id', 'inventory_cost_layers_product_id_fk')->cascadeOnDelete();
             $table->foreignId('variant_id')->nullable()->constrained('product_variants', 'id', 'inventory_cost_layers_variant_id_fk')->nullOnDelete();
             $table->foreignId('batch_id')->nullable()->constrained('batches', 'id', 'inventory_cost_layers_batch_id_fk')->nullOnDelete();
+            $table->foreignId('serial_id')->nullable()->constrained('serials', 'id', 'inventory_cost_layers_serial_id_fk')->nullOnDelete();
+            $table->foreignId('warehouse_id')->nullable()->constrained('warehouses', 'id', 'inventory_cost_layers_warehouse_id_fk')->nullOnDelete();
             $table->foreignId('location_id')->constrained('warehouse_locations', 'id', 'inventory_cost_layers_location_id_fk')->cascadeOnDelete();
-            $table->enum('valuation_method', ['fifo', 'lifo', 'fefo', 'weighted_average', 'standard', 'specific'])->default('fifo');
+            $table->string('valuation_method')->nullable()->comment('fifo, lifo, fefo, weighted_average, standard, specific');
             $table->date('layer_date'); // Date of receipt
             $table->decimal('quantity_in', 20, 6);
             $table->decimal('quantity_remaining', 20, 6);

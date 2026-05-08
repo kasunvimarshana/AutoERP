@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('org_unit_id')->nullable()->constrained('org_units', 'id')->nullOnDelete();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->string('payment_number');
-            $table->enum('direction', ['inbound', 'outbound']);
+            $table->string('direction')->comment('inbound, outbound');
             $table->string('party_type')->nullable()->comment('customer, supplier, etc.');
             $table->unsignedBigInteger('party_id')->nullable();
             $table->foreignId('payment_method_id')->constrained('payment_methods', 'id', 'payments_payment_method_id_fk');
@@ -26,7 +26,7 @@ return new class extends Migration
             $table->decimal('exchange_rate', 20, 10)->default(1);
             $table->decimal('base_amount', 20, 6);
             $table->date('payment_date');
-            $table->enum('status', ['draft', 'posted', 'reconciled', 'voided'])->default('draft');
+            $table->string('status')->default('draft')->comment('draft, posted, reconciled, voided');
             $table->string('reference')->nullable();
             $table->text('notes')->nullable();
             $table->string('idempotency_key')->nullable()->comment('Caller-supplied key to prevent duplicate payment on replay');

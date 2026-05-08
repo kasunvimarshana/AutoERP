@@ -21,8 +21,8 @@ return new class extends Migration
             $table->string('description');
             $table->decimal('amount', 20, 6);
             $table->decimal('balance', 20, 6)->nullable();
-            $table->enum('type', ['debit', 'credit']);
-            $table->enum('status', ['imported', 'categorized', 'reconciled', 'excluded'])->default('imported');
+            $table->string('type')->comment('debit, credit');
+            $table->string('status')->default('imported')->comment('imported, categorized, reconciled, excluded');
             $table->foreignId('matched_journal_entry_id')->nullable();
             $table->foreignId('category_rule_id')->nullable();
             $table->foreign('matched_journal_entry_id', 'bank_transactions_matched_journal_entry_id_fk')->references('id')->on('journal_entries')->nullOnDelete();

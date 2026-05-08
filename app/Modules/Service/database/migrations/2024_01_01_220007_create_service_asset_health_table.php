@@ -23,7 +23,7 @@ return new class extends Migration
             $table->date('next_service_due_date')->nullable();
             $table->unsignedBigInteger('next_service_due_odometer')->nullable();
             $table->json('component_health')->nullable();
-            $table->enum('risk_level', ['low','medium','high','critical'])->default('low');
+            $table->string('risk_level')->default('low')->comment('low, medium, high, critical');
             $table->timestamps();
 
             $table->index(['tenant_id','org_unit_id','vehicle_id'], 'asset_health_vehicle_idx');

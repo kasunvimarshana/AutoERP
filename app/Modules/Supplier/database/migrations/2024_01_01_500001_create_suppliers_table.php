@@ -20,13 +20,13 @@ return new class extends Migration
             $table->foreignId('user_id')->nullable()->unique('suppliers_user_id_uk')->constrained('users', 'id', 'suppliers_user_id_fk')->nullOnDelete(); // for portal access
             $table->string('supplier_code')->nullable();
             $table->string('name');
-            $table->enum('type', ['individual', 'company'])->default('company');
+            $table->string('type')->default('company')->comment('individual, company');
             $table->string('tax_number')->nullable();
             $table->string('registration_number')->nullable();
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'suppliers_currency_id_fk')->nullOnDelete();
             $table->unsignedInteger('payment_terms_days')->default(30);
             $table->foreignId('ap_account_id')->nullable(); // accounts_payable_account_id will reference accounts later
-            $table->enum('status', ['active', 'inactive'])->default('active');
+            $table->string('status')->default('active')->comment('active, inactive');
             $table->text('notes')->nullable();
             $table->json('metadata')->nullable();
             // Suppliers AP account

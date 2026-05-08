@@ -18,7 +18,7 @@ return new class extends Migration
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
 
             $table->foreignId('customer_id')->constrained('customers', 'id', 'customer_addresses_customer_id_fk')->cascadeOnDelete();
-            $table->enum('type', ['billing', 'shipping', 'other'])->default('billing');
+            $table->string('type')->default('billing')->comment('billing, shipping, other');
             $table->string('label')->nullable();
             $table->string('address_line1');
             $table->string('address_line2')->nullable();
