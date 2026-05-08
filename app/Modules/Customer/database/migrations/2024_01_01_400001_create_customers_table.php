@@ -29,6 +29,7 @@ return new class extends Migration
             $table->foreignId('ar_account_id')->nullable(); // accounts_receivable_account_id will reference accounts later
             $table->string('status')->default('active')->comment('active, inactive, blocked');
             $table->text('notes')->nullable();
+            $table->boolean('is_vehicle_lessee')->default(false)->comment('Whether the customer is a vehicle lessee.');
             $table->json('metadata')->nullable();
             // Customers AR account
             $table->foreign('ar_account_id', 'customers_ar_account_id_fk')->references('id')->on('accounts')->nullOnDelete();

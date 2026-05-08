@@ -28,6 +28,8 @@ return new class extends Migration
             $table->foreignId('ap_account_id')->nullable(); // accounts_payable_account_id will reference accounts later
             $table->string('status')->default('active')->comment('active, inactive');
             $table->text('notes')->nullable();
+            $table->boolean('is_product_supplier')->default(true)->comment('Whether the supplier provides products.');
+            $table->boolean('is_vehicle_lessor')->default(false)->comment('Whether the supplier is a vehicle lessor.');
             $table->json('metadata')->nullable();
             // Suppliers AP account
             $table->foreign('ap_account_id', 'suppliers_ap_account_id_fk')->references('id')->on('accounts')->nullOnDelete();
