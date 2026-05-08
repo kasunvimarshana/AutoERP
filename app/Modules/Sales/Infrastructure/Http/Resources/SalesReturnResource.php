@@ -31,7 +31,6 @@ class SalesReturnResource extends JsonResource
             'tax_total' => $entity->getTaxTotal(),
             'restocking_fee_total' => $entity->getRestockingFeeTotal(),
             'grand_total' => $entity->getGrandTotal(),
-            'credit_memo_number' => $entity->getCreditMemoNumber(),
             'journal_entry_id' => $entity->getJournalEntryId(),
             'notes' => $entity->getNotes(),
             'metadata' => $entity->getMetadata(),

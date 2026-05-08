@@ -52,7 +52,6 @@ class UpdateSalesReturnService extends BaseService implements UpdateSalesReturnS
             taxTotal: $dto->taxTotal,
             restockingFeeTotal: $dto->restockingFeeTotal,
             grandTotal: $dto->grandTotal,
-            creditMemoNumber: $dto->creditMemoNumber,
             journalEntryId: $dto->journalEntryId,
             notes: $dto->notes,
             metadata: $dto->metadata,

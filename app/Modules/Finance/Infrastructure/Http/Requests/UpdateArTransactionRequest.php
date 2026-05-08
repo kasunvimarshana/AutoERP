@@ -21,7 +21,7 @@ class UpdateArTransactionRequest extends FormRequest
             'tenant_id' => ['required', 'integer', 'exists:tenants,id'],
             'customer_id' => ['required', 'integer'],
             'account_id' => ['required', 'integer', 'exists:accounts,id'],
-            'transaction_type' => ['required', 'in:invoice,payment,credit_memo,adjustment'],
+            'transaction_type' => ['required', 'in:invoice,payment,adjustment'],
             'amount' => ['required', 'numeric'],
             'balance_after' => ['required', 'numeric'],
             'transaction_date' => ['required', 'date'],

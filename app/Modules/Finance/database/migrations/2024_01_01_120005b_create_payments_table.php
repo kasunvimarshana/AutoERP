@@ -17,8 +17,8 @@ return new class extends Migration
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->string('payment_number');
             $table->enum('direction', ['inbound', 'outbound']);
-            $table->enum('party_type', ['customer', 'supplier']);
-            $table->unsignedBigInteger('party_id');
+            $table->string('party_type')->nullable()->comment('customer, supplier, etc.');
+            $table->unsignedBigInteger('party_id')->nullable();
             $table->foreignId('payment_method_id')->constrained('payment_methods', 'id', 'payments_payment_method_id_fk');
             $table->foreignId('account_id')->constrained('accounts', 'id', 'payments_account_id_fk');
             $table->decimal('amount', 20, 6);

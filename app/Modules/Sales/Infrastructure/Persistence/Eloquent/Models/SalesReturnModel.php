@@ -36,7 +36,6 @@ class SalesReturnModel extends Model
         'tax_total',
         'restocking_fee_total',
         'grand_total',
-        'credit_memo_number',
         'journal_entry_id',
         'notes',
         'metadata',

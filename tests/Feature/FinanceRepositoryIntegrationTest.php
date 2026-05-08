@@ -16,12 +16,10 @@ use Modules\Finance\Domain\Entities\BankCategoryRule;
 use Modules\Finance\Domain\Entities\BankReconciliation;
 use Modules\Finance\Domain\Entities\BankTransaction;
 use Modules\Finance\Domain\Entities\CostCenter;
-use Modules\Finance\Domain\Entities\CreditMemo;
 use Modules\Finance\Domain\Entities\FiscalPeriod;
 use Modules\Finance\Domain\Entities\FiscalYear;
 use Modules\Finance\Domain\Entities\JournalEntry;
 use Modules\Finance\Domain\Entities\JournalEntryLine;
-use Modules\Finance\Domain\Entities\NumberingSequence;
 use Modules\Finance\Domain\Entities\Payment;
 use Modules\Finance\Domain\Entities\PaymentAllocation;
 use Modules\Finance\Domain\Entities\PaymentMethod;
@@ -36,11 +34,9 @@ use Modules\Finance\Domain\RepositoryInterfaces\BankCategoryRuleRepositoryInterf
 use Modules\Finance\Domain\RepositoryInterfaces\BankReconciliationRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\BankTransactionRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\CostCenterRepositoryInterface;
-use Modules\Finance\Domain\RepositoryInterfaces\CreditMemoRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\FiscalPeriodRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\FiscalYearRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\JournalEntryRepositoryInterface;
-use Modules\Finance\Domain\RepositoryInterfaces\NumberingSequenceRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\PaymentAllocationRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\PaymentMethodRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\PaymentRepositoryInterface;
@@ -314,38 +310,6 @@ class FinanceRepositoryIntegrationTest extends TestCase
         $this->assertNull($wrongTenant);
     }
 
-    public function test_numbering_sequence_save_find_and_generate_next_number(): void
-    {
-        /** @var NumberingSequenceRepositoryInterface $repository */
-        $repository = app(NumberingSequenceRepositoryInterface::class);
-
-        $saved = $repository->save(new NumberingSequence(
-            tenantId: $this->tenantId,
-            module: 'finance',
-            documentType: 'payment',
-            prefix: 'PAY-',
-            suffix: null,
-            nextNumber: 15,
-            padding: 4,
-            isActive: true,
-        ));
-
-        $found = $repository->find($saved->getId());
-        $byKey = $repository->findByTenantModuleAndDocumentType($this->tenantId, 'finance', 'payment');
-        $wrongTenant = $repository->findByTenantModuleAndDocumentType($this->tenant2Id, 'finance', 'payment');
-
-        $first = $repository->generateNextNumber($this->tenantId, 'finance', 'payment');
-        $second = $repository->generateNextNumber($this->tenantId, 'finance', 'payment');
-
-        $this->assertNotNull($found);
-        $this->assertNotNull($byKey);
-        $this->assertSame($saved->getId(), $found->getId());
-        $this->assertSame($saved->getId(), $byKey->getId());
-        $this->assertSame('PAY-0015', $first);
-        $this->assertSame('PAY-0016', $second);
-        $this->assertNull($wrongTenant);
-    }
-
     public function test_cost_center_save_find_and_find_by_tenant_and_code(): void
     {
         /** @var CostCenterRepositoryInterface $repository */
@@ -539,28 +503,6 @@ class FinanceRepositoryIntegrationTest extends TestCase
         $this->assertSame('completed', $found->getStatus());
     }
 
-    public function test_credit_memo_save_and_find(): void
-    {
-        /** @var CreditMemoRepositoryInterface $repository */
-        $repository = app(CreditMemoRepositoryInterface::class);
-
-        $saved = $repository->save(new CreditMemo(
-            tenantId: $this->tenantId,
-            partyId: $this->customerId,
-            partyType: 'customer',
-            creditMemoNumber: 'CM-0001',
-            amount: 250.0,
-            issuedDate: new \DateTimeImmutable('2026-02-06'),
-            status: 'issued',
-            notes: 'Price adjustment',
-        ));
-
-        $found = $repository->find($saved->getId());
-
-        $this->assertNotNull($found);
-        $this->assertSame($saved->getId(), $found->getId());
-        $this->assertSame('CM-0001', $found->getCreditMemoNumber());
-    }
 
     public function test_payment_allocation_save_and_find(): void
     {

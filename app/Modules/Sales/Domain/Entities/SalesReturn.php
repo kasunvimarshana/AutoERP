@@ -36,8 +36,6 @@ class SalesReturn
 
     private string $grandTotal;
 
-    private ?string $creditMemoNumber;
-
     private ?int $journalEntryId;
 
     private ?string $notes;
@@ -72,7 +70,6 @@ class SalesReturn
         string $taxTotal = '0.000000',
         string $restockingFeeTotal = '0.000000',
         string $grandTotal = '0.000000',
-        ?string $creditMemoNumber = null,
         ?int $journalEntryId = null,
         ?string $notes = null,
         ?array $metadata = null,
@@ -97,7 +94,6 @@ class SalesReturn
         $this->taxTotal = $taxTotal;
         $this->restockingFeeTotal = $restockingFeeTotal;
         $this->grandTotal = $grandTotal;
-        $this->creditMemoNumber = $creditMemoNumber;
         $this->journalEntryId = $journalEntryId;
         $this->notes = $notes;
         $this->metadata = $metadata;
@@ -180,11 +176,6 @@ class SalesReturn
         return $this->grandTotal;
     }
 
-    public function getCreditMemoNumber(): ?string
-    {
-        return $this->creditMemoNumber;
-    }
-
     public function getJournalEntryId(): ?int
     {
         return $this->journalEntryId;
@@ -241,7 +232,6 @@ class SalesReturn
         string $taxTotal = '0.000000',
         string $restockingFeeTotal = '0.000000',
         string $grandTotal = '0.000000',
-        ?string $creditMemoNumber = null,
         ?int $journalEntryId = null,
         ?string $notes = null,
         ?array $metadata = null,
@@ -258,7 +248,6 @@ class SalesReturn
         $this->taxTotal = $taxTotal;
         $this->restockingFeeTotal = $restockingFeeTotal;
         $this->grandTotal = $grandTotal;
-        $this->creditMemoNumber = $creditMemoNumber;
         $this->journalEntryId = $journalEntryId;
         $this->notes = $notes;
         $this->metadata = $metadata;

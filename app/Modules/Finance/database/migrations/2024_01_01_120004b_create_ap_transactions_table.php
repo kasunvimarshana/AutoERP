@@ -23,7 +23,7 @@ return new class extends Migration
             $table->unsignedBigInteger('party_id')->nullable();
 
             $table->foreignId('account_id')->constrained('accounts', 'id', 'ap_transactions_account_id_fk')->cascadeOnDelete();
-            $table->enum('transaction_type', ['bill', 'payment', 'debit_note', 'adjustment']);
+            $table->string('transaction_type')->comment('bill, payment, debit_note, adjustment, etc.');
             $table->nullableMorphs('reference');
             $table->decimal('amount', 20, 6);
             $table->decimal('balance_after', 20, 6);

@@ -8,7 +8,6 @@ use DateTimeImmutable;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Validation\PresenceVerifierInterface;
 use Modules\Auth\Application\Contracts\AuthorizationServiceInterface;
-use Modules\Finance\Application\Contracts\ApplyCreditMemoServiceInterface;
 use Modules\Finance\Application\Contracts\ApproveApprovalRequestServiceInterface;
 use Modules\Finance\Application\Contracts\CancelApprovalRequestServiceInterface;
 use Modules\Finance\Application\Contracts\CategorizeBankTransactionServiceInterface;
@@ -23,9 +22,7 @@ use Modules\Finance\Application\Contracts\CreateBankCategoryRuleServiceInterface
 use Modules\Finance\Application\Contracts\CreateBankReconciliationServiceInterface;
 use Modules\Finance\Application\Contracts\CreateBankTransactionServiceInterface;
 use Modules\Finance\Application\Contracts\CreateCostCenterServiceInterface;
-use Modules\Finance\Application\Contracts\CreateCreditMemoServiceInterface;
 use Modules\Finance\Application\Contracts\CreateJournalEntryServiceInterface;
-use Modules\Finance\Application\Contracts\CreateNumberingSequenceServiceInterface;
 use Modules\Finance\Application\Contracts\CreatePaymentAllocationServiceInterface;
 use Modules\Finance\Application\Contracts\CreatePaymentMethodServiceInterface;
 use Modules\Finance\Application\Contracts\CreatePaymentServiceInterface;
@@ -40,9 +37,7 @@ use Modules\Finance\Application\Contracts\DeleteBankCategoryRuleServiceInterface
 use Modules\Finance\Application\Contracts\DeleteBankReconciliationServiceInterface;
 use Modules\Finance\Application\Contracts\DeleteBankTransactionServiceInterface;
 use Modules\Finance\Application\Contracts\DeleteCostCenterServiceInterface;
-use Modules\Finance\Application\Contracts\DeleteCreditMemoServiceInterface;
 use Modules\Finance\Application\Contracts\DeleteJournalEntryServiceInterface;
-use Modules\Finance\Application\Contracts\DeleteNumberingSequenceServiceInterface;
 use Modules\Finance\Application\Contracts\DeletePaymentAllocationServiceInterface;
 use Modules\Finance\Application\Contracts\DeletePaymentMethodServiceInterface;
 use Modules\Finance\Application\Contracts\DeletePaymentServiceInterface;
@@ -57,15 +52,11 @@ use Modules\Finance\Application\Contracts\FindBankCategoryRuleServiceInterface;
 use Modules\Finance\Application\Contracts\FindBankReconciliationServiceInterface;
 use Modules\Finance\Application\Contracts\FindBankTransactionServiceInterface;
 use Modules\Finance\Application\Contracts\FindCostCenterServiceInterface;
-use Modules\Finance\Application\Contracts\FindCreditMemoServiceInterface;
 use Modules\Finance\Application\Contracts\FindJournalEntryServiceInterface;
-use Modules\Finance\Application\Contracts\FindNumberingSequenceServiceInterface;
 use Modules\Finance\Application\Contracts\FindPaymentAllocationServiceInterface;
 use Modules\Finance\Application\Contracts\FindPaymentMethodServiceInterface;
 use Modules\Finance\Application\Contracts\FindPaymentServiceInterface;
 use Modules\Finance\Application\Contracts\FindPaymentTermServiceInterface;
-use Modules\Finance\Application\Contracts\IssueCreditMemoServiceInterface;
-use Modules\Finance\Application\Contracts\NextNumberingSequenceServiceInterface;
 use Modules\Finance\Application\Contracts\PostJournalEntryServiceInterface;
 use Modules\Finance\Application\Contracts\PostPaymentServiceInterface;
 use Modules\Finance\Application\Contracts\RejectApprovalRequestServiceInterface;
@@ -81,13 +72,10 @@ use Modules\Finance\Application\Contracts\UpdateBankCategoryRuleServiceInterface
 use Modules\Finance\Application\Contracts\UpdateBankReconciliationServiceInterface;
 use Modules\Finance\Application\Contracts\UpdateBankTransactionServiceInterface;
 use Modules\Finance\Application\Contracts\UpdateCostCenterServiceInterface;
-use Modules\Finance\Application\Contracts\UpdateCreditMemoServiceInterface;
 use Modules\Finance\Application\Contracts\UpdateJournalEntryServiceInterface;
-use Modules\Finance\Application\Contracts\UpdateNumberingSequenceServiceInterface;
 use Modules\Finance\Application\Contracts\UpdatePaymentMethodServiceInterface;
 use Modules\Finance\Application\Contracts\UpdatePaymentServiceInterface;
 use Modules\Finance\Application\Contracts\UpdatePaymentTermServiceInterface;
-use Modules\Finance\Application\Contracts\VoidCreditMemoServiceInterface;
 use Modules\Finance\Application\Contracts\VoidPaymentServiceInterface;
 use Modules\Finance\Domain\Entities\Account;
 use Modules\Finance\Domain\Entities\ApprovalRequest;
@@ -99,9 +87,7 @@ use Modules\Finance\Domain\Entities\BankCategoryRule;
 use Modules\Finance\Domain\Entities\BankReconciliation;
 use Modules\Finance\Domain\Entities\BankTransaction;
 use Modules\Finance\Domain\Entities\CostCenter;
-use Modules\Finance\Domain\Entities\CreditMemo;
 use Modules\Finance\Domain\Entities\JournalEntry;
-use Modules\Finance\Domain\Entities\NumberingSequence;
 use Modules\Finance\Domain\Entities\Payment;
 use Modules\Finance\Domain\Entities\PaymentAllocation;
 use Modules\Finance\Domain\Entities\PaymentMethod;
@@ -127,8 +113,6 @@ class FinanceEndpointsAuthenticatedTest extends TestCase
 
     private JournalEntry $journalEntry;
 
-    private CreditMemo $creditMemo;
-
     private BankAccount $bankAccount;
 
     private BankCategoryRule $bankCategoryRule;
@@ -144,8 +128,6 @@ class FinanceEndpointsAuthenticatedTest extends TestCase
     private ArTransaction $arTransaction;
 
     private ApTransaction $apTransaction;
-
-    private NumberingSequence $numberingSequence;
 
     protected function setUp(): void
     {
@@ -230,16 +212,6 @@ class FinanceEndpointsAuthenticatedTest extends TestCase
             id: 1,
         );
 
-        $this->creditMemo = new CreditMemo(
-            tenantId: 1,
-            partyId: 2,
-            partyType: 'customer',
-            creditMemoNumber: 'CM-001',
-            amount: 50.00,
-            issuedDate: $now,
-            id: 1,
-        );
-
         $this->bankAccount = new BankAccount(
             tenantId: 1,
             accountId: 1,
@@ -317,13 +289,6 @@ class FinanceEndpointsAuthenticatedTest extends TestCase
             balanceAfter: 100.00,
             transactionDate: $now,
             currencyId: 1,
-            id: 1,
-        );
-
-        $this->numberingSequence = new NumberingSequence(
-            tenantId: 1,
-            module: 'finance',
-            documentType: 'invoice',
             id: 1,
         );
     }
@@ -980,149 +945,6 @@ class FinanceEndpointsAuthenticatedTest extends TestCase
             ->postJson('/api/journal-entries/1/post', [
                 'posted_by' => 99,
             ]);
-
-        $response->assertOk()->assertJsonPath('data.id', 1);
-    }
-
-    // -------------------------------------------------------------------------
-    // CreditMemo
-    // -------------------------------------------------------------------------
-
-    public function test_credit_memo_index_returns_paginated_list(): void
-    {
-        $paginator = $this->makePaginator([$this->creditMemo]);
-
-        $findService = $this->createMock(FindCreditMemoServiceInterface::class);
-        $findService->method('list')->willReturn($paginator);
-        $this->app->instance(FindCreditMemoServiceInterface::class, $findService);
-
-        $response = $this->actingAsUser()
-            ->getJson('/api/credit-memos?tenant_id=1');
-
-        $response->assertOk()->assertJsonPath('data.0.id', 1);
-    }
-
-    public function test_credit_memo_store_returns_created(): void
-    {
-        $createService = $this->createMock(CreateCreditMemoServiceInterface::class);
-        $createService->method('execute')->willReturn($this->creditMemo);
-        $this->app->instance(CreateCreditMemoServiceInterface::class, $createService);
-
-        $findService = $this->createMock(FindCreditMemoServiceInterface::class);
-        $this->app->instance(FindCreditMemoServiceInterface::class, $findService);
-
-        $response = $this->actingAsUser()
-            ->postJson('/api/credit-memos', [
-                'tenant_id'            => 1,
-                'party_id'             => 2,
-                'party_type'           => 'customer',
-                'credit_memo_number'   => 'CM-001',
-                'amount'               => 50.00,
-                'issued_date'          => '2026-01-15',
-            ]);
-
-        $response->assertStatus(201)->assertJsonPath('data.id', 1);
-    }
-
-    public function test_credit_memo_show_returns_entity(): void
-    {
-        $findService = $this->createMock(FindCreditMemoServiceInterface::class);
-        $findService->method('find')->with(1)->willReturn($this->creditMemo);
-        $this->app->instance(FindCreditMemoServiceInterface::class, $findService);
-
-        $response = $this->actingAsUser()
-            ->getJson('/api/credit-memos/1');
-
-        $response->assertOk()->assertJsonPath('data.id', 1);
-    }
-
-    public function test_credit_memo_update_returns_entity(): void
-    {
-        $findService = $this->createMock(FindCreditMemoServiceInterface::class);
-        $findService->method('find')->with(1)->willReturn($this->creditMemo);
-        $this->app->instance(FindCreditMemoServiceInterface::class, $findService);
-
-        $updateService = $this->createMock(UpdateCreditMemoServiceInterface::class);
-        $updateService->method('execute')->willReturn($this->creditMemo);
-        $this->app->instance(UpdateCreditMemoServiceInterface::class, $updateService);
-
-        $response = $this->actingAsUser()
-            ->putJson('/api/credit-memos/1', [
-                'row_version'          => 1,
-                'tenant_id'            => 1,
-                'party_id'             => 2,
-                'party_type'           => 'customer',
-                'credit_memo_number'   => 'CM-001',
-                'amount'               => 50.00,
-                'issued_date'          => '2026-01-15',
-            ]);
-
-        $response->assertOk()->assertJsonPath('data.id', 1);
-    }
-
-    public function test_credit_memo_destroy_returns_message(): void
-    {
-        $findService = $this->createMock(FindCreditMemoServiceInterface::class);
-        $findService->method('find')->with(1)->willReturn($this->creditMemo);
-        $this->app->instance(FindCreditMemoServiceInterface::class, $findService);
-
-        $deleteService = $this->createMock(DeleteCreditMemoServiceInterface::class);
-        $deleteService->method('execute')->willReturn(null);
-        $this->app->instance(DeleteCreditMemoServiceInterface::class, $deleteService);
-
-        $response = $this->actingAsUser()
-            ->deleteJson('/api/credit-memos/1');
-
-        $response->assertOk()->assertJsonPath('message', 'Credit memo deleted successfully');
-    }
-
-    public function test_credit_memo_issue_returns_entity(): void
-    {
-        $findService = $this->createMock(FindCreditMemoServiceInterface::class);
-        $findService->method('find')->with(1)->willReturn($this->creditMemo);
-        $this->app->instance(FindCreditMemoServiceInterface::class, $findService);
-
-        $issueService = $this->createMock(IssueCreditMemoServiceInterface::class);
-        $issueService->method('execute')->willReturn($this->creditMemo);
-        $this->app->instance(IssueCreditMemoServiceInterface::class, $issueService);
-
-        $response = $this->actingAsUser()
-            ->postJson('/api/credit-memos/1/issue');
-
-        $response->assertOk()->assertJsonPath('data.id', 1);
-    }
-
-    public function test_credit_memo_apply_returns_entity(): void
-    {
-        $findService = $this->createMock(FindCreditMemoServiceInterface::class);
-        $findService->method('find')->with(1)->willReturn($this->creditMemo);
-        $this->app->instance(FindCreditMemoServiceInterface::class, $findService);
-
-        $applyService = $this->createMock(ApplyCreditMemoServiceInterface::class);
-        $applyService->method('execute')->willReturn($this->creditMemo);
-        $this->app->instance(ApplyCreditMemoServiceInterface::class, $applyService);
-
-        $response = $this->actingAsUser()
-            ->postJson('/api/credit-memos/1/apply', [
-                'invoice_id'   => 1,
-                'invoice_type' => 'sales_invoice',
-            ]);
-
-        $response->assertOk()->assertJsonPath('data.id', 1);
-    }
-
-    public function test_credit_memo_void_returns_entity(): void
-    {
-        $findService = $this->createMock(FindCreditMemoServiceInterface::class);
-        $findService->method('find')->with(1)->willReturn($this->creditMemo);
-        $this->app->instance(FindCreditMemoServiceInterface::class, $findService);
-
-        $voidService = $this->createMock(VoidCreditMemoServiceInterface::class);
-        $voidService->method('execute')->willReturn($this->creditMemo);
-        $this->app->instance(VoidCreditMemoServiceInterface::class, $voidService);
-
-        $response = $this->actingAsUser()
-            ->postJson('/api/credit-memos/1/void');
 
         $response->assertOk()->assertJsonPath('data.id', 1);
     }
@@ -1984,110 +1806,6 @@ class FinanceEndpointsAuthenticatedTest extends TestCase
         $response->assertOk()->assertJsonPath('data.id', 1);
     }
 
-    // -------------------------------------------------------------------------
-    // NumberingSequence
-    // -------------------------------------------------------------------------
-
-    public function test_numbering_sequence_index_returns_paginated_list(): void
-    {
-        $paginator = $this->makePaginator([$this->numberingSequence]);
-
-        $findService = $this->createMock(FindNumberingSequenceServiceInterface::class);
-        $findService->method('list')->willReturn($paginator);
-        $this->app->instance(FindNumberingSequenceServiceInterface::class, $findService);
-
-        $response = $this->actingAsUser()
-            ->getJson('/api/numbering-sequences?tenant_id=1');
-
-        $response->assertOk()->assertJsonPath('data.0.id', 1);
-    }
-
-    public function test_numbering_sequence_store_returns_created(): void
-    {
-        $createService = $this->createMock(CreateNumberingSequenceServiceInterface::class);
-        $createService->method('execute')->willReturn($this->numberingSequence);
-        $this->app->instance(CreateNumberingSequenceServiceInterface::class, $createService);
-
-        $findService = $this->createMock(FindNumberingSequenceServiceInterface::class);
-        $this->app->instance(FindNumberingSequenceServiceInterface::class, $findService);
-
-        $response = $this->actingAsUser()
-            ->postJson('/api/numbering-sequences', [
-                'tenant_id'     => 1,
-                'module'        => 'finance',
-                'document_type' => 'invoice',
-            ]);
-
-        $response->assertStatus(201)->assertJsonPath('data.id', 1);
-    }
-
-    public function test_numbering_sequence_show_returns_entity(): void
-    {
-        $findService = $this->createMock(FindNumberingSequenceServiceInterface::class);
-        $findService->method('find')->with(1)->willReturn($this->numberingSequence);
-        $this->app->instance(FindNumberingSequenceServiceInterface::class, $findService);
-
-        $response = $this->actingAsUser()
-            ->getJson('/api/numbering-sequences/1');
-
-        $response->assertOk()->assertJsonPath('data.id', 1);
-    }
-
-    public function test_numbering_sequence_update_returns_entity(): void
-    {
-        $findService = $this->createMock(FindNumberingSequenceServiceInterface::class);
-        $findService->method('find')->with(1)->willReturn($this->numberingSequence);
-        $this->app->instance(FindNumberingSequenceServiceInterface::class, $findService);
-
-        $updateService = $this->createMock(UpdateNumberingSequenceServiceInterface::class);
-        $updateService->method('execute')->willReturn($this->numberingSequence);
-        $this->app->instance(UpdateNumberingSequenceServiceInterface::class, $updateService);
-
-        $response = $this->actingAsUser()
-            ->putJson('/api/numbering-sequences/1', [
-                'row_version'   => 1,
-                'tenant_id'     => 1,
-                'module'        => 'finance',
-                'document_type' => 'invoice',
-            ]);
-
-        $response->assertOk()->assertJsonPath('data.id', 1);
-    }
-
-    public function test_numbering_sequence_destroy_returns_message(): void
-    {
-        $findService = $this->createMock(FindNumberingSequenceServiceInterface::class);
-        $findService->method('find')->with(1)->willReturn($this->numberingSequence);
-        $this->app->instance(FindNumberingSequenceServiceInterface::class, $findService);
-
-        $deleteService = $this->createMock(DeleteNumberingSequenceServiceInterface::class);
-        $deleteService->method('execute')->willReturn(null);
-        $this->app->instance(DeleteNumberingSequenceServiceInterface::class, $deleteService);
-
-        $response = $this->actingAsUser()
-            ->deleteJson('/api/numbering-sequences/1');
-
-        $response->assertOk()->assertJsonPath('message', 'Numbering sequence deleted successfully');
-    }
-
-    public function test_numbering_sequence_next_returns_message(): void
-    {
-        $findService = $this->createMock(FindNumberingSequenceServiceInterface::class);
-        $findService->method('find')->with(1)->willReturn($this->numberingSequence);
-        $this->app->instance(FindNumberingSequenceServiceInterface::class, $findService);
-
-        $nextService = $this->createMock(NextNumberingSequenceServiceInterface::class);
-        $nextService->method('execute')->willReturn([
-            'number' => 'INV-00001',
-            'sequence' => $this->numberingSequence,
-        ]);
-        $this->app->instance(NextNumberingSequenceServiceInterface::class, $nextService);
-
-        $response = $this->actingAsUser()
-            ->postJson('/api/numbering-sequences/1/next');
-
-        $response->assertOk();
-    }
 
     // -------------------------------------------------------------------------
     // Helpers

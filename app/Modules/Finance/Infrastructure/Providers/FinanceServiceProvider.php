@@ -7,7 +7,6 @@ namespace Modules\Finance\Infrastructure\Providers;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Infrastructure\Concerns\LoadsModuleRoutesAndMigrations;
-use Modules\Finance\Application\Contracts\ApplyCreditMemoServiceInterface;
 use Modules\Finance\Application\Contracts\ApproveApprovalRequestServiceInterface;
 use Modules\Finance\Application\Contracts\CancelApprovalRequestServiceInterface;
 use Modules\Finance\Application\Contracts\CategorizeBankTransactionServiceInterface;
@@ -22,11 +21,9 @@ use Modules\Finance\Application\Contracts\CreateBankCategoryRuleServiceInterface
 use Modules\Finance\Application\Contracts\CreateBankReconciliationServiceInterface;
 use Modules\Finance\Application\Contracts\CreateBankTransactionServiceInterface;
 use Modules\Finance\Application\Contracts\CreateCostCenterServiceInterface;
-use Modules\Finance\Application\Contracts\CreateCreditMemoServiceInterface;
 use Modules\Finance\Application\Contracts\CreateFiscalPeriodServiceInterface;
 use Modules\Finance\Application\Contracts\CreateFiscalYearServiceInterface;
 use Modules\Finance\Application\Contracts\CreateJournalEntryServiceInterface;
-use Modules\Finance\Application\Contracts\CreateNumberingSequenceServiceInterface;
 use Modules\Finance\Application\Contracts\CreatePaymentAllocationServiceInterface;
 use Modules\Finance\Application\Contracts\CreatePaymentMethodServiceInterface;
 use Modules\Finance\Application\Contracts\CreatePaymentServiceInterface;
@@ -41,11 +38,9 @@ use Modules\Finance\Application\Contracts\DeleteBankCategoryRuleServiceInterface
 use Modules\Finance\Application\Contracts\DeleteBankReconciliationServiceInterface;
 use Modules\Finance\Application\Contracts\DeleteBankTransactionServiceInterface;
 use Modules\Finance\Application\Contracts\DeleteCostCenterServiceInterface;
-use Modules\Finance\Application\Contracts\DeleteCreditMemoServiceInterface;
 use Modules\Finance\Application\Contracts\DeleteFiscalPeriodServiceInterface;
 use Modules\Finance\Application\Contracts\DeleteFiscalYearServiceInterface;
 use Modules\Finance\Application\Contracts\DeleteJournalEntryServiceInterface;
-use Modules\Finance\Application\Contracts\DeleteNumberingSequenceServiceInterface;
 use Modules\Finance\Application\Contracts\DeletePaymentAllocationServiceInterface;
 use Modules\Finance\Application\Contracts\DeletePaymentMethodServiceInterface;
 use Modules\Finance\Application\Contracts\DeletePaymentServiceInterface;
@@ -61,17 +56,13 @@ use Modules\Finance\Application\Contracts\FindBankCategoryRuleServiceInterface;
 use Modules\Finance\Application\Contracts\FindBankReconciliationServiceInterface;
 use Modules\Finance\Application\Contracts\FindBankTransactionServiceInterface;
 use Modules\Finance\Application\Contracts\FindCostCenterServiceInterface;
-use Modules\Finance\Application\Contracts\FindCreditMemoServiceInterface;
 use Modules\Finance\Application\Contracts\FindFiscalPeriodServiceInterface;
 use Modules\Finance\Application\Contracts\FindFiscalYearServiceInterface;
 use Modules\Finance\Application\Contracts\FindJournalEntryServiceInterface;
-use Modules\Finance\Application\Contracts\FindNumberingSequenceServiceInterface;
 use Modules\Finance\Application\Contracts\FindPaymentAllocationServiceInterface;
 use Modules\Finance\Application\Contracts\FindPaymentMethodServiceInterface;
 use Modules\Finance\Application\Contracts\FindPaymentServiceInterface;
 use Modules\Finance\Application\Contracts\FindPaymentTermServiceInterface;
-use Modules\Finance\Application\Contracts\IssueCreditMemoServiceInterface;
-use Modules\Finance\Application\Contracts\NextNumberingSequenceServiceInterface;
 use Modules\Finance\Application\Contracts\PostJournalEntryServiceInterface;
 use Modules\Finance\Application\Contracts\PostPaymentServiceInterface;
 use Modules\Finance\Application\Contracts\ReconcileApTransactionServiceInterface;
@@ -87,17 +78,13 @@ use Modules\Finance\Application\Contracts\UpdateBankCategoryRuleServiceInterface
 use Modules\Finance\Application\Contracts\UpdateBankReconciliationServiceInterface;
 use Modules\Finance\Application\Contracts\UpdateBankTransactionServiceInterface;
 use Modules\Finance\Application\Contracts\UpdateCostCenterServiceInterface;
-use Modules\Finance\Application\Contracts\UpdateCreditMemoServiceInterface;
 use Modules\Finance\Application\Contracts\UpdateFiscalPeriodServiceInterface;
 use Modules\Finance\Application\Contracts\UpdateFiscalYearServiceInterface;
 use Modules\Finance\Application\Contracts\UpdateJournalEntryServiceInterface;
-use Modules\Finance\Application\Contracts\UpdateNumberingSequenceServiceInterface;
 use Modules\Finance\Application\Contracts\UpdatePaymentMethodServiceInterface;
 use Modules\Finance\Application\Contracts\UpdatePaymentServiceInterface;
 use Modules\Finance\Application\Contracts\UpdatePaymentTermServiceInterface;
-use Modules\Finance\Application\Contracts\VoidCreditMemoServiceInterface;
 use Modules\Finance\Application\Contracts\VoidPaymentServiceInterface;
-use Modules\Finance\Application\Services\ApplyCreditMemoService;
 use Modules\Finance\Application\Services\ApproveApprovalRequestService;
 use Modules\Finance\Application\Services\CancelApprovalRequestService;
 use Modules\Finance\Application\Services\CategorizeBankTransactionService;
@@ -112,11 +99,9 @@ use Modules\Finance\Application\Services\CreateBankCategoryRuleService;
 use Modules\Finance\Application\Services\CreateBankReconciliationService;
 use Modules\Finance\Application\Services\CreateBankTransactionService;
 use Modules\Finance\Application\Services\CreateCostCenterService;
-use Modules\Finance\Application\Services\CreateCreditMemoService;
 use Modules\Finance\Application\Services\CreateFiscalPeriodService;
 use Modules\Finance\Application\Services\CreateFiscalYearService;
 use Modules\Finance\Application\Services\CreateJournalEntryService;
-use Modules\Finance\Application\Services\CreateNumberingSequenceService;
 use Modules\Finance\Application\Services\CreatePaymentAllocationService;
 use Modules\Finance\Application\Services\CreatePaymentMethodService;
 use Modules\Finance\Application\Services\CreatePaymentService;
@@ -131,11 +116,9 @@ use Modules\Finance\Application\Services\DeleteBankCategoryRuleService;
 use Modules\Finance\Application\Services\DeleteBankReconciliationService;
 use Modules\Finance\Application\Services\DeleteBankTransactionService;
 use Modules\Finance\Application\Services\DeleteCostCenterService;
-use Modules\Finance\Application\Services\DeleteCreditMemoService;
 use Modules\Finance\Application\Services\DeleteFiscalPeriodService;
 use Modules\Finance\Application\Services\DeleteFiscalYearService;
 use Modules\Finance\Application\Services\DeleteJournalEntryService;
-use Modules\Finance\Application\Services\DeleteNumberingSequenceService;
 use Modules\Finance\Application\Services\DeletePaymentAllocationService;
 use Modules\Finance\Application\Services\DeletePaymentMethodService;
 use Modules\Finance\Application\Services\DeletePaymentService;
@@ -151,17 +134,13 @@ use Modules\Finance\Application\Services\FindBankCategoryRuleService;
 use Modules\Finance\Application\Services\FindBankReconciliationService;
 use Modules\Finance\Application\Services\FindBankTransactionService;
 use Modules\Finance\Application\Services\FindCostCenterService;
-use Modules\Finance\Application\Services\FindCreditMemoService;
 use Modules\Finance\Application\Services\FindFiscalPeriodService;
 use Modules\Finance\Application\Services\FindFiscalYearService;
 use Modules\Finance\Application\Services\FindJournalEntryService;
-use Modules\Finance\Application\Services\FindNumberingSequenceService;
 use Modules\Finance\Application\Services\FindPaymentAllocationService;
 use Modules\Finance\Application\Services\FindPaymentMethodService;
 use Modules\Finance\Application\Services\FindPaymentService;
 use Modules\Finance\Application\Services\FindPaymentTermService;
-use Modules\Finance\Application\Services\IssueCreditMemoService;
-use Modules\Finance\Application\Services\NextNumberingSequenceService;
 use Modules\Finance\Application\Services\PostJournalEntryService;
 use Modules\Finance\Application\Services\PostPaymentService;
 use Modules\Finance\Application\Services\ReconcileApTransactionService;
@@ -177,15 +156,12 @@ use Modules\Finance\Application\Services\UpdateBankCategoryRuleService;
 use Modules\Finance\Application\Services\UpdateBankReconciliationService;
 use Modules\Finance\Application\Services\UpdateBankTransactionService;
 use Modules\Finance\Application\Services\UpdateCostCenterService;
-use Modules\Finance\Application\Services\UpdateCreditMemoService;
 use Modules\Finance\Application\Services\UpdateFiscalPeriodService;
 use Modules\Finance\Application\Services\UpdateFiscalYearService;
 use Modules\Finance\Application\Services\UpdateJournalEntryService;
-use Modules\Finance\Application\Services\UpdateNumberingSequenceService;
 use Modules\Finance\Application\Services\UpdatePaymentMethodService;
 use Modules\Finance\Application\Services\UpdatePaymentService;
 use Modules\Finance\Application\Services\UpdatePaymentTermService;
-use Modules\Finance\Application\Services\VoidCreditMemoService;
 use Modules\Finance\Application\Services\VoidPaymentService;
 use Modules\Finance\Domain\RepositoryInterfaces\AccountRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\ApprovalRequestRepositoryInterface;
@@ -197,11 +173,9 @@ use Modules\Finance\Domain\RepositoryInterfaces\BankCategoryRuleRepositoryInterf
 use Modules\Finance\Domain\RepositoryInterfaces\BankReconciliationRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\BankTransactionRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\CostCenterRepositoryInterface;
-use Modules\Finance\Domain\RepositoryInterfaces\CreditMemoRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\FiscalPeriodRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\FiscalYearRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\JournalEntryRepositoryInterface;
-use Modules\Finance\Domain\RepositoryInterfaces\NumberingSequenceRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\PaymentAllocationRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\PaymentMethodRepositoryInterface;
 use Modules\Finance\Domain\RepositoryInterfaces\PaymentRepositoryInterface;
@@ -227,11 +201,9 @@ use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentBan
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentBankReconciliationRepository;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentBankTransactionRepository;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentCostCenterRepository;
-use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentCreditMemoRepository;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentFiscalPeriodRepository;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentFiscalYearRepository;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentJournalEntryRepository;
-use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentNumberingSequenceRepository;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentPaymentAllocationRepository;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentPaymentMethodRepository;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Repositories\EloquentPaymentRepository;
@@ -265,11 +237,9 @@ class FinanceServiceProvider extends ServiceProvider
             BankReconciliationRepositoryInterface::class => EloquentBankReconciliationRepository::class,
             BankTransactionRepositoryInterface::class => EloquentBankTransactionRepository::class,
             CostCenterRepositoryInterface::class => EloquentCostCenterRepository::class,
-            CreditMemoRepositoryInterface::class => EloquentCreditMemoRepository::class,
             FiscalPeriodRepositoryInterface::class => EloquentFiscalPeriodRepository::class,
             FiscalYearRepositoryInterface::class => EloquentFiscalYearRepository::class,
             JournalEntryRepositoryInterface::class => EloquentJournalEntryRepository::class,
-            NumberingSequenceRepositoryInterface::class => EloquentNumberingSequenceRepository::class,
             PaymentAllocationRepositoryInterface::class => EloquentPaymentAllocationRepository::class,
             PaymentMethodRepositoryInterface::class => EloquentPaymentMethodRepository::class,
             PaymentRepositoryInterface::class => EloquentPaymentRepository::class,
@@ -321,10 +291,6 @@ class FinanceServiceProvider extends ServiceProvider
             FindCostCenterServiceInterface::class => FindCostCenterService::class,
             UpdateCostCenterServiceInterface::class => UpdateCostCenterService::class,
             DeleteCostCenterServiceInterface::class => DeleteCostCenterService::class,
-            CreateCreditMemoServiceInterface::class => CreateCreditMemoService::class,
-            FindCreditMemoServiceInterface::class => FindCreditMemoService::class,
-            UpdateCreditMemoServiceInterface::class => UpdateCreditMemoService::class,
-            DeleteCreditMemoServiceInterface::class => DeleteCreditMemoService::class,
             CreateFiscalYearServiceInterface::class => CreateFiscalYearService::class,
             FindFiscalYearServiceInterface::class => FindFiscalYearService::class,
             UpdateFiscalYearServiceInterface::class => UpdateFiscalYearService::class,
@@ -340,9 +306,6 @@ class FinanceServiceProvider extends ServiceProvider
             PostJournalEntryServiceInterface::class => PostJournalEntryService::class,
             PostPaymentServiceInterface::class => PostPaymentService::class,
             VoidPaymentServiceInterface::class => VoidPaymentService::class,
-            IssueCreditMemoServiceInterface::class => IssueCreditMemoService::class,
-            ApplyCreditMemoServiceInterface::class => ApplyCreditMemoService::class,
-            VoidCreditMemoServiceInterface::class => VoidCreditMemoService::class,
             CompleteBankReconciliationServiceInterface::class => CompleteBankReconciliationService::class,
             ApproveApprovalRequestServiceInterface::class => ApproveApprovalRequestService::class,
             RejectApprovalRequestServiceInterface::class => RejectApprovalRequestService::class,
@@ -350,11 +313,6 @@ class FinanceServiceProvider extends ServiceProvider
             CategorizeBankTransactionServiceInterface::class => CategorizeBankTransactionService::class,
             ReconcileArTransactionServiceInterface::class => ReconcileArTransactionService::class,
             ReconcileApTransactionServiceInterface::class => ReconcileApTransactionService::class,
-            NextNumberingSequenceServiceInterface::class => NextNumberingSequenceService::class,
-            CreateNumberingSequenceServiceInterface::class => CreateNumberingSequenceService::class,
-            FindNumberingSequenceServiceInterface::class => FindNumberingSequenceService::class,
-            UpdateNumberingSequenceServiceInterface::class => UpdateNumberingSequenceService::class,
-            DeleteNumberingSequenceServiceInterface::class => DeleteNumberingSequenceService::class,
             CreatePaymentAllocationServiceInterface::class => CreatePaymentAllocationService::class,
             FindPaymentAllocationServiceInterface::class => FindPaymentAllocationService::class,
             DeletePaymentAllocationServiceInterface::class => DeletePaymentAllocationService::class,

@@ -42,7 +42,6 @@ class CreateSalesReturnService extends BaseService implements CreateSalesReturnS
             taxTotal: $dto->taxTotal,
             restockingFeeTotal: $dto->restockingFeeTotal,
             grandTotal: $dto->grandTotal,
-            creditMemoNumber: $dto->creditMemoNumber,
             journalEntryId: $dto->journalEntryId,
             notes: $dto->notes,
             metadata: $dto->metadata,
