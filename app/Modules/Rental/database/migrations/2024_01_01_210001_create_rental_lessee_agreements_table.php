@@ -23,7 +23,7 @@ return new class extends Migration
             $table->foreignId('lessee_id')->constrained('customers', 'id')->comment('Vehicle renter');
             $table->foreignId('vehicle_id')->constrained('vehicles', 'id');
 
-            $table->date('agreement_date');
+            $table->date('agreement_date')->comment('Date agreement signed');
             // $table->dateTime('start_datetime');
             // $table->dateTime('end_datetime')->nullable();
             $table->date('contract_date');
@@ -60,11 +60,11 @@ return new class extends Migration
             $table->softDeletes();
 
             // GL account references
-            $table->foreignId('rental_income_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();
-            $table->foreignId('excess_km_income_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();
-            $table->foreignId('driver_salary_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();
-            $table->foreignId('driver_ot_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();
-            $table->foreignId('driver_night_out_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();
+            $table->foreignId('rental_income_account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();
+            $table->foreignId('excess_km_income_account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();
+            $table->foreignId('driver_salary_account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();
+            $table->foreignId('driver_ot_account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();
+            $table->foreignId('driver_night_out_account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();
 
             $table->unique(['tenant_id', 'org_unit_id', 'agreement_number'], 'lessee_agreements_number_uk');
             $table->index(['tenant_id', 'lessor_id'], 'lessee_agreements_lessee_idx');

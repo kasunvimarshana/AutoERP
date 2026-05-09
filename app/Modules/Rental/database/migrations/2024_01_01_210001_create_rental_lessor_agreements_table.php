@@ -22,14 +22,17 @@ return new class extends Migration
             // $table->unsignedBigInteger('party_id');
             $table->foreignId('lessor_id')->constrained('suppliers', 'id')->comment('Vehicle owner');
             $table->foreignId('vehicle_id')->constrained('vehicles', 'id');
-            $table->date('agreement_date');
+
+            $table->date('agreement_date')->comment('Date agreement signed');
             // $table->dateTime('start_datetime');
             // $table->dateTime('end_datetime')->nullable();
             $table->date('contract_date');
             $table->date('start_date');
             $table->date('end_date')->nullable();
+
             $table->unsignedBigInteger('start_odometer')->nullable();
             $table->unsignedBigInteger('end_odometer')->nullable();
+
             // $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'rental_lessor_agreements_currency_id_fk')->nullOnDelete();
             $table->string('agreement_type')->comment('daily, monthly');
             // $table->string('rental_rate_type')->comment('hourly, daily, weekly, monthly, mileage, fixed');
