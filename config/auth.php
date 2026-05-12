@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\User;
+
 return [
 
     /*
@@ -40,11 +42,6 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
-
-        'api' => [
-            'driver' => 'passport',
-            'provider' => 'users',
-        ],
     ],
 
     /*
@@ -67,7 +64,7 @@ return [
     'providers' => [
         'users' => [
             'driver' => 'eloquent',
-            'model' => env('AUTH_MODEL', 'Modules\\User\\Infrastructure\\Persistence\\Eloquent\\Models\\UserModel'),
+            'model' => env('AUTH_MODEL', User::class),
         ],
 
         // 'users' => [

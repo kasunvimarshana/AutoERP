@@ -1,16 +1,8 @@
 <?php
 
-declare(strict_types=1);
-
-use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use Illuminate\Http\Request;
-use Modules\Auth\Infrastructure\Http\Middleware\AuthenticateWithConfiguredGuard;
-use Modules\Auth\Infrastructure\Http\Middleware\RedirectIfAuthenticated;
-use Modules\Core\Domain\Exceptions\DomainException;
-use Modules\Tenant\Infrastructure\Http\Middleware\ResolveTenant;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -19,47 +11,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->alias([
-            'resolve.tenant' => ResolveTenant::class,
-            'auth.configured' => AuthenticateWithConfiguredGuard::class,
-            'guest' => RedirectIfAuthenticated::class,
-        ]);
+        //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->render(function (QueryException $exception, Request $request) {
-            if (! $request->expectsJson() && ! $request->is('api/*')) {
-                return null;
-            }
-
-            $sqlState = strtoupper((string) $exception->getCode());
-            $message = strtolower($exception->getMessage());
-
-            $isUniqueViolation = in_array($sqlState, ['23000', '23505', '19'], true)
-                || str_contains($message, 'unique constraint')
-                || str_contains($message, 'duplicate entry')
-                || str_contains($message, 'unique failed');
-
-            if (! $isUniqueViolation) {
-                return null;
-            }
-
-            return response()->json([
-                'message' => 'Resource conflict: unique constraint violated.',
-            ], 409);
-        });
-
-        $exceptions->render(function (DomainException $exception, Request $request) {
-            if (! $request->expectsJson() && ! $request->is('api/*')) {
-                return null;
-            }
-
-            $status = $exception->getCode();
-            if (! is_int($status) || $status < 400 || $status > 599) {
-                $status = 422;
-            }
-
-            return response()->json([
-                'message' => $exception->getMessage(),
-            ], $status);
-        });
+        //
     })->create();
