@@ -1,0 +1,12 @@
+erDiagram
+    TENANTS ||--o{ VOUCHERS : has
+    PARTIES ||--o{ VOUCHERS : may_belong
+    CHART_OF_ACCOUNTS ||--o{ VOUCHERS : primary_account
+    CHART_OF_ACCOUNTS ||--o{ VOUCHERS : contra_account
+    TAX_RATES ||--o{ VOUCHERS : tax_applied
+    JOURNAL_ENTRIES ||--o{ VOUCHERS : posted_to
+
+    TENANTS ||--o{ RECURRING_VOUCHERS : has
+    RECURRING_VOUCHERS ||--o{ PARTIES : may_belong
+    RECURRING_VOUCHERS ||--o{ CHART_OF_ACCOUNTS : account
+    RECURRING_VOUCHERS ||--o{ CHART_OF_ACCOUNTS : contra_account

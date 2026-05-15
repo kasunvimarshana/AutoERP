@@ -1,0 +1,36 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('picking_tasks', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
+            $table->json('metadata')->nullable();
+
+            $table->foreignId('document_id')->constrained('documents');
+            $table->foreignId('product_id')->constrained('products');
+            $table->foreignId('source_location_id')->constrained('warehouse_locations');
+            $table->decimal('quantity', 20, 4);
+            $table->string('status')->default('pending');
+            $table->foreignId('assigned_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->timestamp('picked_at')->nullable();
+
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('picking_tasks');
+    }
+};

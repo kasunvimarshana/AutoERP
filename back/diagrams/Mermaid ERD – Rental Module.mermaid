@@ -1,0 +1,15 @@
+erDiagram
+    TENANTS ||--o{ RENTAL_AGREEMENTS : has
+    PARTIES ||--o{ RENTAL_AGREEMENTS : "lessee/lessor"
+    VEHICLES ||--o{ RENTAL_AGREEMENTS : rented
+    EMPLOYEES ||--o{ RENTAL_DRIVERS : assigned
+    RENTAL_AGREEMENTS ||--o{ RENTAL_DRIVERS : has
+    RENTAL_AGREEMENTS ||--o{ RENTAL_DEPOSITS : secured_by
+    RENTAL_AGREEMENTS ||--o{ RENTAL_RUNNING_CHARTS : logged_by
+    RENTAL_AGREEMENTS ||--o{ RENTAL_DAMAGES : has
+    RENTAL_AGREEMENTS ||--o{ RENTAL_EXTENSIONS : extended_by
+    RENTAL_AGREEMENTS ||--o{ RENTAL_INSPECTIONS : inspected_by
+    RENTAL_INSPECTIONS ||--o{ RENTAL_INSPECTION_ITEMS : contains
+    RENTAL_AGREEMENTS ||--o{ RENTAL_INSURANCE_POLICIES : covered_by
+    VEHICLES ||--o{ RENTAL_MAINTENANCE_LOGS : maintained_by
+    RENTAL_AGREEMENTS ||--o{ DOCUMENTS : "invoiced (generic document)"
