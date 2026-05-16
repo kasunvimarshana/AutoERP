@@ -6,8 +6,8 @@ namespace Modules\Core\Infrastructure\Persistence\Repositories;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 class EloquentRepository extends BaseRepository
 {
