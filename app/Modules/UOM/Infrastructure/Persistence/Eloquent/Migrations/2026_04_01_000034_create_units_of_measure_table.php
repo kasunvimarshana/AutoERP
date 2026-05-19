@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('units_of_measure', function (Blueprint $table) {
+        Schema::create('unit_of_measures', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
@@ -25,12 +25,12 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'name'], 'units_of_measures_name_uk');
+            $table->unique(['tenant_id', 'name'], 'unit_of_measures_name_uk');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('units_of_measure');
+        Schema::dropIfExists('unit_of_measures');
     }
 };

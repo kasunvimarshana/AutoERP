@@ -22,7 +22,7 @@ return new class extends Migration
             $table->foreignId('location_id')->constrained('warehouse_locations');
             $table->foreignId('batch_id')->nullable()->constrained('batches')->nullOnDelete();
             $table->foreignId('serial_id')->nullable()->constrained('serials')->nullOnDelete();
-            $table->foreignId('uom_id')->constrained('units_of_measure');
+            $table->foreignId('uom_id')->constrained('unit_of_measures');
             $table->decimal('quantity_on_hand', 20, 4)->default(0);
             $table->decimal('quantity_reserved', 20, 4)->default(0);
             // $table->decimal('quantity_available', 20, 4)->storedAs('quantity_on_hand - quantity_reserved')->comment('quantity_on_hand - quantity_reserved');

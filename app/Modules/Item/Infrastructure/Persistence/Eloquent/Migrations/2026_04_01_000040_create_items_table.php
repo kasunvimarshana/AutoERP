@@ -27,9 +27,9 @@ return new class extends Migration
             $table->string('image_path')->nullable();
 
             // Units of measure
-            $table->foreignId('base_uom_id')->constrained('units_of_measure');
-            $table->foreignId('purchase_uom_id')->nullable()->constrained('units_of_measure');
-            $table->foreignId('sales_uom_id')->nullable()->constrained('units_of_measure');
+            $table->foreignId('base_uom_id')->constrained('unit_of_measures');
+            $table->foreignId('purchase_uom_id')->nullable()->constrained('unit_of_measures');
+            $table->foreignId('sales_uom_id')->nullable()->constrained('unit_of_measures');
 
             $table->foreignId('tax_group_id')->nullable();
 

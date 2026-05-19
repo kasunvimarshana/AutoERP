@@ -24,7 +24,7 @@ return new class extends Migration
             $table->foreignId('warehouse_location_id')->constrained('warehouse_locations', 'id')->nullable()->cascadeOnDelete();
             $table->foreignId('batch_id')->constrained('batches', 'id')->nullable()->cascadeOnDelete();
             $table->foreignId('serial_id')->constrained('serials', 'id')->nullable()->cascadeOnDelete();
-            $table->foreignId('uom_id')->constrained('units_of_measure', 'id', 'price_list_items_uom_id_fk');
+            $table->foreignId('uom_id')->constrained('unit_of_measures', 'id', 'price_list_items_uom_id_fk');
             $table->decimal('min_quantity', 20, 4)->default(1);
             $table->decimal('price', 20, 4);
             // $table->decimal('discount_pct', 20, 4)->default(0);

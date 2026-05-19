@@ -17,8 +17,8 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->json('metadata')->nullable();
 
-            $table->foreignId('from_uom_id')->constrained('units_of_measure');
-            $table->foreignId('to_uom_id')->constrained('units_of_measure');
+            $table->foreignId('from_uom_id')->constrained('unit_of_measures');
+            $table->foreignId('to_uom_id')->constrained('unit_of_measures');
             $table->decimal('factor', 20, 4);
             $table->foreignId('item_id')->nullable()->constrained('items')->cascadeOnDelete();
             $table->boolean('is_bidirectional')->default(true);

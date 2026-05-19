@@ -28,7 +28,7 @@ return new class extends Migration
             $table->foreignId('warehouse_id')->nullable()->constrained('warehouses')->nullOnDelete();
             $table->string('txn_type')->comment('movement_type: GRN, GDN, Adjustment');
             $table->nullableMorphs('reference'); // link to PO line, GRN line, shipment line, etc.
-            $table->foreignId('uom_id')->constrained('units_of_measure');
+            $table->foreignId('uom_id')->constrained('unit_of_measures');
             $table->decimal('quantity', 20, 4);
             $table->decimal('unit_cost', 20, 4)->nullable(); // For receipt/shipment valuation
             // $table->decimal('total_cost', 20, 4)->storedAs('quantity * unit_cost')->comment('quantity * unit_cost');

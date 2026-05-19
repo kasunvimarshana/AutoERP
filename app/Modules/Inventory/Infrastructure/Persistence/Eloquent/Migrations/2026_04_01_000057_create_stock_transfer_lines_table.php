@@ -22,7 +22,7 @@ return new class extends Migration
             $table->foreignId('variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
             $table->foreignId('batch_id')->nullable()->constrained('batches')->nullOnDelete();
             $table->foreignId('serial_id')->nullable()->constrained('serials')->nullOnDelete();
-            $table->foreignId('uom_id')->constrained('units_of_measure');
+            $table->foreignId('uom_id')->constrained('unit_of_measures');
             $table->decimal('quantity', 20, 4);
 
             $table->timestamps();

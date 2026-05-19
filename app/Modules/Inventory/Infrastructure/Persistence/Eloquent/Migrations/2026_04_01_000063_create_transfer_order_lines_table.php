@@ -22,7 +22,7 @@ return new class extends Migration
             $table->foreignId('variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
             $table->foreignId('from_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
             $table->foreignId('to_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
-            $table->foreignId('uom_id')->constrained('units_of_measure');
+            $table->foreignId('uom_id')->constrained('unit_of_measures');
             $table->decimal('requested_qty', 20, 4);
             $table->decimal('shipped_qty', 20, 4)->default(0);
             $table->decimal('received_qty', 20, 4)->default(0);

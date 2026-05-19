@@ -22,7 +22,7 @@ return new class extends Migration
             $table->foreignId('component_variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
             $table->integer('sort_order')->default(0);
             $table->decimal('quantity', 20, 4);
-            $table->foreignId('uom_id')->constrained('units_of_measure');
+            $table->foreignId('uom_id')->constrained('unit_of_measures');
             $table->decimal('unit_price', 20, 4)->nullable();
 
             $table->timestamps();
