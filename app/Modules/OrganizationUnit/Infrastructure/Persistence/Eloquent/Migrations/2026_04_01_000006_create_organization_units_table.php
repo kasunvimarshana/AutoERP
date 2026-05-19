@@ -16,8 +16,8 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->json('metadata')->nullable();
 
-            $table->foreignId('type_id')->nullable()->constrained('org_unit_types', 'id', 'org_units_type_id_fk')->nullOnDelete();
-            $table->foreignId('parent_id')->nullable()->constrained('org_units', 'id', 'org_units_parent_id_fk')->nullOnDelete();
+            $table->foreignId('type_id')->nullable()->constrained('organization_unit_types', 'id', 'organization_units_type_id_fk')->nullOnDelete();
+            $table->foreignId('parent_id')->nullable()->constrained('organization_units', 'id', 'organization_units_parent_id_fk')->nullOnDelete();
             $table->string('name');
             $table->string('code')->nullable();
             $table->string('image_path')->nullable();

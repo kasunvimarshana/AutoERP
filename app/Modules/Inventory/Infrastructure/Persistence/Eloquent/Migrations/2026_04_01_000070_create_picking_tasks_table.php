@@ -17,13 +17,13 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->json('metadata')->nullable();
 
-            $table->foreignId('document_id')->constrained('documents');
-            $table->foreignId('product_id')->constrained('products');
+            $table->foreignId('receipt_inspection_id')->nullable()->constrained('receipt_inspections')->nullOnDelete();
+            $table->foreignId('stock_movement_id')->constrained('stock_movements');
             $table->foreignId('source_location_id')->constrained('warehouse_locations');
             $table->decimal('quantity', 20, 4);
             $table->string('status')->default('pending');
             $table->foreignId('assigned_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->timestamp('picked_at')->nullable();
+            $table->timestamp('completed_at')->nullable();
 
             $table->timestamps();
         });

@@ -18,8 +18,8 @@ return new class extends Migration
             $table->json('metadata')->nullable();
 
             $table->foreignId('count_header_id')->constrained('cycle_count_headers')->cascadeOnDelete();
-            $table->foreignId('product_id')->constrained('products');
-            $table->foreignId('variant_id')->nullable()->constrained('product_variants')->nullOnDelete();
+            $table->foreignId('item_id')->constrained('items');
+            $table->foreignId('variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
             $table->foreignId('batch_id')->nullable()->constrained('batches')->nullOnDelete();
             $table->foreignId('serial_id')->nullable()->constrained('serials')->nullOnDelete();
             $table->decimal('system_qty', 20, 4);

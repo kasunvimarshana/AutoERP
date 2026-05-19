@@ -18,7 +18,9 @@ return new class extends Migration
             $table->json('metadata')->nullable();
 
             $table->foreignId('advance_payment_id')->constrained('advance_payments')->cascadeOnDelete();
-            $table->foreignId('document_id')->constrained('documents');
+            $table->foreignId('document_type');
+            $table->unsignedBigInteger('document_id');
+            $table->string('reference')->nullable();
             $table->decimal('allocated_amount', 20, 4);
 
             $table->timestamps();

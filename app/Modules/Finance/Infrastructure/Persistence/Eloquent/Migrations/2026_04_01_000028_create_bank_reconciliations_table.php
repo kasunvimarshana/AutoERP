@@ -35,7 +35,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['tenant_id', 'organization_unit_id', 'bank_account_id', 'period_end'], 'bank_reconciliations_account_period_idx');
+            $table->index(['tenant_id', 'bank_account_id', 'period_end'], 'bank_reconciliations_account_period_idx');
         });
     }
 

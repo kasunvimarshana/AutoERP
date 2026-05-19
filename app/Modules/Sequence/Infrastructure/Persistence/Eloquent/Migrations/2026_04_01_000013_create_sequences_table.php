@@ -14,7 +14,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->cascadeOnDelete();
             $table->json('metadata')->nullable();
 
             $table->string('document_type')->comment('invoice, purchase_order, journal, etc.');

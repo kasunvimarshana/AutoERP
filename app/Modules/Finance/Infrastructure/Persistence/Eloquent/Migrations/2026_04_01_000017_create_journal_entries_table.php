@@ -17,7 +17,6 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->json('metadata')->nullable();
 
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units')->nullOnDelete();
             $table->foreignId('fiscal_period_id')->nullable()->constrained('fiscal_periods')->nullOnDelete();
             $table->string('entry_number');
             $table->string('entry_type')->default('manual')->comment('manual, auto, system, opening, closing, adjustment');
@@ -36,10 +35,10 @@ return new class extends Migration
             $table->timestamps();
             // No softDeletes – journal entries are immutable; reversals only
 
-            $table->unique(['tenant_id', 'organization_unit_id', 'entry_number'], 'journal_entries_number_uk');
-            $table->index(['tenant_id', 'organization_unit_id', 'entry_date'], 'journal_entries_date_idx');
-            $table->index(['tenant_id', 'organization_unit_id', 'fiscal_period_id', 'status'], 'journal_entries_period_status_idx');
-            $table->index(['tenant_id', 'organization_unit_id', 'reference_type', 'reference_id'], 'journal_entries_reference_idx');
+            $table->unique(['tenant_id', 'entry_number'], 'journal_entries_number_uk');
+            $table->index(['tenant_id', 'entry_date'], 'journal_entries_date_idx');
+            $table->index(['tenant_id', 'fiscal_period_id', 'status'], 'journal_entries_period_status_idx');
+            $table->index(['tenant_id', 'reference_type', 'reference_id'], 'journal_entries_reference_idx');
         });
     }
 

@@ -19,7 +19,7 @@ return new class extends Migration
 
             $table->string('name')->comment('Cash, Bank Transfer, Cheque, Credit Card, Gift Card, etc');
             $table->string('type')->default('bank_transfer')->comment('cash, bank_transfer, card, cheque, other');
-            $table->foreignId('account_id')->nullable()->constrained('chart_of_accounts')->nullOnDelete();
+            $table->foreignId('account_id')->nullable()->constrained('accounts')->nullOnDelete();
             $table->boolean('is_active')->default(true);
 
             $table->timestamps();

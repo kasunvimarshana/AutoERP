@@ -29,8 +29,8 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'organization_unit_id', 'code'], 'cost_centers_tenant_code_uk');
-            $table->index(['tenant_id', 'organization_unit_id', 'parent_id'], 'cost_centers_parent_idx');
+            $table->unique(['tenant_id', 'code'], 'cost_centers_tenant_code_uk');
+            $table->index(['tenant_id', 'parent_id'], 'cost_centers_parent_idx');
         });
     }
 

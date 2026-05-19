@@ -18,8 +18,8 @@ return new class extends Migration
             $table->json('metadata')->nullable();
 
             $table->foreignId('transfer_order_id')->constrained('transfer_orders')->cascadeOnDelete();
-            $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
-            $table->foreignId('variant_id')->nullable()->constrained('product_variants')->nullOnDelete();
+            $table->foreignId('item_id')->constrained('items')->cascadeOnDelete();
+            $table->foreignId('variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
             $table->foreignId('from_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
             $table->foreignId('to_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
             $table->foreignId('uom_id')->constrained('units_of_measure');

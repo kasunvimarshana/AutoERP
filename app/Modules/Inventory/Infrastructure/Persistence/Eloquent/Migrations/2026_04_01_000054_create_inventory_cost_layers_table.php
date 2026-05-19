@@ -17,8 +17,8 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->json('metadata')->nullable();
 
-            $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
-            $table->foreignId('variant_id')->nullable()->constrained('product_variants')->nullOnDelete();
+            $table->foreignId('item_id')->constrained('items')->cascadeOnDelete();
+            $table->foreignId('variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
             $table->foreignId('batch_id')->nullable()->constrained('batches')->nullOnDelete();
             $table->foreignId('serial_id')->nullable()->constrained('serials')->nullOnDelete();
             $table->foreignId('warehouse_id')->nullable()->constrained('warehouses')->nullOnDelete();
@@ -28,13 +28,14 @@ return new class extends Migration
             $table->decimal('quantity_in', 20, 4);
             $table->decimal('quantity_remaining', 20, 4);
             $table->decimal('unit_cost', 20, 4);
+            // $table->decimal('total_cost', 20, 4)->storedAs('quantity_remaining * unit_cost')->comment('quantity_remaining * unit_cost');
             $table->nullableMorphs('reference');
             $table->boolean('is_closed')->default(false);
 
             $table->timestamps();
 
-            $table->index(['tenant_id', 'organization_unit_id', 'product_id', 'layer_date'], 'inventory_cost_layers_product_layer_date_idx');
-            $table->index(['tenant_id', 'organization_unit_id', 'product_id', 'is_closed'], 'inventory_cost_layers_product_is_closed_idx');
+            $table->index(['tenant_id', 'item_id', 'layer_date'], 'inventory_cost_layers_item_layer_date_idx');
+            $table->index(['tenant_id', 'item_id', 'is_closed'], 'inventory_cost_layers_item_is_closed_idx');
         });
     }
 

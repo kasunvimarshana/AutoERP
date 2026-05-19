@@ -18,17 +18,23 @@ return new class extends Migration
             $table->json('metadata')->nullable();
 
             $table->string('first_name');
-            $table->string('last_name');
+            $table->string('last_name')->nullable();
             $table->string('email');
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->rememberToken();
-            $table->string('status')->default('active');
+            $table->string('status')->default('active')->comment('active, inactive, suspended');
+            $table->string('avatar_path')->nullable();
+            $table->string('phone')->nullable();
+            $table->json('preferences')->nullable();
+            $table->date('date_of_birth')->nullable();
+            $table->string('gender', 10)->nullable();
+            $table->string('marital_status', 15)->nullable();
 
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'organization_unit_id', 'email'], 'users_email_uk');
+            $table->unique(['tenant_id', 'email'], 'users_email_uk');
         });
     }
 

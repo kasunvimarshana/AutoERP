@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->json('metadata')->nullable();
 
-            $table->foreignId('product_id')->constrained('products');
+            $table->foreignId('item_id')->constrained('items');
             $table->foreignId('warehouse_id')->constrained('warehouses');
             $table->date('period_start');
             $table->date('period_end');
@@ -26,8 +26,8 @@ return new class extends Migration
             $table->decimal('closing_quantity', 20, 4)->default(0);
             $table->timestamps();
             $table->unique(
-                ['tenant_id', 'organization_unit_id', 'product_id', 'warehouse_id', 'period_start', 'period_end'],
-                'aggregated_stock_ledger_product_warehouse_period_uk'
+                ['tenant_id', 'item_id', 'warehouse_id', 'period_start', 'period_end'],
+                'aggregated_stock_ledger_item_warehouse_period_uk'
             );
         });
     }

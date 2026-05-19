@@ -18,7 +18,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
 
             $table->string('name');
-            $table->foreignId('cash_account_id')->constrained('chart_of_accounts')->comment('GL "Cash" account');
+            $table->foreignId('cash_account_id')->constrained('accounts')->comment('GL "Cash" account');
             $table->decimal('opening_balance', 20, 4)->default(0);
             $table->decimal('current_balance', 20, 4)->default(0);
             $table->boolean('is_active')->default(true);

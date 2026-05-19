@@ -18,8 +18,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
 
             $table->foreignId('tax_group_id')->constrained('tax_groups')->cascadeOnDelete();
-            $table->foreignId('product_category_id')->nullable()->constrained('product_categories')->nullOnDelete();
-            $table->foreignId('party_id')->nullable()->constrained('parties')->nullOnDelete();
+            $table->foreignId('item_category_id')->nullable()->constrained('item_categories')->nullOnDelete();
             $table->string('party_type')->nullable()->comment('customer, supplier');
             $table->string('region')->nullable()->comment('country, state');
             $table->unsignedInteger('priority')->default(0)->comment('higher priority wins');
@@ -27,7 +26,7 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->index(['tenant_id', 'organization_unit_id', 'tax_group_id'], 'tax_rules_group_idx');
+            $table->index(['tenant_id', 'tax_group_id'], 'tax_rules_group_idx');
         });
     }
 

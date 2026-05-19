@@ -10,7 +10,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('roles', function (Blueprint $table) {
+        $guardName = (string) config('auth.defaults.guard', 'api');
+
+        Schema::create('roles', function (Blueprint $table) use ($guardName){
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
@@ -18,11 +20,13 @@ return new class extends Migration
             $table->json('metadata')->nullable();
 
             $table->string('name');
+            $table->string('guard_name')->default($guardName);
+            $table->string('description')->nullable();
 
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'organization_unit_id', 'name'], 'roles_name_uk');
+            $table->unique(['tenant_id', 'name', 'guard_name'], 'roles_name_guard_uk');
         });
     }
 

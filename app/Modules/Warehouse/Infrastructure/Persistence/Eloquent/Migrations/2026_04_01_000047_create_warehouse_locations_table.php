@@ -32,8 +32,8 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'organization_unit_id', 'warehouse_id', 'name'], 'warehouse_locations_warehouse_name_uk');
-            $table->index(['tenant_id', 'organization_unit_id', 'parent_id'], 'warehouse_locations_parent_idx');
+            $table->unique(['tenant_id', 'warehouse_id', 'name'], 'warehouse_locations_warehouse_name_uk');
+            $table->index(['tenant_id', 'parent_id'], 'warehouse_locations_parent_idx');
         });
     }
 

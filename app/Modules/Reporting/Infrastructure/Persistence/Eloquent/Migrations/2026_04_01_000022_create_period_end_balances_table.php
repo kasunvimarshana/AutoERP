@@ -17,14 +17,14 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->json('metadata')->nullable();
 
-            $table->foreignId('account_id')->constrained('chart_of_accounts');
+            $table->foreignId('account_id')->constrained('accounts');
             $table->foreignId('fiscal_period_id')->constrained('fiscal_periods');
             $table->decimal('debit_balance', 20, 4)->default(0);
             $table->decimal('credit_balance', 20, 4)->default(0);
 
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'organization_unit_id', 'account_id', 'fiscal_period_id'], 'period_end_balances_account_period_uk');
+            $table->unique(['tenant_id', 'account_id', 'fiscal_period_id'], 'period_end_balances_account_period_uk');
         });
     }
 

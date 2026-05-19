@@ -19,20 +19,22 @@ return new class extends Migration
 
             $table->unsignedBigInteger('warehouse_id')->nullable();
             $table->foreign('warehouse_id')->references('id')->on('warehouses')->nullOnDelete();
-            $table->foreignId('product_id')->nullable()->constrained('products')->nullOnDelete();
+            $table->foreignId('item_id')->nullable()->constrained('items')->nullOnDelete();
+            // Optional movement-type narrowing
             $table->string('transaction_type', 50)->nullable();
-            $table->string('valuation_method')->nullable();
-            $table->string('allocation_strategy')->default('fifo');
+            // Strategy configuration
+            $table->string('valuation_method')->nullable()->comment('fifo, lifo, fefo, weighted_average, standard, specific');
+            $table->string('allocation_method')->nullable()->comment('fifo, lifo, fefo, nearest_bin, manual')->default('fifo');
             $table->boolean('is_active')->default(true);
 
             $table->timestamps();
 
             $table->unique(
-                ['tenant_id', 'organization_unit_id', 'product_id', 'warehouse_id', 'transaction_type'],
-                'valuation_configs_product_warehouse_transaction_uk'
+                ['tenant_id', 'item_id', 'warehouse_id', 'transaction_type'],
+                'valuation_configs_item_warehouse_transaction_uk'
             );
-            $table->index(['tenant_id', 'organization_unit_id', 'is_active'], 'valuation_configs_active_idx');
-            $table->index(['tenant_id', 'organization_unit_id', 'product_id'], 'valuation_configs_product_fk');
+            $table->index(['tenant_id', 'is_active'], 'valuation_configs_active_idx');
+            $table->index(['tenant_id', 'item_id'], 'valuation_configs_item_fk');
         });
     }
 

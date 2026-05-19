@@ -18,8 +18,9 @@ return new class extends Migration
             $table->json('metadata')->nullable();
 
             $table->string('check_number');
-            $table->string('type')->default('inbound')->comment('inbound (received), outbound (issued)');
-            $table->foreignId('party_id')->nullable()->constrained('parties')->nullOnDelete();
+            $table->string('type')->comment('inbound (received), outbound (issued)');
+            $table->string('party_type')->nullable();
+            $table->unsignedBigInteger('party_id')->nullable();
             $table->foreignId('bank_account_id')->constrained('bank_accounts');
             $table->date('check_date');
             $table->date('due_date')->nullable()->comment('when it can be deposited/cashed');
@@ -32,7 +33,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'organization_unit_id', 'check_number', 'bank_account_id'], 'checks_check_number_bank_account_uk');
+            $table->unique(['tenant_id', 'check_number', 'bank_account_id'], 'checks_check_number_bank_account_uk');
         });
     }
 

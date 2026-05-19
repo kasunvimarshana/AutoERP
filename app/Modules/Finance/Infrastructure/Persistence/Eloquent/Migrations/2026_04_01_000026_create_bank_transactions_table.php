@@ -33,9 +33,9 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'organization_unit_id', 'bank_account_id', 'external_id'], 'bank_transactions_account_external_id_uk');
-            $table->index(['tenant_id', 'organization_unit_id', 'bank_account_id', 'transaction_date'], 'bank_transactions_date_idx');
-            $table->index(['tenant_id', 'organization_unit_id', 'status'], 'bank_transactions_status_idx');
+            $table->unique(['tenant_id', 'bank_account_id', 'external_id'], 'bank_transactions_account_external_id_uk');
+            $table->index(['tenant_id', 'bank_account_id', 'transaction_date'], 'bank_transactions_date_idx');
+            $table->index(['tenant_id', 'status'], 'bank_transactions_status_idx');
         });
     }
 

@@ -17,27 +17,27 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->json('metadata')->nullable();
 
-            $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
-            $table->foreignId('variant_id')->nullable()->constrained('product_variants')->nullOnDelete();
+            $table->foreignId('item_id')->constrained('items')->cascadeOnDelete();
+            $table->foreignId('variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
             $table->string('batch_number');
             $table->string('lot_number')->nullable();
             $table->date('manufacture_date')->nullable();
             $table->date('expiry_date')->nullable();
             $table->date('received_date')->nullable();
-            $table->foreignId('supplier_id')->nullable()->constrained('parties')->nullOnDelete();
+            $table->foreignId('supplier_id')->nullable()->constrained('suppliers')->nullOnDelete();
             $table->string('status')->default('active');
             $table->text('notes')->nullable();
-            $table->decimal('sales_price', 20, 4)->nullable();
-            $table->foreignId('lot_master_id')->nullable()->after('lot_number')->constrained('lot_masters')->nullOnDelete();
+            // $table->decimal('cost_price', 20, 4)->nullable();
+            // $table->decimal('sales_price', 20, 4)->nullable();
 
             $table->timestamps();
 
             $table->unique(
-                ['tenant_id', 'organization_unit_id', 'product_id', 'variant_id', 'batch_number'],
-                'batches_product_variant_batch_uk'
+                ['tenant_id', 'item_id', 'variant_id', 'batch_number'],
+                'batches_item_variant_batch_uk'
             );
-            $table->index(['tenant_id', 'organization_unit_id', 'product_id', 'variant_id', 'batch_number'], 'batches_product_variant_batch_idx');
-            $table->index(['tenant_id', 'organization_unit_id', 'product_id', 'variant_id', 'lot_number'], 'batches_product_variant_lot_idx');
+            $table->index(['tenant_id', 'item_id', 'variant_id', 'batch_number'], 'batches_item_variant_batch_idx');
+            $table->index(['tenant_id', 'item_id', 'variant_id', 'lot_number'], 'batches_item_variant_lot_idx');
         });
     }
 

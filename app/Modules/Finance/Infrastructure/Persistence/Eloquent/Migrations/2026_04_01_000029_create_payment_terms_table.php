@@ -21,7 +21,7 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->unsignedInteger('due_days')->default(30)->comment('days until full payment due');
             $table->unsignedInteger('discount_days')->nullable()->comment('days window for early payment discount');
-            $table->decimal('discount_rate', 5, 2)->nullable()->comment('e.g., 2.00 for 2%');
+            $table->decimal('discount_rate', 20, 4)->nullable()->comment('e.g., 2.00 for 2%');
             $table->string('payment_type')->default('net')->comment('net, end_of_month, end_of_next_month');
             $table->boolean('is_default')->default(false);
             $table->boolean('is_active')->default(true);
@@ -30,7 +30,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'organization_unit_id', 'name'], 'payment_terms_name_uk');
+            $table->unique(['tenant_id', 'name'], 'payment_terms_name_uk');
         });
     }
 

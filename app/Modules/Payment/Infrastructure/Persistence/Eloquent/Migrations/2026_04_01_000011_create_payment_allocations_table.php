@@ -18,7 +18,9 @@ return new class extends Migration
             $table->json('metadata')->nullable();
 
             $table->foreignId('payment_id')->constrained('payments')->cascadeOnDelete();
-            $table->foreignId('document_id')->constrained('documents')->comment('the invoice/credit note being settled');
+            $table->string('document_type')->comment('the invoice/credit note being settled');
+            $table->unsignedBigInteger('document_id');
+            $table->string('reference')->nullable();
             $table->decimal('allocated_amount', 20, 4);
 
             $table->timestamps();

@@ -28,8 +28,8 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'organization_unit_id', 'fiscal_year_id', 'period_number'], 'fiscal_periods_tenant_year_period_uk');
-            $table->index(['tenant_id', 'organization_unit_id', 'status'], 'fiscal_periods_status_idx');
+            $table->unique(['tenant_id', 'fiscal_year_id', 'period_number'], 'fiscal_periods_tenant_year_period_uk');
+            $table->index(['tenant_id', 'status'], 'fiscal_periods_status_idx');
         });
     }
 

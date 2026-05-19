@@ -29,8 +29,8 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'organization_unit_id', 'transfer_number'], 'transfer_orders_transfer_number_uk');
-            $table->index(['tenant_id', 'organization_unit_id', 'status'], 'transfer_orders_status_idx');
+            $table->unique(['tenant_id', 'transfer_number'], 'transfer_orders_transfer_number_uk');
+            $table->index(['tenant_id', 'status'], 'transfer_orders_status_idx');
         });
     }
 

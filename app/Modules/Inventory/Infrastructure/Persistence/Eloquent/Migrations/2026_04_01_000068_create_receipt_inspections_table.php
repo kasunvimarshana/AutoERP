@@ -17,7 +17,8 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->json('metadata')->nullable();
 
-            $table->foreignId('document_id')->constrained('documents');
+            $table->string('document_type');
+            $table->unsignedBigInteger('document_id');
             $table->foreignId('inspected_by')->nullable()->constrained('users')->nullOnDelete();
             $table->string('inspection_result')->default('pending');
             $table->text('notes')->nullable();

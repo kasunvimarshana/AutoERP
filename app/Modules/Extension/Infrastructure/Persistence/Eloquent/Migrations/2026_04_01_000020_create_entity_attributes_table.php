@@ -24,7 +24,7 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'organization_unit_id', 'entity_type', 'entity_id', 'attribute_key'], 'entity_attributes_type_id_key_idx');
+            $table->unique(['tenant_id', 'entity_type', 'entity_id', 'attribute_key'], 'entity_attributes_type_id_key_idx');
         });
     }
 

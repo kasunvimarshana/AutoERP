@@ -17,12 +17,14 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->json('metadata')->nullable();
 
-            $table->foreignId('party_id')->constrained('parties');
+            $table->string('party_type');
+            $table->unsignedBigInteger('party_id');
+            $table->string('reference')->nullable();
             $table->string('advance_number');
             $table->decimal('amount', 20, 4);
             $table->decimal('remaining_amount', 20, 4);
             $table->date('advance_date');
-            $table->string('type')->default('customer')->comment('customer, supplier');
+            $table->string('type')->nullable()->comment('customer, supplier');
             $table->string('status')->default('open')->comment('open, partially_applied, fully_applied, refunded');
             $table->foreignId('payment_id')->nullable()->constrained('payments')->nullOnDelete();
             $table->text('notes')->nullable();
@@ -31,7 +33,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'organization_unit_id', 'advance_number'], 'advance_payments_advance_number_uk');
+            $table->unique(['tenant_id', 'advance_number'], 'advance_payments_advance_number_uk');
         });
     }
 

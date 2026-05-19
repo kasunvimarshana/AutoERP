@@ -25,11 +25,12 @@ return new class extends Migration
             $table->year('year')->nullable();
             $table->string('color', 30)->nullable();
             $table->string('category', 50)->nullable();
+            $table->string('usage_profile')->default('dual')->comment('rent_only, service_only, dual, internal');
             $table->string('fuel_type', 30)->nullable();
             $table->string('transmission', 30)->nullable();
             $table->unsignedTinyInteger('seating_capacity')->nullable();
             $table->unsignedBigInteger('current_odometer')->default(0);
-            $table->string('status')->default('available')->comment('available, rented, in_service');
+            $table->string('status')->default('active')->comment('active, inactive');
             $table->date('registration_expiry')->nullable();
             $table->date('insurance_expiry')->nullable();
             $table->date('last_service_date')->nullable();
@@ -40,9 +41,9 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'organization_unit_id', 'vehicle_code'], 'vehicles_vehicle_code_uk');
-            $table->unique(['tenant_id', 'organization_unit_id', 'vin'], 'vehicles_vin_uk');
-            $table->index(['tenant_id', 'organization_unit_id', 'status'], 'vehicles_status_idx');
+            $table->unique(['tenant_id', 'vehicle_code'], 'vehicles_vehicle_code_uk');
+            $table->unique(['tenant_id', 'vin'], 'vehicles_vin_uk');
+            $table->index(['tenant_id', 'status'], 'vehicles_status_idx');
         });
     }
 

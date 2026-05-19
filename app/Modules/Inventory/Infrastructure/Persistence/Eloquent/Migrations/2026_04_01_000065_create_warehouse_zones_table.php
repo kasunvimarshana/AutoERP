@@ -29,7 +29,7 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'organization_unit_id', 'warehouse_id', 'code'], 'warehouse_zones_code_uk');
+            $table->unique(['tenant_id', 'warehouse_id', 'code'], 'warehouse_zones_code_uk');
         });
     }
 

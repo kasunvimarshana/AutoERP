@@ -27,7 +27,7 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->index(['tenant_id', 'organization_unit_id', 'status'], 'cycle_count_headers_status_idx');
+            $table->index(['tenant_id', 'status'], 'cycle_count_headers_status_idx');
         });
     }
 

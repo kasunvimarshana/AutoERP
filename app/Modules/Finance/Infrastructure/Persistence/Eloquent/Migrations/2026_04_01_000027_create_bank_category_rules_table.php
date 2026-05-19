@@ -22,7 +22,8 @@ return new class extends Migration
             $table->unsignedInteger('priority')->default(0);
             $table->string('match_type')->default('contains')->comment('contains, starts_with, equals, regex');
             $table->string('match_value');
-            $table->foreignId('account_id')->constrained('chart_of_accounts')->comment('GL account to post matched transaction');
+            $table->json('conditions')->nullable();
+            $table->foreignId('account_id')->constrained('accounts')->comment('GL account to post matched transaction');
             $table->string('description_template')->nullable();
             $table->boolean('is_active')->default(true);
             $table->unsignedBigInteger('created_by')->nullable();
@@ -30,7 +31,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['tenant_id', 'organization_unit_id', 'bank_account_id'], 'bank_category_rules_account_idx');
+            $table->index(['tenant_id', 'bank_account_id'], 'bank_category_rules_account_idx');
         });
     }
 

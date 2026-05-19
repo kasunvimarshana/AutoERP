@@ -17,10 +17,10 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->json('metadata')->nullable();
 
-            $table->morphs('entity');
-            $table->foreignId('identifier_id')->nullable()->constrained('product_identifiers')->nullOnDelete();
-            $table->string('action_type');
-            $table->nullableMorphs('reference');
+            $table->morphs('entity'); // Product, Variant, Batch, Serial, Location, etc.
+            $table->foreignId('identifier_id')->nullable()->constrained('item_identifiers')->nullOnDelete();
+            $table->string('action_type')->comment('scan, receive, transfer, pick, pack, ship, return, adjust, dispose, count');
+            $table->nullableMorphs('reference'); // GRN, shipment, transfer, etc.
             $table->foreignId('source_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
             $table->foreignId('destination_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
             $table->decimal('quantity', 20, 4)->nullable();
@@ -30,8 +30,8 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->index(['tenant_id', 'organization_unit_id', 'entity_type', 'entity_id'], 'trace_logs_entity_idx');
-            $table->index(['tenant_id', 'organization_unit_id', 'performed_at'], 'trace_logs_performed_at_idx');
+            $table->index(['tenant_id', 'entity_type', 'entity_id'], 'trace_logs_entity_idx');
+            $table->index(['tenant_id', 'performed_at'], 'trace_logs_performed_at_idx');
         });
     }
 

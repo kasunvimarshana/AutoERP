@@ -19,7 +19,6 @@ return new class extends Migration
             $table->string('slug', 100)->unique('tenants_slug_uk');
             $table->string('logo_path')->nullable();
             $table->boolean('cross_org_transactions')->default(false);
-            $table->string('plan')->default('free');
             $table->foreignId('tenant_plan_id')->nullable()->constrained('tenant_plans', 'id')->nullOnDelete();
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->nullOnDelete();
             $table->string('status')->default('active')->comment('active|suspended|pending|cancelled');

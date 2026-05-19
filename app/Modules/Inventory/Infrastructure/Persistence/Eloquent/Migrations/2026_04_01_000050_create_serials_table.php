@@ -17,8 +17,8 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->json('metadata')->nullable();
 
-            $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
-            $table->foreignId('variant_id')->nullable()->constrained('product_variants')->nullOnDelete();
+            $table->foreignId('item_id')->constrained('items')->cascadeOnDelete();
+            $table->foreignId('variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
             $table->string('serial_number');
             $table->foreignId('batch_id')->nullable()->constrained('batches')->nullOnDelete();
             $table->string('status')->default('available');
@@ -27,12 +27,13 @@ return new class extends Migration
             $table->date('warranty_expiry')->nullable();
             $table->text('notes')->nullable();
             $table->date('manufacture_date')->nullable();
-            $table->decimal('sales_price', 20, 4)->nullable();
+            // $table->decimal('cost_price', 20, 4)->nullable();
+            // $table->decimal('sales_price', 20, 4)->nullable();
 
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'organization_unit_id', 'serial_number'], 'serials_number_uk');
-            $table->index(['tenant_id', 'organization_unit_id', 'product_id'], 'serials_product_idx');
+            $table->unique(['tenant_id', 'serial_number'], 'serials_number_uk');
+            $table->index(['tenant_id', 'item_id'], 'serials_item_idx');
         });
     }
 

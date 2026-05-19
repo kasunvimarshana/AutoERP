@@ -26,10 +26,10 @@ return new class extends Migration
             $table->foreignId('party_id')->nullable()->constrained('parties')->nullOnDelete();
             $table->string('reference')->nullable()->comment('bill number, etc.');
             $table->text('description')->nullable();
-            $table->foreignId('account_id')->constrained('chart_of_accounts')->comment('primary expense/income account');
-            $table->foreignId('contra_account_id')->constrained('chart_of_accounts')->comment('bank/cash/payable account');
+            $table->foreignId('account_id')->constrained('accounts')->comment('primary expense/income account');
+            $table->foreignId('contra_account_id')->constrained('accounts')->comment('bank/cash/payable account');
             $table->foreignId('tax_rate_id')->nullable()->constrained('tax_rates')->nullOnDelete()->comment('applied tax rate');
-            $table->decimal('tax_rate', 10, 4)->default(0)->comment('cached tax rate for historical accuracy');
+            $table->decimal('tax_rate', 20, 4)->default(0)->comment('cached tax rate for historical accuracy');
             $table->decimal('amount', 20, 4);
             $table->decimal('tax_amount', 20, 4)->default(0);
             $table->decimal('total_amount', 20, 4);
@@ -41,8 +41,8 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'organization_unit_id', 'voucher_number'], 'vouchers_voucher_number_uk');
-            $table->index(['tenant_id', 'organization_unit_id', 'type', 'voucher_date'], 'vouchers_type_date_idx');
+            $table->unique(['tenant_id', 'voucher_number'], 'vouchers_voucher_number_uk');
+            $table->index(['tenant_id', 'type', 'voucher_date'], 'vouchers_type_date_idx');
         });
     }
 

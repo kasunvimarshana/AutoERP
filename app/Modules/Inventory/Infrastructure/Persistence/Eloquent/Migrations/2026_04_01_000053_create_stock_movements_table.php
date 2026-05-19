@@ -17,27 +17,30 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->json('metadata')->nullable();
 
-            $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
-            $table->foreignId('variant_id')->nullable()->constrained('product_variants')->nullOnDelete();
+            $table->string('direction')->comment('in, out');
+            $table->foreignId('item_id')->constrained('items')->cascadeOnDelete();
+            $table->foreignId('variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
             $table->foreignId('batch_id')->nullable()->constrained('batches')->nullOnDelete();
             $table->foreignId('serial_id')->nullable()->constrained('serials')->nullOnDelete();
-            $table->foreignId('from_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
-            $table->foreignId('to_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
-            $table->string('movement_type');
-            $table->nullableMorphs('reference');
+            // $table->foreignId('from_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
+            // $table->foreignId('to_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
+            $table->foreignId('location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
+            $table->foreignId('warehouse_id')->nullable()->constrained('warehouses')->nullOnDelete();
+            $table->string('txn_type')->comment('movement_type: GRN, GDN, Adjustment');
+            $table->nullableMorphs('reference'); // link to PO line, GRN line, shipment line, etc.
             $table->foreignId('uom_id')->constrained('units_of_measure');
             $table->decimal('quantity', 20, 4);
-            $table->decimal('unit_cost', 20, 4)->nullable();
+            $table->decimal('unit_cost', 20, 4)->nullable(); // For receipt/shipment valuation
+            // $table->decimal('total_cost', 20, 4)->storedAs('quantity * unit_cost')->comment('quantity * unit_cost');
             $table->foreignId('performed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('performed_at')->useCurrent();
             $table->text('notes')->nullable();
 
             $table->timestamps();
 
-            $table->index(['tenant_id', 'organization_unit_id', 'product_id', 'performed_at'], 'stock_movements_product_performed_at_idx');
-            $table->index(['tenant_id', 'organization_unit_id', 'reference_type', 'reference_id'], 'stock_movements_reference_idx');
-            $table->index(['tenant_id', 'organization_unit_id', 'from_location_id', 'performed_at'], 'stock_movements_from_location_performed_at_idx');
-            $table->index(['tenant_id', 'organization_unit_id', 'to_location_id', 'performed_at'], 'stock_movements_to_location_performed_at_idx');
+            $table->index(['tenant_id', 'item_id', 'performed_at'], 'stock_movements_item_performed_at_idx');
+            $table->index(['tenant_id', 'reference_type', 'reference_id'], 'stock_movements_reference_idx');
+            $table->index(['tenant_id', 'location_id', 'performed_at'], 'stock_movements_location_performed_at_idx');
         });
     }
 

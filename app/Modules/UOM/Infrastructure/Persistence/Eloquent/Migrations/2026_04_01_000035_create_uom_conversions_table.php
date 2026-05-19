@@ -19,8 +19,8 @@ return new class extends Migration
 
             $table->foreignId('from_uom_id')->constrained('units_of_measure');
             $table->foreignId('to_uom_id')->constrained('units_of_measure');
-            $table->decimal('factor', 20, 10);
-            $table->foreignId('product_id')->nullable()->constrained('products')->cascadeOnDelete();
+            $table->decimal('factor', 20, 4);
+            $table->foreignId('item_id')->nullable()->constrained('items')->cascadeOnDelete();
             $table->boolean('is_bidirectional')->default(true);
             $table->boolean('is_active')->default(true);
 
@@ -28,10 +28,10 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(
-                ['tenant_id', 'organization_unit_id', 'product_id', 'from_uom_id', 'to_uom_id'],
-                'uom_conversions_product_from_to_uk'
+                ['tenant_id', 'item_id', 'from_uom_id', 'to_uom_id'],
+                'uom_conversions_item_from_to_uk'
             );
-            $table->index(['tenant_id', 'organization_unit_id', 'product_id', 'is_active'], 'uom_conversions_product_active_idx');
+            $table->index(['tenant_id', 'item_id', 'is_active'], 'uom_conversions_item_active_idx');
         });
     }
 

@@ -29,8 +29,8 @@ return new class extends Migration
             $table->text('reason')->nullable();
 
             $table->timestamps();
-            $table->unique(['tenant_id', 'organization_unit_id', 'reference_number'], 'stock_adjustments_reference_number_uk');
-            $table->index(['tenant_id', 'organization_unit_id', 'status'], 'stock_adjustments_status_idx');
+            $table->unique(['tenant_id', 'reference_number'], 'stock_adjustments_reference_number_uk');
+            $table->index(['tenant_id', 'status'], 'stock_adjustments_status_idx');
         });
     }
 

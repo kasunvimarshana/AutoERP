@@ -26,7 +26,7 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->index(['tenant_id', 'organization_unit_id', 'attachable_type', 'attachable_id'], 'attachments_type_id_idx');
+            $table->index(['tenant_id', 'attachable_type', 'attachable_id'], 'attachments_type_id_idx');
         });
     }
 

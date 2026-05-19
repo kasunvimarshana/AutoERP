@@ -11,17 +11,16 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('user_roles', function (Blueprint $table) {
-            // $table->id();
+            $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->json('metadata')->nullable();
 
-
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('role_id')->constrained('roles')->cascadeOnDelete();
 
-            $table->primary(['tenant_id', 'organization_unit_id', 'user_id', 'role_id'], 'user_roles_pk');
+            $table->unique(['tenant_id', 'user_id', 'role_id'], 'user_roles_uk');
         });
     }
 

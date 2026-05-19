@@ -22,11 +22,12 @@ return new class extends Migration
             $table->string('sub_type')->nullable()->comment('electricity, phone, rent, commission, misc_income, interest');
             $table->string('party_type')->nullable()->comment('customer, supplier, employee, other');
             $table->foreignId('party_id')->nullable()->constrained('parties')->nullOnDelete();
+            $table->string('reference')->nullable();
             $table->text('description')->nullable();
-            $table->foreignId('account_id')->constrained('chart_of_accounts')->comment('primary expense/income account');
-            $table->foreignId('contra_account_id')->constrained('chart_of_accounts')->comment('bank/cash/payable');
+            $table->foreignId('account_id')->constrained('accounts')->comment('primary expense/income account');
+            $table->foreignId('contra_account_id')->constrained('accounts')->comment('bank/cash/payable');
             $table->foreignId('tax_rate_id')->nullable()->constrained('tax_rates')->nullOnDelete()->comment('applied tax rate');
-            $table->decimal('tax_rate', 10, 4)->default(0)->comment('cached tax rate for historical accuracy');
+            $table->decimal('tax_rate', 20, 4)->default(0)->comment('cached tax rate for historical accuracy');
             $table->decimal('amount', 20, 4);
             $table->decimal('tax_amount', 20, 4)->default(0);
             $table->decimal('total_amount', 20, 4);

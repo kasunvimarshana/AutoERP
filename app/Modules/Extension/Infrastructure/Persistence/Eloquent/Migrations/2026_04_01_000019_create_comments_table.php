@@ -25,7 +25,7 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->index(['tenant_id', 'organization_unit_id', 'commentable_type', 'commentable_id'], 'comments_type_id_idx');
+            $table->index(['tenant_id', 'commentable_type', 'commentable_id'], 'comments_type_id_idx');
         });
     }
 

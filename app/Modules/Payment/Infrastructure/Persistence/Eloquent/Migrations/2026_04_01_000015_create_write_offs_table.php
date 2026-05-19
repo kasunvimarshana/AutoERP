@@ -17,10 +17,12 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->json('metadata')->nullable();
 
-            $table->foreignId('document_id')->constrained('documents')->comment('the invoice being written off');
+            $table->string('document_type')->comment('the invoice being written off');
+            $table->unsignedBigInteger('document_id');
             $table->decimal('amount', 20, 4);
             $table->string('reason')->nullable();
             $table->foreignId('journal_entry_id')->nullable()->constrained('journal_entries')->nullOnDelete();
+            $table->string('reference')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
 
             $table->timestamps();

@@ -24,7 +24,7 @@ return new class extends Migration
             $table->string('iban')->nullable();
             $table->string('swift_bic')->nullable();
             $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete();
-            $table->foreignId('gl_account_id')->constrained('chart_of_accounts')->comment('linked Bank GL account');
+            $table->foreignId('account_id')->constrained('accounts')->comment('linked Bank GL account');
             $table->decimal('opening_balance', 20, 4)->default(0);
             $table->decimal('current_balance', 20, 4)->default(0);
             $table->timestamp('last_reconciled_at')->nullable();
@@ -37,7 +37,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'organization_unit_id', 'account_number'], 'bank_accounts_account_number_uk');
+            $table->unique(['tenant_id', 'account_number'], 'bank_accounts_account_number_uk');
         });
     }
 

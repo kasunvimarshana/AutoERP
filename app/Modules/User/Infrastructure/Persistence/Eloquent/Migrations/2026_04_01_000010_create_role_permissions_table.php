@@ -11,7 +11,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('role_permissions', function (Blueprint $table) {
-            // $table->id();
+            $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
@@ -20,7 +20,7 @@ return new class extends Migration
             $table->foreignId('role_id')->constrained('roles')->cascadeOnDelete();
             $table->foreignId('permission_id')->constrained('permissions')->cascadeOnDelete();
 
-            $table->primary(['role_id', 'permission_id'], 'role_permissions_pk');
+            $table->unique(['tenant_id', 'role_id', 'permission_id'], 'role_permissions_uk');
         });
     }
 

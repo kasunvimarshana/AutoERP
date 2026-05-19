@@ -18,7 +18,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
 
             $table->foreignId('budget_id')->constrained('budgets')->cascadeOnDelete();
-            $table->foreignId('account_id')->constrained('chart_of_accounts');
+            $table->foreignId('account_id')->constrained('accounts');
             $table->foreignId('cost_center_id')->nullable()->constrained('cost_centers')->nullOnDelete();
             $table->decimal('period_1_amount', 20, 4)->default(0)->comment('January');
             $table->decimal('period_2_amount', 20, 4)->default(0)->comment('February');
@@ -37,7 +37,7 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'organization_unit_id', 'budget_id', 'account_id', 'cost_center_id'], 'budget_lines_budget_account_cost_center_uk');
+            $table->unique(['tenant_id', 'budget_id', 'account_id', 'cost_center_id'], 'budget_lines_budget_account_cost_center_uk');
         });
     }
 

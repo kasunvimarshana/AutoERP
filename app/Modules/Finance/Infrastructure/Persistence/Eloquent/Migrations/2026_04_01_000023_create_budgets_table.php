@@ -31,8 +31,8 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'organization_unit_id', 'name'], 'budgets_name_uk');
-            $table->index(['tenant_id', 'organization_unit_id', 'fiscal_year_id'], 'budgets_fiscal_year_idx');
+            $table->unique(['tenant_id', 'name'], 'budgets_name_uk');
+            $table->index(['tenant_id', 'fiscal_year_id'], 'budgets_fiscal_year_idx');
         });
     }
 

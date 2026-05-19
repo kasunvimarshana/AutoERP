@@ -18,16 +18,16 @@ return new class extends Migration
             $table->json('metadata')->nullable();
 
             $table->foreignId('stock_adjustment_id')->constrained('stock_adjustments')->cascadeOnDelete();
-            $table->foreignId('product_id')->constrained('products')->cascadeOnDelete();
-            $table->foreignId('variant_id')->nullable()->constrained('product_variants')->nullOnDelete();
+            $table->foreignId('item_id')->constrained('items')->cascadeOnDelete();
+            $table->foreignId('variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
             $table->foreignId('batch_id')->nullable()->constrained('batches')->nullOnDelete();
             $table->foreignId('serial_id')->nullable()->constrained('serials')->nullOnDelete();
             $table->foreignId('location_id')->constrained('warehouse_locations');
             $table->decimal('system_qty', 20, 4);
             $table->decimal('counted_qty', 20, 4);
-            $table->decimal('variance_qty', 20, 4);
+            $table->decimal('variance_qty', 20, 4)->comment('counted_qty - system_qty');
             $table->decimal('unit_cost', 20, 4)->nullable();
-            $table->decimal('variance_value', 20, 4);
+            $table->decimal('variance_value', 20, 4)->comment('variance_qty * unit_cost');
             $table->foreignId('adjustment_movement_id')->nullable()->constrained('stock_movements')->nullOnDelete();
 
             $table->timestamps();
