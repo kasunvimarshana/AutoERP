@@ -27,7 +27,7 @@ use Modules\VehicleRental\Infrastructure\Providers\VehicleRentalServiceProvider;
 use Modules\Voucher\Infrastructure\Providers\VoucherServiceProvider;
 use Modules\Invoice\Infrastructure\Providers\InvoiceServiceProvider;
 use Modules\Payment\Infrastructure\Providers\PaymentServiceProvider;
-use Modules\Reporting\Infrastructure\Providers\ReportingServiceProvider;
+// use Modules\Reporting\Infrastructure\Providers\ReportingServiceProvider;
 
 return [
     AppServiceProvider::class,
@@ -58,5 +58,5 @@ return [
     VoucherServiceProvider::class,
     InvoiceServiceProvider::class,
     PaymentServiceProvider::class,
-    ReportingServiceProvider::class
+    // ReportingServiceProvider::class
 ];
