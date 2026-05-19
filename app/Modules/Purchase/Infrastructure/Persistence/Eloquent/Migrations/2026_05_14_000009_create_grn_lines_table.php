@@ -40,7 +40,7 @@ return new class extends Migration
 
             // Line net (before tax)
             $table->decimal('gross_amount', 20, 4)
-                  ->storedAs('ordered_qty * unit_price')
+                  ->storedAs('received_qty * unit_price')
                   ->comment('Gross = qty * unit price');
             $table->decimal('line_total', 20, 4)
                   ->storedAs('gross_amount - discount_amount')
