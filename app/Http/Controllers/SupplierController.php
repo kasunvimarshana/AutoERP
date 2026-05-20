@@ -2,21 +2,21 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StoreSystemUserRequest;
-use App\Http\Requests\UpdateSystemUserRequest;
-use App\Http\Resources\SystemUserCollectionResource;
-use App\Http\Resources\SystemUserResource;
+use App\Http\Requests\StoreSupplierRequest;
+use App\Http\Requests\UpdateSupplierRequest;
+use App\Http\Resources\SupplierCollectionResource;
+use App\Http\Resources\SupplierResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
-use Modules\SystemUser\Infrastructure\Persistence\Eloquent\Models\SystemUserModel;
+use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierModel;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 
-class SystemUserController extends Controller
+class SupplierController extends Controller
 {
     //
     public function __construct(private readonly FileStorageServiceInterface $fileStorageService)
@@ -35,14 +35,14 @@ class SystemUserController extends Controller
         $page = $page ?: Paginator::resolveCurrentPage($pageName);
         $columns = ['*'];
 
-        $systemUsers = SystemUserModel::with(['user', 'user.roles'])->paginate($perPage, $columns, $pageName, $page);
+        $suppliers = SupplierModel::with(['user', 'user.roles', 'vehicles'])->paginate($perPage, $columns, $pageName, $page);
 
-        $resource = new SystemUserCollectionResource($systemUsers);
+        $resource = new SupplierCollectionResource($suppliers);
 
         return $resource->response()->setStatusCode(HttpResponse::HTTP_OK);
     }
 
-    public function store(StoreSystemUserRequest $request)
+    public function store(StoreSupplierRequest $request)
     {
         $tenant_id = $request->input('tenant_id', env('DEFAULT_TENANT_ID'));
         $organization_unit_id = $request->input('organization_unit_id', env('DEFAULT_OU_ID'));
@@ -78,26 +78,34 @@ class SystemUserController extends Controller
 
             $user->roles()->sync($request->input('user.roles', []));
 
-            $systemUser = SystemUserModel::create([
+            $supplier = SupplierModel::create([
                 'tenant_id' => $user->tenant_id,
                 'organization_unit_id' => $user->organization_unit_id,
                 'code' => $request->input('code'),
                 'registration_number' => $request->input('registration_number'),
                 'status' => $user->status,
                 'notes' => $request->input('notes'),
-                'user_id' => $user->id
+                'user_id' => $user->id,
+
+                'type' => $request->input('type'),
+                'tax_number' => $request->input('tax_number'),
+                'currency_id' => $request->input('currency_id'),
+                'credit_limit' => $request->input('credit_limit'),
+                'payment_terms_days' => $request->input('payment_terms_days'),
+                'ap_account_id' => $request->input('ap_account_id'),
             ]);
 
-            // $systemUser->fresh();
+            // $supplier->fresh();
 
-            $systemUser->load([
+            $supplier->load([
                 'user',
-                'user.roles'
+                'user.roles',
+                'vehicles'
             ]);
 
             DB::commit();
 
-            $resource = new SystemUserResource($systemUser);
+            $resource = new SupplierResource($supplier);
 
             return $resource->response()->setStatusCode(HttpResponse::HTTP_CREATED);
         } catch (\Throwable $e) {
@@ -106,21 +114,21 @@ class SystemUserController extends Controller
         }
     }
 
-    public function show(Request $request, int $systemUserId)
+    public function show(Request $request, int $supplierId)
     {
-        $systemUserEntity = SystemUserModel::with(['user', 'user.roles'])->findOrFail($systemUserId);
+        $supplierEntity = SupplierModel::with(['user', 'user.roles', 'vehicles'])->findOrFail($supplierId);
 
-        $resource = new SystemUserResource($systemUserEntity);
+        $resource = new SupplierResource($supplierEntity);
 
         return $resource->response()->setStatusCode(HttpResponse::HTTP_OK);
     }
 
-    public function update(UpdateSystemUserRequest $request, int $systemUserId)
+    public function update(UpdateSupplierRequest $request, int $supplierId)
     {
         $tenant_id = $request->input('tenant_id', env('DEFAULT_TENANT_ID'));
         $organization_unit_id = $request->input('organization_unit_id', env('DEFAULT_OU_ID'));
 
-        $foundSystemUser = SystemUserModel::with(['user'])->findOrFail($systemUserId);
+        $foundSupplier = SupplierModel::with(['user'])->findOrFail($supplierId);
 
         // $payload = $request->validated();
         $payload = [
@@ -138,7 +146,7 @@ class SystemUserController extends Controller
             'status' => $request->input('status'),
         ];
 
-        $oldAvatarPath = $foundSystemUser->user->avatar_path;
+        $oldAvatarPath = $foundSupplier->user->avatar_path;
         $newAvatarPath = null;
 
         if ($request->hasFile('user.avatar_file')) {
@@ -154,30 +162,37 @@ class SystemUserController extends Controller
         DB::beginTransaction();
 
         try {
-            $foundSystemUser->user->update($payload);
+            $foundSupplier->user->update($payload);
 
-            $foundSystemUser->user->roles()->sync($request->input('user.roles', []));
+            $foundSupplier->user->roles()->sync($request->input('user.roles', []));
 
-            $foundSystemUser->update([
-                'tenant_id' => $foundSystemUser->user->tenant_id,
-                'organization_unit_id' => $foundSystemUser->user->organization_unit_id,
+            $foundSupplier->update([
+                'tenant_id' => $foundSupplier->user->tenant_id,
+                'organization_unit_id' => $foundSupplier->user->organization_unit_id,
                 'code' => $request->input('code'),
                 'registration_number' => $request->input('registration_number'),
-                'status' => $foundSystemUser->user->status,
+                'status' => $foundSupplier->user->status,
                 'notes' => $request->input('notes'),
-                'user_id' => $foundSystemUser->user->id
+                'user_id' => $foundSupplier->user->id,
+
+                'type' => $request->input('type'),
+                'tax_number' => $request->input('tax_number'),
+                'currency_id' => $request->input('currency_id'),
+                'credit_limit' => $request->input('credit_limit'),
+                'payment_terms_days' => $request->input('payment_terms_days'),
+                'ap_account_id' => $request->input('ap_account_id'),
             ]);
 
-            $foundSystemUser->fresh();
+            $foundSupplier->fresh();
 
-            $foundSystemUser->load([
+            $foundSupplier->load([
                 'user',
                 'user.roles'
             ]);
 
             DB::commit();
 
-            $resource = new SystemUserResource($foundSystemUser);
+            $resource = new SupplierResource($foundSupplier);
 
             return $resource->response()->setStatusCode(HttpResponse::HTTP_OK);
         } catch (\Throwable $e) {
@@ -190,14 +205,14 @@ class SystemUserController extends Controller
         }
     }
 
-    public function delete(int $systemUserId)
+    public function delete(int $supplierId)
     {
         //
-        $foundSystemUser = SystemUserModel::with(['user'])->findOrFail($systemUserId);
+        $foundSupplier = SupplierModel::with(['user'])->findOrFail($supplierId);
 
-        $this->deleteImageIfSafe($foundSystemUser->user->avatar_path, $foundSystemUser->tenant_id, 'users');
+        $this->deleteImageIfSafe($foundSupplier->user->avatar_path, $foundSupplier->tenant_id, 'users');
 
-        $foundSystemUser->delete();
+        $foundSupplier->delete();
     }
 
     private function storeImage(UploadedFile $image, int $tenantId, string $baseDirectory): string
