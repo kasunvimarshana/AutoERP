@@ -33,7 +33,6 @@ return new class extends Migration
             $table->unsignedBigInteger('created_by')->nullable();
 
             $table->timestamps();
-            $table->softDeletes();
 
             $table->index(['tenant_id', 'bank_account_id', 'period_end'], 'bank_reconciliations_account_period_idx');
         });

@@ -26,6 +26,7 @@ return new class extends Migration
             $table->timestamp('processed_at')->nullable();
 
             $table->timestamps();
+
             $table->index(['tenant_id', 'employee_id', 'punch_time'], 'attendance_logs_employee_punch_time_idx');
         });
     }

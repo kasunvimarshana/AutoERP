@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('user_devices', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
+            $table->foreignId('tenant_id')->nullable()->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->json('metadata')->nullable();
 
@@ -24,7 +24,6 @@ return new class extends Migration
             $table->timestamp('last_active_at')->nullable();
 
             $table->timestamps();
-            $table->softDeletes();
 
             $table->unique(['tenant_id', 'user_id', 'device_token'], 'user_devices_uk');
         });

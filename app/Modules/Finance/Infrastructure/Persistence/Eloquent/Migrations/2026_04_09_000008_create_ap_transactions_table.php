@@ -24,7 +24,7 @@ return new class extends Migration
             $table->nullableMorphs('reference');
             $table->decimal('debit_amount', 20, 4)->default(0);
             $table->decimal('credit_amount', 20, 4)->default(0);
-            $table->decimal('balance_after', 20, 4);
+            $table->decimal('balance_after', 20, 4)->default(0);
             $table->date('transaction_date');
             $table->date('due_date')->nullable();
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'ap_transactions_currency_id_fk')->nullOnDelete();
@@ -32,7 +32,6 @@ return new class extends Migration
             $table->boolean('is_reconciled')->default(false);
 
             $table->timestamps();
-            $table->softDeletes();
         });
     }
 

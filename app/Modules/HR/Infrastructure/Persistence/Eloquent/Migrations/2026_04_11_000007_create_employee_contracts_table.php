@@ -30,7 +30,6 @@ return new class extends Migration
             $table->unsignedBigInteger('created_by')->nullable();
 
             $table->timestamps();
-            $table->softDeletes();
 
             $table->index(['tenant_id', 'employee_id', 'status'], 'employee_contracts_employee_status_idx');
         });

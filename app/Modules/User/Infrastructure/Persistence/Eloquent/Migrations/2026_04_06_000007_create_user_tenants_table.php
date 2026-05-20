@@ -23,7 +23,6 @@ return new class extends Migration
             $table->boolean('is_default')->default(false);
 
             $table->timestamps();
-            $table->softDeletes();
 
             $table->unique(['tenant_id', 'organization_unit_id', 'user_id'], 'user_tenants_user_uk');
             $table->index(['tenant_id', 'organization_unit_id', 'user_id'], 'user_tenants_user_idx');
