@@ -25,7 +25,7 @@ return new class extends Migration
             $table->foreignId('uom_id')->constrained('unit_of_measures', 'id')->cascadeOnDelete();
             $table->decimal('quantity', 20, 4);
             $table->decimal('unit_price', 20, 4);
-            $table->decimal('unit_cost', 20, 4);
+            $table->decimal('unit_cost', 20, 4)->nullable();
 
             // Discount – stored both as configuration and as absolute amount
             $table->string('discount_type')->nullable()->comment('percentage, fixed');

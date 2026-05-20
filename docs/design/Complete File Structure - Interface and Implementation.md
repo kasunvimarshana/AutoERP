@@ -2199,6 +2199,3 @@ app/
 └── Support/
     └── Helpers.php
 ```
-
-
-

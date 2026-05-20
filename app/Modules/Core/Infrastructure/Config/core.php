@@ -3,11 +3,6 @@
 declare(strict_types=1);
 
 return [
-    'default_repository' => 'eloquent',
-    'pagination' => [
-        'per_page' => 15,
-        'page_name' => 'page',
-    ],
     'file_storage' => [
         /*
         |--------------------------------------------------------------------------
