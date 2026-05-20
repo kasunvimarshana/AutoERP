@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->json('metadata')->nullable();
 
-            $table->foreignId('diagnostic_id')->constrained('service_diagnostics')->cascadeOnDelete();
+            $table->foreignId('diagnostic_id')->constrained('vehicle_service_diagnostics')->cascadeOnDelete();
             $table->string('diagnostic_code')->nullable();
             $table->string('diagnostic_type');
             $table->text('findings')->nullable();

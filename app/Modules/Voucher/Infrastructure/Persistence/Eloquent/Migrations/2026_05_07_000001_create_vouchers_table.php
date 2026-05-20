@@ -23,7 +23,7 @@ return new class extends Migration
             $table->date('voucher_date');
             $table->date('due_date')->nullable();
             $table->string('party_type')->nullable()->comment('customer, supplier, employee, other');
-            $table->foreignId('party_id')->nullable()->constrained('parties')->nullOnDelete();
+            $table->unsignedBigInteger('party_id')->nullable();
             $table->string('reference')->nullable()->comment('bill number, etc.');
             $table->text('description')->nullable();
             $table->foreignId('account_id')->constrained('accounts')->comment('primary expense/income account');

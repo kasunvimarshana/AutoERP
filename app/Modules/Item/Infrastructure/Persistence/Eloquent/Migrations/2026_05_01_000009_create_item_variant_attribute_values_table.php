@@ -18,7 +18,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
 
             $table->foreignId('variant_id')->constrained('item_variants')->cascadeOnDelete();
-            $table->foreignId('attribute_value_id')->constrained('attribute_values')->cascadeOnDelete();
+            $table->foreignId('attribute_value_id')->constrained('item_attribute_values')->cascadeOnDelete();
 
             $table->unique(['tenant_id', 'variant_id',  'attribute_value_id'], 'item_variant_attribute_values_pk');
             $table->index(['tenant_id', 'variant_id'], 'item_variant_attribute_values_variant_idx');

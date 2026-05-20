@@ -24,7 +24,7 @@ return new class extends Migration
             $table->unsignedBigInteger('party_id')->nullable();
             $table->date('invoice_date');
             $table->date('due_date');
-            $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'purchase_invoices_currency_id_fk')->nullOnDelete();
+            $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 4)->default(1);
 
             // ── Line‑derived totals – strictly SUM over lines ──

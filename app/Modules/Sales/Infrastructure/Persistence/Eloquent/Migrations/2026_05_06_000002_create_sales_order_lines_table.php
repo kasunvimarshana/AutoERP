@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('grn_lines', function (Blueprint $table): void {
+        Schema::create('sales_order_lines', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
@@ -16,22 +16,21 @@ return new class extends Migration
             $table->json('metadata')->nullable();
 
             $table->string('reference')->nullable();
-            $table->foreignId('grn_header_id')->constrained('grn_headers', 'id')->cascadeOnDelete();
-            $table->foreignId('purchase_order_line_id')->nullable()->constrained('purchase_order_lines', 'id')->cascadeOnDelete();
+            $table->foreignId('sales_order_id')->constrained('sales_orders', 'id')->cascadeOnDelete();
             $table->foreignId('item_id')->constrained('items', 'id')->cascadeOnDelete();
             $table->foreignId('variant_id')->nullable()->constrained('item_variants', 'id')->nullOnDelete();
             $table->foreignId('batch_id')->nullable()->constrained('batches', 'id')->nullOnDelete();
             $table->foreignId('serial_id')->nullable()->constrained('serials', 'id')->nullOnDelete();
             $table->foreignId('warehouse_id')->nullable()->constrained('warehouses', 'id')->nullOnDelete();
-            $table->foreignId('location_id')->nullable()->constrained('locations', 'id')->nullOnDelete();
-
+            $table->foreignId('location_id')->nullable()->constrained('warehouse_locations', 'id')->nullOnDelete();
             $table->text('description')->nullable();
             $table->foreignId('uom_id')->constrained('unit_of_measures', 'id')->cascadeOnDelete();
-            $table->decimal('expected_qty', 20, 4)->default(0);
-            $table->decimal('received_qty', 20, 4);
+            $table->decimal('ordered_qty', 20, 4);
+            $table->decimal('delivered_qty', 20, 4)->default(0);
             $table->decimal('rejected_qty', 20, 4)->default(0);
             $table->decimal('invoiced_qty', 20, 4)->default(0);
             $table->decimal('unit_price', 20, 4);
+            $table->decimal('unit_cost', 20, 4)->nullable();
 
             // Discount – stored both as configuration and as absolute amount
             $table->string('discount_type')->nullable()->comment('percentage, fixed');
@@ -40,7 +39,7 @@ return new class extends Migration
 
             // Line net (before tax)
             $table->decimal('gross_amount', 20, 4)
-                  ->storedAs('received_qty * unit_price')
+                  ->storedAs('ordered_qty * unit_price')
                   ->comment('Gross = qty * unit price');
             $table->decimal('line_total', 20, 4)
                   ->storedAs('gross_amount - discount_amount')
@@ -65,6 +64,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('grn_lines');
+        Schema::dropIfExists('sales_order_lines');
     }
 };

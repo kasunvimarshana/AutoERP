@@ -19,7 +19,7 @@ return new class extends Migration
 
             $table->foreignId('user_id')->nullable()->unique('employees_user_uk')->constrained('users')->nullOnDelete();
             $table->string('code')->nullable();
-            $table->string('registration_number')->nullable();
+            $table->string('registration_number');
             $table->foreignId('department_id')->nullable()->constrained('departments')->nullOnDelete();
             $table->foreignId('designation_id')->nullable()->constrained('designations')->nullOnDelete();
             $table->foreignId('employment_type_id')->nullable()->constrained('employment_types')->nullOnDelete();
@@ -50,9 +50,8 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'employee_code'], 'employees_code_uk');
-            $table->index(['tenant_id', 'status'], 'employees_status_idx');
-            $table->index(['tenant_id', 'department_id'], 'employees_department_idx');
+            $table->unique(['tenant_id', 'registration_number'], 'employees_registration_number_uk');
+            $table->index(['tenant_id', 'user_id'], 'employees_user_idx');
         });
     }
 

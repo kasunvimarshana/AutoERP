@@ -10,23 +10,19 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('vehicle_rental_lessee_agreement_debit_notes', function (Blueprint $table) {
+        Schema::create('vehicle_service_inspection_lines', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->json('metadata')->nullable();
 
-            $table->foreignId('lessee_agreement_id')->constrained('vehicle_rental_lessee_agreements', 'id')->cascadeOnDelete();
-            $table->string('name');
-            $table->string('reference')->nullable();
-            $table->text('description')->nullable();
-            // GL account references
-            $table->foreignId('account_id')->nullable()->constrained('accounts')->nullOnDelete();
-            $table->decimal('amount', 20, 4);
-            $table->date('entry_date');
-
-            $table->unsignedBigInteger('created_by')->nullable();
+            $table->foreignId('inspection_id')->constrained('vehicle_service_inspections')->cascadeOnDelete();
+            $table->string('inspection_item');
+            $table->string('expected_value')->nullable();
+            $table->string('actual_value')->nullable();
+            $table->string('result')->default('not_tested')->comment('pass, fail, flag, not_tested');
+            $table->text('comment')->nullable();
 
             $table->timestamps();
         });
@@ -34,6 +30,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('vehicle_rental_lessee_agreement_debit_notes');
+        Schema::dropIfExists('vehicle_service_inspection_lines');
     }
 };

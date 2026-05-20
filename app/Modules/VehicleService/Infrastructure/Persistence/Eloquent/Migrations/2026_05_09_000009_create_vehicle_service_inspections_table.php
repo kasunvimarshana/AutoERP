@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->json('metadata')->nullable();
 
-            $table->foreignId('job_card_id')->constrained('service_job_cards')->cascadeOnDelete();
+            $table->foreignId('job_card_id')->constrained('vehicle_service_job_cards')->cascadeOnDelete();
             $table->string('inspection_number');
             $table->string('inspection_phase')->nullable()->comment('pre, post');
             $table->string('inspection_type')->comment('safety, emissions, pre_purchase, periodic, etc.');

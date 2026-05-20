@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('type')->default('expense')->comment('expense, income');
             $table->string('sub_type')->nullable()->comment('electricity, phone, rent, commission, misc_income, interest');
             $table->string('party_type')->nullable()->comment('customer, supplier, employee, other');
-            $table->foreignId('party_id')->nullable()->constrained('parties')->nullOnDelete();
+            $table->unsignedBigInteger('party_id')->nullable();
             $table->string('reference')->nullable();
             $table->text('description')->nullable();
             $table->foreignId('account_id')->constrained('accounts')->comment('primary expense/income account');

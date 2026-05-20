@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -8,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('gdn_lines', function (Blueprint $table): void {
+        Schema::create('vehicle_service_job_card_lines', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
@@ -16,20 +18,16 @@ return new class extends Migration
             $table->json('metadata')->nullable();
 
             $table->string('reference')->nullable();
-            $table->foreignId('gdn_header_id')->constrained('gdn_headers', 'id')->cascadeOnDelete();
-            $table->foreignId('sales_order_line_id')->nullable()->constrained('sales_order_lines', 'id')->cascadeOnDelete();
+            $table->foreignId('job_card_id')->constrained('vehicle_service_job_cards')->cascadeOnDelete();
             $table->foreignId('item_id')->constrained('items', 'id')->cascadeOnDelete();
             $table->foreignId('variant_id')->nullable()->constrained('item_variants', 'id')->nullOnDelete();
             $table->foreignId('batch_id')->nullable()->constrained('batches', 'id')->nullOnDelete();
             $table->foreignId('serial_id')->nullable()->constrained('serials', 'id')->nullOnDelete();
             $table->foreignId('warehouse_id')->nullable()->constrained('warehouses', 'id')->nullOnDelete();
-            $table->foreignId('location_id')->nullable()->constrained('locations', 'id')->nullOnDelete();
-
+            $table->foreignId('location_id')->nullable()->constrained('warehouse_locations', 'id')->nullOnDelete();
             $table->text('description')->nullable();
             $table->foreignId('uom_id')->constrained('unit_of_measures', 'id')->cascadeOnDelete();
-            $table->decimal('delivered_qty', 20, 4);
-            $table->decimal('rejected_qty', 20, 4)->default(0);
-            $table->decimal('invoiced_qty', 20, 4)->default(0);
+            $table->decimal('quantity', 20, 4);
             $table->decimal('unit_price', 20, 4);
             $table->decimal('unit_cost', 20, 4)->nullable();
 
@@ -40,7 +38,7 @@ return new class extends Migration
 
             // Line net (before tax)
             $table->decimal('gross_amount', 20, 4)
-                  ->storedAs('delivered_qty * unit_price')
+                  ->storedAs('quantity * unit_price')
                   ->comment('Gross = qty * unit price');
             $table->decimal('line_total', 20, 4)
                   ->storedAs('gross_amount - discount_amount')
@@ -59,12 +57,13 @@ return new class extends Migration
             $table->foreignId('account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete()->comment('account for posting');
 
             $table->timestamps();
-            $table->softDeletes();
+
+            $table->index(['tenant_id', 'job_card_id'], 'vehicle_service_job_card_lines_job_card_idx');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('gdn_lines');
+        Schema::dropIfExists('vehicle_service_job_card_lines');
     }
 };

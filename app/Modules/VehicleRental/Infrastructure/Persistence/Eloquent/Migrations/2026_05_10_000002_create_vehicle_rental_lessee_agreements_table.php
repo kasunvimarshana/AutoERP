@@ -60,10 +60,10 @@ return new class extends Migration
             $table->text('notes')->nullable();
 
             // GL account references
-            $table->foreignId('rental_income_account_id')->nullable()->constrained('accounts')->nullOnDelete();
-            $table->foreignId('rental_expense_account_id')->nullable()->constrained('accounts')->nullOnDelete();
-            $table->foreignId('excess_km_income_account_id')->nullable()->constrained('accounts')->nullOnDelete();
-            $table->foreignId('driver_expense_account_id')->nullable()->constrained('accounts')->nullOnDelete();
+            $table->foreignId('rental_income_account_id')->nullable()->constrained('accounts', 'id', 'vehicle_rental_lessee_agreements_rental_income_fk')->nullOnDelete();
+            $table->foreignId('rental_expense_account_id')->nullable()->constrained('accounts', 'id', 'vehicle_rental_lessee_agreements_rental_expense_fk')->nullOnDelete();
+            $table->foreignId('excess_km_income_account_id')->nullable()->constrained('accounts', 'id', 'vehicle_rental_lessee_agreements_excess_km_income_fk')->nullOnDelete();
+            $table->foreignId('driver_expense_account_id')->nullable()->constrained('accounts', 'id', 'vehicle_rental_lessee_agreements_driver_expense_fk')->nullOnDelete();
 
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();

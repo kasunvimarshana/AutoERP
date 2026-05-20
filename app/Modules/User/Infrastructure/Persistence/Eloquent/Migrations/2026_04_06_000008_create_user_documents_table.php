@@ -10,26 +10,29 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('vehicle_service_inspection_lines', function (Blueprint $table) {
+        Schema::create('user_documents', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->json('metadata')->nullable();
 
-            $table->foreignId('inspection_id')->constrained('service_inspections')->cascadeOnDelete();
-            $table->string('inspection_item');
-            $table->string('expected_value')->nullable();
-            $table->string('actual_value')->nullable();
-            $table->string('result')->default('not_tested')->comment('pass, fail, flag, not_tested');
-            $table->text('comment')->nullable();
+            // $table->string('uuid')->unique('user_documents_uuid_uk');
+            $table->foreignId('user_id')->constrained('users', 'id')->cascadeOnDelete();
+            $table->string('name');
+            $table->string('file_path');
+            $table->string('mime_type')->nullable();
+            $table->unsignedInteger('size')->nullable();
+            $table->string('type')->nullable();
 
             $table->timestamps();
+
+            $table->unique(['tenant_id', 'user_id', 'name'], 'user_documents_user_name_uk');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('vehicle_service_inspection_lines');
+        Schema::dropIfExists('user_documents');
     }
 };

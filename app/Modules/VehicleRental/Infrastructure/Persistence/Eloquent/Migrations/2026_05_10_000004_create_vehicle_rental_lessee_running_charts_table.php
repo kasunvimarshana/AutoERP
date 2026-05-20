@@ -14,12 +14,12 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id', 'vehicle_rental_lessee_running_charts_ou_fk')->nullOnDelete();
             $table->json('metadata')->nullable();
 
             // $table->foreignId('vehicle_id')->constrained('vehicles', 'id');
-            $table->foreignId('lessee_agreement_id')->constrained('vehicle_rental_lessee_agreements', 'id')->cascadeOnDelete();
-            $table->foreignId('lessor_agreement_id')->nullable()->constrained('vehicle_rental_lessor_agreements', 'id')->nullOnDelete();
+            $table->foreignId('lessee_agreement_id')->constrained('vehicle_rental_lessee_agreements', 'id', 'vehicle_rental_lessee_running_charts_lessee_agreement_fk')->cascadeOnDelete();
+            $table->foreignId('lessor_agreement_id')->nullable()->constrained('vehicle_rental_lessor_agreements', 'id', 'vehicle_rental_lessee_running_charts_lessor_agreement_fk')->nullOnDelete();
             $table->foreignId('driver_id')->nullable()->constrained('employees', 'id')->nullOnDelete();
 
             $table->date('log_date');

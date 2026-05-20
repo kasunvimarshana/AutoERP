@@ -19,7 +19,7 @@ return new class extends Migration
 
             $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete(); // portal login linkage
             $table->string('code')->nullable();
-            $table->string('registration_number')->nullable();
+            $table->string('registration_number');
             $table->string('type')->default('individual')->comment('individual, company');
             $table->string('tax_number')->nullable();
             $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete();
@@ -34,8 +34,8 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['tenant_id', 'type'], 'suppliers_type_idx');
-            $table->index(['tenant_id', 'name'], 'suppliers_name_idx');
+            $table->index(['tenant_id', 'registration_number'], 'suppliers_registration_number_uk');
+            $table->index(['tenant_id', 'user_id'], 'suppliers_user_idx');
         });
     }
 
