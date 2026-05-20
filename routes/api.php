@@ -20,6 +20,10 @@ Route::middleware([])->group(function () {
     Route::get('suppliers/{supplier}', [SupplierController::class, 'show']);
     Route::put('suppliers/{supplier}', [SupplierController::class, 'update']);
     Route::delete('suppliers/{supplier}', [SupplierController::class, 'delete']);
+    Route::post('suppliers/{supplier}', [SupplierController::class, 'delete']);
+    Route::post('suppliers/vehicles', [SupplierController::class, 'assignVehicle']);
+    Route::delete('suppliers/vehicles/{supplier_vehicle}', [SupplierController::class, 'removeVehicle']);
+    Route::get('suppliers/vehicles/{supplier}', [SupplierController::class, 'vehicles']);
 
     // Customer
     Route::post('customers', [CustomerController::class, 'store']);
@@ -27,6 +31,9 @@ Route::middleware([])->group(function () {
     Route::get('customers/{customer}', [CustomerController::class, 'show']);
     Route::put('customers/{customer}', [CustomerController::class, 'update']);
     Route::delete('customers/{customer}', [CustomerController::class, 'delete']);
+    Route::post('customers/vehicles', [CustomerController::class, 'assignVehicle']);
+    Route::delete('customers/vehicles/{customer_vehicle}', [CustomerController::class, 'removeVehicle']);
+    Route::get('customers/vehicles/{customer}', [CustomerController::class, 'vehicles']);
 
     // Vehicle
     Route::post('vehicles', [VehicleController::class, 'store']);

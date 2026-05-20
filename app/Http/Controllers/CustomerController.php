@@ -6,6 +6,7 @@ use App\Http\Requests\StoreCustomerRequest;
 use App\Http\Requests\UpdateCustomerRequest;
 use App\Http\Resources\CustomerCollectionResource;
 use App\Http\Resources\CustomerResource;
+use App\Http\Resources\VehicleCollectionResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerModel;
+use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerVehicleModel;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 
@@ -235,5 +237,62 @@ class CustomerController extends Controller
         if ($this->fileStorageService->exists($imagePath)) {
             $this->fileStorageService->delete($imagePath);
         }
+    }
+
+    public function assignVehicle(Request $request)
+    {
+        $tenant_id = $request->input('tenant_id', env('DEFAULT_TENANT_ID'));
+        $organization_unit_id = $request->input('organization_unit_id', env('DEFAULT_OU_ID'));
+
+        $payload = $request->validated();
+        $payload['tenant_id'] = $tenant_id;
+        $payload['organization_unit_id'] = $organization_unit_id;
+
+        $customerVehicle = CustomerVehicleModel::create($payload);
+
+        if ($customerVehicle->is_current) {
+            $this->clearCurrentForCustomerVehicle($customerVehicle->vehicle_id, $customerVehicle->customer_id);
+        }
+
+        return response()->json([])->setStatusCode(HttpResponse::HTTP_OK);
+    }
+
+    public function removeVehicle(int $customerVehicleId)
+    {
+        //
+        $foundCustomerVehicle = CustomerVehicleModel::findOrFail($customerVehicleId);
+
+        $foundCustomerVehicle->delete();
+    }
+
+    private function clearCurrentForCustomerVehicle(int $vehicleId, ?int $excludeCustomerId = null): void
+    {
+        $query = CustomerVehicleModel::where('vehicleId', $vehicleId)->where('is_current', true);
+
+        if ($excludeCustomerId !== null) {
+            $query->where('customer_id', '!=', $excludeCustomerId);
+        }
+
+        $query->update(['is_current' => false]);
+    }
+
+    public function vehicles(Request $request, int $customerId)
+    {
+        //
+        $validated = $request->all();
+
+        $pageName = config('core.pagination.page_name', 'page');
+        $perPage = (int) ($validated['per_page'] ?? 15);
+        $page = (int) ($validated[$pageName] ?? 1);
+        $page = $page ?: Paginator::resolveCurrentPage($pageName);
+        $columns = ['*'];
+
+        $foundCustomer = CustomerModel::findOrFail($customerId);
+
+        $foundCustomerVehicles = $foundCustomer->vehicles()->paginate($perPage, $columns, $pageName, $page);
+
+        $resource = new VehicleCollectionResource($foundCustomerVehicles);
+
+        return $resource->response()->setStatusCode(HttpResponse::HTTP_OK);
     }
 }

@@ -6,6 +6,7 @@ use App\Http\Requests\StoreSupplierRequest;
 use App\Http\Requests\UpdateSupplierRequest;
 use App\Http\Resources\SupplierCollectionResource;
 use App\Http\Resources\SupplierResource;
+use App\Http\Resources\VehicleCollectionResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierModel;
+use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierVehicleModel;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 
@@ -235,5 +237,62 @@ class SupplierController extends Controller
         if ($this->fileStorageService->exists($imagePath)) {
             $this->fileStorageService->delete($imagePath);
         }
+    }
+
+    public function assignVehicle(Request $request)
+    {
+        $tenant_id = $request->input('tenant_id', env('DEFAULT_TENANT_ID'));
+        $organization_unit_id = $request->input('organization_unit_id', env('DEFAULT_OU_ID'));
+
+        $payload = $request->validated();
+        $payload['tenant_id'] = $tenant_id;
+        $payload['organization_unit_id'] = $organization_unit_id;
+
+        $supplierVehicle = SupplierVehicleModel::create($payload);
+
+        if ($supplierVehicle->is_current) {
+            $this->clearCurrentForSupplierVehicle($supplierVehicle->vehicle_id, $supplierVehicle->supplier_id);
+        }
+
+        return response()->json([])->setStatusCode(HttpResponse::HTTP_OK);
+    }
+
+    public function removeVehicle(int $supplierVehicleId)
+    {
+        //
+        $foundSupplierVehicle = SupplierVehicleModel::findOrFail($supplierVehicleId);
+
+        $foundSupplierVehicle->delete();
+    }
+
+    private function clearCurrentForSupplierVehicle(int $vehicleId, ?int $excludeSupplierId = null): void
+    {
+        $query = SupplierVehicleModel::where('vehicleId', $vehicleId)->where('is_current', true);
+
+        if ($excludeSupplierId !== null) {
+            $query->where('supplier_id', '!=', $excludeSupplierId);
+        }
+
+        $query->update(['is_current' => false]);
+    }
+
+    public function vehicles(Request $request, int $supplierId)
+    {
+        //
+        $validated = $request->all();
+
+        $pageName = config('core.pagination.page_name', 'page');
+        $perPage = (int) ($validated['per_page'] ?? 15);
+        $page = (int) ($validated[$pageName] ?? 1);
+        $page = $page ?: Paginator::resolveCurrentPage($pageName);
+        $columns = ['*'];
+
+        $foundSupplier = SupplierModel::findOrFail($supplierId);
+
+        $foundSupplierVehicles = $foundSupplier->vehicles()->paginate($perPage, $columns, $pageName, $page);
+
+        $resource = new VehicleCollectionResource($foundSupplierVehicles);
+
+        return $resource->response()->setStatusCode(HttpResponse::HTTP_OK);
     }
 }

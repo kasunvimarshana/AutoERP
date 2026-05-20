@@ -20,6 +20,7 @@ return new class extends Migration
             $table->foreignId('supplier_id')->constrained('suppliers')->cascadeOnDelete();
             $table->foreignId('vehicle_id')->constrained('vehicles')->cascadeOnDelete();
             $table->boolean('is_current')->default(false);
+            $table->boolean('is_active')->default(true);
 
             $table->timestamps();
 
