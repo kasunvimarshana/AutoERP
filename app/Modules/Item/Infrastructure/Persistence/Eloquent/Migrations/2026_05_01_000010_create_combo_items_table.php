@@ -39,12 +39,3 @@ return new class extends Migration
         Schema::dropIfExists('combo_items');
     }
 };
-
-
-
-
-            // Service fields
-            $table->decimal('estimated_service_time_hours', 20, 4)->nullable();
-
-            $table->string('incentive_type')->default('fixed')->nullable();   // percentage, fixed
-            $table->decimal('incentive_value', 20, 4)->default(0);
