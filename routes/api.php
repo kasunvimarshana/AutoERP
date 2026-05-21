@@ -10,6 +10,7 @@ use App\Http\Controllers\EmploymentTypeController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\WarehouseController;
 use App\Http\Controllers\ItemController;
+use App\Http\Controllers\ItemBrandController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware([])->group(function () {
@@ -89,4 +90,11 @@ Route::middleware([])->group(function () {
     Route::get('items/{item}', [ItemController::class, 'show']);
     Route::put('items/{item}', [ItemController::class, 'update']);
     Route::delete('items/{item}', [ItemController::class, 'delete']);
+
+    // Item Brand
+    Route::post('item-brands', [ItemBrandController::class, 'store']);
+    Route::get('item-brands', [ItemBrandController::class, 'index']);
+    Route::get('item-brands/{itemBrand}', [ItemBrandController::class, 'show']);
+    Route::put('item-brands/{itemBrand}', [ItemBrandController::class, 'update']);
+    Route::delete('item-brands/{itemBrand}', [ItemBrandController::class, 'delete']);
 });
