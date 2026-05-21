@@ -33,7 +33,7 @@ class VehicleController extends Controller
         $page = $page ?: Paginator::resolveCurrentPage($pageName);
         $columns = ['*'];
 
-        $vehicles = VehicleModel::paginate($perPage, $columns, $pageName, $page);
+        $vehicles = VehicleModel::with(['suppliers', 'customers', 'currentSupplier', 'currentCustomer'])->paginate($perPage, $columns, $pageName, $page);
 
         $resource = new VehicleCollectionResource($vehicles);
 
@@ -56,6 +56,8 @@ class VehicleController extends Controller
 
             // $vehicle->fresh();
 
+            $vehicle->load(['suppliers', 'customers', 'currentSupplier', 'currentCustomer']);
+
             DB::commit();
 
             $resource = new VehicleResource($vehicle);
@@ -70,6 +72,8 @@ class VehicleController extends Controller
     public function show(Request $request, int $vehicleId)
     {
         $vehicleEntity = VehicleModel::findOrFail($vehicleId);
+
+        $vehicleEntity->load(['suppliers', 'customers', 'currentSupplier', 'currentCustomer']);
 
         $resource = new VehicleResource($vehicleEntity);
 
@@ -93,6 +97,8 @@ class VehicleController extends Controller
             $foundVehicle->update($payload);
 
             $foundVehicle->fresh();
+
+            $foundVehicle->load(['suppliers', 'customers', 'currentSupplier', 'currentCustomer']);
 
             DB::commit();
 
