@@ -26,6 +26,7 @@ return new class extends Migration
             $table->decimal('requested_qty', 20, 4);
             $table->decimal('shipped_qty', 20, 4)->default(0);
             $table->decimal('received_qty', 20, 4)->default(0);
+            $table->decimal('unit_cost', 20, 4)->nullable();
 
             $table->timestamps();
         });

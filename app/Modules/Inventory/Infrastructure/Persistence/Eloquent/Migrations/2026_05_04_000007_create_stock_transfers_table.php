@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('reference_number');
             $table->foreignId('from_location_id')->constrained('warehouse_locations');
             $table->foreignId('to_location_id')->constrained('warehouse_locations');
-            $table->string('status')->default('draft');
+            $table->string('status')->default('DRAFT')->comment('DRAFT, PENDING, COMPLETED, CANCELLED');
             $table->foreignId('requested_by')->constrained('users');
             $table->foreignId('approved_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('transferred_at')->nullable();

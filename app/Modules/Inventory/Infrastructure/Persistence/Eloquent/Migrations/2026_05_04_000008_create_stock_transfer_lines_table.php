@@ -24,6 +24,7 @@ return new class extends Migration
             $table->foreignId('serial_id')->nullable()->constrained('serials')->nullOnDelete();
             $table->foreignId('uom_id')->constrained('unit_of_measures');
             $table->decimal('quantity', 20, 4);
+            $table->decimal('unit_cost', 20, 4)->nullable();
 
             $table->timestamps();
         });

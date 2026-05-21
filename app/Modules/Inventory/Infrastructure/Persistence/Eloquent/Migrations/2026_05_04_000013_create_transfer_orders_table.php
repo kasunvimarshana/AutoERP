@@ -20,7 +20,7 @@ return new class extends Migration
             $table->foreignId('from_warehouse_id')->constrained('warehouses');
             $table->foreignId('to_warehouse_id')->constrained('warehouses');
             $table->string('transfer_number');
-            $table->string('status')->default('draft');
+            $table->string('status')->default('DRAFT')->comment('DRAFT, PENDING, COMPLETED, CANCELLED');
             $table->date('request_date');
             $table->date('expected_date')->nullable();
             $table->date('shipped_date')->nullable();

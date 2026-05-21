@@ -21,14 +21,13 @@ return new class extends Migration
             $table->foreignId('variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
             $table->string('serial_number');
             $table->foreignId('batch_id')->nullable()->constrained('batches')->nullOnDelete();
-            $table->string('status')->default('available');
+            $table->string('status')->default('AVAILABLE')->comment('AVAILABLE, SOLD, RETURNED, DAMAGED, SCRAPPED');
             $table->foreignId('current_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
             $table->nullableMorphs('current_owner');
             $table->date('warranty_expiry')->nullable();
             $table->text('notes')->nullable();
             $table->date('manufacture_date')->nullable();
-            // $table->decimal('cost_price', 20, 4)->nullable();
-            // $table->decimal('sales_price', 20, 4)->nullable();
+            $table->decimal('unit_cost', 20, 4)->nullable();
 
             $table->timestamps();
 

@@ -17,6 +17,8 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
+            // $table->string('transaction_no')->nullable();
+            // $table->date('transaction_date')->nullable();
             $table->string('direction')->comment('in, out');
             $table->foreignId('item_id')->constrained('items')->cascadeOnDelete();
             $table->foreignId('variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
@@ -26,7 +28,7 @@ return new class extends Migration
             // $table->foreignId('to_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
             $table->foreignId('location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
             $table->foreignId('warehouse_id')->nullable()->constrained('warehouses')->nullOnDelete();
-            $table->string('txn_type')->comment('movement_type: GRN, GDN, Adjustment');
+            $table->string('txn_type')->comment('movement_type: GRN, GDN, Adjustment (OPENING_STOCK, PURCHASE_RECEIPT, PURCHASE_RETURN, SALES_ISSUE, SALES_RETURN, STOCK_TRANSFER_IN, STOCK_TRANSFER_OUT, ADJUSTMENT_IN, ADJUSTMENT_OUT, PRODUCTION_CONSUMPTION, PRODUCTION_OUTPUT, SCRAP, DAMAGE, COUNT_ADJUSTMENT)');
             $table->nullableMorphs('reference'); // link to PO line, GRN line, shipment line, etc.
             $table->foreignId('uom_id')->constrained('unit_of_measures');
             $table->decimal('quantity', 20, 4);
@@ -35,8 +37,8 @@ return new class extends Migration
             $table->decimal('unit_cost', 20, 4)->nullable(); // For receipt/shipment valuation
             // $table->decimal('total_cost', 20, 4)->storedAs('quantity * unit_cost')->comment('quantity * unit_cost');
             $table->decimal('total_cost', 20, 4)->default(0);
-            $table->decimal('running_quantity', 20, 4)->default(0);
-            $table->decimal('running_value', 20, 4)->default(0);
+            $table->decimal('balance_quantity', 20, 4)->default(0);
+            $table->decimal('balance_value', 20, 4)->default(0);
             $table->foreignId('performed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('performed_at')->useCurrent();
             $table->text('notes')->nullable();

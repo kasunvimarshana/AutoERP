@@ -17,6 +17,7 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
+            // $table->unsignedBigInteger('source_transaction_id');
             $table->foreignId('item_id')->constrained('items')->cascadeOnDelete();
             $table->foreignId('variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
             $table->foreignId('batch_id')->nullable()->constrained('batches')->nullOnDelete();

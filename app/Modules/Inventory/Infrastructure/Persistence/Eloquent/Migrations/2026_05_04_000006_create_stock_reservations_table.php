@@ -25,6 +25,7 @@ return new class extends Migration
             $table->decimal('quantity', 20, 4);
             $table->nullableMorphs('reserved_for'); // e.g., sales order line
             $table->timestamp('expires_at')->nullable();
+            $table->decimal('unit_cost', 20, 4)->nullable();
 
             $table->timestamps();
 

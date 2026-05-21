@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('document_type');
             $table->unsignedBigInteger('document_id');
             $table->foreignId('inspected_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->string('inspection_result')->default('pending');
+            $table->string('inspection_result')->default('PENDING')->comment('PENDING, PASSED, FAILED');
             $table->text('notes')->nullable();
             $table->timestamp('inspected_at')->nullable();
 

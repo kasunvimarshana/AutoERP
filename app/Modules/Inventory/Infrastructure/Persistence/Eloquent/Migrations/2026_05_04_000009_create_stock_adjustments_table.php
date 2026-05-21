@@ -21,7 +21,7 @@ return new class extends Migration
             $table->foreignId('warehouse_id')->constrained('warehouses');
             $table->foreignId('location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
             $table->string('type')->default('cycle_count');
-            $table->string('status')->default('draft');
+            $table->string('status')->default('DRAFT')->comment('DRAFT, PENDING, COMPLETED, CANCELLED');
             $table->foreignId('counted_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('counted_at')->nullable();
             $table->foreignId('approved_by')->nullable()->constrained('users')->nullOnDelete();

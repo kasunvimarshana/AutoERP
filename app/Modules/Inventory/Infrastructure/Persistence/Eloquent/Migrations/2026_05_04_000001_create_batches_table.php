@@ -27,8 +27,7 @@ return new class extends Migration
             $table->foreignId('supplier_id')->nullable()->constrained('suppliers')->nullOnDelete();
             $table->string('status')->default('active');
             $table->text('notes')->nullable();
-            // $table->decimal('cost_price', 20, 4)->nullable();
-            // $table->decimal('sales_price', 20, 4)->nullable();
+            $table->decimal('unit_cost', 20, 4)->nullable();
 
             $table->timestamps();
 

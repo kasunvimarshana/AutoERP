@@ -21,7 +21,7 @@ return new class extends Migration
             $table->foreignId('stock_movement_id')->constrained('stock_movements');
             $table->foreignId('target_location_id')->constrained('warehouse_locations');
             $table->decimal('quantity', 20, 4);
-            $table->string('status')->default('pending');
+            $table->string('status')->default('PENDING')->comment('PENDING, IN_PROGRESS, COMPLETED, CANCELLED');
             $table->foreignId('assigned_user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('completed_at')->nullable();
 

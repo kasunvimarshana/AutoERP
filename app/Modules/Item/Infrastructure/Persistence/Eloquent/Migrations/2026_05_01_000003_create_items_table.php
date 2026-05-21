@@ -25,6 +25,7 @@ return new class extends Migration
             $table->string('sku')->nullable();
             $table->text('description')->nullable();
             $table->string('image_path')->nullable();
+            $table->string('status')->default('DRAFT')->comment('DRAFT, ACTIVE, INACTIVE, DISCONTINUED');
 
             // Units of measure
             $table->foreignId('base_uom_id')->constrained('unit_of_measures');
@@ -39,8 +40,11 @@ return new class extends Migration
             $table->boolean('is_serial_tracked')->default(false);
             $table->boolean('is_stockable')->default(false);
 
-            $table->string('valuation_method')->nullable()->comment('Accounting pricing engine rules: FIFO, LIFO, AVCO');
+            $table->string('valuation_method')->nullable()->comment('(Inventory Costing Engine) Accounting pricing engine rules: FIFO, LIFO, AVCO');
             $table->string('allocation_method')->nullable()->comment('Stock picking strategy rules: FEFO, FIFO, LIFO');
+
+            $table->string('valuation_method')->nullable()->comment('Defines the inventory cost flow assumption and stock valuation policy used for financial costing, inventory asset capitalization, and cost recognition (FIFO, LIFO, Weighted Average, Standard Cost, or Specific Identification)'); // Inventory costing strategy used to determine stock issue valuation and financial inventory asset calculation such as FIFO, LIFO, Weighted Average, Standard Cost, or Specific Identification
+            $table->string('allocation_method')->nullable()->comment('Defines the proportional allocation basis used to distribute shared costs, operational charges, resources, or overhead amounts across related items or transactions'); // Cost or resource distribution strategy used to proportionally allocate shared operational, logistics, freight, service, or overhead expenses across items based on quantity, value, weight, volume, time, or percentage
             $table->decimal('standard_cost', 20, 4)->nullable()->comment('Pre-determined target baseline asset value');
 
             // Account references
@@ -48,6 +52,18 @@ return new class extends Migration
             $table->foreignId('cogs_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('General ledger channel for inventory direct cost');
             $table->foreignId('inventory_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('General ledger channel for asset asset valuation');
             $table->foreignId('expense_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('General ledger channel for non-revenue overhead asset');
+            // RETURNS
+            $table->foreignId('sales_return_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Used when customer returns goods (sales return adjustment)');
+            $table->foreignId('purchase_return_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Used when returning goods to supplier');
+            // INVENTORY VARIANCE (VERY IMPORTANT FOR COUNT ADJUSTMENT)
+            $table->foreignId('inventory_gain_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Used when stock increase due to adjustment');
+            $table->foreignId('inventory_loss_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Used when stock decrease due to damage, scrap, shrinkage');
+            // STOCK TRANSFER (OPTIONAL BUT PROFESSIONAL)
+            $table->foreignId('stock_transfer_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Used if transfer requires temporary clearing account');
+            // PRODUCTION / WIP (if manufacturing module exists)
+            $table->foreignId('wip_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Work In Progress account for production consumption');
+            // DISCOUNT / PRICE DIFFERENCE HANDLING
+            $table->foreignId('price_variance_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Used when cost vs invoice price mismatch occurs');
 
             $table->boolean('is_active')->default(true);
 
@@ -60,6 +76,16 @@ return new class extends Migration
 
             $table->string('incentive_type')->default('fixed')->nullable();   // percentage, fixed
             $table->decimal('incentive_value', 20, 4)->default(0);
+
+            $table->decimal('minimum_stock', 20, 4)->default(0);
+            $table->decimal('maximum_stock', 20, 4)->nullable();
+            $table->decimal('reorder_point', 20, 4)->default(0);
+            $table->decimal('reorder_quantity', 20, 4)->nullable();
+            $table->decimal('safety_stock', 20, 4)->default(0);
+            $table->integer('lead_time_days')->default(0);
+            $table->integer('review_period_days')->default(30);
+            $table->boolean('auto_replenishment_enabled')->default(false);
+            $table->boolean('allow_auto_purchase_order')->default(false);
 
             $table->timestamps();
             $table->softDeletes();
