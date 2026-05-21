@@ -19,7 +19,7 @@ return new class extends Migration
 
             $table->foreignId('group_id')->nullable()->constrained('item_attribute_groups')->nullOnDelete();
             $table->string('name');
-            $table->string('type')->default('select')->comment('text, select, number, boolean');
+            $table->string('type')->default('SELECT')->comment('TEXT, SELECT, NUMBER, BOOLEAN');
             $table->boolean('is_required')->default(false);
 
             $table->timestamps();

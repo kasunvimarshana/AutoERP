@@ -19,7 +19,7 @@ return new class extends Migration
 
             $table->foreignId('tax_group_id')->constrained('tax_groups')->cascadeOnDelete();
             $table->string('name')->comment('e.g., "VAT 18%", "GST 5%"');
-            $table->string('type')->default('percentage')->comment('percentage, fixed');
+            $table->string('type')->default('PERCENTAGE')->comment('PERCENTAGE, FIXED');
             $table->decimal('rate', 20, 4)->comment('percentage (e.g., 18.00 for 18%)');
             $table->foreignId('account_id')->nullable()->constrained('accounts')->nullOnDelete();
             $table->boolean('is_compound')->default(false)->comment('tax on tax');

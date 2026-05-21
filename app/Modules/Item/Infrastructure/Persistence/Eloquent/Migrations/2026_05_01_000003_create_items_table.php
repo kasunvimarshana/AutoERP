@@ -19,7 +19,7 @@ return new class extends Migration
 
             $table->foreignId('category_id')->nullable()->constrained('item_categories')->nullOnDelete();
             $table->foreignId('brand_id')->nullable()->constrained('item_brands')->nullOnDelete();
-            $table->string('type')->default('physical')->comment('physical, service, digital, combo, variable');
+            $table->string('type')->default('PHYSICAL')->comment('PHYSICAL, SERVICE, DIGITAL, COMBO, VARIABLE');
             $table->string('name');
             $table->string('slug')->nullable()->comment('URL-friendly unique name indicator');
             $table->string('sku')->nullable();

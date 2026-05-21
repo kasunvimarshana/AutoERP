@@ -20,8 +20,8 @@ return new class extends Migration
             $table->foreignId('parent_id')->nullable()->constrained('accounts')->nullOnDelete();
             $table->string('code');
             $table->string('name');
-            $table->string('type')->comment('asset, liability, equity, income, expense');
-            $table->string('normal_balance')->default('debit')->comment('debit, credit');
+            $table->string('type')->comment('ASSET, LIABILITY, EQUITY, INCOME, EXPENSE');
+            $table->string('normal_balance')->comment('DEBIT, CREDIT');
             $table->boolean('is_control_account')->default(false);
             $table->boolean('is_bank_account')->default(false);
             $table->boolean('is_cash_account')->default(false);

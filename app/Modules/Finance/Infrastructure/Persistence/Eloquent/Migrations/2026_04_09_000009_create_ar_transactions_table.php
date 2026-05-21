@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('party_type')->nullable();
             $table->unsignedBigInteger('party_id')->nullable();
             $table->foreignId('account_id')->constrained('accounts', 'id', 'ar_transactions_account_id_fk')->cascadeOnDelete();
-            $table->string('transaction_type')->comment('invoice, payment, adjustment, etc.');
+            $table->string('transaction_type')->comment('BILL, PAYMENT, ADJUSTMENT, etc.');
             $table->nullableMorphs('reference');
             $table->decimal('debit_amount', 20, 4)->default(0);
             $table->decimal('credit_amount', 20, 4)->default(0);
