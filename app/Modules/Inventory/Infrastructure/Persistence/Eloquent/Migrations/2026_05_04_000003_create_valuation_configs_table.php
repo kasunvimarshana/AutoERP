@@ -24,7 +24,6 @@ return new class extends Migration
             $table->string('transaction_type')->nullable();
             // Strategy configuration
             $table->string('valuation_method')->nullable()->comment('fifo, lifo, fefo, weighted_average, standard, specific');
-            $table->string('allocation_method')->nullable()->comment('fifo, lifo, fefo, nearest_bin, manual')->default('fifo');
             $table->boolean('is_active')->default(true);
 
             $table->timestamps();

@@ -30,8 +30,13 @@ return new class extends Migration
             $table->nullableMorphs('reference'); // link to PO line, GRN line, shipment line, etc.
             $table->foreignId('uom_id')->constrained('unit_of_measures');
             $table->decimal('quantity', 20, 4);
+            $table->decimal('quantity_in', 20, 4)->default(0);
+            $table->decimal('quantity_out', 20, 4)->default(0);
             $table->decimal('unit_cost', 20, 4)->nullable(); // For receipt/shipment valuation
             // $table->decimal('total_cost', 20, 4)->storedAs('quantity * unit_cost')->comment('quantity * unit_cost');
+            $table->decimal('total_cost', 20, 4)->default(0);
+            $table->decimal('running_quantity', 20, 4)->default(0);
+            $table->decimal('running_value', 20, 4)->default(0);
             $table->foreignId('performed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('performed_at')->useCurrent();
             $table->text('notes')->nullable();
