@@ -11,9 +11,9 @@ return new class extends Migration
         Schema::create('invoices', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
-            $table->json('metadata')->nullable();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
+            $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->string('direction')->default('inbound')->comment('inbound, outbound');
             $table->string('invoice_type'); // purchase, sale, vehicle_service, vehicle_rental_lessor, vehicle_rental_lessee

@@ -13,9 +13,9 @@ return new class extends Migration
         Schema::create('payment_methods', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
-            $table->json('metadata')->nullable();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
+            $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->string('name')->comment('Cash, Bank Transfer, Cheque, Credit Card, Gift Card, etc');
             $table->string('type')->default('bank_transfer')->comment('cash, bank_transfer, card, cheque, other');

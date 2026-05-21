@@ -13,9 +13,9 @@ return new class extends Migration
         Schema::create('item_variant_attribute_values', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
-            $table->json('metadata')->nullable();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
+            $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->foreignId('variant_id')->constrained('item_variants')->cascadeOnDelete();
             $table->foreignId('attribute_value_id')->constrained('item_attribute_values')->cascadeOnDelete();

@@ -13,15 +13,15 @@ return new class extends Migration
         Schema::create('items', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
-            $table->json('metadata')->nullable();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
+            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
+            $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->foreignId('category_id')->nullable()->constrained('item_categories')->nullOnDelete();
             $table->foreignId('brand_id')->nullable()->constrained('item_brands')->nullOnDelete();
             $table->string('type')->default('physical')->comment('physical, service, digital, combo, variable');
             $table->string('name');
-            $table->string('slug')->nullable();
+            $table->string('slug')->nullable()->comment('URL-friendly unique name indicator');
             $table->string('sku')->nullable();
             $table->text('description')->nullable();
             $table->string('image_path')->nullable();
@@ -39,20 +39,21 @@ return new class extends Migration
             $table->boolean('is_serial_tracked')->default(false);
             $table->boolean('is_stockable')->default(false);
 
-            $table->string('valuation_method')->nullable()->comment('fifo, lifo, fefo, weighted_average, standard');
-            $table->decimal('standard_cost', 20, 4)->nullable();
+            $table->string('valuation_method')->nullable()->comment('Accounting pricing engine rules: FIFO, LIFO, AVCO');
+            $table->string('allocation_method')->nullable()->comment('Stock picking strategy rules: FEFO, FIFO, LIFO');
+            $table->decimal('standard_cost', 20, 4)->nullable()->comment('Pre-determined target baseline asset value');
 
             // Account references
-            $table->foreignId('income_account_id')->nullable()->constrained('accounts')->nullOnDelete();
-            $table->foreignId('cogs_account_id')->nullable()->constrained('accounts')->nullOnDelete();
-            $table->foreignId('inventory_account_id')->nullable()->constrained('accounts')->nullOnDelete();
-            $table->foreignId('expense_account_id')->nullable()->constrained('accounts')->nullOnDelete();
+            $table->foreignId('income_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('General ledger channel for product revenue');
+            $table->foreignId('cogs_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('General ledger channel for inventory direct cost');
+            $table->foreignId('inventory_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('General ledger channel for asset asset valuation');
+            $table->foreignId('expense_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('General ledger channel for non-revenue overhead asset');
 
             $table->boolean('is_active')->default(true);
 
             // Pricing
-            $table->decimal('cost_price', 20, 4)->nullable();
-            $table->decimal('sales_price', 20, 4)->nullable();
+            $table->decimal('cost_price', 20, 4)->nullable()->comment('Actual supplier acquisition rate per piece');
+            $table->decimal('sales_price', 20, 4)->nullable()->comment('Standard commercial customer checkout baseline rate');
 
             // Service fields
             $table->decimal('estimated_service_time_hours', 20, 4)->nullable();

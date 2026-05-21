@@ -16,7 +16,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
 
             $table->string('name');
-            $table->string('slug')->unique('tenants_slug_uk');
+            $table->string('slug')->unique('tenants_slug_uk')->comment('URL-friendly unique name indicator');
             $table->string('logo_path')->nullable();
             $table->boolean('cross_org_transactions')->default(false);
             $table->foreignId('tenant_plan_id')->nullable()->constrained('tenant_plans', 'id')->nullOnDelete();
