@@ -4,6 +4,11 @@ use App\Http\Controllers\SystemUserController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\VehicleController;
+use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\DesignationController;
+use App\Http\Controllers\EmploymentTypeController;
+use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\WarehouseController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware([])->group(function () {
@@ -41,4 +46,39 @@ Route::middleware([])->group(function () {
     Route::get('vehicles/{vehicle}', [VehicleController::class, 'show']);
     Route::put('vehicles/{vehicle}', [VehicleController::class, 'update']);
     Route::delete('vehicles/{vehicle}', [VehicleController::class, 'delete']);
+
+    // Department
+    Route::post('departments', [DepartmentController::class, 'store']);
+    Route::get('departments', [DepartmentController::class, 'index']);
+    Route::get('departments/{department}', [DepartmentController::class, 'show']);
+    Route::put('departments/{department}', [DepartmentController::class, 'update']);
+    Route::delete('departments/{department}', [DepartmentController::class, 'delete']);
+
+    // Designation
+    Route::post('designations', [DesignationController::class, 'store']);
+    Route::get('designations', [VehicleController::class, 'index']);
+    Route::get('designations/{designation}', [VehicleController::class, 'show']);
+    Route::put('designations/{designation}', [VehicleController::class, 'update']);
+    Route::delete('designations/{designation}', [VehicleController::class, 'delete']);
+
+    // Employment Type
+    Route::post('vehicles', [EmploymentTypeController::class, 'store']);
+    Route::get('vehicles', [VehicleController::class, 'index']);
+    Route::get('vehicles/{vehicle}', [VehicleController::class, 'show']);
+    Route::put('vehicles/{vehicle}', [VehicleController::class, 'update']);
+    Route::delete('vehicles/{vehicle}', [VehicleController::class, 'delete']);
+
+    // Employee
+    Route::post('employees', [EmployeeController::class, 'store']);
+    Route::get('employees', [EmployeeController::class, 'index']);
+    Route::get('employees/{employee}', [EmployeeController::class, 'show']);
+    Route::put('employees/{employee}', [EmployeeController::class, 'update']);
+    Route::delete('employees/{employee}', [EmployeeController::class, 'delete']);
+
+    // Warehouse
+    Route::post('warehouses', [WarehouseController::class, 'store']);
+    Route::get('warehouses', [WarehouseController::class, 'index']);
+    Route::get('warehouses/{warehouse}', [WarehouseController::class, 'show']);
+    Route::put('warehouses/{warehouse}', [WarehouseController::class, 'update']);
+    Route::delete('warehouses/{warehouse}', [WarehouseController::class, 'delete']);
 });
