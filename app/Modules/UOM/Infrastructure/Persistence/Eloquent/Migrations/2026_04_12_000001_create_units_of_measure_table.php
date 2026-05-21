@@ -18,7 +18,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
 
             $table->string('name');
-            $table->string('symbol', 10);
+            $table->string('symbol');
             $table->string('type')->default('unit')->comment('unit, mass, volume, length, time, other');
             $table->boolean('is_base')->default(false);
 

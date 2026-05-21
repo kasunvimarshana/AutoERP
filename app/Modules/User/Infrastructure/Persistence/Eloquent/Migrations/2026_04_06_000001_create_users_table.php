@@ -28,8 +28,8 @@ return new class extends Migration
             $table->string('phone')->nullable();
             $table->json('preferences')->nullable();
             $table->date('date_of_birth')->nullable();
-            $table->string('gender', 10)->nullable();
-            $table->string('marital_status', 15)->nullable();
+            $table->string('gender')->nullable();
+            $table->string('marital_status')->nullable();
 
             $table->timestamps();
             $table->softDeletes();

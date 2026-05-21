@@ -25,7 +25,7 @@ return new class extends Migration
             $table->string('image_path')->nullable();
             $table->unsignedInteger('depth')->default(0);
             $table->boolean('is_active')->default(true);
-            $table->string('website', 255)->nullable();
+            $table->string('website')->nullable();
             $table->text('description')->nullable();
 
             $table->timestamps();

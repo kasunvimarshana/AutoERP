@@ -13,9 +13,9 @@ return new class extends Migration
         Schema::create('countries', function (Blueprint $table) {
             $table->id();
             $table->json('metadata')->nullable();
-            $table->string('code', 2)->unique('countries_code_uk');
+            $table->string('code')->unique('countries_code_uk');
             $table->string('name');
-            $table->string('phone_code', 10)->nullable();
+            $table->string('phone_code')->nullable();
 
             $table->timestamps();
             $table->softDeletes();

@@ -13,9 +13,9 @@ return new class extends Migration
         Schema::create('currencies', function (Blueprint $table) {
             $table->id();
             $table->json('metadata')->nullable();
-            $table->string('code', 3)->unique('currencies_code_uk');
+            $table->string('code')->unique('currencies_code_uk');
             $table->string('name');
-            $table->string('symbol', 10)->nullable();
+            $table->string('symbol')->nullable();
             $table->unsignedSmallInteger('decimal_places')->default(2);
             $table->boolean('is_active')->default(true);
 

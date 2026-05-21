@@ -29,7 +29,7 @@ return new class extends Migration
             // $table->decimal('unit_price', 20, 4)->nullable();
             $table->decimal('unit_cost', 20, 4)->nullable();
             $table->timestamp('last_movement_at')->nullable();
-            $table->string('condition', 20)->default('good');
+            $table->string('condition')->default('good');
 
             $table->timestamps();
 

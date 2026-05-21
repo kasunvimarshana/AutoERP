@@ -18,7 +18,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
 
             $table->string('name')->comment('Permanent, Contract, Probation, Intern, Part-Time');
-            $table->string('code', 20)->nullable();
+            $table->string('code')->nullable();
             $table->boolean('is_active')->default(true);
             $table->unsignedBigInteger('created_by')->nullable();
 

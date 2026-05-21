@@ -20,8 +20,8 @@ return new class extends Migration
             $table->foreignId('employee_id')->constrained('employees')->cascadeOnDelete();
             $table->foreignId('biometric_device_id')->nullable()->constrained('biometric_devices')->nullOnDelete();
             $table->timestamp('punch_time');
-            $table->string('punch_type', 20)->default('in');
-            $table->string('source', 50)->default('manual');
+            $table->string('punch_type')->default('in')->comment('in,out');
+            $table->string('source')->default('manual');
             $table->json('raw_data')->nullable();
             $table->timestamp('processed_at')->nullable();
 

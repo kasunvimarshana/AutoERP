@@ -21,7 +21,7 @@ return new class extends Migration
             $table->foreign('warehouse_id')->references('id')->on('warehouses')->nullOnDelete();
             $table->foreignId('item_id')->nullable()->constrained('items')->nullOnDelete();
             // Optional movement-type narrowing
-            $table->string('transaction_type', 50)->nullable();
+            $table->string('transaction_type')->nullable();
             // Strategy configuration
             $table->string('valuation_method')->nullable()->comment('fifo, lifo, fefo, weighted_average, standard, specific');
             $table->string('allocation_method')->nullable()->comment('fifo, lifo, fefo, nearest_bin, manual')->default('fifo');

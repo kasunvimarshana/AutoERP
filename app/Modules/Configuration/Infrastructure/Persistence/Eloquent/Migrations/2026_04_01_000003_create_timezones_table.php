@@ -14,7 +14,7 @@ return new class extends Migration
             $table->id();
             $table->json('metadata')->nullable();
             $table->string('name')->unique('timezones_name_uk');
-            $table->string('offset', 10);
+            $table->string('offset');
 
             $table->timestamps();
             $table->softDeletes();

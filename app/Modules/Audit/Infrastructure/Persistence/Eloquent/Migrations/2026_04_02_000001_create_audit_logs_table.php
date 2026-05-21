@@ -17,7 +17,7 @@ return new class extends Migration
             $table->unsignedBigInteger('organization_unit_id')->nullable()->index('audit_logs_organization_unit_idx');
             $table->unsignedBigInteger('user_id')->nullable()->index('audit_logs_user_idx');
 
-            $table->string('event', 50)->index('audit_logs_event_idx')->comment('The action that triggered this entry (created, updated, deleted, etc.)');
+            $table->string('event')->index('audit_logs_event_idx')->comment('The action that triggered this entry (created, updated, deleted, etc.)');
 
             // Polymorphic morph columns
             // $table->morphs('auditable');
@@ -29,8 +29,8 @@ return new class extends Migration
             $table->json('new_values')->nullable();
 
             // Request context
-            $table->string('url', 1000)->nullable();
-            $table->string('ip_address', 45)->nullable();
+            $table->string('url')->nullable();
+            $table->string('ip_address')->nullable();
             $table->text('user_agent')->nullable();
 
             // Extensibility

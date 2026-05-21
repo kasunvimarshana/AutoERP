@@ -16,7 +16,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
 
             $table->string('name');
-            $table->string('slug', 127)->unique('tenant_plans_slug_uk');
+            $table->string('slug')->unique('tenant_plans_slug_uk');
             $table->json('features')->nullable();
             $table->json('limits')->nullable();
             $table->decimal('price', 20, 4)->default(0);
