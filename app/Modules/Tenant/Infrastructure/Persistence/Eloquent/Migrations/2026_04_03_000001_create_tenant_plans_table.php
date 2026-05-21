@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('tenant_plans', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->json('metadata')->nullable();
+            $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->string('name');
             $table->string('slug')->unique('tenant_plans_slug_uk')->comment('URL-friendly unique name indicator');

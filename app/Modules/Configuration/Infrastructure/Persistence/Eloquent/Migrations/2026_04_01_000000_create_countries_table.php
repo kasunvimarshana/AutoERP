@@ -12,7 +12,8 @@ return new class extends Migration
     {
         Schema::create('countries', function (Blueprint $table) {
             $table->id();
-            $table->json('metadata')->nullable();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
             $table->string('code')->unique('countries_code_uk');
             $table->string('name');
             $table->string('phone_code')->nullable();

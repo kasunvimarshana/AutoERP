@@ -13,8 +13,10 @@ return new class extends Migration
         Schema::create('audit_logs', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->unsignedBigInteger('tenant_id')->nullable()->index('audit_logs_tenant_idx');
-            $table->unsignedBigInteger('organization_unit_id')->nullable()->index('audit_logs_organization_unit_idx');
+            $table->unsignedBigInteger('tenant_id')->nullable()->index('audit_logs_tenant_idx')->comment('Multi-tenant owner reference');
+            $table->unsignedBigInteger('organization_unit_id')->nullable()->index('audit_logs_organization_unit_idx')->comment('Branch or department ownership');
+            $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
+            
             $table->unsignedBigInteger('user_id')->nullable()->index('audit_logs_user_idx');
 
             $table->string('event')->index('audit_logs_event_idx')->comment('The action that triggered this entry (created, updated, deleted, etc.)');
@@ -35,7 +37,6 @@ return new class extends Migration
 
             // Extensibility
             $table->json('tags')->nullable();
-            $table->json('metadata')->nullable();
 
             // Audit logs are only ever created, never updated.
             // $table->timestamp('created_at')->useCurrent();

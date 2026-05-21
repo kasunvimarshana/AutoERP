@@ -13,9 +13,9 @@ return new class extends Migration
         Schema::create('organization_unit_settings', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete();
-            $table->foreignId('organization_unit_id')->constrained('organization_units', 'id')->cascadeOnDelete();
-            $table->json('metadata')->nullable();
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
+            $table->foreignId('organization_unit_id')->constrained('organization_units', 'id')->cascadeOnDelete()->comment('Branch or department ownership');
+            $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->foreignId('group_id')->constrained('organization_unit_setting_groups', 'id')->cascadeOnDelete();
             $table->string('key');
