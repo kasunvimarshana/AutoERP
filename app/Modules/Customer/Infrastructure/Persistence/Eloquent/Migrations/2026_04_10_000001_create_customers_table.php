@@ -25,7 +25,7 @@ return new class extends Migration
             $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete();
             $table->decimal('credit_limit', 20, 4)->nullable();
             $table->unsignedInteger('payment_terms_days')->default(30);
-            $table->string('status')->default('active')->comment('active, inactive, blocked');
+            $table->string('status')->default('ACTIVE')->comment('ACTIVE, INACTIVE, BLOCKED');
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();

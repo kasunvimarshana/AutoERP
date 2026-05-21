@@ -23,9 +23,9 @@ return new class extends Migration
             $table->date('value_date')->nullable();
             $table->string('description');
             $table->decimal('amount', 20, 4);
-            $table->string('type')->default('debit')->comment('debit, credit');
+            $table->string('type')->default('DEBIT')->comment('DEBIT, CREDIT');
             $table->decimal('balance', 20, 4)->nullable()->comment('running balance from bank');
-            $table->string('status')->default('imported')->comment('imported, categorized, matched, reconciled, excluded');
+            $table->string('status')->default('IMPORTED')->comment('IMPORTED, CATEGORIZED, MATCHED, RECONCILED, EXCLUDED');
             $table->foreignId('matched_journal_entry_id')->nullable()->constrained('journal_entries')->nullOnDelete();
             $table->foreignId('category_rule_id')->nullable()->constrained('bank_category_rules')->nullOnDelete();
             $table->unsignedBigInteger('created_by')->nullable();

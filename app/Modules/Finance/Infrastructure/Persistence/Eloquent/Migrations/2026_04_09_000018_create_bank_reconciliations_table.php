@@ -24,7 +24,7 @@ return new class extends Migration
             $table->decimal('closing_balance', 20, 4);
             $table->decimal('statement_balance', 20, 4);
             $table->decimal('difference', 20, 4);
-            $table->string('status')->default('draft')->comment('draft, in_progress, completed, approved');
+            $table->string('status')->default('DRAFT')->comment('DRAFT, IN_PROGRESS, COMPLETED, APPROVED');
             $table->foreignId('completed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('completed_at')->nullable();
             $table->foreignId('approved_by')->nullable()->constrained('users')->nullOnDelete();

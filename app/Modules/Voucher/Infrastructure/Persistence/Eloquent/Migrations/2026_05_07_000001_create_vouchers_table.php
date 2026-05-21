@@ -33,7 +33,7 @@ return new class extends Migration
             $table->decimal('amount', 20, 4);
             $table->decimal('tax_amount', 20, 4)->default(0);
             $table->decimal('total_amount', 20, 4);
-            $table->string('status')->default('draft')->comment('draft, posted, paid, void');
+            $table->string('status')->default('DRAFT')->comment('draft, posted, paid, void');
             // $table->foreignId('journal_entry_id')->nullable()->constrained('journal_entries')->nullOnDelete();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();

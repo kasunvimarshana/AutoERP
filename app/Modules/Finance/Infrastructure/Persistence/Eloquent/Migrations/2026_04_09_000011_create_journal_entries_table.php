@@ -19,13 +19,13 @@ return new class extends Migration
 
             $table->foreignId('fiscal_period_id')->nullable()->constrained('fiscal_periods')->nullOnDelete();
             $table->string('entry_number');
-            $table->string('entry_type')->default('manual')->comment('manual, auto, system, opening, closing, adjustment');
+            $table->string('entry_type')->default('MANUAL')->comment('MANUAL, AUTO, SYSTEM, OPENING, CLOSING, ADJUSTMENT');
             $table->string('reference_type')->nullable()->comment('Polymorphic reference (Document, Payment, etc.)');
             $table->unsignedBigInteger('reference_id')->nullable();
             $table->text('description')->nullable();
             $table->date('entry_date');
             $table->date('posting_date')->nullable();
-            $table->string('status')->default('draft')->comment('draft, posted, reversed');
+            $table->string('status')->default('DRAFT')->comment('DRAFT, POSTED, REVERSED');
             $table->boolean('is_reversed')->default(false);
             $table->foreignId('reversal_entry_id')->nullable()->constrained('journal_entries')->nullOnDelete();
             $table->unsignedBigInteger('created_by')->nullable();

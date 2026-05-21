@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('budget_type')->default('expense')->comment('expense, revenue, profit, cash_flow');
             $table->date('start_date');
             $table->date('end_date');
-            $table->string('status')->default('draft')->comment('draft, submitted, approved, closed');
+            $table->string('status')->default('DRAFT')->comment('DRAFT, SUBMITTED, APPROVED, CLOSED');
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('approved_by')->nullable();

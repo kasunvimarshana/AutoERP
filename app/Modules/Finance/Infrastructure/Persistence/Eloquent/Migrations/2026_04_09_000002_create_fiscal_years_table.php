@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('name')->comment('FY 2025');
             $table->date('start_date')->comment('Start date of the fiscal year');
             $table->date('end_date')->comment('End date of the fiscal year');
-            $table->string('status')->default('open')->comment('open, closed, locked');
+            $table->string('status')->default('OPEN')->comment('OPEN, CLOSED, LOCKED');
             $table->boolean('is_current')->default(false)->comment('Indicates if this is the current fiscal year');
             $table->unsignedBigInteger('created_by')->nullable()->comment('User who created the fiscal year');
 

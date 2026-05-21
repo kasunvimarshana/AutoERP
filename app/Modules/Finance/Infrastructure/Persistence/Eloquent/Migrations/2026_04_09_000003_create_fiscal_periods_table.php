@@ -22,8 +22,8 @@ return new class extends Migration
             $table->string('name')->comment('"January 2025", "Q1 2025"');
             $table->date('start_date')->comment('Start date of the fiscal period');
             $table->date('end_date')->comment('End date of the fiscal period');
-            $table->string('status')->default('open')->comment('open, closed, locked');
-            $table->string('period_type')->default('month')->comment('month, quarter, year');
+            $table->string('status')->default('OPEN')->comment('OPEN, CLOSED, LOCKED');
+            $table->string('period_type')->default('MONTH')->comment('MONTH, QUARTER, YEAR');
             $table->unsignedBigInteger('created_by')->nullable()->comment('User who created the fiscal period');
 
             $table->timestamps();
