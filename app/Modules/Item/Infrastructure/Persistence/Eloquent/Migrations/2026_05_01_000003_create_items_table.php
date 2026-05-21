@@ -39,10 +39,6 @@ return new class extends Migration
             $table->boolean('is_lot_tracked')->default(false);
             $table->boolean('is_serial_tracked')->default(false);
             $table->boolean('is_stockable')->default(false);
-
-            $table->string('valuation_method')->nullable()->comment('(Inventory Costing Engine) Accounting pricing engine rules: FIFO, LIFO, AVCO');
-            $table->string('allocation_method')->nullable()->comment('Stock picking strategy rules: FEFO, FIFO, LIFO');
-
             $table->string('valuation_method')->nullable()->comment('Defines the inventory cost flow assumption and stock valuation policy used for financial costing, inventory asset capitalization, and cost recognition (FIFO, LIFO, Weighted Average, Standard Cost, or Specific Identification)'); // Inventory costing strategy used to determine stock issue valuation and financial inventory asset calculation such as FIFO, LIFO, Weighted Average, Standard Cost, or Specific Identification
             $table->string('allocation_method')->nullable()->comment('Defines the proportional allocation basis used to distribute shared costs, operational charges, resources, or overhead amounts across related items or transactions'); // Cost or resource distribution strategy used to proportionally allocate shared operational, logistics, freight, service, or overhead expenses across items based on quantity, value, weight, volume, time, or percentage
             $table->decimal('standard_cost', 20, 4)->nullable()->comment('Pre-determined target baseline asset value');
