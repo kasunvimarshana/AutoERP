@@ -18,6 +18,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
 
             $table->string('reference')->nullable();
+            $table->foreignId('job_card_id')->constrained('vehicle_service_job_cards')->cascadeOnDelete();
             // Link to the planned labour line
             $table->foreignId('labor_item_id')->constrained('vehicle_service_labor_items', 'id')->cascadeOnDelete();
             // Technician assigned to perform this work

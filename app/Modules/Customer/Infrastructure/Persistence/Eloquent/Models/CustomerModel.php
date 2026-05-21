@@ -18,6 +18,6 @@ class CustomerModel extends Model
 
     public function vehicles()
     {
-        return $this->belongsToMany(VehicleModel::class, 'supplier_vehicles', 'customer_id', 'vehicle_id');
+        return $this->belongsToMany(VehicleModel::class, 'customer_vehicles', 'customer_id', 'vehicle_id');
     }
 }

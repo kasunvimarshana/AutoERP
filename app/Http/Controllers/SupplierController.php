@@ -267,7 +267,8 @@ class SupplierController extends Controller
 
     private function clearCurrentForSupplierVehicle(int $vehicleId, ?int $excludeSupplierId = null): void
     {
-        $query = SupplierVehicleModel::where('vehicleId', $vehicleId)->where('is_current', true);
+        $query = SupplierVehicleModel::where('vehicle_id', $vehicleId)->where('is_current', true);
+        $query = SupplierVehicleModel::where('vehicle_id', $vehicleId)->where('is_current', true);
 
         if ($excludeSupplierId !== null) {
             $query->where('supplier_id', '!=', $excludeSupplierId);

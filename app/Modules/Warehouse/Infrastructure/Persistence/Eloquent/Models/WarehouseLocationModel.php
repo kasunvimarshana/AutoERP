@@ -8,4 +8,9 @@ class WarehouseLocationModel extends Model
 {
     protected $table = 'warehouse_locations';
     protected $guarded = [];
+
+    public function warehouse()
+    {
+        return $this->belongsTo(WarehouseModel::class, 'warehouse_id', 'id');
+    }
 }

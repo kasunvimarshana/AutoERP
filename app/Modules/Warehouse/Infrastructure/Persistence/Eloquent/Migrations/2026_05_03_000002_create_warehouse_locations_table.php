@@ -20,7 +20,7 @@ return new class extends Migration
             $table->foreignId('warehouse_id')->constrained('warehouses', 'id', 'warehouse_locations_warehouse_id_fk')->cascadeOnDelete();
             $table->foreignId('parent_id')->nullable()->constrained('warehouse_locations', 'id', 'warehouse_locations_parent_id_fk')->nullOnDelete();
             $table->string('name');
-            $table->string('code', 50)->nullable();
+            $table->string('code')->nullable();
             $table->string('path')->nullable();
             $table->unsignedInteger('depth')->default(0);
             $table->string('type')->default('bin')->comment('zone, aisle, rack, shelf, bin, staging, dispatch');               // zone, aisle, rack, shelf, bin, staging, dispatch

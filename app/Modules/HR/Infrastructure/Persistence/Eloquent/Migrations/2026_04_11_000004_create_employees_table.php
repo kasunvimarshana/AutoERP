@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->json('metadata')->nullable();
 
-            $table->foreignId('user_id')->nullable()->unique('employees_user_uk')->constrained('users')->nullOnDelete();
+            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('code')->nullable();
             $table->string('registration_number');
             $table->foreignId('department_id')->nullable()->constrained('departments')->nullOnDelete();

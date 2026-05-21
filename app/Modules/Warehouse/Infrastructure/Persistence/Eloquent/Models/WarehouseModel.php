@@ -8,4 +8,9 @@ class WarehouseModel extends Model
 {
     protected $table = 'warehouses';
     protected $guarded = [];
+
+    public function locations()
+    {
+        return $this->hasMany(WarehouseLocationModel::class, 'warehouse_id', 'id');
+    }
 }

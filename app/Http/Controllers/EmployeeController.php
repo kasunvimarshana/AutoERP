@@ -2,23 +2,21 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StoreCustomerRequest;
-use App\Http\Requests\UpdateCustomerRequest;
-use App\Http\Resources\CustomerCollectionResource;
-use App\Http\Resources\CustomerResource;
-use App\Http\Resources\VehicleCollectionResource;
+use App\Http\Requests\StoreEmployeeRequest;
+use App\Http\Requests\UpdateEmployeeRequest;
+use App\Http\Resources\EmployeeCollectionResource;
+use App\Http\Resources\EmployeeResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
-use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerModel;
-use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerVehicleModel;
+use Modules\HR\Infrastructure\Persistence\Eloquent\Models\EmployeeModel;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 
-class CustomerController extends Controller
+class EmployeeController extends Controller
 {
     //
     public function __construct(private readonly FileStorageServiceInterface $fileStorageService)
@@ -37,14 +35,14 @@ class CustomerController extends Controller
         $page = $page ?: Paginator::resolveCurrentPage($pageName);
         $columns = ['*'];
 
-        $customers = CustomerModel::with(['user', 'user.roles', 'vehicles'])->paginate($perPage, $columns, $pageName, $page);
+        $employees = EmployeeModel::with(['user', 'department', 'designation', 'type'])->paginate($perPage, $columns, $pageName, $page);
 
-        $resource = new CustomerCollectionResource($customers);
+        $resource = new EmployeeCollectionResource($employees);
 
         return $resource->response()->setStatusCode(HttpResponse::HTTP_OK);
     }
 
-    public function store(StoreCustomerRequest $request)
+    public function store(StoreEmployeeRequest $request)
     {
         $tenant_id = $request->input('tenant_id', env('DEFAULT_TENANT_ID'));
         $organization_unit_id = $request->input('organization_unit_id', env('DEFAULT_OU_ID'));
@@ -80,7 +78,7 @@ class CustomerController extends Controller
 
             $user->roles()->sync($request->input('user.roles', []));
 
-            $customer = CustomerModel::create([
+            $employee = EmployeeModel::create([
                 'tenant_id' => $user->tenant_id,
                 'organization_unit_id' => $user->organization_unit_id,
                 'code' => $request->input('code'),
@@ -89,25 +87,41 @@ class CustomerController extends Controller
                 'notes' => $request->input('notes'),
                 'user_id' => $user->id,
 
-                'type' => $request->input('type'),
-                'tax_number' => $request->input('tax_number'),
-                'currency_id' => $request->input('currency_id'),
-                'credit_limit' => $request->input('credit_limit'),
-                'payment_terms_days' => $request->input('payment_terms_days'),
-                'ar_account_id' => $request->input('ar_account_id'),
+                'department_id' => $request->input('department_id'),
+                'designation_id' => $request->input('designation_id'),
+                'employment_type_id' => $request->input('employment_type_id'),
+                'hire_date' => $request->input('hire_date'),
+                'confirmation_date' => $request->input('confirmation_date'),
+                'termination_date' => $request->input('termination_date'),
+                'termination_reason' => $request->input('termination_reason'),
+                'personal_email' => $request->input('personal_email'),
+                'phone' => $request->input('phone'),
+                'mobile' => $request->input('mobile'),
+                'address_line1' => $request->input('address_line1'),
+                'address_line2' => $request->input('address_line2'),
+                'city' => $request->input('city'),
+                'state' => $request->input('state'),
+                'postal_code' => $request->input('postal_code'),
+                'country_id' => $request->input('country_id'),
+                'tax_identification_number' => $request->input('tax_identification_number'),
+                'social_security_number' => $request->input('social_security_number'),
+                'bank_name' => $request->input('bank_name'),
+                'bank_account_number' => $request->input('bank_account_number'),
+                'bank_routing_number' => $request->input('bank_routing_number'),
             ]);
 
-            // $customer->fresh();
+            // $employee->fresh();
 
-            $customer->load([
+            $employee->load([
                 'user',
-                'user.roles',
-                'vehicles'
+                'department',
+                'designation',
+                'type'
             ]);
 
             DB::commit();
 
-            $resource = new CustomerResource($customer);
+            $resource = new EmployeeResource($employee);
 
             return $resource->response()->setStatusCode(HttpResponse::HTTP_CREATED);
         } catch (\Throwable $e) {
@@ -116,21 +130,21 @@ class CustomerController extends Controller
         }
     }
 
-    public function show(Request $request, int $customerId)
+    public function show(Request $request, int $employeeId)
     {
-        $customerEntity = CustomerModel::with(['user', 'user.roles', 'vehicles'])->findOrFail($customerId);
+        $employeeEntity = EmployeeModel::with(['user', 'department', 'designation', 'type'])->findOrFail($employeeId);
 
-        $resource = new CustomerResource($customerEntity);
+        $resource = new EmployeeResource($employeeEntity);
 
         return $resource->response()->setStatusCode(HttpResponse::HTTP_OK);
     }
 
-    public function update(UpdateCustomerRequest $request, int $customerId)
+    public function update(UpdateEmployeeRequest $request, int $employeeId)
     {
         $tenant_id = $request->input('tenant_id', env('DEFAULT_TENANT_ID'));
         $organization_unit_id = $request->input('organization_unit_id', env('DEFAULT_OU_ID'));
 
-        $foundCustomer = CustomerModel::with(['user'])->findOrFail($customerId);
+        $foundEmployee = EmployeeModel::with(['user'])->findOrFail($employeeId);
 
         // $payload = $request->validated();
         $payload = [
@@ -148,7 +162,7 @@ class CustomerController extends Controller
             'status' => $request->input('status'),
         ];
 
-        $oldAvatarPath = $foundCustomer->user->avatar_path;
+        $oldAvatarPath = $foundEmployee->user->avatar_path;
         $newAvatarPath = null;
 
         if ($request->hasFile('user.avatar_file')) {
@@ -164,37 +178,54 @@ class CustomerController extends Controller
         DB::beginTransaction();
 
         try {
-            $foundCustomer->user->update($payload);
+            $foundEmployee->user->update($payload);
 
-            $foundCustomer->user->roles()->sync($request->input('user.roles', []));
+            $foundEmployee->user->roles()->sync($request->input('user.roles', []));
 
-            $foundCustomer->update([
-                'tenant_id' => $foundCustomer->user->tenant_id,
-                'organization_unit_id' => $foundCustomer->user->organization_unit_id,
+            $foundEmployee->update([
+                'tenant_id' => $foundEmployee->user->tenant_id,
+                'organization_unit_id' => $foundEmployee->user->organization_unit_id,
                 'code' => $request->input('code'),
                 'registration_number' => $request->input('registration_number'),
-                'status' => $foundCustomer->user->status,
+                'status' => $foundEmployee->user->status,
                 'notes' => $request->input('notes'),
-                'user_id' => $foundCustomer->user->id,
+                'user_id' => $foundEmployee->user->id,
 
-                'type' => $request->input('type'),
-                'tax_number' => $request->input('tax_number'),
-                'currency_id' => $request->input('currency_id'),
-                'credit_limit' => $request->input('credit_limit'),
-                'payment_terms_days' => $request->input('payment_terms_days'),
-                'ar_account_id' => $request->input('ar_account_id'),
+                'department_id' => $request->input('department_id'),
+                'designation_id' => $request->input('designation_id'),
+                'employment_type_id' => $request->input('employment_type_id'),
+                'hire_date' => $request->input('hire_date'),
+                'confirmation_date' => $request->input('confirmation_date'),
+                'termination_date' => $request->input('termination_date'),
+                'termination_reason' => $request->input('termination_reason'),
+                'personal_email' => $request->input('personal_email'),
+                'phone' => $request->input('phone'),
+                'mobile' => $request->input('mobile'),
+                'address_line1' => $request->input('address_line1'),
+                'address_line2' => $request->input('address_line2'),
+                'city' => $request->input('city'),
+                'state' => $request->input('state'),
+                'postal_code' => $request->input('postal_code'),
+                'country_id' => $request->input('country_id'),
+                'tax_identification_number' => $request->input('tax_identification_number'),
+                'social_security_number' => $request->input('social_security_number'),
+                'bank_name' => $request->input('bank_name'),
+                'bank_account_number' => $request->input('bank_account_number'),
+                'bank_routing_number' => $request->input('bank_routing_number'),
             ]);
 
-            $foundCustomer->fresh();
+            $foundEmployee->fresh();
 
-            $foundCustomer->load([
+            $foundEmployee->load([
                 'user',
-                'user.roles'
+                'department',
+                'designation',
+                'type'
             ]);
 
             DB::commit();
 
-            $resource = new CustomerResource($foundCustomer);
+            $resource = new EmployeeResource($foundEmployee);
 
             return $resource->response()->setStatusCode(HttpResponse::HTTP_OK);
         } catch (\Throwable $e) {
@@ -207,14 +238,14 @@ class CustomerController extends Controller
         }
     }
 
-    public function delete(int $customerId)
+    public function delete(int $employeeId)
     {
         //
-        $foundCustomer = CustomerModel::with(['user'])->findOrFail($customerId);
+        $foundEmployee = EmployeeModel::with(['user'])->findOrFail($employeeId);
 
-        $this->deleteImageIfSafe($foundCustomer->user->avatar_path, $foundCustomer->tenant_id, 'users');
+        $this->deleteImageIfSafe($foundEmployee->user->avatar_path, $foundEmployee->tenant_id, 'users');
 
-        $foundCustomer->delete();
+        $foundEmployee->delete();
     }
 
     private function storeImage(UploadedFile $image, int $tenantId, string $baseDirectory): string
@@ -237,62 +268,5 @@ class CustomerController extends Controller
         if ($this->fileStorageService->exists($imagePath)) {
             $this->fileStorageService->delete($imagePath);
         }
-    }
-
-    public function assignVehicle(Request $request)
-    {
-        $tenant_id = $request->input('tenant_id', env('DEFAULT_TENANT_ID'));
-        $organization_unit_id = $request->input('organization_unit_id', env('DEFAULT_OU_ID'));
-
-        $payload = $request->validated();
-        $payload['tenant_id'] = $tenant_id;
-        $payload['organization_unit_id'] = $organization_unit_id;
-
-        $customerVehicle = CustomerVehicleModel::create($payload);
-
-        if ($customerVehicle->is_current) {
-            $this->clearCurrentForCustomerVehicle($customerVehicle->vehicle_id, $customerVehicle->customer_id);
-        }
-
-        return response()->json([])->setStatusCode(HttpResponse::HTTP_OK);
-    }
-
-    public function removeVehicle(int $customerVehicleId)
-    {
-        //
-        $foundCustomerVehicle = CustomerVehicleModel::findOrFail($customerVehicleId);
-
-        $foundCustomerVehicle->delete();
-    }
-
-    private function clearCurrentForCustomerVehicle(int $vehicleId, ?int $excludeCustomerId = null): void
-    {
-        $query = CustomerVehicleModel::where('vehicle_id', $vehicleId)->where('is_current', true);
-
-        if ($excludeCustomerId !== null) {
-            $query->where('customer_id', '!=', $excludeCustomerId);
-        }
-
-        $query->update(['is_current' => false]);
-    }
-
-    public function vehicles(Request $request, int $customerId)
-    {
-        //
-        $validated = $request->all();
-
-        $pageName = config('core.pagination.page_name', 'page');
-        $perPage = (int) ($validated['per_page'] ?? 15);
-        $page = (int) ($validated[$pageName] ?? 1);
-        $page = $page ?: Paginator::resolveCurrentPage($pageName);
-        $columns = ['*'];
-
-        $foundCustomer = CustomerModel::findOrFail($customerId);
-
-        $foundCustomerVehicles = $foundCustomer->vehicles()->paginate($perPage, $columns, $pageName, $page);
-
-        $resource = new VehicleCollectionResource($foundCustomerVehicles);
-
-        return $resource->response()->setStatusCode(HttpResponse::HTTP_OK);
     }
 }
