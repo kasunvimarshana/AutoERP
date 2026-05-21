@@ -85,7 +85,7 @@ class VehicleController extends Controller
         $tenant_id = $request->input('tenant_id', env('DEFAULT_TENANT_ID'));
         $organization_unit_id = $request->input('organization_unit_id', env('DEFAULT_OU_ID'));
 
-        $foundVehicle = VehicleModel::with(['user'])->findOrFail($vehicleId);
+        $foundVehicle = VehicleModel::findOrFail($vehicleId);
 
         $payload = $request->validated();
         $payload['tenant_id'] = $tenant_id;
