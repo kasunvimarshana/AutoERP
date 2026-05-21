@@ -69,7 +69,17 @@ class StoreItemRequest extends FormRequest
             'combo_items.*.cost_price' => 'required|string',
             'combo_items.*.sales_price' => 'required|boolean',
             'combo_items.*.incentive_type' => 'required|boolean',
-            'combo_items.*.incentive_value' => 'required|boolean'
+            'combo_items.*.incentive_value' => 'required|boolean',
+
+            //
+
+            'uom_conversions' => 'nullable|array',
+            'uom_conversions.*.from_uom_id' => 'required|integer|exists:unit_of_measures,id',
+            'uom_conversions.*.to_uom_id' => 'required|integer|exists:unit_of_measures,id',
+            'uom_conversions.*.factor' => 'required|numeric',
+            'uom_conversions.*.item_id' => 'nullable|integer|exists:items,id',
+            'uom_conversions.*.is_bidirectional' => 'required|boolean',
+            'uom_conversions.*.is_active' => 'required|boolean',
         ];
     }
 }

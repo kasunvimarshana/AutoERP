@@ -19,7 +19,7 @@ return new class extends Migration
 
             $table->string('name');
             $table->string('symbol');
-            $table->string('type')->default('unit')->comment('unit, mass, volume, length, time, other');
+            $table->string('type')->default('UNIT')->comment('UNIT, MASS, VOLUME, LENGTH, TIME, OTHER');
             $table->boolean('is_base')->default(false);
 
             $table->timestamps();

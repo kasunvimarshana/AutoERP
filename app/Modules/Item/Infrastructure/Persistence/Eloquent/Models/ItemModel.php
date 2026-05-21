@@ -4,6 +4,7 @@ namespace Modules\Item\Infrastructure\Persistence\Eloquent\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Modules\UOM\Infrastructure\Persistence\Eloquent\Models\UnitOfMeasureModel;
+use Modules\UOM\Infrastructure\Persistence\Eloquent\Models\UOMConversionModel;
 
 class ItemModel extends Model
 {
@@ -59,5 +60,10 @@ class ItemModel extends Model
         //     'sort_order'
         // ])
         // ->withTimestamps();
+    }
+
+    public function uomConversions()
+    {
+        return $this->hasMany(UOMConversionModel::class, 'item_id', 'id');
     }
 }

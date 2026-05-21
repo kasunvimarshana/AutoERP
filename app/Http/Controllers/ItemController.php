@@ -43,7 +43,8 @@ class ItemController extends Controller
             'salesUom',
             'comboItems.componentItem',
             'comboItems.componentVariant',
-            'comboItems.componentUom'
+            'comboItems.componentUom',
+            'uomConversions'
             ])->paginate($perPage, $columns, $pageName, $page);
 
         $resource = new ItemCollectionResource($items);
@@ -56,7 +57,7 @@ class ItemController extends Controller
         $tenant_id = $request->input('tenant_id', env('DEFAULT_TENANT_ID'));
         $organization_unit_id = $request->input('organization_unit_id', env('DEFAULT_OU_ID'));
 
-        $payload = $request->except(['locations']);
+        $payload = $request->except(['combo_items', 'uom_conversions']);
         $payload['tenant_id'] = $tenant_id;
         $payload['organization_unit_id'] = $organization_unit_id;
 
@@ -79,7 +80,11 @@ class ItemController extends Controller
                 $this->saveComboItems($item, $comboItemsPayload);
             }
 
-            // $item->fresh();
+            $uomConversionsPayload = $request->input('uom_conversions');
+
+            if (! empty($uomConversionsPayload) && is_array($uomConversionsPayload)) {
+                $this->saveUOMConversions($item, $uomConversionsPayload);
+            }
 
             $item->load([
                 'comboItems',
@@ -90,7 +95,8 @@ class ItemController extends Controller
                 'salesUom',
                 'comboItems.componentItem',
                 'comboItems.componentVariant',
-                'comboItems.componentUom'
+                'comboItems.componentUom',
+                'uomConversions'
             ]);
 
             DB::commit();
@@ -115,7 +121,8 @@ class ItemController extends Controller
             'salesUom',
             'comboItems.componentItem',
             'comboItems.componentVariant',
-            'comboItems.componentUom'
+            'comboItems.componentUom',
+            'uomConversions'
         ])->findOrFail($itemId);
 
         $resource = new ItemResource($itemEntity);
@@ -128,9 +135,9 @@ class ItemController extends Controller
         $tenant_id = $request->input('tenant_id', env('DEFAULT_TENANT_ID'));
         $organization_unit_id = $request->input('organization_unit_id', env('DEFAULT_OU_ID'));
 
-        $foundItem = ItemModel::with(['comboItems'])->findOrFail($itemId);
+        $foundItem = ItemModel::with(['comboItems', 'uomConversions'])->findOrFail($itemId);
 
-        $payload = $request->except(['locations']);
+        $payload = $request->except(['combo_items', 'uom_conversions']);
         $payload['tenant_id'] = $tenant_id;
         $payload['organization_unit_id'] = $organization_unit_id;
 
@@ -158,6 +165,12 @@ class ItemController extends Controller
                 $this->saveComboItems($foundItem, $comboItemsPayload);
             }
 
+            $uomConversionsPayload = $request->input('uom_conversions');
+
+            if (! empty($uomConversionsPayload) && is_array($uomConversionsPayload)) {
+                $this->saveUOMConversions($foundItem, $uomConversionsPayload);
+            }
+
             $foundItem->fresh();
 
             $foundItem->load([
@@ -169,7 +182,8 @@ class ItemController extends Controller
                 'salesUom',
                 'comboItems.componentItem',
                 'comboItems.componentVariant',
-                'comboItems.componentUom'
+                'comboItems.componentUom',
+                'uomConversions'
             ]);
 
             DB::commit();
@@ -244,6 +258,42 @@ class ItemController extends Controller
         }
 
         $cleanupQuery = $item->comboItems()->where('combo_item_id', (int) $item->id);
+
+        if ($keptIds === []) {
+            $cleanupQuery->delete();
+        } else {
+            $cleanupQuery->whereNotIn('id', $keptIds)->delete();
+        }
+    }
+
+    public function saveUOMConversions(ItemModel $item, mixed $uomConversions)
+    {
+        //
+        $keptIds = [];
+        foreach ($uomConversions as $v) {
+            $id = $v['id'] ?? null;
+            if ($id !== null) {
+                $updated = $item->uomConversions()
+                            ->where('tenant_id', (int) $item->tenant_id)
+                            ->whereKey($id)
+                            ->update($v);
+
+                if ($updated > 0) {
+                    $keptIds[] = $id;
+                    continue;
+                }
+            }
+
+            $created = $item->uomConversions()->create([
+                ...$v,
+                'tenant_id' => $item->tenant_id,
+                'organization_unit_id' => $item->organization_unit_id,
+                'item_id' => $item->id,
+            ]);
+            $keptIds[] = (int) $created->id;
+        }
+
+        $cleanupQuery = $item->uomConversions()->where('item_id', (int) $item->id);
 
         if ($keptIds === []) {
             $cleanupQuery->delete();

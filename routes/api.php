@@ -11,6 +11,8 @@ use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\WarehouseController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\ItemBrandController;
+use App\Http\Controllers\ItemCategoryController;
+use App\Http\Controllers\UOMController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware([])->group(function () {
@@ -97,4 +99,18 @@ Route::middleware([])->group(function () {
     Route::get('item-brands/{itemBrand}', [ItemBrandController::class, 'show']);
     Route::put('item-brands/{itemBrand}', [ItemBrandController::class, 'update']);
     Route::delete('item-brands/{itemBrand}', [ItemBrandController::class, 'delete']);
+
+    // Item Category
+    Route::post('item-categories', [ItemCategoryController::class, 'store']);
+    Route::get('item-categories', [ItemCategoryController::class, 'index']);
+    Route::get('item-categories/{itemCategory}', [ItemCategoryController::class, 'show']);
+    Route::put('item-categories/{itemCategory}', [ItemCategoryController::class, 'update']);
+    Route::delete('item-categories/{itemCategory}', [ItemCategoryController::class, 'delete']);
+
+    // UOM
+    Route::post('uoms', [UOMController::class, 'store']);
+    Route::get('uoms', [UOMController::class, 'index']);
+    Route::get('uoms/{uom}', [UOMController::class, 'show']);
+    Route::put('uoms/{uom}', [UOMController::class, 'update']);
+    Route::delete('uoms/{uom}', [UOMController::class, 'delete']);
 });
