@@ -23,7 +23,7 @@ return new class extends Migration
             $table->foreignId('batch_id')->nullable()->constrained('batches')->nullOnDelete();
             $table->foreignId('serial_id')->nullable()->constrained('serials')->nullOnDelete();
             $table->foreignId('warehouse_id')->nullable()->constrained('warehouses')->nullOnDelete();
-            $table->foreignId('location_id')->constrained('warehouse_locations');
+            $table->foreignId('location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
             $table->string('valuation_method')->nullable();
             $table->date('layer_date');
             $table->decimal('quantity_in', 20, 4);

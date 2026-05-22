@@ -22,6 +22,7 @@ return new class extends Migration
             $table->foreignId('variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
             $table->foreignId('batch_id')->nullable()->constrained('batches')->nullOnDelete();
             $table->foreignId('serial_id')->nullable()->constrained('serials')->nullOnDelete();
+            $table->foreignId('location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
             $table->foreignId('uom_id')->constrained('unit_of_measures');
             $table->decimal('quantity', 20, 4);
             $table->decimal('unit_cost', 20, 4)->nullable();

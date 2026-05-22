@@ -18,8 +18,10 @@ return new class extends Migration
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->string('reference_number');
-            $table->foreignId('from_location_id')->constrained('warehouse_locations');
-            $table->foreignId('to_location_id')->constrained('warehouse_locations');
+            $table->foreignId('from_warehouse_id')->constrained('warehouses');
+            $table->foreignId('to_warehouse_id')->constrained('warehouses');
+            $table->foreignId('from_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
+            $table->foreignId('to_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
             $table->string('status')->default('DRAFT')->comment('DRAFT, PENDING, COMPLETED, CANCELLED');
             $table->foreignId('requested_by')->constrained('users');
             $table->foreignId('approved_by')->nullable()->constrained('users')->nullOnDelete();

@@ -20,7 +20,8 @@ return new class extends Migration
 
             $table->foreignId('item_id')->constrained('items')->cascadeOnDelete();
             $table->foreignId('variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
-            $table->foreignId('location_id')->constrained('warehouse_locations');
+            $table->foreignId('warehouse_id')->constrained('warehouses');
+            $table->foreignId('location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
             $table->foreignId('batch_id')->nullable()->constrained('batches')->nullOnDelete();
             $table->foreignId('serial_id')->nullable()->constrained('serials')->nullOnDelete();
             $table->foreignId('uom_id')->constrained('unit_of_measures');

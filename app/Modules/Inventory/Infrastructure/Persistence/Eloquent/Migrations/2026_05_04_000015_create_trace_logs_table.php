@@ -21,6 +21,8 @@ return new class extends Migration
             $table->foreignId('identifier_id')->nullable()->constrained('item_identifiers')->nullOnDelete();
             $table->string('action_type')->comment('scan, receive, transfer, pick, pack, ship, return, adjust, dispose, count');
             $table->nullableMorphs('reference'); // GRN, shipment, transfer, etc.
+            $table->foreignId('source_warehouse_id')->nullable()->constrained('warehouses')->nullOnDelete();
+            $table->foreignId('destination_warehouse_id')->nullable()->constrained('warehouses')->nullOnDelete();
             $table->foreignId('source_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
             $table->foreignId('destination_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
             $table->decimal('quantity', 20, 4)->nullable();

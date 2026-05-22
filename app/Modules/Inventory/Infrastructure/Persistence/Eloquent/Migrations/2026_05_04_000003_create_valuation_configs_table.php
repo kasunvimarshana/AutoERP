@@ -17,9 +17,12 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
-            $table->unsignedBigInteger('warehouse_id')->nullable();
-            $table->foreign('warehouse_id')->references('id')->on('warehouses')->nullOnDelete();
+            $table->foreignId('warehouse_id')->nullable()->constrained('warehouses', 'id')->nullOnDelete();
             $table->foreignId('item_id')->nullable()->constrained('items')->nullOnDelete();
+            $table->foreignId('variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
+            $table->foreignId('location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
+            $table->foreignId('batch_id')->nullable()->constrained('batches')->nullOnDelete();
+            $table->foreignId('serial_id')->nullable()->constrained('serials')->nullOnDelete();
             // Optional movement-type narrowing
             $table->string('transaction_type')->nullable();
             // Strategy configuration

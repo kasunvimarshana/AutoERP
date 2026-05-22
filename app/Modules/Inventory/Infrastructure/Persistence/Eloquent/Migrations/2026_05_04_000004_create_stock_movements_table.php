@@ -19,7 +19,7 @@ return new class extends Migration
 
             // $table->string('transaction_no')->nullable();
             // $table->date('transaction_date')->nullable();
-            $table->string('direction')->comment('in, out');
+            $table->string('direction')->comment('IN, OUT');
             $table->foreignId('item_id')->constrained('items')->cascadeOnDelete();
             $table->foreignId('variant_id')->nullable()->constrained('item_variants')->nullOnDelete();
             $table->foreignId('batch_id')->nullable()->constrained('batches')->nullOnDelete();
@@ -31,7 +31,7 @@ return new class extends Migration
             $table->string('txn_type')->comment('movement_type: GRN, GDN, Adjustment (OPENING_STOCK, PURCHASE_RECEIPT, PURCHASE_RETURN, SALES_ISSUE, SALES_RETURN, STOCK_TRANSFER_IN, STOCK_TRANSFER_OUT, ADJUSTMENT_IN, ADJUSTMENT_OUT, PRODUCTION_CONSUMPTION, PRODUCTION_OUTPUT, SCRAP, DAMAGE, COUNT_ADJUSTMENT)');
             $table->nullableMorphs('reference'); // link to PO line, GRN line, shipment line, etc.
             $table->foreignId('uom_id')->constrained('unit_of_measures');
-            $table->decimal('quantity', 20, 4);
+            $table->decimal('quantity', 20, 4)->default(0);
             $table->decimal('quantity_in', 20, 4)->default(0);
             $table->decimal('quantity_out', 20, 4)->default(0);
             $table->decimal('unit_cost', 20, 4)->nullable(); // For receipt/shipment valuation
