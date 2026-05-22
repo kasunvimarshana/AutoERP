@@ -14,6 +14,7 @@ use App\Http\Controllers\ItemBrandController;
 use App\Http\Controllers\ItemCategoryController;
 use App\Http\Controllers\UOMController;
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\InventoryController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware([])->group(function () {
@@ -121,4 +122,8 @@ Route::middleware([])->group(function () {
     Route::get('accounts/{account}', [AccountController::class, 'show']);
     Route::put('accounts/{account}', [AccountController::class, 'update']);
     Route::delete('accounts/{account}', [AccountController::class, 'delete']);
+
+    // Inventory Engine
+    Route::post('inventory/valuate', [InventoryController::class, 'valuate']);
+    Route::post('inventory/allocate', [InventoryController::class, 'allocate']);
 });
