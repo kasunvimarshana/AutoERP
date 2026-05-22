@@ -1629,8 +1629,6 @@ fetch('/api/graph')
 
 # 🚀 STEP 5 — RESULT
 
-ඔයාට ලැබෙන්නේ:
-
 ## 🔥 Neo4j-like graph UI
 
 ✔ draggable nodes
