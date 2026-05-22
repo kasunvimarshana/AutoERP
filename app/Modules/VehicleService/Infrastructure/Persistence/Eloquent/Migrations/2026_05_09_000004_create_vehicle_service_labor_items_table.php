@@ -52,7 +52,7 @@ return new class extends Migration
             // Incentive – stored both as configuration and as absolute amount
             $table->string('incentive_type')->nullable()->comment('percentage, fixed');
             $table->decimal('incentive_value', 20, 4)->default(0);
-            $table->decimal('ncentive_amount', 20, 4)->default(0)->comment('Calculated incentive amount');
+            $table->decimal('incentive_amount', 20, 4)->default(0)->comment('Calculated incentive amount');
 
             // lines account
             $table->foreignId('account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete()->comment('account for posting');

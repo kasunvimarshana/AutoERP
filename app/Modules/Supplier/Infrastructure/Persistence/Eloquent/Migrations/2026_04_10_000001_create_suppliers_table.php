@@ -34,7 +34,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['tenant_id', 'registration_number'], 'suppliers_registration_number_uk');
+            $table->unique(['tenant_id', 'registration_number'], 'suppliers_registration_number_uk');
             $table->index(['tenant_id', 'user_id'], 'suppliers_user_idx');
         });
     }

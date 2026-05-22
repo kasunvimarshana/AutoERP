@@ -24,7 +24,7 @@ return new class extends Migration
             $table->string('overall_result')->default('pass')->comment('pass, fail, warning, not_applicable');
             $table->text('notes')->nullable();
 
-            $table->unsignedBigInteger('performed_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('performed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->dateTime('performed_at')->nullable();
 
             $table->timestamps();

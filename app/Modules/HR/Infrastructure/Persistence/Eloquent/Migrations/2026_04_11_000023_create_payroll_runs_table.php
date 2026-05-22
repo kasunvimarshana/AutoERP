@@ -27,7 +27,7 @@ return new class extends Migration
             $table->decimal('total_employer_contributions', 20, 4)->default(0);
             $table->timestamp('processed_at')->nullable();
             $table->timestamp('approved_at')->nullable();
-            $table->unsignedBigInteger('approved_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('approved_by')->nullable()->constrained('users')->nullOnDelete();
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
 

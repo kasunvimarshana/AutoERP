@@ -30,7 +30,7 @@ return new class extends Migration
             // Incentive – stored both as configuration and as absolute amount
             $table->string('incentive_type')->nullable()->comment('percentage, fixed');
             $table->decimal('incentive_value', 20, 4)->default(0);
-            $table->decimal('ncentive_amount', 20, 4)->default(0)->comment('Calculated ncentive amount');
+            $table->decimal('incentive_amount', 20, 4)->default(0)->comment('Calculated incentive amount');
             // Role of the technician (e.g., lead, assistant)
             $table->string('role')->nullable()->comment('lead, assistant, supervisor');
             $table->text('notes')->nullable();

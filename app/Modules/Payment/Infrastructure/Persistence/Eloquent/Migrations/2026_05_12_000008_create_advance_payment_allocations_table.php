@@ -18,12 +18,14 @@ return new class extends Migration
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->foreignId('advance_payment_id')->constrained('advance_payments')->cascadeOnDelete();
-            $table->foreignId('document_type');
+            $table->string('document_type')->comment('the invoice/credit note being settled');
             $table->unsignedBigInteger('document_id');
             $table->string('reference')->nullable();
             $table->decimal('allocated_amount', 20, 4);
 
             $table->timestamps();
+
+            $table->index(['tenant_id', 'document_type', 'document_id'], 'advance_payment_allocations_document_lookup_idx');
         });
     }
 

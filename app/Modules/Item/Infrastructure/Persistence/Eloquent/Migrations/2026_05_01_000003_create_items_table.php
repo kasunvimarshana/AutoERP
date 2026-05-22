@@ -32,7 +32,7 @@ return new class extends Migration
             $table->foreignId('purchase_uom_id')->nullable()->constrained('unit_of_measures');
             $table->foreignId('sales_uom_id')->nullable()->constrained('unit_of_measures');
 
-            $table->foreignId('tax_group_id')->nullable();
+            $table->foreignId('tax_group_id')->nullable()->constrained('tax_groups')->nullOnDelete();
 
             // Inventory tracking flags – only meaningful when is_stockable = true
             $table->boolean('is_batch_tracked')->default(false);

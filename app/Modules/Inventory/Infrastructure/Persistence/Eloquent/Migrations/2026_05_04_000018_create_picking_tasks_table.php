@@ -19,8 +19,8 @@ return new class extends Migration
 
             $table->foreignId('receipt_inspection_id')->nullable()->constrained('receipt_inspections')->nullOnDelete();
             $table->foreignId('stock_movement_id')->constrained('stock_movements');
-            $table->foreignId('source_warehouse_id')->constrained('warehouse_locations');
-            $table->foreignId('source_location_id')->nullable()->constrained('warehouses')->nullOnDelete();
+            $table->foreignId('source_warehouse_id')->constrained('warehouses');
+            $table->foreignId('source_location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
             $table->decimal('quantity', 20, 4);
             $table->string('status')->default('PENDING')->comment('PENDING, IN_PROGRESS, COMPLETED, CANCELLED');
             $table->foreignId('assigned_user_id')->nullable()->constrained('users')->nullOnDelete();

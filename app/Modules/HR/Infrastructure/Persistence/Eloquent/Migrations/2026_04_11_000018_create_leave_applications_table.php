@@ -25,7 +25,7 @@ return new class extends Migration
             $table->string('half_day_type')->nullable();
             $table->text('reason')->nullable();
             $table->string('status')->default('pending');
-            $table->unsignedBigInteger('approver_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('approver_id')->nullable()->constrained('users')->nullOnDelete();
             $table->text('approver_note')->nullable();
             $table->timestamp('approved_at')->nullable();
             $table->string('attachment_path')->nullable();
