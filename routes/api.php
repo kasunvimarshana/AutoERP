@@ -13,6 +13,7 @@ use App\Http\Controllers\ItemController;
 use App\Http\Controllers\ItemBrandController;
 use App\Http\Controllers\ItemCategoryController;
 use App\Http\Controllers\UOMController;
+use App\Http\Controllers\AccountController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware([])->group(function () {
@@ -113,4 +114,11 @@ Route::middleware([])->group(function () {
     Route::get('uoms/{uom}', [UOMController::class, 'show']);
     Route::put('uoms/{uom}', [UOMController::class, 'update']);
     Route::delete('uoms/{uom}', [UOMController::class, 'delete']);
+
+    // Account
+    Route::post('accounts', [AccountController::class, 'store']);
+    Route::get('accounts', [AccountController::class, 'index']);
+    Route::get('accounts/{account}', [AccountController::class, 'show']);
+    Route::put('accounts/{account}', [AccountController::class, 'update']);
+    Route::delete('accounts/{account}', [AccountController::class, 'delete']);
 });

@@ -17,19 +17,19 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
-            $table->foreignId('parent_id')->nullable()->constrained('accounts')->nullOnDelete();
+            $table->foreignId('parent_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Parent account for hierarchical structure');
             $table->string('code');
             $table->string('name');
             $table->string('type')->comment('ASSET, LIABILITY, EQUITY, INCOME, EXPENSE');
             $table->string('normal_balance')->comment('DEBIT, CREDIT');
-            $table->boolean('is_control_account')->default(false);
-            $table->boolean('is_bank_account')->default(false);
-            $table->boolean('is_cash_account')->default(false);
-            $table->boolean('is_system')->default(false);
+            $table->boolean('is_control_account')->default(false)->comment('Indicates if this is a control (parent) account');
+            $table->boolean('is_bank_account')->default(false)->comment('Indicates if this account represents a bank account');
+            $table->boolean('is_cash_account')->default(false)->comment('Indicates if this account represents a cash account');
+            $table->boolean('is_system')->default(false)->comment('System-generated account (protected from manual changes)');
             $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete();
             $table->text('description')->nullable();
             $table->boolean('is_active')->default(true);
-            $table->boolean('allows_manual_posting')->default(true);
+            $table->boolean('allows_manual_posting')->default(true)->comment('Allows or restricts manual posting to this account');
             $table->string('path')->nullable()->comment('materialised path');
             $table->unsignedInteger('depth')->default(0);
             $table->unsignedBigInteger('created_by')->nullable();
