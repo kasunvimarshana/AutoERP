@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Customer\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
@@ -16,6 +18,8 @@ class CustomerServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->mergeConfigFrom(__DIR__.'/../../config/customer.php', 'customer');
+
         foreach ([
             CustomerAddressRepositoryInterface::class => EloquentCustomerAddressRepository::class,
             CustomerContactRepositoryInterface::class => EloquentCustomerContactRepository::class,
@@ -29,5 +33,6 @@ class CustomerServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/../../Infrastructure/Persistence/Eloquent/Migrations');
+        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
     }
 }
