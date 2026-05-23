@@ -25,7 +25,7 @@ return new class extends Migration
             $table->string('format')->nullable()->comment('ean13, ean8, upc_a, code128, code39, qr, datamatrix, etc.');
             $table->string('value')->comment('the actual identifier string');
             $table->string('gs1_company_prefix')->nullable();
-            $table->json('gs1_application_identifiers')->nullable();   // parsed AI data (kept as string in DB‑agnostic implementation)
+            $table->json('gs1_application_identifiers')->nullable();   // parsed AI data (kept as string in DB-agnostic implementation)
             $table->boolean('is_primary')->default(false);
             $table->boolean('is_active')->default(true);
 

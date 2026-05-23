@@ -39,7 +39,7 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'payment_number'], 'payments_payment_number_uk');
             $table->unique(['tenant_id', 'idempotency_key'], 'payments_idempotency_key_uk');
-            $table->index(['tenant_id', 'party_id'], 'payments_tenant_party_idx');
+            $table->index(['tenant_id', 'party_type', 'party_id'], 'payments_tenant_party_idx');
             $table->index(['tenant_id', 'status', 'payment_date'], 'payments_status_payment_date_idx');
         });
     }

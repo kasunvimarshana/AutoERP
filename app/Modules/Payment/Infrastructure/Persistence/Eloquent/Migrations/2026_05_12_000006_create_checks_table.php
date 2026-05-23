@@ -33,7 +33,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'check_number', 'bank_account_id'], 'checks_check_number_bank_account_uk');
+            $table->unique(['tenant_id', 'check_number', 'bank_account_id'], 'checks_number_bank_account_uk');
         });
     }
 

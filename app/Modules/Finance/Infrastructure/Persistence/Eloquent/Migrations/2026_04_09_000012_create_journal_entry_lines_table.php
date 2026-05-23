@@ -32,7 +32,7 @@ return new class extends Migration
             $table->unsignedInteger('line_number')->default(1);
 
             $table->timestamps();
-            // No softDeletes – immutable
+            // No softDeletes - immutable
 
             $table->index(['tenant_id', 'account_id', 'journal_entry_id'], 'journal_entry_lines_account_entry_idx');
         });

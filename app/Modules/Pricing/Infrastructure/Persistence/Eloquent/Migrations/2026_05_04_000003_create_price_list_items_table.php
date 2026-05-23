@@ -19,11 +19,11 @@ return new class extends Migration
 
             $table->foreignId('price_list_id')->constrained('price_lists', 'id')->cascadeOnDelete();
             $table->foreignId('item_id')->constrained('items', 'id')->cascadeOnDelete();
-            $table->foreignId('variant_id')->constrained('item_variants', 'id')->nullable()->cascadeOnDelete();
-            $table->foreignId('warehouse_id')->constrained('warehouses', 'id')->nullable()->cascadeOnDelete();
-            $table->foreignId('warehouse_location_id')->constrained('warehouse_locations', 'id')->nullable()->cascadeOnDelete();
-            $table->foreignId('batch_id')->constrained('batches', 'id')->nullable()->cascadeOnDelete();
-            $table->foreignId('serial_id')->constrained('serials', 'id')->nullable()->cascadeOnDelete();
+            $table->foreignId('variant_id')->nullable()->constrained('item_variants', 'id')->nullOnDelete();
+            $table->foreignId('warehouse_id')->nullable()->constrained('warehouses', 'id')->nullOnDelete();
+            $table->foreignId('warehouse_location_id')->nullable()->constrained('warehouse_locations', 'id')->nullOnDelete();
+            $table->foreignId('batch_id')->nullable()->constrained('batches', 'id')->nullOnDelete();
+            $table->foreignId('serial_id')->nullable()->constrained('serials', 'id')->nullOnDelete();
             $table->foreignId('uom_id')->constrained('unit_of_measures', 'id', 'price_list_items_uom_id_fk');
             $table->decimal('min_quantity', 20, 4)->default(1);
             $table->decimal('price', 20, 4);

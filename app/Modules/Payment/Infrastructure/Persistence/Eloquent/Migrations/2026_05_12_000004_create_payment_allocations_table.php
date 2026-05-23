@@ -24,6 +24,9 @@ return new class extends Migration
             $table->decimal('allocated_amount', 20, 4);
 
             $table->timestamps();
+
+            $table->unique(['tenant_id', 'payment_id', 'document_type', 'document_id'], 'payment_allocations_payment_document_uk');
+            $table->index(['tenant_id', 'document_type', 'document_id'], 'payment_allocations_document_idx');
         });
     }
 

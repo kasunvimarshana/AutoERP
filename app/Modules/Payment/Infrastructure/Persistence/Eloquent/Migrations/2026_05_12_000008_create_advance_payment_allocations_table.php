@@ -25,6 +25,7 @@ return new class extends Migration
 
             $table->timestamps();
 
+            $table->unique(['tenant_id', 'advance_payment_id', 'document_type', 'document_id'], 'advance_payment_allocations_document_uk');
             $table->index(['tenant_id', 'document_type', 'document_id'], 'advance_payment_allocations_document_lookup_idx');
         });
     }

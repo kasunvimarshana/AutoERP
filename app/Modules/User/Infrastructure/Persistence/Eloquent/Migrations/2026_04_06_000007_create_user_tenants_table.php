@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // user_tenants – a user can belong to multiple tenants (with a default)
+        // user_tenants - a user can belong to multiple tenants (with a default)
         Schema::create('user_tenants', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');

@@ -34,7 +34,7 @@ return new class extends Migration
 
             $table->foreignId('tax_group_id')->nullable()->constrained('tax_groups')->nullOnDelete();
 
-            // Inventory tracking flags – only meaningful when is_stockable = true
+            // Inventory tracking flags - only meaningful when is_stockable is true
             $table->boolean('is_batch_tracked')->default(false);
             $table->boolean('is_lot_tracked')->default(false);
             $table->boolean('is_serial_tracked')->default(false);

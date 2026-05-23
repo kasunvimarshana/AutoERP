@@ -40,13 +40,13 @@ return new class extends Migration
             $table->unsignedBigInteger('start_odometer')->nullable();
             $table->unsignedBigInteger('end_odometer')->nullable();
 
-            // ─── Driver included? ───
+            // Driver included
             $table->boolean('driver_included')->default(false);
             // $table->decimal('driver_daily_wage', 20, 4)->nullable();
             // $table->decimal('driver_ot_rate_normal', 20, 4)->nullable();
             // $table->decimal('driver_ot_rate_weekend', 20, 4)->nullable();
             // $table->decimal('driver_night_out_allowance', 20, 4)->nullable();
-            $table->decimal('drivers_salary', 20, 4)->nullable();
+            $table->decimal('driver_salary', 20, 4)->nullable();
             $table->decimal('working_hours_per_weekday', 20, 4)->nullable();
             $table->decimal('working_hours_per_saturday', 20, 4)->nullable();
             $table->decimal('working_hours_per_sunday', 20, 4)->nullable();

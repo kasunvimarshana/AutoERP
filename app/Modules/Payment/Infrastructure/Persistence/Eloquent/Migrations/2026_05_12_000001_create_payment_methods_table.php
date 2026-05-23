@@ -17,8 +17,8 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
-            $table->string('name')->comment('Cash, Bank Transfer, Cheque, Credit Card, Gift Card, etc');
-            $table->string('type')->default('bank_transfer')->comment('cash, bank_transfer, card, cheque, other');
+            $table->string('name')->comment('Cash, Bank Transfer, Check, Credit Card, Gift Card, etc');
+            $table->string('type')->default('bank_transfer')->comment('cash, bank_transfer, card, check, other');
             $table->foreignId('account_id')->nullable()->constrained('accounts')->nullOnDelete();
             $table->boolean('is_active')->default(true);
 

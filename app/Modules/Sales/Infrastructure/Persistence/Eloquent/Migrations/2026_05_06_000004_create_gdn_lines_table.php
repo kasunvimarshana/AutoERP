@@ -17,8 +17,8 @@ return new class extends Migration
 
             $table->string('reference')->nullable();
             $table->foreignId('gdn_header_id')->constrained('gdn_headers', 'id')->cascadeOnDelete();
-            $table->foreignId('sales_order_line_id')->nullable()->constrained('sales_order_lines', 'id')->cascadeOnDelete();
-            $table->foreignId('item_id')->constrained('items', 'id')->cascadeOnDelete();
+            $table->foreignId('sales_order_line_id')->nullable()->constrained('sales_order_lines', 'id')->nullOnDelete();
+            $table->foreignId('item_id')->constrained('items', 'id')->restrictOnDelete();
             $table->foreignId('variant_id')->nullable()->constrained('item_variants', 'id')->nullOnDelete();
             $table->foreignId('batch_id')->nullable()->constrained('batches', 'id')->nullOnDelete();
             $table->foreignId('serial_id')->nullable()->constrained('serials', 'id')->nullOnDelete();
@@ -26,14 +26,14 @@ return new class extends Migration
             $table->foreignId('location_id')->nullable()->constrained('warehouse_locations', 'id')->nullOnDelete();
 
             $table->text('description')->nullable();
-            $table->foreignId('uom_id')->constrained('unit_of_measures', 'id')->cascadeOnDelete();
+            $table->foreignId('uom_id')->constrained('unit_of_measures', 'id')->restrictOnDelete();
             $table->decimal('delivered_qty', 20, 4);
             $table->decimal('rejected_qty', 20, 4)->default(0);
             $table->decimal('invoiced_qty', 20, 4)->default(0);
             $table->decimal('unit_price', 20, 4);
             $table->decimal('unit_cost', 20, 4)->nullable();
 
-            // Discount – stored both as configuration and as absolute amount
+            // Discount stored as both configuration and calculated amount
             $table->string('discount_type')->nullable()->comment('percentage, fixed');
             $table->decimal('discount_value', 20, 4)->default(0);
             $table->decimal('discount_amount', 20, 4)->default(0)->comment('Calculated discount amount');
@@ -43,16 +43,16 @@ return new class extends Migration
                   ->storedAs('delivered_qty * unit_price')
                   ->comment('Gross = qty * unit price');
             $table->decimal('line_total', 20, 4)
-                  ->storedAs('gross_amount - discount_amount')
+                  ->storedAs('delivered_qty * unit_price - discount_amount')
                   ->comment('Net after discount before tax');
 
             // Tax
             $table->foreignId('tax_group_id')->nullable()->constrained('tax_groups', 'id')->nullOnDelete();
             $table->decimal('tax_amount', 20, 4)->default(0)->comment('Calculated tax amount');
 
-            // Optional – if you want a stored line total including tax
+            // Stored line total including tax
             $table->decimal('line_total_with_tax', 20, 4)
-                  ->storedAs('line_total + tax_amount')
+                  ->storedAs('delivered_qty * unit_price - discount_amount + tax_amount')
                   ->comment('total including tax');
 
             // lines account

@@ -16,7 +16,7 @@ return new class extends Migration
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->foreignId('invoice_id')->constrained('invoices')->cascadeOnDelete();
-            $table->foreignId('invoice_reference_id')->constrained('invoice_references')->cascadeOnDelete();
+            $table->foreignId('invoice_reference_id')->nullable()->constrained('invoice_references')->nullOnDelete();
             $table->string('reference')->nullable();
             $table->string('item_type')->nullable();
             $table->unsignedBigInteger('item_id')->nullable();
@@ -26,7 +26,7 @@ return new class extends Migration
             $table->decimal('quantity', 20, 4);
             $table->decimal('unit_price', 20, 4);
 
-            // Discount – stored both as configuration and as absolute amount
+            // Discount stored as both configuration and calculated amount
             $table->string('discount_type')->nullable()->comment('percentage, fixed');
             $table->decimal('discount_value', 20, 4)->default(0);
             $table->decimal('discount_amount', 20, 4)->default(0)->comment('Calculated discount amount');
@@ -36,7 +36,7 @@ return new class extends Migration
                   ->storedAs('quantity * unit_price')
                   ->comment('Gross = qty * unit price');
             $table->decimal('line_total', 20, 4)
-                  ->storedAs('gross_amount - discount_amount')
+                  ->storedAs('quantity * unit_price - discount_amount')
                   ->comment('Net after discount before tax');
 
             // Tax
@@ -44,15 +44,18 @@ return new class extends Migration
             $table->decimal('tax_amount', 20, 4)->default(0)
                   ->comment('Calculated tax amount');
 
-            // Optional – if you want a stored line total including tax
+            // Stored line total including tax
             $table->decimal('line_total_with_tax', 20, 4)
-                  ->storedAs('line_total + tax_amount')
+                  ->storedAs('quantity * unit_price - discount_amount + tax_amount')
                   ->comment('total including tax');
 
             // invoice lines account
             $table->foreignId('account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete()->comment('account for posting');
 
             $table->timestamps();
+
+            $table->index(['tenant_id', 'invoice_id'], 'invoice_lines_invoice_idx');
+            $table->index(['tenant_id', 'item_type', 'item_id'], 'invoice_lines_item_lookup_idx');
         });
     }
 

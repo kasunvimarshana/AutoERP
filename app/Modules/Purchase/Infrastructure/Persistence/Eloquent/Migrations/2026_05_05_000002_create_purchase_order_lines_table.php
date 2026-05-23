@@ -17,17 +17,17 @@ return new class extends Migration
 
             $table->string('reference')->nullable();
             $table->foreignId('purchase_order_id')->constrained('purchase_orders', 'id')->cascadeOnDelete();
-            $table->foreignId('item_id')->constrained('items', 'id')->cascadeOnDelete();
+            $table->foreignId('item_id')->constrained('items', 'id')->restrictOnDelete();
             $table->foreignId('variant_id')->nullable()->constrained('item_variants', 'id')->nullOnDelete();
             $table->text('description')->nullable();
-            $table->foreignId('uom_id')->constrained('unit_of_measures', 'id')->cascadeOnDelete();
+            $table->foreignId('uom_id')->constrained('unit_of_measures', 'id')->restrictOnDelete();
             $table->decimal('ordered_qty', 20, 4);
             $table->decimal('received_qty', 20, 4)->default(0);
             $table->decimal('rejected_qty', 20, 4)->default(0);
             $table->decimal('invoiced_qty', 20, 4)->default(0);
             $table->decimal('unit_price', 20, 4);
 
-            // Discount – stored both as configuration and as absolute amount
+            // Discount stored as both configuration and calculated amount
             $table->string('discount_type')->nullable()->comment('percentage, fixed');
             $table->decimal('discount_value', 20, 4)->default(0);
             $table->decimal('discount_amount', 20, 4)->default(0)->comment('Calculated discount amount');
@@ -37,16 +37,16 @@ return new class extends Migration
                   ->storedAs('ordered_qty * unit_price')
                   ->comment('Gross = qty * unit price');
             $table->decimal('line_total', 20, 4)
-                  ->storedAs('gross_amount - discount_amount')
+                  ->storedAs('ordered_qty * unit_price - discount_amount')
                   ->comment('Net after discount before tax');
 
             // Tax
             $table->foreignId('tax_group_id')->nullable()->constrained('tax_groups', 'id')->nullOnDelete();
             $table->decimal('tax_amount', 20, 4)->default(0)->comment('Calculated tax amount');
 
-            // Optional – if you want a stored line total including tax
+            // Stored line total including tax
             $table->decimal('line_total_with_tax', 20, 4)
-                  ->storedAs('line_total + tax_amount')
+                  ->storedAs('ordered_qty * unit_price - discount_amount + tax_amount')
                   ->comment('total including tax');
 
             // lines account

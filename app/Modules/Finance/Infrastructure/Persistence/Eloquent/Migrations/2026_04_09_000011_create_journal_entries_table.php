@@ -33,7 +33,7 @@ return new class extends Migration
             $table->timestamp('posted_at')->nullable();
 
             $table->timestamps();
-            // No softDeletes – journal entries are immutable; reversals only
+            // No softDeletes - journal entries are immutable; reversals only
 
             $table->unique(['tenant_id', 'entry_number'], 'journal_entries_number_uk');
             $table->index(['tenant_id', 'entry_date'], 'journal_entries_date_idx');

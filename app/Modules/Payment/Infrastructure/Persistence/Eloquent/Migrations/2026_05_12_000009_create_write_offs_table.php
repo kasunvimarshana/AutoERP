@@ -26,6 +26,8 @@ return new class extends Migration
             $table->unsignedBigInteger('created_by')->nullable();
 
             $table->timestamps();
+
+            $table->index(['tenant_id', 'document_type', 'document_id'], 'write_offs_document_idx');
         });
     }
 

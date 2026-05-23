@@ -27,7 +27,7 @@ return new class extends Migration
             $table->decimal('hours_worked', 20, 4)->nullable();
             // Actual rate for this technician (may differ from the planned unit price)
             $table->decimal('hourly_rate', 20, 4)->nullable();
-            // Incentive – stored both as configuration and as absolute amount
+            // Incentive stored as both configuration and calculated amount
             $table->string('incentive_type')->nullable()->comment('percentage, fixed');
             $table->decimal('incentive_value', 20, 4)->default(0);
             $table->decimal('incentive_amount', 20, 4)->default(0)->comment('Calculated incentive amount');
