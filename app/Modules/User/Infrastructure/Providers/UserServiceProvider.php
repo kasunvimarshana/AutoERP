@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace Modules\User\Infrastructure\Providers;
 
@@ -26,23 +26,26 @@ class UserServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        foreach ([
-            PermissionRepositoryInterface::class => EloquentPermissionRepository::class,
-            RoleRepositoryInterface::class => EloquentRoleRepository::class,
-            RolePermissionRepositoryInterface::class => EloquentRolePermissionRepository::class,
-            UserDeviceRepositoryInterface::class => EloquentUserDeviceRepository::class,
-            UserDocumentRepositoryInterface::class => EloquentUserDocumentRepository::class,
-            UserRepositoryInterface::class => EloquentUserRepository::class,
-            UserPermissionRepositoryInterface::class => EloquentUserPermissionRepository::class,
-            UserRoleRepositoryInterface::class => EloquentUserRoleRepository::class,
-            UserTenantRepositoryInterface::class => EloquentUserTenantRepository::class,
-        ] as $interface => $implementation) {
+        foreach (
+            [
+                PermissionRepositoryInterface::class => EloquentPermissionRepository::class,
+                RoleRepositoryInterface::class => EloquentRoleRepository::class,
+                RolePermissionRepositoryInterface::class => EloquentRolePermissionRepository::class,
+                UserDeviceRepositoryInterface::class => EloquentUserDeviceRepository::class,
+                UserDocumentRepositoryInterface::class => EloquentUserDocumentRepository::class,
+                UserRepositoryInterface::class => EloquentUserRepository::class,
+                UserPermissionRepositoryInterface::class => EloquentUserPermissionRepository::class,
+                UserRoleRepositoryInterface::class => EloquentUserRoleRepository::class,
+                UserTenantRepositoryInterface::class => EloquentUserTenantRepository::class,
+            ] as $interface => $implementation
+        ) {
             $this->app->bind($interface, $implementation);
         }
     }
 
     public function boot(): void
     {
-        $this->loadMigrationsFrom(__DIR__.'/../../Infrastructure/Persistence/Eloquent/Migrations');
+        $this->loadRoutesFrom(__DIR__ . '/../../routes/api.php');
+        $this->loadMigrationsFrom(__DIR__ . '/../../Infrastructure/Persistence/Eloquent/Migrations');
     }
 }
