@@ -53,9 +53,9 @@ return new class extends Migration
             $table->decimal('non_inventory_item_tax_total', 20, 4)->default(0)->comment('SUM(non_inventory_item.tax_amount)');
             $table->decimal('non_inventory_item_discount_total', 20, 4)->default(0)->comment('SUM(non_inventory_item.discount_amount)');
 
-            $table->decimal('labour_item_subtotal', 20, 4)->default(0)->comment('SUM(labour_item.gross_amount)');
-            $table->decimal('labour_item_tax_total', 20, 4)->default(0)->comment('SUM(labour_item.tax_amount)');
-            $table->decimal('labour_item_discount_total', 20, 4)->default(0)->comment('SUM(labour_item.discount_amount)');
+            $table->decimal('labor_item_subtotal', 20, 4)->default(0)->comment('SUM(labor_item.gross_amount)');
+            $table->decimal('labor_item_tax_total', 20, 4)->default(0)->comment('SUM(labor_item.tax_amount)');
+            $table->decimal('labor_item_discount_total', 20, 4)->default(0)->comment('SUM(labor_item.discount_amount)');
 
             // ── Header‑level adjustments (applied on top of the order) ──
             $table->string('header_discount_type')->nullable()->comment('percentage, fixed');
@@ -65,8 +65,8 @@ return new class extends Migration
             $table->decimal('header_tax_amount', 20, 4)->default(0);
 
             // ── Final totals (combine line + header) ──
-            $table->decimal('discount_total', 20, 4)->default(0)->comment('line_discount_total + non_inventory_item_discount_total + labour_item_discount_total + header_discount_amount');
-            $table->decimal('tax_total', 20, 4)->default(0)->comment('line_tax_total + non_inventory_item_tax_total + labour_item_tax_total + header_tax_amount');
+            $table->decimal('discount_total', 20, 4)->default(0)->comment('line_discount_total + non_inventory_item_discount_total + labor_item_discount_total + header_discount_amount');
+            $table->decimal('tax_total', 20, 4)->default(0)->comment('line_tax_total + non_inventory_item_tax_total + labor_item_tax_total + header_tax_amount');
             $table->decimal('debit_note_total', 20, 4)->default(0)->comment('SUM of debit notes');
             $table->decimal('credit_note_total', 20, 4)->default(0)->comment('SUM of credit notes');
             $table->decimal('grand_total', 20, 4)->default(0)->comment('subtotal - discount_total + tax_total + credit_note_total - debit_note_total');

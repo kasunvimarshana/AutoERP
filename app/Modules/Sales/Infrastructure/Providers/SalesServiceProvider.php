@@ -4,7 +4,7 @@ namespace Modules\Sales\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
 
-class SaleServiceProvider extends ServiceProvider
+class SalesServiceProvider extends ServiceProvider
 {
     public function register(): void
     {

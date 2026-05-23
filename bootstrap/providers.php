@@ -17,7 +17,7 @@ return [
     Modules\Payment\Infrastructure\Providers\PaymentServiceProvider::class,
     Modules\Pricing\Infrastructure\Providers\PricingServiceProvider::class,
     Modules\Purchase\Infrastructure\Providers\PurchaseServiceProvider::class,
-    Modules\Sales\Infrastructure\Providers\SaleServiceProvider::class,
+    Modules\Sales\Infrastructure\Providers\SalesServiceProvider::class,
     Modules\Sequence\Infrastructure\Providers\SequenceServiceProvider::class,
     Modules\Supplier\Infrastructure\Providers\SupplierServiceProvider::class,
     Modules\SystemUser\Infrastructure\Providers\SystemUserServiceProvider::class,

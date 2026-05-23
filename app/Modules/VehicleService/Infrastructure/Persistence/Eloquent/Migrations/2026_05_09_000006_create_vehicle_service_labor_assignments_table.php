@@ -19,11 +19,11 @@ return new class extends Migration
 
             $table->string('reference')->nullable();
             $table->foreignId('job_card_id')->constrained('vehicle_service_job_cards')->cascadeOnDelete();
-            // Link to the planned labour line
+            // Link to the planned labor line
             $table->foreignId('labor_item_id')->constrained('vehicle_service_labor_items', 'id')->cascadeOnDelete();
             // Technician assigned to perform this work
             $table->foreignId('employee_id')->constrained('employees', 'id');
-            // Actual hours worked on this specific labour item
+            // Actual hours worked on this specific labor item
             $table->decimal('hours_worked', 20, 4)->nullable();
             // Actual rate for this technician (may differ from the planned unit price)
             $table->decimal('hourly_rate', 20, 4)->nullable();

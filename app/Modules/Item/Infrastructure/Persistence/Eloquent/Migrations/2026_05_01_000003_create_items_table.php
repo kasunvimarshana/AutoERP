@@ -46,16 +46,16 @@ return new class extends Migration
             // Account references
             $table->foreignId('income_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('General ledger channel for product revenue');
             $table->foreignId('cogs_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('General ledger channel for inventory direct cost');
-            $table->foreignId('inventory_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('General ledger channel for asset asset valuation');
-            $table->foreignId('expense_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('General ledger channel for non-revenue overhead asset');
+            $table->foreignId('inventory_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('General ledger channel for asset valuation');
+            $table->foreignId('expense_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('General ledger channel for non-revenue overhead expenses');
             // RETURNS
             $table->foreignId('sales_return_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Used when customer returns goods (sales return adjustment)');
             $table->foreignId('purchase_return_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Used when returning goods to supplier');
             // INVENTORY VARIANCE (VERY IMPORTANT FOR COUNT ADJUSTMENT)
-            $table->foreignId('inventory_gain_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Used when stock increase due to adjustment');
-            $table->foreignId('inventory_loss_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Used when stock decrease due to damage, scrap, shrinkage');
+            $table->foreignId('inventory_gain_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Used when stock increases due to adjustments');
+            $table->foreignId('inventory_loss_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Used when stock decreases due to damage, scrap, or shrinkage');
             // STOCK TRANSFER (OPTIONAL BUT PROFESSIONAL)
-            $table->foreignId('stock_transfer_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Used if transfer requires temporary clearing account');
+            $table->foreignId('stock_transfer_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Used when a transfer requires a temporary clearing account');
             // PRODUCTION / WIP (if manufacturing module exists)
             $table->foreignId('wip_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Work In Progress account for production consumption');
             // DISCOUNT / PRICE DIFFERENCE HANDLING
