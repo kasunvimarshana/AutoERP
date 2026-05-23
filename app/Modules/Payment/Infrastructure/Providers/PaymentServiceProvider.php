@@ -43,6 +43,8 @@ class PaymentServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->mergeConfigFrom(__DIR__.'/../../config/payment.php', 'payment');
         $this->loadMigrationsFrom(__DIR__.'/../../Infrastructure/Persistence/Eloquent/Migrations');
+        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
     }
 }
