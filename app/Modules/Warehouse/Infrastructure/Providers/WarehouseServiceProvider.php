@@ -12,16 +12,19 @@ class WarehouseServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        foreach ([
-            WarehouseLocationRepositoryInterface::class => EloquentWarehouseLocationRepository::class,
-            WarehouseRepositoryInterface::class => EloquentWarehouseRepository::class,
-        ] as $interface => $implementation) {
+        foreach (
+            [
+                WarehouseLocationRepositoryInterface::class => EloquentWarehouseLocationRepository::class,
+                WarehouseRepositoryInterface::class => EloquentWarehouseRepository::class,
+            ] as $interface => $implementation
+        ) {
             $this->app->bind($interface, $implementation);
         }
     }
 
     public function boot(): void
     {
-        $this->loadMigrationsFrom(__DIR__.'/../../Infrastructure/Persistence/Eloquent/Migrations');
+        $this->loadRoutesFrom(__DIR__ . '/../../routes/api.php');
+        $this->loadMigrationsFrom(__DIR__ . '/../../Infrastructure/Persistence/Eloquent/Migrations');
     }
 }
