@@ -58,7 +58,6 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-
             $table->unique(['tenant_id', 'invoice_number'], 'invoices_invoice_number_uk');
         });
     }

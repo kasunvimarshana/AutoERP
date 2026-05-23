@@ -33,21 +33,21 @@ return new class extends Migration
 
             // Line net (before tax)
             $table->decimal('gross_amount', 20, 4)
-                  ->storedAs('quantity * unit_price')
-                  ->comment('Gross = qty * unit price');
+                ->storedAs('quantity * unit_price')
+                ->comment('Gross = qty * unit price');
             $table->decimal('line_total', 20, 4)
-                  ->storedAs('quantity * unit_price - discount_amount')
-                  ->comment('Net after discount before tax');
+                ->storedAs('quantity * unit_price - discount_amount')
+                ->comment('Net after discount before tax');
 
             // Tax
             $table->foreignId('tax_group_id')->nullable()->constrained('tax_groups', 'id')->nullOnDelete();
             $table->decimal('tax_amount', 20, 4)->default(0)
-                  ->comment('Calculated tax amount');
+                ->comment('Calculated tax amount');
 
             // Stored line total including tax
             $table->decimal('line_total_with_tax', 20, 4)
-                  ->storedAs('quantity * unit_price - discount_amount + tax_amount')
-                  ->comment('total including tax');
+                ->storedAs('quantity * unit_price - discount_amount + tax_amount')
+                ->comment('total including tax');
 
             // invoice lines account
             $table->foreignId('account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete()->comment('account for posting');
