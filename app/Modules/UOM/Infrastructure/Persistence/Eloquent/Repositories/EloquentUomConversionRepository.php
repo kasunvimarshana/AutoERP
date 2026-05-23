@@ -52,4 +52,59 @@ class EloquentUomConversionRepository extends EloquentRepository implements UomC
     {
         return $this->query($with)->where('is_active', false)->get();
     }
+
+    public function findForScope(
+        int|string $tenantId,
+        int|string $fromUomId,
+        int|string $toUomId,
+        int|string|null $itemId = null,
+        int|string|null $excludeId = null,
+        array $with = []
+    ): ?Model {
+        $query = $this->query($with)
+            ->where('tenant_id', $tenantId)
+            ->where('from_uom_id', $fromUomId)
+            ->where('to_uom_id', $toUomId)
+            ->when($itemId === null, fn ($query) => $query->whereNull('item_id'))
+            ->when($itemId !== null, fn ($query) => $query->where('item_id', $itemId));
+
+        if ($excludeId !== null) {
+            $query->whereKeyNot($excludeId);
+        }
+
+        return $query->first();
+    }
+
+    public function findActiveConversion(
+        int|string $tenantId,
+        int|string $fromUomId,
+        int|string $toUomId,
+        int|string|null $itemId = null,
+        array $with = []
+    ): ?Model {
+        $specific = $this->findActiveConversionForItem($tenantId, $fromUomId, $toUomId, $itemId, $with);
+
+        if ($specific !== null || $itemId === null) {
+            return $specific;
+        }
+
+        return $this->findActiveConversionForItem($tenantId, $fromUomId, $toUomId, null, $with);
+    }
+
+    private function findActiveConversionForItem(
+        int|string $tenantId,
+        int|string $fromUomId,
+        int|string $toUomId,
+        int|string|null $itemId,
+        array $with = []
+    ): ?Model {
+        return $this->query($with)
+            ->where('tenant_id', $tenantId)
+            ->where('from_uom_id', $fromUomId)
+            ->where('to_uom_id', $toUomId)
+            ->where('is_active', true)
+            ->when($itemId === null, fn ($query) => $query->whereNull('item_id'))
+            ->when($itemId !== null, fn ($query) => $query->where('item_id', $itemId))
+            ->first();
+    }
 }

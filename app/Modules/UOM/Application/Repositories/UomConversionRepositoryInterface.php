@@ -24,4 +24,21 @@ interface UomConversionRepositoryInterface extends BaseRepositoryInterface
     public function getActive(array $with = []): Collection;
 
     public function getInactive(array $with = []): Collection;
+
+    public function findForScope(
+        int|string $tenantId,
+        int|string $fromUomId,
+        int|string $toUomId,
+        int|string|null $itemId = null,
+        int|string|null $excludeId = null,
+        array $with = []
+    ): ?Model;
+
+    public function findActiveConversion(
+        int|string $tenantId,
+        int|string $fromUomId,
+        int|string $toUomId,
+        int|string|null $itemId = null,
+        array $with = []
+    ): ?Model;
 }

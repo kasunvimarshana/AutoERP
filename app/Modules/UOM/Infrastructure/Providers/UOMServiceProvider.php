@@ -12,6 +12,8 @@ class UOMServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->mergeConfigFrom(__DIR__.'/../../config/uom.php', 'uom');
+
         foreach ([
             UnitOfMeasureRepositoryInterface::class => EloquentUnitOfMeasureRepository::class,
             UomConversionRepositoryInterface::class => EloquentUomConversionRepository::class,
@@ -22,6 +24,7 @@ class UOMServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
         $this->loadMigrationsFrom(__DIR__.'/../../Infrastructure/Persistence/Eloquent/Migrations');
     }
 }
