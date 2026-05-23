@@ -28,7 +28,7 @@ class BankTransactionModel extends Model
             'bank_account_id' => 'integer',
             'category_rule_id' => 'integer',
             'created_by' => 'integer',
-            'external_id' => 'integer',
+            'external_id' => 'string',
             'matched_journal_entry_id' => 'integer',
             'metadata' => 'array',
             'organization_unit_id' => 'integer',

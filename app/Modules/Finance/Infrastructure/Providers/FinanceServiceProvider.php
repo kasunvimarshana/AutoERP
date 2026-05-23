@@ -44,6 +44,8 @@ class FinanceServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->mergeConfigFrom(__DIR__.'/../../config/finance.php', 'finance');
+
         foreach ([
             AccountRepositoryInterface::class => EloquentAccountRepository::class,
             ApTransactionRepositoryInterface::class => EloquentApTransactionRepository::class,
@@ -70,6 +72,7 @@ class FinanceServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
         $this->loadMigrationsFrom(__DIR__.'/../../Infrastructure/Persistence/Eloquent/Migrations');
     }
 }
