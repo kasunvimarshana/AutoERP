@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Supplier\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
@@ -18,6 +20,8 @@ class SupplierServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->mergeConfigFrom(__DIR__.'/../../config/supplier.php', 'supplier');
+
         foreach ([
             SupplierAddressRepositoryInterface::class => EloquentSupplierAddressRepository::class,
             SupplierContactRepositoryInterface::class => EloquentSupplierContactRepository::class,
@@ -32,5 +36,6 @@ class SupplierServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/../../Infrastructure/Persistence/Eloquent/Migrations');
+        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
     }
 }
