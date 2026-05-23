@@ -21,5 +21,24 @@ interface VehicleDocumentRepositoryInterface extends BaseRepositoryInterface
 
     public function getForOrganizationUnit(int|string $organizationUnitId, array $with = []): Collection;
 
-    public function paginateForOrganizationUnit(int|string $organizationUnitId, int $perPage = 15, array $with = []): LengthAwarePaginator;
+    public function paginateForOrganizationUnit(
+        int|string $organizationUnitId,
+        int $perPage = 15,
+        array $with = [],
+    ): LengthAwarePaginator;
+
+    public function getForVehicle(int|string $vehicleId, array $with = []): Collection;
+
+    public function paginateForVehicle(
+        int|string $vehicleId,
+        int $perPage = 15,
+        array $with = [],
+    ): LengthAwarePaginator;
+
+    public function findForTenantAndVehicleById(
+        int|string $tenantId,
+        int|string $vehicleId,
+        int|string $id,
+        array $with = [],
+    ): ?Model;
 }

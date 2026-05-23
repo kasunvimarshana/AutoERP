@@ -43,8 +43,37 @@ class EloquentVehicleDocumentRepository extends EloquentRepository implements Ve
         return $this->query($with)->where('organization_unit_id', $organizationUnitId)->get();
     }
 
-    public function paginateForOrganizationUnit(int|string $organizationUnitId, int $perPage = 15, array $with = []): LengthAwarePaginator
-    {
+    public function paginateForOrganizationUnit(
+        int|string $organizationUnitId,
+        int $perPage = 15,
+        array $with = [],
+    ): LengthAwarePaginator {
         return $this->query($with)->where('organization_unit_id', $organizationUnitId)->paginate($perPage);
+    }
+
+    public function getForVehicle(int|string $vehicleId, array $with = []): Collection
+    {
+        return $this->query($with)->where('vehicle_id', $vehicleId)->get();
+    }
+
+    public function paginateForVehicle(
+        int|string $vehicleId,
+        int $perPage = 15,
+        array $with = [],
+    ): LengthAwarePaginator {
+        return $this->query($with)->where('vehicle_id', $vehicleId)->paginate($perPage);
+    }
+
+    public function findForTenantAndVehicleById(
+        int|string $tenantId,
+        int|string $vehicleId,
+        int|string $id,
+        array $with = [],
+    ): ?Model {
+        return $this->query($with)
+            ->where('tenant_id', $tenantId)
+            ->where('vehicle_id', $vehicleId)
+            ->whereKey($id)
+            ->first();
     }
 }

@@ -12,16 +12,19 @@ class VehicleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        foreach ([
-            VehicleDocumentRepositoryInterface::class => EloquentVehicleDocumentRepository::class,
-            VehicleRepositoryInterface::class => EloquentVehicleRepository::class,
-        ] as $interface => $implementation) {
+        foreach (
+            [
+                VehicleDocumentRepositoryInterface::class => EloquentVehicleDocumentRepository::class,
+                VehicleRepositoryInterface::class => EloquentVehicleRepository::class,
+            ] as $interface => $implementation
+        ) {
             $this->app->bind($interface, $implementation);
         }
     }
 
     public function boot(): void
     {
-        $this->loadMigrationsFrom(__DIR__.'/../../Infrastructure/Persistence/Eloquent/Migrations');
+        $this->loadRoutesFrom(__DIR__ . '/../../routes/api.php');
+        $this->loadMigrationsFrom(__DIR__ . '/../../Infrastructure/Persistence/Eloquent/Migrations');
     }
 }
