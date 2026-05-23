@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Voucher\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
@@ -12,6 +14,8 @@ class VoucherServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->mergeConfigFrom(__DIR__.'/../../config/voucher.php', 'voucher');
+
         foreach ([
             RecurringVoucherRepositoryInterface::class => EloquentRecurringVoucherRepository::class,
             VoucherRepositoryInterface::class => EloquentVoucherRepository::class,
@@ -23,5 +27,6 @@ class VoucherServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/../../Infrastructure/Persistence/Eloquent/Migrations');
+        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
     }
 }
