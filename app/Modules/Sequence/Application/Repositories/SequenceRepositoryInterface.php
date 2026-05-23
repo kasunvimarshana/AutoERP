@@ -19,5 +19,35 @@ interface SequenceRepositoryInterface extends BaseRepositoryInterface
 
     public function getForOrganizationUnit(int|string $organizationUnitId, array $with = []): Collection;
 
-    public function paginateForOrganizationUnit(int|string $organizationUnitId, int $perPage = 15, array $with = []): LengthAwarePaginator;
+    public function paginateForOrganizationUnit(
+        int|string $organizationUnitId,
+        int $perPage = 15,
+        array $with = [],
+    ): LengthAwarePaginator;
+
+    public function findForScopeDocumentAndPeriod(
+        int|string $tenantId,
+        int|string|null $organizationUnitId,
+        string $documentType,
+        ?string $periodValue,
+        bool $fallbackToGlobal = true,
+        array $with = [],
+    ): ?Model;
+
+    public function lockForScopeDocumentAndPeriod(
+        int|string $tenantId,
+        int|string|null $organizationUnitId,
+        string $documentType,
+        ?string $periodValue,
+        bool $fallbackToGlobal = true,
+        array $with = [],
+    ): ?Model;
+
+    public function findDefinitionForScopeDocument(
+        int|string $tenantId,
+        int|string|null $organizationUnitId,
+        string $documentType,
+        bool $fallbackToGlobal = true,
+        array $with = [],
+    ): ?Model;
 }

@@ -38,8 +38,97 @@ class EloquentSequenceRepository extends EloquentRepository implements SequenceR
         return $this->query($with)->where('organization_unit_id', $organizationUnitId)->get();
     }
 
-    public function paginateForOrganizationUnit(int|string $organizationUnitId, int $perPage = 15, array $with = []): LengthAwarePaginator
-    {
+    public function paginateForOrganizationUnit(
+        int|string $organizationUnitId,
+        int $perPage = 15,
+        array $with = [],
+    ): LengthAwarePaginator {
         return $this->query($with)->where('organization_unit_id', $organizationUnitId)->paginate($perPage);
+    }
+
+    public function findForScopeDocumentAndPeriod(
+        int|string $tenantId,
+        int|string|null $organizationUnitId,
+        string $documentType,
+        ?string $periodValue,
+        bool $fallbackToGlobal = true,
+        array $with = [],
+    ): ?Model {
+        $query = $this->query($with)
+            ->where('tenant_id', $tenantId)
+            ->where('document_type', $documentType)
+            ->where('period_value', $periodValue);
+
+        if ($organizationUnitId === null) {
+            return $query->whereNull('organization_unit_id')->first();
+        }
+
+        $scoped = (clone $query)->where('organization_unit_id', $organizationUnitId)->first();
+
+        if ($scoped !== null || ! $fallbackToGlobal) {
+            return $scoped;
+        }
+
+        return $query->whereNull('organization_unit_id')->first();
+    }
+
+    public function lockForScopeDocumentAndPeriod(
+        int|string $tenantId,
+        int|string|null $organizationUnitId,
+        string $documentType,
+        ?string $periodValue,
+        bool $fallbackToGlobal = true,
+        array $with = [],
+    ): ?Model {
+        $query = $this->query($with)
+            ->where('tenant_id', $tenantId)
+            ->where('document_type', $documentType)
+            ->where('period_value', $periodValue);
+
+        if ($organizationUnitId === null) {
+            return $query
+                ->whereNull('organization_unit_id')
+                ->lockForUpdate()
+                ->first();
+        }
+
+        $scoped = (clone $query)
+            ->where('organization_unit_id', $organizationUnitId)
+            ->lockForUpdate()
+            ->first();
+
+        if ($scoped !== null || ! $fallbackToGlobal) {
+            return $scoped;
+        }
+
+        return $query
+            ->whereNull('organization_unit_id')
+            ->lockForUpdate()
+            ->first();
+    }
+
+    public function findDefinitionForScopeDocument(
+        int|string $tenantId,
+        int|string|null $organizationUnitId,
+        string $documentType,
+        bool $fallbackToGlobal = true,
+        array $with = [],
+    ): ?Model {
+        $query = $this->query($with)
+            ->where('tenant_id', $tenantId)
+            ->where('document_type', $documentType)
+            ->orderByDesc('id');
+
+        if ($organizationUnitId === null) {
+            return $query->whereNull('organization_unit_id')->first();
+        }
+
+        $scoped = (clone $query)->where('organization_unit_id', $organizationUnitId)->first();
+
+        if ($scoped !== null || ! $fallbackToGlobal) {
+            return $scoped;
+        }
+
+        return $query->whereNull('organization_unit_id')->first();
     }
 }
