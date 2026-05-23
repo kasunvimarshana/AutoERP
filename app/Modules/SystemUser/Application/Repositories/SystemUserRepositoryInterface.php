@@ -23,7 +23,11 @@ interface SystemUserRepositoryInterface extends BaseRepositoryInterface
 
     public function getForOrganizationUnit(int|string $organizationUnitId, array $with = []): Collection;
 
-    public function paginateForOrganizationUnit(int|string $organizationUnitId, int $perPage = 15, array $with = []): LengthAwarePaginator;
+    public function paginateForOrganizationUnit(
+        int|string $organizationUnitId,
+        int $perPage = 15,
+        array $with = [],
+    ): LengthAwarePaginator;
 
     public function getByStatus(string $status, array $with = []): Collection;
 

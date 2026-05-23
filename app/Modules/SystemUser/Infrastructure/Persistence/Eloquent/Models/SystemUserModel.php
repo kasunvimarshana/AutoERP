@@ -17,7 +17,11 @@ use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 
 class SystemUserModel extends Model
 {
-    use HasOrganizationUnitScope, HasReferenceScope, HasStatusScope, HasTenantScope, SoftDeletes;
+    use HasOrganizationUnitScope;
+    use HasReferenceScope;
+    use HasStatusScope;
+    use HasTenantScope;
+    use SoftDeletes;
 
     protected $table = 'system_users';
 

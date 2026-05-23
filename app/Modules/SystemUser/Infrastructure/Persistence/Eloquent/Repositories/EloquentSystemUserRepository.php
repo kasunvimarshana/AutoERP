@@ -48,7 +48,11 @@ class EloquentSystemUserRepository extends EloquentRepository implements SystemU
         return $this->query($with)->where('organization_unit_id', $organizationUnitId)->get();
     }
 
-    public function paginateForOrganizationUnit(int|string $organizationUnitId, int $perPage = 15, array $with = []): LengthAwarePaginator
+    public function paginateForOrganizationUnit(
+        int|string $organizationUnitId,
+        int $perPage = 15,
+        array $with = [],
+    ): LengthAwarePaginator
     {
         return $this->query($with)->where('organization_unit_id', $organizationUnitId)->paginate($perPage);
     }
