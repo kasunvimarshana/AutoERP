@@ -45,6 +45,11 @@ abstract class EloquentRepository implements BaseRepositoryInterface
         return $this->query($with)->paginate($perPage);
     }
 
+    public function paginateWhere(array $criteria, int $perPage = 15, array $with = []): LengthAwarePaginator
+    {
+        return $this->applyCriteria($this->query($with), $criteria)->paginate($perPage);
+    }
+
     public function create(array $attributes): Model
     {
         return $this->query()->create($attributes);

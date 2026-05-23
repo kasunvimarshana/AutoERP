@@ -20,6 +20,8 @@ interface BaseRepositoryInterface
 
     public function paginate(int $perPage = 15, array $with = []): LengthAwarePaginator;
 
+    public function paginateWhere(array $criteria, int $perPage = 15, array $with = []): LengthAwarePaginator;
+
     public function create(array $attributes): Model;
 
     public function update(Model|int|string $model, array $attributes): Model;
