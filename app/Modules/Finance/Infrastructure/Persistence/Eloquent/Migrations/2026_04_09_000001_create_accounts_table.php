@@ -30,7 +30,7 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->boolean('is_active')->default(true);
             $table->boolean('allows_manual_posting')->default(true)->comment('Allows or restricts manual posting to this account');
-            $table->string('path')->nullable()->comment('materialised path');
+            $table->string('path')->nullable()->comment('materialized path');
             $table->unsignedInteger('depth')->default(0);
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();

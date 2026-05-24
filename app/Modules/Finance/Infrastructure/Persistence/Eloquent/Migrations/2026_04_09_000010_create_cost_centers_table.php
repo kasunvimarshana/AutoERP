@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('name');
             $table->text('description')->nullable();
             $table->boolean('is_active')->default(true);
-            $table->string('path')->nullable()->comment('materialised path');
+            $table->string('path')->nullable()->comment('materialized path');
             $table->unsignedInteger('depth')->default(0);
             $table->unsignedBigInteger('created_by')->nullable();
 

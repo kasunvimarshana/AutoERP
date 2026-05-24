@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
-            $table->morphs('entity'); // Product, Variant, Batch, Serial, Location, etc.
+            $table->morphs('entity'); // Item, variant, batch, serial, location, etc.
             $table->foreignId('identifier_id')->nullable()->constrained('item_identifiers')->nullOnDelete();
             $table->string('action_type')->comment('scan, receive, transfer, pick, pack, ship, return, adjust, dispose, count');
             $table->nullableMorphs('reference'); // GRN, shipment, transfer, etc.

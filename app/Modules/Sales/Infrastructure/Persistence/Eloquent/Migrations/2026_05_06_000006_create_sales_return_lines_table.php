@@ -45,7 +45,7 @@ return new class extends Migration
             // Line net (before tax)
             $table->decimal('gross_amount', 20, 4)
                   ->storedAs('return_qty * unit_price')
-                  ->comment('Gross = qty * unit price');
+                  ->comment('Gross = quantity * unit price');
             $table->decimal('line_total', 20, 4)
                   ->storedAs('return_qty * unit_price - discount_amount')
                   ->comment('Net after discount before tax');
@@ -59,11 +59,15 @@ return new class extends Migration
                   ->storedAs('return_qty * unit_price - discount_amount + tax_amount')
                   ->comment('total including tax');
 
-            // lines account
-            $table->foreignId('account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete()->comment('account for posting');
+            // Line posting account
+            $table->foreignId('account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete()->comment('Account used for posting this line');
 
             $table->timestamps();
             $table->softDeletes();
+
+            $table->index(['tenant_id', 'sales_return_id'], 'sales_return_lines_return_idx');
+            $table->index(['tenant_id', 'original_gdn_line_id'], 'sales_return_lines_original_gdn_line_idx');
+            $table->index(['tenant_id', 'item_id', 'variant_id'], 'sales_return_lines_item_variant_idx');
         });
     }
 

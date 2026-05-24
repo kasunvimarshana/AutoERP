@@ -29,7 +29,7 @@ return new class extends Migration
             $table->foreignId('location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
             $table->foreignId('warehouse_id')->nullable()->constrained('warehouses')->nullOnDelete();
             $table->string('txn_type')->comment('movement_type: GRN, GDN, Adjustment (OPENING_STOCK, PURCHASE_RECEIPT, PURCHASE_RETURN, SALES_ISSUE, SALES_RETURN, STOCK_TRANSFER_IN, STOCK_TRANSFER_OUT, ADJUSTMENT_IN, ADJUSTMENT_OUT, PRODUCTION_CONSUMPTION, PRODUCTION_OUTPUT, SCRAP, DAMAGE, COUNT_ADJUSTMENT)');
-            $table->nullableMorphs('reference'); // link to PO line, GRN line, shipment line, etc.
+            $table->nullableMorphs('reference'); // Link to PO line, GRN line, shipment line, etc.
             $table->foreignId('uom_id')->constrained('unit_of_measures');
             $table->decimal('quantity', 20, 4)->default(0);
             $table->decimal('quantity_in', 20, 4)->default(0);

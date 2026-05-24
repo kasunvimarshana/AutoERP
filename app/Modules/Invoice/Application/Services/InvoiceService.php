@@ -121,7 +121,11 @@ class InvoiceService
             $referenceId = $record->invoice_reference_id ?? ($definition['key'] === 'references' ? $record->getKey() : null);
             $deleted = $repository->delete($record);
 
-            if ($deleted && $definition['key'] === 'lines') {
+            if (! $deleted) {
+                return false;
+            }
+
+            if ($definition['key'] === 'lines') {
                 if ($referenceId !== null) {
                     $this->recalculateReference($tenantId, $referenceId);
                 }
@@ -131,7 +135,11 @@ class InvoiceService
                 }
             }
 
-            return $deleted;
+            if ($definition['key'] === 'references' && $invoiceId !== null) {
+                $this->recalculateInvoice($tenantId, $invoiceId);
+            }
+
+            return true;
         });
     }
 
@@ -338,6 +346,10 @@ class InvoiceService
         if ($resource === 'references') {
             $this->recalculateReference($tenantId, $record->getKey());
             $this->recalculateInvoice($tenantId, $record->invoice_id);
+        }
+
+        if ($resource === 'invoices') {
+            $this->recalculateInvoice($tenantId, $record->getKey());
         }
     }
 
