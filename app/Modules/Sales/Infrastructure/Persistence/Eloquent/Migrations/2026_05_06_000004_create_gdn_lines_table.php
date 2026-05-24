@@ -39,21 +39,18 @@ return new class extends Migration
             $table->decimal('discount_amount', 20, 4)->default(0)->comment('Calculated discount amount');
 
             // Line net (before tax)
-            $table->decimal('gross_amount', 20, 4)
-                  ->storedAs('delivered_qty * unit_price')
-                  ->comment('Gross = quantity * unit price');
-            $table->decimal('line_total', 20, 4)
-                  ->storedAs('delivered_qty * unit_price - discount_amount')
-                  ->comment('Net after discount before tax');
+            $table->decimal('gross_amount', 20, 4)->default(0)
+                ->comment('Application-calculated gross = quantity * unit price');
+            $table->decimal('line_total', 20, 4)->default(0)
+                ->comment('Application-calculated net after discount before tax');
 
             // Tax
             $table->foreignId('tax_group_id')->nullable()->constrained('tax_groups', 'id')->nullOnDelete();
             $table->decimal('tax_amount', 20, 4)->default(0)->comment('Calculated tax amount');
 
-            // Stored line total including tax
-            $table->decimal('line_total_with_tax', 20, 4)
-                  ->storedAs('delivered_qty * unit_price - discount_amount + tax_amount')
-                  ->comment('total including tax');
+            // Application-calculated line total including tax
+            $table->decimal('line_total_with_tax', 20, 4)->default(0)
+                ->comment('Application-calculated total including tax');
 
             // Line posting account
             $table->foreignId('account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete()->comment('Account used for posting this line');

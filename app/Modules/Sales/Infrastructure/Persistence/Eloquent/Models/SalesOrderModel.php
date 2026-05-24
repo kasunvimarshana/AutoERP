@@ -25,7 +25,7 @@ class SalesOrderModel extends Model
 
     protected $table = 'sales_orders';
 
-    protected $guarded = ['id', 'discount_total', 'tax_total', 'grand_total', 'balance'];
+    protected $guarded = ['id'];
 
     protected function casts(): array
     {

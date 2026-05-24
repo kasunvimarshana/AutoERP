@@ -35,7 +35,7 @@ return new class extends Migration
             $table->decimal('quantity_in', 20, 4)->default(0);
             $table->decimal('quantity_out', 20, 4)->default(0);
             $table->decimal('unit_cost', 20, 4)->nullable(); // For receipt/shipment valuation
-            // $table->decimal('total_cost', 20, 4)->storedAs('quantity * unit_cost')->comment('quantity * unit_cost');
+            // $table->decimal('total_cost', 20, 4)->default(0)->comment('Application-calculated: quantity * unit_cost');
             $table->decimal('total_cost', 20, 4)->default(0);
             $table->decimal('balance_quantity', 20, 4)->default(0);
             $table->decimal('balance_value', 20, 4)->default(0);

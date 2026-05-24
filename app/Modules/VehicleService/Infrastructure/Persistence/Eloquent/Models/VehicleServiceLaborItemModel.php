@@ -23,7 +23,7 @@ class VehicleServiceLaborItemModel extends Model
 
     protected $table = 'vehicle_service_labor_items';
 
-    protected $guarded = ['id', 'gross_amount', 'line_total', 'line_total_with_tax'];
+    protected $guarded = ['id'];
 
     protected function casts(): array
     {

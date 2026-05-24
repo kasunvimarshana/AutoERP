@@ -27,7 +27,7 @@ class VehicleServiceJobCardModel extends Model
 
     protected $table = 'vehicle_service_job_cards';
 
-    protected $guarded = ['id', 'discount_total', 'tax_total', 'grand_total', 'balance'];
+    protected $guarded = ['id'];
 
     protected function casts(): array
     {

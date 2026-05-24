@@ -25,7 +25,7 @@ class GrnHeaderModel extends Model
 
     protected $table = 'grn_headers';
 
-    protected $guarded = ['id', 'discount_total', 'tax_total', 'grand_total'];
+    protected $guarded = ['id'];
 
     protected function casts(): array
     {

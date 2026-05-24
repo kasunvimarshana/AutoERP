@@ -28,7 +28,7 @@ return new class extends Migration
             // $table->decimal('quantity', 20, 4)->default(0);
             $table->decimal('quantity_on_hand', 20, 4)->default(0);
             $table->decimal('quantity_reserved', 20, 4)->default(0);
-            // $table->decimal('quantity_available', 20, 4)->storedAs('quantity_on_hand - quantity_reserved')->comment('quantity_on_hand - quantity_reserved');
+            // $table->decimal('quantity_available', 20, 4)->default(0)->comment('Application-calculated: quantity_on_hand - quantity_reserved');
             // $table->decimal('unit_price', 20, 4)->nullable();
             $table->decimal('unit_cost', 20, 4)->nullable();
             // $table->decimal('value', 20, 4)->nullable();

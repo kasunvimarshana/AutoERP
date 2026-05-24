@@ -35,14 +35,14 @@ return new class extends Migration
             $table->decimal('header_tax_amount', 20, 4)->default(0);
 
             // Final totals combine line rollups and header adjustments
-            $table->decimal('discount_total', 20, 4)->storedAs('line_discount_total + header_discount_amount')->comment('line_discount_total + header_discount_amount');
-            $table->decimal('tax_total', 20, 4)->storedAs('line_tax_total + header_tax_amount')->comment('line_tax_total + header_tax_amount');
+            $table->decimal('discount_total', 20, 4)->default(0)->comment('Application-calculated: line_discount_total + header_discount_amount');
+            $table->decimal('tax_total', 20, 4)->default(0)->comment('Application-calculated: line_tax_total + header_tax_amount');
             $table->decimal('debit_note_total', 20, 4)->default(0)->comment('SUM of debit notes');
             $table->decimal('credit_note_total', 20, 4)->default(0)->comment('SUM of credit notes');
-            $table->decimal('grand_total', 20, 4)->storedAs('subtotal - line_discount_total - header_discount_amount + line_tax_total + header_tax_amount + debit_note_total - credit_note_total')->comment('subtotal - discount_total + tax_total + debit_note_total - credit_note_total');
+            $table->decimal('grand_total', 20, 4)->default(0)->comment('Application-calculated: subtotal - discount_total + tax_total + debit_note_total - credit_note_total');
 
             $table->decimal('paid_amount', 20, 4)->default(0);
-            $table->decimal('balance', 20, 4)->storedAs('subtotal - line_discount_total - header_discount_amount + line_tax_total + header_tax_amount + debit_note_total - credit_note_total - paid_amount')->comment('grand_total - paid_amount');
+            $table->decimal('balance', 20, 4)->default(0)->comment('Application-calculated: grand_total - paid_amount');
             $table->foreignId('ap_account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();
             $table->foreignId('ar_account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();
             $table->foreignId('journal_entry_id')->nullable()->constrained('journal_entries', 'id')->nullOnDelete();

@@ -164,6 +164,13 @@ class InvoiceDomainService
                 $this->lineGross($attributes['quantity'], $attributes['unit_price'])
             )
         );
+        $attributes['gross_amount'] = $this->normalizeDecimal($this->lineGross($attributes['quantity'], $attributes['unit_price']));
+        $attributes['line_total'] = $this->normalizeDecimal(
+            (float) $attributes['gross_amount'] - (float) $attributes['discount_amount']
+        );
+        $attributes['line_total_with_tax'] = $this->normalizeDecimal(
+            (float) $attributes['line_total'] + (float) $attributes['tax_amount']
+        );
 
         return $attributes;
     }
@@ -191,7 +198,7 @@ class InvoiceDomainService
             $headerBase
         );
 
-        return [
+        $totals = [
             'subtotal' => $this->normalizeDecimal($subtotal),
             'line_discount_total' => $this->normalizeDecimal($lineDiscountTotal),
             'line_tax_total' => $this->normalizeDecimal($lineTaxTotal),
@@ -201,6 +208,19 @@ class InvoiceDomainService
             'credit_note_total' => $this->normalizeDecimal($attributes['credit_note_total'] ?? 0),
             'paid_amount' => $this->normalizeDecimal($attributes['paid_amount'] ?? 0),
         ];
+
+        $totals['discount_total'] = $this->normalizeDecimal(
+            (float) $totals['line_discount_total'] + (float) $totals['header_discount_amount']
+        );
+        $totals['tax_total'] = $this->normalizeDecimal(
+            (float) $totals['line_tax_total'] + (float) $totals['header_tax_amount']
+        );
+        $totals['grand_total'] = $this->normalizeDecimal($this->grandTotal($totals));
+        $totals['balance'] = $this->normalizeDecimal(
+            (float) $totals['grand_total'] - (float) $totals['paid_amount']
+        );
+
+        return $totals;
     }
 
     /**

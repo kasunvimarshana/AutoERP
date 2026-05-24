@@ -27,7 +27,7 @@ class PurchaseReturnLineModel extends Model
 
     protected $table = 'purchase_return_lines';
 
-    protected $guarded = ['id', 'gross_amount', 'line_total', 'line_total_with_tax'];
+    protected $guarded = ['id'];
 
     protected function casts(): array
     {

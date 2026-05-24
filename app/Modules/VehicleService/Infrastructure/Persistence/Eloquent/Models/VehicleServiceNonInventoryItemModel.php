@@ -21,7 +21,7 @@ class VehicleServiceNonInventoryItemModel extends Model
 
     protected $table = 'vehicle_service_non_inventory_items';
 
-    protected $guarded = ['id', 'gross_amount', 'line_total', 'line_total_with_tax'];
+    protected $guarded = ['id'];
 
     protected static string $referenceColumn = 'name';
 

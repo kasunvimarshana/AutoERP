@@ -27,7 +27,7 @@ class InvoiceModel extends Model
 
     protected $table = 'invoices';
 
-    protected $guarded = ['id', 'discount_total', 'tax_total', 'grand_total', 'balance'];
+    protected $guarded = ['id'];
 
     protected function casts(): array
     {

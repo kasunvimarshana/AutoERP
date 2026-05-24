@@ -221,9 +221,6 @@ class InvoiceService
             'tax_total',
             'grand_total',
             'balance',
-            'gross_amount',
-            'line_total',
-            'line_total_with_tax',
         ] as $generatedColumn) {
             unset($attributes[$generatedColumn]);
         }

@@ -24,7 +24,7 @@ class PurchaseReturnModel extends Model
 
     protected $table = 'purchase_returns';
 
-    protected $guarded = ['id', 'discount_total', 'tax_total', 'grand_total'];
+    protected $guarded = ['id'];
 
     protected function casts(): array
     {

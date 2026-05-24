@@ -29,7 +29,7 @@ return new class extends Migration
             $table->decimal('quantity_in', 20, 4);
             $table->decimal('quantity_remaining', 20, 4);
             $table->decimal('unit_cost', 20, 4);
-            // $table->decimal('total_cost', 20, 4)->storedAs('quantity_remaining * unit_cost')->comment('quantity_remaining * unit_cost');
+            // $table->decimal('total_cost', 20, 4)->default(0)->comment('Application-calculated: quantity_remaining * unit_cost');
             $table->nullableMorphs('reference');
             $table->boolean('is_closed')->default(false);
 
