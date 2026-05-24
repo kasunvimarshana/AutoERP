@@ -1,0 +1,522 @@
+<?php
+
+declare(strict_types=1);
+
+use Modules\HR\Application\Repositories\AttendanceLogRepositoryInterface;
+use Modules\HR\Application\Repositories\AttendanceRecordRepositoryInterface;
+use Modules\HR\Application\Repositories\BiometricDeviceRepositoryInterface;
+use Modules\HR\Application\Repositories\DepartmentRepositoryInterface;
+use Modules\HR\Application\Repositories\DesignationRepositoryInterface;
+use Modules\HR\Application\Repositories\EmployeeContactRepositoryInterface;
+use Modules\HR\Application\Repositories\EmployeeContractRepositoryInterface;
+use Modules\HR\Application\Repositories\EmployeeDocumentRepositoryInterface;
+use Modules\HR\Application\Repositories\EmployeeRepositoryInterface;
+use Modules\HR\Application\Repositories\EmployeeSalaryAssignmentRepositoryInterface;
+use Modules\HR\Application\Repositories\EmploymentTypeRepositoryInterface;
+use Modules\HR\Application\Repositories\HolidayRepositoryInterface;
+use Modules\HR\Application\Repositories\LeaveAllocationRepositoryInterface;
+use Modules\HR\Application\Repositories\LeaveApplicationRepositoryInterface;
+use Modules\HR\Application\Repositories\LeavePolicyLineRepositoryInterface;
+use Modules\HR\Application\Repositories\LeavePolicyRepositoryInterface;
+use Modules\HR\Application\Repositories\LeaveTypeRepositoryInterface;
+use Modules\HR\Application\Repositories\PayrollRunRepositoryInterface;
+use Modules\HR\Application\Repositories\PayslipLineRepositoryInterface;
+use Modules\HR\Application\Repositories\PayslipRepositoryInterface;
+use Modules\HR\Application\Repositories\PerformanceCycleRepositoryInterface;
+use Modules\HR\Application\Repositories\PerformanceReviewRepositoryInterface;
+use Modules\HR\Application\Repositories\SalaryComponentRepositoryInterface;
+use Modules\HR\Application\Repositories\SalaryStructureLineRepositoryInterface;
+use Modules\HR\Application\Repositories\SalaryStructureRepositoryInterface;
+use Modules\HR\Application\Repositories\ShiftAssignmentRepositoryInterface;
+use Modules\HR\Application\Repositories\ShiftRepositoryInterface;
+
+$common = [
+    'row_version' => ['nullable', 'integer', 'min:1'],
+    'organization_unit_id' => ['nullable', 'integer', 'exists:organization_units,id'],
+    'metadata' => ['nullable', 'array'],
+];
+
+$codeName = [
+    ...$common,
+    'name' => ['required', 'string', 'max:255'],
+    'code' => ['nullable', 'string', 'max:255'],
+    'is_active' => ['nullable', 'boolean'],
+    'description' => ['nullable', 'string'],
+    'created_by' => ['nullable', 'integer'],
+    'updated_by' => ['nullable', 'integer'],
+];
+
+return [
+    'precision' => [
+        'scale' => 4,
+    ],
+
+    'employee_statuses' => ['active', 'inactive', 'terminated', 'on_leave'],
+    'contract_statuses' => ['active', 'expired', 'terminated', 'draft'],
+    'attendance_statuses' => ['present', 'absent', 'late', 'half_day', 'leave', 'holiday'],
+    'leave_statuses' => ['pending', 'approved', 'rejected', 'cancelled'],
+    'payroll_statuses' => ['draft', 'processed', 'approved', 'posted', 'cancelled'],
+    'payslip_statuses' => ['draft', 'approved', 'paid', 'cancelled'],
+    'review_statuses' => ['pending', 'in_review', 'completed', 'acknowledged', 'cancelled'],
+    'salary_component_types' => ['earning', 'deduction', 'employer_contribution'],
+    'calculation_types' => ['fixed', 'percentage'],
+    'punch_types' => ['in', 'out'],
+
+    'calculated_columns' => [
+        'row_version',
+        'worked_minutes',
+        'overtime_minutes',
+        'total_days',
+        'used_days',
+        'pending_days',
+        'total_gross',
+        'total_earnings',
+        'total_deductions',
+        'total_net',
+        'total_employer_contributions',
+        'net_salary',
+    ],
+
+    'decimal_columns' => [
+        'salary',
+        'max_days_per_year',
+        'carry_forward_max',
+        'annual_allocation',
+        'accrual_amount',
+        'allocated_days',
+        'used_days',
+        'pending_days',
+        'carried_forward',
+        'total_days',
+        'default_value',
+        'value',
+        'base_salary',
+        'total_gross',
+        'total_earnings',
+        'total_deductions',
+        'total_net',
+        'total_employer_contributions',
+        'net_salary',
+        'worked_days',
+        'leave_days_paid',
+        'leave_days_unpaid',
+        'overtime_hours',
+        'amount',
+    ],
+
+    'immutable' => [
+        'payroll_runs' => ['status_column' => 'status', 'statuses' => ['approved', 'posted', 'cancelled']],
+        'payslips' => ['status_column' => 'status', 'statuses' => ['approved', 'paid', 'cancelled']],
+        'leave_applications' => ['status_column' => 'status', 'statuses' => ['approved', 'rejected', 'cancelled']],
+        'performance_reviews' => ['status_column' => 'status', 'statuses' => ['completed', 'acknowledged', 'cancelled']],
+    ],
+
+    'resources' => [
+        'departments' => [
+            'repository' => DepartmentRepositoryInterface::class,
+            'label' => 'HR department',
+            'rules' => [
+                ...$codeName,
+                'parent_id' => ['nullable', 'integer', 'exists:departments,id'],
+                'depth' => ['nullable', 'integer', 'min:0'],
+                'path' => ['nullable', 'string', 'max:255'],
+            ],
+        ],
+        'designations' => [
+            'repository' => DesignationRepositoryInterface::class,
+            'label' => 'HR designation',
+            'rules' => $codeName,
+        ],
+        'employment_types' => [
+            'repository' => EmploymentTypeRepositoryInterface::class,
+            'label' => 'HR employment type',
+            'rules' => [
+                ...$common,
+                'name' => ['required', 'string', 'max:255'],
+                'code' => ['nullable', 'string', 'max:255'],
+                'is_active' => ['nullable', 'boolean'],
+                'created_by' => ['nullable', 'integer'],
+            ],
+        ],
+        'employees' => [
+            'repository' => EmployeeRepositoryInterface::class,
+            'label' => 'HR employee',
+            'rules' => [
+                ...$common,
+                'user_id' => ['nullable', 'integer', 'exists:users,id'],
+                'code' => ['nullable', 'string', 'max:255'],
+                'registration_number' => ['required', 'string', 'max:255'],
+                'department_id' => ['nullable', 'integer', 'exists:departments,id'],
+                'designation_id' => ['nullable', 'integer', 'exists:designations,id'],
+                'employment_type_id' => ['nullable', 'integer', 'exists:employment_types,id'],
+                'hire_date' => ['required', 'date'],
+                'confirmation_date' => ['nullable', 'date'],
+                'termination_date' => ['nullable', 'date', 'after_or_equal:hire_date'],
+                'termination_reason' => ['nullable', 'string', 'max:255'],
+                'status' => ['nullable', 'string', 'max:255'],
+                'personal_email' => ['nullable', 'email', 'max:255'],
+                'phone' => ['nullable', 'string', 'max:255'],
+                'mobile' => ['nullable', 'string', 'max:255'],
+                'address_line1' => ['nullable', 'string'],
+                'address_line2' => ['nullable', 'string'],
+                'city' => ['nullable', 'string', 'max:255'],
+                'state' => ['nullable', 'string', 'max:255'],
+                'postal_code' => ['nullable', 'string', 'max:255'],
+                'country_id' => ['nullable', 'integer', 'exists:countries,id'],
+                'tax_number' => ['nullable', 'string', 'max:255'],
+                'social_security_number' => ['nullable', 'string', 'max:255'],
+                'bank_name' => ['nullable', 'string', 'max:255'],
+                'bank_account_number' => ['nullable', 'string', 'max:255'],
+                'bank_routing_number' => ['nullable', 'string', 'max:255'],
+                'notes' => ['nullable', 'string'],
+                'created_by' => ['nullable', 'integer'],
+                'updated_by' => ['nullable', 'integer'],
+            ],
+        ],
+        'employee_contacts' => [
+            'repository' => EmployeeContactRepositoryInterface::class,
+            'label' => 'HR employee contact',
+            'rules' => [
+                ...$common,
+                'employee_id' => ['required', 'integer', 'exists:employees,id'],
+                'name' => ['required', 'string', 'max:255'],
+                'relationship' => ['nullable', 'string', 'max:255'],
+                'email' => ['nullable', 'email', 'max:255'],
+                'phone' => ['nullable', 'string', 'max:255'],
+                'is_primary' => ['nullable', 'boolean'],
+                'is_emergency' => ['nullable', 'boolean'],
+            ],
+        ],
+        'employee_documents' => [
+            'repository' => EmployeeDocumentRepositoryInterface::class,
+            'label' => 'HR employee document',
+            'rules' => [
+                ...$common,
+                'employee_id' => ['required', 'integer', 'exists:employees,id'],
+                'document_type' => ['required', 'string', 'max:255'],
+                'name' => ['required', 'string', 'max:255'],
+                'file_path' => ['required', 'string', 'max:1024'],
+                'mime_type' => ['nullable', 'string', 'max:255'],
+                'size' => ['nullable', 'integer', 'min:0'],
+                'issued_date' => ['nullable', 'date'],
+                'expiry_date' => ['nullable', 'date', 'after_or_equal:issued_date'],
+                'notes' => ['nullable', 'string'],
+            ],
+        ],
+        'employee_contracts' => [
+            'repository' => EmployeeContractRepositoryInterface::class,
+            'label' => 'HR employee contract',
+            'rules' => [
+                ...$common,
+                'employee_id' => ['required', 'integer', 'exists:employees,id'],
+                'start_date' => ['required', 'date'],
+                'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+                'contract_type' => ['nullable', 'string', 'max:255'],
+                'salary' => ['required', 'numeric', 'min:0'],
+                'salary_frequency' => ['nullable', 'string', 'max:255'],
+                'currency_id' => ['nullable', 'integer', 'exists:currencies,id'],
+                'status' => ['nullable', 'string', 'max:255'],
+                'terms' => ['nullable', 'string'],
+                'document_path' => ['nullable', 'string', 'max:1024'],
+                'created_by' => ['nullable', 'integer'],
+            ],
+        ],
+        'biometric_devices' => [
+            'repository' => BiometricDeviceRepositoryInterface::class,
+            'label' => 'HR biometric device',
+            'rules' => [
+                ...$common,
+                'name' => ['required', 'string', 'max:255'],
+                'code' => ['required', 'string', 'max:255'],
+                'device_type' => ['nullable', 'string', 'max:255'],
+                'ip_address' => ['nullable', 'string', 'max:255'],
+                'port' => ['nullable', 'integer', 'min:1', 'max:65535'],
+                'location' => ['nullable', 'string', 'max:255'],
+                'status' => ['nullable', 'string', 'max:255'],
+                'config' => ['nullable', 'array'],
+            ],
+        ],
+        'holidays' => [
+            'repository' => HolidayRepositoryInterface::class,
+            'label' => 'HR holiday',
+            'rules' => [
+                ...$common,
+                'name' => ['required', 'string', 'max:255'],
+                'holiday_date' => ['required', 'date'],
+                'holiday_type' => ['nullable', 'string', 'max:255'],
+                'is_recurring' => ['nullable', 'boolean'],
+                'description' => ['nullable', 'string'],
+                'created_by' => ['nullable', 'integer'],
+            ],
+        ],
+        'attendance_logs' => [
+            'repository' => AttendanceLogRepositoryInterface::class,
+            'label' => 'HR attendance log',
+            'rules' => [
+                ...$common,
+                'employee_id' => ['required', 'integer', 'exists:employees,id'],
+                'biometric_device_id' => ['nullable', 'integer', 'exists:biometric_devices,id'],
+                'punch_time' => ['required', 'date'],
+                'punch_type' => ['nullable', 'string', 'max:255'],
+                'source' => ['nullable', 'string', 'max:255'],
+                'raw_data' => ['nullable', 'array'],
+                'processed_at' => ['nullable', 'date'],
+            ],
+        ],
+        'shifts' => [
+            'repository' => ShiftRepositoryInterface::class,
+            'label' => 'HR shift',
+            'rules' => [
+                ...$common,
+                'name' => ['required', 'string', 'max:255'],
+                'code' => ['required', 'string', 'max:255'],
+                'shift_type' => ['nullable', 'string', 'max:255'],
+                'start_time' => ['required', 'date_format:H:i:s'],
+                'end_time' => ['required', 'date_format:H:i:s'],
+                'break_duration' => ['nullable', 'integer', 'min:0'],
+                'grace_minutes' => ['nullable', 'integer', 'min:0'],
+                'overtime_threshold' => ['nullable', 'integer', 'min:0'],
+                'work_days' => ['nullable', 'array'],
+                'is_night_shift' => ['nullable', 'boolean'],
+                'is_active' => ['nullable', 'boolean'],
+                'created_by' => ['nullable', 'integer'],
+            ],
+        ],
+        'shift_assignments' => [
+            'repository' => ShiftAssignmentRepositoryInterface::class,
+            'label' => 'HR shift assignment',
+            'rules' => [
+                ...$common,
+                'employee_id' => ['required', 'integer', 'exists:employees,id'],
+                'shift_id' => ['required', 'integer', 'exists:shifts,id'],
+                'effective_from' => ['required', 'date'],
+                'effective_to' => ['nullable', 'date', 'after_or_equal:effective_from'],
+                'created_by' => ['nullable', 'integer'],
+            ],
+        ],
+        'attendance_records' => [
+            'repository' => AttendanceRecordRepositoryInterface::class,
+            'label' => 'HR attendance record',
+            'rules' => [
+                ...$common,
+                'employee_id' => ['required', 'integer', 'exists:employees,id'],
+                'attendance_date' => ['required', 'date'],
+                'check_in' => ['nullable', 'date'],
+                'check_out' => ['nullable', 'date', 'after_or_equal:check_in'],
+                'break_duration' => ['nullable', 'integer', 'min:0'],
+                'status' => ['nullable', 'string', 'max:255'],
+                'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
+                'remarks' => ['nullable', 'string'],
+            ],
+        ],
+        'leave_types' => [
+            'repository' => LeaveTypeRepositoryInterface::class,
+            'label' => 'HR leave type',
+            'rules' => [
+                ...$common,
+                'name' => ['required', 'string', 'max:255'],
+                'code' => ['required', 'string', 'max:255'],
+                'description' => ['nullable', 'string'],
+                'is_paid' => ['nullable', 'boolean'],
+                'requires_approval' => ['nullable', 'boolean'],
+                'is_active' => ['nullable', 'boolean'],
+                'max_days_per_year' => ['nullable', 'numeric', 'min:0'],
+                'carry_forward_max' => ['nullable', 'numeric', 'min:0'],
+                'allow_negative_balance' => ['nullable', 'boolean'],
+                'applicable_gender' => ['nullable', 'string', 'max:255'],
+                'min_service_days' => ['nullable', 'integer', 'min:0'],
+            ],
+        ],
+        'leave_policies' => [
+            'repository' => LeavePolicyRepositoryInterface::class,
+            'label' => 'HR leave policy',
+            'rules' => [
+                ...$common,
+                'name' => ['required', 'string', 'max:255'],
+                'description' => ['nullable', 'string'],
+                'is_active' => ['nullable', 'boolean'],
+                'created_by' => ['nullable', 'integer'],
+            ],
+        ],
+        'leave_policy_lines' => [
+            'repository' => LeavePolicyLineRepositoryInterface::class,
+            'label' => 'HR leave policy line',
+            'rules' => [
+                ...$common,
+                'leave_policy_id' => ['required', 'integer', 'exists:leave_policies,id'],
+                'leave_type_id' => ['required', 'integer', 'exists:leave_types,id'],
+                'annual_allocation' => ['required', 'numeric', 'min:0'],
+                'accrual_type' => ['nullable', 'string', 'max:255'],
+                'accrual_amount' => ['nullable', 'numeric', 'min:0'],
+                'carry_forward_max' => ['nullable', 'numeric', 'min:0'],
+            ],
+        ],
+        'leave_allocations' => [
+            'repository' => LeaveAllocationRepositoryInterface::class,
+            'label' => 'HR leave allocation',
+            'rules' => [
+                ...$common,
+                'employee_id' => ['required', 'integer', 'exists:employees,id'],
+                'leave_type_id' => ['required', 'integer', 'exists:leave_types,id'],
+                'year' => ['required', 'integer', 'min:1900', 'max:2500'],
+                'allocated_days' => ['nullable', 'numeric', 'min:0'],
+                'carried_forward' => ['nullable', 'numeric', 'min:0'],
+                'expiry_date' => ['nullable', 'date'],
+                'created_by' => ['nullable', 'integer'],
+            ],
+        ],
+        'leave_applications' => [
+            'repository' => LeaveApplicationRepositoryInterface::class,
+            'label' => 'HR leave application',
+            'rules' => [
+                ...$common,
+                'employee_id' => ['required', 'integer', 'exists:employees,id'],
+                'leave_type_id' => ['required', 'integer', 'exists:leave_types,id'],
+                'start_date' => ['required', 'date'],
+                'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+                'half_day_type' => ['nullable', 'string', 'max:255'],
+                'reason' => ['nullable', 'string'],
+                'status' => ['nullable', 'string', 'max:255'],
+                'approver_id' => ['nullable', 'integer', 'exists:users,id'],
+                'approver_note' => ['nullable', 'string'],
+                'approved_at' => ['nullable', 'date'],
+                'attachment_path' => ['nullable', 'string', 'max:1024'],
+                'created_by' => ['nullable', 'integer'],
+            ],
+        ],
+        'salary_components' => [
+            'repository' => SalaryComponentRepositoryInterface::class,
+            'label' => 'HR salary component',
+            'rules' => [
+                ...$common,
+                'name' => ['required', 'string', 'max:255'],
+                'code' => ['required', 'string', 'max:255'],
+                'type' => ['nullable', 'string', 'max:255'],
+                'calculation_type' => ['nullable', 'string', 'max:255'],
+                'default_value' => ['nullable', 'numeric', 'min:0'],
+                'is_taxable' => ['nullable', 'boolean'],
+                'affects_net_pay' => ['nullable', 'boolean'],
+                'account_id' => ['nullable', 'integer', 'exists:accounts,id'],
+                'is_active' => ['nullable', 'boolean'],
+                'created_by' => ['nullable', 'integer'],
+            ],
+        ],
+        'salary_structures' => [
+            'repository' => SalaryStructureRepositoryInterface::class,
+            'label' => 'HR salary structure',
+            'rules' => [
+                ...$common,
+                'name' => ['required', 'string', 'max:255'],
+                'code' => ['nullable', 'string', 'max:255'],
+                'is_active' => ['nullable', 'boolean'],
+                'description' => ['nullable', 'string'],
+                'created_by' => ['nullable', 'integer'],
+            ],
+        ],
+        'salary_structure_lines' => [
+            'repository' => SalaryStructureLineRepositoryInterface::class,
+            'label' => 'HR salary structure line',
+            'rules' => [
+                ...$common,
+                'salary_structure_id' => ['required', 'integer', 'exists:salary_structures,id'],
+                'salary_component_id' => ['required', 'integer', 'exists:salary_components,id'],
+                'calculation_type' => ['nullable', 'string', 'max:255'],
+                'value' => ['required', 'numeric', 'min:0'],
+                'sequence' => ['nullable', 'integer', 'min:0'],
+            ],
+        ],
+        'employee_salary_assignments' => [
+            'repository' => EmployeeSalaryAssignmentRepositoryInterface::class,
+            'label' => 'HR employee salary assignment',
+            'rules' => [
+                ...$common,
+                'employee_id' => ['required', 'integer', 'exists:employees,id'],
+                'salary_structure_id' => ['required', 'integer', 'exists:salary_structures,id'],
+                'effective_from' => ['required', 'date'],
+                'effective_to' => ['nullable', 'date', 'after_or_equal:effective_from'],
+                'base_salary' => ['required', 'numeric', 'min:0'],
+                'pay_frequency' => ['nullable', 'string', 'max:255'],
+                'created_by' => ['nullable', 'integer'],
+            ],
+        ],
+        'payroll_runs' => [
+            'repository' => PayrollRunRepositoryInterface::class,
+            'label' => 'HR payroll run',
+            'rules' => [
+                ...$common,
+                'period_start' => ['required', 'date'],
+                'period_end' => ['required', 'date', 'after_or_equal:period_start'],
+                'payment_date' => ['required', 'date'],
+                'status' => ['nullable', 'string', 'max:255'],
+                'processed_at' => ['nullable', 'date'],
+                'approved_at' => ['nullable', 'date'],
+                'approved_by' => ['nullable', 'integer', 'exists:users,id'],
+                'notes' => ['nullable', 'string'],
+                'created_by' => ['nullable', 'integer'],
+            ],
+        ],
+        'payslips' => [
+            'repository' => PayslipRepositoryInterface::class,
+            'label' => 'HR payslip',
+            'rules' => [
+                ...$common,
+                'employee_id' => ['required', 'integer', 'exists:employees,id'],
+                'payroll_run_id' => ['required', 'integer', 'exists:payroll_runs,id'],
+                'salary_structure_id' => ['nullable', 'integer', 'exists:salary_structures,id'],
+                'period_start' => ['required', 'date'],
+                'period_end' => ['required', 'date', 'after_or_equal:period_start'],
+                'base_salary' => ['nullable', 'numeric', 'min:0'],
+                'worked_days' => ['nullable', 'numeric', 'min:0'],
+                'leave_days_paid' => ['nullable', 'numeric', 'min:0'],
+                'leave_days_unpaid' => ['nullable', 'numeric', 'min:0'],
+                'overtime_hours' => ['nullable', 'numeric', 'min:0'],
+                'status' => ['nullable', 'string', 'max:255'],
+                'journal_entry_id' => ['nullable', 'integer', 'exists:journal_entries,id'],
+            ],
+        ],
+        'payslip_lines' => [
+            'repository' => PayslipLineRepositoryInterface::class,
+            'label' => 'HR payslip line',
+            'rules' => [
+                ...$common,
+                'payslip_id' => ['required', 'integer', 'exists:payslips,id'],
+                'salary_component_id' => ['nullable', 'integer', 'exists:salary_components,id'],
+                'item_name' => ['required', 'string', 'max:255'],
+                'item_code' => ['required', 'string', 'max:255'],
+                'type' => ['nullable', 'string', 'max:255'],
+                'amount' => ['nullable', 'numeric', 'min:0'],
+                'sequence' => ['nullable', 'integer', 'min:0'],
+            ],
+        ],
+        'performance_cycles' => [
+            'repository' => PerformanceCycleRepositoryInterface::class,
+            'label' => 'HR performance cycle',
+            'rules' => [
+                ...$common,
+                'name' => ['required', 'string', 'max:255'],
+                'period_start' => ['required', 'date'],
+                'period_end' => ['required', 'date', 'after_or_equal:period_start'],
+                'is_active' => ['nullable', 'boolean'],
+                'created_by' => ['nullable', 'integer'],
+            ],
+        ],
+        'performance_reviews' => [
+            'repository' => PerformanceReviewRepositoryInterface::class,
+            'label' => 'HR performance review',
+            'rules' => [
+                ...$common,
+                'employee_id' => ['required', 'integer', 'exists:employees,id'],
+                'cycle_id' => ['required', 'integer', 'exists:performance_cycles,id'],
+                'reviewer_id' => ['required', 'integer', 'exists:users,id'],
+                'overall_rating' => ['nullable', 'string', 'max:30'],
+                'goals' => ['nullable', 'array'],
+                'strengths' => ['nullable', 'string'],
+                'improvements' => ['nullable', 'string'],
+                'reviewer_comments' => ['nullable', 'string'],
+                'employee_comments' => ['nullable', 'string'],
+                'status' => ['nullable', 'string', 'max:255'],
+                'acknowledged_at' => ['nullable', 'date'],
+            ],
+        ],
+    ],
+];

@@ -62,6 +62,8 @@ class HRServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->mergeConfigFrom(__DIR__.'/../../config/hr.php', 'hr');
+
         foreach ([
             AttendanceLogRepositoryInterface::class => EloquentAttendanceLogRepository::class,
             AttendanceRecordRepositoryInterface::class => EloquentAttendanceRecordRepository::class,
@@ -98,5 +100,6 @@ class HRServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/../../Infrastructure/Persistence/Eloquent/Migrations');
+        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
     }
 }
