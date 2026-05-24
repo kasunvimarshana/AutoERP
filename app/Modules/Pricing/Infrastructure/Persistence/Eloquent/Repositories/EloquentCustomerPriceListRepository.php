@@ -42,4 +42,14 @@ class EloquentCustomerPriceListRepository extends EloquentRepository implements 
     {
         return $this->query($with)->where('organization_unit_id', $organizationUnitId)->paginate($perPage);
     }
+
+    public function getForCustomer(int|string $tenantId, int|string $customerId, array $with = []): Collection
+    {
+        return $this->query($with)
+            ->where('tenant_id', $tenantId)
+            ->where('customer_id', $customerId)
+            ->orderByDesc('priority')
+            ->orderBy('id')
+            ->get();
+    }
 }

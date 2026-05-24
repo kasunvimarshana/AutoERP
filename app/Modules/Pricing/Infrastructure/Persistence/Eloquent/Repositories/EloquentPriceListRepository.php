@@ -6,6 +6,7 @@ namespace Modules\Pricing\Infrastructure\Persistence\Eloquent\Repositories;
 
 use App\Support\Repositories\EloquentRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Pricing\Application\Repositories\PriceListRepositoryInterface;
@@ -56,5 +57,46 @@ class EloquentPriceListRepository extends EloquentRepository implements PriceLis
     public function getInactive(array $with = []): Collection
     {
         return $this->query($with)->where('is_active', false)->get();
+    }
+
+    public function getActiveForTenantByType(int|string $tenantId, string $type, ?string $date = null, array $with = []): Collection
+    {
+        return $this->applyValidity(
+            $this->query($with)
+                ->where('tenant_id', $tenantId)
+                ->where('type', $type)
+                ->where('is_active', true),
+            $date
+        )
+            ->orderByDesc('is_default')
+            ->orderBy('name')
+            ->get();
+    }
+
+    public function findDefaultForTenantByType(int|string $tenantId, string $type, ?string $date = null, array $with = []): ?Model
+    {
+        return $this->applyValidity(
+            $this->query($with)
+                ->where('tenant_id', $tenantId)
+                ->where('type', $type)
+                ->where('is_active', true)
+                ->where('is_default', true),
+            $date
+        )->first();
+    }
+
+    private function applyValidity(Builder $query, ?string $date): Builder
+    {
+        if ($date === null) {
+            return $query;
+        }
+
+        return $query
+            ->where(function (Builder $query) use ($date): void {
+                $query->whereNull('valid_from')->orWhere('valid_from', '<=', $date);
+            })
+            ->where(function (Builder $query) use ($date): void {
+                $query->whereNull('valid_to')->orWhere('valid_to', '>=', $date);
+            });
     }
 }

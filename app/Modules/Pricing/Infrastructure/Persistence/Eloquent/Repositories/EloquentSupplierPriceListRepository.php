@@ -42,4 +42,14 @@ class EloquentSupplierPriceListRepository extends EloquentRepository implements 
     {
         return $this->query($with)->where('organization_unit_id', $organizationUnitId)->paginate($perPage);
     }
+
+    public function getForSupplier(int|string $tenantId, int|string $supplierId, array $with = []): Collection
+    {
+        return $this->query($with)
+            ->where('tenant_id', $tenantId)
+            ->where('supplier_id', $supplierId)
+            ->orderByDesc('priority')
+            ->orderBy('id')
+            ->get();
+    }
 }

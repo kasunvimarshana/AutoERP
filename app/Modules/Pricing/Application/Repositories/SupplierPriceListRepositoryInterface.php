@@ -20,4 +20,6 @@ interface SupplierPriceListRepositoryInterface extends BaseRepositoryInterface
     public function getForOrganizationUnit(int|string $organizationUnitId, array $with = []): Collection;
 
     public function paginateForOrganizationUnit(int|string $organizationUnitId, int $perPage = 15, array $with = []): LengthAwarePaginator;
+
+    public function getForSupplier(int|string $tenantId, int|string $supplierId, array $with = []): Collection;
 }

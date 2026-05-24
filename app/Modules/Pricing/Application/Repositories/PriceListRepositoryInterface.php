@@ -26,4 +26,8 @@ interface PriceListRepositoryInterface extends BaseRepositoryInterface
     public function getActive(array $with = []): Collection;
 
     public function getInactive(array $with = []): Collection;
+
+    public function getActiveForTenantByType(int|string $tenantId, string $type, ?string $date = null, array $with = []): Collection;
+
+    public function findDefaultForTenantByType(int|string $tenantId, string $type, ?string $date = null, array $with = []): ?Model;
 }

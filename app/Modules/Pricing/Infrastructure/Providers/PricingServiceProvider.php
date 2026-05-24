@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Modules\Pricing\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
@@ -16,6 +18,8 @@ class PricingServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->mergeConfigFrom(__DIR__.'/../../config/pricing.php', 'pricing');
+
         foreach ([
             CustomerPriceListRepositoryInterface::class => EloquentCustomerPriceListRepository::class,
             PriceListItemRepositoryInterface::class => EloquentPriceListItemRepository::class,
@@ -29,5 +33,6 @@ class PricingServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/../../Infrastructure/Persistence/Eloquent/Migrations');
+        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
     }
 }
