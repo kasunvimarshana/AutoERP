@@ -20,6 +20,8 @@ class PurchaseServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->mergeConfigFrom(__DIR__.'/../../config/purchase.php', 'purchase');
+
         foreach ([
             GrnHeaderRepositoryInterface::class => EloquentGrnHeaderRepository::class,
             GrnLineRepositoryInterface::class => EloquentGrnLineRepository::class,
@@ -35,5 +37,6 @@ class PurchaseServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/../../Infrastructure/Persistence/Eloquent/Migrations');
+        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
     }
 }
