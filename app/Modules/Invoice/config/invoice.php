@@ -13,7 +13,7 @@ return [
 
     'directions' => ['inbound', 'outbound'],
 
-    'statuses' => ['draft', 'approved', 'partial_paid', 'paid', 'disputed', 'cancelled'],
+    'statuses' => ['draft', 'approved', 'partially_paid', 'paid', 'disputed', 'cancelled'],
 
     'invoice_types' => [
         'purchase',

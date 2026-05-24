@@ -31,7 +31,7 @@ return new class extends Migration
             $table->decimal('subtotal', 20, 4)->default(0)->comment('SUM(line.gross_amount)');
             $table->decimal('line_tax_total', 20, 4)->default(0)->comment('SUM(line.tax_amount)');
             $table->decimal('line_discount_total', 20, 4)->default(0)->comment('SUM(line.discount_amount)');
-             $table->decimal('line_restocking_total', 20, 4)->default(0)->comment('SUM(line.restocking_fee)');
+            $table->decimal('line_restocking_total', 20, 4)->default(0)->comment('SUM(line.restocking_fee)');
 
             // Header-level adjustments applied on top of the document
             $table->string('header_discount_type')->nullable()->comment('percentage, fixed');

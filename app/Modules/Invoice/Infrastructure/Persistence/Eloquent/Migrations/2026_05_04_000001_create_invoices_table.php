@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('invoice_type'); // purchase, sale, vehicle_service, vehicle_rental_lessor, vehicle_rental_lessee
             $table->string('invoice_number');
             $table->string('reference')->nullable();
-            $table->string('status')->default('draft')->comment('draft, approved, partial_paid, paid, disputed, cancelled');
+            $table->string('status')->default('draft')->comment('draft, approved, partially_paid, paid, disputed, cancelled');
             $table->string('party_type')->nullable();
             $table->unsignedBigInteger('party_id')->nullable();
             $table->date('invoice_date');

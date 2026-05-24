@@ -240,10 +240,10 @@ class InvoiceDomainService
         }
 
         if ($paidAmount > 0) {
-            return config('invoice.statuses.2', 'partial_paid');
+            return config('invoice.statuses.2', 'partially_paid');
         }
 
-        return $current === config('invoice.statuses.3', 'paid') || $current === config('invoice.statuses.2', 'partial_paid')
+        return $current === config('invoice.statuses.3', 'paid') || $current === config('invoice.statuses.2', 'partially_paid')
             ? config('invoice.statuses.1', 'approved')
             : $current;
     }
