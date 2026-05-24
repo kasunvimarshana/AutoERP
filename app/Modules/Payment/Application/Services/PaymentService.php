@@ -9,8 +9,13 @@ use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Invoice\Application\Repositories\InvoiceReferenceRepositoryInterface;
+use Modules\Invoice\Application\Repositories\InvoiceRepositoryInterface;
+use Modules\Invoice\Application\Services\InvoiceService;
 use Modules\Payment\Application\DTOs\PaymentRecordData;
+use Modules\Payment\Application\Repositories\AdvancePaymentAllocationRepositoryInterface;
 use Modules\Payment\Application\Repositories\AdvancePaymentRepositoryInterface;
+use Modules\Payment\Application\Repositories\PaymentAllocationRepositoryInterface;
 use Modules\Payment\Application\Repositories\PaymentRepositoryInterface;
 use Modules\Payment\Domain\Exceptions\PaymentIntegrityException;
 use Modules\Payment\Domain\Exceptions\PaymentRecordNotFoundException;
@@ -23,7 +28,9 @@ class PaymentService
         private readonly Container $container,
         private readonly TenantRepositoryInterface $tenants,
         private readonly PaymentRepositoryInterface $payments,
+        private readonly PaymentAllocationRepositoryInterface $paymentAllocations,
         private readonly AdvancePaymentRepositoryInterface $advancePayments,
+        private readonly AdvancePaymentAllocationRepositoryInterface $advancePaymentAllocations,
         private readonly PaymentDomainService $domain,
     ) {}
 
@@ -95,10 +102,12 @@ class PaymentService
         $this->domain->assertRowVersion($data->rowVersion, $record);
 
         return $repository->transaction(function () use ($definition, $repository, $record, $data, $tenantId): Model {
+            $originalDocument = $this->documentReference($definition['key'], $record);
             $updated = $repository->update($record, [
                 ...$this->prepareAttributes($definition['key'], $data->attributes, $tenantId),
                 'row_version' => $this->domain->nextRowVersion($record),
             ]);
+            $this->recalculateDocumentReference($tenantId, $originalDocument);
             $this->recalculateForResourceChange($definition['key'], $updated, $tenantId);
 
             return $this->reloadRecord($definition['key'], $tenantId, $updated->getKey());
@@ -115,10 +124,15 @@ class PaymentService
 
         return $repository->transaction(function () use ($definition, $repository, $record, $tenantId): bool {
             $advancePaymentId = $record->advance_payment_id ?? null;
+            $document = $this->documentReference($definition['key'], $record);
             $deleted = $repository->delete($record);
 
             if ($deleted && $definition['key'] === 'advance_payment_allocations' && $advancePaymentId !== null) {
                 $this->recalculateAdvancePayment($tenantId, $advancePaymentId);
+            }
+
+            if ($deleted) {
+                $this->recalculateDocumentReference($tenantId, $document);
             }
 
             return $deleted;
@@ -131,10 +145,18 @@ class PaymentService
         $this->domain->ensureMutable('payments', $payment, $this->definition('payments'), true);
         $this->domain->assertPaymentCanAcceptAllocation($payment);
 
-        return $this->payments->transaction(fn (): Model => $this->payments->update($payment, [
-            'status' => config('payment.payment_statuses.1', 'posted'),
-            'row_version' => $this->domain->nextRowVersion($payment),
-        ]));
+        return $this->payments->transaction(function () use ($tenantId, $payment): Model {
+            $updated = $this->payments->update($payment, [
+                'status' => config('payment.payment_statuses.1', 'posted'),
+                'row_version' => $this->domain->nextRowVersion($payment),
+            ]);
+
+            foreach ($this->paymentAllocations->getWhere(['tenant_id' => $tenantId, 'payment_id' => $payment->getKey()]) as $allocation) {
+                $this->recalculateInvoiceDocumentPaidAmount($tenantId, $allocation->document_type, $allocation->document_id);
+            }
+
+            return $updated;
+        });
     }
 
     public function recalculateAdvancePayment(int|string $tenantId, int|string $advancePaymentId): Model
@@ -251,6 +273,8 @@ class PaymentService
             throw PaymentIntegrityException::rule('Payment allocations can only be changed while the payment is draft.');
         }
 
+        $this->assertSupportedInvoiceDocument($tenantId, $attributes['document_type'] ?? null, $attributes['document_id'] ?? null);
+
         return $attributes;
     }
 
@@ -289,6 +313,8 @@ class PaymentService
             throw PaymentIntegrityException::rule('Refunded advance payments cannot be allocated.');
         }
 
+        $this->assertSupportedInvoiceDocument($tenantId, $attributes['document_type'] ?? null, $attributes['document_id'] ?? null);
+
         return $attributes;
     }
 
@@ -310,15 +336,160 @@ class PaymentService
         if ($resource === 'payment_allocations') {
             $payment = $this->domain->assertTenantPayment($tenantId, $record->payment_id);
             $this->domain->assertPaymentCanAcceptAllocation($payment);
+            $this->recalculateInvoiceDocumentPaidAmount($tenantId, $record->document_type, $record->document_id);
         }
 
         if ($resource === 'advance_payment_allocations') {
             $this->recalculateAdvancePayment($tenantId, $record->advance_payment_id);
+            $this->recalculateInvoiceDocumentPaidAmount($tenantId, $record->document_type, $record->document_id);
         }
     }
 
     private function reloadRecord(string $resource, int|string $tenantId, int|string $id): Model
     {
         return $this->find($resource, $tenantId, $id);
+    }
+
+    /**
+     * @return array{type: string, id: int|string}|null
+     */
+    private function documentReference(string $resource, Model $record): ?array
+    {
+        if (! in_array($resource, ['payment_allocations', 'advance_payment_allocations'], true)) {
+            return null;
+        }
+
+        return [
+            'type' => $record->document_type,
+            'id' => $record->document_id,
+        ];
+    }
+
+    /**
+     * @param  array{type: string, id: int|string}|null  $document
+     */
+    private function recalculateDocumentReference(int|string $tenantId, ?array $document): void
+    {
+        if ($document === null) {
+            return;
+        }
+
+        $this->recalculateInvoiceDocumentPaidAmount($tenantId, $document['type'], $document['id']);
+    }
+
+    private function assertSupportedInvoiceDocument(int|string $tenantId, mixed $documentType, mixed $documentId): void
+    {
+        $resource = $this->invoiceResourceForDocumentType($documentType);
+
+        if ($resource === null) {
+            throw PaymentIntegrityException::rule("Unsupported allocation document type [{$documentType}].");
+        }
+
+        $this->container->make(InvoiceService::class)->find($resource, $tenantId, $documentId);
+    }
+
+    private function recalculateInvoiceDocumentPaidAmount(int|string $tenantId, mixed $documentType, mixed $documentId): void
+    {
+        $resource = $this->invoiceResourceForDocumentType($documentType);
+
+        if ($resource === null || $documentId === null) {
+            return;
+        }
+
+        $paidAmount = $this->domain->normalizeDecimal(
+            $this->postedPaymentAllocationTotal($tenantId, $documentType, $documentId)
+            + $this->advanceAllocationTotal($tenantId, $documentType, $documentId)
+        );
+
+        $repository = $resource === 'invoices'
+            ? $this->container->make(InvoiceRepositoryInterface::class)
+            : $this->container->make(InvoiceReferenceRepositoryInterface::class);
+        $record = $repository->findForTenantById($tenantId, $documentId);
+
+        if ($record === null) {
+            return;
+        }
+
+        $repository->update($record, [
+            'paid_amount' => $paidAmount,
+            'row_version' => $this->domain->nextRowVersion($record),
+        ]);
+
+        $invoices = $this->container->make(InvoiceService::class);
+
+        if ($resource === 'invoices') {
+            $invoices->recalculateInvoice($tenantId, $documentId);
+
+            return;
+        }
+
+        $invoices->recalculateReference($tenantId, $documentId);
+        $reloaded = $repository->findForTenantById($tenantId, $documentId);
+
+        if ($reloaded !== null) {
+            $invoices->recalculateInvoice($tenantId, $reloaded->invoice_id);
+        }
+    }
+
+    private function postedPaymentAllocationTotal(int|string $tenantId, mixed $documentType, mixed $documentId): float
+    {
+        $total = 0.0;
+        $postedStatuses = [
+            config('payment.payment_statuses.1', 'posted'),
+            config('payment.payment_statuses.2', 'reconciled'),
+        ];
+
+        foreach ($this->invoiceDocumentTypeAliases($documentType) as $alias) {
+            foreach ($this->paymentAllocations->getWhere([
+                'tenant_id' => $tenantId,
+                'document_type' => $alias,
+                'document_id' => $documentId,
+            ]) as $allocation) {
+                $payment = $this->domain->assertTenantPayment($tenantId, $allocation->payment_id);
+
+                if (in_array((string) $payment->status, $postedStatuses, true)) {
+                    $total += (float) $allocation->allocated_amount;
+                }
+            }
+        }
+
+        return $total;
+    }
+
+    private function advanceAllocationTotal(int|string $tenantId, mixed $documentType, mixed $documentId): float
+    {
+        $total = 0.0;
+
+        foreach ($this->invoiceDocumentTypeAliases($documentType) as $alias) {
+            $total += (float) $this->advancePaymentAllocations->getWhere([
+                'tenant_id' => $tenantId,
+                'document_type' => $alias,
+                'document_id' => $documentId,
+            ])
+                ->sum(fn (Model $allocation): float => (float) $allocation->allocated_amount);
+        }
+
+        return $total;
+    }
+
+    private function invoiceResourceForDocumentType(mixed $documentType): ?string
+    {
+        return match (strtolower((string) $documentType)) {
+            'invoice', 'invoices' => 'invoices',
+            'invoice_reference', 'invoice-reference', 'invoice_references', 'invoice-references', 'reference', 'references' => 'references',
+            default => null,
+        };
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function invoiceDocumentTypeAliases(mixed $documentType): array
+    {
+        return match ($this->invoiceResourceForDocumentType($documentType)) {
+            'invoices' => ['invoice', 'invoices'],
+            'references' => ['invoice_reference', 'invoice-reference', 'invoice_references', 'invoice-references', 'reference', 'references'],
+            default => [(string) $documentType],
+        };
     }
 }

@@ -221,8 +221,9 @@ class InvoiceService
             'tax_total',
             'grand_total',
             'balance',
-        ] as $generatedColumn) {
-            unset($attributes[$generatedColumn]);
+            'paid_amount',
+        ] as $calculatedColumn) {
+            unset($attributes[$calculatedColumn]);
         }
 
         $attributes = [
