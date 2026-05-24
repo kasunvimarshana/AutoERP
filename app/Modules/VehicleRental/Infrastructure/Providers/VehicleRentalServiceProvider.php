@@ -24,6 +24,8 @@ class VehicleRentalServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->mergeConfigFrom(__DIR__.'/../../config/vehicle-rental.php', 'vehicle-rental');
+
         foreach ([
             VehicleRentalLesseeAgreementCreditNoteRepositoryInterface::class => EloquentVehicleRentalLesseeAgreementCreditNoteRepository::class,
             VehicleRentalLesseeAgreementDebitNoteRepositoryInterface::class => EloquentVehicleRentalLesseeAgreementDebitNoteRepository::class,
@@ -41,5 +43,6 @@ class VehicleRentalServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/../../Infrastructure/Persistence/Eloquent/Migrations');
+        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
     }
 }
