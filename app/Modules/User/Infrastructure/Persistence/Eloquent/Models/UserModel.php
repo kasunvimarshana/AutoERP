@@ -7,10 +7,13 @@ namespace Modules\User\Infrastructure\Persistence\Eloquent\Models;
 use App\Support\Eloquent\Concerns\HasOrganizationUnitScope;
 use App\Support\Eloquent\Concerns\HasStatusScope;
 use App\Support\Eloquent\Concerns\HasTenantScope;
-use Illuminate\Database\Eloquent\Model;
+// use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Laravel\Passport\Contracts\OAuthenticatable;
 use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerModel;
 use Modules\Extension\Infrastructure\Persistence\Eloquent\Models\CommentModel;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\BankReconciliationModel;
@@ -33,9 +36,9 @@ use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantModel;
 use Modules\VehicleService\Infrastructure\Persistence\Eloquent\Models\VehicleServiceDiagnosticModel;
 use Modules\VehicleService\Infrastructure\Persistence\Eloquent\Models\VehicleServiceInspectionModel;
 
-class UserModel extends Model
+class UserModel extends Authenticatable implements OAuthenticatable
 {
-    use HasOrganizationUnitScope, HasStatusScope, HasTenantScope, SoftDeletes;
+    use HasApiTokens, Notifiable, HasOrganizationUnitScope, HasStatusScope, HasTenantScope, SoftDeletes;
 
     protected $table = 'users';
 
@@ -53,6 +56,11 @@ class UserModel extends Model
             'tenant_id' => 'integer',
         ];
     }
+
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
 
     public function tenant(): BelongsTo
     {
