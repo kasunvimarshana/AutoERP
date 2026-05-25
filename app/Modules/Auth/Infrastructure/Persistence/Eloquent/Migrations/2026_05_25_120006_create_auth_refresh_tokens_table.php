@@ -28,7 +28,7 @@ return new class extends Migration
             $table->timestamp('rotated_at')->nullable();
             $table->timestamp('replaced_by_expires_at')->nullable();
             $table->string('status', 40)->default('active');
-            $table->timestamp('issued_at');
+            $table->timestamp('issued_at')->nullable();
             $table->timestamp('expires_at')->nullable();
             $table->timestamp('revoked_at')->nullable();
 
