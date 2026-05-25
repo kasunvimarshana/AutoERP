@@ -353,4 +353,56 @@ Migrations are the single source of truth for the entire system.
 
 ------------------------------------------------------------
 
-Enforce a strict rule across the entire codebase: avoid over-engineering at all times. All implementations must follow KISS principles by prioritizing simplicity, clarity, and direct solutions over unnecessary abstractions, layers, or patterns. Only introduce interfaces, services, or architectural layers when there is a clear, immediate, and justified need. Reuse existing Core, Configuration, Tenant, and shared module patterns instead of creating new structures. Do not duplicate logic or introduce speculative future-proofing. Keep all code minimal, readable, maintainable, and aligned with existing architecture without adding unnecessary complexity.
+GLOBAL SIMPLICITY RULE (KISS / ANTI-OVER-ENGINEERING)
+
+------------------------------------------------------------
+CORE PRINCIPLE
+------------------------------------------------------------
+
+All implementations across the codebase MUST prefer the simplest design that satisfies the current requirement.
+
+------------------------------------------------------------
+MANDATORY RULES
+------------------------------------------------------------
+
+- Apply KISS at all times
+- Prefer direct, readable, minimal solutions over layered or speculative designs
+- Introduce interfaces, services, DTOs, policies, middleware, abstractions, or supporting layers ONLY when there is a clear, immediate, and justified need
+- Reuse existing Core, Configuration, Tenant, User, and shared module patterns before adding new structures
+- Extend existing contracts and flows when they already solve the problem correctly
+- Keep files, methods, and dependencies as small and explicit as practical
+- Optimize for maintainability, clarity, and local reasoning
+
+------------------------------------------------------------
+STRICTLY FORBIDDEN
+------------------------------------------------------------
+
+- Speculative future-proofing without an immediate requirement
+- Creating new abstraction layers for symmetry or aesthetics alone
+- Adding interfaces where only one stable implementation exists and no injection boundary is actually needed
+- Splitting simple logic across multiple classes without a concrete architectural reason
+- Duplicating rules already implemented in Core or shared modules
+- Introducing patterns, wrappers, or indirection that make the code harder to follow without measurable benefit
+
+------------------------------------------------------------
+DECISION RULE
+------------------------------------------------------------
+
+Before adding any new abstraction, ask:
+
+1. Does an existing Core or module pattern already solve this?
+  → YES: reuse it
+
+2. Is the new layer required right now for a real boundary, contract, test seam, or cross-module reuse?
+  → NO: do not add it
+
+3. Does the change make the code simpler to understand and maintain?
+  → NO: reject it
+
+------------------------------------------------------------
+FINAL RULE
+------------------------------------------------------------
+
+Prefer the minimum architecture necessary for the current requirement.
+
+Simplicity is a hard rule, not an optional preference.

@@ -49,6 +49,20 @@ These rules are mandatory for all modules under app/Modules and define non-negot
 - Unnecessary abstractions and over-engineering.
 - Cross-layer leakage.
 
+## 7. Simplicity First (KISS)
+
+- Prefer the smallest design that satisfies the current requirement.
+- Do not introduce abstractions, interfaces, services, or layers without an immediate and concrete need.
+- Reuse existing Core and shared module patterns before creating new structures.
+- Keep implementations readable, direct, and easy to reason about locally.
+- Avoid speculative future-proofing and indirection that does not solve a present problem.
+
+### Decision Rule
+
+- If an existing Core or shared pattern already solves the problem, reuse it.
+- If a new layer does not create a necessary boundary or materially simplify maintenance, do not add it.
+- When in doubt, choose the simpler implementation.
+
 ## Enforcement
 
 - Architecture rules are enforced by automated tests in tests/Unit/Architecture.
