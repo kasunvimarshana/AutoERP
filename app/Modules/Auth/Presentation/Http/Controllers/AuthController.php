@@ -6,6 +6,7 @@ namespace Modules\Auth\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
+use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Application\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Auth\Application\Contracts\UseCases\AuthorizeClientServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\ExchangeAuthorizationCodeServiceInterface;
@@ -59,6 +60,7 @@ final class AuthController extends Controller
         private readonly AuthorizeClientServiceInterface $authorizeClientService,
         private readonly ExchangeAuthorizationCodeServiceInterface $exchangeAuthorizationCodeService,
         private readonly CurrentUserContextAccessorInterface $currentUser,
+        private readonly CurrentTenantContextAccessorInterface $currentTenant,
     ) {
     }
 
@@ -180,8 +182,9 @@ final class AuthController extends Controller
 
         $payload['user_id'] = $context->userIdAsInt();
 
-        if ($context->tenantId() !== null) {
-            $payload['tenant_id'] = $context->tenantId();
+        $tenantId = $this->currentTenant->currentTenantId() ?? $context->tenantId();
+        if ($tenantId !== null) {
+            $payload['tenant_id'] = $tenantId;
         }
 
         if ($context->organizationUnitId() !== null) {

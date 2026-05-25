@@ -9,8 +9,12 @@ use Modules\OrganizationUnit\Presentation\Http\Controllers\OrganizationUnitSetti
 use Modules\OrganizationUnit\Presentation\Http\Controllers\OrganizationUnitSettingGroupController;
 use Modules\OrganizationUnit\Presentation\Http\Controllers\OrganizationUnitTypeController;
 
+$protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
+$currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');
+$currentTenantMiddleware = (string) config('core.current_tenant.middleware_alias', 'current.tenant');
+
 Route::prefix('api/organization-unit')
-    ->middleware('api')
+    ->middleware(['api', 'auth:' . $protectedGuard, $currentUserMiddleware, $currentTenantMiddleware])
     ->name('organization-unit.')
     ->group(function (): void {
         Route::apiResource('organization-unit-types', OrganizationUnitTypeController::class);

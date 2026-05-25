@@ -21,4 +21,16 @@ final class UserRoutesTest extends TestCase
         self::assertTrue(Route::has('user.user-documents.index'));
         self::assertTrue(Route::has('user.user-devices.index'));
     }
+
+    public function test_user_routes_use_current_user_and_current_tenant_middlewares(): void
+    {
+        $route = Route::getRoutes()->getByName('user.users.index');
+
+        self::assertNotNull($route);
+
+        $middlewares = $route->gatherMiddleware();
+        self::assertContains('auth:' . (string) config('module-auth.protected_route_guard', 'auth-api'), $middlewares);
+        self::assertContains((string) config('core.current_user.middleware_alias', 'current.user'), $middlewares);
+        self::assertContains((string) config('core.current_tenant.middleware_alias', 'current.tenant'), $middlewares);
+    }
 }

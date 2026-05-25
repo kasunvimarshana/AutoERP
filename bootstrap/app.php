@@ -14,6 +14,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             (string) env('CORE_CURRENT_USER_MIDDLEWARE_ALIAS', 'current.user')
                 => \Modules\Core\Presentation\Http\Middleware\CurrentUserMiddleware::class,
+            (string) env('CORE_CURRENT_TENANT_MIDDLEWARE_ALIAS', 'current.tenant')
+                => \Modules\Core\Presentation\Http\Middleware\CurrentTenantMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

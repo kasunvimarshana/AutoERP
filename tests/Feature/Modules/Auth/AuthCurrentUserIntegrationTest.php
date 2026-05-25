@@ -18,7 +18,10 @@ use Modules\Auth\Application\Contracts\UseCases\ValidateTokenServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\VerifyChallengeServiceInterface;
 use Modules\Auth\Application\DTOs\AuthorizeClientData;
 use Modules\Auth\Application\DTOs\TokenIssueData;
+use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Results\Result;
+use Modules\Tenant\Application\Repositories\TenantDomainRepositoryInterface;
+use Modules\Tenant\Application\Repositories\TenantRepositoryInterface;
 use Modules\User\Application\Repositories\UserTenantRepositoryInterface;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use Tests\TestCase;
@@ -71,7 +74,7 @@ final class AuthCurrentUserIntegrationTest extends TestCase
             }))
             ->willReturn(Result::success(['access_token' => 'issued-token']));
 
-        $this->bindProtectedAuthServices(issueToken: $service);
+        $this->bindProtectedAuthServices(issueToken: $service, tenants: $this->tenantRepositoryWithRecords(7));
 
         $response = $this->actingAs($user, 'auth-api')
             ->postJson('/api/auth/token', [
@@ -106,7 +109,7 @@ final class AuthCurrentUserIntegrationTest extends TestCase
             }))
             ->willReturn(Result::success(['authorization_code' => 'auth-code']));
 
-        $this->bindProtectedAuthServices(authorizeClient: $service);
+        $this->bindProtectedAuthServices(authorizeClient: $service, tenants: $this->tenantRepositoryWithRecords(7));
 
         $response = $this->actingAs($user, 'auth-api')
             ->postJson('/api/auth/authorize-client', [
@@ -134,7 +137,10 @@ final class AuthCurrentUserIntegrationTest extends TestCase
             ->with(888, 42)
             ->willReturn(false);
 
-        $this->bindProtectedAuthServices(userTenants: $userTenants);
+        $this->bindProtectedAuthServices(
+            userTenants: $userTenants,
+            tenants: $this->tenantRepositoryWithRecords(7, 888),
+        );
 
         $response = $this->actingAs($user, 'auth-api')
             ->postJson('/api/auth/token', [
@@ -146,11 +152,56 @@ final class AuthCurrentUserIntegrationTest extends TestCase
             ->assertJson(['message' => 'Authenticated user cannot access the requested tenant.']);
     }
 
+    public function testIssueTokenUsesResolvedRequestedTenantWhenUserHasAccess(): void
+    {
+        config()->set('auth.guards.auth-api.driver', 'session');
+
+        $user = new UserModel();
+        $user->id = 42;
+        $user->tenant_id = 7;
+        $user->organization_unit_id = 3;
+
+        $service = $this->createMock(IssueTokenServiceInterface::class);
+        $service->expects(self::once())
+            ->method('issueToken')
+            ->with(self::callback(function (TokenIssueData $data): bool {
+                self::assertSame(42, $data->userId);
+                self::assertSame(888, $data->tenantId);
+                self::assertSame(3, $data->organizationUnitId);
+
+                return true;
+            }))
+            ->willReturn(Result::success(['access_token' => 'issued-token']));
+
+        $userTenants = $this->createMock(UserTenantRepositoryInterface::class);
+        $userTenants->expects(self::atLeastOnce())
+            ->method('existsForTenantAndUser')
+            ->with(888, 42)
+            ->willReturn(true);
+
+        $this->bindProtectedAuthServices(
+            issueToken: $service,
+            userTenants: $userTenants,
+            tenants: $this->tenantRepositoryWithRecords(7, 888),
+        );
+
+        $response = $this->actingAs($user, 'auth-api')
+            ->postJson('/api/auth/token', [
+                'grant_type' => 'client_credentials',
+                'tenant_id' => 888,
+            ]);
+
+        $response->assertCreated()
+            ->assertJson(['data' => ['access_token' => 'issued-token']]);
+    }
+
     private function bindProtectedAuthServices(
         ?IssueTokenServiceInterface $issueToken = null,
         ?ListSessionsServiceInterface $listSessions = null,
         ?AuthorizeClientServiceInterface $authorizeClient = null,
         ?UserTenantRepositoryInterface $userTenants = null,
+        ?TenantRepositoryInterface $tenants = null,
+        ?TenantDomainRepositoryInterface $tenantDomains = null,
     ): void {
         $this->app->instance(LoginServiceInterface::class, $this->createMock(LoginServiceInterface::class));
         $this->app->instance(LogoutServiceInterface::class, $this->createMock(LogoutServiceInterface::class));
@@ -195,5 +246,40 @@ final class AuthCurrentUserIntegrationTest extends TestCase
             UserTenantRepositoryInterface::class,
             $userTenants ?? $this->createMock(UserTenantRepositoryInterface::class),
         );
+        $this->app->instance(
+            TenantRepositoryInterface::class,
+            $tenants ?? $this->tenantRepositoryWithRecords(7),
+        );
+        $this->app->instance(
+            TenantDomainRepositoryInterface::class,
+            $tenantDomains ?? $this->createMock(TenantDomainRepositoryInterface::class),
+        );
+    }
+
+    private function tenantRepositoryWithRecords(int ...$tenantIds): TenantRepositoryInterface
+    {
+        $repository = $this->createMock(TenantRepositoryInterface::class);
+
+        $records = [];
+        foreach ($tenantIds as $tenantId) {
+            $records[$tenantId] = $this->tenantRecord($tenantId);
+        }
+
+        $repository->method('findById')
+            ->willReturnCallback(static fn (int|string $id): ?DataRecord => $records[(int) $id] ?? null);
+
+        return $repository;
+    }
+
+    private function tenantRecord(int $tenantId): DataRecord
+    {
+        return new DataRecord([
+            'id' => $tenantId,
+            'code' => 'TENANT-' . $tenantId,
+            'uuid' => sprintf('00000000-0000-0000-0000-%012d', $tenantId),
+            'isolation_key' => 'iso-' . $tenantId,
+            'status' => 'active',
+            'is_active' => true,
+        ]);
     }
 }

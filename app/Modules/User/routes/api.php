@@ -13,8 +13,12 @@ use Modules\User\Presentation\Http\Controllers\UserPermissionController;
 use Modules\User\Presentation\Http\Controllers\UserRoleController;
 use Modules\User\Presentation\Http\Controllers\UserTenantController;
 
+$protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
+$currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');
+$currentTenantMiddleware = (string) config('core.current_tenant.middleware_alias', 'current.tenant');
+
 Route::prefix('api/user')
-    ->middleware('api')
+    ->middleware(['api', 'auth:' . $protectedGuard, $currentUserMiddleware, $currentTenantMiddleware])
     ->name('user.')
     ->group(function (): void {
         Route::apiResource('users', UserController::class);

@@ -1,0 +1,15 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Core\Application\Contracts;
+
+use Illuminate\Http\Request;
+use Modules\Core\Application\DTO\CurrentTenantContext;
+
+interface CurrentTenantContextResolverInterface
+{
+    public function resolve(Request $request): ?CurrentTenantContext;
+
+    public function hasAccess(Request $request, CurrentTenantContext $context): bool;
+}

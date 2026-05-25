@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Modules\Tenant\Application\Events\TenantCreated;
 use Modules\Tenant\Application\Events\TenantStatusChanged;
+use Modules\Core\Application\Contracts\CurrentTenantContextResolverInterface;
 use Modules\Tenant\Application\Contracts\TenantRecordMapperInterface;
 use Modules\Tenant\Application\Contracts\UseCases\Documents\TenantDocumentServiceInterface;
 use Modules\Tenant\Application\Contracts\UseCases\Plans\CreateTenantPlanServiceInterface;
@@ -64,6 +65,7 @@ use Modules\Tenant\Infrastructure\Persistence\Eloquent\Repositories\EloquentTena
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Repositories\EloquentTenantRepository;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Repositories\EloquentTenantSettingGroupRepository;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Repositories\EloquentTenantSettingRepository;
+use Modules\Tenant\Infrastructure\Services\CurrentTenantContextResolver;
 use Modules\Tenant\Presentation\Policies\TenantPolicy;
 use Modules\Tenant\Presentation\Console\Commands\TenantActivateCommand;
 use Modules\Tenant\Presentation\Console\Commands\TenantCreateCommand;
@@ -76,6 +78,7 @@ final class TenantServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__ . '/../Config/tenant.php', 'tenant');
 
+        $this->app->bind(CurrentTenantContextResolverInterface::class, CurrentTenantContextResolver::class);
         $this->app->singleton(TenantDomainServiceInterface::class, TenantDomainService::class);
         $this->app->singleton(TenantRecordMapperInterface::class, TenantRecordMapper::class);
 

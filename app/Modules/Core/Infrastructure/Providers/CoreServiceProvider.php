@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Application\Configuration\CoreConfigKey;
 use Modules\Core\Application\Contracts\ClockInterface;
+use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Application\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Application\Contracts\PasswordHasherInterface;
@@ -16,6 +17,7 @@ use Modules\Core\Application\Contracts\UuidGeneratorInterface;
 use Modules\Core\Infrastructure\Services\FileStorageService;
 use Modules\Core\Infrastructure\Services\PasswordHasher;
 use Modules\Core\Infrastructure\Services\SlugGenerator;
+use Modules\Core\Infrastructure\Support\RequestCurrentTenantContextAccessor;
 use Modules\Core\Infrastructure\Support\LaravelUuidGenerator;
 use Modules\Core\Infrastructure\Support\RequestCurrentUserContextAccessor;
 use Modules\Core\Infrastructure\Support\SystemClock;
@@ -29,6 +31,7 @@ final class CoreServiceProvider extends ServiceProvider
         $this->app->singleton(ClockInterface::class, SystemClock::class);
         $this->app->singleton(UuidGeneratorInterface::class, LaravelUuidGenerator::class);
         $this->app->bind(CurrentUserContextAccessorInterface::class, RequestCurrentUserContextAccessor::class);
+        $this->app->bind(CurrentTenantContextAccessorInterface::class, RequestCurrentTenantContextAccessor::class);
         $this->app->bind(FileStorageServiceInterface::class, FileStorageService::class);
         $this->app->bind(PasswordHasherInterface::class, PasswordHasher::class);
         $this->app->bind(SlugGeneratorInterface::class, SlugGenerator::class);
@@ -92,6 +95,56 @@ final class CoreServiceProvider extends ServiceProvider
                     'auth_access_token',
                 ),
             );
+
+        $this->app->when(RequestCurrentTenantContextAccessor::class)
+            ->needs('$requestAttribute')
+            ->give(static fn (): string => (string) Config::get('core.current_tenant.request_attribute', 'current_tenant'));
+
+        $this->app->when(RequestCurrentTenantContextAccessor::class)
+            ->needs('$idAttribute')
+            ->give(static fn (): string => (string) Config::get('core.current_tenant.id_attribute', 'current_tenant_id'));
+
+        $this->app->when(RequestCurrentTenantContextAccessor::class)
+            ->needs('$codeAttribute')
+            ->give(static fn (): string => (string) Config::get('core.current_tenant.code_attribute', 'current_tenant_code'));
+
+        $this->app->when(RequestCurrentTenantContextAccessor::class)
+            ->needs('$uuidAttribute')
+            ->give(static fn (): string => (string) Config::get('core.current_tenant.uuid_attribute', 'current_tenant_uuid'));
+
+        $this->app->when(RequestCurrentTenantContextAccessor::class)
+            ->needs('$isolationKeyAttribute')
+            ->give(
+                static fn (): string => (string) Config::get(
+                    'core.current_tenant.isolation_key_attribute',
+                    'current_tenant_isolation_key',
+                ),
+            );
+
+        $this->app->when(RequestCurrentTenantContextAccessor::class)
+            ->needs('$domainAttribute')
+            ->give(static fn (): string => (string) Config::get('core.current_tenant.domain_attribute', 'current_tenant_domain'));
+
+        $this->app->when(RequestCurrentTenantContextAccessor::class)
+            ->needs('$statusAttribute')
+            ->give(static fn (): string => (string) Config::get('core.current_tenant.status_attribute', 'current_tenant_status'));
+
+        $this->app->when(RequestCurrentTenantContextAccessor::class)
+            ->needs('$activeAttribute')
+            ->give(static fn (): string => (string) Config::get('core.current_tenant.active_attribute', 'current_tenant_is_active'));
+
+        $this->app->when(RequestCurrentTenantContextAccessor::class)
+            ->needs('$applicationAttribute')
+            ->give(
+                static fn (): string => (string) Config::get(
+                    'core.current_tenant.application_attribute',
+                    'current_application_id',
+                ),
+            );
+
+        $this->app->when(RequestCurrentTenantContextAccessor::class)
+            ->needs('$sourceAttribute')
+            ->give(static fn (): string => (string) Config::get('core.current_tenant.source_attribute', 'current_tenant_source'));
     }
 
     public function boot(): void

@@ -7,11 +7,12 @@ use Modules\Auth\Presentation\Http\Controllers\AuthController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');
+$currentTenantMiddleware = (string) config('core.current_tenant.middleware_alias', 'current.tenant');
 
 Route::prefix('api/auth')
     ->middleware('api')
     ->name('auth.')
-    ->group(function () use ($protectedGuard, $currentUserMiddleware): void {
+    ->group(function () use ($protectedGuard, $currentUserMiddleware, $currentTenantMiddleware): void {
         Route::post('login', [AuthController::class, 'login'])->name('login');
         Route::post('register', [AuthController::class, 'register'])->name('register');
         Route::post('token/refresh', [AuthController::class, 'refreshToken'])->name('token.refresh');
@@ -24,7 +25,7 @@ Route::prefix('api/auth')
         )->name('verification.request');
         Route::post('verification/verify', [AuthController::class, 'verifyChallenge'])->name('verification.verify');
 
-        Route::middleware(['auth:' . $protectedGuard, $currentUserMiddleware])->group(function (): void {
+        Route::middleware(['auth:' . $protectedGuard, $currentUserMiddleware, $currentTenantMiddleware])->group(function (): void {
             Route::post('token', [AuthController::class, 'issueToken'])->name('token.issue');
             Route::post('logout', [AuthController::class, 'logout'])->name('logout');
             Route::get('sessions', [AuthController::class, 'listSessions'])->name('sessions.list');
