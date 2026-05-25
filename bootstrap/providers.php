@@ -13,4 +13,5 @@ return [
     Modules\SystemUser\Infrastructure\Providers\SystemUserServiceProvider::class,
     Modules\OrganizationUnit\Infrastructure\Providers\OrganizationUnitServiceProvider::class,
     Modules\Finance\Infrastructure\Providers\FinanceServiceProvider::class,
+    Modules\Vehicle\Infrastructure\Providers\VehicleServiceProvider::class,
 ];
