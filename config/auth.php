@@ -42,6 +42,10 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+        'auth-api' => [
+            'driver' => env('MODULE_AUTH_TOKEN_GUARD_DRIVER', 'module-auth-token'),
+            'provider' => 'users',
+        ],
     ],
 
     /*

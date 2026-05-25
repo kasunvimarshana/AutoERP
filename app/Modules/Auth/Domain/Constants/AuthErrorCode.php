@@ -1,0 +1,25 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Auth\Domain\Constants;
+
+final class AuthErrorCode
+{
+    public const INVALID_CREDENTIALS = 'AUTH_INVALID_CREDENTIALS';
+    public const PROVIDER_NOT_FOUND = 'AUTH_PROVIDER_NOT_FOUND';
+    public const PROVIDER_DISABLED = 'AUTH_PROVIDER_DISABLED';
+    public const CLIENT_NOT_FOUND = 'AUTH_CLIENT_NOT_FOUND';
+    public const CLIENT_NOT_ALLOWED = 'AUTH_CLIENT_NOT_ALLOWED';
+    public const INVALID_CLIENT_SECRET = 'AUTH_INVALID_CLIENT_SECRET';
+    public const TOKEN_INVALID = 'AUTH_TOKEN_INVALID';
+    public const TOKEN_EXPIRED = 'AUTH_TOKEN_EXPIRED';
+    public const TOKEN_REVOKED = 'AUTH_TOKEN_REVOKED';
+    public const SESSION_NOT_FOUND = 'AUTH_SESSION_NOT_FOUND';
+    public const VERIFICATION_FAILED = 'AUTH_VERIFICATION_FAILED';
+    public const AUTHORIZATION_CODE_INVALID = 'AUTH_AUTHORIZATION_CODE_INVALID';
+
+    private function __construct()
+    {
+    }
+}
