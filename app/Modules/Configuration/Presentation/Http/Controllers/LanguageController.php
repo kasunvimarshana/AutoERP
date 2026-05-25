@@ -46,10 +46,10 @@ final class LanguageController extends Controller
         );
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->error()?->message], 422);
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
         }
 
-        $page = $result->value();
+        $page = $result->valueOrFail();
         if (! $page instanceof PagedResult) {
             return response()->json(['message' => 'Unexpected list response.'], 500);
         }
@@ -71,10 +71,10 @@ final class LanguageController extends Controller
         $result = $this->getLanguage->execute($language);
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->error()?->message], 404);
+            return response()->json(['message' => $result->errorOrFail()->message], 404);
         }
 
-        return new LanguageResource($result->value());
+        return new LanguageResource($result->valueOrFail());
     }
 
     public function store(UpsertLanguageRequest $request): JsonResponse|LanguageResource
@@ -82,10 +82,10 @@ final class LanguageController extends Controller
         $result = $this->createLanguage->execute($request->validated());
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->error()?->message], 422);
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
         }
 
-        return (new LanguageResource($result->value()))->response()->setStatusCode(201);
+        return (new LanguageResource($result->valueOrFail()))->response()->setStatusCode(201);
     }
 
     public function update(UpsertLanguageRequest $request, int|string $language): JsonResponse|LanguageResource
@@ -93,12 +93,13 @@ final class LanguageController extends Controller
         $result = $this->updateLanguage->execute($language, $request->validated());
 
         if ($result->isFailure()) {
-            $status = $result->error()?->code === 'CONFIGURATION_NOT_FOUND' ? 404 : 422;
+            $error = $result->errorOrFail();
+            $status = $error->code === 'CONFIGURATION_NOT_FOUND' ? 404 : 422;
 
-            return response()->json(['message' => $result->error()?->message], $status);
+            return response()->json(['message' => $error->message], $status);
         }
 
-        return new LanguageResource($result->value());
+        return new LanguageResource($result->valueOrFail());
     }
 
     public function destroy(int|string $language): JsonResponse
@@ -106,7 +107,7 @@ final class LanguageController extends Controller
         $result = $this->deleteLanguage->execute($language);
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->error()?->message], 404);
+            return response()->json(['message' => $result->errorOrFail()->message], 404);
         }
 
         return response()->json(null, 204);

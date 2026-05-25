@@ -33,12 +33,12 @@ final class ConfigSetCommand extends Command
         );
 
         if ($result->isFailure()) {
-            $this->error($result->error()?->message ?? 'Unable to set configuration.');
+            $this->error($result->errorOrFail()->message);
 
             return self::FAILURE;
         }
 
-        $data = $result->value();
+        $data = $result->valueOrFail();
         if (! $data instanceof ConfigurationValueData) {
             $this->error('Invalid set response.');
 

@@ -46,10 +46,10 @@ final class TimezoneController extends Controller
         );
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->error()?->message], 422);
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
         }
 
-        $page = $result->value();
+        $page = $result->valueOrFail();
         if (! $page instanceof PagedResult) {
             return response()->json(['message' => 'Unexpected list response.'], 500);
         }
@@ -71,10 +71,10 @@ final class TimezoneController extends Controller
         $result = $this->getTimezone->execute($timezone);
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->error()?->message], 404);
+            return response()->json(['message' => $result->errorOrFail()->message], 404);
         }
 
-        return new TimezoneResource($result->value());
+        return new TimezoneResource($result->valueOrFail());
     }
 
     public function store(UpsertTimezoneRequest $request): JsonResponse|TimezoneResource
@@ -82,10 +82,10 @@ final class TimezoneController extends Controller
         $result = $this->createTimezone->execute($request->validated());
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->error()?->message], 422);
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
         }
 
-        return (new TimezoneResource($result->value()))->response()->setStatusCode(201);
+        return (new TimezoneResource($result->valueOrFail()))->response()->setStatusCode(201);
     }
 
     public function update(UpsertTimezoneRequest $request, int|string $timezone): JsonResponse|TimezoneResource
@@ -93,12 +93,13 @@ final class TimezoneController extends Controller
         $result = $this->updateTimezone->execute($timezone, $request->validated());
 
         if ($result->isFailure()) {
-            $status = $result->error()?->code === 'CONFIGURATION_NOT_FOUND' ? 404 : 422;
+            $error = $result->errorOrFail();
+            $status = $error->code === 'CONFIGURATION_NOT_FOUND' ? 404 : 422;
 
-            return response()->json(['message' => $result->error()?->message], $status);
+            return response()->json(['message' => $error->message], $status);
         }
 
-        return new TimezoneResource($result->value());
+        return new TimezoneResource($result->valueOrFail());
     }
 
     public function destroy(int|string $timezone): JsonResponse
@@ -106,7 +107,7 @@ final class TimezoneController extends Controller
         $result = $this->deleteTimezone->execute($timezone);
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->error()?->message], 404);
+            return response()->json(['message' => $result->errorOrFail()->message], 404);
         }
 
         return response()->json(null, 204);

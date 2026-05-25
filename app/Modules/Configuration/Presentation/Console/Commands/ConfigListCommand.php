@@ -36,12 +36,12 @@ final class ConfigListCommand extends Command
         ));
 
         if ($result->isFailure()) {
-            $this->error($result->error()?->message ?? 'Unable to list configuration.');
+            $this->error($result->errorOrFail()->message);
 
             return self::FAILURE;
         }
 
-        $page = $result->value();
+        $page = $result->valueOrFail();
         if (! $page instanceof PagedResult) {
             $this->error('Invalid list response.');
 

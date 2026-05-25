@@ -24,12 +24,12 @@ final class ConfigGetCommand extends Command
         $result = $this->service->execute((string) $this->argument('key'));
 
         if ($result->isFailure()) {
-            $this->error($result->error()?->message ?? 'Configuration key not found.');
+            $this->error($result->errorOrFail()->message);
 
             return self::FAILURE;
         }
 
-        $data = $result->value();
+        $data = $result->valueOrFail();
         if (! $data instanceof ConfigurationValueData) {
             $this->error('Invalid get response.');
 

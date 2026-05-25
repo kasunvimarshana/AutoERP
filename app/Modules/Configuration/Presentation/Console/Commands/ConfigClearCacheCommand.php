@@ -23,7 +23,7 @@ final class ConfigClearCacheCommand extends Command
         $result = $this->service->execute();
 
         if ($result->isFailure()) {
-            $this->error($result->error()?->message ?? 'Unable to clear cache.');
+            $this->error($result->errorOrFail()->message);
 
             return self::FAILURE;
         }

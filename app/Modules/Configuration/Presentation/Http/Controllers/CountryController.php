@@ -46,10 +46,10 @@ final class CountryController extends Controller
         );
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->error()?->message], 422);
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
         }
 
-        $page = $result->value();
+        $page = $result->valueOrFail();
         if (! $page instanceof PagedResult) {
             return response()->json(['message' => 'Unexpected list response.'], 500);
         }
@@ -71,10 +71,10 @@ final class CountryController extends Controller
         $result = $this->getCountry->execute($country);
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->error()?->message], 404);
+            return response()->json(['message' => $result->errorOrFail()->message], 404);
         }
 
-        return new CountryResource($result->value());
+        return new CountryResource($result->valueOrFail());
     }
 
     public function store(UpsertCountryRequest $request): JsonResponse|CountryResource
@@ -82,10 +82,10 @@ final class CountryController extends Controller
         $result = $this->createCountry->execute($request->validated());
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->error()?->message], 422);
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
         }
 
-        return (new CountryResource($result->value()))->response()->setStatusCode(201);
+        return (new CountryResource($result->valueOrFail()))->response()->setStatusCode(201);
     }
 
     public function update(UpsertCountryRequest $request, int|string $country): JsonResponse|CountryResource
@@ -93,12 +93,13 @@ final class CountryController extends Controller
         $result = $this->updateCountry->execute($country, $request->validated());
 
         if ($result->isFailure()) {
-            $status = $result->error()?->code === 'CONFIGURATION_NOT_FOUND' ? 404 : 422;
+            $error = $result->errorOrFail();
+            $status = $error->code === 'CONFIGURATION_NOT_FOUND' ? 404 : 422;
 
-            return response()->json(['message' => $result->error()?->message], $status);
+            return response()->json(['message' => $error->message], $status);
         }
 
-        return new CountryResource($result->value());
+        return new CountryResource($result->valueOrFail());
     }
 
     public function destroy(int|string $country): JsonResponse
@@ -106,7 +107,7 @@ final class CountryController extends Controller
         $result = $this->deleteCountry->execute($country);
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->error()?->message], 404);
+            return response()->json(['message' => $result->errorOrFail()->message], 404);
         }
 
         return response()->json(null, 204);

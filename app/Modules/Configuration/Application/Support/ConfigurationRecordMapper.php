@@ -6,7 +6,6 @@ namespace Modules\Configuration\Application\Support;
 
 use Modules\Configuration\Application\Contracts\ConfigurationRecordMapperInterface;
 use Modules\Configuration\Application\DTOs\ConfigurationValueData;
-use Modules\Configuration\Domain\Constants\ConfigurationErrorCode;
 use Modules\Configuration\Domain\Constants\ConfigurationValueType;
 use Modules\Configuration\Domain\Contracts\ConfigurationDomainServiceInterface;
 use Modules\Configuration\Domain\Entities\ConfigurationEntry;
@@ -33,33 +32,24 @@ final class ConfigurationRecordMapper implements ConfigurationRecordMapperInterf
 
     public function extractId(DataRecord $record): int|string
     {
-        $id = $record->values['id'] ?? null;
-
-        if (! is_int($id) && ! is_string($id)) {
-            throw new \RuntimeException(ConfigurationErrorCode::INVALID_RECORD . ': Missing identifier.');
-        }
-
-        return $id;
+        return $record->id();
     }
 
     private function toEntry(DataRecord $record): ConfigurationEntry
     {
-        $values = $record->values;
+        $id = $record->id();
 
-        $id = $values['id'] ?? null;
-        if (! is_int($id) && ! is_string($id)) {
-            throw new \RuntimeException(ConfigurationErrorCode::INVALID_RECORD . ': Missing identifier.');
-        }
+        $key = $this->domain->normalizeKey((string) $record->require('key'));
+        $source = $this->domain->normalizeSource(
+            ($record->get('source') !== null) ? (string) $record->get('source') : null,
+        );
+        $description = ($record->get('description') !== null) ? (string) $record->get('description') : null;
+        $updatedAt = ($record->get('updated_at') !== null) ? (string) $record->get('updated_at') : null;
 
-        $key = $this->domain->normalizeKey((string) ($values['key'] ?? ''));
-        $source = $this->domain->normalizeSource(isset($values['source']) ? (string) $values['source'] : null);
-        $description = isset($values['description']) ? (string) $values['description'] : null;
-        $updatedAt = isset($values['updated_at']) ? (string) $values['updated_at'] : null;
-
-        $valueType = isset($values['value_type'])
-            ? (string) $values['value_type']
+        $valueType = ($record->get('value_type') !== null)
+            ? (string) $record->get('value_type')
             : ConfigurationValueType::NULL;
-        $storedValue = isset($values['value']) ? (string) $values['value'] : '';
+        $storedValue = ($record->get('value') !== null) ? (string) $record->get('value') : '';
 
         $value = $this->domain->deserializeValue($storedValue, $valueType);
 

@@ -36,10 +36,10 @@ final class ConfigurationController extends Controller
         $result = $this->listConfigurations->execute(ConfigurationQueryData::fromArray($request->validated()));
 
         if ($result->isFailure()) {
-            return $this->errorResponse($result->error()?->message ?? 'Unable to list configuration.', 422);
+            return $this->errorResponse($result->errorOrFail()->message, 422);
         }
 
-        $page = $result->value();
+        $page = $result->valueOrFail();
         if (! $page instanceof PagedResult) {
             return $this->errorResponse('Unexpected list response.', 500);
         }
@@ -61,10 +61,10 @@ final class ConfigurationController extends Controller
         $result = $this->getConfiguration->execute($key);
 
         if ($result->isFailure()) {
-            return $this->errorResponse($result->error()?->message ?? 'Configuration not found.', 404);
+            return $this->errorResponse($result->errorOrFail()->message, 404);
         }
 
-        return new ConfigurationResource($result->value());
+        return new ConfigurationResource($result->valueOrFail());
     }
 
     public function store(UpsertConfigurationRequest $request): JsonResponse|ConfigurationResource
@@ -74,10 +74,10 @@ final class ConfigurationController extends Controller
 
         $result = $this->setConfiguration->execute($data);
         if ($result->isFailure()) {
-            return $this->errorResponse($result->error()?->message ?? 'Unable to set configuration.', 422);
+            return $this->errorResponse($result->errorOrFail()->message, 422);
         }
 
-        return (new ConfigurationResource($result->value()))->response()->setStatusCode(201);
+        return (new ConfigurationResource($result->valueOrFail()))->response()->setStatusCode(201);
     }
 
     public function update(UpsertConfigurationRequest $request, string $key): JsonResponse|ConfigurationResource
@@ -88,10 +88,10 @@ final class ConfigurationController extends Controller
         $result = $this->updateConfiguration->execute($key, ConfigurationMutationData::fromArray($payload));
 
         if ($result->isFailure()) {
-            return $this->errorResponse($result->error()?->message ?? 'Unable to update configuration.', 422);
+            return $this->errorResponse($result->errorOrFail()->message, 422);
         }
 
-        return new ConfigurationResource($result->value());
+        return new ConfigurationResource($result->valueOrFail());
     }
 
     public function clearCache(): JsonResponse
@@ -99,7 +99,7 @@ final class ConfigurationController extends Controller
         $result = $this->clearConfigurationCache->execute();
 
         if ($result->isFailure()) {
-            return $this->errorResponse($result->error()?->message ?? 'Unable to clear cache.', 422);
+            return $this->errorResponse($result->errorOrFail()->message, 422);
         }
 
         return response()->json(['message' => 'Configuration cache cleared.']);
@@ -110,7 +110,7 @@ final class ConfigurationController extends Controller
         $result = $this->deleteConfiguration->execute($key);
 
         if ($result->isFailure()) {
-            return $this->errorResponse($result->error()?->message ?? 'Unable to delete configuration.', 404);
+            return $this->errorResponse($result->errorOrFail()->message, 404);
         }
 
         return response()->json(null, 204);
