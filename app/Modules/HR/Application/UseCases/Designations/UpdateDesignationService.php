@@ -1,0 +1,32 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\HR\Application\UseCases\Designations;
+
+use Modules\Core\Application\Results\Error;
+use Modules\Core\Application\Results\Result;
+use Modules\HR\Application\Contracts\UseCases\Designations\UpdateDesignationServiceInterface;
+use Modules\HR\Application\Repositories\DesignationRepositoryInterface;
+use Modules\HR\Domain\Constants\HrErrorCode;
+use Throwable;
+
+final class UpdateDesignationService implements UpdateDesignationServiceInterface
+{
+    public function __construct(private readonly DesignationRepositoryInterface $repository)
+    {
+    }
+
+    public function execute(int|string $id, array $payload): Result
+    {
+        try {
+            if ($this->repository->findById($id) === null) {
+                return Result::failure(new Error(HrErrorCode::NOT_FOUND, 'Designation not found.'));
+            }
+
+            return Result::success($this->repository->update($id, $payload));
+        } catch (Throwable $exception) {
+            return Result::failure(new Error(HrErrorCode::INVALID_VALUE, $exception->getMessage()));
+        }
+    }
+}
