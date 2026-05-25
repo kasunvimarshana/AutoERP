@@ -10,6 +10,7 @@
 ## Project Governance
 
 - Database schema evolution policy: [docs/DATABASE-SCHEMA-EVOLUTION-RULE.md](docs/DATABASE-SCHEMA-EVOLUTION-RULE.md)
+- Global architecture rules: [docs/GLOBAL-ARCHITECTURE-RULES.md](docs/GLOBAL-ARCHITECTURE-RULES.md)
 
 ## About Laravel
 
