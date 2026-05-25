@@ -9,5 +9,6 @@ return [
     Modules\Auth\Infrastructure\Providers\AuthServiceProvider::class,
     Modules\User\Infrastructure\Providers\UserServiceProvider::class,
     Modules\Tenant\Infrastructure\Providers\TenantServiceProvider::class,
+    Modules\Sequence\Infrastructure\Providers\SequenceServiceProvider::class,
     Modules\OrganizationUnit\Infrastructure\Providers\OrganizationUnitServiceProvider::class,
 ];

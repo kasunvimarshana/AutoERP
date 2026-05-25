@@ -1,0 +1,16 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Sequence\Domain\Constants;
+
+final class SequenceErrorCode
+{
+    public const NOT_FOUND = 'SEQUENCE_NOT_FOUND';
+    public const INVALID_VALUE = 'SEQUENCE_INVALID_VALUE';
+    public const CONFLICT = 'SEQUENCE_CONFLICT';
+
+    private function __construct()
+    {
+    }
+}
