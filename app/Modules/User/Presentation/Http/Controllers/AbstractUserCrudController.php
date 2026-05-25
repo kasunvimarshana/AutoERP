@@ -1,0 +1,88 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\User\Presentation\Http\Controllers;
+
+use Illuminate\Http\JsonResponse;
+use Illuminate\Routing\Controller;
+use Modules\Core\Application\DTO\PagedResult;
+use Modules\Core\Application\Results\Result;
+use Modules\User\Presentation\Http\Resources\UserRecordResource;
+
+abstract class AbstractUserCrudController extends Controller
+{
+    protected function responseForList(Result $result): JsonResponse
+    {
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
+        }
+
+        $value = $result->valueOrFail();
+
+        if ($value instanceof PagedResult) {
+            return response()->json([
+                'data' => UserRecordResource::collection($value->items)->resolve(),
+                'meta' => [
+                    'total' => $value->total,
+                    'page' => $value->page,
+                    'per_page' => $value->perPage,
+                    'page_count' => $value->pageCount(),
+                    'has_more' => $value->hasMore(),
+                ],
+            ]);
+        }
+
+        $items = is_array($value) ? $value : [];
+
+        return response()->json([
+            'data' => UserRecordResource::collection($items)->resolve(),
+            'meta' => null,
+        ]);
+    }
+
+    protected function responseForShow(Result $result, string $notFoundCode = 'USER_NOT_FOUND'): JsonResponse|UserRecordResource
+    {
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === $notFoundCode ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return new UserRecordResource($result->valueOrFail());
+    }
+
+    protected function responseForStore(Result $result): JsonResponse|UserRecordResource
+    {
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
+        }
+
+        return (new UserRecordResource($result->valueOrFail()))->response()->setStatusCode(201);
+    }
+
+    protected function responseForUpdate(Result $result, string $notFoundCode = 'USER_NOT_FOUND'): JsonResponse|UserRecordResource
+    {
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === $notFoundCode ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return new UserRecordResource($result->valueOrFail());
+    }
+
+    protected function responseForDelete(Result $result, string $notFoundCode = 'USER_NOT_FOUND'): JsonResponse
+    {
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === $notFoundCode ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(status: 204);
+    }
+}
