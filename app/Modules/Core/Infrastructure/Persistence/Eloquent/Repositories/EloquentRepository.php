@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Support\Repositories;
+namespace Modules\Core\Infrastructure\Persistence\Eloquent\Repositories;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -10,10 +10,13 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Application\Repositories\Contracts\BaseRepositoryInterface;
 
 abstract class EloquentRepository implements BaseRepositoryInterface
 {
-    public function __construct(protected Model $model) {}
+    public function __construct(protected Model $model)
+    {
+    }
 
     public function query(array $with = []): Builder
     {

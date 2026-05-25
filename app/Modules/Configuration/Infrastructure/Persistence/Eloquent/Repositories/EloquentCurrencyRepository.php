@@ -1,10 +1,10 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\Configuration\Infrastructure\Persistence\Eloquent\Repositories;
 
-use App\Support\Repositories\EloquentRepository;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Configuration\Application\Repositories\CurrencyRepositoryInterface;
@@ -37,3 +37,4 @@ class EloquentCurrencyRepository extends EloquentRepository implements CurrencyR
         return $this->query($with)->where('is_active', false)->get();
     }
 }
+

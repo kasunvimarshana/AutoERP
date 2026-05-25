@@ -1,11 +1,11 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\Inventory\Infrastructure\Persistence\Eloquent\Models;
 
-use App\Support\Eloquent\Concerns\HasOrganizationUnitScope;
-use App\Support\Eloquent\Concerns\HasTenantScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Item\Infrastructure\Persistence\Eloquent\Models\ItemModel;
@@ -96,3 +96,4 @@ class StockAdjustmentLineModel extends Model
         return $this->belongsTo(StockMovementModel::class, 'adjustment_movement_id');
     }
 }
+

@@ -1,10 +1,10 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\Configuration\Infrastructure\Persistence\Eloquent\Repositories;
 
-use App\Support\Repositories\EloquentRepository;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Configuration\Application\Repositories\TimezoneRepositoryInterface;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\TimezoneModel;
@@ -21,3 +21,4 @@ class EloquentTimezoneRepository extends EloquentRepository implements TimezoneR
         return $this->query($with)->where('name', $name)->first();
     }
 }
+

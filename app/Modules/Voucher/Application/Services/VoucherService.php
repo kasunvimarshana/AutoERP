@@ -1,10 +1,10 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\Voucher\Application\Services;
 
-use App\Support\Repositories\BaseRepositoryInterface;
+use Modules\Core\Application\Repositories\Contracts\BaseRepositoryInterface;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
@@ -257,3 +257,4 @@ class VoucherService
         return Str::upper('RV-'.$template->getKey().'-'.now()->format('YmdHis'));
     }
 }
+

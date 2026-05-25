@@ -1,13 +1,13 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models;
 
-use App\Support\Eloquent\Concerns\HasActiveScope;
-use App\Support\Eloquent\Concerns\HasOrganizationUnitScope;
-use App\Support\Eloquent\Concerns\HasReferenceScope;
-use App\Support\Eloquent\Concerns\HasTenantScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasActiveScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasReferenceScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -220,3 +220,4 @@ class WarehouseLocationModel extends Model
         return $this->hasMany(WarehouseLocationModel::class, 'parent_id');
     }
 }
+

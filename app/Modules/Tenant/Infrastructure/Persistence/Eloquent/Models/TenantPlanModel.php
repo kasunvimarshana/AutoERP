@@ -1,11 +1,11 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Models;
 
-use App\Support\Eloquent\Concerns\HasActiveScope;
-use App\Support\Eloquent\Concerns\HasReferenceScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasActiveScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasReferenceScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -45,3 +45,4 @@ class TenantPlanModel extends Model
         return $this->hasMany(TenantModel::class, 'tenant_plan_id');
     }
 }
+

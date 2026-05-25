@@ -1,10 +1,10 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\Pricing\Infrastructure\Persistence\Eloquent\Repositories;
 
-use App\Support\Repositories\EloquentRepository;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -103,3 +103,4 @@ class EloquentPriceListItemRepository extends EloquentRepository implements Pric
         return $query;
     }
 }
+

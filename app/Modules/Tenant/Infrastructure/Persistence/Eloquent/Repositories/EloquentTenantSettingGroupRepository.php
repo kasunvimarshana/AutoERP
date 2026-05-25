@@ -1,10 +1,10 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Repositories;
 
-use App\Support\Repositories\EloquentRepository;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -33,3 +33,4 @@ class EloquentTenantSettingGroupRepository extends EloquentRepository implements
         return $this->query($with)->where('tenant_id', $tenantId)->whereKey($id)->first();
     }
 }
+

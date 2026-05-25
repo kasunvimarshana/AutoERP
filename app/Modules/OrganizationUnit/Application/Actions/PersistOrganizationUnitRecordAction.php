@@ -1,10 +1,10 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Application\Actions;
 
-use App\Support\Repositories\BaseRepositoryInterface;
+use Modules\Core\Application\Repositories\Contracts\BaseRepositoryInterface;
 use Illuminate\Database\Eloquent\Model;
 
 class PersistOrganizationUnitRecordAction
@@ -25,3 +25,4 @@ class PersistOrganizationUnitRecordAction
         return $repository->transaction(fn (): Model => $repository->update($record, $attributes));
     }
 }
+

@@ -1,10 +1,10 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\SystemUser\Application\Actions;
 
-use App\Support\Repositories\BaseRepositoryInterface;
+use Modules\Core\Application\Repositories\Contracts\BaseRepositoryInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -31,3 +31,4 @@ class ListSystemUserRecordsAction
         return $repository->all();
     }
 }
+

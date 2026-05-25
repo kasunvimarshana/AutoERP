@@ -1,10 +1,10 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\Item\Infrastructure\Persistence\Eloquent\Repositories;
 
-use App\Support\Repositories\EloquentRepository;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -73,3 +73,4 @@ class EloquentItemRepository extends EloquentRepository implements ItemRepositor
         return $this->query($with)->where('status', $status)->paginate($perPage);
     }
 }
+

@@ -1,12 +1,12 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\UOM\Infrastructure\Persistence\Eloquent\Models;
 
-use App\Support\Eloquent\Concerns\HasActiveScope;
-use App\Support\Eloquent\Concerns\HasOrganizationUnitScope;
-use App\Support\Eloquent\Concerns\HasTenantScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasActiveScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -63,3 +63,4 @@ class UomConversionModel extends Model
         return $this->belongsTo(ItemModel::class, 'item_id');
     }
 }
+

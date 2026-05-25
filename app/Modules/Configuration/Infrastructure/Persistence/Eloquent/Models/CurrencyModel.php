@@ -1,11 +1,11 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\Configuration\Infrastructure\Persistence\Eloquent\Models;
 
-use App\Support\Eloquent\Concerns\HasActiveScope;
-use App\Support\Eloquent\Concerns\HasReferenceScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasActiveScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasReferenceScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -155,3 +155,4 @@ class CurrencyModel extends Model
         return $this->hasMany(VehicleServiceJobCardModel::class, 'currency_id');
     }
 }
+

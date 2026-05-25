@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Support\Eloquent\Concerns;
+namespace Modules\Core\Infrastructure\Persistence\Eloquent\Concerns;
 
 use Illuminate\Support\Str;
 

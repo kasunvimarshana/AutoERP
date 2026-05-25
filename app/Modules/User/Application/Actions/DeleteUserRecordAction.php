@@ -1,10 +1,10 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\User\Application\Actions;
 
-use App\Support\Repositories\BaseRepositoryInterface;
+use Modules\Core\Application\Repositories\Contracts\BaseRepositoryInterface;
 use Illuminate\Database\Eloquent\Model;
 
 class DeleteUserRecordAction
@@ -14,3 +14,4 @@ class DeleteUserRecordAction
         return $repository->transaction(fn (): bool => $repository->delete($record));
     }
 }
+

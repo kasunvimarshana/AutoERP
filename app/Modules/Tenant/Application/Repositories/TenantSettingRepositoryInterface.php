@@ -1,10 +1,10 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\Tenant\Application\Repositories;
 
-use App\Support\Repositories\BaseRepositoryInterface;
+use Modules\Core\Application\Repositories\Contracts\BaseRepositoryInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -17,3 +17,4 @@ interface TenantSettingRepositoryInterface extends BaseRepositoryInterface
 
     public function findForTenantById(int|string $tenantId, int|string $id, array $with = []): ?Model;
 }
+

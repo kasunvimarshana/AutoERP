@@ -1,10 +1,10 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\Configuration\Application\Actions;
 
-use App\Support\Repositories\BaseRepositoryInterface;
+use Modules\Core\Application\Repositories\Contracts\BaseRepositoryInterface;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Configuration\Domain\Exceptions\ConfigurationRecordNotFoundException;
 
@@ -21,3 +21,4 @@ class FindConfigurationRecordAction
         return $record;
     }
 }
+

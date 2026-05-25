@@ -1,10 +1,10 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\SystemUser\Application\Actions;
 
-use App\Support\Repositories\BaseRepositoryInterface;
+use Modules\Core\Application\Repositories\Contracts\BaseRepositoryInterface;
 use Illuminate\Database\Eloquent\Model;
 use Modules\SystemUser\Domain\Exceptions\SystemUserRecordNotFoundException;
 
@@ -21,3 +21,4 @@ class FindSystemUserRecordAction
         return $record;
     }
 }
+

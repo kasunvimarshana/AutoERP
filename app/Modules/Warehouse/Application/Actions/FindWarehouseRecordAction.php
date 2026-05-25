@@ -1,10 +1,10 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\Warehouse\Application\Actions;
 
-use App\Support\Repositories\BaseRepositoryInterface;
+use Modules\Core\Application\Repositories\Contracts\BaseRepositoryInterface;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Warehouse\Domain\Exceptions\WarehouseRecordNotFoundException;
 
@@ -21,3 +21,4 @@ class FindWarehouseRecordAction
         return $record;
     }
 }
+

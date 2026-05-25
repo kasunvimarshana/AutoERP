@@ -1,10 +1,10 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\HR\Application\Actions;
 
-use App\Support\Repositories\BaseRepositoryInterface;
+use Modules\Core\Application\Repositories\Contracts\BaseRepositoryInterface;
 use Illuminate\Database\Eloquent\Model;
 use Modules\HR\Domain\Exceptions\HRRecordNotFoundException;
 
@@ -27,3 +27,4 @@ class FindHRRecordAction
         return $record;
     }
 }
+

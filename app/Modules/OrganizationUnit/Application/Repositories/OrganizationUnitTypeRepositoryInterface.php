@@ -1,10 +1,10 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Application\Repositories;
 
-use App\Support\Repositories\BaseRepositoryInterface;
+use Modules\Core\Application\Repositories\Contracts\BaseRepositoryInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -23,3 +23,4 @@ interface OrganizationUnitTypeRepositoryInterface extends BaseRepositoryInterfac
 
     public function getInactive(array $with = []): Collection;
 }
+

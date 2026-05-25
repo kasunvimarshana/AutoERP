@@ -1,10 +1,10 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\VehicleRental\Infrastructure\Persistence\Eloquent\Repositories;
 
-use App\Support\Repositories\EloquentRepository;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -48,3 +48,4 @@ class EloquentVehicleRentalLessorAgreementDebitNoteRepository extends EloquentRe
         return $this->query($with)->where('organization_unit_id', $organizationUnitId)->paginate($perPage);
     }
 }
+

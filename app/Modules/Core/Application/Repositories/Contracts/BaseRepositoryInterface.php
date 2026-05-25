@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Support\Repositories;
+namespace Modules\Core\Application\Repositories\Contracts;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;

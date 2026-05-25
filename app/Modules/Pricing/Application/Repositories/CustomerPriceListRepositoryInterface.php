@@ -1,10 +1,10 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\Pricing\Application\Repositories;
 
-use App\Support\Repositories\BaseRepositoryInterface;
+use Modules\Core\Application\Repositories\Contracts\BaseRepositoryInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -23,3 +23,4 @@ interface CustomerPriceListRepositoryInterface extends BaseRepositoryInterface
 
     public function getForCustomer(int|string $tenantId, int|string $customerId, array $with = []): Collection;
 }
+

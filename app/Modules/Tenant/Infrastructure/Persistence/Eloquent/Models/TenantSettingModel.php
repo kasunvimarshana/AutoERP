@@ -1,10 +1,10 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Models;
 
-use App\Support\Eloquent\Concerns\HasTenantScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -36,3 +36,4 @@ class TenantSettingModel extends Model
         return $this->belongsTo(TenantSettingGroupModel::class, 'group_id');
     }
 }
+

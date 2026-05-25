@@ -1,10 +1,10 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Repositories;
 
-use App\Support\Repositories\EloquentRepository;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Tenant\Application\Repositories\TenantPlanRepositoryInterface;
@@ -32,3 +32,4 @@ class EloquentTenantPlanRepository extends EloquentRepository implements TenantP
         return $this->query($with)->where('is_active', false)->get();
     }
 }
+

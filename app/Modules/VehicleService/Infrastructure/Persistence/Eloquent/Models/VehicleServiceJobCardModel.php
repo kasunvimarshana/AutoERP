@@ -1,12 +1,12 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\VehicleService\Infrastructure\Persistence\Eloquent\Models;
 
-use App\Support\Eloquent\Concerns\HasOrganizationUnitScope;
-use App\Support\Eloquent\Concerns\HasStatusScope;
-use App\Support\Eloquent\Concerns\HasTenantScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasStatusScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -159,3 +159,4 @@ class VehicleServiceJobCardModel extends Model
         return $this->hasMany(VehicleServiceInspectionModel::class, 'job_card_id');
     }
 }
+

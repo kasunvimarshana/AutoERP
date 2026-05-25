@@ -1,10 +1,10 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\Configuration\Infrastructure\Persistence\Eloquent\Repositories;
 
-use App\Support\Repositories\EloquentRepository;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Configuration\Application\Repositories\CountryRepositoryInterface;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\CountryModel;
@@ -26,3 +26,4 @@ class EloquentCountryRepository extends EloquentRepository implements CountryRep
         return $this->query($with)->where('name', $name)->first();
     }
 }
+

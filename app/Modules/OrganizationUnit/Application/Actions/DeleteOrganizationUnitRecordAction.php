@@ -1,10 +1,10 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Application\Actions;
 
-use App\Support\Repositories\BaseRepositoryInterface;
+use Modules\Core\Application\Repositories\Contracts\BaseRepositoryInterface;
 use Illuminate\Database\Eloquent\Model;
 
 class DeleteOrganizationUnitRecordAction
@@ -14,3 +14,4 @@ class DeleteOrganizationUnitRecordAction
         return $repository->transaction(fn (): bool => $repository->delete($record));
     }
 }
+
