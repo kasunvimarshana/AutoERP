@@ -17,4 +17,5 @@ return [
     Modules\HR\Infrastructure\Providers\HrServiceProvider::class,
     Modules\Item\Infrastructure\Providers\ItemServiceProvider::class,
     Modules\Inventory\Infrastructure\Providers\InventoryServiceProvider::class,
+    Modules\UOM\Infrastructure\Providers\UomServiceProvider::class,
 ];
