@@ -24,4 +24,15 @@ final class AuthRoutesTest extends TestCase
         self::assertTrue(Route::has('auth.verification.verify'));
         self::assertTrue(Route::has('auth.client.authorize'));
     }
+
+    public function testProtectedRoutesUseCurrentUserMiddleware(): void
+    {
+        $route = Route::getRoutes()->getByName('auth.token.issue');
+
+        self::assertNotNull($route);
+
+        $middlewares = $route->gatherMiddleware();
+        self::assertContains('auth:' . (string) config('module-auth.protected_route_guard', 'auth-api'), $middlewares);
+        self::assertContains((string) config('core.current_user.middleware_alias', 'current.user'), $middlewares);
+    }
 }

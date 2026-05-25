@@ -71,12 +71,14 @@ use Modules\Auth\Infrastructure\Persistence\Eloquent\Repositories\EloquentAuthRe
 use Modules\Auth\Infrastructure\Persistence\Eloquent\Repositories\EloquentAuthSessionRepository;
 use Modules\Auth\Infrastructure\Persistence\Eloquent\Repositories\EloquentAuthVerificationChallengeRepository;
 use Modules\Auth\Infrastructure\Services\AuthProviderRegistry;
+use Modules\Auth\Infrastructure\Services\CurrentUserContextResolver;
 use Modules\Auth\Infrastructure\Services\DatabaseIdentityProvider;
 use Modules\Auth\Infrastructure\Services\DatabaseSessionProvider;
 use Modules\Auth\Infrastructure\Services\DatabaseSsoProvider;
 use Modules\Auth\Infrastructure\Services\DatabaseTokenProvider;
 use Modules\Auth\Infrastructure\Services\DatabaseVerificationProvider;
 use Modules\Auth\Infrastructure\Services\InternalAuthenticationProvider;
+use Modules\Core\Application\Contracts\CurrentUserContextResolverInterface;
 use Modules\Auth\Presentation\Console\Commands\AuthClientCreateCommand;
 use Modules\Auth\Presentation\Policies\AuthClientPolicy;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
@@ -148,6 +150,7 @@ final class AuthServiceProvider extends ServiceProvider
         $this->app->singleton(VerificationProviderInterface::class, DatabaseVerificationProvider::class);
         $this->app->singleton(IdentityProviderInterface::class, DatabaseIdentityProvider::class);
         $this->app->singleton(AuthProviderRegistryInterface::class, AuthProviderRegistry::class);
+        $this->app->singleton(CurrentUserContextResolverInterface::class, CurrentUserContextResolver::class);
 
         $this->app->singleton(AuthWorkflowService::class);
 

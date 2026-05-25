@@ -350,3 +350,7 @@ If migrations and code disagree:
 → MIGRATIONS WIN ALWAYS
 
 Migrations are the single source of truth for the entire system.
+
+------------------------------------------------------------
+
+Enforce a strict rule across the entire codebase: avoid over-engineering at all times. All implementations must follow KISS principles by prioritizing simplicity, clarity, and direct solutions over unnecessary abstractions, layers, or patterns. Only introduce interfaces, services, or architectural layers when there is a clear, immediate, and justified need. Reuse existing Core, Configuration, Tenant, and shared module patterns instead of creating new structures. Do not duplicate logic or introduce speculative future-proofing. Keep all code minimal, readable, maintainable, and aligned with existing architecture without adding unnecessary complexity.
