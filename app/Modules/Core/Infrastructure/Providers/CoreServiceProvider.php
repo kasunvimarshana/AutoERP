@@ -9,9 +9,11 @@ use Illuminate\Support\ServiceProvider;
 use Modules\Core\Application\Configuration\CoreConfigKey;
 use Modules\Core\Application\Contracts\ClockInterface;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
+use Modules\Core\Application\Contracts\PasswordHasherInterface;
 use Modules\Core\Application\Contracts\SlugGeneratorInterface;
 use Modules\Core\Application\Contracts\UuidGeneratorInterface;
 use Modules\Core\Infrastructure\Services\FileStorageService;
+use Modules\Core\Infrastructure\Services\PasswordHasher;
 use Modules\Core\Infrastructure\Services\SlugGenerator;
 use Modules\Core\Infrastructure\Support\LaravelUuidGenerator;
 use Modules\Core\Infrastructure\Support\SystemClock;
@@ -25,6 +27,7 @@ final class CoreServiceProvider extends ServiceProvider
         $this->app->singleton(ClockInterface::class, SystemClock::class);
         $this->app->singleton(UuidGeneratorInterface::class, LaravelUuidGenerator::class);
         $this->app->bind(FileStorageServiceInterface::class, FileStorageService::class);
+        $this->app->bind(PasswordHasherInterface::class, PasswordHasher::class);
         $this->app->bind(SlugGeneratorInterface::class, SlugGenerator::class);
 
         $this->app->when(FileStorageService::class)

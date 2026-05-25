@@ -30,6 +30,22 @@ final class UserDomainService implements UserDomainServiceInterface
         return (new UserEmail($email))->normalized();
     }
 
+    public function normalizeRequiredString(string $value, string $field, int $maxLength = 255): string
+    {
+        $candidate = trim($value);
+        if ($candidate === '') {
+            throw new InvalidArgumentException(sprintf('%s is required.', $field));
+        }
+
+        if (mb_strlen($candidate) > $maxLength) {
+            throw new InvalidArgumentException(
+                sprintf('%s may not be greater than %d characters.', $field, $maxLength),
+            );
+        }
+
+        return $candidate;
+    }
+
     public function normalizeNullableString(?string $value): ?string
     {
         $candidate = trim((string) $value);

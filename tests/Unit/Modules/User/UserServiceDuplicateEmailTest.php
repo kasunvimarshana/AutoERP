@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Modules\User;
 
+use Modules\Core\Application\Contracts\PasswordHasherInterface;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\User\Application\Repositories\UserRepositoryInterface;
 use Modules\User\Application\UseCases\UserService;
@@ -12,10 +13,11 @@ use PHPUnit\Framework\TestCase;
 
 final class UserServiceDuplicateEmailTest extends TestCase
 {
-    public function test_it_rejects_duplicate_tenant_email(): void
+    public function testItRejectsDuplicateTenantEmail(): void
     {
         $repository = $this->createMock(UserRepositoryInterface::class);
         $domain = $this->createMock(UserDomainServiceInterface::class);
+        $passwordHasher = $this->createMock(PasswordHasherInterface::class);
 
         $domain->method('normalizeEmail')->willReturn('duplicate@example.com');
 
@@ -24,7 +26,7 @@ final class UserServiceDuplicateEmailTest extends TestCase
             ->with(4, 'duplicate@example.com')
             ->willReturn(new DataRecord(['id' => 99]));
 
-        $service = new UserService($repository, $domain);
+        $service = new UserService($repository, $domain, $passwordHasher);
 
         $result = $service->create([
             'tenant_id' => 4,

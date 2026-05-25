@@ -7,20 +7,19 @@ namespace Modules\User\Infrastructure\Persistence\Eloquent\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasStatusScope;
-// use Modules\Core\Infrastructure\Persistence\Eloquent\Models\CoreModel;
-use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
-use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantModel;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Passport\Contracts\OAuthenticatable;
-use Laravel\Passport\HasApiTokens;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasStatusScope;
+use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantModel;
 
-
-final class UserModel extends Authenticatable implements OAuthenticatable
+final class UserModel extends Authenticatable
 {
     use HasStatusScope;
-    use SoftDeletes, HasApiTokens, Notifiable;
+
+    use SoftDeletes;
+
+    use Notifiable;
 
     protected $table = 'users';
 
@@ -33,9 +32,11 @@ final class UserModel extends Authenticatable implements OAuthenticatable
         return array_merge(parent::casts(), [
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
+            'metadata' => 'array',
             'preferences' => 'array',
             'date_of_birth' => 'date',
             'email_verified_at' => 'datetime',
+            'row_version' => 'integer',
         ]);
     }
 

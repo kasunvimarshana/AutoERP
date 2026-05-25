@@ -52,11 +52,15 @@ final class PermissionService extends AbstractUserCrudService implements Permiss
     {
         try {
             $tenantId = $this->toNullableInt($payload['tenant_id'] ?? null);
-            $name = trim((string) ($payload['name'] ?? ''));
-            $guardName = $this->domain->normalizeNullableString($payload['guard_name'] ?? null) ?? (string) config('auth.defaults.guard', 'api');
+            $name = $this->domain->normalizeRequiredString((string) ($payload['name'] ?? ''), 'Permission name');
+            $guardName = $this->domain->normalizeNullableString($payload['guard_name'] ?? null)
+                ?? (string) config('auth.defaults.guard', 'api');
 
             if ($this->permissions->findByTenantNameGuard($tenantId, $name, $guardName) !== null) {
-                return $this->failure(UserErrorCode::DUPLICATE_PERMISSION, 'Permission already exists in tenant scope.');
+                return $this->failure(
+                    UserErrorCode::DUPLICATE_PERMISSION,
+                    'Permission already exists in tenant scope.',
+                );
             }
 
             return $this->success($this->permissions->create([
@@ -84,18 +88,29 @@ final class PermissionService extends AbstractUserCrudService implements Permiss
 
             $recordId = (int) $existing->id();
             $tenantId = $this->toNullableInt($payload['tenant_id'] ?? $existing->get('tenant_id'));
-            $name = array_key_exists('name', $payload) ? trim((string) $payload['name']) : (string) $existing->get('name');
+            $name = array_key_exists('name', $payload)
+                ? $this->domain->normalizeRequiredString(
+                    (string) $payload['name'],
+                    'Permission name',
+                )
+                : (string) $existing->get('name');
             $guardName = array_key_exists('guard_name', $payload)
                 ? ($this->domain->normalizeNullableString($payload['guard_name']) ?? 'api')
                 : (string) $existing->get('guard_name', 'api');
 
             if ($this->permissions->findByTenantNameGuard($tenantId, $name, $guardName, $recordId) !== null) {
-                return $this->failure(UserErrorCode::DUPLICATE_PERMISSION, 'Permission already exists in tenant scope.');
+                return $this->failure(
+                    UserErrorCode::DUPLICATE_PERMISSION,
+                    'Permission already exists in tenant scope.',
+                );
             }
 
-            return $this->success($this->permissions->update($id, [
+            return $this->success(
+                $this->permissions->update($id, [
                 'tenant_id' => $tenantId,
-                'organization_unit_id' => $this->toNullableInt($payload['organization_unit_id'] ?? $existing->get('organization_unit_id')),
+                'organization_unit_id' => $this->toNullableInt(
+                    $payload['organization_unit_id'] ?? $existing->get('organization_unit_id'),
+                ),
                 'metadata' => array_key_exists('metadata', $payload)
                     ? $this->domain->normalizeMetadata($payload['metadata'])
                     : $existing->get('metadata'),
@@ -108,7 +123,8 @@ final class PermissionService extends AbstractUserCrudService implements Permiss
                     ? $this->domain->normalizeNullableString($payload['description'])
                     : $existing->get('description'),
                 'row_version' => (int) $existing->get('row_version', 1) + 1,
-            ]));
+                ]),
+            );
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }

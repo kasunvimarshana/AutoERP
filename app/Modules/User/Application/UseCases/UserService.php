@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\User\Application\UseCases;
 
+use Modules\Core\Application\Contracts\PasswordHasherInterface;
 use Modules\Core\Application\Results\Result;
 use Modules\User\Application\Contracts\UseCases\UserServiceInterface;
 use Modules\User\Application\Events\UserCreated;
@@ -17,6 +18,7 @@ final class UserService extends AbstractUserCrudService implements UserServiceIn
     public function __construct(
         private readonly UserRepositoryInterface $users,
         private readonly UserDomainServiceInterface $domain,
+        private readonly PasswordHasherInterface $passwordHasher,
     ) {
     }
 
@@ -53,6 +55,10 @@ final class UserService extends AbstractUserCrudService implements UserServiceIn
         try {
             $tenantId = $this->toNullableInt($payload['tenant_id'] ?? null);
             $email = $this->domain->normalizeEmail((string) ($payload['email'] ?? ''));
+            $firstName = $this->domain->normalizeRequiredString(
+                (string) ($payload['first_name'] ?? ''),
+                'First name',
+            );
             if ($this->users->findByTenantAndEmail($tenantId, $email) !== null) {
                 return $this->failure(UserErrorCode::DUPLICATE_EMAIL, 'User email already exists in tenant scope.');
             }
@@ -61,11 +67,11 @@ final class UserService extends AbstractUserCrudService implements UserServiceIn
                 'tenant_id' => $tenantId,
                 'organization_unit_id' => $this->toNullableInt($payload['organization_unit_id'] ?? null),
                 'metadata' => $this->domain->normalizeMetadata($payload['metadata'] ?? null),
-                'first_name' => trim((string) ($payload['first_name'] ?? '')),
+                'first_name' => $firstName,
                 'last_name' => $this->domain->normalizeNullableString($payload['last_name'] ?? null),
                 'email' => $email,
                 'email_verified_at' => $this->domain->normalizeNullableString($payload['email_verified_at'] ?? null),
-                'password' => (string) ($payload['password'] ?? ''),
+                'password' => $this->passwordHasher->hash((string) ($payload['password'] ?? '')),
                 'status' => $this->domain->normalizeStatus($payload['status'] ?? null),
                 'avatar_path' => $this->domain->normalizeNullableString($payload['avatar_path'] ?? null),
                 'phone' => $this->domain->normalizeNullableString($payload['phone'] ?? null),
@@ -97,6 +103,9 @@ final class UserService extends AbstractUserCrudService implements UserServiceIn
             $email = array_key_exists('email', $payload)
                 ? $this->domain->normalizeEmail((string) $payload['email'])
                 : (string) $existing->get('email');
+            $firstName = array_key_exists('first_name', $payload)
+                ? $this->domain->normalizeRequiredString((string) $payload['first_name'], 'First name')
+                : (string) $existing->get('first_name');
 
             if ($this->users->findByTenantAndEmail($tenantId, $email, $targetId) !== null) {
                 return $this->failure(UserErrorCode::DUPLICATE_EMAIL, 'User email already exists in tenant scope.');
@@ -104,13 +113,13 @@ final class UserService extends AbstractUserCrudService implements UserServiceIn
 
             $updated = $this->users->update($id, [
                 'tenant_id' => $tenantId,
-                'organization_unit_id' => $this->toNullableInt($payload['organization_unit_id'] ?? $existing->get('organization_unit_id')),
+                'organization_unit_id' => $this->toNullableInt(
+                    $payload['organization_unit_id'] ?? $existing->get('organization_unit_id'),
+                ),
                 'metadata' => array_key_exists('metadata', $payload)
                     ? $this->domain->normalizeMetadata($payload['metadata'])
                     : $existing->get('metadata'),
-                'first_name' => array_key_exists('first_name', $payload)
-                    ? trim((string) $payload['first_name'])
-                    : $existing->get('first_name'),
+                'first_name' => $firstName,
                 'last_name' => array_key_exists('last_name', $payload)
                     ? $this->domain->normalizeNullableString($payload['last_name'])
                     : $existing->get('last_name'),
@@ -119,7 +128,7 @@ final class UserService extends AbstractUserCrudService implements UserServiceIn
                     ? $this->domain->normalizeNullableString($payload['email_verified_at'])
                     : $existing->get('email_verified_at'),
                 'password' => array_key_exists('password', $payload)
-                    ? (string) $payload['password']
+                    ? $this->passwordHasher->hash((string) $payload['password'])
                     : $existing->get('password'),
                 'status' => array_key_exists('status', $payload)
                     ? $this->domain->normalizeStatus($payload['status'])

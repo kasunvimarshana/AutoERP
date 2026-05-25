@@ -10,6 +10,8 @@ interface UserDomainServiceInterface
 
     public function normalizeEmail(string $email): string;
 
+    public function normalizeRequiredString(string $value, string $field, int $maxLength = 255): string;
+
     public function normalizeNullableString(?string $value): ?string;
 
     /**

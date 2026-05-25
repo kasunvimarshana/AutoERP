@@ -10,12 +10,13 @@ use PHPUnit\Framework\TestCase;
 
 final class UserDomainServiceTest extends TestCase
 {
-    public function test_it_normalizes_status_and_email(): void
+    public function testItNormalizesStatusAndEmail(): void
     {
         $service = new UserDomainService();
 
         self::assertSame(UserStatus::ACTIVE, $service->normalizeStatus(null));
         self::assertSame(UserStatus::SUSPENDED, $service->normalizeStatus(' SUSPENDED '));
         self::assertSame('demo@example.com', $service->normalizeEmail(' Demo@Example.com '));
+        self::assertSame('Jane', $service->normalizeRequiredString(' Jane ', 'First name'));
     }
 }
