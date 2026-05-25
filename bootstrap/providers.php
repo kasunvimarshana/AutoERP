@@ -24,4 +24,5 @@ return [
     Modules\Invoice\Infrastructure\Providers\InvoiceServiceProvider::class,
     Modules\Payment\Infrastructure\Providers\PaymentServiceProvider::class,
     Modules\Pricing\Infrastructure\Providers\PricingServiceProvider::class,
+    Modules\Purchase\Infrastructure\Providers\PurchaseServiceProvider::class,
 ];
