@@ -15,4 +15,8 @@ interface OrganizationUnitRepositoryInterface extends RepositoryPortInterface
     public function listByTenant(int|string $tenantId): array;
 
     public function findByTenantAndName(int|string $tenantId, string $name): ?DataRecord;
+
+    public function findByTenantAndCode(int|string $tenantId, string $code): ?DataRecord;
+
+    public function findByTenantAndPath(int|string $tenantId, string $path): ?DataRecord;
 }

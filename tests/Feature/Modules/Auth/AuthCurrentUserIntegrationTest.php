@@ -20,6 +20,7 @@ use Modules\Auth\Application\DTOs\AuthorizeClientData;
 use Modules\Auth\Application\DTOs\TokenIssueData;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Results\Result;
+use Modules\OrganizationUnit\Application\Repositories\OrganizationUnitRepositoryInterface;
 use Modules\Tenant\Application\Repositories\TenantDomainRepositoryInterface;
 use Modules\Tenant\Application\Repositories\TenantRepositoryInterface;
 use Modules\User\Application\Repositories\UserTenantRepositoryInterface;
@@ -43,7 +44,10 @@ final class AuthCurrentUserIntegrationTest extends TestCase
             ->with(42, 7)
             ->willReturn(Result::success(['items' => []]));
 
-        $this->bindProtectedAuthServices(listSessions: $service);
+        $this->bindProtectedAuthServices(
+            listSessions: $service,
+            organizationUnits: $this->organizationUnitRepositoryWithRecords([3 => 7]),
+        );
 
         $response = $this->actingAs($user, 'auth-api')
             ->getJson('/api/auth/sessions');
@@ -74,13 +78,16 @@ final class AuthCurrentUserIntegrationTest extends TestCase
             }))
             ->willReturn(Result::success(['access_token' => 'issued-token']));
 
-        $this->bindProtectedAuthServices(issueToken: $service, tenants: $this->tenantRepositoryWithRecords(7));
+        $this->bindProtectedAuthServices(
+            issueToken: $service,
+            tenants: $this->tenantRepositoryWithRecords(7),
+            organizationUnits: $this->organizationUnitRepositoryWithRecords([3 => 7]),
+        );
 
         $response = $this->actingAs($user, 'auth-api')
             ->postJson('/api/auth/token', [
                 'grant_type' => 'client_credentials',
                 'user_id' => 999,
-                'organization_unit_id' => 777,
             ]);
 
         $response->assertCreated()
@@ -109,13 +116,16 @@ final class AuthCurrentUserIntegrationTest extends TestCase
             }))
             ->willReturn(Result::success(['authorization_code' => 'auth-code']));
 
-        $this->bindProtectedAuthServices(authorizeClient: $service, tenants: $this->tenantRepositoryWithRecords(7));
+        $this->bindProtectedAuthServices(
+            authorizeClient: $service,
+            tenants: $this->tenantRepositoryWithRecords(7),
+            organizationUnits: $this->organizationUnitRepositoryWithRecords([3 => 7]),
+        );
 
         $response = $this->actingAs($user, 'auth-api')
             ->postJson('/api/auth/authorize-client', [
                 'client_key' => 'portal-web',
                 'user_id' => 999,
-                'organization_unit_id' => 777,
             ]);
 
         $response->assertCreated()
@@ -140,6 +150,7 @@ final class AuthCurrentUserIntegrationTest extends TestCase
         $this->bindProtectedAuthServices(
             userTenants: $userTenants,
             tenants: $this->tenantRepositoryWithRecords(7, 888),
+            organizationUnits: $this->organizationUnitRepositoryWithRecords([3 => 7]),
         );
 
         $response = $this->actingAs($user, 'auth-api')
@@ -167,7 +178,7 @@ final class AuthCurrentUserIntegrationTest extends TestCase
             ->with(self::callback(function (TokenIssueData $data): bool {
                 self::assertSame(42, $data->userId);
                 self::assertSame(888, $data->tenantId);
-                self::assertSame(3, $data->organizationUnitId);
+                self::assertSame(8883, $data->organizationUnitId);
 
                 return true;
             }))
@@ -178,17 +189,23 @@ final class AuthCurrentUserIntegrationTest extends TestCase
             ->method('existsForTenantAndUser')
             ->with(888, 42)
             ->willReturn(true);
+        $userTenants->expects(self::once())
+            ->method('existsForTenantUserAndOrganizationUnit')
+            ->with(888, 42, 8883)
+            ->willReturn(true);
 
         $this->bindProtectedAuthServices(
             issueToken: $service,
             userTenants: $userTenants,
             tenants: $this->tenantRepositoryWithRecords(7, 888),
+            organizationUnits: $this->organizationUnitRepositoryWithRecords([3 => 7, 8883 => 888]),
         );
 
         $response = $this->actingAs($user, 'auth-api')
             ->postJson('/api/auth/token', [
                 'grant_type' => 'client_credentials',
                 'tenant_id' => 888,
+                'organization_unit_id' => 8883,
             ]);
 
         $response->assertCreated()
@@ -202,6 +219,7 @@ final class AuthCurrentUserIntegrationTest extends TestCase
         ?UserTenantRepositoryInterface $userTenants = null,
         ?TenantRepositoryInterface $tenants = null,
         ?TenantDomainRepositoryInterface $tenantDomains = null,
+        ?OrganizationUnitRepositoryInterface $organizationUnits = null,
     ): void {
         $this->app->instance(LoginServiceInterface::class, $this->createMock(LoginServiceInterface::class));
         $this->app->instance(LogoutServiceInterface::class, $this->createMock(LogoutServiceInterface::class));
@@ -254,6 +272,10 @@ final class AuthCurrentUserIntegrationTest extends TestCase
             TenantDomainRepositoryInterface::class,
             $tenantDomains ?? $this->createMock(TenantDomainRepositoryInterface::class),
         );
+        $this->app->instance(
+            OrganizationUnitRepositoryInterface::class,
+            $organizationUnits ?? $this->organizationUnitRepositoryWithRecords([3 => 7]),
+        );
     }
 
     private function tenantRepositoryWithRecords(int ...$tenantIds): TenantRepositoryInterface
@@ -279,6 +301,79 @@ final class AuthCurrentUserIntegrationTest extends TestCase
             'uuid' => sprintf('00000000-0000-0000-0000-%012d', $tenantId),
             'isolation_key' => 'iso-' . $tenantId,
             'status' => 'active',
+            'is_active' => true,
+        ]);
+    }
+
+    /**
+     * @param array<int, int> $organizationUnits [organizationUnitId => tenantId]
+     */
+    private function organizationUnitRepositoryWithRecords(
+        array $organizationUnits,
+    ): OrganizationUnitRepositoryInterface {
+        $repository = $this->createMock(OrganizationUnitRepositoryInterface::class);
+
+        $records = [];
+        foreach ($organizationUnits as $organizationUnitId => $tenantId) {
+            $records[(int) $organizationUnitId] = $this->organizationUnitRecord(
+                (int) $organizationUnitId,
+                (int) $tenantId,
+            );
+        }
+
+        $repository->method('findById')
+            ->willReturnCallback(static fn (int|string $id): ?DataRecord => $records[(int) $id] ?? null);
+
+        $repository->method('findByTenantAndCode')
+            ->willReturnCallback(static function (int|string $tenantId, string $code) use ($records): ?DataRecord {
+                foreach ($records as $record) {
+                    $matchesTenant = (int) $record->get('tenant_id') === (int) $tenantId;
+                    $matchesCode = (string) $record->get('code') === trim($code);
+                    if ($matchesTenant && $matchesCode) {
+                        return $record;
+                    }
+                }
+
+                return null;
+            });
+
+        $repository->method('findByTenantAndPath')
+            ->willReturnCallback(static function (int|string $tenantId, string $path) use ($records): ?DataRecord {
+                foreach ($records as $record) {
+                    $matchesTenant = (int) $record->get('tenant_id') === (int) $tenantId;
+                    $matchesPath = (string) $record->get('path') === trim($path);
+                    if ($matchesTenant && $matchesPath) {
+                        return $record;
+                    }
+                }
+
+                return null;
+            });
+
+        $repository->method('findByTenantAndName')
+            ->willReturnCallback(static function (int|string $tenantId, string $name) use ($records): ?DataRecord {
+                foreach ($records as $record) {
+                    $matchesTenant = (int) $record->get('tenant_id') === (int) $tenantId;
+                    $matchesName = (string) $record->get('name') === trim($name);
+                    if ($matchesTenant && $matchesName) {
+                        return $record;
+                    }
+                }
+
+                return null;
+            });
+
+        return $repository;
+    }
+
+    private function organizationUnitRecord(int $organizationUnitId, int $tenantId): DataRecord
+    {
+        return new DataRecord([
+            'id' => $organizationUnitId,
+            'tenant_id' => $tenantId,
+            'name' => 'Organization Unit ' . $organizationUnitId,
+            'code' => 'OU-' . $organizationUnitId,
+            'path' => '/ou/' . $organizationUnitId,
             'is_active' => true,
         ]);
     }

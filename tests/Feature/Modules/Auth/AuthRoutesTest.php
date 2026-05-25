@@ -25,7 +25,7 @@ final class AuthRoutesTest extends TestCase
         self::assertTrue(Route::has('auth.client.authorize'));
     }
 
-    public function testProtectedRoutesUseCurrentUserAndCurrentTenantMiddleware(): void
+    public function testProtectedRoutesUseCurrentUserCurrentTenantAndCurrentOrganizationUnitMiddleware(): void
     {
         $route = Route::getRoutes()->getByName('auth.token.issue');
 
@@ -35,5 +35,9 @@ final class AuthRoutesTest extends TestCase
         self::assertContains('auth:' . (string) config('module-auth.protected_route_guard', 'auth-api'), $middlewares);
         self::assertContains((string) config('core.current_user.middleware_alias', 'current.user'), $middlewares);
         self::assertContains((string) config('core.current_tenant.middleware_alias', 'current.tenant'), $middlewares);
+        self::assertContains(
+            (string) config('core.current_organization_unit.middleware_alias', 'current.organization-unit'),
+            $middlewares,
+        );
     }
 }

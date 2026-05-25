@@ -18,7 +18,7 @@ final class OrganizationUnitRoutesTest extends TestCase
         self::assertTrue(Route::has('organization-unit.organization-unit-documents.index'));
     }
 
-    public function test_organization_unit_routes_use_current_user_and_current_tenant_middlewares(): void
+    public function test_organization_unit_routes_use_current_user_current_tenant_and_current_organization_unit_middlewares(): void
     {
         $route = Route::getRoutes()->getByName('organization-unit.organization-units.index');
 
@@ -28,5 +28,9 @@ final class OrganizationUnitRoutesTest extends TestCase
         self::assertContains('auth:' . (string) config('module-auth.protected_route_guard', 'auth-api'), $middlewares);
         self::assertContains((string) config('core.current_user.middleware_alias', 'current.user'), $middlewares);
         self::assertContains((string) config('core.current_tenant.middleware_alias', 'current.tenant'), $middlewares);
+        self::assertContains(
+            (string) config('core.current_organization_unit.middleware_alias', 'current.organization-unit'),
+            $middlewares,
+        );
     }
 }

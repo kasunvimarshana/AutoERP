@@ -47,6 +47,15 @@ final class EloquentUserTenantRepository extends EloquentRepository implements U
             ->exists();
     }
 
+    public function existsForTenantUserAndOrganizationUnit(int $tenantId, int $userId, int $organizationUnitId): bool
+    {
+        return $this->query()
+            ->where('tenant_id', $tenantId)
+            ->where('user_id', $userId)
+            ->where('organization_unit_id', $organizationUnitId)
+            ->exists();
+    }
+
     public function clearDefaultForUser(int $tenantId, int $userId, ?int $excludeId = null): void
     {
         $query = $this->query()

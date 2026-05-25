@@ -38,6 +38,7 @@ use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Repositories\El
 use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrganizationUnitSettingGroupRepository;
 use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrganizationUnitSettingRepository;
 use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrganizationUnitTypeRepository;
+use Modules\OrganizationUnit\Infrastructure\Services\CurrentOrganizationUnitContextResolver;
 use Modules\OrganizationUnit\Presentation\Policies\OrganizationUnitPolicy;
 
 final class OrganizationUnitServiceProvider extends ServiceProvider
@@ -45,6 +46,11 @@ final class OrganizationUnitServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__ . '/../Config/organization-unit.php', 'organization-unit');
+
+        $this->app->bind(
+            'Modules\\Core\\Application\\Contracts\\CurrentOrganizationUnitContextResolverInterface',
+            CurrentOrganizationUnitContextResolver::class,
+        );
 
         $this->app->singleton(OrganizationUnitDomainServiceInterface::class, OrganizationUnitDomainService::class);
 

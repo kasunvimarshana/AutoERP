@@ -43,4 +43,32 @@ final class EloquentOrganizationUnitRepository extends EloquentRepository implem
 
         return $this->toRecord($model);
     }
+
+    public function findByTenantAndCode(int|string $tenantId, string $code): ?DataRecord
+    {
+        $model = $this->query()
+            ->where('tenant_id', $tenantId)
+            ->where('code', trim($code))
+            ->first();
+
+        if (! $model instanceof Model) {
+            return null;
+        }
+
+        return $this->toRecord($model);
+    }
+
+    public function findByTenantAndPath(int|string $tenantId, string $path): ?DataRecord
+    {
+        $model = $this->query()
+            ->where('tenant_id', $tenantId)
+            ->where('path', trim($path))
+            ->first();
+
+        if (! $model instanceof Model) {
+            return null;
+        }
+
+        return $this->toRecord($model);
+    }
 }

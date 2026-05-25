@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Application\Configuration\CoreConfigKey;
 use Modules\Core\Application\Contracts\ClockInterface;
+use Modules\Core\Application\Contracts\CurrentOrganizationUnitContextAccessorInterface;
 use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Application\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
@@ -17,6 +18,7 @@ use Modules\Core\Application\Contracts\UuidGeneratorInterface;
 use Modules\Core\Infrastructure\Services\FileStorageService;
 use Modules\Core\Infrastructure\Services\PasswordHasher;
 use Modules\Core\Infrastructure\Services\SlugGenerator;
+use Modules\Core\Infrastructure\Support\RequestCurrentOrganizationUnitContextAccessor;
 use Modules\Core\Infrastructure\Support\RequestCurrentTenantContextAccessor;
 use Modules\Core\Infrastructure\Support\LaravelUuidGenerator;
 use Modules\Core\Infrastructure\Support\RequestCurrentUserContextAccessor;
@@ -32,6 +34,10 @@ final class CoreServiceProvider extends ServiceProvider
         $this->app->singleton(UuidGeneratorInterface::class, LaravelUuidGenerator::class);
         $this->app->bind(CurrentUserContextAccessorInterface::class, RequestCurrentUserContextAccessor::class);
         $this->app->bind(CurrentTenantContextAccessorInterface::class, RequestCurrentTenantContextAccessor::class);
+        $this->app->bind(
+            CurrentOrganizationUnitContextAccessorInterface::class,
+            RequestCurrentOrganizationUnitContextAccessor::class,
+        );
         $this->app->bind(FileStorageServiceInterface::class, FileStorageService::class);
         $this->app->bind(PasswordHasherInterface::class, PasswordHasher::class);
         $this->app->bind(SlugGeneratorInterface::class, SlugGenerator::class);
@@ -145,6 +151,87 @@ final class CoreServiceProvider extends ServiceProvider
         $this->app->when(RequestCurrentTenantContextAccessor::class)
             ->needs('$sourceAttribute')
             ->give(static fn (): string => (string) Config::get('core.current_tenant.source_attribute', 'current_tenant_source'));
+
+        $this->app->when(RequestCurrentOrganizationUnitContextAccessor::class)
+            ->needs('$requestAttribute')
+            ->give(
+                static fn (): string => (string) Config::get(
+                    'core.current_organization_unit.request_attribute',
+                    'current_organization_unit',
+                ),
+            );
+
+        $this->app->when(RequestCurrentOrganizationUnitContextAccessor::class)
+            ->needs('$idAttribute')
+            ->give(
+                static fn (): string => (string) Config::get(
+                    'core.current_organization_unit.id_attribute',
+                    'current_organization_unit_id',
+                ),
+            );
+
+        $this->app->when(RequestCurrentOrganizationUnitContextAccessor::class)
+            ->needs('$tenantIdAttribute')
+            ->give(
+                static fn (): string => (string) Config::get(
+                    'core.current_organization_unit.tenant_id_attribute',
+                    'current_organization_unit_tenant_id',
+                ),
+            );
+
+        $this->app->when(RequestCurrentOrganizationUnitContextAccessor::class)
+            ->needs('$codeAttribute')
+            ->give(
+                static fn (): string => (string) Config::get(
+                    'core.current_organization_unit.code_attribute',
+                    'current_organization_unit_code',
+                ),
+            );
+
+        $this->app->when(RequestCurrentOrganizationUnitContextAccessor::class)
+            ->needs('$pathAttribute')
+            ->give(
+                static fn (): string => (string) Config::get(
+                    'core.current_organization_unit.path_attribute',
+                    'current_organization_unit_path',
+                ),
+            );
+
+        $this->app->when(RequestCurrentOrganizationUnitContextAccessor::class)
+            ->needs('$nameAttribute')
+            ->give(
+                static fn (): string => (string) Config::get(
+                    'core.current_organization_unit.name_attribute',
+                    'current_organization_unit_name',
+                ),
+            );
+
+        $this->app->when(RequestCurrentOrganizationUnitContextAccessor::class)
+            ->needs('$activeAttribute')
+            ->give(
+                static fn (): string => (string) Config::get(
+                    'core.current_organization_unit.active_attribute',
+                    'current_organization_unit_is_active',
+                ),
+            );
+
+        $this->app->when(RequestCurrentOrganizationUnitContextAccessor::class)
+            ->needs('$applicationAttribute')
+            ->give(
+                static fn (): string => (string) Config::get(
+                    'core.current_organization_unit.application_attribute',
+                    'current_application_id',
+                ),
+            );
+
+        $this->app->when(RequestCurrentOrganizationUnitContextAccessor::class)
+            ->needs('$sourceAttribute')
+            ->give(
+                static fn (): string => (string) Config::get(
+                    'core.current_organization_unit.source_attribute',
+                    'current_organization_unit_source',
+                ),
+            );
     }
 
     public function boot(): void

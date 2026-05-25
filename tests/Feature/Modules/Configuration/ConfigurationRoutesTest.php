@@ -23,7 +23,7 @@ final class ConfigurationRoutesTest extends TestCase
         self::assertTrue(Route::has('configuration.timezones.index'));
     }
 
-    public function test_configuration_routes_use_current_user_and_current_tenant_middlewares(): void
+    public function test_configuration_routes_use_current_user_current_tenant_and_current_organization_unit_middlewares(): void
     {
         $route = Route::getRoutes()->getByName('configuration.entries.index');
 
@@ -33,5 +33,9 @@ final class ConfigurationRoutesTest extends TestCase
         self::assertContains('auth:' . (string) config('module-auth.protected_route_guard', 'auth-api'), $middlewares);
         self::assertContains((string) config('core.current_user.middleware_alias', 'current.user'), $middlewares);
         self::assertContains((string) config('core.current_tenant.middleware_alias', 'current.tenant'), $middlewares);
+        self::assertContains(
+            (string) config('core.current_organization_unit.middleware_alias', 'current.organization-unit'),
+            $middlewares,
+        );
     }
 }

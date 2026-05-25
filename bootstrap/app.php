@@ -16,6 +16,8 @@ return Application::configure(basePath: dirname(__DIR__))
                 => \Modules\Core\Presentation\Http\Middleware\CurrentUserMiddleware::class,
             (string) env('CORE_CURRENT_TENANT_MIDDLEWARE_ALIAS', 'current.tenant')
                 => \Modules\Core\Presentation\Http\Middleware\CurrentTenantMiddleware::class,
+            (string) env('CORE_CURRENT_ORGANIZATION_UNIT_MIDDLEWARE_ALIAS', 'current.organization-unit')
+                => \Modules\Core\Presentation\Http\Middleware\CurrentOrganizationUnitMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
