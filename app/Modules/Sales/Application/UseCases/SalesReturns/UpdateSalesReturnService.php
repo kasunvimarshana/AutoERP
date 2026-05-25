@@ -1,0 +1,32 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Sales\Application\UseCases\SalesReturns;
+
+use Modules\Core\Application\Results\Error;
+use Modules\Core\Application\Results\Result;
+use Modules\Sales\Application\Contracts\UseCases\SalesReturns\UpdateSalesReturnServiceInterface;
+use Modules\Sales\Application\Repositories\SalesReturnRepositoryInterface;
+use Modules\Sales\Domain\Constants\SalesErrorCode;
+use Throwable;
+
+final class UpdateSalesReturnService implements UpdateSalesReturnServiceInterface
+{
+    public function __construct(private readonly SalesReturnRepositoryInterface $repository)
+    {
+    }
+
+    public function execute(int|string $id, array $payload): Result
+    {
+        try {
+            if ($this->repository->findById($id) === null) {
+                return Result::failure(new Error(SalesErrorCode::NOT_FOUND, 'SalesReturn not found.'));
+            }
+
+            return Result::success($this->repository->update($id, $payload));
+        } catch (Throwable $exception) {
+            return Result::failure(new Error(SalesErrorCode::INVALID_VALUE, $exception->getMessage()));
+        }
+    }
+}

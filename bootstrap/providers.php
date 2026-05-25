@@ -25,4 +25,10 @@ return [
     Modules\Payment\Infrastructure\Providers\PaymentServiceProvider::class,
     Modules\Pricing\Infrastructure\Providers\PricingServiceProvider::class,
     Modules\Purchase\Infrastructure\Providers\PurchaseServiceProvider::class,
+    Modules\Sales\Infrastructure\Providers\SalesServiceProvider::class,
+    Modules\Supplier\Infrastructure\Providers\SupplierServiceProvider::class,
+    Modules\VehicleRental\Infrastructure\Providers\VehicleRentalServiceProvider::class,
+    Modules\VehicleService\Infrastructure\Providers\VehicleServiceServiceProvider::class,
+    Modules\Voucher\Infrastructure\Providers\VoucherServiceProvider::class,
+    Modules\Warehouse\Infrastructure\Providers\WarehouseServiceProvider::class,
 ];
