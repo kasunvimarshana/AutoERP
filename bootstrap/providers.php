@@ -12,4 +12,5 @@ return [
     Modules\Sequence\Infrastructure\Providers\SequenceServiceProvider::class,
     Modules\SystemUser\Infrastructure\Providers\SystemUserServiceProvider::class,
     Modules\OrganizationUnit\Infrastructure\Providers\OrganizationUnitServiceProvider::class,
+    Modules\Finance\Infrastructure\Providers\FinanceServiceProvider::class,
 ];
