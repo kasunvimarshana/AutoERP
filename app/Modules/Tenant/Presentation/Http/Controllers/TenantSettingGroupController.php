@@ -5,68 +5,69 @@ declare(strict_types=1);
 namespace Modules\Tenant\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Modules\Tenant\Application\DTOs\TenantSettingGroupData;
-use Modules\Tenant\Application\Services\TenantService;
-use Modules\Tenant\Domain\Exceptions\TenantRecordNotFoundException;
-use Modules\Tenant\Presentation\Http\Controllers\Concerns\HandlesTenantHttp;
-use Modules\Tenant\Presentation\Http\Requests\StoreTenantSettingGroupRequest;
-use Modules\Tenant\Presentation\Http\Requests\UpdateTenantSettingGroupRequest;
+use Modules\Tenant\Application\Contracts\UseCases\SettingGroups\TenantSettingGroupServiceInterface;
+use Modules\Tenant\Presentation\Http\Requests\ListTenantSettingGroupRequest;
+use Modules\Tenant\Presentation\Http\Requests\UpsertTenantSettingGroupRequest;
 use Modules\Tenant\Presentation\Http\Resources\TenantSettingGroupResource;
 
-class TenantSettingGroupController extends Controller
+final class TenantSettingGroupController extends Controller
 {
-    use HandlesTenantHttp;
-
-    public function __construct(private readonly TenantService $tenants) {}
-
-    public function index(Request $request, int|string $tenant): mixed
+    public function __construct(private readonly TenantSettingGroupServiceInterface $groups)
     {
-        try {
-            return TenantSettingGroupResource::collection($this->tenants->listSettingGroups($tenant, $this->perPage($request)));
-        } catch (TenantRecordNotFoundException $exception) {
-            return $this->notFound($exception);
-        }
     }
 
-    public function store(StoreTenantSettingGroupRequest $request, int|string $tenant): JsonResponse
+    public function index(ListTenantSettingGroupRequest $request): JsonResponse
     {
-        try {
-            $group = $this->tenants->createSettingGroup(TenantSettingGroupData::fromArray($tenant, $request->validated()));
-
-            return (new TenantSettingGroupResource($group))->response()->setStatusCode(201);
-        } catch (TenantRecordNotFoundException $exception) {
-            return $this->notFound($exception);
+        $result = $this->groups->listByTenant((int) $request->validated('tenant_id'));
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
         }
+
+        return response()->json(['data' => TenantSettingGroupResource::collection($result->valueOrFail())->resolve()]);
     }
 
-    public function show(int|string $tenant, int|string $setting_group): TenantSettingGroupResource|JsonResponse
+    public function show(int|string $tenantSettingGroup): JsonResponse|TenantSettingGroupResource
     {
-        try {
-            return new TenantSettingGroupResource($this->tenants->findSettingGroup($tenant, $setting_group));
-        } catch (TenantRecordNotFoundException $exception) {
-            return $this->notFound($exception);
+        $result = $this->groups->get($tenantSettingGroup);
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 404);
         }
+
+        return new TenantSettingGroupResource($result->valueOrFail());
     }
 
-    public function update(UpdateTenantSettingGroupRequest $request, int|string $tenant, int|string $setting_group): TenantSettingGroupResource|JsonResponse
+    public function store(UpsertTenantSettingGroupRequest $request): JsonResponse|TenantSettingGroupResource
     {
-        try {
-            return new TenantSettingGroupResource($this->tenants->updateSettingGroup($tenant, $setting_group, TenantSettingGroupData::fromArray($tenant, $request->validated())));
-        } catch (TenantRecordNotFoundException $exception) {
-            return $this->notFound($exception);
+        $result = $this->groups->create($request->validated());
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
         }
+
+        return (new TenantSettingGroupResource($result->valueOrFail()))->response()->setStatusCode(201);
     }
 
-    public function destroy(int|string $tenant, int|string $setting_group): JsonResponse
-    {
-        try {
-            $this->tenants->deleteSettingGroup($tenant, $setting_group);
+    public function update(
+        UpsertTenantSettingGroupRequest $request,
+        int|string $tenantSettingGroup,
+    ): JsonResponse|TenantSettingGroupResource {
+        $result = $this->groups->update($tenantSettingGroup, $request->validated());
+        if ($result->isFailure()) {
+            $status = $result->errorOrFail()->code === 'TENANT_NOT_FOUND' ? 404 : 422;
 
-            return response()->json(null, 204);
-        } catch (TenantRecordNotFoundException $exception) {
-            return $this->notFound($exception);
+            return response()->json(['message' => $result->errorOrFail()->message], $status);
         }
+
+        return new TenantSettingGroupResource($result->valueOrFail());
+    }
+
+    public function destroy(int|string $tenantSettingGroup): JsonResponse
+    {
+        $result = $this->groups->delete($tenantSettingGroup);
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 404);
+        }
+
+        return response()->json(null, 204);
     }
 }

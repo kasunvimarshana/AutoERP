@@ -6,21 +6,16 @@ namespace Modules\Tenant\Presentation\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Core\Application\DTO\DataRecord;
 
-class TenantSettingGroupResource extends JsonResource
+final class TenantSettingGroupResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        return [
-            'id' => $this->id,
-            'tenant_id' => $this->tenant_id,
-            'key' => $this->key,
-            'value' => $this->value,
-            'parent_id' => $this->parent_id,
-            'metadata' => $this->metadata,
-            'row_version' => $this->row_version,
-            'created_at' => $this->created_at,
-            'updated_at' => $this->updated_at,
-        ];
+        if ($this->resource instanceof DataRecord) {
+            return $this->resource->toArray();
+        }
+
+        return is_array($this->resource) ? $this->resource : [];
     }
 }

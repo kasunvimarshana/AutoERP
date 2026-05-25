@@ -1,20 +1,20 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\Tenant\Application\Repositories;
 
-use Modules\Core\Application\Repositories\Contracts\BaseRepositoryInterface;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Application\DTO\DataRecord;
+use Modules\Core\Application\DTO\PagedResult;
+use Modules\Core\Application\Repositories\Contracts\RepositoryPortInterface;
 
-interface TenantRepositoryInterface extends BaseRepositoryInterface
+interface TenantRepositoryInterface extends RepositoryPortInterface
 {
-    public function findByName(string $name, array $with = []): ?Model;
+    public function findByCode(string $code): ?DataRecord;
 
-    public function getByStatus(string $status, array $with = []): Collection;
+    public function findByUuid(string $uuid): ?DataRecord;
 
-    public function paginateByStatus(string $status, int $perPage = 15, array $with = []): LengthAwarePaginator;
+    public function findByIsolationKey(string $isolationKey): ?DataRecord;
+
+    public function pageByFilters(?string $status, ?bool $isActive, ?string $search, int $perPage, int $page): PagedResult;
 }
-

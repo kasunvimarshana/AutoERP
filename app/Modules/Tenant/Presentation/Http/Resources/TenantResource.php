@@ -6,26 +6,46 @@ namespace Modules\Tenant\Presentation\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Core\Application\DTO\DataRecord;
+use Modules\Tenant\Application\DTOs\TenantValueData;
 
-class TenantResource extends JsonResource
+final class TenantResource extends JsonResource
 {
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(Request $request): array
     {
-        return [
-            'id' => $this->id,
-            'name' => $this->name,
-            'slug' => $this->slug,
-            'logo_path' => $this->logo_path,
-            'cross_org_transactions' => $this->cross_org_transactions,
-            'tenant_plan_id' => $this->tenant_plan_id,
-            'currency_id' => $this->currency_id,
-            'status' => $this->status,
-            'trial_ends_at' => $this->trial_ends_at,
-            'subscription_ends_at' => $this->subscription_ends_at,
-            'metadata' => $this->metadata,
-            'row_version' => $this->row_version,
-            'created_at' => $this->created_at,
-            'updated_at' => $this->updated_at,
-        ];
+        if ($this->resource instanceof TenantValueData) {
+            return [
+                'id' => $this->resource->id,
+                'uuid' => $this->resource->uuid,
+                'code' => $this->resource->code,
+                'name' => $this->resource->name,
+                'slug' => $this->resource->slug,
+                'logo_path' => $this->resource->logoPath,
+                'cross_org_transactions' => $this->resource->crossOrgTransactions,
+                'tenant_plan_id' => $this->resource->tenantPlanId,
+                'currency_id' => $this->resource->currencyId,
+                'status' => $this->resource->status,
+                'trial_ends_at' => $this->resource->trialEndsAt,
+                'subscription_ends_at' => $this->resource->subscriptionEndsAt,
+                'is_active' => $this->resource->isActive,
+                'is_isolated' => $this->resource->isIsolated,
+                'isolation_key' => $this->resource->isolationKey,
+                'configuration_scope' => $this->resource->configurationScope,
+                'metadata' => $this->resource->metadata,
+            ];
+        }
+
+        if ($this->resource instanceof DataRecord) {
+            return $this->resource->toArray();
+        }
+
+        if (is_array($this->resource)) {
+            return $this->resource;
+        }
+
+        return [];
     }
 }

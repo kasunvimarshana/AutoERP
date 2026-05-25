@@ -1,41 +1,46 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Application\DTO\DataRecord;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
 use Modules\Tenant\Application\Repositories\TenantDocumentRepositoryInterface;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantDocumentModel;
 
-class EloquentTenantDocumentRepository extends EloquentRepository implements TenantDocumentRepositoryInterface
+final class EloquentTenantDocumentRepository extends EloquentRepository implements TenantDocumentRepositoryInterface
 {
     public function __construct(TenantDocumentModel $model)
     {
         parent::__construct($model);
     }
 
-    public function findByName(string $name, array $with = []): ?Model
+    public function listByTenant(int|string $tenantId): array
     {
-        return $this->query($with)->where('name', $name)->first();
+        $records = [];
+
+        foreach ($this->query()->where('tenant_id', $tenantId)->orderBy('name')->get() as $model) {
+            if ($model instanceof Model) {
+                $records[] = $this->toRecord($model);
+            }
+        }
+
+        return $records;
     }
 
-    public function getForTenant(int|string $tenantId, array $with = []): Collection
+    public function findByTenantAndName(int|string $tenantId, string $name): ?DataRecord
     {
-        return $this->query($with)->where('tenant_id', $tenantId)->get();
-    }
+        $model = $this->query()
+            ->where('tenant_id', $tenantId)
+            ->where('name', trim($name))
+            ->first();
 
-    public function paginateForTenant(int|string $tenantId, int $perPage = 15, array $with = []): LengthAwarePaginator
-    {
-        return $this->query($with)->where('tenant_id', $tenantId)->paginate($perPage);
-    }
+        if (! $model instanceof Model) {
+            return null;
+        }
 
-    public function findForTenantById(int|string $tenantId, int|string $id, array $with = []): ?Model
-    {
-        return $this->query($with)->where('tenant_id', $tenantId)->whereKey($id)->first();
+        return $this->toRecord($model);
     }
 }
-

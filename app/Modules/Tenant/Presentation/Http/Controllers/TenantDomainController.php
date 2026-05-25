@@ -5,68 +5,67 @@ declare(strict_types=1);
 namespace Modules\Tenant\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Modules\Tenant\Application\DTOs\TenantDomainData;
-use Modules\Tenant\Application\Services\TenantService;
-use Modules\Tenant\Domain\Exceptions\TenantRecordNotFoundException;
-use Modules\Tenant\Presentation\Http\Controllers\Concerns\HandlesTenantHttp;
-use Modules\Tenant\Presentation\Http\Requests\StoreTenantDomainRequest;
-use Modules\Tenant\Presentation\Http\Requests\UpdateTenantDomainRequest;
+use Modules\Tenant\Application\Contracts\UseCases\Domains\TenantDomainServiceInterface;
+use Modules\Tenant\Presentation\Http\Requests\ListTenantDomainRequest;
+use Modules\Tenant\Presentation\Http\Requests\UpsertTenantDomainRequest;
 use Modules\Tenant\Presentation\Http\Resources\TenantDomainResource;
 
-class TenantDomainController extends Controller
+final class TenantDomainController extends Controller
 {
-    use HandlesTenantHttp;
-
-    public function __construct(private readonly TenantService $tenants) {}
-
-    public function index(Request $request, int|string $tenant): mixed
+    public function __construct(private readonly TenantDomainServiceInterface $domains)
     {
-        try {
-            return TenantDomainResource::collection($this->tenants->listDomains($tenant, $this->perPage($request)));
-        } catch (TenantRecordNotFoundException $exception) {
-            return $this->notFound($exception);
-        }
     }
 
-    public function store(StoreTenantDomainRequest $request, int|string $tenant): JsonResponse
+    public function index(ListTenantDomainRequest $request): JsonResponse
     {
-        try {
-            $domain = $this->tenants->createDomain(TenantDomainData::fromArray($tenant, $request->validated()));
-
-            return (new TenantDomainResource($domain))->response()->setStatusCode(201);
-        } catch (TenantRecordNotFoundException $exception) {
-            return $this->notFound($exception);
+        $result = $this->domains->listByTenant((int) $request->validated('tenant_id'));
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
         }
+
+        return response()->json(['data' => TenantDomainResource::collection($result->valueOrFail())->resolve()]);
     }
 
-    public function show(int|string $tenant, int|string $domain): TenantDomainResource|JsonResponse
+    public function show(int|string $tenantDomain): JsonResponse|TenantDomainResource
     {
-        try {
-            return new TenantDomainResource($this->tenants->findDomain($tenant, $domain));
-        } catch (TenantRecordNotFoundException $exception) {
-            return $this->notFound($exception);
+        $result = $this->domains->get($tenantDomain);
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 404);
         }
+
+        return new TenantDomainResource($result->valueOrFail());
     }
 
-    public function update(UpdateTenantDomainRequest $request, int|string $tenant, int|string $domain): TenantDomainResource|JsonResponse
+    public function store(UpsertTenantDomainRequest $request): JsonResponse|TenantDomainResource
     {
-        try {
-            return new TenantDomainResource($this->tenants->updateDomain($tenant, $domain, TenantDomainData::fromArray($tenant, $request->validated())));
-        } catch (TenantRecordNotFoundException $exception) {
-            return $this->notFound($exception);
+        $result = $this->domains->create($request->validated());
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
         }
+
+        return (new TenantDomainResource($result->valueOrFail()))->response()->setStatusCode(201);
     }
 
-    public function destroy(int|string $tenant, int|string $domain): JsonResponse
+    public function update(UpsertTenantDomainRequest $request, int|string $tenantDomain): JsonResponse|TenantDomainResource
     {
-        try {
-            $this->tenants->deleteDomain($tenant, $domain);
+        $result = $this->domains->update($tenantDomain, $request->validated());
+        if ($result->isFailure()) {
+            $status = $result->errorOrFail()->code === 'TENANT_NOT_FOUND' ? 404 : 422;
 
-            return response()->json(null, 204);
-        } catch (TenantRecordNotFoundException $exception) {
-            return $this->notFound($exception);
+            return response()->json(['message' => $result->errorOrFail()->message], $status);
         }
+
+        return new TenantDomainResource($result->valueOrFail());
+    }
+
+    public function destroy(int|string $tenantDomain): JsonResponse
+    {
+        $result = $this->domains->delete($tenantDomain);
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 404);
+        }
+
+        return response()->json(null, 204);
     }
 }

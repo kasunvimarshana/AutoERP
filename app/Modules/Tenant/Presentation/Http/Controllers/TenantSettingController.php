@@ -5,68 +5,67 @@ declare(strict_types=1);
 namespace Modules\Tenant\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Modules\Tenant\Application\DTOs\TenantSettingData;
-use Modules\Tenant\Application\Services\TenantService;
-use Modules\Tenant\Domain\Exceptions\TenantRecordNotFoundException;
-use Modules\Tenant\Presentation\Http\Controllers\Concerns\HandlesTenantHttp;
-use Modules\Tenant\Presentation\Http\Requests\StoreTenantSettingRequest;
-use Modules\Tenant\Presentation\Http\Requests\UpdateTenantSettingRequest;
+use Modules\Tenant\Application\Contracts\UseCases\Settings\TenantSettingServiceInterface;
+use Modules\Tenant\Presentation\Http\Requests\ListTenantSettingRequest;
+use Modules\Tenant\Presentation\Http\Requests\UpsertTenantSettingRequest;
 use Modules\Tenant\Presentation\Http\Resources\TenantSettingResource;
 
-class TenantSettingController extends Controller
+final class TenantSettingController extends Controller
 {
-    use HandlesTenantHttp;
-
-    public function __construct(private readonly TenantService $tenants) {}
-
-    public function index(Request $request, int|string $tenant): mixed
+    public function __construct(private readonly TenantSettingServiceInterface $settings)
     {
-        try {
-            return TenantSettingResource::collection($this->tenants->listSettings($tenant, $this->perPage($request)));
-        } catch (TenantRecordNotFoundException $exception) {
-            return $this->notFound($exception);
-        }
     }
 
-    public function store(StoreTenantSettingRequest $request, int|string $tenant): JsonResponse
+    public function index(ListTenantSettingRequest $request): JsonResponse
     {
-        try {
-            $setting = $this->tenants->createSetting(TenantSettingData::fromArray($tenant, $request->validated()));
-
-            return (new TenantSettingResource($setting))->response()->setStatusCode(201);
-        } catch (TenantRecordNotFoundException $exception) {
-            return $this->notFound($exception);
+        $result = $this->settings->listByTenant((int) $request->validated('tenant_id'));
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
         }
+
+        return response()->json(['data' => TenantSettingResource::collection($result->valueOrFail())->resolve()]);
     }
 
-    public function show(int|string $tenant, int|string $setting): TenantSettingResource|JsonResponse
+    public function show(int|string $tenantSetting): JsonResponse|TenantSettingResource
     {
-        try {
-            return new TenantSettingResource($this->tenants->findSetting($tenant, $setting));
-        } catch (TenantRecordNotFoundException $exception) {
-            return $this->notFound($exception);
+        $result = $this->settings->get($tenantSetting);
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 404);
         }
+
+        return new TenantSettingResource($result->valueOrFail());
     }
 
-    public function update(UpdateTenantSettingRequest $request, int|string $tenant, int|string $setting): TenantSettingResource|JsonResponse
+    public function store(UpsertTenantSettingRequest $request): JsonResponse|TenantSettingResource
     {
-        try {
-            return new TenantSettingResource($this->tenants->updateSetting($tenant, $setting, TenantSettingData::fromArray($tenant, $request->validated())));
-        } catch (TenantRecordNotFoundException $exception) {
-            return $this->notFound($exception);
+        $result = $this->settings->create($request->validated());
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
         }
+
+        return (new TenantSettingResource($result->valueOrFail()))->response()->setStatusCode(201);
     }
 
-    public function destroy(int|string $tenant, int|string $setting): JsonResponse
+    public function update(UpsertTenantSettingRequest $request, int|string $tenantSetting): JsonResponse|TenantSettingResource
     {
-        try {
-            $this->tenants->deleteSetting($tenant, $setting);
+        $result = $this->settings->update($tenantSetting, $request->validated());
+        if ($result->isFailure()) {
+            $status = $result->errorOrFail()->code === 'TENANT_NOT_FOUND' ? 404 : 422;
 
-            return response()->json(null, 204);
-        } catch (TenantRecordNotFoundException $exception) {
-            return $this->notFound($exception);
+            return response()->json(['message' => $result->errorOrFail()->message], $status);
         }
+
+        return new TenantSettingResource($result->valueOrFail());
+    }
+
+    public function destroy(int|string $tenantSetting): JsonResponse
+    {
+        $result = $this->settings->delete($tenantSetting);
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 404);
+        }
+
+        return response()->json(null, 204);
     }
 }

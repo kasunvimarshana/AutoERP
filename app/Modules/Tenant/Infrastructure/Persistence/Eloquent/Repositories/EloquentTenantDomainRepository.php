@@ -1,41 +1,72 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Application\DTO\DataRecord;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
 use Modules\Tenant\Application\Repositories\TenantDomainRepositoryInterface;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantDomainModel;
 
-class EloquentTenantDomainRepository extends EloquentRepository implements TenantDomainRepositoryInterface
+final class EloquentTenantDomainRepository extends EloquentRepository implements TenantDomainRepositoryInterface
 {
     public function __construct(TenantDomainModel $model)
     {
         parent::__construct($model);
     }
 
-    public function findByDomain(string $domain, array $with = []): ?Model
+    public function listByTenant(int|string $tenantId): array
     {
-        return $this->query($with)->where('domain', $domain)->first();
+        $records = [];
+
+        foreach (
+            $this->query()
+                ->where('tenant_id', $tenantId)
+                ->orderByDesc('is_primary')
+                ->orderBy('domain')
+                ->get() as $model
+        ) {
+            if ($model instanceof Model) {
+                $records[] = $this->toRecord($model);
+            }
+        }
+
+        return $records;
     }
 
-    public function getForTenant(int|string $tenantId, array $with = []): Collection
+    public function findByDomain(string $domain): ?DataRecord
     {
-        return $this->query($with)->where('tenant_id', $tenantId)->get();
+        $model = $this->query()->where('domain', strtolower(trim($domain)))->first();
+
+        if (! $model instanceof Model) {
+            return null;
+        }
+
+        return $this->toRecord($model);
     }
 
-    public function paginateForTenant(int|string $tenantId, int $perPage = 15, array $with = []): LengthAwarePaginator
+    public function findPrimaryByTenant(int|string $tenantId): ?DataRecord
     {
-        return $this->query($with)->where('tenant_id', $tenantId)->paginate($perPage);
+        $model = $this->query()->where('tenant_id', $tenantId)->where('is_primary', true)->first();
+
+        if (! $model instanceof Model) {
+            return null;
+        }
+
+        return $this->toRecord($model);
     }
 
-    public function findForTenantById(int|string $tenantId, int|string $id, array $with = []): ?Model
+    public function clearPrimaryForTenant(int|string $tenantId): int
     {
-        return $this->query($with)->where('tenant_id', $tenantId)->whereKey($id)->first();
+        return $this->query()
+            ->where('tenant_id', $tenantId)
+            ->where('is_primary', true)
+            ->update([
+                'is_primary' => false,
+                'row_version' => \Illuminate\Support\Facades\DB::raw('row_version + 1'),
+                'updated_at' => now(),
+            ]);
     }
 }
-
