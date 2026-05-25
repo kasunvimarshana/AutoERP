@@ -8,14 +8,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasStatusScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Models\CoreModel;
+// use Modules\Core\Infrastructure\Persistence\Eloquent\Models\CoreModel;
 use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantModel;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Laravel\Passport\Contracts\OAuthenticatable;
+use Laravel\Passport\HasApiTokens;
 
-final class UserModel extends CoreModel
+
+final class UserModel extends Authenticatable implements OAuthenticatable
 {
     use HasStatusScope;
-    use SoftDeletes;
+    use SoftDeletes, HasApiTokens, Notifiable;
 
     protected $table = 'users';
 
