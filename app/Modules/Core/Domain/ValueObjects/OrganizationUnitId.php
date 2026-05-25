@@ -10,7 +10,7 @@ final class OrganizationUnitId extends ValueObject
 {
     public function __construct(private readonly int|string $value)
     {
-        if ((string) $value === '') {
+        if (is_string($value) && trim($value) === '') {
             throw InvalidValueObjectException::because('OrganizationUnitId cannot be empty.');
         }
     }
@@ -30,7 +30,12 @@ final class OrganizationUnitId extends ValueObject
      */
     public static function fromArray(array $data): static
     {
-        return new self((string) ($data['value'] ?? ''));
+        $value = $data['value'] ?? '';
+        if (! is_int($value) && ! is_string($value)) {
+            $value = (string) $value;
+        }
+
+        return new self($value);
     }
 
     /**

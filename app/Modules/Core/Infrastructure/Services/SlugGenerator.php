@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace Modules\Core\Infrastructure\Services;
 
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Modules\Core\Application\Contracts\SlugGeneratorInterface;
 
-class SlugGenerator implements SlugGeneratorInterface
+final class SlugGenerator implements SlugGeneratorInterface
 {
     public function __construct(private readonly string $fallback)
     {
+        if (trim($this->fallback) === '') {
+            throw new InvalidArgumentException('Slug fallback cannot be empty.');
+        }
     }
 
     public function generate(?string $preferredValue, ?string $sourceValue, ?string $fallback = null): string
@@ -27,10 +31,14 @@ class SlugGenerator implements SlugGeneratorInterface
             return $slug;
         }
 
-        $fallbackValue = $fallback ?? $this->fallback;
+        $fallbackValue = $this->normalizeInput($fallback) ?? $this->fallback;
         $fallbackSlug = Str::slug(trim($fallbackValue));
 
-        return $fallbackSlug !== '' ? $fallbackSlug : $this->fallback;
+        if ($fallbackSlug === '') {
+            throw new InvalidArgumentException('Unable to generate slug from provided values.');
+        }
+
+        return $fallbackSlug;
     }
 
     private function normalizeInput(?string $value): ?string

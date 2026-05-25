@@ -16,7 +16,7 @@ use Modules\Core\Infrastructure\Services\SlugGenerator;
 use Modules\Core\Infrastructure\Support\LaravelUuidGenerator;
 use Modules\Core\Infrastructure\Support\SystemClock;
 
-class CoreServiceProvider extends ServiceProvider
+final class CoreServiceProvider extends ServiceProvider
 {
     public function register(): void
     {

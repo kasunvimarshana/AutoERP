@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Core\Application\DTO;
 
+use InvalidArgumentException;
+
 final readonly class PagedResult
 {
     /**
@@ -15,6 +17,21 @@ final readonly class PagedResult
         public int $page,
         public int $perPage,
     ) {
+        if ($this->total < 0) {
+            throw new InvalidArgumentException('PagedResult total cannot be negative.');
+        }
+
+        if ($this->page < 1) {
+            throw new InvalidArgumentException('PagedResult page must be greater than zero.');
+        }
+
+        if ($this->perPage < 1) {
+            throw new InvalidArgumentException('PagedResult perPage must be greater than zero.');
+        }
+
+        if (! array_is_list($this->items)) {
+            throw new InvalidArgumentException('PagedResult items must be a list.');
+        }
     }
 
     public function pageCount(): int

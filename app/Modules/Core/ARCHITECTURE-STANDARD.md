@@ -1,29 +1,15 @@
 # Core Architecture Standard
 
-This document defines the simplified Core baseline after removing over-engineering.
+Core is the foundation module and must stay minimal, contract-driven, and module-agnostic.
 
-## 1) Comparison Summary
+## 1) Design Rules
 
-### Previous Core
+- DbC: explicit preconditions, postconditions, and no silent failures.
+- IDD: depend on contracts, not implementations.
+- Clean Architecture: Domain independent, Application contract-focused, Infrastructure adapter-only.
+- Keep only reusable building blocks required by active modules.
 
-- Mixed service/repository abstractions with framework leakage.
-- Repository contracts exposed ORM classes.
-- Shared kernel and infrastructure concerns were fragmented.
-
-### Current refactored Core before simplification
-
-- Correctly removed ORM leakage from contracts.
-- Introduced many generic layers (CQRS/pattern/context/audit abstractions) not yet used by modules.
-- Added DTO and entity-related structures, but some abstractions were speculative.
-
-### Simplified result
-
-- Keep only abstractions used by the active architecture baseline.
-- DTO usage: repository boundary uses `DataRecord` and `PagedResult`.
-- Entity usage: `Entity`, `AggregateRoot`, and value objects remain domain-side only.
-- Remove unused CQRS/pattern/context/audit abstraction layers.
-
-## 2) Final Simplified Core Structure
+## 2) Final Core Structure
 
 ```text
 app/Modules/Core/
@@ -38,10 +24,6 @@ app/Modules/Core/
     DTO/
       DataRecord.php
       PagedResult.php
-      PaginationRequest.php
-    Pipelines/
-      Pipeline.php
-      PipelineStageInterface.php
     Repositories/
       Contracts/
         RepositoryPortInterface.php
@@ -57,14 +39,8 @@ app/Modules/Core/
       DomainEventInterface.php
       RecordsDomainEvents.php
     Exceptions/
-      CoreException.php
       DomainException.php
       InvalidValueObjectException.php
-    Specifications/
-      AndSpecification.php
-      NotSpecification.php
-      OrSpecification.php
-      SpecificationInterface.php
     ValueObjects/
       OrganizationUnitId.php
       TenantId.php
@@ -92,14 +68,7 @@ app/Modules/Core/
       SystemClock.php
 ```
 
-## 3) DTO vs Entity Rules
-
-- Use DTOs (`DataRecord`, `PagedResult`, `PaginationRequest`) for application boundary transport.
-- Use Entities/ValueObjects only for domain behavior and identity/value semantics.
-- Never expose Eloquent models from repository/application boundaries.
-- Do not use entities as generic transport containers.
-
-## 4) Dependency Flow
+## 3) Dependency Flow
 
 ```mermaid
 flowchart LR
@@ -108,16 +77,17 @@ flowchart LR
   Infrastructure -.implements.-> Application
 ```
 
-## 5) Simplification Principles Applied
+## 4) Core Contract Intent
 
-- Removed unused abstraction layers (CQRS interfaces, generic pattern interfaces, unused cross-cutting contracts).
-- Collapsed mutation repository API to id-based operations to avoid DTO/entity overlap.
-- Reduced configuration surface to active keys only.
-- Kept explicit constructor dependency injection and framework isolation in infrastructure.
+- `Result` and `Error` are explicit success/failure contracts.
+- `RepositoryPortInterface` defines application-safe persistence boundaries using DTOs.
+- `DataRecord` and `PagedResult` are boundary transport only.
+- Value objects and entities enforce domain invariants.
+- Infrastructure services implement application contracts and keep Laravel-specific behavior isolated.
 
-## 6) Module Guidelines
+## 5) Module Usage Rules
 
-- Depend on Core contracts and DTO boundaries, not infrastructure classes.
-- Keep module-specific policies/strategies inside modules unless reused broadly.
-- Perform calculations in application/domain, not in database-generated totals.
-- Prefer explicit simple contracts over speculative generic abstractions.
+- Modules must import Core contracts from Application/Domain only.
+- Modules must not import Core infrastructure implementations.
+- All repository/service dependencies should be constructor-injected interfaces.
+- Avoid introducing new Core abstractions unless reused by multiple modules with proven need.

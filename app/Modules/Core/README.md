@@ -30,4 +30,4 @@ See `ARCHITECTURE-STANDARD.md` for:
 
 Simplification rule:
 
-- Prefer DTO and Entity primitives over speculative interface layers.
+- Keep only actively reused contracts and base abstractions; remove speculative patterns.

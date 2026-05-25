@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Application\Results;
 
+use LogicException;
+use InvalidArgumentException;
+
 final class Result
 {
     private function __construct(
@@ -11,6 +14,13 @@ final class Result
         private readonly mixed $value = null,
         private readonly ?Error $error = null,
     ) {
+        if ($this->successful && $this->error !== null) {
+            throw new InvalidArgumentException('Successful result cannot contain an error.');
+        }
+
+        if (! $this->successful && $this->error === null) {
+            throw new InvalidArgumentException('Failed result must contain an error.');
+        }
     }
 
     public static function success(mixed $value = null): self
@@ -38,8 +48,26 @@ final class Result
         return $this->value;
     }
 
+    public function valueOrFail(): mixed
+    {
+        if ($this->isFailure()) {
+            throw new LogicException('Cannot read value from a failed result.');
+        }
+
+        return $this->value;
+    }
+
     public function error(): ?Error
     {
+        return $this->error;
+    }
+
+    public function errorOrFail(): Error
+    {
+        if ($this->isSuccess() || $this->error === null) {
+            throw new LogicException('Cannot read error from a successful result.');
+        }
+
         return $this->error;
     }
 }

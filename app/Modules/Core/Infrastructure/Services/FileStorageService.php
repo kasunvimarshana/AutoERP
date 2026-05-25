@@ -7,10 +7,12 @@ namespace Modules\Core\Infrastructure\Services;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use InvalidArgumentException;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-class FileStorageService implements FileStorageServiceInterface
+final class FileStorageService implements FileStorageServiceInterface
 {
     protected FilesystemAdapter $disk;
 
@@ -18,10 +20,14 @@ class FileStorageService implements FileStorageServiceInterface
 
     public function __construct(string $defaultDisk)
     {
+        if (trim($defaultDisk) === '') {
+            throw new InvalidArgumentException('Default storage disk cannot be empty.');
+        }
+
         $this->defaultDisk = $defaultDisk;
         $disk = Storage::disk($defaultDisk);
         if (! $disk instanceof FilesystemAdapter) {
-            throw new \RuntimeException('Configured filesystem disk does not provide a FilesystemAdapter.');
+            throw new RuntimeException('Configured filesystem disk does not provide a FilesystemAdapter.');
         }
 
         $this->disk = $disk;
@@ -30,20 +36,15 @@ class FileStorageService implements FileStorageServiceInterface
     public function store(string $tmpPath, string $directory, string $filename, ?string $disk = null): string
     {
         if (! is_file($tmpPath)) {
-            return '';
+            throw new InvalidArgumentException(sprintf('Temporary file not found: %s', $tmpPath));
         }
 
         $contents = file_get_contents($tmpPath);
         if ($contents === false) {
-            return '';
+            throw new RuntimeException(sprintf('Unable to read temporary file: %s', $tmpPath));
         }
 
-        $targetPath = trim($directory, '/');
-        $targetPath = $targetPath === '' ? $filename : $targetPath . '/' . $filename;
-        $adapter = $this->getDisk($disk);
-        $stored = $adapter->put($targetPath, $contents);
-
-        return $stored ? $targetPath : '';
+        return $this->storeContent($contents, $directory, $filename, $disk);
     }
 
     public function storeContent(
@@ -52,12 +53,18 @@ class FileStorageService implements FileStorageServiceInterface
         string $filename,
         ?string $disk = null,
     ): string {
-        $adapter = $this->getDisk($disk);
-        $targetPath = trim($directory, '/');
-        $targetPath = $targetPath === '' ? $filename : $targetPath . '/' . $filename;
-        $stored = $adapter->put($targetPath, $contents);
+        if ($contents === '') {
+            throw new InvalidArgumentException('File contents cannot be empty.');
+        }
 
-        return $stored ? $targetPath : '';
+        $adapter = $this->getDisk($disk);
+        $targetPath = $this->buildTargetPath($directory, $filename);
+        $stored = $adapter->put($targetPath, $contents);
+        if (! $stored) {
+            throw new RuntimeException(sprintf('Unable to store file at path: %s', $targetPath));
+        }
+
+        return $targetPath;
     }
 
     /**
@@ -76,7 +83,7 @@ class FileStorageService implements FileStorageServiceInterface
 
         $contents = file_get_contents($realPath);
         if ($contents === false) {
-            return '';
+            throw new RuntimeException(sprintf('Unable to read uploaded file: %s', $realPath));
         }
 
         return $this->storeContent(
@@ -133,6 +140,10 @@ class FileStorageService implements FileStorageServiceInterface
     {
         $adapter = $this->getDisk($disk);
 
+        if (! $adapter->exists($path)) {
+            return null;
+        }
+
         return $adapter->get($path);
     }
 
@@ -162,6 +173,10 @@ class FileStorageService implements FileStorageServiceInterface
         int $minutes,
         ?string $disk = null,
     ): ?string {
+        if ($minutes < 1) {
+            throw new InvalidArgumentException('Temporary URL minutes must be greater than zero.');
+        }
+
         $adapter = $this->getDisk($disk);
         if (method_exists($adapter, 'temporaryUrl')) {
             return $adapter->temporaryUrl($path, now()->addMinutes($minutes));
@@ -194,10 +209,14 @@ class FileStorageService implements FileStorageServiceInterface
 
     public function setDefaultDisk(string $disk): void
     {
+        if (trim($disk) === '') {
+            throw new InvalidArgumentException('Storage disk cannot be empty.');
+        }
+
         $this->defaultDisk = $disk;
         $adapter = Storage::disk($disk);
         if (! $adapter instanceof FilesystemAdapter) {
-            throw new \RuntimeException('Configured filesystem disk does not provide a FilesystemAdapter.');
+            throw new RuntimeException('Configured filesystem disk does not provide a FilesystemAdapter.');
         }
 
         $this->disk = $adapter;
@@ -205,6 +224,10 @@ class FileStorageService implements FileStorageServiceInterface
 
     protected function getDisk(?string $disk = null): FilesystemAdapter
     {
+        if ($disk !== null && trim($disk) === '') {
+            throw new InvalidArgumentException('Storage disk cannot be empty.');
+        }
+
         if ($disk === null || $disk === $this->defaultDisk) {
             return $this->disk;
         }
@@ -213,5 +236,17 @@ class FileStorageService implements FileStorageServiceInterface
         $adapter = Storage::disk($disk);
 
         return $adapter;
+    }
+
+    private function buildTargetPath(string $directory, string $filename): string
+    {
+        $normalizedFilename = trim($filename);
+        if ($normalizedFilename === '') {
+            throw new InvalidArgumentException('Filename cannot be empty.');
+        }
+
+        $targetPath = trim($directory, '/');
+
+        return $targetPath === '' ? $normalizedFilename : $targetPath . '/' . $normalizedFilename;
     }
 }

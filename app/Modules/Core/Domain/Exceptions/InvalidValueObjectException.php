@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Domain\Exceptions;
 
-final class InvalidValueObjectException extends CoreException
+final class InvalidValueObjectException extends DomainException
 {
     public static function because(string $message): self
     {

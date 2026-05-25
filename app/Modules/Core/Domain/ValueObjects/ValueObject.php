@@ -23,6 +23,10 @@ abstract class ValueObject
 
     final public function equals(self $other): bool
     {
+        if ($other::class !== static::class) {
+            return false;
+        }
+
         return $this->primitives() === $other->primitives();
     }
 }

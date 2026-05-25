@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\DTO\PagedResult;
 use Modules\Core\Application\Repositories\Contracts\RepositoryPortInterface;
@@ -19,6 +20,9 @@ abstract class EloquentRepository implements RepositoryPortInterface
         protected Model $model,
         protected string $identifierColumn = SchemaColumns::ID,
     ) {
+        if (trim($this->identifierColumn) === '') {
+            throw new InvalidArgumentException('Identifier column cannot be empty.');
+        }
     }
 
     public function query(array $with = []): Builder
@@ -28,14 +32,14 @@ abstract class EloquentRepository implements RepositoryPortInterface
 
     public function findById(int|string $id, array $with = []): ?DataRecord
     {
-        $model = $this->query($with)->find($id);
+        $model = $this->findByIdentifier($id, $with, false);
 
         return $model === null ? null : $this->toRecord($model);
     }
 
     public function findOrFail(int|string $id, array $with = []): DataRecord
     {
-        return $this->toRecord($this->query($with)->findOrFail($id));
+        return $this->toRecord($this->findByIdentifier($id, $with, true));
     }
 
     /**
@@ -63,13 +67,18 @@ abstract class EloquentRepository implements RepositoryPortInterface
         int $page,
         array $with = [],
     ): PagedResult {
-        $resolvedPage = $page > 0 ? $page : 1;
-        $resolvedPerPage = $perPage > 0 ? $perPage : 1;
+        if ($page < 1) {
+            throw new InvalidArgumentException('Page must be greater than zero.');
+        }
+
+        if ($perPage < 1) {
+            throw new InvalidArgumentException('Per-page must be greater than zero.');
+        }
 
         $paginator = $criteria === []
-            ? $this->query($with)->paginate($resolvedPerPage, ['*'], 'page', $resolvedPage)
+            ? $this->query($with)->paginate($perPage, ['*'], 'page', $page)
             : $this->applyCriteria($this->query($with), $criteria)
-                ->paginate($resolvedPerPage, ['*'], 'page', $resolvedPage);
+                ->paginate($perPage, ['*'], 'page', $page);
 
         $items = [];
         foreach ($paginator->items() as $model) {
@@ -113,7 +122,7 @@ abstract class EloquentRepository implements RepositoryPortInterface
             return false;
         }
 
-        $targetModel = $this->query()->withTrashed()->findOrFail($id);
+        $targetModel = $this->findByIdentifier($id, [], true, true);
 
         return (bool) $targetModel->restore();
     }
@@ -131,8 +140,24 @@ abstract class EloquentRepository implements RepositoryPortInterface
     protected function applyCriteria(Builder $query, array $criteria): Builder
     {
         foreach ($criteria as $column => $value) {
+            if (! is_string($column) || trim($column) === '') {
+                throw new InvalidArgumentException('Criteria keys must be non-empty strings.');
+            }
+
             if (is_array($value)) {
+                if ($value === []) {
+                    $query->whereRaw('1 = 0');
+
+                    continue;
+                }
+
                 $query->whereIn($column, $value);
+
+                continue;
+            }
+
+            if ($value === null) {
+                $query->whereNull($column);
 
                 continue;
             }
@@ -145,7 +170,32 @@ abstract class EloquentRepository implements RepositoryPortInterface
 
     protected function resolveModel(int|string $id): Model
     {
-        return $this->query()->findOrFail($id);
+        return $this->findByIdentifier($id, [], true);
+    }
+
+    protected function findByIdentifier(
+        int|string $id,
+        array $with = [],
+        bool $failIfMissing = false,
+        bool $includeTrashed = false,
+    ): ?Model {
+        if (is_string($id) && trim($id) === '') {
+            throw new InvalidArgumentException('Identifier cannot be empty.');
+        }
+
+        $query = $this->query($with);
+
+        if ($includeTrashed) {
+            $query = $query->withTrashed();
+        }
+
+        if ($this->identifierColumn === SchemaColumns::ID || $this->identifierColumn === $this->model->getKeyName()) {
+            return $failIfMissing ? $query->findOrFail($id) : $query->find($id);
+        }
+
+        $query->where($this->identifierColumn, $id);
+
+        return $failIfMissing ? $query->firstOrFail() : $query->first();
     }
 
     protected function toRecord(Model $model): DataRecord
