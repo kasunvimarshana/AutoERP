@@ -1,0 +1,17 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories;
+
+use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
+use Modules\Inventory\Application\Repositories\ValuationConfigRepositoryInterface;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\ValuationConfigModel;
+
+final class EloquentValuationConfigRepository extends EloquentRepository implements ValuationConfigRepositoryInterface
+{
+    public function __construct(ValuationConfigModel $model)
+    {
+        parent::__construct($model);
+    }
+}

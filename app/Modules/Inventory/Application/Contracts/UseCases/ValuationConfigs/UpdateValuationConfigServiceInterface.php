@@ -1,0 +1,15 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Inventory\Application\Contracts\UseCases\ValuationConfigs;
+
+use Modules\Core\Application\Results\Result;
+
+interface UpdateValuationConfigServiceInterface
+{
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public function execute(int|string $id, array $payload): Result;
+}
