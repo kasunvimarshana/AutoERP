@@ -1,29 +1,30 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\Configuration\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Configuration\Application\Repositories\CountryRepositoryInterface;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\CountryModel;
+use Modules\Core\Application\DTO\DataRecord;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
 
-class EloquentCountryRepository extends EloquentRepository implements CountryRepositoryInterface
+final class EloquentCountryRepository extends EloquentRepository implements CountryRepositoryInterface
 {
     public function __construct(CountryModel $model)
     {
         parent::__construct($model);
     }
 
-    public function findByCode(string $code, array $with = []): ?Model
+    public function findByCode(string $code): ?DataRecord
     {
-        return $this->query($with)->where('code', $code)->first();
-    }
+        $model = $this->query()->where('code', $code)->first();
 
-    public function findByName(string $name, array $with = []): ?Model
-    {
-        return $this->query($with)->where('name', $name)->first();
+        if (! $model instanceof Model) {
+            return null;
+        }
+
+        return $this->toRecord($model);
     }
 }
-

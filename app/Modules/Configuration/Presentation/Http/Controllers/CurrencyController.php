@@ -5,80 +5,113 @@ declare(strict_types=1);
 namespace Modules\Configuration\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Modules\Configuration\Application\DTOs\CurrencyData;
-use Modules\Configuration\Application\Services\ConfigurationService;
-use Modules\Configuration\Domain\Exceptions\ConfigurationRecordNotFoundException;
-use Modules\Configuration\Presentation\Http\Controllers\Concerns\HandlesConfigurationHttp;
-use Modules\Configuration\Presentation\Http\Requests\StoreCurrencyRequest;
-use Modules\Configuration\Presentation\Http\Requests\UpdateCurrencyRequest;
+use Modules\Configuration\Application\Contracts\UseCases\Currencies\CreateCurrencyServiceInterface;
+use Modules\Configuration\Application\Contracts\UseCases\Currencies\DeleteCurrencyServiceInterface;
+use Modules\Configuration\Application\Contracts\UseCases\Currencies\GetCurrencyServiceInterface;
+use Modules\Configuration\Application\Contracts\UseCases\Currencies\ListCurrenciesServiceInterface;
+use Modules\Configuration\Application\Contracts\UseCases\Currencies\UpdateCurrencyServiceInterface;
+use Modules\Configuration\Presentation\Http\Requests\ListCurrencyRequest;
+use Modules\Configuration\Presentation\Http\Requests\UpsertCurrencyRequest;
 use Modules\Configuration\Presentation\Http\Resources\CurrencyResource;
+use Modules\Core\Application\DTO\PagedResult;
 
-class CurrencyController extends Controller
+final class CurrencyController extends Controller
 {
-    use HandlesConfigurationHttp;
+    public function __construct(
+        private readonly ListCurrenciesServiceInterface $listCurrencies,
+        private readonly GetCurrencyServiceInterface $getCurrency,
+        private readonly CreateCurrencyServiceInterface $createCurrency,
+        private readonly UpdateCurrencyServiceInterface $updateCurrency,
+        private readonly DeleteCurrencyServiceInterface $deleteCurrency,
+    ) {
+    }
 
-    public function __construct(private readonly ConfigurationService $configuration) {}
-
-    public function index(Request $request): mixed
+    public function index(ListCurrencyRequest $request): JsonResponse
     {
-        $records = $this->configuration->listCurrencies(
-            filters: $this->filters($request, ['code', 'name', 'is_active']),
-            perPage: $this->perPage($request),
+        $criteria = [];
+        $validated = $request->validated();
+
+        if (isset($validated['code'])) {
+            $criteria['code'] = (string) $validated['code'];
+        }
+        if (isset($validated['name'])) {
+            $criteria['name'] = (string) $validated['name'];
+        }
+        if (array_key_exists('is_active', $validated)) {
+            $criteria['is_active'] = (bool) $validated['is_active'];
+        }
+
+        $result = $this->listCurrencies->execute(
+            $criteria,
+            (int) ($validated['per_page'] ?? 0),
+            (int) ($validated['page'] ?? 0),
         );
 
-        return CurrencyResource::collection($records);
-    }
-
-    public function store(StoreCurrencyRequest $request): JsonResponse
-    {
-        $currency = $this->configuration->createCurrency(CurrencyData::fromArray($request->validated()));
-
-        return (new CurrencyResource($currency))->response()->setStatusCode(201);
-    }
-
-    public function show(int|string $currency): CurrencyResource|JsonResponse
-    {
-        try {
-            return new CurrencyResource($this->configuration->findCurrency($currency));
-        } catch (ConfigurationRecordNotFoundException $exception) {
-            return $this->notFound($exception);
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->error()?->message], 422);
         }
+
+        $page = $result->value();
+        if (! $page instanceof PagedResult) {
+            return response()->json(['message' => 'Unexpected list response.'], 500);
+        }
+
+        return response()->json([
+            'data' => CurrencyResource::collection($page->items)->resolve(),
+            'meta' => [
+                'total' => $page->total,
+                'page' => $page->page,
+                'per_page' => $page->perPage,
+                'page_count' => $page->pageCount(),
+                'has_more' => $page->hasMore(),
+            ],
+        ]);
     }
 
-    public function update(UpdateCurrencyRequest $request, int|string $currency): CurrencyResource|JsonResponse
+    public function show(int|string $currency): JsonResponse|CurrencyResource
     {
-        try {
-            return new CurrencyResource($this->configuration->updateCurrency($currency, CurrencyData::fromArray($request->validated())));
-        } catch (ConfigurationRecordNotFoundException $exception) {
-            return $this->notFound($exception);
+        $result = $this->getCurrency->execute($currency);
+
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->error()?->message], 404);
         }
+
+        return new CurrencyResource($result->value());
+    }
+
+    public function store(UpsertCurrencyRequest $request): JsonResponse|CurrencyResource
+    {
+        $result = $this->createCurrency->execute($request->validated());
+
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->error()?->message], 422);
+        }
+
+        return (new CurrencyResource($result->value()))->response()->setStatusCode(201);
+    }
+
+    public function update(UpsertCurrencyRequest $request, int|string $currency): JsonResponse|CurrencyResource
+    {
+        $result = $this->updateCurrency->execute($currency, $request->validated());
+
+        if ($result->isFailure()) {
+            $status = $result->error()?->code === 'CONFIGURATION_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $result->error()?->message], $status);
+        }
+
+        return new CurrencyResource($result->value());
     }
 
     public function destroy(int|string $currency): JsonResponse
     {
-        try {
-            $this->configuration->deleteCurrency($currency);
+        $result = $this->deleteCurrency->execute($currency);
 
-            return response()->json(null, 204);
-        } catch (ConfigurationRecordNotFoundException $exception) {
-            return $this->notFound($exception);
-        }
-    }
-
-    /**
-     * @param  array<int, string>  $allowed
-     * @return array<string, mixed>
-     */
-    protected function filters(Request $request, array $allowed): array
-    {
-        $filters = collect($request->only($allowed))->filter(fn (mixed $value): bool => $value !== null && $value !== '')->all();
-
-        if (array_key_exists('is_active', $filters)) {
-            $filters['is_active'] = filter_var($filters['is_active'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->error()?->message], 404);
         }
 
-        return array_filter($filters, fn (mixed $value): bool => $value !== null);
+        return response()->json(null, 204);
     }
 }

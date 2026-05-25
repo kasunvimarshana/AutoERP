@@ -5,65 +5,110 @@ declare(strict_types=1);
 namespace Modules\Configuration\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Modules\Configuration\Application\DTOs\TimezoneData;
-use Modules\Configuration\Application\Services\ConfigurationService;
-use Modules\Configuration\Domain\Exceptions\ConfigurationRecordNotFoundException;
-use Modules\Configuration\Presentation\Http\Controllers\Concerns\HandlesConfigurationHttp;
-use Modules\Configuration\Presentation\Http\Requests\StoreTimezoneRequest;
-use Modules\Configuration\Presentation\Http\Requests\UpdateTimezoneRequest;
+use Modules\Configuration\Application\Contracts\UseCases\Timezones\CreateTimezoneServiceInterface;
+use Modules\Configuration\Application\Contracts\UseCases\Timezones\DeleteTimezoneServiceInterface;
+use Modules\Configuration\Application\Contracts\UseCases\Timezones\GetTimezoneServiceInterface;
+use Modules\Configuration\Application\Contracts\UseCases\Timezones\ListTimezonesServiceInterface;
+use Modules\Configuration\Application\Contracts\UseCases\Timezones\UpdateTimezoneServiceInterface;
+use Modules\Configuration\Presentation\Http\Requests\ListTimezoneRequest;
+use Modules\Configuration\Presentation\Http\Requests\UpsertTimezoneRequest;
 use Modules\Configuration\Presentation\Http\Resources\TimezoneResource;
+use Modules\Core\Application\DTO\PagedResult;
 
-class TimezoneController extends Controller
+final class TimezoneController extends Controller
 {
-    use HandlesConfigurationHttp;
+    public function __construct(
+        private readonly ListTimezonesServiceInterface $listTimezones,
+        private readonly GetTimezoneServiceInterface $getTimezone,
+        private readonly CreateTimezoneServiceInterface $createTimezone,
+        private readonly UpdateTimezoneServiceInterface $updateTimezone,
+        private readonly DeleteTimezoneServiceInterface $deleteTimezone,
+    ) {
+    }
 
-    public function __construct(private readonly ConfigurationService $configuration) {}
-
-    public function index(Request $request): mixed
+    public function index(ListTimezoneRequest $request): JsonResponse
     {
-        $records = $this->configuration->listTimezones(
-            filters: $this->filters($request, ['name', 'offset']),
-            perPage: $this->perPage($request),
+        $criteria = [];
+        $validated = $request->validated();
+
+        if (isset($validated['name'])) {
+            $criteria['name'] = (string) $validated['name'];
+        }
+        if (isset($validated['offset'])) {
+            $criteria['offset'] = (string) $validated['offset'];
+        }
+
+        $result = $this->listTimezones->execute(
+            $criteria,
+            (int) ($validated['per_page'] ?? 0),
+            (int) ($validated['page'] ?? 0),
         );
 
-        return TimezoneResource::collection($records);
-    }
-
-    public function store(StoreTimezoneRequest $request): JsonResponse
-    {
-        $timezone = $this->configuration->createTimezone(TimezoneData::fromArray($request->validated()));
-
-        return (new TimezoneResource($timezone))->response()->setStatusCode(201);
-    }
-
-    public function show(int|string $timezone): TimezoneResource|JsonResponse
-    {
-        try {
-            return new TimezoneResource($this->configuration->findTimezone($timezone));
-        } catch (ConfigurationRecordNotFoundException $exception) {
-            return $this->notFound($exception);
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->error()?->message], 422);
         }
+
+        $page = $result->value();
+        if (! $page instanceof PagedResult) {
+            return response()->json(['message' => 'Unexpected list response.'], 500);
+        }
+
+        return response()->json([
+            'data' => TimezoneResource::collection($page->items)->resolve(),
+            'meta' => [
+                'total' => $page->total,
+                'page' => $page->page,
+                'per_page' => $page->perPage,
+                'page_count' => $page->pageCount(),
+                'has_more' => $page->hasMore(),
+            ],
+        ]);
     }
 
-    public function update(UpdateTimezoneRequest $request, int|string $timezone): TimezoneResource|JsonResponse
+    public function show(int|string $timezone): JsonResponse|TimezoneResource
     {
-        try {
-            return new TimezoneResource($this->configuration->updateTimezone($timezone, TimezoneData::fromArray($request->validated())));
-        } catch (ConfigurationRecordNotFoundException $exception) {
-            return $this->notFound($exception);
+        $result = $this->getTimezone->execute($timezone);
+
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->error()?->message], 404);
         }
+
+        return new TimezoneResource($result->value());
+    }
+
+    public function store(UpsertTimezoneRequest $request): JsonResponse|TimezoneResource
+    {
+        $result = $this->createTimezone->execute($request->validated());
+
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->error()?->message], 422);
+        }
+
+        return (new TimezoneResource($result->value()))->response()->setStatusCode(201);
+    }
+
+    public function update(UpsertTimezoneRequest $request, int|string $timezone): JsonResponse|TimezoneResource
+    {
+        $result = $this->updateTimezone->execute($timezone, $request->validated());
+
+        if ($result->isFailure()) {
+            $status = $result->error()?->code === 'CONFIGURATION_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $result->error()?->message], $status);
+        }
+
+        return new TimezoneResource($result->value());
     }
 
     public function destroy(int|string $timezone): JsonResponse
     {
-        try {
-            $this->configuration->deleteTimezone($timezone);
+        $result = $this->deleteTimezone->execute($timezone);
 
-            return response()->json(null, 204);
-        } catch (ConfigurationRecordNotFoundException $exception) {
-            return $this->notFound($exception);
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->error()?->message], 404);
         }
+
+        return response()->json(null, 204);
     }
 }

@@ -1,16 +1,13 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\Configuration\Application\Repositories;
 
-use Modules\Core\Application\Repositories\Contracts\BaseRepositoryInterface;
-use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Application\DTO\DataRecord;
+use Modules\Core\Application\Repositories\Contracts\RepositoryPortInterface;
 
-interface CountryRepositoryInterface extends BaseRepositoryInterface
+interface CountryRepositoryInterface extends RepositoryPortInterface
 {
-    public function findByCode(string $code, array $with = []): ?Model;
-
-    public function findByName(string $name, array $with = []): ?Model;
+    public function findByCode(string $code): ?DataRecord;
 }
-

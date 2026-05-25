@@ -1,29 +1,30 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\Configuration\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Configuration\Application\Repositories\LanguageRepositoryInterface;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\LanguageModel;
+use Modules\Core\Application\DTO\DataRecord;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
 
-class EloquentLanguageRepository extends EloquentRepository implements LanguageRepositoryInterface
+final class EloquentLanguageRepository extends EloquentRepository implements LanguageRepositoryInterface
 {
     public function __construct(LanguageModel $model)
     {
         parent::__construct($model);
     }
 
-    public function findByCode(string $code, array $with = []): ?Model
+    public function findByCode(string $code): ?DataRecord
     {
-        return $this->query($with)->where('code', $code)->first();
-    }
+        $model = $this->query()->where('code', $code)->first();
 
-    public function findByName(string $name, array $with = []): ?Model
-    {
-        return $this->query($with)->where('name', $name)->first();
+        if (! $model instanceof Model) {
+            return null;
+        }
+
+        return $this->toRecord($model);
     }
 }
-

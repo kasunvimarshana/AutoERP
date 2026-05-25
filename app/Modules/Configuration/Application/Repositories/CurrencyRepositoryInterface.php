@@ -1,21 +1,13 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\Configuration\Application\Repositories;
 
-use Modules\Core\Application\Repositories\Contracts\BaseRepositoryInterface;
-use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Application\DTO\DataRecord;
+use Modules\Core\Application\Repositories\Contracts\RepositoryPortInterface;
 
-interface CurrencyRepositoryInterface extends BaseRepositoryInterface
+interface CurrencyRepositoryInterface extends RepositoryPortInterface
 {
-    public function findByCode(string $code, array $with = []): ?Model;
-
-    public function findByName(string $name, array $with = []): ?Model;
-
-    public function getActive(array $with = []): Collection;
-
-    public function getInactive(array $with = []): Collection;
+    public function findByCode(string $code): ?DataRecord;
 }
-

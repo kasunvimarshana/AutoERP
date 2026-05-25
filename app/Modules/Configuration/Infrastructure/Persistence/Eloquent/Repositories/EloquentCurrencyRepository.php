@@ -1,40 +1,30 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\Configuration\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Configuration\Application\Repositories\CurrencyRepositoryInterface;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\CurrencyModel;
+use Modules\Core\Application\DTO\DataRecord;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
 
-class EloquentCurrencyRepository extends EloquentRepository implements CurrencyRepositoryInterface
+final class EloquentCurrencyRepository extends EloquentRepository implements CurrencyRepositoryInterface
 {
     public function __construct(CurrencyModel $model)
     {
         parent::__construct($model);
     }
 
-    public function findByCode(string $code, array $with = []): ?Model
+    public function findByCode(string $code): ?DataRecord
     {
-        return $this->query($with)->where('code', $code)->first();
-    }
+        $model = $this->query()->where('code', $code)->first();
 
-    public function findByName(string $name, array $with = []): ?Model
-    {
-        return $this->query($with)->where('name', $name)->first();
-    }
+        if (! $model instanceof Model) {
+            return null;
+        }
 
-    public function getActive(array $with = []): Collection
-    {
-        return $this->query($with)->where('is_active', true)->get();
-    }
-
-    public function getInactive(array $with = []): Collection
-    {
-        return $this->query($with)->where('is_active', false)->get();
+        return $this->toRecord($model);
     }
 }
-

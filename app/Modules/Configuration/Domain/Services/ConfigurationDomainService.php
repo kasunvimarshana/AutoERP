@@ -4,35 +4,135 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Domain\Services;
 
-use InvalidArgumentException;
+use Modules\Configuration\Domain\Constants\ConfigurationErrorCode;
+use Modules\Configuration\Domain\Constants\ConfigurationSource;
+use Modules\Configuration\Domain\Constants\ConfigurationValueType;
+use Modules\Configuration\Domain\Contracts\ConfigurationDomainServiceInterface;
+use Modules\Core\Domain\Exceptions\DomainException;
 
-class ConfigurationDomainService
+final class ConfigurationDomainService implements ConfigurationDomainServiceInterface
 {
-    public function normalizeCode(string $code): string
+    private const KEY_PATTERN = '/^[a-z0-9._-]+$/i';
+
+    private const SOURCE_MAX_LENGTH = 20;
+
+    public function normalizeKey(string $key): string
     {
-        return strtoupper(trim($code));
+        $normalized = trim($key);
+
+        if ($normalized === '' || preg_match(self::KEY_PATTERN, $normalized) !== 1) {
+            throw new DomainException(ConfigurationErrorCode::INVALID_KEY . ': Invalid configuration key format.');
+        }
+
+        return $normalized;
     }
 
-    public function normalizeText(?string $value): ?string
+    public function normalizeSource(?string $source): string
     {
-        $value = $value === null ? null : trim($value);
+        $resolved = $source === null ? '' : trim($source);
+
+        if ($resolved === '') {
+            return ConfigurationSource::DATABASE;
+        }
+
+        if (mb_strlen($resolved) > self::SOURCE_MAX_LENGTH) {
+            throw new DomainException(ConfigurationErrorCode::INVALID_SOURCE . ': Source exceeds schema limit.');
+        }
+
+        return $resolved;
+    }
+
+    public function normalizeDescription(?string $description): ?string
+    {
+        if ($description === null) {
+            return null;
+        }
+
+        $value = trim($description);
 
         return $value === '' ? null : $value;
     }
 
-    /**
-     * @param  array<string, mixed>|null  $metadata
-     * @return array<string, mixed>|null
-     */
-    public function normalizeMetadata(?array $metadata): ?array
+    public function parseCliValue(string $raw): mixed
     {
-        return $metadata === [] ? null : $metadata;
+        $trimmed = trim($raw);
+        $lowered = strtolower($trimmed);
+
+        if ($lowered === 'null') {
+            return null;
+        }
+
+        if ($lowered === 'true') {
+            return true;
+        }
+
+        if ($lowered === 'false') {
+            return false;
+        }
+
+        if (preg_match('/^-?\d+$/', $trimmed) === 1) {
+            return (int) $trimmed;
+        }
+
+        if (preg_match('/^-?\d+\.\d+$/', $trimmed) === 1) {
+            return (float) $trimmed;
+        }
+
+        if (
+            str_starts_with($trimmed, '{')
+            || str_starts_with($trimmed, '[')
+        ) {
+            $decoded = json_decode($trimmed, true);
+
+            if (json_last_error() === JSON_ERROR_NONE) {
+                return $decoded;
+            }
+        }
+
+        return $raw;
     }
 
-    public function assertCurrencyDecimalPlaces(int $decimalPlaces): void
+    /**
+     * @return array{0: string, 1: string}
+     */
+    public function serializeValue(mixed $value): array
     {
-        if ($decimalPlaces < 0 || $decimalPlaces > 8) {
-            throw new InvalidArgumentException('Currency decimal places must be between 0 and 8.');
+        if ($value === null) {
+            return ['', ConfigurationValueType::NULL];
         }
+
+        if (is_bool($value)) {
+            return [$value ? '1' : '0', ConfigurationValueType::BOOLEAN];
+        }
+
+        if (is_int($value)) {
+            return [(string) $value, ConfigurationValueType::INTEGER];
+        }
+
+        if (is_float($value)) {
+            return [(string) $value, ConfigurationValueType::FLOAT];
+        }
+
+        if (is_array($value)) {
+            return [json_encode($value, JSON_THROW_ON_ERROR), ConfigurationValueType::JSON];
+        }
+
+        if (is_string($value)) {
+            return [$value, ConfigurationValueType::STRING];
+        }
+
+        throw new DomainException(ConfigurationErrorCode::INVALID_VALUE . ': Unsupported value type.');
+    }
+
+    public function deserializeValue(string $storedValue, string $valueType): mixed
+    {
+        return match ($valueType) {
+            ConfigurationValueType::NULL => null,
+            ConfigurationValueType::BOOLEAN => $storedValue === '1',
+            ConfigurationValueType::INTEGER => (int) $storedValue,
+            ConfigurationValueType::FLOAT => (float) $storedValue,
+            ConfigurationValueType::JSON => json_decode($storedValue, true, 512, JSON_THROW_ON_ERROR),
+            default => $storedValue,
+        };
     }
 }
