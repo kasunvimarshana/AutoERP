@@ -4,6 +4,7 @@ use App\Providers\AppServiceProvider;
 
 return [
     AppServiceProvider::class,
+    Modules\Core\Infrastructure\Providers\CoreServiceProvider::class,
     Modules\Audit\Infrastructure\Providers\AuditServiceProvider::class,
     Modules\Configuration\Infrastructure\Providers\ConfigurationServiceProvider::class,
     Modules\Customer\Infrastructure\Providers\CustomerServiceProvider::class,
