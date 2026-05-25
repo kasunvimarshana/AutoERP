@@ -1,22 +1,21 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\Configuration\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasReferenceScope;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class TimezoneModel extends Model
 {
-    use HasReferenceScope, SoftDeletes;
+    use SoftDeletes;
 
     protected $table = 'timezones';
 
     protected $guarded = ['id'];
-
-    protected static string $referenceColumn = 'name';
 
     protected function casts(): array
     {
@@ -25,5 +24,5 @@ class TimezoneModel extends Model
             'row_version' => 'integer',
         ];
     }
-}
 
+}

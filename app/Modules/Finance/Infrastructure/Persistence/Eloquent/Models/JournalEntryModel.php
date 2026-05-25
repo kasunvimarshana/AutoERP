@@ -1,17 +1,19 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasReferenceScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasStatusScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasStatusScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\BankTransactionModel;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\FiscalPeriodModel;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\JournalEntryLineModel;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\JournalEntryModel;
 use Modules\HR\Infrastructure\Persistence\Eloquent\Models\PayslipModel;
 use Modules\Invoice\Infrastructure\Persistence\Eloquent\Models\InvoiceModel;
 use Modules\Invoice\Infrastructure\Persistence\Eloquent\Models\InvoiceReferenceModel;
@@ -19,44 +21,28 @@ use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\Organiza
 use Modules\Payment\Infrastructure\Persistence\Eloquent\Models\PaymentModel;
 use Modules\Payment\Infrastructure\Persistence\Eloquent\Models\WriteOffModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantModel;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Models\VoucherModel;
 
 class JournalEntryModel extends Model
 {
-    use HasOrganizationUnitScope, HasReferenceScope, HasStatusScope, HasTenantScope;
+    use HasTenantScope, HasOrganizationUnitScope, HasStatusScope;
 
     protected $table = 'journal_entries';
 
     protected $guarded = ['id'];
 
-    protected static string $referenceColumn = 'entry_number';
-
     protected function casts(): array
     {
         return [
-            'created_by' => 'integer',
             'entry_date' => 'date',
-            'fiscal_period_id' => 'integer',
             'is_reversed' => 'boolean',
             'metadata' => 'array',
-            'organization_unit_id' => 'integer',
             'posted_at' => 'datetime',
             'posted_by' => 'integer',
             'posting_date' => 'date',
             'reference_id' => 'integer',
-            'reversal_entry_id' => 'integer',
             'row_version' => 'integer',
-            'tenant_id' => 'integer',
         ];
-    }
-
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(TenantModel::class, 'tenant_id');
-    }
-
-    public function organizationUnit(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
     }
 
     public function fiscalPeriod(): BelongsTo
@@ -64,9 +50,34 @@ class JournalEntryModel extends Model
         return $this->belongsTo(FiscalPeriodModel::class, 'fiscal_period_id');
     }
 
+    public function organizationUnit(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
+    }
+
     public function reversalEntry(): BelongsTo
     {
         return $this->belongsTo(JournalEntryModel::class, 'reversal_entry_id');
+    }
+
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(TenantModel::class, 'tenant_id');
+    }
+
+    public function bankTransactions(): HasMany
+    {
+        return $this->hasMany(BankTransactionModel::class, 'matched_journal_entry_id');
+    }
+
+    public function invoiceReferences(): HasMany
+    {
+        return $this->hasMany(InvoiceReferenceModel::class, 'journal_entry_id');
+    }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(InvoiceModel::class, 'journal_entry_id');
     }
 
     public function journalEntries(): HasMany
@@ -79,9 +90,9 @@ class JournalEntryModel extends Model
         return $this->hasMany(JournalEntryLineModel::class, 'journal_entry_id');
     }
 
-    public function bankTransactions(): HasMany
+    public function payments(): HasMany
     {
-        return $this->hasMany(BankTransactionModel::class, 'matched_journal_entry_id');
+        return $this->hasMany(PaymentModel::class, 'journal_entry_id');
     }
 
     public function payslips(): HasMany
@@ -89,19 +100,9 @@ class JournalEntryModel extends Model
         return $this->hasMany(PayslipModel::class, 'journal_entry_id');
     }
 
-    public function invoices(): HasMany
+    public function vouchers(): HasMany
     {
-        return $this->hasMany(InvoiceModel::class, 'journal_entry_id');
-    }
-
-    public function invoiceReferences(): HasMany
-    {
-        return $this->hasMany(InvoiceReferenceModel::class, 'journal_entry_id');
-    }
-
-    public function payments(): HasMany
-    {
-        return $this->hasMany(PaymentModel::class, 'journal_entry_id');
+        return $this->hasMany(VoucherModel::class, 'journal_entry_id');
     }
 
     public function writeOffs(): HasMany
@@ -109,9 +110,4 @@ class JournalEntryModel extends Model
         return $this->hasMany(WriteOffModel::class, 'journal_entry_id');
     }
 
-    public function reference(): MorphTo
-    {
-        return $this->morphTo();
-    }
 }
-

@@ -1,13 +1,18 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\Inventory\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\BatchModel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\CycleCountHeaderModel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\SerialModel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\StockMovementModel;
 use Modules\Item\Infrastructure\Persistence\Eloquent\Models\ItemModel;
 use Modules\Item\Infrastructure\Persistence\Eloquent\Models\ItemVariantModel;
 use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
@@ -16,7 +21,7 @@ use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models\WarehouseLocati
 
 class CycleCountLineModel extends Model
 {
-    use HasOrganizationUnitScope, HasTenantScope;
+    use HasTenantScope, HasOrganizationUnitScope;
 
     protected $table = 'cycle_count_lines';
 
@@ -25,33 +30,24 @@ class CycleCountLineModel extends Model
     protected function casts(): array
     {
         return [
-            'adjustment_movement_id' => 'integer',
-            'batch_id' => 'integer',
-            'count_header_id' => 'integer',
             'counted_qty' => 'decimal:4',
-            'item_id' => 'integer',
-            'location_id' => 'integer',
             'metadata' => 'array',
-            'organization_unit_id' => 'integer',
             'row_version' => 'integer',
-            'serial_id' => 'integer',
             'system_qty' => 'decimal:4',
-            'tenant_id' => 'integer',
             'unit_cost' => 'decimal:4',
             'variance_qty' => 'decimal:4',
             'variance_value' => 'decimal:4',
-            'variant_id' => 'integer',
         ];
     }
 
-    public function tenant(): BelongsTo
+    public function adjustmentMovement(): BelongsTo
     {
-        return $this->belongsTo(TenantModel::class, 'tenant_id');
+        return $this->belongsTo(StockMovementModel::class, 'adjustment_movement_id');
     }
 
-    public function organizationUnit(): BelongsTo
+    public function batch(): BelongsTo
     {
-        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
+        return $this->belongsTo(BatchModel::class, 'batch_id');
     }
 
     public function countHeader(): BelongsTo
@@ -64,14 +60,14 @@ class CycleCountLineModel extends Model
         return $this->belongsTo(ItemModel::class, 'item_id');
     }
 
-    public function variant(): BelongsTo
+    public function location(): BelongsTo
     {
-        return $this->belongsTo(ItemVariantModel::class, 'variant_id');
+        return $this->belongsTo(WarehouseLocationModel::class, 'location_id');
     }
 
-    public function batch(): BelongsTo
+    public function organizationUnit(): BelongsTo
     {
-        return $this->belongsTo(BatchModel::class, 'batch_id');
+        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
     }
 
     public function serial(): BelongsTo
@@ -79,14 +75,14 @@ class CycleCountLineModel extends Model
         return $this->belongsTo(SerialModel::class, 'serial_id');
     }
 
-    public function location(): BelongsTo
+    public function tenant(): BelongsTo
     {
-        return $this->belongsTo(WarehouseLocationModel::class, 'location_id');
+        return $this->belongsTo(TenantModel::class, 'tenant_id');
     }
 
-    public function adjustmentMovement(): BelongsTo
+    public function variant(): BelongsTo
     {
-        return $this->belongsTo(StockMovementModel::class, 'adjustment_movement_id');
+        return $this->belongsTo(ItemVariantModel::class, 'variant_id');
     }
+
 }
-

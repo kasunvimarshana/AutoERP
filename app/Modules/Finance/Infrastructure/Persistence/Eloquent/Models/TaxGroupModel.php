@@ -1,17 +1,18 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\Finance\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasActiveScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasReferenceScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasActiveScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\TaxRateModel;
+use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\TaxRuleModel;
 use Modules\Invoice\Infrastructure\Persistence\Eloquent\Models\InvoiceLineModel;
 use Modules\Invoice\Infrastructure\Persistence\Eloquent\Models\InvoiceModel;
 use Modules\Invoice\Infrastructure\Persistence\Eloquent\Models\InvoiceReferenceModel;
@@ -37,29 +38,19 @@ use Modules\VehicleService\Infrastructure\Persistence\Eloquent\Models\VehicleSer
 
 class TaxGroupModel extends Model
 {
-    use HasActiveScope, HasOrganizationUnitScope, HasReferenceScope, HasTenantScope, SoftDeletes;
+    use HasTenantScope, HasOrganizationUnitScope, HasActiveScope, SoftDeletes;
 
     protected $table = 'tax_groups';
 
     protected $guarded = ['id'];
 
-    protected static string $referenceColumn = 'name';
-
     protected function casts(): array
     {
         return [
-            'created_by' => 'integer',
             'is_active' => 'boolean',
             'metadata' => 'array',
-            'organization_unit_id' => 'integer',
             'row_version' => 'integer',
-            'tenant_id' => 'integer',
         ];
-    }
-
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(TenantModel::class, 'tenant_id');
     }
 
     public function organizationUnit(): BelongsTo
@@ -67,74 +58,9 @@ class TaxGroupModel extends Model
         return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
     }
 
-    public function taxRates(): HasMany
+    public function tenant(): BelongsTo
     {
-        return $this->hasMany(TaxRateModel::class, 'tax_group_id');
-    }
-
-    public function taxRules(): HasMany
-    {
-        return $this->hasMany(TaxRuleModel::class, 'tax_group_id');
-    }
-
-    public function invoices(): HasMany
-    {
-        return $this->hasMany(InvoiceModel::class, 'header_tax_group_id');
-    }
-
-    public function invoiceReferences(): HasMany
-    {
-        return $this->hasMany(InvoiceReferenceModel::class, 'header_tax_group_id');
-    }
-
-    public function invoiceLines(): HasMany
-    {
-        return $this->hasMany(InvoiceLineModel::class, 'tax_group_id');
-    }
-
-    public function items(): HasMany
-    {
-        return $this->hasMany(ItemModel::class, 'tax_group_id');
-    }
-
-    public function purchaseOrders(): HasMany
-    {
-        return $this->hasMany(PurchaseOrderModel::class, 'header_tax_group_id');
-    }
-
-    public function purchaseOrderLines(): HasMany
-    {
-        return $this->hasMany(PurchaseOrderLineModel::class, 'tax_group_id');
-    }
-
-    public function grnHeaders(): HasMany
-    {
-        return $this->hasMany(GrnHeaderModel::class, 'header_tax_group_id');
-    }
-
-    public function grnLines(): HasMany
-    {
-        return $this->hasMany(GrnLineModel::class, 'tax_group_id');
-    }
-
-    public function purchaseReturns(): HasMany
-    {
-        return $this->hasMany(PurchaseReturnModel::class, 'header_tax_group_id');
-    }
-
-    public function purchaseReturnLines(): HasMany
-    {
-        return $this->hasMany(PurchaseReturnLineModel::class, 'tax_group_id');
-    }
-
-    public function salesOrders(): HasMany
-    {
-        return $this->hasMany(SalesOrderModel::class, 'header_tax_group_id');
-    }
-
-    public function salesOrderLines(): HasMany
-    {
-        return $this->hasMany(SalesOrderLineModel::class, 'tax_group_id');
+        return $this->belongsTo(TenantModel::class, 'tenant_id');
     }
 
     public function gdnHeaders(): HasMany
@@ -147,9 +73,64 @@ class TaxGroupModel extends Model
         return $this->hasMany(GdnLineModel::class, 'tax_group_id');
     }
 
-    public function salesReturns(): HasMany
+    public function grnHeaders(): HasMany
     {
-        return $this->hasMany(SalesReturnModel::class, 'header_tax_group_id');
+        return $this->hasMany(GrnHeaderModel::class, 'header_tax_group_id');
+    }
+
+    public function grnLines(): HasMany
+    {
+        return $this->hasMany(GrnLineModel::class, 'tax_group_id');
+    }
+
+    public function invoiceLines(): HasMany
+    {
+        return $this->hasMany(InvoiceLineModel::class, 'tax_group_id');
+    }
+
+    public function invoiceReferences(): HasMany
+    {
+        return $this->hasMany(InvoiceReferenceModel::class, 'header_tax_group_id');
+    }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(InvoiceModel::class, 'header_tax_group_id');
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(ItemModel::class, 'tax_group_id');
+    }
+
+    public function purchaseOrderLines(): HasMany
+    {
+        return $this->hasMany(PurchaseOrderLineModel::class, 'tax_group_id');
+    }
+
+    public function purchaseOrders(): HasMany
+    {
+        return $this->hasMany(PurchaseOrderModel::class, 'header_tax_group_id');
+    }
+
+    public function purchaseReturnLines(): HasMany
+    {
+        return $this->hasMany(PurchaseReturnLineModel::class, 'tax_group_id');
+    }
+
+    public function purchaseReturns(): HasMany
+    {
+        return $this->hasMany(PurchaseReturnModel::class, 'header_tax_group_id');
+    }
+
+    public function salesOrderLines(): HasMany
+    {
+        return $this->hasMany(SalesOrderLineModel::class, 'tax_group_id');
+    }
+
+    public function salesOrders(): HasMany
+    {
+        return $this->hasMany(SalesOrderModel::class, 'header_tax_group_id');
     }
 
     public function salesReturnLines(): HasMany
@@ -157,14 +138,29 @@ class TaxGroupModel extends Model
         return $this->hasMany(SalesReturnLineModel::class, 'tax_group_id');
     }
 
-    public function vehicleServiceJobCards(): HasMany
+    public function salesReturns(): HasMany
     {
-        return $this->hasMany(VehicleServiceJobCardModel::class, 'header_tax_group_id');
+        return $this->hasMany(SalesReturnModel::class, 'header_tax_group_id');
+    }
+
+    public function taxRates(): HasMany
+    {
+        return $this->hasMany(TaxRateModel::class, 'tax_group_id');
+    }
+
+    public function taxRules(): HasMany
+    {
+        return $this->hasMany(TaxRuleModel::class, 'tax_group_id');
     }
 
     public function vehicleServiceJobCardLines(): HasMany
     {
         return $this->hasMany(VehicleServiceJobCardLineModel::class, 'tax_group_id');
+    }
+
+    public function vehicleServiceJobCards(): HasMany
+    {
+        return $this->hasMany(VehicleServiceJobCardModel::class, 'header_tax_group_id');
     }
 
     public function vehicleServiceLaborItems(): HasMany
@@ -176,5 +172,5 @@ class TaxGroupModel extends Model
     {
         return $this->hasMany(VehicleServiceNonInventoryItemModel::class, 'tax_group_id');
     }
-}
 
+}

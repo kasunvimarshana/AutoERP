@@ -1,18 +1,20 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\Audit\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 
 class AuditLogModel extends Model
 {
-    use HasOrganizationUnitScope, HasTenantScope, SoftDeletes;
+    use HasTenantScope, HasOrganizationUnitScope, SoftDeletes;
 
     protected $table = 'audit_logs';
 
@@ -21,15 +23,13 @@ class AuditLogModel extends Model
     protected function casts(): array
     {
         return [
-            'auditable_id' => 'integer',
+            'created_at' => 'datetime',
             'metadata' => 'array',
             'new_values' => 'array',
             'occurred_at' => 'datetime',
             'old_values' => 'array',
-            'organization_unit_id' => 'integer',
             'row_version' => 'integer',
             'tags' => 'array',
-            'tenant_id' => 'integer',
             'user_id' => 'integer',
         ];
     }
@@ -38,5 +38,5 @@ class AuditLogModel extends Model
     {
         return $this->morphTo();
     }
-}
 
+}

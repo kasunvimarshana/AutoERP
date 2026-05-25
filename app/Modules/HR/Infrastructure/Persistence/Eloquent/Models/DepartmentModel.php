@@ -1,23 +1,25 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\HR\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasActiveScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasReferenceScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasActiveScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasReferenceScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
+use Modules\HR\Infrastructure\Persistence\Eloquent\Models\DepartmentModel;
+use Modules\HR\Infrastructure\Persistence\Eloquent\Models\EmployeeModel;
 use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantModel;
 
 class DepartmentModel extends Model
 {
-    use HasActiveScope, HasOrganizationUnitScope, HasReferenceScope, HasTenantScope, SoftDeletes;
+    use HasTenantScope, HasOrganizationUnitScope, HasReferenceScope, HasActiveScope, SoftDeletes;
 
     protected $table = 'departments';
 
@@ -28,21 +30,10 @@ class DepartmentModel extends Model
     protected function casts(): array
     {
         return [
-            'created_by' => 'integer',
-            'depth' => 'integer',
             'is_active' => 'boolean',
             'metadata' => 'array',
-            'organization_unit_id' => 'integer',
-            'parent_id' => 'integer',
             'row_version' => 'integer',
-            'tenant_id' => 'integer',
-            'updated_by' => 'integer',
         ];
-    }
-
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(TenantModel::class, 'tenant_id');
     }
 
     public function organizationUnit(): BelongsTo
@@ -55,7 +46,12 @@ class DepartmentModel extends Model
         return $this->belongsTo(DepartmentModel::class, 'parent_id');
     }
 
-    public function departmentsAsParent(): HasMany
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(TenantModel::class, 'tenant_id');
+    }
+
+    public function departments(): HasMany
     {
         return $this->hasMany(DepartmentModel::class, 'parent_id');
     }
@@ -64,5 +60,5 @@ class DepartmentModel extends Model
     {
         return $this->hasMany(EmployeeModel::class, 'department_id');
     }
-}
 
+}

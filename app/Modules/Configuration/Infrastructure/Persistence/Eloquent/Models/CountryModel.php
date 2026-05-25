@@ -1,13 +1,14 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\Configuration\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasReferenceScope;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasReferenceScope;
 use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerAddressModel;
 use Modules\HR\Infrastructure\Persistence\Eloquent\Models\EmployeeModel;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierAddressModel;
@@ -44,5 +45,5 @@ class CountryModel extends Model
     {
         return $this->hasMany(SupplierAddressModel::class, 'country_id');
     }
-}
 
+}

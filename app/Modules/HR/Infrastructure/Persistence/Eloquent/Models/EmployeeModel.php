@@ -1,29 +1,42 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\HR\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasReferenceScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasStatusScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\CountryModel;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasReferenceScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasStatusScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
+use Modules\HR\Infrastructure\Persistence\Eloquent\Models\AttendanceLogModel;
+use Modules\HR\Infrastructure\Persistence\Eloquent\Models\AttendanceRecordModel;
+use Modules\HR\Infrastructure\Persistence\Eloquent\Models\DepartmentModel;
+use Modules\HR\Infrastructure\Persistence\Eloquent\Models\DesignationModel;
+use Modules\HR\Infrastructure\Persistence\Eloquent\Models\EmployeeContactModel;
+use Modules\HR\Infrastructure\Persistence\Eloquent\Models\EmployeeContractModel;
+use Modules\HR\Infrastructure\Persistence\Eloquent\Models\EmployeeDocumentModel;
+use Modules\HR\Infrastructure\Persistence\Eloquent\Models\EmployeeSalaryAssignmentModel;
+use Modules\HR\Infrastructure\Persistence\Eloquent\Models\EmploymentTypeModel;
+use Modules\HR\Infrastructure\Persistence\Eloquent\Models\LeaveAllocationModel;
+use Modules\HR\Infrastructure\Persistence\Eloquent\Models\LeaveApplicationModel;
+use Modules\HR\Infrastructure\Persistence\Eloquent\Models\PayslipModel;
+use Modules\HR\Infrastructure\Persistence\Eloquent\Models\PerformanceReviewModel;
+use Modules\HR\Infrastructure\Persistence\Eloquent\Models\ShiftAssignmentModel;
 use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantModel;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
 use Modules\VehicleRental\Infrastructure\Persistence\Eloquent\Models\VehicleRentalLesseeRunningChartModel;
 use Modules\VehicleRental\Infrastructure\Persistence\Eloquent\Models\VehicleRentalLessorRunningChartModel;
-use Modules\VehicleService\Infrastructure\Persistence\Eloquent\Models\VehicleServiceJobCardModel;
 use Modules\VehicleService\Infrastructure\Persistence\Eloquent\Models\VehicleServiceLaborAssignmentModel;
 
 class EmployeeModel extends Model
 {
-    use HasOrganizationUnitScope, HasReferenceScope, HasStatusScope, HasTenantScope, SoftDeletes;
+    use HasTenantScope, HasOrganizationUnitScope, HasReferenceScope, HasStatusScope, SoftDeletes;
 
     protected $table = 'employees';
 
@@ -35,35 +48,16 @@ class EmployeeModel extends Model
     {
         return [
             'confirmation_date' => 'date',
-            'country_id' => 'integer',
-            'created_by' => 'integer',
-            'department_id' => 'integer',
-            'designation_id' => 'integer',
-            'employment_type_id' => 'integer',
             'hire_date' => 'date',
             'metadata' => 'array',
-            'organization_unit_id' => 'integer',
             'row_version' => 'integer',
-            'tenant_id' => 'integer',
             'termination_date' => 'date',
-            'updated_by' => 'integer',
-            'user_id' => 'integer',
         ];
     }
 
-    public function tenant(): BelongsTo
+    public function country(): BelongsTo
     {
-        return $this->belongsTo(TenantModel::class, 'tenant_id');
-    }
-
-    public function organizationUnit(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
-    }
-
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(UserModel::class, 'user_id');
+        return $this->belongsTo(CountryModel::class, 'country_id');
     }
 
     public function department(): BelongsTo
@@ -81,24 +75,19 @@ class EmployeeModel extends Model
         return $this->belongsTo(EmploymentTypeModel::class, 'employment_type_id');
     }
 
-    public function country(): BelongsTo
+    public function organizationUnit(): BelongsTo
     {
-        return $this->belongsTo(CountryModel::class, 'country_id');
+        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
     }
 
-    public function employeeContacts(): HasMany
+    public function tenant(): BelongsTo
     {
-        return $this->hasMany(EmployeeContactModel::class, 'employee_id');
+        return $this->belongsTo(TenantModel::class, 'tenant_id');
     }
 
-    public function employeeDocuments(): HasMany
+    public function user(): BelongsTo
     {
-        return $this->hasMany(EmployeeDocumentModel::class, 'employee_id');
-    }
-
-    public function employeeContracts(): HasMany
-    {
-        return $this->hasMany(EmployeeContractModel::class, 'employee_id');
+        return $this->belongsTo(UserModel::class, 'user_id');
     }
 
     public function attendanceLogs(): HasMany
@@ -106,14 +95,29 @@ class EmployeeModel extends Model
         return $this->hasMany(AttendanceLogModel::class, 'employee_id');
     }
 
-    public function shiftAssignments(): HasMany
-    {
-        return $this->hasMany(ShiftAssignmentModel::class, 'employee_id');
-    }
-
     public function attendanceRecords(): HasMany
     {
         return $this->hasMany(AttendanceRecordModel::class, 'employee_id');
+    }
+
+    public function employeeContacts(): HasMany
+    {
+        return $this->hasMany(EmployeeContactModel::class, 'employee_id');
+    }
+
+    public function employeeContracts(): HasMany
+    {
+        return $this->hasMany(EmployeeContractModel::class, 'employee_id');
+    }
+
+    public function employeeDocuments(): HasMany
+    {
+        return $this->hasMany(EmployeeDocumentModel::class, 'employee_id');
+    }
+
+    public function employeeSalaryAssignments(): HasMany
+    {
+        return $this->hasMany(EmployeeSalaryAssignmentModel::class, 'employee_id');
     }
 
     public function leaveAllocations(): HasMany
@@ -126,11 +130,6 @@ class EmployeeModel extends Model
         return $this->hasMany(LeaveApplicationModel::class, 'employee_id');
     }
 
-    public function employeeSalaryAssignments(): HasMany
-    {
-        return $this->hasMany(EmployeeSalaryAssignmentModel::class, 'employee_id');
-    }
-
     public function payslips(): HasMany
     {
         return $this->hasMany(PayslipModel::class, 'employee_id');
@@ -141,9 +140,9 @@ class EmployeeModel extends Model
         return $this->hasMany(PerformanceReviewModel::class, 'employee_id');
     }
 
-    public function vehicleRentalLessorRunningCharts(): HasMany
+    public function shiftAssignments(): HasMany
     {
-        return $this->hasMany(VehicleRentalLessorRunningChartModel::class, 'driver_id');
+        return $this->hasMany(ShiftAssignmentModel::class, 'employee_id');
     }
 
     public function vehicleRentalLesseeRunningCharts(): HasMany
@@ -151,14 +150,14 @@ class EmployeeModel extends Model
         return $this->hasMany(VehicleRentalLesseeRunningChartModel::class, 'driver_id');
     }
 
-    public function vehicleServiceJobCards(): HasMany
+    public function vehicleRentalLessorRunningCharts(): HasMany
     {
-        return $this->hasMany(VehicleServiceJobCardModel::class, 'assigned_to');
+        return $this->hasMany(VehicleRentalLessorRunningChartModel::class, 'driver_id');
     }
 
     public function vehicleServiceLaborAssignments(): HasMany
     {
         return $this->hasMany(VehicleServiceLaborAssignmentModel::class, 'employee_id');
     }
-}
 
+}

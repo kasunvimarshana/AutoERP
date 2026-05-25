@@ -1,18 +1,20 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\Pricing\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasActiveScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasReferenceScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\CurrencyModel;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasActiveScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
+use Modules\Pricing\Infrastructure\Persistence\Eloquent\Models\CustomerPriceListModel;
+use Modules\Pricing\Infrastructure\Persistence\Eloquent\Models\PriceListItemModel;
+use Modules\Pricing\Infrastructure\Persistence\Eloquent\Models\SupplierPriceListModel;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\GrnHeaderModel;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\PurchaseOrderModel;
 use Modules\Sales\Infrastructure\Persistence\Eloquent\Models\GdnHeaderModel;
@@ -22,37 +24,22 @@ use Modules\VehicleService\Infrastructure\Persistence\Eloquent\Models\VehicleSer
 
 class PriceListModel extends Model
 {
-    use HasActiveScope, HasOrganizationUnitScope, HasReferenceScope, HasTenantScope;
+    use HasTenantScope, HasOrganizationUnitScope, HasActiveScope;
 
     protected $table = 'price_lists';
 
     protected $guarded = ['id'];
 
-    protected static string $referenceColumn = 'name';
-
     protected function casts(): array
     {
         return [
-            'currency_id' => 'integer',
             'is_active' => 'boolean',
             'is_default' => 'boolean',
             'metadata' => 'array',
-            'organization_unit_id' => 'integer',
             'row_version' => 'integer',
-            'tenant_id' => 'integer',
             'valid_from' => 'date',
             'valid_to' => 'date',
         ];
-    }
-
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(TenantModel::class, 'tenant_id');
-    }
-
-    public function organizationUnit(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
     }
 
     public function currency(): BelongsTo
@@ -60,14 +47,14 @@ class PriceListModel extends Model
         return $this->belongsTo(CurrencyModel::class, 'currency_id');
     }
 
-    public function priceListItems(): HasMany
+    public function organizationUnit(): BelongsTo
     {
-        return $this->hasMany(PriceListItemModel::class, 'price_list_id');
+        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
     }
 
-    public function supplierPriceLists(): HasMany
+    public function tenant(): BelongsTo
     {
-        return $this->hasMany(SupplierPriceListModel::class, 'price_list_id');
+        return $this->belongsTo(TenantModel::class, 'tenant_id');
     }
 
     public function customerPriceLists(): HasMany
@@ -75,9 +62,9 @@ class PriceListModel extends Model
         return $this->hasMany(CustomerPriceListModel::class, 'price_list_id');
     }
 
-    public function purchaseOrders(): HasMany
+    public function gdnHeaders(): HasMany
     {
-        return $this->hasMany(PurchaseOrderModel::class, 'price_list_id');
+        return $this->hasMany(GdnHeaderModel::class, 'price_list_id');
     }
 
     public function grnHeaders(): HasMany
@@ -85,19 +72,29 @@ class PriceListModel extends Model
         return $this->hasMany(GrnHeaderModel::class, 'price_list_id');
     }
 
+    public function priceListItems(): HasMany
+    {
+        return $this->hasMany(PriceListItemModel::class, 'price_list_id');
+    }
+
+    public function purchaseOrders(): HasMany
+    {
+        return $this->hasMany(PurchaseOrderModel::class, 'price_list_id');
+    }
+
     public function salesOrders(): HasMany
     {
         return $this->hasMany(SalesOrderModel::class, 'price_list_id');
     }
 
-    public function gdnHeaders(): HasMany
+    public function supplierPriceLists(): HasMany
     {
-        return $this->hasMany(GdnHeaderModel::class, 'price_list_id');
+        return $this->hasMany(SupplierPriceListModel::class, 'price_list_id');
     }
 
     public function vehicleServiceJobCards(): HasMany
     {
         return $this->hasMany(VehicleServiceJobCardModel::class, 'price_list_id');
     }
-}
 
+}

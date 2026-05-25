@@ -1,19 +1,22 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
+use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
+use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitSettingGroupModel;
+use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitSettingModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantModel;
 
 class OrganizationUnitSettingGroupModel extends Model
 {
-    use HasOrganizationUnitScope, HasTenantScope;
+    use HasTenantScope, HasOrganizationUnitScope;
 
     protected $table = 'organization_unit_setting_groups';
 
@@ -23,16 +26,8 @@ class OrganizationUnitSettingGroupModel extends Model
     {
         return [
             'metadata' => 'array',
-            'organization_unit_id' => 'integer',
-            'parent_id' => 'integer',
             'row_version' => 'integer',
-            'tenant_id' => 'integer',
         ];
-    }
-
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(TenantModel::class, 'tenant_id');
     }
 
     public function organizationUnit(): BelongsTo
@@ -45,7 +40,12 @@ class OrganizationUnitSettingGroupModel extends Model
         return $this->belongsTo(OrganizationUnitSettingGroupModel::class, 'parent_id');
     }
 
-    public function organizationUnitSettingGroupsAsParent(): HasMany
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(TenantModel::class, 'tenant_id');
+    }
+
+    public function organizationUnitSettingGroups(): HasMany
     {
         return $this->hasMany(OrganizationUnitSettingGroupModel::class, 'parent_id');
     }
@@ -54,5 +54,5 @@ class OrganizationUnitSettingGroupModel extends Model
     {
         return $this->hasMany(OrganizationUnitSettingModel::class, 'group_id');
     }
-}
 
+}

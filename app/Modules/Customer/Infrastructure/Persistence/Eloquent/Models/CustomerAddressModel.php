@@ -1,20 +1,22 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\Customer\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\CountryModel;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
+use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerModel;
 use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantModel;
 
 class CustomerAddressModel extends Model
 {
-    use HasOrganizationUnitScope, HasTenantScope;
+    use HasTenantScope, HasOrganizationUnitScope;
 
     protected $table = 'customer_addresses';
 
@@ -23,26 +25,17 @@ class CustomerAddressModel extends Model
     protected function casts(): array
     {
         return [
-            'country_id' => 'integer',
-            'customer_id' => 'integer',
             'geo_lat' => 'decimal:4',
             'geo_lng' => 'decimal:4',
             'is_default' => 'boolean',
             'metadata' => 'array',
-            'organization_unit_id' => 'integer',
             'row_version' => 'integer',
-            'tenant_id' => 'integer',
         ];
     }
 
-    public function tenant(): BelongsTo
+    public function country(): BelongsTo
     {
-        return $this->belongsTo(TenantModel::class, 'tenant_id');
-    }
-
-    public function organizationUnit(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
+        return $this->belongsTo(CountryModel::class, 'country_id');
     }
 
     public function customer(): BelongsTo
@@ -50,9 +43,14 @@ class CustomerAddressModel extends Model
         return $this->belongsTo(CustomerModel::class, 'customer_id');
     }
 
-    public function country(): BelongsTo
+    public function organizationUnit(): BelongsTo
     {
-        return $this->belongsTo(CountryModel::class, 'country_id');
+        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
     }
-}
 
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(TenantModel::class, 'tenant_id');
+    }
+
+}

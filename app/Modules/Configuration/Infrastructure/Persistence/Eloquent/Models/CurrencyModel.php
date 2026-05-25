@@ -1,14 +1,15 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\Configuration\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasActiveScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasReferenceScope;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasActiveScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasReferenceScope;
 use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerModel;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\AccountModel;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\ApTransactionModel;
@@ -33,7 +34,7 @@ use Modules\VehicleService\Infrastructure\Persistence\Eloquent\Models\VehicleSer
 
 class CurrencyModel extends Model
 {
-    use HasActiveScope, HasReferenceScope, SoftDeletes;
+    use HasReferenceScope, HasActiveScope, SoftDeletes;
 
     protected $table = 'currencies';
 
@@ -48,11 +49,6 @@ class CurrencyModel extends Model
             'metadata' => 'array',
             'row_version' => 'integer',
         ];
-    }
-
-    public function customers(): HasMany
-    {
-        return $this->hasMany(CustomerModel::class, 'currency_id');
     }
 
     public function accounts(): HasMany
@@ -70,14 +66,14 @@ class CurrencyModel extends Model
         return $this->hasMany(ArTransactionModel::class, 'currency_id');
     }
 
-    public function journalEntryLines(): HasMany
-    {
-        return $this->hasMany(JournalEntryLineModel::class, 'currency_id');
-    }
-
     public function bankAccounts(): HasMany
     {
         return $this->hasMany(BankAccountModel::class, 'currency_id');
+    }
+
+    public function customers(): HasMany
+    {
+        return $this->hasMany(CustomerModel::class, 'currency_id');
     }
 
     public function employeeContracts(): HasMany
@@ -85,14 +81,29 @@ class CurrencyModel extends Model
         return $this->hasMany(EmployeeContractModel::class, 'currency_id');
     }
 
-    public function invoices(): HasMany
+    public function gdnHeaders(): HasMany
     {
-        return $this->hasMany(InvoiceModel::class, 'currency_id');
+        return $this->hasMany(GdnHeaderModel::class, 'currency_id');
+    }
+
+    public function grnHeaders(): HasMany
+    {
+        return $this->hasMany(GrnHeaderModel::class, 'currency_id');
     }
 
     public function invoiceReferences(): HasMany
     {
         return $this->hasMany(InvoiceReferenceModel::class, 'currency_id');
+    }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(InvoiceModel::class, 'currency_id');
+    }
+
+    public function journalEntryLines(): HasMany
+    {
+        return $this->hasMany(JournalEntryLineModel::class, 'currency_id');
     }
 
     public function payments(): HasMany
@@ -110,11 +121,6 @@ class CurrencyModel extends Model
         return $this->hasMany(PurchaseOrderModel::class, 'currency_id');
     }
 
-    public function grnHeaders(): HasMany
-    {
-        return $this->hasMany(GrnHeaderModel::class, 'currency_id');
-    }
-
     public function purchaseReturns(): HasMany
     {
         return $this->hasMany(PurchaseReturnModel::class, 'currency_id');
@@ -123,11 +129,6 @@ class CurrencyModel extends Model
     public function salesOrders(): HasMany
     {
         return $this->hasMany(SalesOrderModel::class, 'currency_id');
-    }
-
-    public function gdnHeaders(): HasMany
-    {
-        return $this->hasMany(GdnHeaderModel::class, 'currency_id');
     }
 
     public function salesReturns(): HasMany
@@ -154,5 +155,5 @@ class CurrencyModel extends Model
     {
         return $this->hasMany(VehicleServiceJobCardModel::class, 'currency_id');
     }
-}
 
+}

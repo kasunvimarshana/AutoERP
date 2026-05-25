@@ -1,17 +1,17 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasActiveScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasReferenceScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasActiveScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasReferenceScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\CycleCountHeaderModel;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\InventoryCostLayerModel;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\PickingTaskModel;
@@ -39,10 +39,11 @@ use Modules\Sales\Infrastructure\Persistence\Eloquent\Models\SalesReturnLineMode
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantModel;
 use Modules\VehicleService\Infrastructure\Persistence\Eloquent\Models\VehicleServiceJobCardLineModel;
 use Modules\VehicleService\Infrastructure\Persistence\Eloquent\Models\VehicleServiceJobCardModel;
+use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models\WarehouseLocationModel;
 
 class WarehouseModel extends Model
 {
-    use HasActiveScope, HasOrganizationUnitScope, HasReferenceScope, HasTenantScope, SoftDeletes;
+    use HasTenantScope, HasOrganizationUnitScope, HasReferenceScope, HasActiveScope, SoftDeletes;
 
     protected $table = 'warehouses';
 
@@ -56,15 +57,8 @@ class WarehouseModel extends Model
             'is_active' => 'boolean',
             'is_default' => 'boolean',
             'metadata' => 'array',
-            'organization_unit_id' => 'integer',
             'row_version' => 'integer',
-            'tenant_id' => 'integer',
         ];
-    }
-
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(TenantModel::class, 'tenant_id');
     }
 
     public function organizationUnit(): BelongsTo
@@ -72,49 +66,9 @@ class WarehouseModel extends Model
         return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
     }
 
-    public function valuationConfigs(): HasMany
+    public function tenant(): BelongsTo
     {
-        return $this->hasMany(ValuationConfigModel::class, 'warehouse_id');
-    }
-
-    public function stockLevels(): HasMany
-    {
-        return $this->hasMany(StockLevelModel::class, 'warehouse_id');
-    }
-
-    public function stockMovements(): HasMany
-    {
-        return $this->hasMany(StockMovementModel::class, 'warehouse_id');
-    }
-
-    public function inventoryCostLayers(): HasMany
-    {
-        return $this->hasMany(InventoryCostLayerModel::class, 'warehouse_id');
-    }
-
-    public function stockReservations(): HasMany
-    {
-        return $this->hasMany(StockReservationModel::class, 'warehouse_id');
-    }
-
-    public function stockTransfersAsFromWarehouse(): HasMany
-    {
-        return $this->hasMany(StockTransferModel::class, 'from_warehouse_id');
-    }
-
-    public function stockTransfersAsToWarehouse(): HasMany
-    {
-        return $this->hasMany(StockTransferModel::class, 'to_warehouse_id');
-    }
-
-    public function stockAdjustments(): HasMany
-    {
-        return $this->hasMany(StockAdjustmentModel::class, 'warehouse_id');
-    }
-
-    public function stockAdjustmentLines(): HasMany
-    {
-        return $this->hasMany(StockAdjustmentLineModel::class, 'warehouse_id');
+        return $this->belongsTo(TenantModel::class, 'tenant_id');
     }
 
     public function cycleCountHeaders(): HasMany
@@ -122,29 +76,29 @@ class WarehouseModel extends Model
         return $this->hasMany(CycleCountHeaderModel::class, 'warehouse_id');
     }
 
-    public function transferOrdersAsFromWarehouse(): HasMany
+    public function gdnHeaders(): HasMany
     {
-        return $this->hasMany(TransferOrderModel::class, 'from_warehouse_id');
+        return $this->hasMany(GdnHeaderModel::class, 'warehouse_id');
     }
 
-    public function transferOrdersAsToWarehouse(): HasMany
+    public function gdnLines(): HasMany
     {
-        return $this->hasMany(TransferOrderModel::class, 'to_warehouse_id');
+        return $this->hasMany(GdnLineModel::class, 'warehouse_id');
     }
 
-    public function traceLogsAsSourceWarehouse(): HasMany
+    public function grnHeaders(): HasMany
     {
-        return $this->hasMany(TraceLogModel::class, 'source_warehouse_id');
+        return $this->hasMany(GrnHeaderModel::class, 'warehouse_id');
     }
 
-    public function traceLogsAsDestinationWarehouse(): HasMany
+    public function grnLines(): HasMany
     {
-        return $this->hasMany(TraceLogModel::class, 'destination_warehouse_id');
+        return $this->hasMany(GrnLineModel::class, 'warehouse_id');
     }
 
-    public function putAwayTasks(): HasMany
+    public function inventoryCostLayers(): HasMany
     {
-        return $this->hasMany(PutAwayTaskModel::class, 'target_warehouse_id');
+        return $this->hasMany(InventoryCostLayerModel::class, 'warehouse_id');
     }
 
     public function pickingTasks(): HasMany
@@ -162,24 +116,14 @@ class WarehouseModel extends Model
         return $this->hasMany(PurchaseOrderModel::class, 'warehouse_id');
     }
 
-    public function grnHeaders(): HasMany
-    {
-        return $this->hasMany(GrnHeaderModel::class, 'warehouse_id');
-    }
-
-    public function grnLines(): HasMany
-    {
-        return $this->hasMany(GrnLineModel::class, 'warehouse_id');
-    }
-
     public function purchaseReturnLines(): HasMany
     {
         return $this->hasMany(PurchaseReturnLineModel::class, 'warehouse_id');
     }
 
-    public function salesOrders(): HasMany
+    public function putAwayTasks(): HasMany
     {
-        return $this->hasMany(SalesOrderModel::class, 'warehouse_id');
+        return $this->hasMany(PutAwayTaskModel::class, 'target_warehouse_id');
     }
 
     public function salesOrderLines(): HasMany
@@ -187,14 +131,9 @@ class WarehouseModel extends Model
         return $this->hasMany(SalesOrderLineModel::class, 'warehouse_id');
     }
 
-    public function gdnHeaders(): HasMany
+    public function salesOrders(): HasMany
     {
-        return $this->hasMany(GdnHeaderModel::class, 'warehouse_id');
-    }
-
-    public function gdnLines(): HasMany
-    {
-        return $this->hasMany(GdnLineModel::class, 'warehouse_id');
+        return $this->hasMany(SalesOrderModel::class, 'warehouse_id');
     }
 
     public function salesReturnLines(): HasMany
@@ -202,9 +141,49 @@ class WarehouseModel extends Model
         return $this->hasMany(SalesReturnLineModel::class, 'warehouse_id');
     }
 
-    public function vehicleServiceJobCards(): HasMany
+    public function stockAdjustmentLines(): HasMany
     {
-        return $this->hasMany(VehicleServiceJobCardModel::class, 'warehouse_id');
+        return $this->hasMany(StockAdjustmentLineModel::class, 'warehouse_id');
+    }
+
+    public function stockAdjustments(): HasMany
+    {
+        return $this->hasMany(StockAdjustmentModel::class, 'warehouse_id');
+    }
+
+    public function stockLevels(): HasMany
+    {
+        return $this->hasMany(StockLevelModel::class, 'warehouse_id');
+    }
+
+    public function stockMovements(): HasMany
+    {
+        return $this->hasMany(StockMovementModel::class, 'warehouse_id');
+    }
+
+    public function stockReservations(): HasMany
+    {
+        return $this->hasMany(StockReservationModel::class, 'warehouse_id');
+    }
+
+    public function stockTransfers(): HasMany
+    {
+        return $this->hasMany(StockTransferModel::class, 'to_warehouse_id');
+    }
+
+    public function traceLogs(): HasMany
+    {
+        return $this->hasMany(TraceLogModel::class, 'destination_warehouse_id');
+    }
+
+    public function transferOrders(): HasMany
+    {
+        return $this->hasMany(TransferOrderModel::class, 'to_warehouse_id');
+    }
+
+    public function valuationConfigs(): HasMany
+    {
+        return $this->hasMany(ValuationConfigModel::class, 'warehouse_id');
     }
 
     public function vehicleServiceJobCardLines(): HasMany
@@ -212,9 +191,14 @@ class WarehouseModel extends Model
         return $this->hasMany(VehicleServiceJobCardLineModel::class, 'warehouse_id');
     }
 
+    public function vehicleServiceJobCards(): HasMany
+    {
+        return $this->hasMany(VehicleServiceJobCardModel::class, 'warehouse_id');
+    }
+
     public function warehouseLocations(): HasMany
     {
         return $this->hasMany(WarehouseLocationModel::class, 'warehouse_id');
     }
-}
 
+}

@@ -1,12 +1,14 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantModel;
 
 class TenantDomainModel extends Model
 {
@@ -23,7 +25,6 @@ class TenantDomainModel extends Model
             'is_verified' => 'boolean',
             'metadata' => 'array',
             'row_version' => 'integer',
-            'tenant_id' => 'integer',
             'verified_at' => 'datetime',
         ];
     }
@@ -32,5 +33,5 @@ class TenantDomainModel extends Model
     {
         return $this->belongsTo(TenantModel::class, 'tenant_id');
     }
-}
 
+}

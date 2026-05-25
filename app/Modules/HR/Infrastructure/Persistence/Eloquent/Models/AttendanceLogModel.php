@@ -1,19 +1,22 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\HR\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
+use Modules\HR\Infrastructure\Persistence\Eloquent\Models\BiometricDeviceModel;
+use Modules\HR\Infrastructure\Persistence\Eloquent\Models\EmployeeModel;
 use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantModel;
 
 class AttendanceLogModel extends Model
 {
-    use HasOrganizationUnitScope, HasTenantScope;
+    use HasTenantScope, HasOrganizationUnitScope;
 
     protected $table = 'attendance_logs';
 
@@ -22,26 +25,17 @@ class AttendanceLogModel extends Model
     protected function casts(): array
     {
         return [
-            'biometric_device_id' => 'integer',
-            'employee_id' => 'integer',
             'metadata' => 'array',
-            'organization_unit_id' => 'integer',
             'processed_at' => 'datetime',
             'punch_time' => 'datetime',
             'raw_data' => 'array',
             'row_version' => 'integer',
-            'tenant_id' => 'integer',
         ];
     }
 
-    public function tenant(): BelongsTo
+    public function biometricDevice(): BelongsTo
     {
-        return $this->belongsTo(TenantModel::class, 'tenant_id');
-    }
-
-    public function organizationUnit(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
+        return $this->belongsTo(BiometricDeviceModel::class, 'biometric_device_id');
     }
 
     public function employee(): BelongsTo
@@ -49,9 +43,14 @@ class AttendanceLogModel extends Model
         return $this->belongsTo(EmployeeModel::class, 'employee_id');
     }
 
-    public function biometricDevice(): BelongsTo
+    public function organizationUnit(): BelongsTo
     {
-        return $this->belongsTo(BiometricDeviceModel::class, 'biometric_device_id');
+        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
     }
-}
 
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(TenantModel::class, 'tenant_id');
+    }
+
+}

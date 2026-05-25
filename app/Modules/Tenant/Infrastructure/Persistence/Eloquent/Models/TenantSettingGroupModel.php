@@ -1,13 +1,16 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantModel;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantSettingGroupModel;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantSettingModel;
 
 class TenantSettingGroupModel extends Model
 {
@@ -21,15 +24,8 @@ class TenantSettingGroupModel extends Model
     {
         return [
             'metadata' => 'array',
-            'parent_id' => 'integer',
             'row_version' => 'integer',
-            'tenant_id' => 'integer',
         ];
-    }
-
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(TenantModel::class, 'tenant_id');
     }
 
     public function parent(): BelongsTo
@@ -37,7 +33,12 @@ class TenantSettingGroupModel extends Model
         return $this->belongsTo(TenantSettingGroupModel::class, 'parent_id');
     }
 
-    public function tenantSettingGroupsAsParent(): HasMany
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(TenantModel::class, 'tenant_id');
+    }
+
+    public function tenantSettingGroups(): HasMany
     {
         return $this->hasMany(TenantSettingGroupModel::class, 'parent_id');
     }
@@ -46,5 +47,5 @@ class TenantSettingGroupModel extends Model
     {
         return $this->hasMany(TenantSettingModel::class, 'group_id');
     }
-}
 
+}

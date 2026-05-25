@@ -1,14 +1,17 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\Inventory\Infrastructure\Persistence\Eloquent\Models;
 
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasStatusScope;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\ReceiptInspectionModel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\StockMovementModel;
 use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantModel;
 use Modules\User\Infrastructure\Persistence\Eloquent\Models\UserModel;
@@ -17,7 +20,7 @@ use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models\WarehouseModel;
 
 class PutAwayTaskModel extends Model
 {
-    use HasOrganizationUnitScope, HasStatusScope, HasTenantScope;
+    use HasTenantScope, HasOrganizationUnitScope, HasStatusScope;
 
     protected $table = 'put_away_tasks';
 
@@ -26,23 +29,16 @@ class PutAwayTaskModel extends Model
     protected function casts(): array
     {
         return [
-            'assigned_user_id' => 'integer',
             'completed_at' => 'datetime',
             'metadata' => 'array',
-            'organization_unit_id' => 'integer',
             'quantity' => 'decimal:4',
-            'receipt_inspection_id' => 'integer',
             'row_version' => 'integer',
-            'stock_movement_id' => 'integer',
-            'target_location_id' => 'integer',
-            'target_warehouse_id' => 'integer',
-            'tenant_id' => 'integer',
         ];
     }
 
-    public function tenant(): BelongsTo
+    public function assignedUser(): BelongsTo
     {
-        return $this->belongsTo(TenantModel::class, 'tenant_id');
+        return $this->belongsTo(UserModel::class, 'assigned_user_id');
     }
 
     public function organizationUnit(): BelongsTo
@@ -60,19 +56,19 @@ class PutAwayTaskModel extends Model
         return $this->belongsTo(StockMovementModel::class, 'stock_movement_id');
     }
 
-    public function targetWarehouse(): BelongsTo
-    {
-        return $this->belongsTo(WarehouseModel::class, 'target_warehouse_id');
-    }
-
     public function targetLocation(): BelongsTo
     {
         return $this->belongsTo(WarehouseLocationModel::class, 'target_location_id');
     }
 
-    public function assignedUser(): BelongsTo
+    public function targetWarehouse(): BelongsTo
     {
-        return $this->belongsTo(UserModel::class, 'assigned_user_id');
+        return $this->belongsTo(WarehouseModel::class, 'target_warehouse_id');
     }
-}
 
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(TenantModel::class, 'tenant_id');
+    }
+
+}

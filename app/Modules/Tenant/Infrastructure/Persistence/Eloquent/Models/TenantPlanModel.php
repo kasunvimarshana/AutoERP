@@ -1,31 +1,28 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\Tenant\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasActiveScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasReferenceScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\CurrencyModel;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasActiveScope;
+use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantModel;
 
 class TenantPlanModel extends Model
 {
-    use HasActiveScope, HasReferenceScope, SoftDeletes;
+    use HasActiveScope, SoftDeletes;
 
     protected $table = 'tenant_plans';
 
     protected $guarded = ['id'];
 
-    protected static string $referenceColumn = 'name';
-
     protected function casts(): array
     {
         return [
-            'currency_id' => 'integer',
             'features' => 'array',
             'is_active' => 'boolean',
             'limits' => 'array',
@@ -44,5 +41,5 @@ class TenantPlanModel extends Model
     {
         return $this->hasMany(TenantModel::class, 'tenant_plan_id');
     }
-}
 
+}

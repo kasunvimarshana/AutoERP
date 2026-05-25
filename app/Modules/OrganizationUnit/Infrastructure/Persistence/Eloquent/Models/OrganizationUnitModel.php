@@ -1,16 +1,16 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasActiveScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasReferenceScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasActiveScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasReferenceScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerAddressModel;
 use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerContactModel;
 use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerModel;
@@ -96,6 +96,11 @@ use Modules\Item\Infrastructure\Persistence\Eloquent\Models\ItemModel;
 use Modules\Item\Infrastructure\Persistence\Eloquent\Models\ItemVariantAttributeModel;
 use Modules\Item\Infrastructure\Persistence\Eloquent\Models\ItemVariantAttributeValueModel;
 use Modules\Item\Infrastructure\Persistence\Eloquent\Models\ItemVariantModel;
+use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitDocumentModel;
+use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
+use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitSettingGroupModel;
+use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitSettingModel;
+use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitTypeModel;
 use Modules\Payment\Infrastructure\Persistence\Eloquent\Models\AdvancePaymentAllocationModel;
 use Modules\Payment\Infrastructure\Persistence\Eloquent\Models\AdvancePaymentModel;
 use Modules\Payment\Infrastructure\Persistence\Eloquent\Models\CashRegisterModel;
@@ -167,7 +172,7 @@ use Modules\Warehouse\Infrastructure\Persistence\Eloquent\Models\WarehouseModel;
 
 class OrganizationUnitModel extends Model
 {
-    use HasActiveScope, HasReferenceScope, HasTenantScope, SoftDeletes;
+    use HasTenantScope, HasReferenceScope, HasActiveScope, SoftDeletes;
 
     protected $table = 'organization_units';
 
@@ -180,14 +185,15 @@ class OrganizationUnitModel extends Model
         return [
             '_lft' => 'integer',
             '_rgt' => 'integer',
-            'depth' => 'integer',
             'is_active' => 'boolean',
             'metadata' => 'array',
-            'parent_id' => 'integer',
             'row_version' => 'integer',
-            'tenant_id' => 'integer',
-            'type_id' => 'integer',
         ];
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationUnitModel::class, 'parent_id');
     }
 
     public function tenant(): BelongsTo
@@ -200,74 +206,19 @@ class OrganizationUnitModel extends Model
         return $this->belongsTo(OrganizationUnitTypeModel::class, 'type_id');
     }
 
-    public function parent(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationUnitModel::class, 'parent_id');
-    }
-
-    public function customers(): HasMany
-    {
-        return $this->hasMany(CustomerModel::class, 'organization_unit_id');
-    }
-
-    public function customerContacts(): HasMany
-    {
-        return $this->hasMany(CustomerContactModel::class, 'organization_unit_id');
-    }
-
-    public function customerAddresses(): HasMany
-    {
-        return $this->hasMany(CustomerAddressModel::class, 'organization_unit_id');
-    }
-
-    public function customerVehicles(): HasMany
-    {
-        return $this->hasMany(CustomerVehicleModel::class, 'organization_unit_id');
-    }
-
-    public function attachments(): HasMany
-    {
-        return $this->hasMany(AttachmentModel::class, 'organization_unit_id');
-    }
-
-    public function entityAttributes(): HasMany
-    {
-        return $this->hasMany(EntityAttributeModel::class, 'organization_unit_id');
-    }
-
-    public function comments(): HasMany
-    {
-        return $this->hasMany(CommentModel::class, 'organization_unit_id');
-    }
-
     public function accounts(): HasMany
     {
         return $this->hasMany(AccountModel::class, 'organization_unit_id');
     }
 
-    public function fiscalYears(): HasMany
+    public function advancePaymentAllocations(): HasMany
     {
-        return $this->hasMany(FiscalYearModel::class, 'organization_unit_id');
+        return $this->hasMany(AdvancePaymentAllocationModel::class, 'organization_unit_id');
     }
 
-    public function fiscalPeriods(): HasMany
+    public function advancePayments(): HasMany
     {
-        return $this->hasMany(FiscalPeriodModel::class, 'organization_unit_id');
-    }
-
-    public function paymentTerms(): HasMany
-    {
-        return $this->hasMany(PaymentTermModel::class, 'organization_unit_id');
-    }
-
-    public function taxGroups(): HasMany
-    {
-        return $this->hasMany(TaxGroupModel::class, 'organization_unit_id');
-    }
-
-    public function taxRates(): HasMany
-    {
-        return $this->hasMany(TaxRateModel::class, 'organization_unit_id');
+        return $this->hasMany(AdvancePaymentModel::class, 'organization_unit_id');
     }
 
     public function apTransactions(): HasMany
@@ -280,29 +231,19 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(ArTransactionModel::class, 'organization_unit_id');
     }
 
-    public function costCenters(): HasMany
+    public function attachments(): HasMany
     {
-        return $this->hasMany(CostCenterModel::class, 'organization_unit_id');
+        return $this->hasMany(AttachmentModel::class, 'organization_unit_id');
     }
 
-    public function journalEntries(): HasMany
+    public function attendanceLogs(): HasMany
     {
-        return $this->hasMany(JournalEntryModel::class, 'organization_unit_id');
+        return $this->hasMany(AttendanceLogModel::class, 'organization_unit_id');
     }
 
-    public function journalEntryLines(): HasMany
+    public function attendanceRecords(): HasMany
     {
-        return $this->hasMany(JournalEntryLineModel::class, 'organization_unit_id');
-    }
-
-    public function budgets(): HasMany
-    {
-        return $this->hasMany(BudgetModel::class, 'organization_unit_id');
-    }
-
-    public function budgetLines(): HasMany
-    {
-        return $this->hasMany(BudgetLineModel::class, 'organization_unit_id');
+        return $this->hasMany(AttendanceRecordModel::class, 'organization_unit_id');
     }
 
     public function bankAccounts(): HasMany
@@ -315,154 +256,14 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(BankCategoryRuleModel::class, 'organization_unit_id');
     }
 
-    public function bankTransactions(): HasMany
-    {
-        return $this->hasMany(BankTransactionModel::class, 'organization_unit_id');
-    }
-
     public function bankReconciliations(): HasMany
     {
         return $this->hasMany(BankReconciliationModel::class, 'organization_unit_id');
     }
 
-    public function taxRules(): HasMany
+    public function bankTransactions(): HasMany
     {
-        return $this->hasMany(TaxRuleModel::class, 'organization_unit_id');
-    }
-
-    public function departments(): HasMany
-    {
-        return $this->hasMany(DepartmentModel::class, 'organization_unit_id');
-    }
-
-    public function designations(): HasMany
-    {
-        return $this->hasMany(DesignationModel::class, 'organization_unit_id');
-    }
-
-    public function employmentTypes(): HasMany
-    {
-        return $this->hasMany(EmploymentTypeModel::class, 'organization_unit_id');
-    }
-
-    public function employees(): HasMany
-    {
-        return $this->hasMany(EmployeeModel::class, 'organization_unit_id');
-    }
-
-    public function employeeContacts(): HasMany
-    {
-        return $this->hasMany(EmployeeContactModel::class, 'organization_unit_id');
-    }
-
-    public function employeeDocuments(): HasMany
-    {
-        return $this->hasMany(EmployeeDocumentModel::class, 'organization_unit_id');
-    }
-
-    public function employeeContracts(): HasMany
-    {
-        return $this->hasMany(EmployeeContractModel::class, 'organization_unit_id');
-    }
-
-    public function biometricDevices(): HasMany
-    {
-        return $this->hasMany(BiometricDeviceModel::class, 'organization_unit_id');
-    }
-
-    public function holidays(): HasMany
-    {
-        return $this->hasMany(HolidayModel::class, 'organization_unit_id');
-    }
-
-    public function attendanceLogs(): HasMany
-    {
-        return $this->hasMany(AttendanceLogModel::class, 'organization_unit_id');
-    }
-
-    public function shifts(): HasMany
-    {
-        return $this->hasMany(ShiftModel::class, 'organization_unit_id');
-    }
-
-    public function shiftAssignments(): HasMany
-    {
-        return $this->hasMany(ShiftAssignmentModel::class, 'organization_unit_id');
-    }
-
-    public function attendanceRecords(): HasMany
-    {
-        return $this->hasMany(AttendanceRecordModel::class, 'organization_unit_id');
-    }
-
-    public function leaveTypes(): HasMany
-    {
-        return $this->hasMany(LeaveTypeModel::class, 'organization_unit_id');
-    }
-
-    public function leavePolicies(): HasMany
-    {
-        return $this->hasMany(LeavePolicyModel::class, 'organization_unit_id');
-    }
-
-    public function leavePolicyLines(): HasMany
-    {
-        return $this->hasMany(LeavePolicyLineModel::class, 'organization_unit_id');
-    }
-
-    public function leaveAllocations(): HasMany
-    {
-        return $this->hasMany(LeaveAllocationModel::class, 'organization_unit_id');
-    }
-
-    public function leaveApplications(): HasMany
-    {
-        return $this->hasMany(LeaveApplicationModel::class, 'organization_unit_id');
-    }
-
-    public function salaryComponents(): HasMany
-    {
-        return $this->hasMany(SalaryComponentModel::class, 'organization_unit_id');
-    }
-
-    public function salaryStructures(): HasMany
-    {
-        return $this->hasMany(SalaryStructureModel::class, 'organization_unit_id');
-    }
-
-    public function salaryStructureLines(): HasMany
-    {
-        return $this->hasMany(SalaryStructureLineModel::class, 'organization_unit_id');
-    }
-
-    public function employeeSalaryAssignments(): HasMany
-    {
-        return $this->hasMany(EmployeeSalaryAssignmentModel::class, 'organization_unit_id');
-    }
-
-    public function payrollRuns(): HasMany
-    {
-        return $this->hasMany(PayrollRunModel::class, 'organization_unit_id');
-    }
-
-    public function payslips(): HasMany
-    {
-        return $this->hasMany(PayslipModel::class, 'organization_unit_id');
-    }
-
-    public function payslipLines(): HasMany
-    {
-        return $this->hasMany(PayslipLineModel::class, 'organization_unit_id');
-    }
-
-    public function performanceCycles(): HasMany
-    {
-        return $this->hasMany(PerformanceCycleModel::class, 'organization_unit_id');
-    }
-
-    public function performanceReviews(): HasMany
-    {
-        return $this->hasMany(PerformanceReviewModel::class, 'organization_unit_id');
+        return $this->hasMany(BankTransactionModel::class, 'organization_unit_id');
     }
 
     public function batches(): HasMany
@@ -470,54 +271,69 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(BatchModel::class, 'organization_unit_id');
     }
 
-    public function serials(): HasMany
+    public function biometricDevices(): HasMany
     {
-        return $this->hasMany(SerialModel::class, 'organization_unit_id');
+        return $this->hasMany(BiometricDeviceModel::class, 'organization_unit_id');
     }
 
-    public function valuationConfigs(): HasMany
+    public function budgetLines(): HasMany
     {
-        return $this->hasMany(ValuationConfigModel::class, 'organization_unit_id');
+        return $this->hasMany(BudgetLineModel::class, 'organization_unit_id');
     }
 
-    public function stockLevels(): HasMany
+    public function budgets(): HasMany
     {
-        return $this->hasMany(StockLevelModel::class, 'organization_unit_id');
+        return $this->hasMany(BudgetModel::class, 'organization_unit_id');
     }
 
-    public function stockMovements(): HasMany
+    public function cashRegisters(): HasMany
     {
-        return $this->hasMany(StockMovementModel::class, 'organization_unit_id');
+        return $this->hasMany(CashRegisterModel::class, 'organization_unit_id');
     }
 
-    public function inventoryCostLayers(): HasMany
+    public function checks(): HasMany
     {
-        return $this->hasMany(InventoryCostLayerModel::class, 'organization_unit_id');
+        return $this->hasMany(CheckModel::class, 'organization_unit_id');
     }
 
-    public function stockReservations(): HasMany
+    public function comboItems(): HasMany
     {
-        return $this->hasMany(StockReservationModel::class, 'organization_unit_id');
+        return $this->hasMany(ComboItemModel::class, 'organization_unit_id');
     }
 
-    public function stockTransfers(): HasMany
+    public function comments(): HasMany
     {
-        return $this->hasMany(StockTransferModel::class, 'organization_unit_id');
+        return $this->hasMany(CommentModel::class, 'organization_unit_id');
     }
 
-    public function stockTransferLines(): HasMany
+    public function costCenters(): HasMany
     {
-        return $this->hasMany(StockTransferLineModel::class, 'organization_unit_id');
+        return $this->hasMany(CostCenterModel::class, 'organization_unit_id');
     }
 
-    public function stockAdjustments(): HasMany
+    public function customerAddresses(): HasMany
     {
-        return $this->hasMany(StockAdjustmentModel::class, 'organization_unit_id');
+        return $this->hasMany(CustomerAddressModel::class, 'organization_unit_id');
     }
 
-    public function stockAdjustmentLines(): HasMany
+    public function customerContacts(): HasMany
     {
-        return $this->hasMany(StockAdjustmentLineModel::class, 'organization_unit_id');
+        return $this->hasMany(CustomerContactModel::class, 'organization_unit_id');
+    }
+
+    public function customerPriceLists(): HasMany
+    {
+        return $this->hasMany(CustomerPriceListModel::class, 'organization_unit_id');
+    }
+
+    public function customers(): HasMany
+    {
+        return $this->hasMany(CustomerModel::class, 'organization_unit_id');
+    }
+
+    public function customerVehicles(): HasMany
+    {
+        return $this->hasMany(CustomerVehicleModel::class, 'organization_unit_id');
     }
 
     public function cycleCountHeaders(): HasMany
@@ -530,44 +346,89 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(CycleCountLineModel::class, 'organization_unit_id');
     }
 
-    public function transferOrders(): HasMany
+    public function departments(): HasMany
     {
-        return $this->hasMany(TransferOrderModel::class, 'organization_unit_id');
+        return $this->hasMany(DepartmentModel::class, 'organization_unit_id');
     }
 
-    public function transferOrderLines(): HasMany
+    public function designations(): HasMany
     {
-        return $this->hasMany(TransferOrderLineModel::class, 'organization_unit_id');
+        return $this->hasMany(DesignationModel::class, 'organization_unit_id');
     }
 
-    public function traceLogs(): HasMany
+    public function employeeContacts(): HasMany
     {
-        return $this->hasMany(TraceLogModel::class, 'organization_unit_id');
+        return $this->hasMany(EmployeeContactModel::class, 'organization_unit_id');
     }
 
-    public function receiptInspections(): HasMany
+    public function employeeContracts(): HasMany
     {
-        return $this->hasMany(ReceiptInspectionModel::class, 'organization_unit_id');
+        return $this->hasMany(EmployeeContractModel::class, 'organization_unit_id');
     }
 
-    public function putAwayTasks(): HasMany
+    public function employeeDocuments(): HasMany
     {
-        return $this->hasMany(PutAwayTaskModel::class, 'organization_unit_id');
+        return $this->hasMany(EmployeeDocumentModel::class, 'organization_unit_id');
     }
 
-    public function pickingTasks(): HasMany
+    public function employees(): HasMany
     {
-        return $this->hasMany(PickingTaskModel::class, 'organization_unit_id');
+        return $this->hasMany(EmployeeModel::class, 'organization_unit_id');
     }
 
-    public function invoices(): HasMany
+    public function employeeSalaryAssignments(): HasMany
     {
-        return $this->hasMany(InvoiceModel::class, 'organization_unit_id');
+        return $this->hasMany(EmployeeSalaryAssignmentModel::class, 'organization_unit_id');
     }
 
-    public function invoiceReferences(): HasMany
+    public function employmentTypes(): HasMany
     {
-        return $this->hasMany(InvoiceReferenceModel::class, 'organization_unit_id');
+        return $this->hasMany(EmploymentTypeModel::class, 'organization_unit_id');
+    }
+
+    public function entityAttributes(): HasMany
+    {
+        return $this->hasMany(EntityAttributeModel::class, 'organization_unit_id');
+    }
+
+    public function fiscalPeriods(): HasMany
+    {
+        return $this->hasMany(FiscalPeriodModel::class, 'organization_unit_id');
+    }
+
+    public function fiscalYears(): HasMany
+    {
+        return $this->hasMany(FiscalYearModel::class, 'organization_unit_id');
+    }
+
+    public function gdnHeaders(): HasMany
+    {
+        return $this->hasMany(GdnHeaderModel::class, 'organization_unit_id');
+    }
+
+    public function gdnLines(): HasMany
+    {
+        return $this->hasMany(GdnLineModel::class, 'organization_unit_id');
+    }
+
+    public function grnHeaders(): HasMany
+    {
+        return $this->hasMany(GrnHeaderModel::class, 'organization_unit_id');
+    }
+
+    public function grnLines(): HasMany
+    {
+        return $this->hasMany(GrnLineModel::class, 'organization_unit_id');
+    }
+
+    public function holidays(): HasMany
+    {
+        return $this->hasMany(HolidayModel::class, 'organization_unit_id');
+    }
+
+    public function inventoryCostLayers(): HasMany
+    {
+        return $this->hasMany(InventoryCostLayerModel::class, 'organization_unit_id');
     }
 
     public function invoiceLines(): HasMany
@@ -575,19 +436,14 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(InvoiceLineModel::class, 'organization_unit_id');
     }
 
-    public function itemCategories(): HasMany
+    public function invoiceReferences(): HasMany
     {
-        return $this->hasMany(ItemCategoryModel::class, 'organization_unit_id');
+        return $this->hasMany(InvoiceReferenceModel::class, 'organization_unit_id');
     }
 
-    public function itemBrands(): HasMany
+    public function invoices(): HasMany
     {
-        return $this->hasMany(ItemBrandModel::class, 'organization_unit_id');
-    }
-
-    public function items(): HasMany
-    {
-        return $this->hasMany(ItemModel::class, 'organization_unit_id');
+        return $this->hasMany(InvoiceModel::class, 'organization_unit_id');
     }
 
     public function itemAttributeGroups(): HasMany
@@ -605,9 +461,24 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(ItemAttributeValueModel::class, 'organization_unit_id');
     }
 
-    public function itemVariants(): HasMany
+    public function itemBrands(): HasMany
     {
-        return $this->hasMany(ItemVariantModel::class, 'organization_unit_id');
+        return $this->hasMany(ItemBrandModel::class, 'organization_unit_id');
+    }
+
+    public function itemCategories(): HasMany
+    {
+        return $this->hasMany(ItemCategoryModel::class, 'organization_unit_id');
+    }
+
+    public function itemIdentifiers(): HasMany
+    {
+        return $this->hasMany(ItemIdentifierModel::class, 'organization_unit_id');
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(ItemModel::class, 'organization_unit_id');
     }
 
     public function itemVariantAttributes(): HasMany
@@ -620,17 +491,52 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(ItemVariantAttributeValueModel::class, 'organization_unit_id');
     }
 
-    public function comboItems(): HasMany
+    public function itemVariants(): HasMany
     {
-        return $this->hasMany(ComboItemModel::class, 'organization_unit_id');
+        return $this->hasMany(ItemVariantModel::class, 'organization_unit_id');
     }
 
-    public function itemIdentifiers(): HasMany
+    public function journalEntries(): HasMany
     {
-        return $this->hasMany(ItemIdentifierModel::class, 'organization_unit_id');
+        return $this->hasMany(JournalEntryModel::class, 'organization_unit_id');
     }
 
-    public function organizationUnitsAsParent(): HasMany
+    public function journalEntryLines(): HasMany
+    {
+        return $this->hasMany(JournalEntryLineModel::class, 'organization_unit_id');
+    }
+
+    public function leaveAllocations(): HasMany
+    {
+        return $this->hasMany(LeaveAllocationModel::class, 'organization_unit_id');
+    }
+
+    public function leaveApplications(): HasMany
+    {
+        return $this->hasMany(LeaveApplicationModel::class, 'organization_unit_id');
+    }
+
+    public function leavePolicies(): HasMany
+    {
+        return $this->hasMany(LeavePolicyModel::class, 'organization_unit_id');
+    }
+
+    public function leavePolicyLines(): HasMany
+    {
+        return $this->hasMany(LeavePolicyLineModel::class, 'organization_unit_id');
+    }
+
+    public function leaveTypes(): HasMany
+    {
+        return $this->hasMany(LeaveTypeModel::class, 'organization_unit_id');
+    }
+
+    public function organizationUnitDocuments(): HasMany
+    {
+        return $this->hasMany(OrganizationUnitDocumentModel::class, 'organization_unit_id');
+    }
+
+    public function organizationUnits(): HasMany
     {
         return $this->hasMany(OrganizationUnitModel::class, 'parent_id');
     }
@@ -645,14 +551,9 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(OrganizationUnitSettingModel::class, 'organization_unit_id');
     }
 
-    public function organizationUnitDocuments(): HasMany
+    public function paymentAllocations(): HasMany
     {
-        return $this->hasMany(OrganizationUnitDocumentModel::class, 'organization_unit_id');
-    }
-
-    public function paymentMethods(): HasMany
-    {
-        return $this->hasMany(PaymentMethodModel::class, 'organization_unit_id');
+        return $this->hasMany(PaymentAllocationModel::class, 'organization_unit_id');
     }
 
     public function paymentGroups(): HasMany
@@ -660,44 +561,54 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(PaymentGroupModel::class, 'organization_unit_id');
     }
 
+    public function paymentMethods(): HasMany
+    {
+        return $this->hasMany(PaymentMethodModel::class, 'organization_unit_id');
+    }
+
     public function payments(): HasMany
     {
         return $this->hasMany(PaymentModel::class, 'organization_unit_id');
     }
 
-    public function paymentAllocations(): HasMany
+    public function paymentTerms(): HasMany
     {
-        return $this->hasMany(PaymentAllocationModel::class, 'organization_unit_id');
+        return $this->hasMany(PaymentTermModel::class, 'organization_unit_id');
     }
 
-    public function cashRegisters(): HasMany
+    public function payrollRuns(): HasMany
     {
-        return $this->hasMany(CashRegisterModel::class, 'organization_unit_id');
+        return $this->hasMany(PayrollRunModel::class, 'organization_unit_id');
     }
 
-    public function checks(): HasMany
+    public function payslipLines(): HasMany
     {
-        return $this->hasMany(CheckModel::class, 'organization_unit_id');
+        return $this->hasMany(PayslipLineModel::class, 'organization_unit_id');
     }
 
-    public function advancePayments(): HasMany
+    public function payslips(): HasMany
     {
-        return $this->hasMany(AdvancePaymentModel::class, 'organization_unit_id');
+        return $this->hasMany(PayslipModel::class, 'organization_unit_id');
     }
 
-    public function advancePaymentAllocations(): HasMany
+    public function performanceCycles(): HasMany
     {
-        return $this->hasMany(AdvancePaymentAllocationModel::class, 'organization_unit_id');
+        return $this->hasMany(PerformanceCycleModel::class, 'organization_unit_id');
     }
 
-    public function writeOffs(): HasMany
+    public function performanceReviews(): HasMany
     {
-        return $this->hasMany(WriteOffModel::class, 'organization_unit_id');
+        return $this->hasMany(PerformanceReviewModel::class, 'organization_unit_id');
     }
 
-    public function priceLists(): HasMany
+    public function permissions(): HasMany
     {
-        return $this->hasMany(PriceListModel::class, 'organization_unit_id');
+        return $this->hasMany(PermissionModel::class, 'organization_unit_id');
+    }
+
+    public function pickingTasks(): HasMany
+    {
+        return $this->hasMany(PickingTaskModel::class, 'organization_unit_id');
     }
 
     public function priceListItems(): HasMany
@@ -705,19 +616,9 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(PriceListItemModel::class, 'organization_unit_id');
     }
 
-    public function supplierPriceLists(): HasMany
+    public function priceLists(): HasMany
     {
-        return $this->hasMany(SupplierPriceListModel::class, 'organization_unit_id');
-    }
-
-    public function customerPriceLists(): HasMany
-    {
-        return $this->hasMany(CustomerPriceListModel::class, 'organization_unit_id');
-    }
-
-    public function purchaseOrders(): HasMany
-    {
-        return $this->hasMany(PurchaseOrderModel::class, 'organization_unit_id');
+        return $this->hasMany(PriceListModel::class, 'organization_unit_id');
     }
 
     public function purchaseOrderLines(): HasMany
@@ -725,19 +626,9 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(PurchaseOrderLineModel::class, 'organization_unit_id');
     }
 
-    public function grnHeaders(): HasMany
+    public function purchaseOrders(): HasMany
     {
-        return $this->hasMany(GrnHeaderModel::class, 'organization_unit_id');
-    }
-
-    public function grnLines(): HasMany
-    {
-        return $this->hasMany(GrnLineModel::class, 'organization_unit_id');
-    }
-
-    public function purchaseReturns(): HasMany
-    {
-        return $this->hasMany(PurchaseReturnModel::class, 'organization_unit_id');
+        return $this->hasMany(PurchaseOrderModel::class, 'organization_unit_id');
     }
 
     public function purchaseReturnLines(): HasMany
@@ -745,9 +636,49 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(PurchaseReturnLineModel::class, 'organization_unit_id');
     }
 
-    public function salesOrders(): HasMany
+    public function purchaseReturns(): HasMany
     {
-        return $this->hasMany(SalesOrderModel::class, 'organization_unit_id');
+        return $this->hasMany(PurchaseReturnModel::class, 'organization_unit_id');
+    }
+
+    public function putAwayTasks(): HasMany
+    {
+        return $this->hasMany(PutAwayTaskModel::class, 'organization_unit_id');
+    }
+
+    public function receiptInspections(): HasMany
+    {
+        return $this->hasMany(ReceiptInspectionModel::class, 'organization_unit_id');
+    }
+
+    public function recurringVouchers(): HasMany
+    {
+        return $this->hasMany(RecurringVoucherModel::class, 'organization_unit_id');
+    }
+
+    public function rolePermissions(): HasMany
+    {
+        return $this->hasMany(RolePermissionModel::class, 'organization_unit_id');
+    }
+
+    public function roles(): HasMany
+    {
+        return $this->hasMany(RoleModel::class, 'organization_unit_id');
+    }
+
+    public function salaryComponents(): HasMany
+    {
+        return $this->hasMany(SalaryComponentModel::class, 'organization_unit_id');
+    }
+
+    public function salaryStructureLines(): HasMany
+    {
+        return $this->hasMany(SalaryStructureLineModel::class, 'organization_unit_id');
+    }
+
+    public function salaryStructures(): HasMany
+    {
+        return $this->hasMany(SalaryStructureModel::class, 'organization_unit_id');
     }
 
     public function salesOrderLines(): HasMany
@@ -755,19 +686,9 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(SalesOrderLineModel::class, 'organization_unit_id');
     }
 
-    public function gdnHeaders(): HasMany
+    public function salesOrders(): HasMany
     {
-        return $this->hasMany(GdnHeaderModel::class, 'organization_unit_id');
-    }
-
-    public function gdnLines(): HasMany
-    {
-        return $this->hasMany(GdnLineModel::class, 'organization_unit_id');
-    }
-
-    public function salesReturns(): HasMany
-    {
-        return $this->hasMany(SalesReturnModel::class, 'organization_unit_id');
+        return $this->hasMany(SalesOrderModel::class, 'organization_unit_id');
     }
 
     public function salesReturnLines(): HasMany
@@ -775,19 +696,64 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(SalesReturnLineModel::class, 'organization_unit_id');
     }
 
+    public function salesReturns(): HasMany
+    {
+        return $this->hasMany(SalesReturnModel::class, 'organization_unit_id');
+    }
+
     public function sequences(): HasMany
     {
         return $this->hasMany(SequenceModel::class, 'organization_unit_id');
     }
 
-    public function suppliers(): HasMany
+    public function serials(): HasMany
     {
-        return $this->hasMany(SupplierModel::class, 'organization_unit_id');
+        return $this->hasMany(SerialModel::class, 'organization_unit_id');
     }
 
-    public function supplierContacts(): HasMany
+    public function shiftAssignments(): HasMany
     {
-        return $this->hasMany(SupplierContactModel::class, 'organization_unit_id');
+        return $this->hasMany(ShiftAssignmentModel::class, 'organization_unit_id');
+    }
+
+    public function shifts(): HasMany
+    {
+        return $this->hasMany(ShiftModel::class, 'organization_unit_id');
+    }
+
+    public function stockAdjustmentLines(): HasMany
+    {
+        return $this->hasMany(StockAdjustmentLineModel::class, 'organization_unit_id');
+    }
+
+    public function stockAdjustments(): HasMany
+    {
+        return $this->hasMany(StockAdjustmentModel::class, 'organization_unit_id');
+    }
+
+    public function stockLevels(): HasMany
+    {
+        return $this->hasMany(StockLevelModel::class, 'organization_unit_id');
+    }
+
+    public function stockMovements(): HasMany
+    {
+        return $this->hasMany(StockMovementModel::class, 'organization_unit_id');
+    }
+
+    public function stockReservations(): HasMany
+    {
+        return $this->hasMany(StockReservationModel::class, 'organization_unit_id');
+    }
+
+    public function stockTransferLines(): HasMany
+    {
+        return $this->hasMany(StockTransferLineModel::class, 'organization_unit_id');
+    }
+
+    public function stockTransfers(): HasMany
+    {
+        return $this->hasMany(StockTransferModel::class, 'organization_unit_id');
     }
 
     public function supplierAddresses(): HasMany
@@ -795,9 +761,9 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(SupplierAddressModel::class, 'organization_unit_id');
     }
 
-    public function supplierVehicles(): HasMany
+    public function supplierContacts(): HasMany
     {
-        return $this->hasMany(SupplierVehicleModel::class, 'organization_unit_id');
+        return $this->hasMany(SupplierContactModel::class, 'organization_unit_id');
     }
 
     public function supplierItems(): HasMany
@@ -805,9 +771,54 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(SupplierItemModel::class, 'organization_unit_id');
     }
 
+    public function supplierPriceLists(): HasMany
+    {
+        return $this->hasMany(SupplierPriceListModel::class, 'organization_unit_id');
+    }
+
+    public function suppliers(): HasMany
+    {
+        return $this->hasMany(SupplierModel::class, 'organization_unit_id');
+    }
+
+    public function supplierVehicles(): HasMany
+    {
+        return $this->hasMany(SupplierVehicleModel::class, 'organization_unit_id');
+    }
+
     public function systemUsers(): HasMany
     {
         return $this->hasMany(SystemUserModel::class, 'organization_unit_id');
+    }
+
+    public function taxGroups(): HasMany
+    {
+        return $this->hasMany(TaxGroupModel::class, 'organization_unit_id');
+    }
+
+    public function taxRates(): HasMany
+    {
+        return $this->hasMany(TaxRateModel::class, 'organization_unit_id');
+    }
+
+    public function taxRules(): HasMany
+    {
+        return $this->hasMany(TaxRuleModel::class, 'organization_unit_id');
+    }
+
+    public function traceLogs(): HasMany
+    {
+        return $this->hasMany(TraceLogModel::class, 'organization_unit_id');
+    }
+
+    public function transferOrderLines(): HasMany
+    {
+        return $this->hasMany(TransferOrderLineModel::class, 'organization_unit_id');
+    }
+
+    public function transferOrders(): HasMany
+    {
+        return $this->hasMany(TransferOrderModel::class, 'organization_unit_id');
     }
 
     public function unitOfMeasures(): HasMany
@@ -820,39 +831,9 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(UomConversionModel::class, 'organization_unit_id');
     }
 
-    public function users(): HasMany
+    public function userDevices(): HasMany
     {
-        return $this->hasMany(UserModel::class, 'organization_unit_id');
-    }
-
-    public function roles(): HasMany
-    {
-        return $this->hasMany(RoleModel::class, 'organization_unit_id');
-    }
-
-    public function permissions(): HasMany
-    {
-        return $this->hasMany(PermissionModel::class, 'organization_unit_id');
-    }
-
-    public function rolePermissions(): HasMany
-    {
-        return $this->hasMany(RolePermissionModel::class, 'organization_unit_id');
-    }
-
-    public function userRoles(): HasMany
-    {
-        return $this->hasMany(UserRoleModel::class, 'organization_unit_id');
-    }
-
-    public function userPermissions(): HasMany
-    {
-        return $this->hasMany(UserPermissionModel::class, 'organization_unit_id');
-    }
-
-    public function userTenants(): HasMany
-    {
-        return $this->hasMany(UserTenantModel::class, 'organization_unit_id');
+        return $this->hasMany(UserDeviceModel::class, 'organization_unit_id');
     }
 
     public function userDocuments(): HasMany
@@ -860,24 +841,49 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(UserDocumentModel::class, 'organization_unit_id');
     }
 
-    public function userDevices(): HasMany
+    public function userPermissions(): HasMany
     {
-        return $this->hasMany(UserDeviceModel::class, 'organization_unit_id');
+        return $this->hasMany(UserPermissionModel::class, 'organization_unit_id');
     }
 
-    public function vehicleRentalLessorAgreements(): HasMany
+    public function userRoles(): HasMany
     {
-        return $this->hasMany(VehicleRentalLessorAgreementModel::class, 'organization_unit_id');
+        return $this->hasMany(UserRoleModel::class, 'organization_unit_id');
+    }
+
+    public function users(): HasMany
+    {
+        return $this->hasMany(UserModel::class, 'organization_unit_id');
+    }
+
+    public function userTenants(): HasMany
+    {
+        return $this->hasMany(UserTenantModel::class, 'organization_unit_id');
+    }
+
+    public function valuationConfigs(): HasMany
+    {
+        return $this->hasMany(ValuationConfigModel::class, 'organization_unit_id');
+    }
+
+    public function vehicleDocuments(): HasMany
+    {
+        return $this->hasMany(VehicleDocumentModel::class, 'organization_unit_id');
+    }
+
+    public function vehicleRentalLesseeAgreementCreditNotes(): HasMany
+    {
+        return $this->hasMany(VehicleRentalLesseeAgreementCreditNoteModel::class, 'organization_unit_id');
+    }
+
+    public function vehicleRentalLesseeAgreementDebitNotes(): HasMany
+    {
+        return $this->hasMany(VehicleRentalLesseeAgreementDebitNoteModel::class, 'organization_unit_id');
     }
 
     public function vehicleRentalLesseeAgreements(): HasMany
     {
         return $this->hasMany(VehicleRentalLesseeAgreementModel::class, 'organization_unit_id');
-    }
-
-    public function vehicleRentalLessorRunningCharts(): HasMany
-    {
-        return $this->hasMany(VehicleRentalLessorRunningChartModel::class, 'organization_unit_id');
     }
 
     public function vehicleRentalLesseeRunningCharts(): HasMany
@@ -895,19 +901,44 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(VehicleRentalLessorAgreementDebitNoteModel::class, 'organization_unit_id');
     }
 
-    public function vehicleRentalLesseeAgreementCreditNotes(): HasMany
+    public function vehicleRentalLessorAgreements(): HasMany
     {
-        return $this->hasMany(VehicleRentalLesseeAgreementCreditNoteModel::class, 'organization_unit_id');
+        return $this->hasMany(VehicleRentalLessorAgreementModel::class, 'organization_unit_id');
     }
 
-    public function vehicleRentalLesseeAgreementDebitNotes(): HasMany
+    public function vehicleRentalLessorRunningCharts(): HasMany
     {
-        return $this->hasMany(VehicleRentalLesseeAgreementDebitNoteModel::class, 'organization_unit_id');
+        return $this->hasMany(VehicleRentalLessorRunningChartModel::class, 'organization_unit_id');
     }
 
-    public function vehicleServiceTypes(): HasMany
+    public function vehicles(): HasMany
     {
-        return $this->hasMany(VehicleServiceTypeModel::class, 'organization_unit_id');
+        return $this->hasMany(VehicleModel::class, 'organization_unit_id');
+    }
+
+    public function vehicleServiceDiagnosticLines(): HasMany
+    {
+        return $this->hasMany(VehicleServiceDiagnosticLineModel::class, 'organization_unit_id');
+    }
+
+    public function vehicleServiceDiagnostics(): HasMany
+    {
+        return $this->hasMany(VehicleServiceDiagnosticModel::class, 'organization_unit_id');
+    }
+
+    public function vehicleServiceInspectionLines(): HasMany
+    {
+        return $this->hasMany(VehicleServiceInspectionLineModel::class, 'organization_unit_id');
+    }
+
+    public function vehicleServiceInspections(): HasMany
+    {
+        return $this->hasMany(VehicleServiceInspectionModel::class, 'organization_unit_id');
+    }
+
+    public function vehicleServiceJobCardLines(): HasMany
+    {
+        return $this->hasMany(VehicleServiceJobCardLineModel::class, 'organization_unit_id');
     }
 
     public function vehicleServiceJobCards(): HasMany
@@ -915,9 +946,9 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(VehicleServiceJobCardModel::class, 'organization_unit_id');
     }
 
-    public function vehicleServiceJobCardLines(): HasMany
+    public function vehicleServiceLaborAssignments(): HasMany
     {
-        return $this->hasMany(VehicleServiceJobCardLineModel::class, 'organization_unit_id');
+        return $this->hasMany(VehicleServiceLaborAssignmentModel::class, 'organization_unit_id');
     }
 
     public function vehicleServiceLaborItems(): HasMany
@@ -930,39 +961,9 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(VehicleServiceNonInventoryItemModel::class, 'organization_unit_id');
     }
 
-    public function vehicleServiceLaborAssignments(): HasMany
+    public function vehicleServiceTypes(): HasMany
     {
-        return $this->hasMany(VehicleServiceLaborAssignmentModel::class, 'organization_unit_id');
-    }
-
-    public function vehicleServiceDiagnostics(): HasMany
-    {
-        return $this->hasMany(VehicleServiceDiagnosticModel::class, 'organization_unit_id');
-    }
-
-    public function vehicleServiceDiagnosticLines(): HasMany
-    {
-        return $this->hasMany(VehicleServiceDiagnosticLineModel::class, 'organization_unit_id');
-    }
-
-    public function vehicleServiceInspections(): HasMany
-    {
-        return $this->hasMany(VehicleServiceInspectionModel::class, 'organization_unit_id');
-    }
-
-    public function vehicleServiceInspectionLines(): HasMany
-    {
-        return $this->hasMany(VehicleServiceInspectionLineModel::class, 'organization_unit_id');
-    }
-
-    public function vehicles(): HasMany
-    {
-        return $this->hasMany(VehicleModel::class, 'organization_unit_id');
-    }
-
-    public function vehicleDocuments(): HasMany
-    {
-        return $this->hasMany(VehicleDocumentModel::class, 'organization_unit_id');
+        return $this->hasMany(VehicleServiceTypeModel::class, 'organization_unit_id');
     }
 
     public function vouchers(): HasMany
@@ -970,9 +971,9 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(VoucherModel::class, 'organization_unit_id');
     }
 
-    public function recurringVouchers(): HasMany
+    public function warehouseLocations(): HasMany
     {
-        return $this->hasMany(RecurringVoucherModel::class, 'organization_unit_id');
+        return $this->hasMany(WarehouseLocationModel::class, 'organization_unit_id');
     }
 
     public function warehouses(): HasMany
@@ -980,9 +981,9 @@ class OrganizationUnitModel extends Model
         return $this->hasMany(WarehouseModel::class, 'organization_unit_id');
     }
 
-    public function warehouseLocations(): HasMany
+    public function writeOffs(): HasMany
     {
-        return $this->hasMany(WarehouseLocationModel::class, 'organization_unit_id');
+        return $this->hasMany(WriteOffModel::class, 'organization_unit_id');
     }
-}
 
+}

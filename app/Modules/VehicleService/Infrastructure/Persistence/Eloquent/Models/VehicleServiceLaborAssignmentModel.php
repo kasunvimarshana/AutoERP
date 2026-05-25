@@ -1,20 +1,23 @@
-﻿<?php
+<?php
 
 declare(strict_types=1);
 
 namespace Modules\VehicleService\Infrastructure\Persistence\Eloquent\Models;
 
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
-use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasOrganizationUnitScope;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Concerns\HasTenantScope;
 use Modules\HR\Infrastructure\Persistence\Eloquent\Models\EmployeeModel;
 use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitModel;
 use Modules\Tenant\Infrastructure\Persistence\Eloquent\Models\TenantModel;
+use Modules\VehicleService\Infrastructure\Persistence\Eloquent\Models\VehicleServiceJobCardModel;
+use Modules\VehicleService\Infrastructure\Persistence\Eloquent\Models\VehicleServiceLaborItemModel;
 
 class VehicleServiceLaborAssignmentModel extends Model
 {
-    use HasOrganizationUnitScope, HasTenantScope;
+    use HasTenantScope, HasOrganizationUnitScope;
 
     protected $table = 'vehicle_service_labor_assignments';
 
@@ -23,28 +26,18 @@ class VehicleServiceLaborAssignmentModel extends Model
     protected function casts(): array
     {
         return [
-            'employee_id' => 'integer',
             'hourly_rate' => 'decimal:4',
             'hours_worked' => 'decimal:4',
             'incentive_amount' => 'decimal:4',
             'incentive_value' => 'decimal:4',
-            'job_card_id' => 'integer',
-            'labor_item_id' => 'integer',
             'metadata' => 'array',
-            'organization_unit_id' => 'integer',
             'row_version' => 'integer',
-            'tenant_id' => 'integer',
         ];
     }
 
-    public function tenant(): BelongsTo
+    public function employee(): BelongsTo
     {
-        return $this->belongsTo(TenantModel::class, 'tenant_id');
-    }
-
-    public function organizationUnit(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
+        return $this->belongsTo(EmployeeModel::class, 'employee_id');
     }
 
     public function jobCard(): BelongsTo
@@ -57,9 +50,14 @@ class VehicleServiceLaborAssignmentModel extends Model
         return $this->belongsTo(VehicleServiceLaborItemModel::class, 'labor_item_id');
     }
 
-    public function employee(): BelongsTo
+    public function organizationUnit(): BelongsTo
     {
-        return $this->belongsTo(EmployeeModel::class, 'employee_id');
+        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
     }
-}
 
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(TenantModel::class, 'tenant_id');
+    }
+
+}
