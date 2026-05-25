@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Warehouse\Application\Repositories;
 
-use Modules\Core\Application\Repositories\Contracts\BaseRepositoryInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Application\Repositories\Contracts\RepositoryPortInterface;
 
-interface WarehouseRepositoryInterface extends BaseRepositoryInterface
+interface WarehouseRepositoryInterface extends RepositoryPortInterface
 {
     public function findByCode(string $code, array $with = []): ?Model;
 
@@ -23,10 +23,13 @@ interface WarehouseRepositoryInterface extends BaseRepositoryInterface
 
     public function getForOrganizationUnit(int|string $organizationUnitId, array $with = []): Collection;
 
-    public function paginateForOrganizationUnit(int|string $organizationUnitId, int $perPage = 15, array $with = []): LengthAwarePaginator;
+    public function paginateForOrganizationUnit(
+        int|string $organizationUnitId,
+        int $perPage = 15,
+        array $with = [],
+    ): LengthAwarePaginator;
 
     public function getActive(array $with = []): Collection;
 
     public function getInactive(array $with = []): Collection;
 }
-

@@ -4,16 +4,9 @@ declare(strict_types=1);
 
 return [
     'file_storage' => [
-        /*
-        |--------------------------------------------------------------------------
-        | Default File Storage Disk
-        |--------------------------------------------------------------------------
-        |
-        | This option defines the default disk that will be used by the
-        | FileStorageService. It must be one of the disks configured in
-        | your filesystems.php configuration file.
-        |
-        */
-        'default_disk' => env('FILE_STORAGE_DISK', 'public'),
+        'default_disk' => env('CORE_FILE_STORAGE_DISK'),
+    ],
+    'slug' => [
+        'fallback' => env('CORE_SLUG_FALLBACK'),
     ],
 ];

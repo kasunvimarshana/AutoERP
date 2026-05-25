@@ -4,25 +4,24 @@ declare(strict_types=1);
 
 namespace Modules\Warehouse\Application\Actions;
 
-use Modules\Core\Application\Repositories\Contracts\BaseRepositoryInterface;
-use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Application\DTO\DataRecord;
+use Modules\Core\Application\Repositories\Contracts\RepositoryPortInterface;
 
 class PersistWarehouseRecordAction
 {
     /**
      * @param  array<string, mixed>  $attributes
      */
-    public function create(BaseRepositoryInterface $repository, array $attributes): Model
+    public function create(RepositoryPortInterface $repository, array $attributes): DataRecord
     {
-        return $repository->transaction(fn (): Model => $repository->create($attributes));
+        return $repository->transaction(fn (): DataRecord => $repository->create($attributes));
     }
 
     /**
      * @param  array<string, mixed>  $attributes
      */
-    public function update(BaseRepositoryInterface $repository, Model|int|string $record, array $attributes): Model
+    public function update(RepositoryPortInterface $repository, int|string $id, array $attributes): DataRecord
     {
-        return $repository->transaction(fn (): Model => $repository->update($record, $attributes));
+        return $repository->transaction(fn (): DataRecord => $repository->update($id, $attributes));
     }
 }
-

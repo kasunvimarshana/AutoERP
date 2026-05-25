@@ -9,7 +9,11 @@ use Modules\Core\Application\Contracts\SlugGeneratorInterface;
 
 class SlugGenerator implements SlugGeneratorInterface
 {
-    public function generate(?string $preferredValue, ?string $sourceValue, string $fallback = 'n-a'): string
+    public function __construct(private readonly string $fallback)
+    {
+    }
+
+    public function generate(?string $preferredValue, ?string $sourceValue, ?string $fallback = null): string
     {
         $candidate = $this->normalizeInput($preferredValue);
 
@@ -23,9 +27,10 @@ class SlugGenerator implements SlugGeneratorInterface
             return $slug;
         }
 
-        $fallbackSlug = Str::slug(trim($fallback));
+        $fallbackValue = $fallback ?? $this->fallback;
+        $fallbackSlug = Str::slug(trim($fallbackValue));
 
-        return $fallbackSlug !== '' ? $fallbackSlug : 'n-a';
+        return $fallbackSlug !== '' ? $fallbackSlug : $this->fallback;
     }
 
     private function normalizeInput(?string $value): ?string

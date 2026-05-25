@@ -4,18 +4,21 @@ declare(strict_types=1);
 
 namespace Modules\Core\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
-use Modules\Core\Application\Repositories\Contracts\BaseRepositoryInterface;
+use Modules\Core\Application\DTO\DataRecord;
+use Modules\Core\Application\DTO\PagedResult;
+use Modules\Core\Application\Repositories\Contracts\RepositoryPortInterface;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Constants\SchemaColumns;
 
-abstract class EloquentRepository implements BaseRepositoryInterface
+abstract class EloquentRepository implements RepositoryPortInterface
 {
-    public function __construct(protected Model $model)
-    {
+    public function __construct(
+        protected Model $model,
+        protected string $identifierColumn = SchemaColumns::ID,
+    ) {
     }
 
     public function query(array $with = []): Builder
@@ -23,66 +26,96 @@ abstract class EloquentRepository implements BaseRepositoryInterface
         return $this->model->newQuery()->with($with);
     }
 
-    public function findById(int|string $id, array $with = []): ?Model
+    public function findById(int|string $id, array $with = []): ?DataRecord
     {
-        return $this->query($with)->find($id);
+        $model = $this->query($with)->find($id);
+
+        return $model === null ? null : $this->toRecord($model);
     }
 
-    public function findOrFail(int|string $id, array $with = []): Model
+    public function findOrFail(int|string $id, array $with = []): DataRecord
     {
-        return $this->query($with)->findOrFail($id);
+        return $this->toRecord($this->query($with)->findOrFail($id));
     }
 
-    public function all(array $with = []): Collection
+    /**
+     * @return list<DataRecord>
+     */
+    public function list(array $criteria = [], array $with = []): array
     {
-        return $this->query($with)->get();
+        $models = $criteria === []
+            ? $this->query($with)->get()
+            : $this->applyCriteria($this->query($with), $criteria)->get();
+
+        $records = [];
+        foreach ($models as $model) {
+            if ($model instanceof Model) {
+                $records[] = $this->toRecord($model);
+            }
+        }
+
+        return $records;
     }
 
-    public function getWhere(array $criteria, array $with = []): Collection
-    {
-        return $this->applyCriteria($this->query($with), $criteria)->get();
+    public function page(
+        array $criteria,
+        int $perPage,
+        int $page,
+        array $with = [],
+    ): PagedResult {
+        $resolvedPage = $page > 0 ? $page : 1;
+        $resolvedPerPage = $perPage > 0 ? $perPage : 1;
+
+        $paginator = $criteria === []
+            ? $this->query($with)->paginate($resolvedPerPage, ['*'], 'page', $resolvedPage)
+            : $this->applyCriteria($this->query($with), $criteria)
+                ->paginate($resolvedPerPage, ['*'], 'page', $resolvedPage);
+
+        $items = [];
+        foreach ($paginator->items() as $model) {
+            if ($model instanceof Model) {
+                $items[] = $this->toRecord($model);
+            }
+        }
+
+        return new PagedResult(
+            $items,
+            $paginator->total(),
+            $paginator->currentPage(),
+            $paginator->perPage(),
+        );
     }
 
-    public function paginate(int $perPage = 15, array $with = []): LengthAwarePaginator
+    public function create(array $attributes): DataRecord
     {
-        return $this->query($with)->paginate($perPage);
+        return $this->toRecord($this->query()->create($attributes));
     }
 
-    public function paginateWhere(array $criteria, int $perPage = 15, array $with = []): LengthAwarePaginator
+    public function update(int|string $id, array $attributes): DataRecord
     {
-        return $this->applyCriteria($this->query($with), $criteria)->paginate($perPage);
+        $targetModel = $this->resolveModel($id);
+        $targetModel->fill($attributes);
+        $targetModel->save();
+
+        return $this->toRecord($targetModel);
     }
 
-    public function create(array $attributes): Model
+    public function delete(int|string $id): bool
     {
-        return $this->query()->create($attributes);
+        $targetModel = $this->resolveModel($id);
+
+        return (bool) $targetModel->delete();
     }
 
-    public function update(Model|int|string $model, array $attributes): Model
-    {
-        $model = $model instanceof Model ? $model : $this->findOrFail($model);
-        $model->fill($attributes);
-        $model->save();
-
-        return $model;
-    }
-
-    public function delete(Model|int|string $model): bool
-    {
-        $model = $model instanceof Model ? $model : $this->findOrFail($model);
-
-        return (bool) $model->delete();
-    }
-
-    public function restore(Model|int|string $model): bool
+    public function restore(int|string $id): bool
     {
         if (! in_array(SoftDeletes::class, class_uses_recursive($this->model), true)) {
             return false;
         }
 
-        $model = $model instanceof Model ? $model : $this->query()->withTrashed()->findOrFail($model);
+        $targetModel = $this->query()->withTrashed()->findOrFail($id);
 
-        return (bool) $model->restore();
+        return (bool) $targetModel->restore();
     }
 
     public function exists(array $criteria): bool
@@ -108,5 +141,18 @@ abstract class EloquentRepository implements BaseRepositoryInterface
         }
 
         return $query;
+    }
+
+    protected function resolveModel(int|string $id): Model
+    {
+        return $this->query()->findOrFail($id);
+    }
+
+    protected function toRecord(Model $model): DataRecord
+    {
+        /** @var array<string, mixed> $payload */
+        $payload = $model->attributesToArray();
+
+        return new DataRecord($payload);
     }
 }

@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Warehouse\Application\Services;
 
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Core\Application\DTO\DataRecord;
+use Modules\Core\Application\DTO\PagedResult;
 use Modules\Tenant\Application\Repositories\TenantRepositoryInterface;
 use Modules\Warehouse\Application\Actions\DeleteWarehouseRecordAction;
-use Modules\Warehouse\Application\Actions\FindWarehouseRecordAction;
 use Modules\Warehouse\Application\Actions\ListWarehouseRecordsAction;
 use Modules\Warehouse\Application\Actions\PersistWarehouseRecordAction;
 use Modules\Warehouse\Application\DTOs\WarehouseData;
@@ -27,7 +26,6 @@ class WarehouseService
         private readonly WarehouseLocationRepositoryInterface $locations,
         private readonly WarehouseDomainService $domain,
         private readonly ListWarehouseRecordsAction $listRecords,
-        private readonly FindWarehouseRecordAction $findRecord,
         private readonly PersistWarehouseRecordAction $persistRecord,
         private readonly DeleteWarehouseRecordAction $deleteRecord,
     ) {
@@ -40,7 +38,7 @@ class WarehouseService
         int|string $tenantId,
         array $filters = [],
         ?int $perPage = null,
-    ): Collection|LengthAwarePaginator {
+    ): array|PagedResult {
         $this->findTenant($tenantId);
 
         return $this->listRecords->execute(
@@ -61,25 +59,29 @@ class WarehouseService
         return $record;
     }
 
-    public function createWarehouse(WarehouseData $data): Model
+    public function createWarehouse(WarehouseData $data): DataRecord
     {
         $this->findTenant($data->tenantId);
 
         return $this->persistRecord->create($this->warehouses, $this->warehouseAttributes($data));
     }
 
-    public function updateWarehouse(int|string $tenantId, int|string $id, WarehouseData $data): Model
+    public function updateWarehouse(int|string $tenantId, int|string $id, WarehouseData $data): DataRecord
     {
+        $this->findWarehouse($tenantId, $id);
+
         return $this->persistRecord->update(
             $this->warehouses,
-            $this->findWarehouse($tenantId, $id),
+            $id,
             $this->warehouseAttributes($data),
         );
     }
 
     public function deleteWarehouse(int|string $tenantId, int|string $id): bool
     {
-        return $this->deleteRecord->execute($this->warehouses, $this->findWarehouse($tenantId, $id));
+        $this->findWarehouse($tenantId, $id);
+
+        return $this->deleteRecord->execute($this->warehouses, $id);
     }
 
     /**
@@ -90,7 +92,7 @@ class WarehouseService
         int|string $warehouseId,
         array $filters = [],
         ?int $perPage = null,
-    ): Collection|LengthAwarePaginator {
+    ): array|PagedResult {
         $this->findWarehouse($tenantId, $warehouseId);
 
         return $this->listRecords->execute(
@@ -111,7 +113,7 @@ class WarehouseService
         return $record;
     }
 
-    public function createLocation(WarehouseLocationData $data): Model
+    public function createLocation(WarehouseLocationData $data): DataRecord
     {
         $warehouse = $this->findWarehouse($data->tenantId, $data->warehouseId);
 
@@ -127,28 +129,40 @@ class WarehouseService
         int|string $warehouseId,
         int|string $id,
         WarehouseLocationData $data,
-    ): Model {
+    ): DataRecord {
         $warehouse = $this->findWarehouse($tenantId, $warehouseId);
 
         if ($data->parentId !== null) {
             $this->findLocation($tenantId, $warehouseId, $data->parentId);
         }
 
-        return $this->persistRecord->update(
-            $this->locations,
-            $this->findLocation($tenantId, $warehouseId, $id),
-            $this->locationAttributes($data, $warehouse),
-        );
+        $this->findLocation($tenantId, $warehouseId, $id);
+
+        return $this->persistRecord->update($this->locations, $id, $this->locationAttributes($data, $warehouse));
     }
 
     public function deleteLocation(int|string $tenantId, int|string $warehouseId, int|string $id): bool
     {
-        return $this->deleteRecord->execute($this->locations, $this->findLocation($tenantId, $warehouseId, $id));
+        $this->findLocation($tenantId, $warehouseId, $id);
+
+        return $this->deleteRecord->execute($this->locations, $id);
     }
 
     private function findTenant(int|string $tenantId): Model
     {
-        return $this->findRecord->execute($this->tenants, 'Tenant', $tenantId);
+        $method = 'findById';
+
+        if (! method_exists($this->tenants, $method)) {
+            throw WarehouseRecordNotFoundException::for('Tenant', $tenantId);
+        }
+
+        $tenant = $this->tenants->{$method}($tenantId);
+
+        if ($tenant === null) {
+            throw WarehouseRecordNotFoundException::for('Tenant', $tenantId);
+        }
+
+        return $tenant;
     }
 
     /**

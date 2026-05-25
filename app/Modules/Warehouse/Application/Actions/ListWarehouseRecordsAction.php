@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Warehouse\Application\Actions;
 
-use Modules\Core\Application\Repositories\Contracts\BaseRepositoryInterface;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Collection;
+use Modules\Core\Application\DTO\PagedResult;
+use Modules\Core\Application\Repositories\Contracts\RepositoryPortInterface;
 
 class ListWarehouseRecordsAction
 {
@@ -14,21 +13,14 @@ class ListWarehouseRecordsAction
      * @param  array<string, mixed>  $criteria
      */
     public function execute(
-        BaseRepositoryInterface $repository,
+        RepositoryPortInterface $repository,
         array $criteria = [],
         ?int $perPage = null,
-    ): Collection|LengthAwarePaginator {
+    ): array|PagedResult {
         if ($perPage !== null) {
-            return $criteria === []
-                ? $repository->paginate($perPage)
-                : $repository->paginateWhere($criteria, $perPage);
+            return $repository->page($criteria, $perPage, 1);
         }
 
-        if ($criteria !== []) {
-            return $repository->getWhere($criteria);
-        }
-
-        return $repository->all();
+        return $repository->list($criteria);
     }
 }
-

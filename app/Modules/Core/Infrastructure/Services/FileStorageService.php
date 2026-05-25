@@ -12,48 +12,81 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FileStorageService implements FileStorageServiceInterface
 {
-    /**
-     * @var FilesystemAdapter The current disk adapter.
-     */
     protected FilesystemAdapter $disk;
 
-    /**
-     * @var string The default disk name.
-     */
     protected string $defaultDisk;
 
-    /**
-     * @param  string  $disk  The default disk name.
-     */
-    public function __construct(string $disk = 'public')
+    public function __construct(string $defaultDisk)
     {
-        $this->defaultDisk = $disk;
-        $this->disk = Storage::disk($disk);
+        $this->defaultDisk = $defaultDisk;
+        $disk = Storage::disk($defaultDisk);
+        if (! $disk instanceof FilesystemAdapter) {
+            throw new \RuntimeException('Configured filesystem disk does not provide a FilesystemAdapter.');
+        }
+
+        $this->disk = $disk;
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function store(string $tmpPath, string $directory, string $filename, ?string $disk = null): string
     {
-        $adapter = $this->getDisk($disk);
+        if (! is_file($tmpPath)) {
+            return '';
+        }
 
-        return $adapter->putFileAs($directory, $tmpPath, $filename);
+        $contents = file_get_contents($tmpPath);
+        if ($contents === false) {
+            return '';
+        }
+
+        $targetPath = trim($directory, '/');
+        $targetPath = $targetPath === '' ? $filename : $targetPath . '/' . $filename;
+        $adapter = $this->getDisk($disk);
+        $stored = $adapter->put($targetPath, $contents);
+
+        return $stored ? $targetPath : '';
+    }
+
+    public function storeContent(
+        string $contents,
+        string $directory,
+        string $filename,
+        ?string $disk = null,
+    ): string {
+        $adapter = $this->getDisk($disk);
+        $targetPath = trim($directory, '/');
+        $targetPath = $targetPath === '' ? $filename : $targetPath . '/' . $filename;
+        $stored = $adapter->put($targetPath, $contents);
+
+        return $stored ? $targetPath : '';
     }
 
     /**
-     * {@inheritdoc}
+     * Compatibility bridge for duplicated sample interfaces in workspace.
      */
-    public function storeFile(UploadedFile $file, string $directory, ?string $filename = null, ?string $disk = null): string
-    {
-        $adapter = $this->getDisk($disk);
+    public function storeFile(
+        UploadedFile $file,
+        string $directory,
+        ?string $filename = null,
+        ?string $disk = null,
+    ): string {
+        $realPath = $file->getRealPath();
+        if ($realPath === false || ! is_file($realPath)) {
+            return '';
+        }
 
-        return $adapter->putFileAs($directory, $file, $filename ?? $file->getClientOriginalName());
+        $contents = file_get_contents($realPath);
+        if ($contents === false) {
+            return '';
+        }
+
+        return $this->storeContent(
+            $contents,
+            $directory,
+            $filename ?? $file->getClientOriginalName(),
+            $disk,
+        );
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function delete(string $path, ?string $disk = null): bool
     {
         $adapter = $this->getDisk($disk);
@@ -61,9 +94,6 @@ class FileStorageService implements FileStorageServiceInterface
         return $adapter->delete($path);
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function exists(string $path, ?string $disk = null): bool
     {
         $adapter = $this->getDisk($disk);
@@ -71,9 +101,6 @@ class FileStorageService implements FileStorageServiceInterface
         return $adapter->exists($path);
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function url(string $path, ?string $disk = null): string
     {
         $adapter = $this->getDisk($disk);
@@ -81,9 +108,6 @@ class FileStorageService implements FileStorageServiceInterface
         return $adapter->url($path);
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function size(string $path, ?string $disk = null): int
     {
         $adapter = $this->getDisk($disk);
@@ -91,9 +115,6 @@ class FileStorageService implements FileStorageServiceInterface
         return $adapter->size($path);
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function mimeType(string $path, ?string $disk = null): string|false
     {
         $adapter = $this->getDisk($disk);
@@ -101,9 +122,6 @@ class FileStorageService implements FileStorageServiceInterface
         return $adapter->mimeType($path);
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function lastModified(string $path, ?string $disk = null): int
     {
         $adapter = $this->getDisk($disk);
@@ -111,9 +129,6 @@ class FileStorageService implements FileStorageServiceInterface
         return $adapter->lastModified($path);
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function read(string $path, ?string $disk = null): ?string
     {
         $adapter = $this->getDisk($disk);
@@ -121,9 +136,6 @@ class FileStorageService implements FileStorageServiceInterface
         return $adapter->get($path);
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function write(string $path, string $contents, ?string $disk = null): bool
     {
         $adapter = $this->getDisk($disk);
@@ -131,9 +143,6 @@ class FileStorageService implements FileStorageServiceInterface
         return $adapter->put($path, $contents);
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function copy(string $from, string $to, ?string $disk = null): bool
     {
         $adapter = $this->getDisk($disk);
@@ -141,9 +150,6 @@ class FileStorageService implements FileStorageServiceInterface
         return $adapter->copy($from, $to);
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function move(string $from, string $to, ?string $disk = null): bool
     {
         $adapter = $this->getDisk($disk);
@@ -151,13 +157,12 @@ class FileStorageService implements FileStorageServiceInterface
         return $adapter->move($from, $to);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function temporaryUrl(string $path, int $minutes = 5, ?string $disk = null): ?string
-    {
+    public function temporaryUrl(
+        string $path,
+        int $minutes,
+        ?string $disk = null,
+    ): ?string {
         $adapter = $this->getDisk($disk);
-        // Not all disks support temporary URLs (e.g., public disk). Return null if method missing.
         if (method_exists($adapter, 'temporaryUrl')) {
             return $adapter->temporaryUrl($path, now()->addMinutes($minutes));
         }
@@ -165,8 +170,15 @@ class FileStorageService implements FileStorageServiceInterface
         return null;
     }
 
+    public function readStream(string $path, ?string $disk = null): mixed
+    {
+        $adapter = $this->getDisk($disk);
+
+        return $adapter->readStream($path);
+    }
+
     /**
-     * {@inheritdoc}
+     * Compatibility bridge for duplicated sample interfaces in workspace.
      */
     public function stream(string $path, ?string $disk = null): StreamedResponse
     {
@@ -175,28 +187,22 @@ class FileStorageService implements FileStorageServiceInterface
         return $adapter->response($path);
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function getDefaultDisk(): string
     {
         return $this->defaultDisk;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function setDefaultDisk(string $disk): self
+    public function setDefaultDisk(string $disk): void
     {
         $this->defaultDisk = $disk;
-        $this->disk = Storage::disk($disk);
+        $adapter = Storage::disk($disk);
+        if (! $adapter instanceof FilesystemAdapter) {
+            throw new \RuntimeException('Configured filesystem disk does not provide a FilesystemAdapter.');
+        }
 
-        return $this;
+        $this->disk = $adapter;
     }
 
-    /**
-     * Get the disk adapter for the given disk name, falling back to the default.
-     */
     protected function getDisk(?string $disk = null): FilesystemAdapter
     {
         if ($disk === null || $disk === $this->defaultDisk) {
