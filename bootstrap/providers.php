@@ -20,4 +20,5 @@ return [
     Modules\UOM\Infrastructure\Providers\UomServiceProvider::class,
     Modules\Audit\Infrastructure\Providers\AuditServiceProvider::class,
     Modules\Customer\Infrastructure\Providers\CustomerServiceProvider::class,
+    Modules\Extension\Infrastructure\Providers\ExtensionServiceProvider::class,
 ];
