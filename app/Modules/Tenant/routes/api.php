@@ -10,8 +10,12 @@ use Modules\Tenant\Presentation\Http\Controllers\TenantSettingController;
 use Modules\Tenant\Presentation\Http\Controllers\TenantSettingGroupController;
 use Modules\Tenant\Presentation\Http\Controllers\TenantController;
 
+$protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
+$currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');
+$currentTenantMiddleware = (string) config('core.current_tenant.middleware_alias', 'current.tenant');
+
 Route::prefix('api/tenant')
-    ->middleware('api')
+    ->middleware(['api', 'auth:' . $protectedGuard, $currentUserMiddleware, $currentTenantMiddleware])
     ->name('tenant.')
     ->group(function (): void {
         Route::apiResource('tenants', TenantController::class)->except(['destroy']);

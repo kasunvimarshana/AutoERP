@@ -9,8 +9,12 @@ use Modules\Configuration\Presentation\Http\Controllers\CurrencyController;
 use Modules\Configuration\Presentation\Http\Controllers\LanguageController;
 use Modules\Configuration\Presentation\Http\Controllers\TimezoneController;
 
+$protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
+$currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');
+$currentTenantMiddleware = (string) config('core.current_tenant.middleware_alias', 'current.tenant');
+
 Route::prefix('api/configuration')
-    ->middleware('api')
+    ->middleware(['api', 'auth:' . $protectedGuard, $currentUserMiddleware, $currentTenantMiddleware])
     ->name('configuration.')
     ->group(function (): void {
         $keyPattern = '[A-Za-z0-9._-]+';
