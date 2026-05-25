@@ -19,7 +19,7 @@ final class LogoutRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tenant_id' => ['nullable', 'integer', 'min:1', 'required_with:session_id'],
+            'tenant_id' => ['nullable', 'integer', 'min:1'],
             'session_id' => ['nullable', 'integer', 'min:1'],
             'access_token' => ['nullable', 'string', 'min:10'],
         ];

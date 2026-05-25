@@ -6,6 +6,7 @@ namespace Modules\Auth\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
+use Modules\Core\Application\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Auth\Application\Contracts\UseCases\AuthorizeClientServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\ExchangeAuthorizationCodeServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\IssueTokenServiceInterface;
@@ -57,6 +58,7 @@ final class AuthController extends Controller
         private readonly VerifyChallengeServiceInterface $verifyChallengeService,
         private readonly AuthorizeClientServiceInterface $authorizeClientService,
         private readonly ExchangeAuthorizationCodeServiceInterface $exchangeAuthorizationCodeService,
+        private readonly CurrentUserContextAccessorInterface $currentUser,
     ) {
     }
 
@@ -76,7 +78,9 @@ final class AuthController extends Controller
 
     public function issueToken(IssueTokenRequest $request): JsonResponse|AuthPayloadResource
     {
-        $result = $this->issueTokenService->issueToken(TokenIssueData::fromArray($request->validated()));
+        $result = $this->issueTokenService->issueToken(
+            TokenIssueData::fromArray($this->mergeProtectedContext($request->validated())),
+        );
 
         return $this->respond($result, 201);
     }
@@ -90,16 +94,19 @@ final class AuthController extends Controller
 
     public function logout(LogoutRequest $request): JsonResponse|AuthPayloadResource
     {
-        $result = $this->logoutService->logout(LogoutData::fromArray($request->validated()));
+        $result = $this->logoutService->logout(
+            LogoutData::fromArray($this->mergeProtectedContext($request->validated())),
+        );
 
         return $this->respond($result);
     }
 
     public function revokeSession(RevokeSessionRequest $request, int|string $session): JsonResponse|AuthPayloadResource
     {
+        $payload = $this->mergeProtectedContext($request->validated());
         $result = $this->revokeSessionService->revokeSession(
             $session,
-            isset($request->validated()['tenant_id']) ? (int) $request->validated()['tenant_id'] : null,
+            isset($payload['tenant_id']) ? (int) $payload['tenant_id'] : null,
         );
 
         return $this->respond($result);
@@ -107,7 +114,7 @@ final class AuthController extends Controller
 
     public function listSessions(ListSessionsRequest $request): JsonResponse|AuthPayloadResource
     {
-        $validated = $request->validated();
+        $validated = $this->mergeProtectedContext($request->validated());
         $result = $this->listSessionsService->listSessions(
             (int) $validated['user_id'],
             isset($validated['tenant_id']) ? (int) $validated['tenant_id'] : null,
@@ -146,7 +153,9 @@ final class AuthController extends Controller
 
     public function authorizeClient(AuthorizeClientRequest $request): JsonResponse|AuthPayloadResource
     {
-        $result = $this->authorizeClientService->authorizeClient(AuthorizeClientData::fromArray($request->validated()));
+        $result = $this->authorizeClientService->authorizeClient(
+            AuthorizeClientData::fromArray($this->mergeProtectedContext($request->validated())),
+        );
 
         return $this->respond($result, 201);
     }
@@ -159,6 +168,27 @@ final class AuthController extends Controller
         );
 
         return $this->respond($result, 201);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function mergeProtectedContext(array $payload): array
+    {
+        $context = $this->currentUser->requireCurrent();
+
+        $payload['user_id'] = $context->userIdAsInt();
+
+        if ($context->tenantId() !== null) {
+            $payload['tenant_id'] = $context->tenantId();
+        }
+
+        if ($context->organizationUnitId() !== null) {
+            $payload['organization_unit_id'] = $context->organizationUnitId();
+        }
+
+        return $payload;
     }
 
     private function respond(Result $result, int $successStatus = 200): JsonResponse|AuthPayloadResource

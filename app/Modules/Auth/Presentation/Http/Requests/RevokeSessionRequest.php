@@ -19,7 +19,7 @@ final class RevokeSessionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tenant_id' => ['required', 'integer', 'min:1'],
+            'tenant_id' => ['nullable', 'integer', 'min:1'],
         ];
     }
 }

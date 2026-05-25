@@ -20,7 +20,7 @@ final class ListSessionsRequest extends FormRequest
     {
         return [
             'tenant_id' => ['nullable', 'integer', 'min:1'],
-            'user_id' => ['required', 'integer', 'min:1'],
+            'user_id' => ['nullable', 'integer', 'min:1'],
         ];
     }
 }
