@@ -23,7 +23,7 @@ final class UpsertTenantPlanRequest extends FormRequest
             'features' => ['nullable', 'array'],
             'limits' => ['nullable', 'array'],
             'price' => ['nullable', 'numeric', 'min:0'],
-            'currency_id' => ['nullable', 'integer', 'min:1'],
+            'currency_id' => ['nullable', 'integer', 'min:1', 'exists:currencies,id'],
             'billing_interval' => ['nullable', 'string', 'in:month,year'],
             'is_active' => ['nullable', 'boolean'],
             'metadata' => ['nullable', 'array'],

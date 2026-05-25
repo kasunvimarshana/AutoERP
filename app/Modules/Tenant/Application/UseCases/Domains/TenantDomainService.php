@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Application\UseCases\Domains;
 
+use DateTimeImmutable;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Modules\Tenant\Application\Contracts\UseCases\Domains\TenantDomainServiceInterface;
@@ -56,7 +57,9 @@ final class TenantDomainService implements TenantDomainServiceInterface
             $domain = $this->domain->normalizeDomain((string) ($payload['domain'] ?? ''));
             $byDomain = $this->domains->findByDomain($domain);
             if ($byDomain !== null) {
-                return Result::failure(new Error(TenantErrorCode::CONFLICT, 'Domain already assigned to another tenant.'));
+                return Result::failure(
+                    new Error(TenantErrorCode::CONFLICT, 'Domain already assigned to another tenant.'),
+                );
             }
 
             $isPrimary = isset($payload['is_primary']) ? (bool) $payload['is_primary'] : false;
@@ -66,7 +69,7 @@ final class TenantDomainService implements TenantDomainServiceInterface
 
             $isVerified = isset($payload['is_verified']) ? (bool) $payload['is_verified'] : false;
             $verifiedAt = $isVerified
-                ? (isset($payload['verified_at']) ? (string) $payload['verified_at'] : now()->format('Y-m-d H:i:s'))
+                ? $this->normalizeVerifiedAt(isset($payload['verified_at']) ? (string) $payload['verified_at'] : null)
                 : null;
 
             $record = $this->domains->create([
@@ -97,7 +100,9 @@ final class TenantDomainService implements TenantDomainServiceInterface
             $domain = $this->domain->normalizeDomain((string) ($payload['domain'] ?? $existing->require('domain')));
             $byDomain = $this->domains->findByDomain($domain);
             if ($byDomain !== null && (string) $byDomain->id() !== (string) $existing->id()) {
-                return Result::failure(new Error(TenantErrorCode::CONFLICT, 'Domain already assigned to another tenant.'));
+                return Result::failure(
+                    new Error(TenantErrorCode::CONFLICT, 'Domain already assigned to another tenant.'),
+                );
             }
 
             $isPrimary = array_key_exists('is_primary', $payload)
@@ -113,11 +118,13 @@ final class TenantDomainService implements TenantDomainServiceInterface
                 : (bool) $existing->get('is_verified', false);
 
             $verifiedAt = $isVerified
-                ? (isset($payload['verified_at'])
-                    ? (string) $payload['verified_at']
-                    : ($existing->get('verified_at') !== null
-                        ? (string) $existing->get('verified_at')
-                        : now()->format('Y-m-d H:i:s')))
+                ? $this->normalizeVerifiedAt(
+                    isset($payload['verified_at'])
+                        ? (string) $payload['verified_at']
+                        : ($existing->get('verified_at') !== null
+                            ? (string) $existing->get('verified_at')
+                            : null),
+                )
                 : null;
 
             $record = $this->domains->update($id, [
@@ -148,5 +155,15 @@ final class TenantDomainService implements TenantDomainServiceInterface
         } catch (Throwable $exception) {
             return Result::failure(new Error(TenantErrorCode::INVALID_VALUE, $exception->getMessage()));
         }
+    }
+
+    private function normalizeVerifiedAt(?string $value): string
+    {
+        $candidate = $this->domain->normalizeOptionalText($value);
+        if ($candidate === null) {
+            return now()->format('Y-m-d H:i:s');
+        }
+
+        return (new DateTimeImmutable($candidate))->format('Y-m-d H:i:s');
     }
 }
