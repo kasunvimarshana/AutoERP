@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Audit\Application\Contracts\UseCases\AuditLogs;
 
+use Modules\Audit\Application\DTOs\AuditLogQueryData;
 use Modules\Core\Application\Results\Result;
 
 interface ListAuditLogsServiceInterface
 {
-    /**
-     * @param array<string, mixed> $criteria
-     */
-    public function execute(array $criteria, int $perPage, int $page): Result;
+    public function execute(AuditLogQueryData $query): Result;
 }

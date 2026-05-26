@@ -6,13 +6,10 @@ namespace Modules\Audit\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\Audit\Application\Contracts\UseCases\AuditLogs\CreateAuditLogServiceInterface;
-use Modules\Audit\Application\Contracts\UseCases\AuditLogs\DeleteAuditLogServiceInterface;
 use Modules\Audit\Application\Contracts\UseCases\AuditLogs\GetAuditLogServiceInterface;
 use Modules\Audit\Application\Contracts\UseCases\AuditLogs\ListAuditLogsServiceInterface;
-use Modules\Audit\Application\Contracts\UseCases\AuditLogs\UpdateAuditLogServiceInterface;
+use Modules\Audit\Application\DTOs\AuditLogQueryData;
 use Modules\Audit\Presentation\Http\Requests\ListAuditLogRequest;
-use Modules\Audit\Presentation\Http\Requests\UpsertAuditLogRequest;
 use Modules\Audit\Presentation\Http\Resources\AuditLogResource;
 use Modules\Core\Application\DTO\PagedResult;
 
@@ -21,20 +18,13 @@ final class AuditLogController extends Controller
     public function __construct(
         private readonly ListAuditLogsServiceInterface $listService,
         private readonly GetAuditLogServiceInterface $getService,
-        private readonly CreateAuditLogServiceInterface $createService,
-        private readonly UpdateAuditLogServiceInterface $updateService,
-        private readonly DeleteAuditLogServiceInterface $deleteService,
     ) {
     }
 
     public function index(ListAuditLogRequest $request): JsonResponse
     {
         $validated = $request->validated();
-        $perPage = (int) ($validated['per_page'] ?? 0);
-        $page = (int) ($validated['page'] ?? 0);
-        unset($validated['per_page'], $validated['page']);
-
-        $result = $this->listService->execute($validated, $perPage, $page);
+        $result = $this->listService->execute(AuditLogQueryData::fromArray($validated));
 
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 422);
@@ -66,41 +56,5 @@ final class AuditLogController extends Controller
         }
 
         return new AuditLogResource($result->valueOrFail());
-    }
-
-    public function store(UpsertAuditLogRequest $request): JsonResponse|AuditLogResource
-    {
-        $result = $this->createService->execute($request->validated());
-
-        if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 422);
-        }
-
-        return (new AuditLogResource($result->valueOrFail()))->response()->setStatusCode(201);
-    }
-
-    public function update(UpsertAuditLogRequest $request, int|string $id): JsonResponse|AuditLogResource
-    {
-        $result = $this->updateService->execute($id, $request->validated());
-
-        if ($result->isFailure()) {
-            $error = $result->errorOrFail();
-            $status = $error->code === 'AUDIT_NOT_FOUND' ? 404 : 422;
-
-            return response()->json(['message' => $error->message], $status);
-        }
-
-        return new AuditLogResource($result->valueOrFail());
-    }
-
-    public function destroy(int|string $id): JsonResponse
-    {
-        $result = $this->deleteService->execute($id);
-
-        if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 404);
-        }
-
-        return response()->json(null, 204);
     }
 }

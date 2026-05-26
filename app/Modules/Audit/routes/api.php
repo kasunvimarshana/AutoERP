@@ -23,5 +23,8 @@ Route::prefix('api/audit')
     ])
     ->name('audit.')
     ->group(function (): void {
-        Route::apiResource('audit-logs', AuditLogController::class);
+        Route::get('audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
+        Route::get('audit-logs/{id}', [AuditLogController::class, 'show'])
+            ->whereNumber('id')
+            ->name('audit-logs.show');
     });

@@ -17,7 +17,7 @@ final class AuditLogModel extends CoreModel
 
     protected function casts(): array
     {
-        return array_merge(parent::casts(), [
+        return [
             'row_version' => 'integer',
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
@@ -27,6 +27,6 @@ final class AuditLogModel extends CoreModel
             'new_values' => 'array',
             'tags' => 'array',
             'occurred_at' => 'datetime',
-        ]);
+        ];
     }
 }
