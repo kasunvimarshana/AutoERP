@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Modules\Payment\Presentation\Http\Controllers\PaymentMethodController;
 use Modules\Payment\Presentation\Http\Controllers\PaymentGroupController;
 use Modules\Payment\Presentation\Http\Controllers\PaymentController;
+use Modules\Payment\Presentation\Http\Controllers\PaymentEngineController;
 use Modules\Payment\Presentation\Http\Controllers\PaymentAllocationController;
 use Modules\Payment\Presentation\Http\Controllers\CashRegisterController;
 use Modules\Payment\Presentation\Http\Controllers\CheckController;
@@ -31,6 +32,12 @@ Route::prefix('api/payment')
     ])
     ->name('payment.')
     ->group(function (): void {
+        Route::post('payments/{payment}/engines/allocate', [PaymentEngineController::class, 'allocate'])
+            ->name('payments.engines.allocate');
+        Route::post('payments/{payment}/engines/unallocate', [PaymentEngineController::class, 'unallocate'])
+            ->name('payments.engines.unallocate');
+        Route::post('payments/{payment}/engines/status', [PaymentEngineController::class, 'settleStatus'])
+            ->name('payments.engines.status');
         Route::apiResource('payment-methods', PaymentMethodController::class);
         Route::apiResource('payment-groups', PaymentGroupController::class);
         Route::apiResource('payments', PaymentController::class);

@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Modules\Payment\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Payment\Application\Contracts\UseCases\PaymentEngines\AllocatePaymentDocumentServiceInterface;
+use Modules\Payment\Application\Contracts\UseCases\PaymentEngines\SettlePaymentStatusServiceInterface;
+use Modules\Payment\Application\Contracts\UseCases\PaymentEngines\UnallocatePaymentDocumentServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\AdvancePaymentAllocations\CreateAdvancePaymentAllocationServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\AdvancePaymentAllocations\DeleteAdvancePaymentAllocationServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\AdvancePaymentAllocations\GetAdvancePaymentAllocationServiceInterface;
@@ -84,6 +87,9 @@ use Modules\Payment\Application\UseCases\PaymentAllocations\DeletePaymentAllocat
 use Modules\Payment\Application\UseCases\PaymentAllocations\GetPaymentAllocationService;
 use Modules\Payment\Application\UseCases\PaymentAllocations\ListPaymentAllocationsService;
 use Modules\Payment\Application\UseCases\PaymentAllocations\UpdatePaymentAllocationService;
+use Modules\Payment\Application\UseCases\PaymentEngines\AllocatePaymentDocumentService;
+use Modules\Payment\Application\UseCases\PaymentEngines\SettlePaymentStatusService;
+use Modules\Payment\Application\UseCases\PaymentEngines\UnallocatePaymentDocumentService;
 use Modules\Payment\Application\UseCases\PaymentGroups\CreatePaymentGroupService;
 use Modules\Payment\Application\UseCases\PaymentGroups\DeletePaymentGroupService;
 use Modules\Payment\Application\UseCases\PaymentGroups\GetPaymentGroupService;
@@ -176,6 +182,9 @@ final class PaymentServiceProvider extends ServiceProvider
                 CreateWriteOffServiceInterface::class => CreateWriteOffService::class,
                 UpdateWriteOffServiceInterface::class => UpdateWriteOffService::class,
                 DeleteWriteOffServiceInterface::class => DeleteWriteOffService::class,
+                AllocatePaymentDocumentServiceInterface::class => AllocatePaymentDocumentService::class,
+                UnallocatePaymentDocumentServiceInterface::class => UnallocatePaymentDocumentService::class,
+                SettlePaymentStatusServiceInterface::class => SettlePaymentStatusService::class,
             ] as $contract => $implementation
         ) {
             $this->app->singleton($contract, $implementation);
