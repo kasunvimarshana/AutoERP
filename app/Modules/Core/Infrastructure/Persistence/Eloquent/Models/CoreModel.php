@@ -10,12 +10,4 @@ use Modules\Core\Infrastructure\Persistence\Eloquent\Constants\SchemaColumns;
 abstract class CoreModel extends Model
 {
     protected $guarded = [SchemaColumns::ID];
-
-    protected function casts(): array
-    {
-        return [
-            'metadata' => 'array',
-            'row_version' => 'integer',
-        ];
-    }
 }
