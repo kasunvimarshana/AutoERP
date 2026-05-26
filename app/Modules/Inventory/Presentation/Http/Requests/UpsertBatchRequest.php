@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Modules\Supplier\Presentation\Http\Requests;
+namespace Modules\Inventory\Presentation\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-final class UpsertSupplierAddressesRequest extends FormRequest
+final class UpsertBatchRequest extends FormRequest
 {
     public function authorize(): bool
     {

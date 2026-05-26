@@ -23,15 +23,6 @@ final class ListValuationConfigRequest extends FormRequest
             'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:' . (int) config('inventory.pagination.max_per_page', 200)],
-            'warehouse_id' => ['nullable', 'integer', 'min:1'],
-            'item_id' => ['nullable', 'integer', 'min:1'],
-            'variant_id' => ['nullable', 'integer', 'min:1'],
-            'location_id' => ['nullable', 'integer', 'min:1'],
-            'batch_id' => ['nullable', 'integer', 'min:1'],
-            'serial_id' => ['nullable', 'integer', 'min:1'],
-            'transaction_type' => ['nullable', 'string', 'max:255'],
-            'valuation_method' => ['nullable', 'string', 'max:255'],
-            'is_active' => ['nullable', 'boolean'],
         ];
     }
 }

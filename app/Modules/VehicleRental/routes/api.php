@@ -30,12 +30,44 @@ Route::prefix('api/vehicle-rental')
     ])
     ->name('vehiclerental.')
     ->group(function (): void {
-        Route::apiResource('vehicle-rental-lessor-agreements', VehicleRentalLessorAgreementController::class);
-        Route::apiResource('vehicle-rental-lessee-agreements', VehicleRentalLesseeAgreementController::class);
-        Route::apiResource('vehicle-rental-lessor-running-charts', VehicleRentalLessorRunningChartController::class);
-        Route::apiResource('vehicle-rental-lessee-running-charts', VehicleRentalLesseeRunningChartController::class);
-        Route::apiResource('vehicle-rental-lessor-agreement-credit-notes', VehicleRentalLessorAgreementCreditNoteController::class);
-        Route::apiResource('vehicle-rental-lessor-agreement-debit-notes', VehicleRentalLessorAgreementDebitNoteController::class);
-        Route::apiResource('vehicle-rental-lessee-agreement-credit-notes', VehicleRentalLesseeAgreementCreditNoteController::class);
-        Route::apiResource('vehicle-rental-lessee-agreement-debit-notes', VehicleRentalLesseeAgreementDebitNoteController::class);
+        Route::apiResource(
+            'vehicle-rental-lessor-agreements',
+            VehicleRentalLessorAgreementController::class,
+        )
+            ->parameters(['vehicle-rental-lessor-agreements' => 'lessor_agreement']);
+        Route::apiResource(
+            'vehicle-rental-lessee-agreements',
+            VehicleRentalLesseeAgreementController::class,
+        )
+            ->parameters(['vehicle-rental-lessee-agreements' => 'lessee_agreement']);
+        Route::apiResource(
+            'vehicle-rental-lessor-running-charts',
+            VehicleRentalLessorRunningChartController::class,
+        )
+            ->parameters(['vehicle-rental-lessor-running-charts' => 'lessor_chart']);
+        Route::apiResource(
+            'vehicle-rental-lessee-running-charts',
+            VehicleRentalLesseeRunningChartController::class,
+        )
+            ->parameters(['vehicle-rental-lessee-running-charts' => 'lessee_chart']);
+        Route::apiResource(
+            'vehicle-rental-lessor-agreement-credit-notes',
+            VehicleRentalLessorAgreementCreditNoteController::class,
+        )
+            ->parameters(['vehicle-rental-lessor-agreement-credit-notes' => 'lessor_credit_note']);
+        Route::apiResource(
+            'vehicle-rental-lessor-agreement-debit-notes',
+            VehicleRentalLessorAgreementDebitNoteController::class,
+        )
+            ->parameters(['vehicle-rental-lessor-agreement-debit-notes' => 'lessor_debit_note']);
+        Route::apiResource(
+            'vehicle-rental-lessee-agreement-credit-notes',
+            VehicleRentalLesseeAgreementCreditNoteController::class,
+        )
+            ->parameters(['vehicle-rental-lessee-agreement-credit-notes' => 'lessee_credit_note']);
+        Route::apiResource(
+            'vehicle-rental-lessee-agreement-debit-notes',
+            VehicleRentalLesseeAgreementDebitNoteController::class,
+        )
+            ->parameters(['vehicle-rental-lessee-agreement-debit-notes' => 'lessee_debit_note']);
     });

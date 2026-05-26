@@ -6,14 +6,14 @@ namespace Modules\Supplier\Application\UseCases\SupplierAddresses;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\GetSupplierAddressesServiceInterface;
-use Modules\Supplier\Application\Repositories\SupplierAddressesRepositoryInterface;
+use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\GetSupplierAddressServiceInterface;
+use Modules\Supplier\Application\Repositories\SupplierAddressRepositoryInterface;
 use Modules\Supplier\Domain\Constants\SupplierErrorCode;
 use Throwable;
 
-final class GetSupplierAddressesService implements GetSupplierAddressesServiceInterface
+final class GetSupplierAddressService implements GetSupplierAddressServiceInterface
 {
-    public function __construct(private readonly SupplierAddressesRepositoryInterface $repository)
+    public function __construct(private readonly SupplierAddressRepositoryInterface $repository)
     {
     }
 
@@ -23,7 +23,7 @@ final class GetSupplierAddressesService implements GetSupplierAddressesServiceIn
             $record = $this->repository->findById($id);
 
             if ($record === null) {
-                return Result::failure(new Error(SupplierErrorCode::NOT_FOUND, 'SupplierAddresses not found.'));
+                return Result::failure(new Error(SupplierErrorCode::NOT_FOUND, 'SupplierAddress not found.'));
             }
 
             return Result::success($record);

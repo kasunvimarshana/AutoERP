@@ -18,16 +18,7 @@ final class TransferOrderModel extends CoreModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-            'row_version' => 'integer',
-            'tenant_id' => 'integer',
-            'organization_unit_id' => 'integer',
-            'metadata' => 'array',
-            'from_warehouse_id' => 'integer',
-            'to_warehouse_id' => 'integer',
-            'request_date' => 'date',
-            'expected_date' => 'date',
-            'shipped_date' => 'date',
-            'received_date' => 'date',
+
         ]);
     }
 }

@@ -6,14 +6,14 @@ namespace Modules\Inventory\Application\UseCases\Batches;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Inventory\Application\Contracts\UseCases\Batches\CreateBatcheServiceInterface;
-use Modules\Inventory\Application\Repositories\BatcheRepositoryInterface;
+use Modules\Inventory\Application\Contracts\UseCases\Batches\CreateBatchServiceInterface;
+use Modules\Inventory\Application\Repositories\BatchRepositoryInterface;
 use Modules\Inventory\Domain\Constants\InventoryErrorCode;
 use Throwable;
 
-final class CreateBatcheService implements CreateBatcheServiceInterface
+final class CreateBatchService implements CreateBatchServiceInterface
 {
-    public function __construct(private readonly BatcheRepositoryInterface $repository)
+    public function __construct(private readonly BatchRepositoryInterface $repository)
     {
     }
 

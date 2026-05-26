@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Modules\Supplier\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\CreateSupplierAddressesServiceInterface;
-use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\DeleteSupplierAddressesServiceInterface;
-use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\GetSupplierAddressesServiceInterface;
+use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\CreateSupplierAddressServiceInterface;
+use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\DeleteSupplierAddressServiceInterface;
+use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\GetSupplierAddressServiceInterface;
 use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\ListSupplierAddressesServiceInterface;
-use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\UpdateSupplierAddressesServiceInterface;
+use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\UpdateSupplierAddressServiceInterface;
 use Modules\Supplier\Application\Contracts\UseCases\SupplierContacts\CreateSupplierContactServiceInterface;
 use Modules\Supplier\Application\Contracts\UseCases\SupplierContacts\DeleteSupplierContactServiceInterface;
 use Modules\Supplier\Application\Contracts\UseCases\SupplierContacts\GetSupplierContactServiceInterface;
@@ -30,16 +30,16 @@ use Modules\Supplier\Application\Contracts\UseCases\SupplierVehicles\DeleteSuppl
 use Modules\Supplier\Application\Contracts\UseCases\SupplierVehicles\GetSupplierVehicleServiceInterface;
 use Modules\Supplier\Application\Contracts\UseCases\SupplierVehicles\ListSupplierVehiclesServiceInterface;
 use Modules\Supplier\Application\Contracts\UseCases\SupplierVehicles\UpdateSupplierVehicleServiceInterface;
-use Modules\Supplier\Application\Repositories\SupplierAddressesRepositoryInterface;
+use Modules\Supplier\Application\Repositories\SupplierAddressRepositoryInterface;
 use Modules\Supplier\Application\Repositories\SupplierContactRepositoryInterface;
 use Modules\Supplier\Application\Repositories\SupplierItemRepositoryInterface;
 use Modules\Supplier\Application\Repositories\SupplierRepositoryInterface;
 use Modules\Supplier\Application\Repositories\SupplierVehicleRepositoryInterface;
-use Modules\Supplier\Application\UseCases\SupplierAddresses\CreateSupplierAddressesService;
-use Modules\Supplier\Application\UseCases\SupplierAddresses\DeleteSupplierAddressesService;
-use Modules\Supplier\Application\UseCases\SupplierAddresses\GetSupplierAddressesService;
+use Modules\Supplier\Application\UseCases\SupplierAddresses\CreateSupplierAddressService;
+use Modules\Supplier\Application\UseCases\SupplierAddresses\DeleteSupplierAddressService;
+use Modules\Supplier\Application\UseCases\SupplierAddresses\GetSupplierAddressService;
 use Modules\Supplier\Application\UseCases\SupplierAddresses\ListSupplierAddressesService;
-use Modules\Supplier\Application\UseCases\SupplierAddresses\UpdateSupplierAddressesService;
+use Modules\Supplier\Application\UseCases\SupplierAddresses\UpdateSupplierAddressService;
 use Modules\Supplier\Application\UseCases\SupplierContacts\CreateSupplierContactService;
 use Modules\Supplier\Application\UseCases\SupplierContacts\DeleteSupplierContactService;
 use Modules\Supplier\Application\UseCases\SupplierContacts\GetSupplierContactService;
@@ -60,12 +60,12 @@ use Modules\Supplier\Application\UseCases\SupplierVehicles\DeleteSupplierVehicle
 use Modules\Supplier\Application\UseCases\SupplierVehicles\GetSupplierVehicleService;
 use Modules\Supplier\Application\UseCases\SupplierVehicles\ListSupplierVehiclesService;
 use Modules\Supplier\Application\UseCases\SupplierVehicles\UpdateSupplierVehicleService;
-use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierAddressesModel;
+use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierAddressModel;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierContactModel;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierItemModel;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierModel;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierVehicleModel;
-use Modules\Supplier\Infrastructure\Persistence\Eloquent\Repositories\EloquentSupplierAddressesRepository;
+use Modules\Supplier\Infrastructure\Persistence\Eloquent\Repositories\EloquentSupplierAddressRepository;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Repositories\EloquentSupplierContactRepository;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Repositories\EloquentSupplierItemRepository;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Repositories\EloquentSupplierRepository;
@@ -90,10 +90,10 @@ final class SupplierServiceProvider extends ServiceProvider
                 UpdateSupplierContactServiceInterface::class => UpdateSupplierContactService::class,
                 DeleteSupplierContactServiceInterface::class => DeleteSupplierContactService::class,
                 ListSupplierAddressesServiceInterface::class => ListSupplierAddressesService::class,
-                GetSupplierAddressesServiceInterface::class => GetSupplierAddressesService::class,
-                CreateSupplierAddressesServiceInterface::class => CreateSupplierAddressesService::class,
-                UpdateSupplierAddressesServiceInterface::class => UpdateSupplierAddressesService::class,
-                DeleteSupplierAddressesServiceInterface::class => DeleteSupplierAddressesService::class,
+                GetSupplierAddressServiceInterface::class => GetSupplierAddressService::class,
+                CreateSupplierAddressServiceInterface::class => CreateSupplierAddressService::class,
+                UpdateSupplierAddressServiceInterface::class => UpdateSupplierAddressService::class,
+                DeleteSupplierAddressServiceInterface::class => DeleteSupplierAddressService::class,
                 ListSupplierVehiclesServiceInterface::class => ListSupplierVehiclesService::class,
                 GetSupplierVehicleServiceInterface::class => GetSupplierVehicleService::class,
                 CreateSupplierVehicleServiceInterface::class => CreateSupplierVehicleService::class,
@@ -115,8 +115,8 @@ final class SupplierServiceProvider extends ServiceProvider
         $this->app->singleton(SupplierContactRepositoryInterface::class, function (): SupplierContactRepositoryInterface {
             return new EloquentSupplierContactRepository(new SupplierContactModel());
         });
-        $this->app->singleton(SupplierAddressesRepositoryInterface::class, function (): SupplierAddressesRepositoryInterface {
-            return new EloquentSupplierAddressesRepository(new SupplierAddressesModel());
+        $this->app->singleton(SupplierAddressRepositoryInterface::class, function (): SupplierAddressRepositoryInterface {
+            return new EloquentSupplierAddressRepository(new SupplierAddressModel());
         });
         $this->app->singleton(SupplierVehicleRepositoryInterface::class, function (): SupplierVehicleRepositoryInterface {
             return new EloquentSupplierVehicleRepository(new SupplierVehicleModel());

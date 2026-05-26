@@ -6,7 +6,7 @@ namespace Modules\Supplier\Presentation\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-final class ListSupplierAddressesRequest extends FormRequest
+final class ListSupplierAddressRequest extends FormRequest
 {
     public function authorize(): bool
     {

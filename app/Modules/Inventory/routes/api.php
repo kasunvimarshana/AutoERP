@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use Modules\Inventory\Presentation\Http\Controllers\BatcheController;
+use Modules\Inventory\Presentation\Http\Controllers\BatchController;
 use Modules\Inventory\Presentation\Http\Controllers\SerialController;
 use Modules\Inventory\Presentation\Http\Controllers\ValuationConfigController;
 use Modules\Inventory\Presentation\Http\Controllers\StockLevelController;
@@ -41,7 +41,7 @@ Route::prefix('api/inventory')
     ])
     ->name('inventory.')
     ->group(function (): void {
-        Route::apiResource('batches', BatcheController::class);
+        Route::apiResource('batches', BatchController::class);
         Route::apiResource('serials', SerialController::class);
         Route::apiResource('valuation-configs', ValuationConfigController::class);
         Route::apiResource('stock-levels', StockLevelController::class);

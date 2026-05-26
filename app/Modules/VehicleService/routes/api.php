@@ -32,14 +32,34 @@ Route::prefix('api/vehicle-service')
     ])
     ->name('vehicleservice.')
     ->group(function (): void {
-        Route::apiResource('vehicle-service-types', VehicleServiceTypeController::class);
-        Route::apiResource('vehicle-service-job-cards', VehicleServiceJobCardController::class);
-        Route::apiResource('vehicle-service-job-card-lines', VehicleServiceJobCardLineController::class);
-        Route::apiResource('vehicle-service-labor-items', VehicleServiceLaborItemController::class);
-        Route::apiResource('vehicle-service-non-inventory-items', VehicleServiceNonInventoryItemController::class);
-        Route::apiResource('vehicle-service-labor-assignments', VehicleServiceLaborAssignmentController::class);
-        Route::apiResource('vehicle-service-diagnostics', VehicleServiceDiagnosticController::class);
-        Route::apiResource('vehicle-service-diagnostic-lines', VehicleServiceDiagnosticLineController::class);
-        Route::apiResource('vehicle-service-inspections', VehicleServiceInspectionController::class);
-        Route::apiResource('vehicle-service-inspection-lines', VehicleServiceInspectionLineController::class);
+        Route::apiResource('vehicle-service-types', VehicleServiceTypeController::class)
+            ->parameters(['vehicle-service-types' => 'service_type']);
+        Route::apiResource('vehicle-service-job-cards', VehicleServiceJobCardController::class)
+            ->parameters(['vehicle-service-job-cards' => 'job_card']);
+        Route::apiResource(
+            'vehicle-service-job-card-lines',
+            VehicleServiceJobCardLineController::class,
+        )->parameters(['vehicle-service-job-card-lines' => 'job_card_line']);
+        Route::apiResource('vehicle-service-labor-items', VehicleServiceLaborItemController::class)
+            ->parameters(['vehicle-service-labor-items' => 'labor_item']);
+        Route::apiResource(
+            'vehicle-service-non-inventory-items',
+            VehicleServiceNonInventoryItemController::class,
+        )->parameters(['vehicle-service-non-inventory-items' => 'non_inventory_item']);
+        Route::apiResource(
+            'vehicle-service-labor-assignments',
+            VehicleServiceLaborAssignmentController::class,
+        )->parameters(['vehicle-service-labor-assignments' => 'labor_assignment']);
+        Route::apiResource('vehicle-service-diagnostics', VehicleServiceDiagnosticController::class)
+            ->parameters(['vehicle-service-diagnostics' => 'diagnostic']);
+        Route::apiResource(
+            'vehicle-service-diagnostic-lines',
+            VehicleServiceDiagnosticLineController::class,
+        )->parameters(['vehicle-service-diagnostic-lines' => 'diagnostic_line']);
+        Route::apiResource('vehicle-service-inspections', VehicleServiceInspectionController::class)
+            ->parameters(['vehicle-service-inspections' => 'inspection']);
+        Route::apiResource(
+            'vehicle-service-inspection-lines',
+            VehicleServiceInspectionLineController::class,
+        )->parameters(['vehicle-service-inspection-lines' => 'inspection_line']);
     });

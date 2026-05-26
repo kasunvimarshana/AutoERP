@@ -6,14 +6,14 @@ namespace Modules\Inventory\Application\UseCases\Batches;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Inventory\Application\Contracts\UseCases\Batches\DeleteBatcheServiceInterface;
-use Modules\Inventory\Application\Repositories\BatcheRepositoryInterface;
+use Modules\Inventory\Application\Contracts\UseCases\Batches\DeleteBatchServiceInterface;
+use Modules\Inventory\Application\Repositories\BatchRepositoryInterface;
 use Modules\Inventory\Domain\Constants\InventoryErrorCode;
 use Throwable;
 
-final class DeleteBatcheService implements DeleteBatcheServiceInterface
+final class DeleteBatchService implements DeleteBatchServiceInterface
 {
-    public function __construct(private readonly BatcheRepositoryInterface $repository)
+    public function __construct(private readonly BatchRepositoryInterface $repository)
     {
     }
 
@@ -21,7 +21,7 @@ final class DeleteBatcheService implements DeleteBatcheServiceInterface
     {
         try {
             if ($this->repository->findById($id) === null) {
-                return Result::failure(new Error(InventoryErrorCode::NOT_FOUND, 'Batche not found.'));
+                return Result::failure(new Error(InventoryErrorCode::NOT_FOUND, 'Batch not found.'));
             }
 
             $this->repository->delete($id);

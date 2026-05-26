@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Modules\Supplier\Presentation\Http\Controllers\SupplierController;
 use Modules\Supplier\Presentation\Http\Controllers\SupplierContactController;
-use Modules\Supplier\Presentation\Http\Controllers\SupplierAddressesController;
+use Modules\Supplier\Presentation\Http\Controllers\SupplierAddressController;
 use Modules\Supplier\Presentation\Http\Controllers\SupplierVehicleController;
 use Modules\Supplier\Presentation\Http\Controllers\SupplierItemController;
 
@@ -29,7 +29,7 @@ Route::prefix('api/supplier')
     ->group(function (): void {
         Route::apiResource('suppliers', SupplierController::class);
         Route::apiResource('supplier-contacts', SupplierContactController::class);
-        Route::apiResource('supplier-addresses', SupplierAddressesController::class);
+        Route::apiResource('supplier-addresses', SupplierAddressController::class);
         Route::apiResource('supplier-vehicles', SupplierVehicleController::class);
         Route::apiResource('supplier-items', SupplierItemController::class);
     });

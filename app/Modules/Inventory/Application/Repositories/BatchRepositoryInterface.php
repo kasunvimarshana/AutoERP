@@ -6,6 +6,6 @@ namespace Modules\Inventory\Application\Repositories;
 
 use Modules\Core\Application\Repositories\Contracts\RepositoryPortInterface;
 
-interface BatcheRepositoryInterface extends RepositoryPortInterface
+interface BatchRepositoryInterface extends RepositoryPortInterface
 {
 }

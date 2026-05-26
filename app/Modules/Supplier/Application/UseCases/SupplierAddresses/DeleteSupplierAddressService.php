@@ -6,14 +6,14 @@ namespace Modules\Supplier\Application\UseCases\SupplierAddresses;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\DeleteSupplierAddressesServiceInterface;
-use Modules\Supplier\Application\Repositories\SupplierAddressesRepositoryInterface;
+use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\DeleteSupplierAddressServiceInterface;
+use Modules\Supplier\Application\Repositories\SupplierAddressRepositoryInterface;
 use Modules\Supplier\Domain\Constants\SupplierErrorCode;
 use Throwable;
 
-final class DeleteSupplierAddressesService implements DeleteSupplierAddressesServiceInterface
+final class DeleteSupplierAddressService implements DeleteSupplierAddressServiceInterface
 {
-    public function __construct(private readonly SupplierAddressesRepositoryInterface $repository)
+    public function __construct(private readonly SupplierAddressRepositoryInterface $repository)
     {
     }
 
@@ -21,7 +21,7 @@ final class DeleteSupplierAddressesService implements DeleteSupplierAddressesSer
     {
         try {
             if ($this->repository->findById($id) === null) {
-                return Result::failure(new Error(SupplierErrorCode::NOT_FOUND, 'SupplierAddresses not found.'));
+                return Result::failure(new Error(SupplierErrorCode::NOT_FOUND, 'SupplierAddress not found.'));
             }
 
             $this->repository->delete($id);

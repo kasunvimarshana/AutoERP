@@ -18,13 +18,7 @@ final class ReceiptInspectionModel extends CoreModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-            'row_version' => 'integer',
-            'tenant_id' => 'integer',
-            'organization_unit_id' => 'integer',
-            'metadata' => 'array',
-            'document_id' => 'integer',
-            'inspected_by' => 'integer',
-            'inspected_at' => 'datetime',
+
         ]);
     }
 }

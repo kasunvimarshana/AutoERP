@@ -7,11 +7,11 @@ namespace Modules\Inventory\Infrastructure\Persistence\Eloquent\Models;
 
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\CoreModel;
 
-final class StockMovementModel extends CoreModel
+final class BatchModel extends CoreModel
 {
 
 
-    protected $table = 'stock_movements';
+    protected $table = 'batches';
 
     protected $guarded = ['id'];
 

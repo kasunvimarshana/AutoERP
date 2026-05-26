@@ -6,14 +6,14 @@ namespace Modules\Supplier\Application\UseCases\SupplierAddresses;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\CreateSupplierAddressesServiceInterface;
-use Modules\Supplier\Application\Repositories\SupplierAddressesRepositoryInterface;
+use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\CreateSupplierAddressServiceInterface;
+use Modules\Supplier\Application\Repositories\SupplierAddressRepositoryInterface;
 use Modules\Supplier\Domain\Constants\SupplierErrorCode;
 use Throwable;
 
-final class CreateSupplierAddressesService implements CreateSupplierAddressesServiceInterface
+final class CreateSupplierAddressService implements CreateSupplierAddressServiceInterface
 {
-    public function __construct(private readonly SupplierAddressesRepositoryInterface $repository)
+    public function __construct(private readonly SupplierAddressRepositoryInterface $repository)
     {
     }
 

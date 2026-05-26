@@ -6,10 +6,10 @@ namespace Modules\Inventory\Application\Contracts\UseCases\Batches;
 
 use Modules\Core\Application\Results\Result;
 
-interface CreateBatcheServiceInterface
+interface UpdateBatchServiceInterface
 {
     /**
      * @param array<string, mixed> $payload
      */
-    public function execute(array $payload): Result;
+    public function execute(int|string $id, array $payload): Result;
 }

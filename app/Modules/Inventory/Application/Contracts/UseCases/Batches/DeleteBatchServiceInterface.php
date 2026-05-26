@@ -6,7 +6,7 @@ namespace Modules\Inventory\Application\Contracts\UseCases\Batches;
 
 use Modules\Core\Application\Results\Result;
 
-interface DeleteBatcheServiceInterface
+interface DeleteBatchServiceInterface
 {
     public function execute(int|string $id): Result;
 }

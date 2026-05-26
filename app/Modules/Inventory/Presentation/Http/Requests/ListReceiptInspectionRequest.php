@@ -23,10 +23,6 @@ final class ListReceiptInspectionRequest extends FormRequest
             'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:' . (int) config('inventory.pagination.max_per_page', 200)],
-            'document_type' => ['nullable', 'string', 'max:255'],
-            'inspected_by' => ['nullable', 'integer', 'min:1'],
-            'inspection_result' => ['nullable', 'string', 'max:255'],
-            'inspected_at' => ['nullable', 'date'],
         ];
     }
 }

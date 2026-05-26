@@ -7,14 +7,14 @@ namespace Modules\Supplier\Application\UseCases\SupplierAddresses;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\ListSupplierAddressesServiceInterface;
-use Modules\Supplier\Application\Repositories\SupplierAddressesRepositoryInterface;
+use Modules\Supplier\Application\Repositories\SupplierAddressRepositoryInterface;
 use Modules\Supplier\Domain\Constants\SupplierDefaults;
 use Modules\Supplier\Domain\Constants\SupplierErrorCode;
 use Throwable;
 
 final class ListSupplierAddressesService implements ListSupplierAddressesServiceInterface
 {
-    public function __construct(private readonly SupplierAddressesRepositoryInterface $repository)
+    public function __construct(private readonly SupplierAddressRepositoryInterface $repository)
     {
     }
 

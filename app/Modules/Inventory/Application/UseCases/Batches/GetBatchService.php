@@ -6,14 +6,14 @@ namespace Modules\Inventory\Application\UseCases\Batches;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Inventory\Application\Contracts\UseCases\Batches\GetBatcheServiceInterface;
-use Modules\Inventory\Application\Repositories\BatcheRepositoryInterface;
+use Modules\Inventory\Application\Contracts\UseCases\Batches\GetBatchServiceInterface;
+use Modules\Inventory\Application\Repositories\BatchRepositoryInterface;
 use Modules\Inventory\Domain\Constants\InventoryErrorCode;
 use Throwable;
 
-final class GetBatcheService implements GetBatcheServiceInterface
+final class GetBatchService implements GetBatchServiceInterface
 {
-    public function __construct(private readonly BatcheRepositoryInterface $repository)
+    public function __construct(private readonly BatchRepositoryInterface $repository)
     {
     }
 
@@ -23,7 +23,7 @@ final class GetBatcheService implements GetBatcheServiceInterface
             $record = $this->repository->findById($id);
 
             if ($record === null) {
-                return Result::failure(new Error(InventoryErrorCode::NOT_FOUND, 'Batche not found.'));
+                return Result::failure(new Error(InventoryErrorCode::NOT_FOUND, 'Batch not found.'));
             }
 
             return Result::success($record);

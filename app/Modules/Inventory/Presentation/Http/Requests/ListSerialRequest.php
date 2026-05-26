@@ -23,15 +23,6 @@ final class ListSerialRequest extends FormRequest
             'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:' . (int) config('inventory.pagination.max_per_page', 200)],
-            'item_id' => ['nullable', 'integer', 'min:1'],
-            'variant_id' => ['nullable', 'integer', 'min:1'],
-            'serial_number' => ['nullable', 'string', 'max:255'],
-            'batch_id' => ['nullable', 'integer', 'min:1'],
-            'status' => ['nullable', 'string', 'max:255'],
-            'current_location_id' => ['nullable', 'integer', 'min:1'],
-            'warranty_expiry' => ['nullable', 'date'],
-            'manufacture_date' => ['nullable', 'date'],
-            'current_owner_type' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

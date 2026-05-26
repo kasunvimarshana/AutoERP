@@ -7,7 +7,7 @@ namespace Modules\Supplier\Infrastructure\Persistence\Eloquent\Models;
 
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\CoreModel;
 
-final class SupplierAddressesModel extends CoreModel
+final class SupplierAddressModel extends CoreModel
 {
 
 

@@ -18,17 +18,7 @@ final class StockTransferModel extends CoreModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-            'row_version' => 'integer',
-            'tenant_id' => 'integer',
-            'organization_unit_id' => 'integer',
-            'metadata' => 'array',
-            'from_warehouse_id' => 'integer',
-            'to_warehouse_id' => 'integer',
-            'from_location_id' => 'integer',
-            'to_location_id' => 'integer',
-            'requested_by' => 'integer',
-            'approved_by' => 'integer',
-            'transferred_at' => 'datetime',
+
         ]);
     }
 }

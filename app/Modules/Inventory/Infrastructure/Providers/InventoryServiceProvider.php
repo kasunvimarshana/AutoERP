@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Modules\Inventory\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Modules\Inventory\Application\Contracts\UseCases\Batches\CreateBatcheServiceInterface;
-use Modules\Inventory\Application\Contracts\UseCases\Batches\DeleteBatcheServiceInterface;
-use Modules\Inventory\Application\Contracts\UseCases\Batches\GetBatcheServiceInterface;
+use Modules\Inventory\Application\Contracts\UseCases\Batches\CreateBatchServiceInterface;
+use Modules\Inventory\Application\Contracts\UseCases\Batches\DeleteBatchServiceInterface;
+use Modules\Inventory\Application\Contracts\UseCases\Batches\GetBatchServiceInterface;
 use Modules\Inventory\Application\Contracts\UseCases\Batches\ListBatchesServiceInterface;
-use Modules\Inventory\Application\Contracts\UseCases\Batches\UpdateBatcheServiceInterface;
+use Modules\Inventory\Application\Contracts\UseCases\Batches\UpdateBatchServiceInterface;
 use Modules\Inventory\Application\Contracts\UseCases\CycleCountHeaders\CreateCycleCountHeaderServiceInterface;
 use Modules\Inventory\Application\Contracts\UseCases\CycleCountHeaders\DeleteCycleCountHeaderServiceInterface;
 use Modules\Inventory\Application\Contracts\UseCases\CycleCountHeaders\GetCycleCountHeaderServiceInterface;
@@ -100,7 +100,7 @@ use Modules\Inventory\Application\Contracts\UseCases\ValuationConfigs\DeleteValu
 use Modules\Inventory\Application\Contracts\UseCases\ValuationConfigs\GetValuationConfigServiceInterface;
 use Modules\Inventory\Application\Contracts\UseCases\ValuationConfigs\ListValuationConfigsServiceInterface;
 use Modules\Inventory\Application\Contracts\UseCases\ValuationConfigs\UpdateValuationConfigServiceInterface;
-use Modules\Inventory\Application\Repositories\BatcheRepositoryInterface;
+use Modules\Inventory\Application\Repositories\BatchRepositoryInterface;
 use Modules\Inventory\Application\Repositories\CycleCountHeaderRepositoryInterface;
 use Modules\Inventory\Application\Repositories\CycleCountLineRepositoryInterface;
 use Modules\Inventory\Application\Repositories\InventoryCostLayerRepositoryInterface;
@@ -119,11 +119,11 @@ use Modules\Inventory\Application\Repositories\TraceLogRepositoryInterface;
 use Modules\Inventory\Application\Repositories\TransferOrderLineRepositoryInterface;
 use Modules\Inventory\Application\Repositories\TransferOrderRepositoryInterface;
 use Modules\Inventory\Application\Repositories\ValuationConfigRepositoryInterface;
-use Modules\Inventory\Application\UseCases\Batches\CreateBatcheService;
-use Modules\Inventory\Application\UseCases\Batches\DeleteBatcheService;
-use Modules\Inventory\Application\UseCases\Batches\GetBatcheService;
+use Modules\Inventory\Application\UseCases\Batches\CreateBatchService;
+use Modules\Inventory\Application\UseCases\Batches\DeleteBatchService;
+use Modules\Inventory\Application\UseCases\Batches\GetBatchService;
 use Modules\Inventory\Application\UseCases\Batches\ListBatchesService;
-use Modules\Inventory\Application\UseCases\Batches\UpdateBatcheService;
+use Modules\Inventory\Application\UseCases\Batches\UpdateBatchService;
 use Modules\Inventory\Application\UseCases\CycleCountHeaders\CreateCycleCountHeaderService;
 use Modules\Inventory\Application\UseCases\CycleCountHeaders\DeleteCycleCountHeaderService;
 use Modules\Inventory\Application\UseCases\CycleCountHeaders\GetCycleCountHeaderService;
@@ -214,7 +214,7 @@ use Modules\Inventory\Application\UseCases\ValuationConfigs\DeleteValuationConfi
 use Modules\Inventory\Application\UseCases\ValuationConfigs\GetValuationConfigService;
 use Modules\Inventory\Application\UseCases\ValuationConfigs\ListValuationConfigsService;
 use Modules\Inventory\Application\UseCases\ValuationConfigs\UpdateValuationConfigService;
-use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\BatcheModel;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\BatchModel;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\CycleCountHeaderModel;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\CycleCountLineModel;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\InventoryCostLayerModel;
@@ -233,7 +233,7 @@ use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\TraceLogModel;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\TransferOrderLineModel;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\TransferOrderModel;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Models\ValuationConfigModel;
-use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentBatcheRepository;
+use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentBatchRepository;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentCycleCountHeaderRepository;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentCycleCountLineRepository;
 use Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories\EloquentInventoryCostLayerRepository;
@@ -262,10 +262,10 @@ final class InventoryServiceProvider extends ServiceProvider
         foreach (
             [
                 ListBatchesServiceInterface::class => ListBatchesService::class,
-                GetBatcheServiceInterface::class => GetBatcheService::class,
-                CreateBatcheServiceInterface::class => CreateBatcheService::class,
-                UpdateBatcheServiceInterface::class => UpdateBatcheService::class,
-                DeleteBatcheServiceInterface::class => DeleteBatcheService::class,
+                GetBatchServiceInterface::class => GetBatchService::class,
+                CreateBatchServiceInterface::class => CreateBatchService::class,
+                UpdateBatchServiceInterface::class => UpdateBatchService::class,
+                DeleteBatchServiceInterface::class => DeleteBatchService::class,
                 ListSerialsServiceInterface::class => ListSerialsService::class,
                 GetSerialServiceInterface::class => GetSerialService::class,
                 CreateSerialServiceInterface::class => CreateSerialService::class,
@@ -361,8 +361,8 @@ final class InventoryServiceProvider extends ServiceProvider
             $this->app->singleton($contract, $implementation);
         }
 
-        $this->app->singleton(BatcheRepositoryInterface::class, function (): BatcheRepositoryInterface {
-            return new EloquentBatcheRepository(new BatcheModel());
+        $this->app->singleton(BatchRepositoryInterface::class, function (): BatchRepositoryInterface {
+            return new EloquentBatchRepository(new BatchModel());
         });
         $this->app->singleton(SerialRepositoryInterface::class, function (): SerialRepositoryInterface {
             return new EloquentSerialRepository(new SerialModel());

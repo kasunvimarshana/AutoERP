@@ -18,17 +18,7 @@ final class PickingTaskModel extends CoreModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-            'row_version' => 'integer',
-            'tenant_id' => 'integer',
-            'organization_unit_id' => 'integer',
-            'metadata' => 'array',
-            'receipt_inspection_id' => 'integer',
-            'stock_movement_id' => 'integer',
-            'source_warehouse_id' => 'integer',
-            'source_location_id' => 'integer',
-            'quantity' => 'decimal:4',
-            'assigned_user_id' => 'integer',
-            'completed_at' => 'datetime',
+
         ]);
     }
 }

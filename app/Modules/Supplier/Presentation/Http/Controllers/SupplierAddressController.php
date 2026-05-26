@@ -2,32 +2,32 @@
 
 declare(strict_types=1);
 
-namespace Modules\Inventory\Presentation\Http\Controllers;
+namespace Modules\Supplier\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\Application\DTO\PagedResult;
-use Modules\Inventory\Application\Contracts\UseCases\Batches\CreateBatcheServiceInterface;
-use Modules\Inventory\Application\Contracts\UseCases\Batches\DeleteBatcheServiceInterface;
-use Modules\Inventory\Application\Contracts\UseCases\Batches\GetBatcheServiceInterface;
-use Modules\Inventory\Application\Contracts\UseCases\Batches\ListBatchesServiceInterface;
-use Modules\Inventory\Application\Contracts\UseCases\Batches\UpdateBatcheServiceInterface;
-use Modules\Inventory\Presentation\Http\Requests\ListBatcheRequest;
-use Modules\Inventory\Presentation\Http\Requests\UpsertBatcheRequest;
-use Modules\Inventory\Presentation\Http\Resources\BatcheResource;
+use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\CreateSupplierAddressServiceInterface;
+use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\DeleteSupplierAddressServiceInterface;
+use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\GetSupplierAddressServiceInterface;
+use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\ListSupplierAddressesServiceInterface;
+use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\UpdateSupplierAddressServiceInterface;
+use Modules\Supplier\Presentation\Http\Requests\ListSupplierAddressRequest;
+use Modules\Supplier\Presentation\Http\Requests\UpsertSupplierAddressRequest;
+use Modules\Supplier\Presentation\Http\Resources\SupplierAddressResource;
 
-final class BatcheController extends Controller
+final class SupplierAddressController extends Controller
 {
     public function __construct(
-        private readonly ListBatchesServiceInterface $listService,
-        private readonly GetBatcheServiceInterface $getService,
-        private readonly CreateBatcheServiceInterface $createService,
-        private readonly UpdateBatcheServiceInterface $updateService,
-        private readonly DeleteBatcheServiceInterface $deleteService,
+        private readonly ListSupplierAddressesServiceInterface $listService,
+        private readonly GetSupplierAddressServiceInterface $getService,
+        private readonly CreateSupplierAddressServiceInterface $createService,
+        private readonly UpdateSupplierAddressServiceInterface $updateService,
+        private readonly DeleteSupplierAddressServiceInterface $deleteService,
     ) {
     }
 
-    public function index(ListBatcheRequest $request): JsonResponse
+    public function index(ListSupplierAddressRequest $request): JsonResponse
     {
         $validated = $request->validated();
         $perPage = (int) ($validated['per_page'] ?? 0);
@@ -46,7 +46,7 @@ final class BatcheController extends Controller
         }
 
         return response()->json([
-            'data' => BatcheResource::collection($pageResult->items)->resolve(),
+            'data' => SupplierAddressResource::collection($pageResult->items)->resolve(),
             'meta' => [
                 'total' => $pageResult->total,
                 'page' => $pageResult->page,
@@ -57,7 +57,7 @@ final class BatcheController extends Controller
         ]);
     }
 
-    public function show(int|string $id): JsonResponse|BatcheResource
+    public function show(int|string $id): JsonResponse|SupplierAddressResource
     {
         $result = $this->getService->execute($id);
 
@@ -65,10 +65,10 @@ final class BatcheController extends Controller
             return response()->json(['message' => $result->errorOrFail()->message], 404);
         }
 
-        return new BatcheResource($result->valueOrFail());
+        return new SupplierAddressResource($result->valueOrFail());
     }
 
-    public function store(UpsertBatcheRequest $request): JsonResponse|BatcheResource
+    public function store(UpsertSupplierAddressRequest $request): JsonResponse|SupplierAddressResource
     {
         $result = $this->createService->execute($request->validated());
 
@@ -76,21 +76,21 @@ final class BatcheController extends Controller
             return response()->json(['message' => $result->errorOrFail()->message], 422);
         }
 
-        return (new BatcheResource($result->valueOrFail()))->response()->setStatusCode(201);
+        return (new SupplierAddressResource($result->valueOrFail()))->response()->setStatusCode(201);
     }
 
-    public function update(UpsertBatcheRequest $request, int|string $id): JsonResponse|BatcheResource
+    public function update(UpsertSupplierAddressRequest $request, int|string $id): JsonResponse|SupplierAddressResource
     {
         $result = $this->updateService->execute($id, $request->validated());
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
-            $status = $error->code === 'INVENTORY_NOT_FOUND' ? 404 : 422;
+            $status = $error->code === 'SUPPLIER_NOT_FOUND' ? 404 : 422;
 
             return response()->json(['message' => $error->message], $status);
         }
 
-        return new BatcheResource($result->valueOrFail());
+        return new SupplierAddressResource($result->valueOrFail());
     }
 
     public function destroy(int|string $id): JsonResponse

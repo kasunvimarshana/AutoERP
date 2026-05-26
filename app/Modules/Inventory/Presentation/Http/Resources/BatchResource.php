@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Modules\Supplier\Presentation\Http\Resources;
+namespace Modules\Inventory\Presentation\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Modules\Core\Application\DTO\DataRecord;
 
-final class SupplierAddressesResource extends JsonResource
+final class BatchResource extends JsonResource
 {
     /**
      * @return array<string, mixed>

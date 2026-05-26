@@ -6,7 +6,7 @@ namespace Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses;
 
 use Modules\Core\Application\Results\Result;
 
-interface UpdateSupplierAddressesServiceInterface
+interface UpdateSupplierAddressServiceInterface
 {
     /**
      * @param array<string, mixed> $payload

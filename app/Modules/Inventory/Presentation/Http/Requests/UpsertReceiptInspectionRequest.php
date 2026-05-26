@@ -21,16 +21,7 @@ final class UpsertReceiptInspectionRequest extends FormRequest
         $required = $this->isMethod('post') ? ['required'] : ['sometimes'];
 
         return [
-            'tenant_id' => array_merge($required, ['integer', 'min:1', 'exists:tenants,id']),
-            'row_version' => ['nullable', 'integer', 'min:0'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
-            'metadata' => ['nullable', 'array'],
-            'document_type' => array_merge($required, ['string', 'max:255']),
-            'document_id' => array_merge($required, ['integer', 'min:0']),
-            'inspected_by' => ['nullable', 'integer', 'min:1', 'exists:users,id'],
-            'inspection_result' => ['nullable', 'string', 'max:255'],
-            'notes' => ['nullable', 'string'],
-            'inspected_at' => ['nullable', 'date'],
+
         ];
     }
 }

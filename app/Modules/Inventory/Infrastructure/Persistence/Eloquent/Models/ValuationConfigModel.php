@@ -18,17 +18,7 @@ final class ValuationConfigModel extends CoreModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-            'row_version' => 'integer',
-            'tenant_id' => 'integer',
-            'organization_unit_id' => 'integer',
-            'metadata' => 'array',
-            'warehouse_id' => 'integer',
-            'item_id' => 'integer',
-            'variant_id' => 'integer',
-            'location_id' => 'integer',
-            'batch_id' => 'integer',
-            'serial_id' => 'integer',
-            'is_active' => 'boolean',
+
         ]);
     }
 }
