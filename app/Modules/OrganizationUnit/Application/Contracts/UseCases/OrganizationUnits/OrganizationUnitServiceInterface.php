@@ -22,5 +22,9 @@ interface OrganizationUnitServiceInterface
      */
     public function update(int|string $id, array $payload): Result;
 
+    public function activate(int|string $id): Result;
+
+    public function deactivate(int|string $id): Result;
+
     public function delete(int|string $id): Result;
 }

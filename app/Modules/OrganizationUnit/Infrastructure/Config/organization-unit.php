@@ -7,4 +7,7 @@ return [
         'default_per_page' => 20,
         'max_per_page' => 100,
     ],
+    'resolution' => [
+        'required' => (bool) env('ORGANIZATION_UNIT_RESOLUTION_REQUIRED', true),
+    ],
 ];

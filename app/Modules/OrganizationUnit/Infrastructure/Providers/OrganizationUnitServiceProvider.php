@@ -7,11 +7,15 @@ namespace Modules\OrganizationUnit\Infrastructure\Providers;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
-use Modules\OrganizationUnit\Application\Contracts\UseCases\OrganizationUnitDocuments\OrganizationUnitDocumentServiceInterface;
-use Modules\OrganizationUnit\Application\Contracts\UseCases\OrganizationUnitSettingGroups\OrganizationUnitSettingGroupServiceInterface;
-use Modules\OrganizationUnit\Application\Contracts\UseCases\OrganizationUnitSettings\OrganizationUnitSettingServiceInterface;
-use Modules\OrganizationUnit\Application\Contracts\UseCases\OrganizationUnitTypes\OrganizationUnitTypeServiceInterface;
-use Modules\OrganizationUnit\Application\Contracts\UseCases\OrganizationUnits\OrganizationUnitServiceInterface;
+use Modules\OrganizationUnit\Application\Contracts\UseCases\{
+    OrganizationUnitDocuments\OrganizationUnitDocumentServiceInterface,
+    OrganizationUnitSettingGroups\OrganizationUnitSettingGroupServiceInterface,
+    OrganizationUnitSettings\OrganizationUnitSettingServiceInterface,
+    OrganizationUnitTypes\OrganizationUnitTypeServiceInterface,
+    OrganizationUnits\AssignUserToOrganizationUnitServiceInterface,
+    OrganizationUnits\OrganizationUnitServiceInterface,
+    OrganizationUnits\ResolveOrganizationUnitServiceInterface,
+};
 use Modules\OrganizationUnit\Application\Events\OrganizationUnitCreated;
 use Modules\OrganizationUnit\Application\Events\OrganizationUnitDeleted;
 use Modules\OrganizationUnit\Application\Events\OrganizationUnitUpdated;
@@ -24,7 +28,10 @@ use Modules\OrganizationUnit\Application\UseCases\OrganizationUnitDocuments\Orga
 use Modules\OrganizationUnit\Application\UseCases\OrganizationUnitSettingGroups\OrganizationUnitSettingGroupService;
 use Modules\OrganizationUnit\Application\UseCases\OrganizationUnitSettings\OrganizationUnitSettingService;
 use Modules\OrganizationUnit\Application\UseCases\OrganizationUnitTypes\OrganizationUnitTypeService;
+use Modules\OrganizationUnit\Application\UseCases\OrganizationUnits\AssignUserToOrganizationUnitService;
 use Modules\OrganizationUnit\Application\UseCases\OrganizationUnits\OrganizationUnitService;
+use Modules\OrganizationUnit\Application\UseCases\OrganizationUnits\ResolveOrganizationUnitService;
+use Modules\OrganizationUnit\Application\Support\OrganizationUnitContext;
 use Modules\OrganizationUnit\Domain\Contracts\OrganizationUnitDomainServiceInterface;
 use Modules\OrganizationUnit\Domain\Services\OrganizationUnitDomainService;
 use Modules\OrganizationUnit\Infrastructure\Listeners\RecordOrganizationUnitAuditListener;
@@ -33,11 +40,13 @@ use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\Organiza
 use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitSettingGroupModel;
 use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitSettingModel;
 use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Models\OrganizationUnitTypeModel;
-use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrganizationUnitDocumentRepository;
 use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrganizationUnitRepository;
-use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrganizationUnitSettingGroupRepository;
-use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrganizationUnitSettingRepository;
-use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Repositories\EloquentOrganizationUnitTypeRepository;
+use Modules\OrganizationUnit\Infrastructure\Persistence\Eloquent\Repositories\{
+    EloquentOrganizationUnitDocumentRepository,
+    EloquentOrganizationUnitSettingGroupRepository,
+    EloquentOrganizationUnitSettingRepository,
+    EloquentOrganizationUnitTypeRepository,
+};
 use Modules\OrganizationUnit\Infrastructure\Services\CurrentOrganizationUnitContextResolver;
 use Modules\OrganizationUnit\Presentation\Policies\OrganizationUnitPolicy;
 
@@ -53,11 +62,14 @@ final class OrganizationUnitServiceProvider extends ServiceProvider
         );
 
         $this->app->singleton(OrganizationUnitDomainServiceInterface::class, OrganizationUnitDomainService::class);
+        $this->app->singleton(OrganizationUnitContext::class, OrganizationUnitContext::class);
 
         foreach (
             [
                 OrganizationUnitTypeServiceInterface::class => OrganizationUnitTypeService::class,
                 OrganizationUnitServiceInterface::class => OrganizationUnitService::class,
+                ResolveOrganizationUnitServiceInterface::class => ResolveOrganizationUnitService::class,
+                AssignUserToOrganizationUnitServiceInterface::class => AssignUserToOrganizationUnitService::class,
                 OrganizationUnitSettingGroupServiceInterface::class => OrganizationUnitSettingGroupService::class,
                 OrganizationUnitSettingServiceInterface::class => OrganizationUnitSettingService::class,
                 OrganizationUnitDocumentServiceInterface::class => OrganizationUnitDocumentService::class,
@@ -66,13 +78,19 @@ final class OrganizationUnitServiceProvider extends ServiceProvider
             $this->app->singleton($contract, $implementation);
         }
 
-        $this->app->singleton(OrganizationUnitTypeRepositoryInterface::class, function (): OrganizationUnitTypeRepositoryInterface {
-            return new EloquentOrganizationUnitTypeRepository(new OrganizationUnitTypeModel());
-        });
+        $this->app->singleton(
+            OrganizationUnitTypeRepositoryInterface::class,
+            function (): OrganizationUnitTypeRepositoryInterface {
+                return new EloquentOrganizationUnitTypeRepository(new OrganizationUnitTypeModel());
+            },
+        );
 
-        $this->app->singleton(OrganizationUnitRepositoryInterface::class, function (): OrganizationUnitRepositoryInterface {
-            return new EloquentOrganizationUnitRepository(new OrganizationUnitModel());
-        });
+        $this->app->singleton(
+            OrganizationUnitRepositoryInterface::class,
+            function (): OrganizationUnitRepositoryInterface {
+                return new EloquentOrganizationUnitRepository(new OrganizationUnitModel());
+            },
+        );
 
         $this->app->singleton(
             OrganizationUnitSettingGroupRepositoryInterface::class,
@@ -81,13 +99,19 @@ final class OrganizationUnitServiceProvider extends ServiceProvider
             },
         );
 
-        $this->app->singleton(OrganizationUnitSettingRepositoryInterface::class, function (): OrganizationUnitSettingRepositoryInterface {
-            return new EloquentOrganizationUnitSettingRepository(new OrganizationUnitSettingModel());
-        });
+        $this->app->singleton(
+            OrganizationUnitSettingRepositoryInterface::class,
+            function (): OrganizationUnitSettingRepositoryInterface {
+                return new EloquentOrganizationUnitSettingRepository(new OrganizationUnitSettingModel());
+            },
+        );
 
-        $this->app->singleton(OrganizationUnitDocumentRepositoryInterface::class, function (): OrganizationUnitDocumentRepositoryInterface {
-            return new EloquentOrganizationUnitDocumentRepository(new OrganizationUnitDocumentModel());
-        });
+        $this->app->singleton(
+            OrganizationUnitDocumentRepositoryInterface::class,
+            function (): OrganizationUnitDocumentRepositoryInterface {
+                return new EloquentOrganizationUnitDocumentRepository(new OrganizationUnitDocumentModel());
+            },
+        );
     }
 
     public function boot(): void
