@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Modules\Finance\Presentation\Http\Controllers\AccountController;
+use Modules\Finance\Presentation\Http\Controllers\JournalEngineController;
 use Modules\Finance\Presentation\Http\Controllers\ApTransactionController;
 use Modules\Finance\Presentation\Http\Controllers\ArTransactionController;
 use Modules\Finance\Presentation\Http\Controllers\BankAccountController;
@@ -40,6 +41,10 @@ Route::prefix('api/finance')
     ])
     ->name('finance.')
     ->group(function (): void {
+        Route::post('journal-entries/{journalEntry}/engines/post', [JournalEngineController::class, 'post'])
+            ->name('journal-entries.engines.post');
+        Route::post('journal-entries/{journalEntry}/engines/reverse', [JournalEngineController::class, 'reverse'])
+            ->name('journal-entries.engines.reverse');
         Route::apiResource('accounts', AccountController::class);
         Route::apiResource('fiscal-years', FiscalYearController::class);
         Route::apiResource('fiscal-periods', FiscalPeriodController::class);

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\Finance\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Finance\Application\Contracts\UseCases\JournalEngines\PostJournalEntryServiceInterface;
+use Modules\Finance\Application\Contracts\UseCases\JournalEngines\ReverseJournalEntryServiceInterface;
 use Modules\Finance\Application\Contracts\UseCases\Accounts\CreateAccountServiceInterface;
 use Modules\Finance\Application\Contracts\UseCases\Accounts\DeleteAccountServiceInterface;
 use Modules\Finance\Application\Contracts\UseCases\Accounts\GetAccountServiceInterface;
@@ -183,6 +185,8 @@ use Modules\Finance\Application\UseCases\JournalEntryLines\DeleteJournalEntryLin
 use Modules\Finance\Application\UseCases\JournalEntryLines\GetJournalEntryLineService;
 use Modules\Finance\Application\UseCases\JournalEntryLines\ListJournalEntryLinesService;
 use Modules\Finance\Application\UseCases\JournalEntryLines\UpdateJournalEntryLineService;
+use Modules\Finance\Application\UseCases\JournalEngines\PostJournalEntryService;
+use Modules\Finance\Application\UseCases\JournalEngines\ReverseJournalEntryService;
 use Modules\Finance\Application\UseCases\PaymentTerms\CreatePaymentTermService;
 use Modules\Finance\Application\UseCases\PaymentTerms\DeletePaymentTermService;
 use Modules\Finance\Application\UseCases\PaymentTerms\GetPaymentTermService;
@@ -338,6 +342,8 @@ final class FinanceServiceProvider extends ServiceProvider
                 CreateBankReconciliationServiceInterface::class => CreateBankReconciliationService::class,
                 UpdateBankReconciliationServiceInterface::class => UpdateBankReconciliationService::class,
                 DeleteBankReconciliationServiceInterface::class => DeleteBankReconciliationService::class,
+                PostJournalEntryServiceInterface::class => PostJournalEntryService::class,
+                ReverseJournalEntryServiceInterface::class => ReverseJournalEntryService::class,
             ] as $contract => $implementation
         ) {
             $this->app->singleton($contract, $implementation);
