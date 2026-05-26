@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Auth\Infrastructure\Providers;
 
 use Illuminate\Http\Request;
+use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
@@ -18,6 +19,7 @@ use Modules\Auth\Application\Contracts\Providers\AuthProviderRegistryInterface;
 use Modules\Auth\Application\Contracts\UseCases\AuthorizeClientServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\ExchangeAuthorizationCodeServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\IssueTokenServiceInterface;
+use Modules\Auth\Application\Contracts\UseCases\LinkExternalIdentityServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\ListSessionsServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\LoginServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\LogoutServiceInterface;
@@ -27,6 +29,7 @@ use Modules\Auth\Application\Contracts\UseCases\RequestVerificationChallengeServ
 use Modules\Auth\Application\Contracts\UseCases\RevokeSessionServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\ValidateTokenServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\VerifyChallengeServiceInterface;
+use Modules\Auth\Application\Contracts\UseCases\UnlinkExternalIdentityServiceInterface;
 use Modules\Auth\Application\UseCases\AuthorizeClientService;
 use Modules\Auth\Application\Repositories\AuthAccessTokenRepositoryInterface;
 use Modules\Auth\Application\Repositories\AuthAuthorizationCodeRepositoryInterface;
@@ -40,6 +43,7 @@ use Modules\Auth\Application\Repositories\AuthVerificationChallengeRepositoryInt
 use Modules\Auth\Application\UseCases\AuthWorkflowService;
 use Modules\Auth\Application\UseCases\ExchangeAuthorizationCodeService;
 use Modules\Auth\Application\UseCases\IssueTokenService;
+use Modules\Auth\Application\UseCases\LinkExternalIdentityService;
 use Modules\Auth\Application\UseCases\ListSessionsService;
 use Modules\Auth\Application\UseCases\LoginService;
 use Modules\Auth\Application\UseCases\LogoutService;
@@ -49,6 +53,7 @@ use Modules\Auth\Application\UseCases\RequestVerificationChallengeService;
 use Modules\Auth\Application\UseCases\RevokeSessionService;
 use Modules\Auth\Application\UseCases\ValidateTokenService;
 use Modules\Auth\Application\UseCases\VerifyChallengeService;
+use Modules\Auth\Application\UseCases\UnlinkExternalIdentityService;
 use Modules\Auth\Domain\Contracts\AuthDomainServiceInterface;
 use Modules\Auth\Domain\Services\AuthDomainService;
 use Modules\Auth\Infrastructure\Listeners\RecordAuthLifecycleListener;
@@ -78,6 +83,10 @@ use Modules\Auth\Infrastructure\Services\DatabaseSsoProvider;
 use Modules\Auth\Infrastructure\Services\DatabaseTokenProvider;
 use Modules\Auth\Infrastructure\Services\DatabaseVerificationProvider;
 use Modules\Auth\Infrastructure\Services\InternalAuthenticationProvider;
+use Modules\Auth\Presentation\Http\Middleware\AuthenticateMiddleware;
+use Modules\Auth\Presentation\Http\Middleware\AuthContextMiddleware;
+use Modules\Auth\Presentation\Http\Middleware\SSOContextMiddleware;
+use Modules\Auth\Presentation\Http\Middleware\TokenValidationMiddleware;
 use Modules\Core\Application\Contracts\CurrentUserContextResolverInterface;
 use Modules\Auth\Presentation\Console\Commands\AuthClientCreateCommand;
 use Modules\Auth\Presentation\Policies\AuthClientPolicy;
@@ -160,6 +169,8 @@ final class AuthServiceProvider extends ServiceProvider
                 LogoutServiceInterface::class => LogoutService::class,
                 RegisterServiceInterface::class => RegisterService::class,
                 IssueTokenServiceInterface::class => IssueTokenService::class,
+                LinkExternalIdentityServiceInterface::class => LinkExternalIdentityService::class,
+                UnlinkExternalIdentityServiceInterface::class => UnlinkExternalIdentityService::class,
                 RefreshTokenServiceInterface::class => RefreshTokenService::class,
                 RevokeSessionServiceInterface::class => RevokeSessionService::class,
                 ListSessionsServiceInterface::class => ListSessionsService::class,
@@ -176,6 +187,24 @@ final class AuthServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $router = $this->app->make(Router::class);
+        $router->aliasMiddleware(
+            (string) config('module-auth.middleware.authenticate_alias', 'auth.module.authenticate'),
+            AuthenticateMiddleware::class,
+        );
+        $router->aliasMiddleware(
+            (string) config('module-auth.middleware.token_validation_alias', 'auth.module.token'),
+            TokenValidationMiddleware::class,
+        );
+        $router->aliasMiddleware(
+            (string) config('module-auth.middleware.context_alias', 'auth.module.context'),
+            AuthContextMiddleware::class,
+        );
+        $router->aliasMiddleware(
+            (string) config('module-auth.middleware.sso_context_alias', 'auth.module.sso-context'),
+            SSOContextMiddleware::class,
+        );
+
         Auth::viaRequest(
             (string) config('module-auth.token_guard_driver', 'module-auth-token'),
             function (Request $request): ?UserModel {

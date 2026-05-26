@@ -12,6 +12,7 @@ use Modules\Core\Application\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Auth\Application\Contracts\UseCases\AuthorizeClientServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\ExchangeAuthorizationCodeServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\IssueTokenServiceInterface;
+use Modules\Auth\Application\Contracts\UseCases\LinkExternalIdentityServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\ListSessionsServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\LoginServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\LogoutServiceInterface;
@@ -21,18 +22,22 @@ use Modules\Auth\Application\Contracts\UseCases\RequestVerificationChallengeServ
 use Modules\Auth\Application\Contracts\UseCases\RevokeSessionServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\ValidateTokenServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\VerifyChallengeServiceInterface;
+use Modules\Auth\Application\Contracts\UseCases\UnlinkExternalIdentityServiceInterface;
 use Modules\Auth\Application\DTOs\AuthorizeClientData;
 use Modules\Auth\Application\DTOs\ExchangeAuthorizationCodeData;
+use Modules\Auth\Application\DTOs\LinkExternalIdentityData;
 use Modules\Auth\Application\DTOs\LoginData;
 use Modules\Auth\Application\DTOs\LogoutData;
 use Modules\Auth\Application\DTOs\RegistrationData;
 use Modules\Auth\Application\DTOs\TokenIssueData;
 use Modules\Auth\Application\DTOs\TokenRefreshData;
+use Modules\Auth\Application\DTOs\UnlinkExternalIdentityData;
 use Modules\Auth\Application\DTOs\VerificationChallengeRequestData;
 use Modules\Auth\Application\DTOs\VerificationChallengeVerifyData;
 use Modules\Auth\Presentation\Http\Requests\AuthorizeClientRequest;
 use Modules\Auth\Presentation\Http\Requests\ExchangeAuthorizationCodeRequest;
 use Modules\Auth\Presentation\Http\Requests\IssueTokenRequest;
+use Modules\Auth\Presentation\Http\Requests\LinkExternalIdentityRequest;
 use Modules\Auth\Presentation\Http\Requests\ListSessionsRequest;
 use Modules\Auth\Presentation\Http\Requests\LoginRequest;
 use Modules\Auth\Presentation\Http\Requests\LogoutRequest;
@@ -40,6 +45,7 @@ use Modules\Auth\Presentation\Http\Requests\RefreshTokenRequest;
 use Modules\Auth\Presentation\Http\Requests\RegisterRequest;
 use Modules\Auth\Presentation\Http\Requests\RequestVerificationChallengeRequest;
 use Modules\Auth\Presentation\Http\Requests\RevokeSessionRequest;
+use Modules\Auth\Presentation\Http\Requests\UnlinkExternalIdentityRequest;
 use Modules\Auth\Presentation\Http\Requests\ValidateTokenRequest;
 use Modules\Auth\Presentation\Http\Requests\VerifyChallengeRequest;
 use Modules\Auth\Presentation\Http\Resources\AuthPayloadResource;
@@ -52,6 +58,8 @@ final class AuthController extends Controller
         private readonly LogoutServiceInterface $logoutService,
         private readonly RegisterServiceInterface $registerService,
         private readonly IssueTokenServiceInterface $issueTokenService,
+        private readonly LinkExternalIdentityServiceInterface $linkExternalIdentityService,
+        private readonly UnlinkExternalIdentityServiceInterface $unlinkExternalIdentityService,
         private readonly RefreshTokenServiceInterface $refreshTokenService,
         private readonly RevokeSessionServiceInterface $revokeSessionService,
         private readonly ListSessionsServiceInterface $listSessionsService,
@@ -87,6 +95,24 @@ final class AuthController extends Controller
         );
 
         return $this->respond($result, 201);
+    }
+
+    public function linkExternalIdentity(LinkExternalIdentityRequest $request): JsonResponse|AuthPayloadResource
+    {
+        $result = $this->linkExternalIdentityService->linkExternalIdentity(
+            LinkExternalIdentityData::fromArray($this->mergeProtectedContext($request->validated())),
+        );
+
+        return $this->respond($result, 201);
+    }
+
+    public function unlinkExternalIdentity(UnlinkExternalIdentityRequest $request): JsonResponse|AuthPayloadResource
+    {
+        $result = $this->unlinkExternalIdentityService->unlinkExternalIdentity(
+            UnlinkExternalIdentityData::fromArray($this->mergeProtectedContext($request->validated())),
+        );
+
+        return $this->respond($result);
     }
 
     public function refreshToken(RefreshTokenRequest $request): JsonResponse|AuthPayloadResource
@@ -172,6 +198,34 @@ final class AuthController extends Controller
         );
 
         return $this->respond($result, 201);
+    }
+
+    public function me(): JsonResponse|AuthPayloadResource
+    {
+        $context = $this->currentUser->current();
+        if ($context === null) {
+            return response()->json([
+                'message' => 'Authenticated user context is not available.',
+                'code' => 'AUTH_UNAUTHORIZED_ACCESS',
+            ], 401);
+        }
+
+        return (new AuthPayloadResource([
+            'user_id' => $context->userIdAsInt(),
+            'tenant_id' => $this->currentTenant->currentTenantId() ?? $context->tenantId(),
+            'organization_unit_id' => $this->currentOrganizationUnit->currentOrganizationUnitId()
+                ?? $context->organizationUnitId(),
+            'guard' => $context->guard(),
+            'provider' => $context->provider(),
+            'application_id' => $context->applicationId(),
+            'token_payload' => $context->tokenPayload(),
+        ]))->response()->setStatusCode(200);
+    }
+
+    public function ssoCallback(
+        ExchangeAuthorizationCodeRequest $request,
+    ): JsonResponse|AuthPayloadResource {
+        return $this->exchangeAuthorizationCode($request);
     }
 
     /**

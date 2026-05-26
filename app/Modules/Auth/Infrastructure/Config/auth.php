@@ -16,4 +16,10 @@ return [
     'verification_ttl_seconds' => (int) env('AUTH_VERIFICATION_TTL', 600),
     'max_login_attempts' => (int) env('AUTH_MAX_LOGIN_ATTEMPTS', 5),
     'login_attempt_window_seconds' => (int) env('AUTH_LOGIN_ATTEMPT_WINDOW', 900),
+    'middleware' => [
+        'authenticate_alias' => env('AUTH_MIDDLEWARE_AUTHENTICATE_ALIAS', 'auth.module.authenticate'),
+        'token_validation_alias' => env('AUTH_MIDDLEWARE_TOKEN_VALIDATION_ALIAS', 'auth.module.token'),
+        'context_alias' => env('AUTH_MIDDLEWARE_CONTEXT_ALIAS', 'auth.module.context'),
+        'sso_context_alias' => env('AUTH_MIDDLEWARE_SSO_CONTEXT_ALIAS', 'auth.module.sso-context'),
+    ],
 ];

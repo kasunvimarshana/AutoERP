@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Auth\Application\UseCases;
 
 use Modules\Auth\Application\Contracts\Providers\AuthProviderRegistryInterface;
+use Modules\Auth\Application\DTOs\LinkExternalIdentityData;
 use Modules\Auth\Application\Contracts\UseCases\LoginServiceInterface;
 use Modules\Auth\Application\DTOs\AuthorizeClientData;
 use Modules\Auth\Application\DTOs\ExchangeAuthorizationCodeData;
@@ -13,6 +14,7 @@ use Modules\Auth\Application\DTOs\LogoutData;
 use Modules\Auth\Application\DTOs\RegistrationData;
 use Modules\Auth\Application\DTOs\TokenIssueData;
 use Modules\Auth\Application\DTOs\TokenRefreshData;
+use Modules\Auth\Application\DTOs\UnlinkExternalIdentityData;
 use Modules\Auth\Application\DTOs\VerificationChallengeRequestData;
 use Modules\Auth\Application\DTOs\VerificationChallengeVerifyData;
 use Modules\Auth\Application\Repositories\AuthIdentityRepositoryInterface;
@@ -20,6 +22,8 @@ use Modules\Auth\Application\Repositories\AuthLoginAttemptRepositoryInterface;
 use Modules\Auth\Application\Repositories\AuthProviderRepositoryInterface;
 use Modules\Auth\Domain\Constants\AuthErrorCode;
 use Modules\Auth\Domain\Contracts\AuthDomainServiceInterface;
+use Modules\Core\Application\Contracts\ErrorNormalizerInterface;
+use Modules\Core\Application\Contracts\TransactionManagerInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Modules\User\Application\Contracts\UseCases\UserServiceInterface;
@@ -37,7 +41,9 @@ final class AuthWorkflowService implements
     \Modules\Auth\Application\Contracts\UseCases\RequestVerificationChallengeServiceInterface,
     \Modules\Auth\Application\Contracts\UseCases\VerifyChallengeServiceInterface,
     \Modules\Auth\Application\Contracts\UseCases\AuthorizeClientServiceInterface,
-    \Modules\Auth\Application\Contracts\UseCases\ExchangeAuthorizationCodeServiceInterface
+    \Modules\Auth\Application\Contracts\UseCases\ExchangeAuthorizationCodeServiceInterface,
+    \Modules\Auth\Application\Contracts\UseCases\LinkExternalIdentityServiceInterface,
+    \Modules\Auth\Application\Contracts\UseCases\UnlinkExternalIdentityServiceInterface
 {
     public function __construct(
         private readonly AuthProviderRegistryInterface $registry,
@@ -46,73 +52,95 @@ final class AuthWorkflowService implements
         private readonly AuthLoginAttemptRepositoryInterface $loginAttempts,
         private readonly AuthDomainServiceInterface $domain,
         private readonly UserServiceInterface $userService,
+        private readonly TransactionManagerInterface $transactions,
+        private readonly ErrorNormalizerInterface $errorNormalizer,
     ) {
     }
 
     public function login(LoginData $data): Result
     {
         try {
-            if ($this->isLockedOut($data)) {
-                return $this->failure(AuthErrorCode::INVALID_CREDENTIALS, 'Credentials are invalid.');
-            }
+            return $this->transactions->runInTransaction(function () use ($data): Result {
+                if ($this->isLockedOut($data)) {
+                    return $this->failure(AuthErrorCode::INVALID_CREDENTIALS, 'Credentials are invalid.');
+                }
 
-            $provider = $this->registry->authenticationProvider($data->tenantId, $data->providerKey);
-            if ($provider === null) {
-                return $this->failure(AuthErrorCode::PROVIDER_NOT_FOUND, 'Auth provider is not available.');
-            }
+                $provider = $this->registry->authenticationProvider($data->tenantId, $data->providerKey);
+                if ($provider === null) {
+                    return $this->failure(AuthErrorCode::PROVIDER_NOT_FOUND, 'Auth provider is not available.');
+                }
 
-            $context = $provider->authenticate($data);
-            if ($context === null) {
-                $this->recordAttempt($data, false, AuthErrorCode::INVALID_CREDENTIALS, null, null, null);
+                $context = $provider->authenticate($data);
+                if ($context === null) {
+                    $this->recordAttempt($data, false, AuthErrorCode::INVALID_CREDENTIALS, null, null, null);
+                    $this->publishLifecycleEvent('LoginFailed', [
+                        'tenant_id' => $data->tenantId,
+                        'provider_key' => $data->providerKey,
+                        'login_identifier' => strtolower($data->loginIdentifier),
+                    ]);
 
-                return $this->failure(AuthErrorCode::INVALID_CREDENTIALS, 'Credentials are invalid.');
-            }
+                    return $this->failure(AuthErrorCode::INVALID_CREDENTIALS, 'Credentials are invalid.');
+                }
 
-            $user = $context['user'];
-            $providerRecord = $context['provider'];
-            $identity = $context['identity'] ?? null;
+                $user = $context['user'];
+                $providerRecord = $context['provider'];
+                $identity = $context['identity'] ?? null;
 
-            $session = $this->registry->sessionProvider()->create([
-                'tenant_id' => $data->tenantId,
-                'organization_unit_id' => $data->organizationUnitId,
-                'provider_id' => $providerRecord['id'] ?? null,
-                'identity_id' => $identity['id'] ?? null,
-                'user_id' => $user['id'],
-                'ip_address' => $data->ipAddress,
-                'user_agent' => $data->userAgent,
-                'device_name' => $data->deviceName,
-                'metadata' => $data->metadata,
-            ]);
+                $session = $this->registry->sessionProvider()->create([
+                    'tenant_id' => $data->tenantId,
+                    'organization_unit_id' => $data->organizationUnitId,
+                    'provider_id' => $providerRecord['id'] ?? null,
+                    'identity_id' => $identity['id'] ?? null,
+                    'user_id' => $user['id'],
+                    'ip_address' => $data->ipAddress,
+                    'user_agent' => $data->userAgent,
+                    'device_name' => $data->deviceName,
+                    'metadata' => $data->metadata,
+                ]);
 
-            $tokenPair = $this->registry->tokenProvider()->issue(TokenIssueData::fromArray([
-                'tenant_id' => $data->tenantId,
-                'organization_unit_id' => $data->organizationUnitId,
-                'provider_id' => $providerRecord['id'] ?? null,
-                'identity_id' => $identity['id'] ?? null,
-                'session_id' => $session['id'] ?? null,
-                'user_id' => $user['id'],
-                'grant_type' => 'password',
-                'scopes' => [],
-            ]));
+                $tokenPair = $this->registry->tokenProvider()->issue(TokenIssueData::fromArray([
+                    'tenant_id' => $data->tenantId,
+                    'organization_unit_id' => $data->organizationUnitId,
+                    'provider_id' => $providerRecord['id'] ?? null,
+                    'identity_id' => $identity['id'] ?? null,
+                    'session_id' => $session['id'] ?? null,
+                    'user_id' => $user['id'],
+                    'grant_type' => 'password',
+                    'scopes' => [],
+                ]));
 
-            $this->recordAttempt(
-                $data,
-                true,
-                null,
-                isset($providerRecord['id']) ? (int) $providerRecord['id'] : null,
-                isset($identity['id']) ? (int) $identity['id'] : null,
-                (int) $user['id'],
-            );
+                $this->recordAttempt(
+                    $data,
+                    true,
+                    null,
+                    isset($providerRecord['id']) ? (int) $providerRecord['id'] : null,
+                    isset($identity['id']) ? (int) $identity['id'] : null,
+                    (int) $user['id'],
+                );
 
-            $this->clearRecentFailures($data);
+                $this->clearRecentFailures($data);
+                $this->publishLifecycleEvent('LoginSuccess', [
+                    'tenant_id' => $data->tenantId,
+                    'user_id' => $user['id'] ?? null,
+                    'provider_id' => $providerRecord['id'] ?? null,
+                    'identity_id' => $identity['id'] ?? null,
+                    'session_id' => $session['id'] ?? null,
+                ]);
+                $this->publishLifecycleEvent('TokenIssued', [
+                    'tenant_id' => $data->tenantId,
+                    'user_id' => $user['id'] ?? null,
+                    'access_token_id' => $tokenPair['access_token_id'] ?? null,
+                    'refresh_token_id' => $tokenPair['refresh_token_id'] ?? null,
+                ]);
 
-            return Result::success([
-                'provider' => $providerRecord,
-                'identity' => $identity,
-                'user' => $user,
-                'session' => $session,
-                'tokens' => $tokenPair,
-            ]);
+                return Result::success([
+                    'provider' => $providerRecord,
+                    'identity' => $identity,
+                    'user' => $user,
+                    'session' => $session,
+                    'tokens' => $tokenPair,
+                ]);
+            });
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }
@@ -121,17 +149,28 @@ final class AuthWorkflowService implements
     public function logout(LogoutData $data): Result
     {
         try {
-            if ($data->accessToken !== null) {
-                $this->registry->tokenProvider()->revokeAccessToken($data->accessToken, $data->tenantId);
-            }
+            return $this->transactions->runInTransaction(function () use ($data): Result {
+                if ($data->accessToken !== null) {
+                    $this->registry->tokenProvider()->revokeAccessToken($data->accessToken, $data->tenantId);
+                }
 
-            if ($data->sessionId !== null) {
-                $sessionTenantId = $this->resolveSessionTenantId($data->sessionId, $data->tenantId);
-                $this->registry->tokenProvider()->revokeSessionTokens($data->sessionId, $sessionTenantId);
-                $this->registry->sessionProvider()->revoke($data->sessionId, $sessionTenantId);
-            }
+                if ($data->sessionId !== null) {
+                    $sessionTenantId = $this->resolveSessionTenantId($data->sessionId, $data->tenantId);
+                    $this->registry->tokenProvider()->revokeSessionTokens($data->sessionId, $sessionTenantId);
+                    $this->registry->sessionProvider()->revoke($data->sessionId, $sessionTenantId);
+                    $this->publishLifecycleEvent('TokenRevoked', [
+                        'tenant_id' => $sessionTenantId,
+                        'session_id' => $data->sessionId,
+                    ]);
+                }
 
-            return Result::success(true);
+                $this->publishLifecycleEvent('Logout', [
+                    'tenant_id' => $data->tenantId,
+                    'session_id' => $data->sessionId,
+                ]);
+
+                return Result::success(true);
+            });
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }
@@ -140,56 +179,65 @@ final class AuthWorkflowService implements
     public function register(RegistrationData $data): Result
     {
         try {
-            $provider = $this->registry->authenticationProvider($data->tenantId, $data->providerKey);
-            if ($provider === null) {
-                return $this->failure(AuthErrorCode::PROVIDER_NOT_FOUND, 'Auth provider is not available.');
-            }
-
-            $createdByProvider = $provider->register($data);
-            if ($createdByProvider !== null) {
-                return Result::success($createdByProvider);
-            }
-
-            $createdUser = $this->userService->create([
-                'tenant_id' => $data->tenantId,
-                'organization_unit_id' => $data->organizationUnitId,
-                'first_name' => $data->firstName,
-                'last_name' => $data->lastName,
-                'email' => $data->email,
-                'password' => $data->password,
-                'metadata' => $data->metadata,
-                'status' => 'active',
-            ]);
-
-            if ($createdUser->isFailure()) {
-                return Result::failure($createdUser->errorOrFail());
-            }
-
-            $userRecord = $createdUser->valueOrFail()->toArray();
-            $providerRecord = $this->providers->findActiveByKey($data->tenantId, $data->providerKey);
-            if ($providerRecord !== null) {
-                $existingIdentity = $this->identities->findByProviderAndSubject(
-                    $data->tenantId,
-                    (int) $providerRecord->id(),
-                    strtolower($data->email),
-                );
-
-                if ($existingIdentity === null) {
-                    $this->identities->create([
-                        'tenant_id' => $data->tenantId,
-                        'organization_unit_id' => $data->organizationUnitId,
-                        'provider_id' => (int) $providerRecord->id(),
-                        'user_id' => (int) $userRecord['id'],
-                        'provider_user_key' => strtolower($data->email),
-                        'status' => 'active',
-                        'is_primary' => true,
-                        'metadata' => $data->metadata,
-                        'row_version' => 1,
-                    ]);
+            return $this->transactions->runInTransaction(function () use ($data): Result {
+                $provider = $this->registry->authenticationProvider($data->tenantId, $data->providerKey);
+                if ($provider === null) {
+                    return $this->failure(AuthErrorCode::PROVIDER_NOT_FOUND, 'Auth provider is not available.');
                 }
-            }
 
-            return Result::success($userRecord);
+                $createdByProvider = $provider->register($data);
+                if ($createdByProvider !== null) {
+                    return Result::success($createdByProvider);
+                }
+
+                $createdUser = $this->userService->create([
+                    'tenant_id' => $data->tenantId,
+                    'organization_unit_id' => $data->organizationUnitId,
+                    'first_name' => $data->firstName,
+                    'last_name' => $data->lastName,
+                    'email' => $data->email,
+                    'password' => $data->password,
+                    'metadata' => $data->metadata,
+                    'status' => 'active',
+                ]);
+
+                if ($createdUser->isFailure()) {
+                    return Result::failure($createdUser->errorOrFail());
+                }
+
+                $userRecord = $createdUser->valueOrFail()->toArray();
+                $providerRecord = $this->providers->findActiveByKey($data->tenantId, $data->providerKey);
+                if ($providerRecord !== null) {
+                    $existingIdentity = $this->identities->findByProviderAndSubject(
+                        $data->tenantId,
+                        (int) $providerRecord->id(),
+                        strtolower($data->email),
+                    );
+
+                    if ($existingIdentity === null) {
+                        $identity = $this->identities->create([
+                            'tenant_id' => $data->tenantId,
+                            'organization_unit_id' => $data->organizationUnitId,
+                            'provider_id' => (int) $providerRecord->id(),
+                            'user_id' => (int) $userRecord['id'],
+                            'provider_user_key' => strtolower($data->email),
+                            'status' => 'active',
+                            'is_primary' => true,
+                            'metadata' => $data->metadata,
+                            'row_version' => 1,
+                        ]);
+
+                        $this->publishLifecycleEvent('IdentityLinked', [
+                            'tenant_id' => $data->tenantId,
+                            'user_id' => $userRecord['id'] ?? null,
+                            'identity_id' => $identity->id(),
+                            'provider_id' => $providerRecord->id(),
+                        ]);
+                    }
+                }
+
+                return Result::success($userRecord);
+            });
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }
@@ -198,7 +246,9 @@ final class AuthWorkflowService implements
     public function issueToken(TokenIssueData $data): Result
     {
         try {
-            return Result::success($this->registry->tokenProvider()->issue($data));
+            return $this->transactions->runInTransaction(
+                fn (): Result => Result::success($this->registry->tokenProvider()->issue($data)),
+            );
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }
@@ -207,12 +257,20 @@ final class AuthWorkflowService implements
     public function refreshToken(TokenRefreshData $data): Result
     {
         try {
-            $tokens = $this->registry->tokenProvider()->refresh($data);
-            if ($tokens === null) {
-                return $this->failure(AuthErrorCode::TOKEN_INVALID, 'Refresh token is invalid or expired.');
-            }
+            return $this->transactions->runInTransaction(function () use ($data): Result {
+                $tokens = $this->registry->tokenProvider()->refresh($data);
+                if ($tokens === null) {
+                    return $this->failure(AuthErrorCode::TOKEN_INVALID, 'Refresh token is invalid or expired.');
+                }
 
-            return Result::success($tokens);
+                $this->publishLifecycleEvent('TokenIssued', [
+                    'tenant_id' => $data->tenantId,
+                    'access_token_id' => $tokens['access_token_id'] ?? null,
+                    'refresh_token_id' => $tokens['refresh_token_id'] ?? null,
+                ]);
+
+                return Result::success($tokens);
+            });
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }
@@ -221,14 +279,21 @@ final class AuthWorkflowService implements
     public function revokeSession(int|string $sessionId, ?int $tenantId = null): Result
     {
         try {
-            $sessionTenantId = $this->resolveSessionTenantId($sessionId, $tenantId);
-            $this->registry->tokenProvider()->revokeSessionTokens((int) $sessionId, $sessionTenantId);
-            $revoked = $this->registry->sessionProvider()->revoke($sessionId, $sessionTenantId);
-            if (! $revoked) {
-                return $this->failure(AuthErrorCode::SESSION_NOT_FOUND, 'Session not found.');
-            }
+            return $this->transactions->runInTransaction(function () use ($sessionId, $tenantId): Result {
+                $sessionTenantId = $this->resolveSessionTenantId($sessionId, $tenantId);
+                $this->registry->tokenProvider()->revokeSessionTokens((int) $sessionId, $sessionTenantId);
+                $revoked = $this->registry->sessionProvider()->revoke($sessionId, $sessionTenantId);
+                if (! $revoked) {
+                    return $this->failure(AuthErrorCode::SESSION_NOT_FOUND, 'Session not found.');
+                }
 
-            return Result::success(true);
+                $this->publishLifecycleEvent('TokenRevoked', [
+                    'tenant_id' => $sessionTenantId,
+                    'session_id' => $sessionId,
+                ]);
+
+                return Result::success(true);
+            });
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }
@@ -260,7 +325,9 @@ final class AuthWorkflowService implements
     public function requestVerificationChallenge(VerificationChallengeRequestData $data): Result
     {
         try {
-            return Result::success($this->registry->verificationProvider()->requestChallenge($data));
+            return $this->transactions->runInTransaction(
+                fn (): Result => Result::success($this->registry->verificationProvider()->requestChallenge($data)),
+            );
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }
@@ -269,12 +336,14 @@ final class AuthWorkflowService implements
     public function verifyChallenge(VerificationChallengeVerifyData $data): Result
     {
         try {
-            $isValid = $this->registry->verificationProvider()->verifyChallenge($data);
-            if (! $isValid) {
-                return $this->failure(AuthErrorCode::VERIFICATION_FAILED, 'Verification challenge failed.');
-            }
+            return $this->transactions->runInTransaction(function () use ($data): Result {
+                $isValid = $this->registry->verificationProvider()->verifyChallenge($data);
+                if (! $isValid) {
+                    return $this->failure(AuthErrorCode::VERIFICATION_FAILED, 'Verification challenge failed.');
+                }
 
-            return Result::success(true);
+                return Result::success(true);
+            });
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }
@@ -283,12 +352,21 @@ final class AuthWorkflowService implements
     public function authorizeClient(AuthorizeClientData $data): Result
     {
         try {
-            $authorizationCode = $this->registry->ssoProvider()->authorizeClient($data);
-            if ($authorizationCode === null) {
-                return $this->failure(AuthErrorCode::CLIENT_NOT_ALLOWED, 'Client authorization failed.');
-            }
+            return $this->transactions->runInTransaction(function () use ($data): Result {
+                $authorizationCode = $this->registry->ssoProvider()->authorizeClient($data);
+                if ($authorizationCode === null) {
+                    return $this->failure(AuthErrorCode::CLIENT_NOT_ALLOWED, 'Client authorization failed.');
+                }
 
-            return Result::success($authorizationCode);
+                $this->publishLifecycleEvent('SSOLogin', [
+                    'tenant_id' => $data->tenantId,
+                    'client_key' => $data->clientKey,
+                    'user_id' => $data->userId,
+                    'authorization_code_id' => $authorizationCode['authorization_code_id'] ?? null,
+                ]);
+
+                return Result::success($authorizationCode);
+            });
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }
@@ -297,35 +375,158 @@ final class AuthWorkflowService implements
     public function exchangeAuthorizationCode(ExchangeAuthorizationCodeData $data): Result
     {
         try {
-            $context = $this->registry->ssoProvider()->exchangeAuthorizationCode($data);
-            if ($context === null) {
-                return $this->failure(
-                    AuthErrorCode::AUTHORIZATION_CODE_INVALID,
-                    'Authorization code is invalid or expired.',
-                );
-            }
+            return $this->transactions->runInTransaction(function () use ($data): Result {
+                $context = $this->registry->ssoProvider()->exchangeAuthorizationCode($data);
+                if ($context === null) {
+                    return $this->failure(
+                        AuthErrorCode::AUTHORIZATION_CODE_INVALID,
+                        'Authorization code is invalid or expired.',
+                    );
+                }
 
-            $tokenPair = $this->registry->tokenProvider()->issue(TokenIssueData::fromArray([
-                'tenant_id' => $context['tenant_id'] ?? $data->tenantId,
-                'organization_unit_id' => $context['organization_unit_id'] ?? null,
-                'provider_id' => $context['provider_id'] ?? null,
-                'client_id' => $context['client_id'] ?? null,
-                'identity_id' => $context['identity_id'] ?? null,
-                'session_id' => $context['session_id'] ?? null,
-                'user_id' => $context['user_id'] ?? null,
-                'grant_type' => 'authorization_code',
-                'scopes' => $context['scopes'] ?? [],
-                'access_token_ttl_seconds' => $data->accessTokenTtlSeconds,
-                'refresh_token_ttl_seconds' => $data->refreshTokenTtlSeconds,
-                'metadata' => [
-                    'authorization_code_id' => $context['authorization_code_id'] ?? null,
-                ],
-            ]));
+                $tokenPair = $this->registry->tokenProvider()->issue(TokenIssueData::fromArray([
+                    'tenant_id' => $context['tenant_id'] ?? $data->tenantId,
+                    'organization_unit_id' => $context['organization_unit_id'] ?? null,
+                    'provider_id' => $context['provider_id'] ?? null,
+                    'client_id' => $context['client_id'] ?? null,
+                    'identity_id' => $context['identity_id'] ?? null,
+                    'session_id' => $context['session_id'] ?? null,
+                    'user_id' => $context['user_id'] ?? null,
+                    'grant_type' => 'authorization_code',
+                    'scopes' => $context['scopes'] ?? [],
+                    'access_token_ttl_seconds' => $data->accessTokenTtlSeconds,
+                    'refresh_token_ttl_seconds' => $data->refreshTokenTtlSeconds,
+                    'metadata' => [
+                        'authorization_code_id' => $context['authorization_code_id'] ?? null,
+                    ],
+                ]));
 
-            return Result::success($tokenPair);
+                $this->publishLifecycleEvent('TokenIssued', [
+                    'tenant_id' => $context['tenant_id'] ?? $data->tenantId,
+                    'user_id' => $context['user_id'] ?? null,
+                    'access_token_id' => $tokenPair['access_token_id'] ?? null,
+                    'refresh_token_id' => $tokenPair['refresh_token_id'] ?? null,
+                ]);
+
+                return Result::success($tokenPair);
+            });
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }
+    }
+
+    public function linkExternalIdentity(LinkExternalIdentityData $data): Result
+    {
+        try {
+            return $this->transactions->runInTransaction(function () use ($data): Result {
+                $provider = $this->providers->findActiveByKey($data->tenantId, trim(strtolower($data->providerKey)));
+                if ($provider === null) {
+                    return $this->failure(AuthErrorCode::PROVIDER_NOT_FOUND, 'Auth provider is not available.');
+                }
+
+                $providerId = (int) $provider->id();
+                $subject = trim(strtolower($data->providerUserKey));
+                if ($subject === '' || $data->userId < 1) {
+                    return $this->failure(AuthErrorCode::INVALID_CREDENTIALS, 'Identity mapping input is invalid.');
+                }
+
+                $existing = $this->identities->findByProviderAndSubject($data->tenantId, $providerId, $subject);
+                if ($existing !== null) {
+                    if ((int) $existing->get('user_id') !== $data->userId) {
+                        return $this->failure(
+                            AuthErrorCode::TENANT_MISMATCH,
+                            'Identity already linked to another user.',
+                        );
+                    }
+
+                    $updated = $this->identities->update($existing->id(), [
+                        'organization_unit_id' => $data->organizationUnitId,
+                        'is_primary' => $data->isPrimary,
+                        'claims' => $data->claims,
+                        'metadata' => $data->metadata,
+                        'status' => 'active',
+                        'row_version' => ((int) $existing->get('row_version', 1)) + 1,
+                    ]);
+
+                    $this->publishLifecycleEvent('IdentityLinked', [
+                        'tenant_id' => $data->tenantId,
+                        'user_id' => $data->userId,
+                        'identity_id' => $updated->id(),
+                        'provider_id' => $providerId,
+                    ]);
+
+                    return Result::success($updated);
+                }
+
+                $created = $this->identities->create([
+                    'tenant_id' => $data->tenantId,
+                    'organization_unit_id' => $data->organizationUnitId,
+                    'provider_id' => $providerId,
+                    'user_id' => $data->userId,
+                    'provider_user_key' => $subject,
+                    'status' => 'active',
+                    'is_primary' => $data->isPrimary,
+                    'claims' => $data->claims,
+                    'metadata' => $data->metadata,
+                    'row_version' => 1,
+                ]);
+
+                $this->publishLifecycleEvent('IdentityLinked', [
+                    'tenant_id' => $data->tenantId,
+                    'user_id' => $data->userId,
+                    'identity_id' => $created->id(),
+                    'provider_id' => $providerId,
+                ]);
+
+                return Result::success($created);
+            });
+        } catch (Throwable $exception) {
+            return $this->fromThrowable($exception);
+        }
+    }
+
+    public function unlinkExternalIdentity(UnlinkExternalIdentityData $data): Result
+    {
+        try {
+            return $this->transactions->runInTransaction(function () use ($data): Result {
+                $provider = $this->providers->findActiveByKey($data->tenantId, trim(strtolower($data->providerKey)));
+                if ($provider === null) {
+                    return $this->failure(AuthErrorCode::PROVIDER_NOT_FOUND, 'Auth provider is not available.');
+                }
+
+                $providerId = (int) $provider->id();
+                $subject = trim(strtolower($data->providerUserKey));
+                $existing = $this->identities->findByProviderAndSubject($data->tenantId, $providerId, $subject);
+                if ($existing === null || (int) $existing->get('user_id') !== $data->userId) {
+                    return $this->failure(AuthErrorCode::UNAUTHORIZED_ACCESS, 'Identity link not found.');
+                }
+
+                $this->identities->delete($existing->id());
+
+                $this->publishLifecycleEvent('IdentityUnlinked', [
+                    'tenant_id' => $data->tenantId,
+                    'user_id' => $data->userId,
+                    'identity_id' => $existing->id(),
+                    'provider_id' => $providerId,
+                ]);
+
+                return Result::success(true);
+            });
+        } catch (Throwable $exception) {
+            return $this->fromThrowable($exception);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function publishLifecycleEvent(string $name, array $context = []): void
+    {
+        event('auth.lifecycle', [
+            'name' => $name,
+            'context' => $context,
+            'occurred_at' => now()->toIso8601String(),
+        ]);
     }
 
     private function failure(string $code, string $message): Result
@@ -335,9 +536,10 @@ final class AuthWorkflowService implements
 
     private function fromThrowable(Throwable $throwable): Result
     {
-        return Result::failure(new Error(
-            'AUTH_UNEXPECTED_ERROR',
-            $throwable->getMessage() !== '' ? $throwable->getMessage() : 'Unexpected auth failure.',
+        return Result::failure($this->errorNormalizer->normalize(
+            $throwable,
+            AuthErrorCode::UNAUTHORIZED_ACCESS,
+            ['operation' => 'auth.workflow'],
         ));
     }
 
