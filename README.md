@@ -1638,3 +1638,7 @@ Generate a COMPLETE, production-grade, plug-and-play module that:
 ---
 
 Scan app/Modules Core Configuration Tenant OrganizationUnit as immutable foundation, read ONLY migrations at app/Modules/*/Infrastructure/Persistence/Eloquent/Migrations as single source of truth, infer schema strictly, generate full production-ready modular SaaS system (Laravel modular monolith) with strict DDD/Clean Architecture, tenant isolation, event-driven integration, no cross-module business logic, no hardcoding, no stubs, no TODOs, no assumptions, no modification of existing Core modules, each module must be self-contained (Domain/Application/Infrastructure/Presentation), use repositories + DTO + use cases + service contracts, Inventory/Finance never depend on business modules, all integration via events, fully multi-tenant + org-unit aware, plug-and-play modules (add/remove without breaking system), enforce SOLID/DRY/KISS, dependency injection only, validate everything against migrations, output only complete production-ready code structure and implementations.
+
+---
+
+Before creating any new migration, table, service, model, event, contract, helper, or business logic, ALWAYS first check the existing implementation to avoid duplicates, overlapping responsibilities, inconsistent structures, and architectural conflicts. Prefer extending and improving the existing foundation instead of creating parallel or duplicate implementations unless a full replacement is intentionally required.
