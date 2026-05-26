@@ -62,6 +62,19 @@ final class EloquentUserRepository extends EloquentRepository implements UserRep
         return new PagedResult($items, $paginator->total(), $paginator->currentPage(), $paginator->perPage());
     }
 
+    public function findByTenantAndIdentityReference(
+        int $tenantId,
+        string $providerKey,
+        string $providerUserKey,
+    ): ?DataRecord {
+        $query = $this->query()->where('tenant_id', $tenantId);
+        $query->where('metadata->identity_references->' . $providerKey, $providerUserKey);
+
+        $model = $query->first();
+
+        return $model instanceof Model ? $this->toRecord($model) : null;
+    }
+
     private function applyTenantScope(Builder $query, ?int $tenantId): void
     {
         if ($tenantId === null) {

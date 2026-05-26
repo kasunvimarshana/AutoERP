@@ -20,6 +20,7 @@ $currentOrganizationUnitMiddleware = (string) config(
     'core.current_organization_unit.middleware_alias',
     'current.organization-unit',
 );
+$currentUserRecordMiddleware = (string) config('user.context.middleware_alias', 'current.user-record');
 
 Route::prefix('api/user')
     ->middleware([
@@ -28,9 +29,26 @@ Route::prefix('api/user')
         $currentUserMiddleware,
         $currentTenantMiddleware,
         $currentOrganizationUnitMiddleware,
+        $currentUserRecordMiddleware,
     ])
     ->name('user.')
     ->group(function (): void {
+        Route::get('users/resolve-identity', [UserController::class, 'resolveByIdentity'])
+            ->name('users.resolve-identity');
+        Route::patch('users/{user}/activate', [UserController::class, 'activate'])
+            ->name('users.activate');
+        Route::patch('users/{user}/deactivate', [UserController::class, 'deactivate'])
+            ->name('users.deactivate');
+        Route::patch('users/{user}/suspend', [UserController::class, 'suspend'])
+            ->name('users.suspend');
+        Route::post('users/{user}/organization-units', [UserController::class, 'assignOrganizationUnit'])
+            ->name('users.organization-units.assign');
+        Route::delete(
+            'users/{user}/organization-units/{organizationUnit}',
+            [UserController::class, 'removeOrganizationUnit'],
+        )
+            ->name('users.organization-units.remove');
+
         Route::apiResource('users', UserController::class);
         Route::apiResource('roles', RoleController::class);
         Route::apiResource('permissions', PermissionController::class);

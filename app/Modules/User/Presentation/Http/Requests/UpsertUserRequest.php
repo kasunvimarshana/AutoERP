@@ -11,7 +11,7 @@ final class UpsertUserRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return auth()->check();
+        return true;
     }
 
     /**
@@ -25,6 +25,8 @@ final class UpsertUserRequest extends FormRequest
             'tenant_id' => ['nullable', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'metadata' => ['nullable', 'array'],
+            'identity_references' => ['nullable', 'array'],
+            'identity_references.*' => ['required_with:identity_references', 'string', 'max:255'],
             'first_name' => array_merge($required, ['string', 'max:255']),
             'last_name' => ['nullable', 'string', 'max:255'],
             'email' => array_merge($required, ['email:rfc,dns', 'max:255']),

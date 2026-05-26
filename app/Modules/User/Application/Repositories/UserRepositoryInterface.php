@@ -12,5 +12,11 @@ interface UserRepositoryInterface extends RepositoryPortInterface
 {
     public function findByTenantAndEmail(?int $tenantId, string $email, ?int $excludeId = null): ?DataRecord;
 
+    public function findByTenantAndIdentityReference(
+        int $tenantId,
+        string $providerKey,
+        string $providerUserKey,
+    ): ?DataRecord;
+
     public function pageByFilters(?int $tenantId, ?string $search, int $perPage, int $page): PagedResult;
 }
