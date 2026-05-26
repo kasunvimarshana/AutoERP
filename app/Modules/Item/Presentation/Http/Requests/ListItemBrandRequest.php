@@ -10,7 +10,7 @@ final class ListItemBrandRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return auth()->check();
     }
 
     /**

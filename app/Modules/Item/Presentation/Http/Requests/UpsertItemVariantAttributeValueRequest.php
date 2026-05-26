@@ -10,7 +10,7 @@ final class UpsertItemVariantAttributeValueRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return auth()->check();
     }
 
     /**

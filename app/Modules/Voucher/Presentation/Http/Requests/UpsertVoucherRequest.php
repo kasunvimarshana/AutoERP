@@ -10,7 +10,7 @@ final class UpsertVoucherRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return auth()->check();
     }
 
     /**

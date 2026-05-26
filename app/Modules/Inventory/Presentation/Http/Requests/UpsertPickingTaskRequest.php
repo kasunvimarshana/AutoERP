@@ -10,7 +10,7 @@ final class UpsertPickingTaskRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return auth()->check();
     }
 
     /**

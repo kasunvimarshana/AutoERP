@@ -11,7 +11,7 @@ final class ListTimezoneRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return auth()->check();
     }
 
     /**
