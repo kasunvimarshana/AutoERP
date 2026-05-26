@@ -11,6 +11,9 @@ final readonly class ConfigurationMutationData
         public mixed $value,
         public ?string $source = null,
         public ?string $description = null,
+        public ?string $scope = null,
+        public ?int $tenantId = null,
+        public ?int $organizationUnitId = null,
     ) {
     }
 
@@ -24,6 +27,11 @@ final readonly class ConfigurationMutationData
             $payload['value'] ?? null,
             isset($payload['source']) ? (string) $payload['source'] : null,
             isset($payload['description']) ? (string) $payload['description'] : null,
+            isset($payload['scope']) ? (string) $payload['scope'] : null,
+            isset($payload['tenant_id']) && is_numeric($payload['tenant_id']) ? (int) $payload['tenant_id'] : null,
+            isset($payload['organization_unit_id']) && is_numeric($payload['organization_unit_id'])
+                ? (int) $payload['organization_unit_id']
+                : null,
         );
     }
 }

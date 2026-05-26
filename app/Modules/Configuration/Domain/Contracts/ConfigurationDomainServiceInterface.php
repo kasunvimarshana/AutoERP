@@ -8,6 +8,8 @@ interface ConfigurationDomainServiceInterface
 {
     public function normalizeKey(string $key): string;
 
+    public function normalizeScope(?string $scope): string;
+
     public function normalizeSource(?string $source): string;
 
     public function normalizeDescription(?string $description): ?string;
@@ -18,6 +20,8 @@ interface ConfigurationDomainServiceInterface
      * @return array{0: string, 1: string}
      */
     public function serializeValue(mixed $value): array;
+
+    public function assertValueType(string $valueType): void;
 
     public function deserializeValue(string $storedValue, string $valueType): mixed;
 }

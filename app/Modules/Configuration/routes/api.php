@@ -34,6 +34,12 @@ Route::prefix('api/configuration')
         Route::get('entries/{key}', [ConfigurationController::class, 'show'])
             ->where('key', $keyPattern)
             ->name('entries.show');
+        Route::get('entries/{key}/resolve', [ConfigurationController::class, 'resolve'])
+            ->where('key', $keyPattern)
+            ->name('entries.resolve');
+        Route::get('features/{key}/enabled', [ConfigurationController::class, 'featureEnabled'])
+            ->where('key', $keyPattern)
+            ->name('features.enabled');
         Route::put('entries/{key}', [ConfigurationController::class, 'update'])
             ->where('key', $keyPattern)
             ->name('entries.update');

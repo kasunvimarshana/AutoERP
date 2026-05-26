@@ -16,6 +16,12 @@ final class ConfigurationErrorCode
 
     public const INVALID_RECORD = 'CONFIGURATION_INVALID_RECORD';
 
+    public const INVALID_SCOPE = 'CONFIGURATION_INVALID_SCOPE';
+
+    public const TENANT_CONTEXT_REQUIRED = 'CONFIGURATION_TENANT_CONTEXT_REQUIRED';
+
+    public const TRANSACTION_FAILED = 'CONFIGURATION_TRANSACTION_FAILED';
+
     private function __construct()
     {
     }

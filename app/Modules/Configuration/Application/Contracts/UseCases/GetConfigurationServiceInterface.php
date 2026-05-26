@@ -8,5 +8,5 @@ use Modules\Core\Application\Results\Result;
 
 interface GetConfigurationServiceInterface
 {
-    public function execute(string $key): Result;
+    public function execute(string $key, ?int $tenantId = null): Result;
 }

@@ -6,7 +6,7 @@ namespace Modules\Configuration\Application\Contracts\UseCases;
 
 use Modules\Core\Application\Results\Result;
 
-interface DeleteConfigurationServiceInterface
+interface IsFeatureEnabledServiceInterface
 {
-    public function execute(string $key, ?string $scope = null, ?int $tenantId = null): Result;
+    public function execute(string $key, ?int $tenantId = null, bool $default = false): Result;
 }

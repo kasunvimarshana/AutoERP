@@ -22,6 +22,7 @@ use Modules\Configuration\Application\Contracts\UseCases\Currencies\ListCurrenci
 use Modules\Configuration\Application\Contracts\UseCases\Currencies\UpdateCurrencyServiceInterface;
 use Modules\Configuration\Application\Contracts\UseCases\DeleteConfigurationServiceInterface;
 use Modules\Configuration\Application\Contracts\UseCases\GetConfigurationServiceInterface;
+use Modules\Configuration\Application\Contracts\UseCases\IsFeatureEnabledServiceInterface;
 use Modules\Configuration\Application\Contracts\UseCases\Languages\CreateLanguageServiceInterface;
 use Modules\Configuration\Application\Contracts\UseCases\Languages\DeleteLanguageServiceInterface;
 use Modules\Configuration\Application\Contracts\UseCases\Languages\GetLanguageServiceInterface;
@@ -30,6 +31,7 @@ use Modules\Configuration\Application\Contracts\UseCases\Languages\UpdateLanguag
 use Modules\Configuration\Application\Contracts\UseCases\ListConfigurationsServiceInterface;
 use Modules\Configuration\Application\Contracts\UseCases\SetConfigurationFromCliServiceInterface;
 use Modules\Configuration\Application\Contracts\UseCases\SetConfigurationServiceInterface;
+use Modules\Configuration\Application\Contracts\UseCases\ResolveConfigurationServiceInterface;
 use Modules\Configuration\Application\Contracts\UseCases\Timezones\CreateTimezoneServiceInterface;
 use Modules\Configuration\Application\Contracts\UseCases\Timezones\DeleteTimezoneServiceInterface;
 use Modules\Configuration\Application\Contracts\UseCases\Timezones\GetTimezoneServiceInterface;
@@ -56,6 +58,7 @@ use Modules\Configuration\Application\UseCases\Currencies\ListCurrenciesService;
 use Modules\Configuration\Application\UseCases\Currencies\UpdateCurrencyService;
 use Modules\Configuration\Application\UseCases\DeleteConfigurationService;
 use Modules\Configuration\Application\UseCases\GetConfigurationService;
+use Modules\Configuration\Application\UseCases\IsFeatureEnabledService;
 use Modules\Configuration\Application\UseCases\Languages\CreateLanguageService;
 use Modules\Configuration\Application\UseCases\Languages\DeleteLanguageService;
 use Modules\Configuration\Application\UseCases\Languages\GetLanguageService;
@@ -64,6 +67,7 @@ use Modules\Configuration\Application\UseCases\Languages\UpdateLanguageService;
 use Modules\Configuration\Application\UseCases\ListConfigurationsService;
 use Modules\Configuration\Application\UseCases\SetConfigurationFromCliService;
 use Modules\Configuration\Application\UseCases\SetConfigurationService;
+use Modules\Configuration\Application\UseCases\ResolveConfigurationService;
 use Modules\Configuration\Application\UseCases\Timezones\CreateTimezoneService;
 use Modules\Configuration\Application\UseCases\Timezones\DeleteTimezoneService;
 use Modules\Configuration\Application\UseCases\Timezones\GetTimezoneService;
@@ -78,6 +82,7 @@ use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\CountryMode
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\CurrencyModel;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\LanguageModel;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\TimezoneModel;
+use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\TenantConfigurationModel;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Repositories\EloquentConfigurationRepository;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Repositories\EloquentCountryRepository;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Repositories\EloquentCurrencyRepository;
@@ -105,6 +110,8 @@ final class ConfigurationServiceProvider extends ServiceProvider
                 ListConfigurationsServiceInterface::class => ListConfigurationsService::class,
                 GetConfigurationServiceInterface::class => GetConfigurationService::class,
                 SetConfigurationServiceInterface::class => SetConfigurationService::class,
+                ResolveConfigurationServiceInterface::class => ResolveConfigurationService::class,
+                IsFeatureEnabledServiceInterface::class => IsFeatureEnabledService::class,
                 UpdateConfigurationServiceInterface::class => UpdateConfigurationService::class,
                 DeleteConfigurationServiceInterface::class => DeleteConfigurationService::class,
                 ClearConfigurationCacheServiceInterface::class => ClearConfigurationCacheService::class,
@@ -139,7 +146,10 @@ final class ConfigurationServiceProvider extends ServiceProvider
         }
 
         $this->app->singleton(ConfigurationRepositoryInterface::class, function (): ConfigurationRepositoryInterface {
-            return new EloquentConfigurationRepository(new ConfigurationModel());
+            return new EloquentConfigurationRepository(
+                new ConfigurationModel(),
+                new TenantConfigurationModel(),
+            );
         });
 
         $this->app->singleton(CountryRepositoryInterface::class, function (): CountryRepositoryInterface {

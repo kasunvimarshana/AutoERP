@@ -18,6 +18,8 @@ final class ConfigurationValueType
 
     public const NULL = 'null';
 
+    public const ENCRYPTED = 'encrypted';
+
     private function __construct()
     {
     }

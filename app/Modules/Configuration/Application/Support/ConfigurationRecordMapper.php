@@ -6,6 +6,7 @@ namespace Modules\Configuration\Application\Support;
 
 use Modules\Configuration\Application\Contracts\ConfigurationRecordMapperInterface;
 use Modules\Configuration\Application\DTOs\ConfigurationValueData;
+use Modules\Configuration\Domain\Constants\ConfigurationScope;
 use Modules\Configuration\Domain\Constants\ConfigurationValueType;
 use Modules\Configuration\Domain\Contracts\ConfigurationDomainServiceInterface;
 use Modules\Configuration\Domain\Entities\ConfigurationEntry;
@@ -27,6 +28,10 @@ final class ConfigurationRecordMapper implements ConfigurationRecordMapperInterf
             $entry->source(),
             $entry->description(),
             $entry->updatedAt(),
+            $entry->scope(),
+            $entry->tenantId(),
+            $entry->organizationUnitId(),
+            $entry->scope(),
         );
     }
 
@@ -45,6 +50,13 @@ final class ConfigurationRecordMapper implements ConfigurationRecordMapperInterf
         );
         $description = ($record->get('description') !== null) ? (string) $record->get('description') : null;
         $updatedAt = ($record->get('updated_at') !== null) ? (string) $record->get('updated_at') : null;
+        $scope = ($record->get('scope') !== null)
+            ? $this->domain->normalizeScope((string) $record->get('scope'))
+            : ConfigurationScope::GLOBAL;
+        $tenantId = ($record->get('tenant_id') !== null) ? (int) $record->get('tenant_id') : null;
+        $organizationUnitId = ($record->get('organization_unit_id') !== null)
+            ? (int) $record->get('organization_unit_id')
+            : null;
 
         $valueType = ($record->get('value_type') !== null)
             ? (string) $record->get('value_type')
@@ -53,6 +65,16 @@ final class ConfigurationRecordMapper implements ConfigurationRecordMapperInterf
 
         $value = $this->domain->deserializeValue($storedValue, $valueType);
 
-        return new ConfigurationEntry($id, $key, $value, $source, $description, $updatedAt);
+        return new ConfigurationEntry(
+            $id,
+            $key,
+            $value,
+            $source,
+            $description,
+            $updatedAt,
+            $scope,
+            $tenantId,
+            $organizationUnitId,
+        );
     }
 }

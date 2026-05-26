@@ -15,6 +15,9 @@ final class ConfigurationEntry extends Entity
         private readonly string $source,
         private readonly ?string $description,
         private readonly ?string $updatedAt,
+        private readonly string $scope,
+        private readonly ?int $tenantId,
+        private readonly ?int $organizationUnitId,
     ) {
         parent::__construct($id);
     }
@@ -42,5 +45,20 @@ final class ConfigurationEntry extends Entity
     public function updatedAt(): ?string
     {
         return $this->updatedAt;
+    }
+
+    public function scope(): string
+    {
+        return $this->scope;
+    }
+
+    public function tenantId(): ?int
+    {
+        return $this->tenantId;
+    }
+
+    public function organizationUnitId(): ?int
+    {
+        return $this->organizationUnitId;
     }
 }

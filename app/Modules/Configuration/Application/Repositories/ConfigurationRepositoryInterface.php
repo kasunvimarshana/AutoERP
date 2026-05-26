@@ -12,7 +12,20 @@ interface ConfigurationRepositoryInterface extends RepositoryPortInterface
 {
     public function findByKey(string $key): ?DataRecord;
 
-    public function pageByFilters(?string $prefix, ?string $source, int $perPage, int $page): PagedResult;
+    public function findByTenantAndKey(int $tenantId, string $key): ?DataRecord;
 
-    public function deleteByKey(string $key): bool;
+    public function findResolvedByScope(string $key, ?int $tenantId = null): ?DataRecord;
+
+    public function pageByFilters(
+        ?string $prefix,
+        ?string $source,
+        int $perPage,
+        int $page,
+        ?string $scope = null,
+        ?int $tenantId = null,
+    ): PagedResult;
+
+    public function upsertScoped(string $key, array $attributes, ?int $tenantId = null): DataRecord;
+
+    public function deleteScopedByKey(string $key, ?int $tenantId = null): bool;
 }

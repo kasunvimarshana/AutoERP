@@ -11,6 +11,9 @@ final readonly class ConfigurationQueryData
         public ?string $source,
         public int $page,
         public int $perPage,
+        public ?string $scope = null,
+        public ?int $tenantId = null,
+        public ?int $organizationUnitId = null,
     ) {
     }
 
@@ -24,6 +27,11 @@ final readonly class ConfigurationQueryData
             isset($payload['source']) ? (string) $payload['source'] : null,
             (int) ($payload['page'] ?? 0),
             (int) ($payload['per_page'] ?? $payload['perPage'] ?? 0),
+            isset($payload['scope']) ? (string) $payload['scope'] : null,
+            isset($payload['tenant_id']) && is_numeric($payload['tenant_id']) ? (int) $payload['tenant_id'] : null,
+            isset($payload['organization_unit_id']) && is_numeric($payload['organization_unit_id'])
+                ? (int) $payload['organization_unit_id']
+                : null,
         );
     }
 }

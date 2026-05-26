@@ -12,8 +12,14 @@ final class ConfigurationCacheKeyFactory implements ConfigurationCacheKeyFactory
 
     private const CACHE_KEY_SEPARATOR = ':';
 
-    public function keyForConfiguration(string $key): string
+    public function keyForConfiguration(string $key, ?int $tenantId = null): string
     {
-        return self::CACHE_PREFIX . self::CACHE_KEY_SEPARATOR . $key;
+        $scope = $tenantId === null ? 'global' : 'tenant:' . (string) $tenantId;
+
+        return self::CACHE_PREFIX
+            . self::CACHE_KEY_SEPARATOR
+            . $scope
+            . self::CACHE_KEY_SEPARATOR
+            . $key;
     }
 }

@@ -6,16 +6,20 @@ namespace Modules\Configuration\Infrastructure\Persistence\Eloquent\Repositories
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Modules\Configuration\Domain\Constants\ConfigurationScope;
 use Modules\Configuration\Application\Repositories\ConfigurationRepositoryInterface;
 use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\ConfigurationModel;
+use Modules\Configuration\Infrastructure\Persistence\Eloquent\Models\TenantConfigurationModel;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\DTO\PagedResult;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
 
 final class EloquentConfigurationRepository extends EloquentRepository implements ConfigurationRepositoryInterface
 {
-    public function __construct(ConfigurationModel $model)
-    {
+    public function __construct(
+        ConfigurationModel $model,
+        private readonly TenantConfigurationModel $tenantModel,
+    ) {
         parent::__construct($model, ConfigurationModel::COLUMN_ID);
     }
 
@@ -30,12 +34,49 @@ final class EloquentConfigurationRepository extends EloquentRepository implement
         return $this->toRecord($model);
     }
 
-    public function pageByFilters(?string $prefix, ?string $source, int $perPage, int $page): PagedResult
+    public function findByTenantAndKey(int $tenantId, string $key): ?DataRecord
     {
+        $model = $this->tenantQuery()
+            ->where(TenantConfigurationModel::COLUMN_TENANT_ID, $tenantId)
+            ->where(TenantConfigurationModel::COLUMN_KEY, $key)
+            ->first();
+
+        if (! $model instanceof Model) {
+            return null;
+        }
+
+        return $this->toRecord($model);
+    }
+
+    public function findResolvedByScope(string $key, ?int $tenantId = null): ?DataRecord
+    {
+        if ($tenantId !== null) {
+            $tenantRecord = $this->findByTenantAndKey($tenantId, $key);
+            if ($tenantRecord instanceof DataRecord) {
+                return $tenantRecord;
+            }
+        }
+
+        return $this->findByKey($key);
+    }
+
+    public function pageByFilters(
+        ?string $prefix,
+        ?string $source,
+        int $perPage,
+        int $page,
+        ?string $scope = null,
+        ?int $tenantId = null,
+    ): PagedResult {
         $resolvedPage = $page > 0 ? $page : 1;
         $resolvedPerPage = $perPage > 0 ? $perPage : 1;
 
-        $paginator = $this->applyFilters($this->query(), $prefix, $source)
+        $resolvedScope = $scope ?? ConfigurationScope::GLOBAL;
+        $query = $resolvedScope === ConfigurationScope::TENANT && $tenantId !== null
+            ? $this->tenantQuery()->where(TenantConfigurationModel::COLUMN_TENANT_ID, $tenantId)
+            : $this->query();
+
+        $paginator = $this->applyFilters($query, $prefix, $source)
             ->paginate($resolvedPerPage, ['*'], 'page', $resolvedPage);
 
         $items = [];
@@ -53,15 +94,64 @@ final class EloquentConfigurationRepository extends EloquentRepository implement
         );
     }
 
-    public function deleteByKey(string $key): bool
+    public function upsertScoped(string $key, array $attributes, ?int $tenantId = null): DataRecord
     {
-        $model = $this->query()->where(ConfigurationModel::COLUMN_KEY, $key)->first();
+        if ($tenantId === null) {
+            $current = $this->findByKey($key);
+
+            if ($current instanceof DataRecord) {
+                return $this->update($current->id(), $attributes);
+            }
+
+            return $this->create($attributes);
+        }
+
+        $query = $this->tenantQuery()
+            ->where(TenantConfigurationModel::COLUMN_TENANT_ID, $tenantId)
+            ->where(TenantConfigurationModel::COLUMN_KEY, $key);
+
+        $existing = $query->first();
+        if ($existing instanceof Model) {
+            $existing->fill($attributes);
+            $existing->save();
+
+            return $this->toRecord($existing);
+        }
+
+        $created = $this->tenantQuery()->create($attributes);
+
+        return $this->toRecord($created);
+    }
+
+    public function deleteScopedByKey(string $key, ?int $tenantId = null): bool
+    {
+        $query = $tenantId === null
+            ? $this->query()->where(ConfigurationModel::COLUMN_KEY, $key)
+            : $this->tenantQuery()
+                ->where(TenantConfigurationModel::COLUMN_TENANT_ID, $tenantId)
+                ->where(TenantConfigurationModel::COLUMN_KEY, $key);
+
+        $model = $query->first();
 
         if (! $model instanceof Model) {
             return false;
         }
 
         return (bool) $model->delete();
+    }
+
+    protected function toRecord(Model $model): DataRecord
+    {
+        /** @var array<string, mixed> $payload */
+        $payload = $model->attributesToArray();
+
+        if (($payload[TenantConfigurationModel::COLUMN_TENANT_ID] ?? null) !== null) {
+            $payload['scope'] = ConfigurationScope::TENANT;
+        } else {
+            $payload['scope'] = ConfigurationScope::GLOBAL;
+        }
+
+        return new DataRecord($payload);
     }
 
     private function applyFilters(Builder $query, ?string $prefix, ?string $source): Builder
@@ -75,5 +165,10 @@ final class EloquentConfigurationRepository extends EloquentRepository implement
         }
 
         return $query;
+    }
+
+    private function tenantQuery(): Builder
+    {
+        return $this->tenantModel->newQuery();
     }
 }

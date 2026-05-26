@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Configuration\Domain\Services;
 
 use Modules\Configuration\Domain\Constants\ConfigurationErrorCode;
+use Modules\Configuration\Domain\Constants\ConfigurationScope;
 use Modules\Configuration\Domain\Constants\ConfigurationSource;
 use Modules\Configuration\Domain\Constants\ConfigurationValueType;
 use Modules\Configuration\Domain\Contracts\ConfigurationDomainServiceInterface;
@@ -15,6 +16,8 @@ final class ConfigurationDomainService implements ConfigurationDomainServiceInte
     private const KEY_PATTERN = '/^[a-z0-9._-]+$/i';
 
     private const SOURCE_MAX_LENGTH = 20;
+
+    private const VALUE_TYPE_MAX_LENGTH = 20;
 
     public function normalizeKey(string $key): string
     {
@@ -37,6 +40,25 @@ final class ConfigurationDomainService implements ConfigurationDomainServiceInte
 
         if (mb_strlen($resolved) > self::SOURCE_MAX_LENGTH) {
             throw new DomainException(ConfigurationErrorCode::INVALID_SOURCE . ': Source exceeds schema limit.');
+        }
+
+        if (! in_array($resolved, [ConfigurationSource::DATABASE, ConfigurationSource::ENVIRONMENT, ConfigurationSource::RUNTIME], true)) {
+            throw new DomainException(ConfigurationErrorCode::INVALID_SOURCE . ': Unsupported source value.');
+        }
+
+        return $resolved;
+    }
+
+    public function normalizeScope(?string $scope): string
+    {
+        $resolved = $scope === null ? '' : trim($scope);
+
+        if ($resolved === '') {
+            return ConfigurationScope::GLOBAL;
+        }
+
+        if (! in_array($resolved, [ConfigurationScope::GLOBAL, ConfigurationScope::TENANT, ConfigurationScope::ORGANIZATION_UNIT], true)) {
+            throw new DomainException(ConfigurationErrorCode::INVALID_SCOPE . ': Unsupported scope value.');
         }
 
         return $resolved;
@@ -124,14 +146,40 @@ final class ConfigurationDomainService implements ConfigurationDomainServiceInte
         throw new DomainException(ConfigurationErrorCode::INVALID_VALUE . ': Unsupported value type.');
     }
 
+    public function assertValueType(string $valueType): void
+    {
+        if (mb_strlen($valueType) > self::VALUE_TYPE_MAX_LENGTH) {
+            throw new DomainException(ConfigurationErrorCode::INVALID_VALUE . ': Value type exceeds schema limit.');
+        }
+
+        if (! in_array(
+            $valueType,
+            [
+                ConfigurationValueType::NULL,
+                ConfigurationValueType::STRING,
+                ConfigurationValueType::INTEGER,
+                ConfigurationValueType::FLOAT,
+                ConfigurationValueType::BOOLEAN,
+                ConfigurationValueType::JSON,
+                ConfigurationValueType::ENCRYPTED,
+            ],
+            true,
+        )) {
+            throw new DomainException(ConfigurationErrorCode::INVALID_VALUE . ': Unsupported value type.');
+        }
+    }
+
     public function deserializeValue(string $storedValue, string $valueType): mixed
     {
+        $this->assertValueType($valueType);
+
         return match ($valueType) {
             ConfigurationValueType::NULL => null,
             ConfigurationValueType::BOOLEAN => $storedValue === '1',
             ConfigurationValueType::INTEGER => (int) $storedValue,
             ConfigurationValueType::FLOAT => (float) $storedValue,
             ConfigurationValueType::JSON => json_decode($storedValue, true, 512, JSON_THROW_ON_ERROR),
+            ConfigurationValueType::ENCRYPTED => $storedValue,
             default => $storedValue,
         };
     }

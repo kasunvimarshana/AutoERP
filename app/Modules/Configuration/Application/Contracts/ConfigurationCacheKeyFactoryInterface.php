@@ -6,5 +6,5 @@ namespace Modules\Configuration\Application\Contracts;
 
 interface ConfigurationCacheKeyFactoryInterface
 {
-    public function keyForConfiguration(string $key): string;
+    public function keyForConfiguration(string $key, ?int $tenantId = null): string;
 }

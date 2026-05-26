@@ -12,6 +12,10 @@ final readonly class ConfigurationValueData
         public string $source,
         public ?string $description = null,
         public ?string $updatedAt = null,
+        public ?string $scope = null,
+        public ?int $tenantId = null,
+        public ?int $organizationUnitId = null,
+        public ?string $resolvedFrom = null,
     ) {
     }
 
@@ -26,6 +30,10 @@ final readonly class ConfigurationValueData
             'source' => $this->source,
             'description' => $this->description,
             'updated_at' => $this->updatedAt,
+            'scope' => $this->scope,
+            'tenant_id' => $this->tenantId,
+            'organization_unit_id' => $this->organizationUnitId,
+            'resolved_from' => $this->resolvedFrom,
         ];
     }
 
@@ -40,6 +48,12 @@ final readonly class ConfigurationValueData
             (string) ($payload['source'] ?? ''),
             isset($payload['description']) ? (string) $payload['description'] : null,
             isset($payload['updated_at']) ? (string) $payload['updated_at'] : null,
+            isset($payload['scope']) ? (string) $payload['scope'] : null,
+            isset($payload['tenant_id']) && is_numeric($payload['tenant_id']) ? (int) $payload['tenant_id'] : null,
+            isset($payload['organization_unit_id']) && is_numeric($payload['organization_unit_id'])
+                ? (int) $payload['organization_unit_id']
+                : null,
+            isset($payload['resolved_from']) ? (string) $payload['resolved_from'] : null,
         );
     }
 }

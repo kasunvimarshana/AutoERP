@@ -32,6 +32,10 @@ final class ConfigurationResource extends JsonResource
             'source' => null,
             'description' => null,
             'updated_at' => null,
+            'scope' => null,
+            'tenant_id' => null,
+            'organization_unit_id' => null,
+            'resolved_from' => null,
         ];
     }
 }

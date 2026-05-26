@@ -11,13 +11,19 @@ use Modules\Core\Application\Contracts\ClockInterface;
 use Modules\Core\Application\Contracts\CurrentOrganizationUnitContextAccessorInterface;
 use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Application\Contracts\CurrentUserContextAccessorInterface;
+use Modules\Core\Application\Contracts\ErrorNormalizerInterface;
+use Modules\Core\Application\Contracts\ExceptionParserInterface;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Application\Contracts\PasswordHasherInterface;
 use Modules\Core\Application\Contracts\SlugGeneratorInterface;
+use Modules\Core\Application\Contracts\TransactionManagerInterface;
 use Modules\Core\Application\Contracts\UuidGeneratorInterface;
 use Modules\Core\Infrastructure\Services\FileStorageService;
 use Modules\Core\Infrastructure\Services\PasswordHasher;
 use Modules\Core\Infrastructure\Services\SlugGenerator;
+use Modules\Core\Infrastructure\Support\ErrorNormalizer;
+use Modules\Core\Infrastructure\Support\ExceptionParser;
+use Modules\Core\Infrastructure\Support\LaravelTransactionManager;
 use Modules\Core\Infrastructure\Support\RequestCurrentOrganizationUnitContextAccessor;
 use Modules\Core\Infrastructure\Support\RequestCurrentTenantContextAccessor;
 use Modules\Core\Infrastructure\Support\LaravelUuidGenerator;
@@ -41,6 +47,9 @@ final class CoreServiceProvider extends ServiceProvider
         $this->app->bind(FileStorageServiceInterface::class, FileStorageService::class);
         $this->app->bind(PasswordHasherInterface::class, PasswordHasher::class);
         $this->app->bind(SlugGeneratorInterface::class, SlugGenerator::class);
+        $this->app->singleton(TransactionManagerInterface::class, LaravelTransactionManager::class);
+        $this->app->singleton(ExceptionParserInterface::class, ExceptionParser::class);
+        $this->app->singleton(ErrorNormalizerInterface::class, ErrorNormalizer::class);
 
         $this->app->when(FileStorageService::class)
             ->needs('$defaultDisk')
