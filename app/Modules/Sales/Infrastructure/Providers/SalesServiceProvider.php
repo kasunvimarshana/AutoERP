@@ -83,6 +83,7 @@ use Modules\Sales\Infrastructure\Persistence\Eloquent\Repositories\EloquentSales
 use Modules\Sales\Infrastructure\Persistence\Eloquent\Repositories\EloquentSalesOrderRepository;
 use Modules\Sales\Infrastructure\Persistence\Eloquent\Repositories\EloquentSalesReturnLineRepository;
 use Modules\Sales\Infrastructure\Persistence\Eloquent\Repositories\EloquentSalesReturnRepository;
+use Modules\Sales\Domain\Services\SalesLifecycleService;
 
 final class SalesServiceProvider extends ServiceProvider
 {
@@ -122,6 +123,7 @@ final class SalesServiceProvider extends ServiceProvider
                 CreateSalesReturnLineServiceInterface::class => CreateSalesReturnLineService::class,
                 UpdateSalesReturnLineServiceInterface::class => UpdateSalesReturnLineService::class,
                 DeleteSalesReturnLineServiceInterface::class => DeleteSalesReturnLineService::class,
+                SalesLifecycleService::class => SalesLifecycleService::class,
             ] as $contract => $implementation
         ) {
             $this->app->singleton($contract, $implementation);

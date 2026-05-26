@@ -12,9 +12,12 @@ use Modules\Purchase\Application\Contracts\UseCases\GrnHeaders\DeleteGrnHeaderSe
 use Modules\Purchase\Application\Contracts\UseCases\GrnHeaders\GetGrnHeaderServiceInterface;
 use Modules\Purchase\Application\Contracts\UseCases\GrnHeaders\ListGrnHeadersServiceInterface;
 use Modules\Purchase\Application\Contracts\UseCases\GrnHeaders\UpdateGrnHeaderServiceInterface;
+use Modules\Purchase\Application\DTOs\ReceiveGoodsDTO;
+use Modules\Purchase\Application\UseCases\ReceiveGoodsAction;
 use Modules\Purchase\Presentation\Http\Requests\ListGrnHeaderRequest;
 use Modules\Purchase\Presentation\Http\Requests\UpsertGrnHeaderRequest;
 use Modules\Purchase\Presentation\Http\Resources\GrnHeaderResource;
+use Throwable;
 
 final class GrnHeaderController extends Controller
 {
@@ -24,6 +27,7 @@ final class GrnHeaderController extends Controller
         private readonly CreateGrnHeaderServiceInterface $createService,
         private readonly UpdateGrnHeaderServiceInterface $updateService,
         private readonly DeleteGrnHeaderServiceInterface $deleteService,
+        private readonly ReceiveGoodsAction $receiveGoodsAction,
     ) {
     }
 
@@ -70,13 +74,13 @@ final class GrnHeaderController extends Controller
 
     public function store(UpsertGrnHeaderRequest $request): JsonResponse|GrnHeaderResource
     {
-        $result = $this->createService->execute($request->validated());
-
-        if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 422);
+        try {
+            $record = $this->receiveGoodsAction->execute(new ReceiveGoodsDTO($request->validated()));
+        } catch (Throwable $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
         }
 
-        return (new GrnHeaderResource($result->valueOrFail()))->response()->setStatusCode(201);
+        return (new GrnHeaderResource($record))->response()->setStatusCode(201);
     }
 
     public function update(UpsertGrnHeaderRequest $request, int|string $id): JsonResponse|GrnHeaderResource
@@ -102,5 +106,14 @@ final class GrnHeaderController extends Controller
         }
 
         return response()->json(null, 204);
+    }
+
+    public function confirm(int|string $id): JsonResponse|GrnHeaderResource
+    {
+        try {
+            return new GrnHeaderResource($this->receiveGoodsAction->confirm((int) $id));
+        } catch (Throwable $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
     }
 }

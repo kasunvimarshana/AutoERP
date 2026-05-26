@@ -15,6 +15,11 @@ use Modules\VehicleService\Application\Contracts\UseCases\VehicleServiceJobCards
 use Modules\VehicleService\Presentation\Http\Requests\ListVehicleServiceJobCardRequest;
 use Modules\VehicleService\Presentation\Http\Requests\UpsertVehicleServiceJobCardRequest;
 use Modules\VehicleService\Presentation\Http\Resources\VehicleServiceJobCardResource;
+use Modules\VehicleService\Application\DTOs\CompleteJobCardDTO;
+use Modules\VehicleService\Application\DTOs\CreateJobCardDTO;
+use Modules\VehicleService\Application\DTOs\CreateServiceInvoiceDTO;
+use Modules\VehicleService\Application\Orchestrators\VehicleServiceOrchestrator;
+use Throwable;
 
 final class VehicleServiceJobCardController extends Controller
 {
@@ -24,6 +29,7 @@ final class VehicleServiceJobCardController extends Controller
         private readonly CreateVehicleServiceJobCardServiceInterface $createService,
         private readonly UpdateVehicleServiceJobCardServiceInterface $updateService,
         private readonly DeleteVehicleServiceJobCardServiceInterface $deleteService,
+        private readonly VehicleServiceOrchestrator $orchestrator,
     ) {
     }
 
@@ -70,13 +76,13 @@ final class VehicleServiceJobCardController extends Controller
 
     public function store(UpsertVehicleServiceJobCardRequest $request): JsonResponse|VehicleServiceJobCardResource
     {
-        $result = $this->createService->execute($request->validated());
-
-        if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 422);
+        try {
+            return (new VehicleServiceJobCardResource(
+                $this->orchestrator->create(new CreateJobCardDTO($request->validated())),
+            ))->response()->setStatusCode(201);
+        } catch (Throwable $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
         }
-
-        return (new VehicleServiceJobCardResource($result->valueOrFail()))->response()->setStatusCode(201);
     }
 
     public function update(UpsertVehicleServiceJobCardRequest $request, int|string $id): JsonResponse|VehicleServiceJobCardResource
@@ -102,5 +108,32 @@ final class VehicleServiceJobCardController extends Controller
         }
 
         return response()->json(null, 204);
+    }
+
+    public function start(int|string $id): JsonResponse|VehicleServiceJobCardResource
+    {
+        try {
+            return new VehicleServiceJobCardResource($this->orchestrator->start((int) $id));
+        } catch (Throwable $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+    }
+
+    public function complete(int|string $id): JsonResponse|VehicleServiceJobCardResource
+    {
+        try {
+            return new VehicleServiceJobCardResource($this->orchestrator->complete(new CompleteJobCardDTO((int) $id)));
+        } catch (Throwable $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+    }
+
+    public function invoice(int|string $id): JsonResponse|VehicleServiceJobCardResource
+    {
+        try {
+            return new VehicleServiceJobCardResource($this->orchestrator->invoice(new CreateServiceInvoiceDTO((int) $id)));
+        } catch (Throwable $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
     }
 }

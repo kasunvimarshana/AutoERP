@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Infrastructure\Persistence\Eloquent\Models;
 
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\CoreModel;
 
@@ -14,6 +15,11 @@ final class PurchaseOrderModel extends CoreModel
     protected $table = 'purchase_orders';
 
     protected $guarded = ['id'];
+
+    public function lines(): HasMany
+    {
+        return $this->hasMany(PurchaseOrderLineModel::class, 'purchase_order_id');
+    }
 
     protected function casts(): array
     {

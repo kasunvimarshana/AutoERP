@@ -7,6 +7,8 @@ use Modules\Sales\Presentation\Http\Controllers\SalesOrderController;
 use Modules\Sales\Presentation\Http\Controllers\SalesOrderLineController;
 use Modules\Sales\Presentation\Http\Controllers\GdnHeaderController;
 use Modules\Sales\Presentation\Http\Controllers\GdnLineController;
+use Modules\Sales\Presentation\Http\Controllers\SalesInvoiceController;
+use Modules\Sales\Presentation\Http\Controllers\SalesPaymentController;
 use Modules\Sales\Presentation\Http\Controllers\SalesReturnController;
 use Modules\Sales\Presentation\Http\Controllers\SalesReturnLineController;
 
@@ -28,6 +30,16 @@ Route::prefix('api/sales')
     ])
     ->name('sales.')
     ->group(function (): void {
+        Route::patch('sales-orders/{sales_order}/confirm', [SalesOrderController::class, 'confirm'])
+            ->name('sales-orders.confirm');
+        Route::patch('gdn-headers/{gdn_header}/confirm', [GdnHeaderController::class, 'confirm'])
+            ->name('gdn-headers.confirm');
+        Route::patch('sales-returns/{sales_return}/approve', [SalesReturnController::class, 'approve'])
+            ->name('sales-returns.approve');
+        Route::post('sales-invoices', [SalesInvoiceController::class, 'store'])->name('sales-invoices.store');
+        Route::patch('sales-invoices/{invoice}/approve', [SalesInvoiceController::class, 'approve'])
+            ->name('sales-invoices.approve');
+        Route::post('sales-payments', [SalesPaymentController::class, 'store'])->name('sales-payments.store');
         Route::apiResource('sales-orders', SalesOrderController::class);
         Route::apiResource('sales-order-lines', SalesOrderLineController::class);
         Route::apiResource('gdn-headers', GdnHeaderController::class);

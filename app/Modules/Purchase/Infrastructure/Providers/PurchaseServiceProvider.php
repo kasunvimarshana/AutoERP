@@ -41,6 +41,14 @@ use Modules\Purchase\Application\Repositories\PurchaseOrderLineRepositoryInterfa
 use Modules\Purchase\Application\Repositories\PurchaseOrderRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchaseReturnLineRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchaseReturnRepositoryInterface;
+use Modules\Purchase\Application\UseCases\ConfirmPurchaseOrderAction;
+use Modules\Purchase\Application\UseCases\CreateAdvancePaymentAction;
+use Modules\Purchase\Application\UseCases\CreatePurchaseInvoiceAction;
+use Modules\Purchase\Application\UseCases\CreatePurchaseOrderAction;
+use Modules\Purchase\Application\UseCases\CreatePurchasePaymentAction;
+use Modules\Purchase\Application\UseCases\CreatePurchaseReturnAction;
+use Modules\Purchase\Application\UseCases\ReceiveGoodsAction;
+use Modules\Purchase\Application\UseCases\ReverseTransactionAction;
 use Modules\Purchase\Application\UseCases\GrnHeaders\CreateGrnHeaderService;
 use Modules\Purchase\Application\UseCases\GrnHeaders\DeleteGrnHeaderService;
 use Modules\Purchase\Application\UseCases\GrnHeaders\GetGrnHeaderService;
@@ -79,10 +87,21 @@ use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\PurchaseReturnLi
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\PurchaseReturnModel;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentGrnHeaderRepository;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentGrnLineRepository;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentPurchaseAggregateRepository;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentPurchaseOrderLineRepository;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentPurchaseOrderRepository;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentPurchaseReturnLineRepository;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentPurchaseReturnRepository;
+use Modules\Purchase\Domain\Repositories\PurchaseAggregateRepositoryInterface;
+use Modules\Purchase\Domain\Services\GoodsReceiptService;
+use Modules\Purchase\Domain\Services\PurchaseAdvancePaymentService;
+use Modules\Purchase\Domain\Services\PurchaseInvoiceService;
+use Modules\Purchase\Domain\Services\PurchaseOrderService;
+use Modules\Purchase\Domain\Services\PurchasePaymentService;
+use Modules\Purchase\Domain\Services\PurchaseReturnService;
+use Modules\Purchase\Domain\Services\PurchaseReversalService;
+use Modules\Purchase\Domain\Services\PurchaseTotalsService;
+use Modules\Purchase\Domain\Services\TaxCalculationService;
 
 final class PurchaseServiceProvider extends ServiceProvider
 {
@@ -122,6 +141,23 @@ final class PurchaseServiceProvider extends ServiceProvider
                 CreatePurchaseReturnLineServiceInterface::class => CreatePurchaseReturnLineService::class,
                 UpdatePurchaseReturnLineServiceInterface::class => UpdatePurchaseReturnLineService::class,
                 DeletePurchaseReturnLineServiceInterface::class => DeletePurchaseReturnLineService::class,
+                PurchaseTotalsService::class => PurchaseTotalsService::class,
+                TaxCalculationService::class => TaxCalculationService::class,
+                PurchaseOrderService::class => PurchaseOrderService::class,
+                GoodsReceiptService::class => GoodsReceiptService::class,
+                PurchaseInvoiceService::class => PurchaseInvoiceService::class,
+                PurchasePaymentService::class => PurchasePaymentService::class,
+                PurchaseReturnService::class => PurchaseReturnService::class,
+                PurchaseReversalService::class => PurchaseReversalService::class,
+                PurchaseAdvancePaymentService::class => PurchaseAdvancePaymentService::class,
+                CreateAdvancePaymentAction::class => CreateAdvancePaymentAction::class,
+                CreatePurchaseOrderAction::class => CreatePurchaseOrderAction::class,
+                ConfirmPurchaseOrderAction::class => ConfirmPurchaseOrderAction::class,
+                ReceiveGoodsAction::class => ReceiveGoodsAction::class,
+                CreatePurchaseInvoiceAction::class => CreatePurchaseInvoiceAction::class,
+                CreatePurchasePaymentAction::class => CreatePurchasePaymentAction::class,
+                CreatePurchaseReturnAction::class => CreatePurchaseReturnAction::class,
+                ReverseTransactionAction::class => ReverseTransactionAction::class,
             ] as $contract => $implementation
         ) {
             $this->app->singleton($contract, $implementation);
@@ -145,6 +181,7 @@ final class PurchaseServiceProvider extends ServiceProvider
         $this->app->singleton(PurchaseReturnLineRepositoryInterface::class, function (): PurchaseReturnLineRepositoryInterface {
             return new EloquentPurchaseReturnLineRepository(new PurchaseReturnLineModel());
         });
+        $this->app->singleton(PurchaseAggregateRepositoryInterface::class, EloquentPurchaseAggregateRepository::class);
     }
 
     public function boot(): void

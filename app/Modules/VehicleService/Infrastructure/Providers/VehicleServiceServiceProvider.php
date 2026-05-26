@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\VehicleService\Infrastructure\Providers;
 
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Modules\VehicleService\Application\Contracts\UseCases\VehicleServiceDiagnosticLines\CreateVehicleServiceDiagnosticLineServiceInterface;
 use Modules\VehicleService\Application\Contracts\UseCases\VehicleServiceDiagnosticLines\DeleteVehicleServiceDiagnosticLineServiceInterface;
@@ -135,6 +136,16 @@ use Modules\VehicleService\Infrastructure\Persistence\Eloquent\Repositories\Eloq
 use Modules\VehicleService\Infrastructure\Persistence\Eloquent\Repositories\EloquentVehicleServiceLaborItemRepository;
 use Modules\VehicleService\Infrastructure\Persistence\Eloquent\Repositories\EloquentVehicleServiceNonInventoryItemRepository;
 use Modules\VehicleService\Infrastructure\Persistence\Eloquent\Repositories\EloquentVehicleServiceTypeRepository;
+use Modules\VehicleService\Domain\Events\JobCardCompleted;
+use Modules\VehicleService\Domain\Events\JobCardCreated;
+use Modules\VehicleService\Domain\Events\ServiceInvoicePosted;
+use Modules\VehicleService\Domain\Services\VehicleServiceLifecycleService;
+use Modules\VehicleService\Domain\Services\VehicleServiceCalculationService;
+use Modules\VehicleService\Application\Orchestrators\VehicleServiceOrchestrator;
+use Modules\VehicleService\Infrastructure\Listeners\ConsumeInventoryForJobCard;
+use Modules\VehicleService\Infrastructure\Listeners\RecordServiceInvoicePosted;
+use Modules\VehicleService\Infrastructure\Listeners\UpdateVehicleStatusToActive;
+use Modules\VehicleService\Infrastructure\Listeners\UpdateVehicleStatusToInService;
 
 final class VehicleServiceServiceProvider extends ServiceProvider
 {
@@ -194,6 +205,9 @@ final class VehicleServiceServiceProvider extends ServiceProvider
                 CreateVehicleServiceInspectionLineServiceInterface::class => CreateVehicleServiceInspectionLineService::class,
                 UpdateVehicleServiceInspectionLineServiceInterface::class => UpdateVehicleServiceInspectionLineService::class,
                 DeleteVehicleServiceInspectionLineServiceInterface::class => DeleteVehicleServiceInspectionLineService::class,
+                VehicleServiceLifecycleService::class => VehicleServiceLifecycleService::class,
+                VehicleServiceCalculationService::class => VehicleServiceCalculationService::class,
+                VehicleServiceOrchestrator::class => VehicleServiceOrchestrator::class,
             ] as $contract => $implementation
         ) {
             $this->app->singleton($contract, $implementation);
@@ -235,5 +249,9 @@ final class VehicleServiceServiceProvider extends ServiceProvider
     {
         $this->loadRoutesFrom(__DIR__ . '/../../routes/api.php');
         $this->loadMigrationsFrom(__DIR__ . '/../Persistence/Eloquent/Migrations');
+        Event::listen(JobCardCreated::class, UpdateVehicleStatusToInService::class);
+        Event::listen(JobCardCompleted::class, ConsumeInventoryForJobCard::class);
+        Event::listen(JobCardCompleted::class, UpdateVehicleStatusToActive::class);
+        Event::listen(ServiceInvoicePosted::class, RecordServiceInvoicePosted::class);
     }
 }

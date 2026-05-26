@@ -12,9 +12,14 @@ use Modules\Purchase\Application\Contracts\UseCases\PurchaseOrders\DeletePurchas
 use Modules\Purchase\Application\Contracts\UseCases\PurchaseOrders\GetPurchaseOrderServiceInterface;
 use Modules\Purchase\Application\Contracts\UseCases\PurchaseOrders\ListPurchaseOrdersServiceInterface;
 use Modules\Purchase\Application\Contracts\UseCases\PurchaseOrders\UpdatePurchaseOrderServiceInterface;
+use Modules\Purchase\Application\DTOs\CreatePurchaseOrderDTO;
+use Modules\Purchase\Application\UseCases\ConfirmPurchaseOrderAction;
+use Modules\Purchase\Application\UseCases\CreatePurchaseOrderAction;
 use Modules\Purchase\Presentation\Http\Requests\ListPurchaseOrderRequest;
 use Modules\Purchase\Presentation\Http\Requests\UpsertPurchaseOrderRequest;
 use Modules\Purchase\Presentation\Http\Resources\PurchaseOrderResource;
+use Modules\Purchase\Domain\Services\PurchaseOrderService;
+use Throwable;
 
 final class PurchaseOrderController extends Controller
 {
@@ -24,6 +29,9 @@ final class PurchaseOrderController extends Controller
         private readonly CreatePurchaseOrderServiceInterface $createService,
         private readonly UpdatePurchaseOrderServiceInterface $updateService,
         private readonly DeletePurchaseOrderServiceInterface $deleteService,
+        private readonly CreatePurchaseOrderAction $createPurchaseOrderAction,
+        private readonly ConfirmPurchaseOrderAction $confirmPurchaseOrderAction,
+        private readonly PurchaseOrderService $purchaseOrderService,
     ) {
     }
 
@@ -70,27 +78,24 @@ final class PurchaseOrderController extends Controller
 
     public function store(UpsertPurchaseOrderRequest $request): JsonResponse|PurchaseOrderResource
     {
-        $result = $this->createService->execute($request->validated());
-
-        if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 422);
+        try {
+            $record = $this->createPurchaseOrderAction->execute(new CreatePurchaseOrderDTO($request->validated()));
+        } catch (Throwable $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
         }
 
-        return (new PurchaseOrderResource($result->valueOrFail()))->response()->setStatusCode(201);
+        return (new PurchaseOrderResource($record))->response()->setStatusCode(201);
     }
 
     public function update(UpsertPurchaseOrderRequest $request, int|string $id): JsonResponse|PurchaseOrderResource
     {
-        $result = $this->updateService->execute($id, $request->validated());
-
-        if ($result->isFailure()) {
-            $error = $result->errorOrFail();
-            $status = $error->code === 'PURCHASE_NOT_FOUND' ? 404 : 422;
-
-            return response()->json(['message' => $error->message], $status);
+        try {
+            $record = $this->purchaseOrderService->update((int) $id, $request->validated());
+        } catch (Throwable $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
         }
 
-        return new PurchaseOrderResource($result->valueOrFail());
+        return new PurchaseOrderResource($record);
     }
 
     public function destroy(int|string $id): JsonResponse
@@ -102,5 +107,23 @@ final class PurchaseOrderController extends Controller
         }
 
         return response()->json(null, 204);
+    }
+
+    public function confirm(int|string $id): JsonResponse|PurchaseOrderResource
+    {
+        try {
+            return new PurchaseOrderResource($this->confirmPurchaseOrderAction->execute((int) $id));
+        } catch (Throwable $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+    }
+
+    public function cancel(int|string $id): JsonResponse|PurchaseOrderResource
+    {
+        try {
+            return new PurchaseOrderResource($this->purchaseOrderService->cancel((int) $id));
+        } catch (Throwable $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
     }
 }

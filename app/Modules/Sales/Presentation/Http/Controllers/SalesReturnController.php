@@ -15,6 +15,8 @@ use Modules\Sales\Application\Contracts\UseCases\SalesReturns\UpdateSalesReturnS
 use Modules\Sales\Presentation\Http\Requests\ListSalesReturnRequest;
 use Modules\Sales\Presentation\Http\Requests\UpsertSalesReturnRequest;
 use Modules\Sales\Presentation\Http\Resources\SalesReturnResource;
+use Modules\Sales\Domain\Services\SalesLifecycleService;
+use Throwable;
 
 final class SalesReturnController extends Controller
 {
@@ -24,6 +26,7 @@ final class SalesReturnController extends Controller
         private readonly CreateSalesReturnServiceInterface $createService,
         private readonly UpdateSalesReturnServiceInterface $updateService,
         private readonly DeleteSalesReturnServiceInterface $deleteService,
+        private readonly SalesLifecycleService $lifecycle,
     ) {
     }
 
@@ -102,5 +105,14 @@ final class SalesReturnController extends Controller
         }
 
         return response()->json(null, 204);
+    }
+
+    public function approve(int|string $id): JsonResponse|SalesReturnResource
+    {
+        try {
+            return new SalesReturnResource($this->lifecycle->approveReturn((int) $id));
+        } catch (Throwable $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
     }
 }

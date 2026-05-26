@@ -15,6 +15,8 @@ use Modules\Sales\Application\Contracts\UseCases\GdnHeaders\UpdateGdnHeaderServi
 use Modules\Sales\Presentation\Http\Requests\ListGdnHeaderRequest;
 use Modules\Sales\Presentation\Http\Requests\UpsertGdnHeaderRequest;
 use Modules\Sales\Presentation\Http\Resources\GdnHeaderResource;
+use Modules\Sales\Domain\Services\SalesLifecycleService;
+use Throwable;
 
 final class GdnHeaderController extends Controller
 {
@@ -24,6 +26,7 @@ final class GdnHeaderController extends Controller
         private readonly CreateGdnHeaderServiceInterface $createService,
         private readonly UpdateGdnHeaderServiceInterface $updateService,
         private readonly DeleteGdnHeaderServiceInterface $deleteService,
+        private readonly SalesLifecycleService $lifecycle,
     ) {
     }
 
@@ -102,5 +105,14 @@ final class GdnHeaderController extends Controller
         }
 
         return response()->json(null, 204);
+    }
+
+    public function confirm(int|string $id): JsonResponse|GdnHeaderResource
+    {
+        try {
+            return new GdnHeaderResource($this->lifecycle->confirmGdn((int) $id));
+        } catch (Throwable $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
     }
 }

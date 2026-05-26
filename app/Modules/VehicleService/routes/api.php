@@ -13,6 +13,7 @@ use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceDiagnosti
 use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceDiagnosticLineController;
 use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceInspectionController;
 use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceInspectionLineController;
+use Modules\VehicleService\Presentation\Http\Controllers\VehicleServicePaymentController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');
@@ -32,6 +33,14 @@ Route::prefix('api/vehicle-service')
     ])
     ->name('vehicleservice.')
     ->group(function (): void {
+        Route::patch('vehicle-service-job-cards/{job_card}/start', [VehicleServiceJobCardController::class, 'start'])
+            ->name('vehicle-service-job-cards.start');
+        Route::patch('vehicle-service-job-cards/{job_card}/complete', [VehicleServiceJobCardController::class, 'complete'])
+            ->name('vehicle-service-job-cards.complete');
+        Route::post('vehicle-service-job-cards/{job_card}/invoice', [VehicleServiceJobCardController::class, 'invoice'])
+            ->name('vehicle-service-job-cards.invoice');
+        Route::post('vehicle-service-payments', [VehicleServicePaymentController::class, 'store'])
+            ->name('vehicle-service-payments.store');
         Route::apiResource('vehicle-service-types', VehicleServiceTypeController::class);
         Route::apiResource('vehicle-service-job-cards', VehicleServiceJobCardController::class);
         Route::apiResource('vehicle-service-job-card-lines', VehicleServiceJobCardLineController::class);

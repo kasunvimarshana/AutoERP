@@ -15,6 +15,8 @@ use Modules\Sales\Application\Contracts\UseCases\SalesOrders\UpdateSalesOrderSer
 use Modules\Sales\Presentation\Http\Requests\ListSalesOrderRequest;
 use Modules\Sales\Presentation\Http\Requests\UpsertSalesOrderRequest;
 use Modules\Sales\Presentation\Http\Resources\SalesOrderResource;
+use Modules\Sales\Domain\Services\SalesLifecycleService;
+use Throwable;
 
 final class SalesOrderController extends Controller
 {
@@ -24,6 +26,7 @@ final class SalesOrderController extends Controller
         private readonly CreateSalesOrderServiceInterface $createService,
         private readonly UpdateSalesOrderServiceInterface $updateService,
         private readonly DeleteSalesOrderServiceInterface $deleteService,
+        private readonly SalesLifecycleService $lifecycle,
     ) {
     }
 
@@ -102,5 +105,14 @@ final class SalesOrderController extends Controller
         }
 
         return response()->json(null, 204);
+    }
+
+    public function confirm(int|string $id): JsonResponse|SalesOrderResource
+    {
+        try {
+            return new SalesOrderResource($this->lifecycle->confirmSalesOrder((int) $id));
+        } catch (Throwable $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
     }
 }

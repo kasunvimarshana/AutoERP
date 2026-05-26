@@ -12,9 +12,12 @@ use Modules\Purchase\Application\Contracts\UseCases\PurchaseReturns\DeletePurcha
 use Modules\Purchase\Application\Contracts\UseCases\PurchaseReturns\GetPurchaseReturnServiceInterface;
 use Modules\Purchase\Application\Contracts\UseCases\PurchaseReturns\ListPurchaseReturnsServiceInterface;
 use Modules\Purchase\Application\Contracts\UseCases\PurchaseReturns\UpdatePurchaseReturnServiceInterface;
+use Modules\Purchase\Application\DTOs\CreatePurchaseReturnDTO;
+use Modules\Purchase\Application\UseCases\CreatePurchaseReturnAction;
 use Modules\Purchase\Presentation\Http\Requests\ListPurchaseReturnRequest;
 use Modules\Purchase\Presentation\Http\Requests\UpsertPurchaseReturnRequest;
 use Modules\Purchase\Presentation\Http\Resources\PurchaseReturnResource;
+use Throwable;
 
 final class PurchaseReturnController extends Controller
 {
@@ -24,6 +27,7 @@ final class PurchaseReturnController extends Controller
         private readonly CreatePurchaseReturnServiceInterface $createService,
         private readonly UpdatePurchaseReturnServiceInterface $updateService,
         private readonly DeletePurchaseReturnServiceInterface $deleteService,
+        private readonly CreatePurchaseReturnAction $createPurchaseReturnAction,
     ) {
     }
 
@@ -70,13 +74,13 @@ final class PurchaseReturnController extends Controller
 
     public function store(UpsertPurchaseReturnRequest $request): JsonResponse|PurchaseReturnResource
     {
-        $result = $this->createService->execute($request->validated());
-
-        if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 422);
+        try {
+            $record = $this->createPurchaseReturnAction->execute(new CreatePurchaseReturnDTO($request->validated()));
+        } catch (Throwable $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
         }
 
-        return (new PurchaseReturnResource($result->valueOrFail()))->response()->setStatusCode(201);
+        return (new PurchaseReturnResource($record))->response()->setStatusCode(201);
     }
 
     public function update(UpsertPurchaseReturnRequest $request, int|string $id): JsonResponse|PurchaseReturnResource
@@ -102,5 +106,14 @@ final class PurchaseReturnController extends Controller
         }
 
         return response()->json(null, 204);
+    }
+
+    public function approve(int|string $id): JsonResponse|PurchaseReturnResource
+    {
+        try {
+            return new PurchaseReturnResource($this->createPurchaseReturnAction->approve((int) $id));
+        } catch (Throwable $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
     }
 }
