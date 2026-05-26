@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Application\UseCases;
 
+use Modules\Core\Application\Contracts\ErrorNormalizerInterface;
+use Modules\Core\Application\Contracts\TransactionManagerInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Modules\Tenant\Application\Events\TenantStatusChanged;
@@ -19,29 +21,37 @@ final class SuspendTenantService implements SuspendTenantServiceInterface
     public function __construct(
         private readonly TenantRepositoryInterface $tenants,
         private readonly TenantRecordMapperInterface $mapper,
+        private readonly TransactionManagerInterface $transactions,
+        private readonly ErrorNormalizerInterface $errorNormalizer,
     ) {
     }
 
     public function execute(int|string $id): Result
     {
         try {
-            $existing = $this->tenants->findById($id);
+            return $this->transactions->runInTransaction(function () use ($id): Result {
+                $existing = $this->tenants->findById($id);
 
-            if ($existing === null) {
-                return Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant not found.'));
-            }
+                if ($existing === null) {
+                    return Result::failure(new Error(TenantErrorCode::NOT_FOUND, 'Tenant not found.'));
+                }
 
-            $record = $this->tenants->update($id, [
-                'status' => TenantStatus::SUSPENDED,
-                'is_active' => false,
-                'row_version' => ((int) $existing->get('row_version', 1)) + 1,
-            ]);
+                $record = $this->tenants->update($id, [
+                    'status' => TenantStatus::SUSPENDED,
+                    'is_active' => false,
+                    'row_version' => ((int) $existing->get('row_version', 1)) + 1,
+                ]);
 
-            $this->dispatchEvent(new TenantStatusChanged($record->id(), TenantStatus::SUSPENDED, false));
+                $this->dispatchEvent(new TenantStatusChanged($record->id(), TenantStatus::SUSPENDED, false));
 
-            return Result::success($this->mapper->toValueData($record));
+                return Result::success($this->mapper->toValueData($record));
+            });
         } catch (Throwable $exception) {
-            return Result::failure(new Error(TenantErrorCode::INVALID_VALUE, $exception->getMessage()));
+            return Result::failure($this->errorNormalizer->normalize(
+                $exception,
+                TenantErrorCode::INVALID_VALUE,
+                ['operation' => 'tenant.suspend', 'tenant_id' => (string) $id],
+            ));
         }
     }
 

@@ -6,7 +6,9 @@ namespace Modules\Tenant\Application\UseCases;
 
 use DateTimeImmutable;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
+use Modules\Core\Application\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Application\Contracts\SlugGeneratorInterface;
+use Modules\Core\Application\Contracts\TransactionManagerInterface;
 use Modules\Core\Application\Contracts\UuidGeneratorInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
@@ -28,6 +30,8 @@ final class CreateTenantService implements CreateTenantServiceInterface
         private readonly SlugGeneratorInterface $slugger,
         private readonly UuidGeneratorInterface $uuidGenerator,
         private readonly FileStorageServiceInterface $files,
+        private readonly TransactionManagerInterface $transactions,
+        private readonly ErrorNormalizerInterface $errorNormalizer,
     ) {
     }
 
@@ -37,60 +41,66 @@ final class CreateTenantService implements CreateTenantServiceInterface
     public function execute(array $payload): Result
     {
         try {
-            $input = TenantMutationData::fromArray($payload);
-            $code = $this->domain->normalizeCode($input->code);
-            $name = $this->domain->normalizeName($input->name);
+            return $this->transactions->runInTransaction(function () use ($payload): Result {
+                $input = TenantMutationData::fromArray($payload);
+                $code = $this->domain->normalizeCode($input->code);
+                $name = $this->domain->normalizeName($input->name);
 
-            if ($this->tenants->findByCode($code) !== null) {
-                return Result::failure(new Error(TenantErrorCode::DUPLICATE_CODE, 'Tenant code already exists.'));
-            }
+                if ($this->tenants->findByCode($code) !== null) {
+                    return Result::failure(new Error(TenantErrorCode::DUPLICATE_CODE, 'Tenant code already exists.'));
+                }
 
-            $slug = $this->slugger->generate($input->slug, $name, $code);
-            $status = $this->domain->normalizeStatus($input->status);
-            $isIsolated = $input->isIsolated;
-            $isolationKey = $this->domain->ensureIsolationKey(
-                $isIsolated,
-                $input->isolationKey,
-                sprintf('tenant:%s', $slug),
-            );
-
-            if ($isolationKey !== null && $this->tenants->findByIsolationKey($isolationKey) !== null) {
-                return Result::failure(
-                    new Error(TenantErrorCode::DUPLICATE_ISOLATION_KEY, 'Tenant isolation key already exists.'),
+                $slug = $this->slugger->generate($input->slug, $name, $code);
+                $status = $this->domain->normalizeStatus($input->status);
+                $isIsolated = $input->isIsolated;
+                $isolationKey = $this->domain->ensureIsolationKey(
+                    $isIsolated,
+                    $input->isolationKey,
+                    sprintf('tenant:%s', $slug),
                 );
-            }
 
-            $logoPath = $input->logoPath;
-            if ($input->logoTmpPath !== null) {
-                $logoPath = $this->storeLogo($input->logoTmpPath, $input->logoOriginalName, $slug);
-            }
+                if ($isolationKey !== null && $this->tenants->findByIsolationKey($isolationKey) !== null) {
+                    return Result::failure(
+                        new Error(TenantErrorCode::DUPLICATE_ISOLATION_KEY, 'Tenant isolation key already exists.'),
+                    );
+                }
 
-            $record = $this->tenants->create([
-                'uuid' => $this->uuidGenerator->generate(),
-                'code' => $code,
-                'name' => $name,
-                'slug' => $slug,
-                'logo_path' => $this->domain->normalizeOptionalText($logoPath),
-                'cross_org_transactions' => $input->crossOrgTransactions,
-                'tenant_plan_id' => $input->tenantPlanId,
-                'currency_id' => $input->currencyId,
-                'status' => $status,
-                'trial_ends_at' => $this->normalizeNullableDateTime($input->trialEndsAt),
-                'subscription_ends_at' => $this->normalizeNullableDateTime($input->subscriptionEndsAt),
-                'is_active' => $this->domain->deriveActiveFlag($status),
-                'is_isolated' => $isIsolated,
-                'isolation_key' => $isolationKey,
-                'configuration_scope' => $this->domain->normalizeOptionalText($input->configurationScope)
-                    ?? strtolower($code),
-                'metadata' => $this->domain->normalizeMetadata($input->metadata),
-                'row_version' => 1,
-            ]);
+                $logoPath = $input->logoPath;
+                if ($input->logoTmpPath !== null) {
+                    $logoPath = $this->storeLogo($input->logoTmpPath, $input->logoOriginalName, $slug);
+                }
 
-            $this->dispatchEvent(new TenantCreated($record->id(), $code));
+                $record = $this->tenants->create([
+                    'uuid' => $this->uuidGenerator->generate(),
+                    'code' => $code,
+                    'name' => $name,
+                    'slug' => $slug,
+                    'logo_path' => $this->domain->normalizeOptionalText($logoPath),
+                    'cross_org_transactions' => $input->crossOrgTransactions,
+                    'tenant_plan_id' => $input->tenantPlanId,
+                    'currency_id' => $input->currencyId,
+                    'status' => $status,
+                    'trial_ends_at' => $this->normalizeNullableDateTime($input->trialEndsAt),
+                    'subscription_ends_at' => $this->normalizeNullableDateTime($input->subscriptionEndsAt),
+                    'is_active' => $this->domain->deriveActiveFlag($status),
+                    'is_isolated' => $isIsolated,
+                    'isolation_key' => $isolationKey,
+                    'configuration_scope' => $this->domain->normalizeOptionalText($input->configurationScope)
+                        ?? strtolower($code),
+                    'metadata' => $this->domain->normalizeMetadata($input->metadata),
+                    'row_version' => 1,
+                ]);
 
-            return Result::success($this->mapper->toValueData($record));
+                $this->dispatchEvent(new TenantCreated($record->id(), $code));
+
+                return Result::success($this->mapper->toValueData($record));
+            });
         } catch (Throwable $exception) {
-            return Result::failure(new Error(TenantErrorCode::INVALID_VALUE, $exception->getMessage()));
+            return Result::failure($this->errorNormalizer->normalize(
+                $exception,
+                TenantErrorCode::INVALID_VALUE,
+                ['operation' => 'tenant.create'],
+            ));
         }
     }
 

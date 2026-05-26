@@ -63,6 +63,14 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
         }
 
         $authenticatedTenantId = $this->resolveAuthenticatedTenantId($request);
+        if (
+            $this->enforceAuthenticatedTenantMatch()
+            && $authenticatedTenantId !== null
+            && $authenticatedTenantId !== $resolvedTenantId
+        ) {
+            return false;
+        }
+
         if ($authenticatedTenantId !== null && $authenticatedTenantId === $resolvedTenantId) {
             return true;
         }
@@ -88,43 +96,83 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
         }
 
         foreach ($this->configArray('id_header_keys', ['X-Tenant-Id']) as $key) {
-            $contexts[] = $this->contextFromTenantIdSignal($request->headers->get($key), $applicationId, 'request_metadata');
+            $contexts[] = $this->contextFromTenantIdSignal(
+                $request->headers->get($key),
+                $applicationId,
+                'request_metadata',
+            );
         }
 
         foreach ($this->configArray('code_input_keys', ['tenant_code']) as $key) {
-            $contexts[] = $this->contextFromRecordSignal($this->stringSignal($request->input($key)), 'code', $applicationId);
+            $contexts[] = $this->contextFromRecordSignal(
+                $this->stringSignal($request->input($key)),
+                'code',
+                $applicationId,
+            );
         }
 
         foreach ($this->configArray('code_route_keys', ['tenant', 'tenant_code']) as $key) {
-            $contexts[] = $this->contextFromRecordSignal($this->stringSignal($request->route($key)), 'code', $applicationId);
+            $contexts[] = $this->contextFromRecordSignal(
+                $this->stringSignal($request->route($key)),
+                'code',
+                $applicationId,
+            );
         }
 
         foreach ($this->configArray('code_header_keys', ['X-Tenant-Code']) as $key) {
-            $contexts[] = $this->contextFromRecordSignal($this->stringSignal($request->headers->get($key)), 'code', $applicationId);
+            $contexts[] = $this->contextFromRecordSignal(
+                $this->stringSignal($request->headers->get($key)),
+                'code',
+                $applicationId,
+            );
         }
 
         foreach ($this->configArray('uuid_input_keys', ['tenant_uuid']) as $key) {
-            $contexts[] = $this->contextFromRecordSignal($this->stringSignal($request->input($key)), 'uuid', $applicationId);
+            $contexts[] = $this->contextFromRecordSignal(
+                $this->stringSignal($request->input($key)),
+                'uuid',
+                $applicationId,
+            );
         }
 
         foreach ($this->configArray('uuid_route_keys', ['tenant_uuid']) as $key) {
-            $contexts[] = $this->contextFromRecordSignal($this->stringSignal($request->route($key)), 'uuid', $applicationId);
+            $contexts[] = $this->contextFromRecordSignal(
+                $this->stringSignal($request->route($key)),
+                'uuid',
+                $applicationId,
+            );
         }
 
         foreach ($this->configArray('uuid_header_keys', ['X-Tenant-Uuid']) as $key) {
-            $contexts[] = $this->contextFromRecordSignal($this->stringSignal($request->headers->get($key)), 'uuid', $applicationId);
+            $contexts[] = $this->contextFromRecordSignal(
+                $this->stringSignal($request->headers->get($key)),
+                'uuid',
+                $applicationId,
+            );
         }
 
         foreach ($this->configArray('isolation_key_input_keys', ['tenant_isolation_key']) as $key) {
-            $contexts[] = $this->contextFromRecordSignal($this->stringSignal($request->input($key)), 'isolation', $applicationId);
+            $contexts[] = $this->contextFromRecordSignal(
+                $this->stringSignal($request->input($key)),
+                'isolation',
+                $applicationId,
+            );
         }
 
         foreach ($this->configArray('isolation_key_route_keys', ['tenant_isolation_key']) as $key) {
-            $contexts[] = $this->contextFromRecordSignal($this->stringSignal($request->route($key)), 'isolation', $applicationId);
+            $contexts[] = $this->contextFromRecordSignal(
+                $this->stringSignal($request->route($key)),
+                'isolation',
+                $applicationId,
+            );
         }
 
         foreach ($this->configArray('isolation_key_header_keys', ['X-Tenant-Isolation-Key']) as $key) {
-            $contexts[] = $this->contextFromRecordSignal($this->stringSignal($request->headers->get($key)), 'isolation', $applicationId);
+            $contexts[] = $this->contextFromRecordSignal(
+                $this->stringSignal($request->headers->get($key)),
+                'isolation',
+                $applicationId,
+            );
         }
 
         foreach ($this->configArray('domain_input_keys', ['tenant_domain']) as $key) {
@@ -132,10 +180,16 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
         }
 
         foreach ($this->configArray('domain_header_keys', ['X-Tenant-Domain']) as $key) {
-            $contexts[] = $this->contextFromDomainSignal($this->stringSignal($request->headers->get($key)), $applicationId);
+            $contexts[] = $this->contextFromDomainSignal(
+                $this->stringSignal($request->headers->get($key)),
+                $applicationId,
+            );
         }
 
-        $contexts = array_values(array_filter($contexts, static fn ($context): bool => $context instanceof CurrentTenantContext));
+        $contexts = array_values(array_filter(
+            $contexts,
+            static fn ($context): bool => $context instanceof CurrentTenantContext,
+        ));
 
         if ($contexts === []) {
             return null;
@@ -184,8 +238,11 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
         return $this->toContext($tenant, $applicationId, 'request_host', $host);
     }
 
-    private function contextFromTenantIdSignal(mixed $value, ?string $applicationId, string $source): ?CurrentTenantContext
-    {
+    private function contextFromTenantIdSignal(
+        mixed $value,
+        ?string $applicationId,
+        string $source,
+    ): ?CurrentTenantContext {
         if ($value === null || $value === '') {
             return null;
         }
@@ -203,8 +260,11 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
         return $this->toContext($tenant, $applicationId, $source);
     }
 
-    private function contextFromRecordSignal(?string $value, string $type, ?string $applicationId): ?CurrentTenantContext
-    {
+    private function contextFromRecordSignal(
+        ?string $value,
+        string $type,
+        ?string $applicationId,
+    ): ?CurrentTenantContext {
         if ($value === null) {
             return null;
         }
@@ -215,6 +275,13 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
             'isolation' => $this->tenants->findByIsolationKey($value),
             default => null,
         };
+
+        if ($tenant === null && $type === 'code') {
+            $tenantId = $this->toNullableInt($value);
+            if ($tenantId !== null) {
+                $tenant = $this->tenants->findById($tenantId);
+            }
+        }
 
         if ($tenant === null) {
             throw new CurrentTenantContextResolutionException('Requested tenant could not be resolved.');
@@ -288,7 +355,12 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
             }
         }
 
-        foreach ($this->configArray('application_header_keys', ['X-Application-Id', 'X-App-Id', 'X-Client-Id']) as $key) {
+        $applicationHeaderKeys = $this->configArray(
+            'application_header_keys',
+            ['X-Application-Id', 'X-App-Id', 'X-Client-Id'],
+        );
+
+        foreach ($applicationHeaderKeys as $key) {
             $value = $request->headers->get($key);
             if (is_string($value) && trim($value) !== '') {
                 return trim($value);
@@ -469,5 +541,10 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
 
         /** @var list<string> $values */
         return array_values(array_unique($values));
+    }
+
+    private function enforceAuthenticatedTenantMatch(): bool
+    {
+        return (bool) config('tenant.resolution.enforce_authenticated_tenant_match', true);
     }
 }
