@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Modules\Invoice\Presentation\Http\Controllers\InvoiceController;
+use Modules\Invoice\Presentation\Http\Controllers\InvoiceEngineController;
 use Modules\Invoice\Presentation\Http\Controllers\InvoiceReferenceController;
 use Modules\Invoice\Presentation\Http\Controllers\InvoiceLineController;
 
@@ -25,6 +26,10 @@ Route::prefix('api/invoice')
     ])
     ->name('invoice.')
     ->group(function (): void {
+        Route::post('invoices/{invoice}/engines/recalculate', [InvoiceEngineController::class, 'recalculateTotals'])
+            ->name('invoices.engines.recalculate');
+        Route::post('invoices/{invoice}/engines/status', [InvoiceEngineController::class, 'transitionStatus'])
+            ->name('invoices.engines.status');
         Route::apiResource('invoices', InvoiceController::class);
         Route::apiResource('invoice-references', InvoiceReferenceController::class);
         Route::apiResource('invoice-lines', InvoiceLineController::class);

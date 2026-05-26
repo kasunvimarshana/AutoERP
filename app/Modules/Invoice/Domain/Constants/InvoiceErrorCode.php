@@ -8,4 +8,5 @@ final class InvoiceErrorCode
 {
     public const INVALID_VALUE = 'INVOICE_INVALID_VALUE';
     public const NOT_FOUND = 'INVOICE_NOT_FOUND';
+    public const INVALID_STATUS_TRANSITION = 'INVOICE_INVALID_STATUS_TRANSITION';
 }

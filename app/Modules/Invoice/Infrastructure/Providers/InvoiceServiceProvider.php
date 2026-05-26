@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\Invoice\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Invoice\Application\Contracts\UseCases\InvoiceEngines\RecalculateInvoiceTotalsServiceInterface;
+use Modules\Invoice\Application\Contracts\UseCases\InvoiceEngines\TransitionInvoiceStatusServiceInterface;
 use Modules\Invoice\Application\Contracts\UseCases\InvoiceLines\CreateInvoiceLineServiceInterface;
 use Modules\Invoice\Application\Contracts\UseCases\InvoiceLines\DeleteInvoiceLineServiceInterface;
 use Modules\Invoice\Application\Contracts\UseCases\InvoiceLines\GetInvoiceLineServiceInterface;
@@ -33,6 +35,8 @@ use Modules\Invoice\Application\UseCases\InvoiceReferences\DeleteInvoiceReferenc
 use Modules\Invoice\Application\UseCases\InvoiceReferences\GetInvoiceReferenceService;
 use Modules\Invoice\Application\UseCases\InvoiceReferences\ListInvoiceReferencesService;
 use Modules\Invoice\Application\UseCases\InvoiceReferences\UpdateInvoiceReferenceService;
+use Modules\Invoice\Application\UseCases\InvoiceEngines\RecalculateInvoiceTotalsService;
+use Modules\Invoice\Application\UseCases\InvoiceEngines\TransitionInvoiceStatusService;
 use Modules\Invoice\Application\UseCases\Invoices\CreateInvoiceService;
 use Modules\Invoice\Application\UseCases\Invoices\DeleteInvoiceService;
 use Modules\Invoice\Application\UseCases\Invoices\GetInvoiceService;
@@ -68,6 +72,8 @@ final class InvoiceServiceProvider extends ServiceProvider
                 CreateInvoiceLineServiceInterface::class => CreateInvoiceLineService::class,
                 UpdateInvoiceLineServiceInterface::class => UpdateInvoiceLineService::class,
                 DeleteInvoiceLineServiceInterface::class => DeleteInvoiceLineService::class,
+                RecalculateInvoiceTotalsServiceInterface::class => RecalculateInvoiceTotalsService::class,
+                TransitionInvoiceStatusServiceInterface::class => TransitionInvoiceStatusService::class,
             ] as $contract => $implementation
         ) {
             $this->app->singleton($contract, $implementation);
@@ -76,9 +82,12 @@ final class InvoiceServiceProvider extends ServiceProvider
         $this->app->singleton(InvoiceRepositoryInterface::class, function (): InvoiceRepositoryInterface {
             return new EloquentInvoiceRepository(new InvoiceModel());
         });
-        $this->app->singleton(InvoiceReferenceRepositoryInterface::class, function (): InvoiceReferenceRepositoryInterface {
-            return new EloquentInvoiceReferenceRepository(new InvoiceReferenceModel());
-        });
+        $this->app->singleton(
+            InvoiceReferenceRepositoryInterface::class,
+            function (): InvoiceReferenceRepositoryInterface {
+                return new EloquentInvoiceReferenceRepository(new InvoiceReferenceModel());
+            }
+        );
         $this->app->singleton(InvoiceLineRepositoryInterface::class, function (): InvoiceLineRepositoryInterface {
             return new EloquentInvoiceLineRepository(new InvoiceLineModel());
         });
