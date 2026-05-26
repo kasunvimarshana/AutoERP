@@ -14,4 +14,12 @@ return [
         'next_number' => 1,
         'period_type' => 'yearly',
     ],
+    'tokens' => [
+        'supported' => [
+            'TENANT_ID',
+            'ORG_ID',
+            'DOC_TYPE',
+            'PERIOD',
+        ],
+    ],
 ];

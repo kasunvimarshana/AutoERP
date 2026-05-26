@@ -49,6 +49,37 @@ final class EloquentSequenceRepository extends EloquentRepository implements Seq
         return $this->toRecord($model);
     }
 
+    public function findByScopeForUpdate(
+        int $tenantId,
+        ?int $organizationUnitId,
+        string $documentType,
+        ?string $periodValue,
+    ): ?DataRecord {
+        $query = $this->query()
+            ->where('tenant_id', $tenantId)
+            ->where('document_type', trim($documentType))
+            ->lockForUpdate();
+
+        if ($organizationUnitId === null) {
+            $query->whereNull('organization_unit_id');
+        } else {
+            $query->where('organization_unit_id', $organizationUnitId);
+        }
+
+        if ($periodValue === null || trim($periodValue) === '') {
+            $query->whereNull('period_value');
+        } else {
+            $query->where('period_value', trim($periodValue));
+        }
+
+        $model = $query->first();
+        if (! $model instanceof Model) {
+            return null;
+        }
+
+        return $this->toRecord($model);
+    }
+
     public function pageByFilters(
         ?int $tenantId,
         ?int $organizationUnitId,
@@ -90,5 +121,25 @@ final class EloquentSequenceRepository extends EloquentRepository implements Seq
         }
 
         return new PagedResult($items, $paginator->total(), $paginator->currentPage(), $paginator->perPage());
+    }
+
+    public function updateNextNumberWithVersion(
+        int|string $id,
+        int $expectedRowVersion,
+        int $nextNumber,
+    ): ?DataRecord {
+        $updatedRows = $this->query()
+            ->whereKey($id)
+            ->where('row_version', $expectedRowVersion)
+            ->update([
+                'next_number' => $nextNumber,
+                'row_version' => $expectedRowVersion + 1,
+            ]);
+
+        if ($updatedRows !== 1) {
+            return null;
+        }
+
+        return $this->findById($id);
     }
 }

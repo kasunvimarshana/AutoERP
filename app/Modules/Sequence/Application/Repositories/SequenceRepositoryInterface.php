@@ -26,4 +26,17 @@ interface SequenceRepositoryInterface extends RepositoryPortInterface
         int $perPage,
         int $page,
     ): PagedResult;
+
+    public function findByScopeForUpdate(
+        int $tenantId,
+        ?int $organizationUnitId,
+        string $documentType,
+        ?string $periodValue,
+    ): ?DataRecord;
+
+    public function updateNextNumberWithVersion(
+        int|string $id,
+        int $expectedRowVersion,
+        int $nextNumber,
+    ): ?DataRecord;
 }

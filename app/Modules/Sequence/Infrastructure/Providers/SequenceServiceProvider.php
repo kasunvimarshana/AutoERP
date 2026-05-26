@@ -7,14 +7,20 @@ namespace Modules\Sequence\Infrastructure\Providers;
 use Illuminate\Support\ServiceProvider;
 use Modules\Sequence\Application\Contracts\UseCases\Sequences\CreateSequenceServiceInterface;
 use Modules\Sequence\Application\Contracts\UseCases\Sequences\DeleteSequenceServiceInterface;
+use Modules\Sequence\Application\Contracts\UseCases\Sequences\GenerateSequenceNumberServiceInterface;
 use Modules\Sequence\Application\Contracts\UseCases\Sequences\GetSequenceServiceInterface;
 use Modules\Sequence\Application\Contracts\UseCases\Sequences\ListSequencesServiceInterface;
+use Modules\Sequence\Application\Contracts\UseCases\Sequences\PreviewSequenceNumberServiceInterface;
+use Modules\Sequence\Application\Contracts\UseCases\Sequences\RollbackSequenceNumberServiceInterface;
 use Modules\Sequence\Application\Contracts\UseCases\Sequences\UpdateSequenceServiceInterface;
 use Modules\Sequence\Application\Repositories\SequenceRepositoryInterface;
 use Modules\Sequence\Application\UseCases\Sequences\CreateSequenceService;
 use Modules\Sequence\Application\UseCases\Sequences\DeleteSequenceService;
+use Modules\Sequence\Application\UseCases\Sequences\GenerateSequenceNumberService;
 use Modules\Sequence\Application\UseCases\Sequences\GetSequenceService;
 use Modules\Sequence\Application\UseCases\Sequences\ListSequencesService;
+use Modules\Sequence\Application\UseCases\Sequences\PreviewSequenceNumberService;
+use Modules\Sequence\Application\UseCases\Sequences\RollbackSequenceNumberService;
 use Modules\Sequence\Application\UseCases\Sequences\UpdateSequenceService;
 use Modules\Sequence\Domain\Contracts\SequenceDomainServiceInterface;
 use Modules\Sequence\Domain\Services\SequenceDomainService;
@@ -36,6 +42,9 @@ final class SequenceServiceProvider extends ServiceProvider
                 CreateSequenceServiceInterface::class => CreateSequenceService::class,
                 UpdateSequenceServiceInterface::class => UpdateSequenceService::class,
                 DeleteSequenceServiceInterface::class => DeleteSequenceService::class,
+                PreviewSequenceNumberServiceInterface::class => PreviewSequenceNumberService::class,
+                GenerateSequenceNumberServiceInterface::class => GenerateSequenceNumberService::class,
+                RollbackSequenceNumberServiceInterface::class => RollbackSequenceNumberService::class,
             ] as $contract => $implementation
         ) {
             $this->app->singleton($contract, $implementation);
