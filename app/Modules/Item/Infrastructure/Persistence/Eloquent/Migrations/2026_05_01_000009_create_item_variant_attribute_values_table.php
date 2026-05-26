@@ -19,6 +19,12 @@ return new class extends Migration
 
             $table->foreignId('variant_id')->constrained('item_variants')->cascadeOnDelete();
             $table->foreignId('attribute_value_id')->constrained('item_attribute_values')->cascadeOnDelete();
+            $table->unsignedBigInteger('created_by')->nullable()->index('item_variant_attribute_values_created_by_idx');
+            $table->unsignedBigInteger('updated_by')->nullable()->index('item_variant_attribute_values_updated_by_idx');
+            $table->unsignedBigInteger('deleted_by')->nullable()->index('item_variant_attribute_values_deleted_by_idx');
+
+            $table->timestamps();
+            $table->softDeletes();
 
             $table->unique(['tenant_id', 'variant_id',  'attribute_value_id'], 'item_variant_attribute_values_pk');
             $table->index(['tenant_id', 'variant_id'], 'item_variant_attribute_values_variant_idx');

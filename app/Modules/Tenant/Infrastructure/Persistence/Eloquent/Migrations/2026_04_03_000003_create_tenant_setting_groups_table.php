@@ -17,12 +17,20 @@ return new class extends Migration
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->string('key');
-            $table->text('value')->nullable();
+            $table->string('name');
+            $table->string('description')->nullable();
             $table->foreignId('parent_id')->nullable()->constrained('tenant_setting_groups', 'id')->cascadeOnDelete();
+            $table->unsignedInteger('sort_order')->default(0);
+            $table->boolean('is_active')->default(true);
+            $table->unsignedBigInteger('created_by')->nullable()->index('tenant_setting_groups_created_by_idx');
+            $table->unsignedBigInteger('updated_by')->nullable()->index('tenant_setting_groups_updated_by_idx');
+            $table->unsignedBigInteger('deleted_by')->nullable()->index('tenant_setting_groups_deleted_by_idx');
 
             $table->timestamps();
+            $table->softDeletes();
 
             $table->unique(['tenant_id', 'key'], 'tenant_setting_groups_tenant_key_uk');
+            $table->index(['tenant_id', 'parent_id', 'sort_order'], 'tenant_setting_groups_tree_idx');
         });
     }
 

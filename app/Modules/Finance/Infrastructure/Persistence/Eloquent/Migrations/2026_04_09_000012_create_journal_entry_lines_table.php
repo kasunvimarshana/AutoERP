@@ -13,8 +13,15 @@ return new class extends Migration
         Schema::create('journal_entry_lines', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
+            $table->foreignId('tenant_id')
+                ->constrained('tenants', 'id')
+                ->cascadeOnDelete()
+                ->comment('Multi-tenant owner reference');
+            $table->foreignId('organization_unit_id')
+                ->nullable()
+                ->constrained('organization_units', 'id')
+                ->nullOnDelete()
+                ->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->foreignId('journal_entry_id')->constrained('journal_entries')->cascadeOnDelete();
@@ -34,7 +41,12 @@ return new class extends Migration
             $table->timestamps();
             // No softDeletes - immutable
 
+            $table->unique(
+                ['tenant_id', 'journal_entry_id', 'line_number'],
+                'journal_entry_lines_tenant_entry_line_uk'
+            );
             $table->index(['tenant_id', 'account_id', 'journal_entry_id'], 'journal_entry_lines_account_entry_idx');
+            $table->index(['tenant_id', 'journal_entry_id'], 'journal_entry_lines_entry_idx');
         });
     }
 

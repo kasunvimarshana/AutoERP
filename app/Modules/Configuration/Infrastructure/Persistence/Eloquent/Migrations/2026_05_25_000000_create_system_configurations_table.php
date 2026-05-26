@@ -5,8 +5,6 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Modules\Configuration\Domain\Constants\ConfigurationSource;
-use Modules\Configuration\Domain\Constants\ConfigurationValueType;
 
 return new class extends Migration
 {
@@ -18,17 +16,51 @@ return new class extends Migration
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
             $table->string('key')->unique();
             $table->longText('value')->nullable();
-            $table->string('value_type', 20)->default(ConfigurationValueType::NULL);
-            $table->string('source', 20)->default(ConfigurationSource::DATABASE);
+            $table->enum(
+                'value_type',
+                ['null', 'string', 'integer', 'float', 'boolean', 'json', 'encrypted']
+            )->default('null');
+            $table->enum('source', ['database', 'environment', 'runtime'])->default('database');
             $table->string('description')->nullable();
+            $table->unsignedBigInteger('created_by')->nullable()->index('system_configurations_created_by_idx');
+            $table->unsignedBigInteger('updated_by')->nullable()->index('system_configurations_updated_by_idx');
+            $table->unsignedBigInteger('deleted_by')->nullable()->index('system_configurations_deleted_by_idx');
             $table->timestamps();
+            $table->softDeletes();
 
             $table->index('source');
+        });
+
+        Schema::create('tenant_configurations', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->foreignId('tenant_id')
+                ->constrained('tenants', 'id')
+                ->cascadeOnDelete()
+                ->comment('Multi-tenant owner reference');
+            $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
+            $table->string('key');
+            $table->longText('value')->nullable();
+            $table->enum(
+                'value_type',
+                ['null', 'string', 'integer', 'float', 'boolean', 'json', 'encrypted']
+            )->default('null');
+            $table->enum('source', ['database', 'environment', 'runtime'])->default('database');
+            $table->string('description')->nullable();
+            $table->unsignedBigInteger('created_by')->nullable()->index('tenant_configurations_created_by_idx');
+            $table->unsignedBigInteger('updated_by')->nullable()->index('tenant_configurations_updated_by_idx');
+            $table->unsignedBigInteger('deleted_by')->nullable()->index('tenant_configurations_deleted_by_idx');
+            $table->timestamps();
+            $table->softDeletes();
+
+            $table->unique(['tenant_id', 'key'], 'tenant_configurations_tenant_key_uk');
+            $table->index(['tenant_id', 'source'], 'tenant_configurations_tenant_source_idx');
         });
     }
 
     public function down(): void
     {
+        Schema::dropIfExists('tenant_configurations');
         Schema::dropIfExists('system_configurations');
     }
 };

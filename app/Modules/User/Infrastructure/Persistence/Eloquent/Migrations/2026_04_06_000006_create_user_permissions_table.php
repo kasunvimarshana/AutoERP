@@ -19,6 +19,10 @@ return new class extends Migration
 
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('permission_id')->constrained('permissions')->cascadeOnDelete();
+            $table->unsignedBigInteger('created_by')->nullable()->index('user_permissions_created_by_idx');
+            $table->unsignedBigInteger('updated_by')->nullable()->index('user_permissions_updated_by_idx');
+
+            $table->timestamps();
 
             $table->unique(['tenant_id', 'user_id', 'permission_id'], 'user_permissions_uk');
         });

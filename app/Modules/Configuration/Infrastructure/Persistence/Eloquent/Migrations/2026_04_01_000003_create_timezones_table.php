@@ -16,6 +16,9 @@ return new class extends Migration
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
             $table->string('name')->unique('timezones_name_uk');
             $table->string('offset');
+            $table->unsignedBigInteger('created_by')->nullable()->index('timezones_created_by_idx');
+            $table->unsignedBigInteger('updated_by')->nullable()->index('timezones_updated_by_idx');
+            $table->unsignedBigInteger('deleted_by')->nullable()->index('timezones_deleted_by_idx');
 
             $table->timestamps();
             $table->softDeletes();

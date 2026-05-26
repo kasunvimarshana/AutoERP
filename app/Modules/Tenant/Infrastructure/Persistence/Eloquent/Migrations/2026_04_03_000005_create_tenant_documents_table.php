@@ -19,12 +19,19 @@ return new class extends Migration
             $table->string('name');
             $table->string('file_path');
             $table->string('mime_type')->nullable();
-            $table->unsignedInteger('size')->nullable();
+            $table->unsignedBigInteger('size')->nullable();
+            $table->string('checksum_sha256', 64)->nullable();
             $table->string('type')->nullable();
+            $table->boolean('is_public')->default(false);
+            $table->unsignedBigInteger('created_by')->nullable()->index('tenant_documents_created_by_idx');
+            $table->unsignedBigInteger('updated_by')->nullable()->index('tenant_documents_updated_by_idx');
+            $table->unsignedBigInteger('deleted_by')->nullable()->index('tenant_documents_deleted_by_idx');
 
             $table->timestamps();
+            $table->softDeletes();
 
             $table->unique(['tenant_id', 'name'], 'tenant_documents_tenant_name_uk');
+            $table->index(['tenant_id', 'type', 'is_public'], 'tenant_documents_tenant_type_public_idx');
         });
     }
 

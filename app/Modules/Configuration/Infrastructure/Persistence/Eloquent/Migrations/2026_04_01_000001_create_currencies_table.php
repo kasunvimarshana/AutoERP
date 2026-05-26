@@ -19,6 +19,9 @@ return new class extends Migration
             $table->string('symbol')->nullable();
             $table->unsignedSmallInteger('decimal_places')->default(2);
             $table->boolean('is_active')->default(true);
+            $table->unsignedBigInteger('created_by')->nullable()->index('currencies_created_by_idx');
+            $table->unsignedBigInteger('updated_by')->nullable()->index('currencies_updated_by_idx');
+            $table->unsignedBigInteger('deleted_by')->nullable()->index('currencies_deleted_by_idx');
 
             $table->timestamps();
             $table->softDeletes();

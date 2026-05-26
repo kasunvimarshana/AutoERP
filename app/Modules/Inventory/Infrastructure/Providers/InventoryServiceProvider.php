@@ -356,6 +356,12 @@ final class InventoryServiceProvider extends ServiceProvider
                 CreatePickingTaskServiceInterface::class => CreatePickingTaskService::class,
                 UpdatePickingTaskServiceInterface::class => UpdatePickingTaskService::class,
                 DeletePickingTaskServiceInterface::class => DeletePickingTaskService::class,
+                \Modules\Inventory\Application\Contracts\UseCases\InventoryEngines\ResolveInventoryDimensionsServiceInterface::class =>
+                    \Modules\Inventory\Application\UseCases\InventoryEngines\ResolveInventoryDimensionsService::class,
+                \Modules\Inventory\Application\Contracts\UseCases\InventoryEngines\CalculateInventoryValuationServiceInterface::class =>
+                    \Modules\Inventory\Application\UseCases\InventoryEngines\CalculateInventoryValuationService::class,
+                \Modules\Inventory\Application\Contracts\UseCases\InventoryEngines\AllocateInventoryStockServiceInterface::class =>
+                    \Modules\Inventory\Application\UseCases\InventoryEngines\AllocateInventoryStockService::class,
             ] as $contract => $implementation
         ) {
             $this->app->singleton($contract, $implementation);

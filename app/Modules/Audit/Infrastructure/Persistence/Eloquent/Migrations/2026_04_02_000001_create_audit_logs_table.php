@@ -16,7 +16,7 @@ return new class extends Migration
             $table->unsignedBigInteger('tenant_id')->nullable()->index('audit_logs_tenant_idx')->comment('Multi-tenant owner reference');
             $table->unsignedBigInteger('organization_unit_id')->nullable()->index('audit_logs_organization_unit_idx')->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
-            
+
             $table->unsignedBigInteger('user_id')->nullable()->index('audit_logs_user_idx');
 
             $table->string('event')->index('audit_logs_event_idx')->comment('The action that triggered this entry (created, updated, deleted, etc.)');
@@ -39,8 +39,8 @@ return new class extends Migration
             $table->json('tags')->nullable();
 
             // Audit logs are only ever created, never updated.
-            // $table->timestamp('created_at')->useCurrent();
             $table->timestamp('occurred_at')->useCurrent();
+            $table->timestamps();
             $table->softDeletes();
 
             $table->index(['tenant_id', 'organization_unit_id', 'auditable_type', 'auditable_id'], 'audit_logs_auditable_idx');

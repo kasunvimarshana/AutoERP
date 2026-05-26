@@ -22,6 +22,7 @@ use Modules\Inventory\Presentation\Http\Controllers\TraceLogController;
 use Modules\Inventory\Presentation\Http\Controllers\ReceiptInspectionController;
 use Modules\Inventory\Presentation\Http\Controllers\PutAwayTaskController;
 use Modules\Inventory\Presentation\Http\Controllers\PickingTaskController;
+use Modules\Inventory\Presentation\Http\Controllers\InventoryEngineController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');
@@ -60,4 +61,8 @@ Route::prefix('api/inventory')
         Route::apiResource('receipt-inspections', ReceiptInspectionController::class);
         Route::apiResource('put-away-tasks', PutAwayTaskController::class);
         Route::apiResource('picking-tasks', PickingTaskController::class);
+        Route::post('engines/valuation/calculate', [InventoryEngineController::class, 'calculateValuation'])
+            ->name('engines.valuation.calculate');
+        Route::post('engines/allocation/allocate', [InventoryEngineController::class, 'allocateStock'])
+            ->name('engines.allocation.allocate');
     });

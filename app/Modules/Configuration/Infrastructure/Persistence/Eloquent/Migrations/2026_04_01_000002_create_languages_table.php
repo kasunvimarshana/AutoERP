@@ -16,6 +16,9 @@ return new class extends Migration
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
             $table->string('code')->unique('languages_code_uk');
             $table->string('name');
+            $table->unsignedBigInteger('created_by')->nullable()->index('languages_created_by_idx');
+            $table->unsignedBigInteger('updated_by')->nullable()->index('languages_updated_by_idx');
+            $table->unsignedBigInteger('deleted_by')->nullable()->index('languages_deleted_by_idx');
 
             $table->timestamps();
             $table->softDeletes();

@@ -23,13 +23,16 @@ return new class extends Migration
             $table->boolean('cross_org_transactions')->default(false);
             $table->foreignId('tenant_plan_id')->nullable()->constrained('tenant_plans', 'id')->nullOnDelete();
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->nullOnDelete();
-            $table->string('status')->default('active')->comment('active|inactive|suspended');
+            $table->enum('status', ['active', 'inactive', 'suspended', 'archived'])->default('active');
             $table->boolean('is_active')->default(true);
             $table->boolean('is_isolated')->default(true);
             $table->string('isolation_key', 255)->nullable()->unique('tenants_isolation_key_uk');
             $table->string('configuration_scope', 255)->nullable();
             $table->timestamp('trial_ends_at')->nullable();
             $table->timestamp('subscription_ends_at')->nullable();
+            $table->unsignedBigInteger('created_by')->nullable()->index('tenants_created_by_idx');
+            $table->unsignedBigInteger('updated_by')->nullable()->index('tenants_updated_by_idx');
+            $table->unsignedBigInteger('deleted_by')->nullable()->index('tenants_deleted_by_idx');
 
             $table->timestamps();
             $table->softDeletes();

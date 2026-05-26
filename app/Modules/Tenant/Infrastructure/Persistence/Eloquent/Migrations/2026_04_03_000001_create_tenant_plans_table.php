@@ -19,10 +19,13 @@ return new class extends Migration
             $table->string('slug')->unique('tenant_plans_slug_uk')->comment('URL-friendly unique name indicator');
             $table->json('features')->nullable();
             $table->json('limits')->nullable();
-            $table->decimal('price', 20, 4)->default(0);
+            $table->decimal('price', 18, 4)->default(0);
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->nullOnDelete();
-            $table->string('billing_interval')->default('month')->comment('month|year');
+            $table->enum('billing_interval', ['month', 'quarter', 'year'])->default('month');
             $table->boolean('is_active')->default(true)->index('tenant_plans_active_idx');
+            $table->unsignedBigInteger('created_by')->nullable()->index('tenant_plans_created_by_idx');
+            $table->unsignedBigInteger('updated_by')->nullable()->index('tenant_plans_updated_by_idx');
+            $table->unsignedBigInteger('deleted_by')->nullable()->index('tenant_plans_deleted_by_idx');
 
             $table->timestamps();
             $table->softDeletes();

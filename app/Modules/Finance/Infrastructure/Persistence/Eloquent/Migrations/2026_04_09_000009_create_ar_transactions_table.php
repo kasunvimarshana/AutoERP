@@ -30,8 +30,14 @@ return new class extends Migration
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'ar_transactions_currency_id_fk')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 4)->default(1);
             $table->boolean('is_reconciled')->default(false);
+            $table->unsignedBigInteger('created_by')->nullable()->index('ar_transactions_created_by_idx');
+            $table->unsignedBigInteger('updated_by')->nullable()->index('ar_transactions_updated_by_idx');
 
             $table->timestamps();
+
+            $table->index(['tenant_id', 'transaction_date', 'due_date'], 'ar_transactions_tenant_dates_idx');
+            $table->index(['tenant_id', 'party_type', 'party_id'], 'ar_transactions_party_idx');
+            $table->index(['tenant_id', 'is_reconciled'], 'ar_transactions_reconciled_idx');
         });
     }
 

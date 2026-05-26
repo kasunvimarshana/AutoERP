@@ -22,10 +22,14 @@ return new class extends Migration
             $table->string('suffix')->default('');
             $table->unsignedInteger('padding')->default(5);
             $table->bigInteger('next_number')->default(1);
-            $table->string('period_type')->default('yearly')->comment('yearly, monthly, infinite');
+            $table->enum('period_type', ['yearly', 'monthly', 'infinite'])->default('yearly');
             $table->string('period_value')->nullable()->comment('e.g., 2025');
+            $table->unsignedBigInteger('created_by')->nullable()->index('sequences_created_by_idx');
+            $table->unsignedBigInteger('updated_by')->nullable()->index('sequences_updated_by_idx');
+            $table->unsignedBigInteger('deleted_by')->nullable()->index('sequences_deleted_by_idx');
 
             $table->timestamps();
+            $table->softDeletes();
 
             $table->unique(
                 ['tenant_id', 'organization_unit_id', 'document_type', 'period_value'],

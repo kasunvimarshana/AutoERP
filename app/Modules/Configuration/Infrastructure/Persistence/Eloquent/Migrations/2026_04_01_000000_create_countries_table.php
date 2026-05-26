@@ -17,6 +17,9 @@ return new class extends Migration
             $table->string('code')->unique('countries_code_uk');
             $table->string('name');
             $table->string('phone_code')->nullable();
+            $table->unsignedBigInteger('created_by')->nullable()->index('countries_created_by_idx');
+            $table->unsignedBigInteger('updated_by')->nullable()->index('countries_updated_by_idx');
+            $table->unsignedBigInteger('deleted_by')->nullable()->index('countries_deleted_by_idx');
 
             $table->timestamps();
             $table->softDeletes();
