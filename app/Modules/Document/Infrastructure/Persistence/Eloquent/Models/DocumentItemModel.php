@@ -9,6 +9,7 @@ class DocumentItemModel extends Model
     protected $table = 'document_items';
 
     protected $fillable = [
+        'tenant_id',
         'document_id',
         'item_type',
         'description',

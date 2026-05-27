@@ -9,12 +9,13 @@ use Modules\Document\Domain\Repositories\DocumentRepositoryInterface;
 class GetDocumentQuery
 {
     public function __construct(
-        private readonly DocumentRepositoryInterface $repository,
-    ) {}
+        private readonly DocumentRepositoryInterface $repository
+    ) {
+    }
 
-    public function execute(int $documentId): DocumentAggregate
+    public function execute(int $tenantId, int $documentId): DocumentAggregate
     {
-        $aggregate = $this->repository->findById($documentId);
+        $aggregate = $this->repository->findById($tenantId, $documentId);
 
         if ($aggregate === null) {
             throw new DocumentNotFoundException("Document [{$documentId}] was not found.");

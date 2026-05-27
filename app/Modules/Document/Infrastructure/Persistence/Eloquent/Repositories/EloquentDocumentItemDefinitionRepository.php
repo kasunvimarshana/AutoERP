@@ -33,7 +33,9 @@ class EloquentDocumentItemDefinitionRepository implements DocumentItemDefinition
             'item_type_code' => (string) $definition->item_type_code,
             'field_schema' => json_decode((string) $definition->field_schema, true) ?: [],
             'validation_rules' => json_decode((string) ($definition->validation_rules ?? '[]'), true) ?: [],
-            'calculation_rule' => $definition->calculation_rule !== null ? (string) $definition->calculation_rule : null,
+            'calculation_rule' => $definition->calculation_rule !== null
+                ? (string) $definition->calculation_rule
+                : null,
         ];
     }
 }

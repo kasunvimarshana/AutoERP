@@ -28,7 +28,7 @@ class DocumentResource extends JsonResource
                 'grand_total' => $this->resource->document->grandTotal,
                 'data' => $this->resource->document->data,
                 'notes' => $this->resource->document->notes,
-                'attachments' => [],
+                'attachments' => $this->resource->document->attachments,
                 'items' => DocumentItemResource::collection($this->resource->items),
             ];
         }

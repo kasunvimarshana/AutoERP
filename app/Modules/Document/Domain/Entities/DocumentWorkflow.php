@@ -17,5 +17,6 @@ class DocumentWorkflow
         public bool $isActive,
         public array $steps,
         public array $transitions,
-    ) {}
+    ) {
+    }
 }

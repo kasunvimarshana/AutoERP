@@ -27,7 +27,8 @@ class DocumentOrchestrator
         private readonly DocumentRepositoryInterface $documentRepository,
         private readonly DocumentTypeRepositoryInterface $documentTypeRepository,
         private readonly SequenceService $sequenceService,
-    ) {}
+    ) {
+    }
 
     public function create(CreateDocumentDTO $dto): DocumentAggregate
     {
@@ -50,9 +51,9 @@ class DocumentOrchestrator
         });
     }
 
-    public function show(int $documentId): DocumentAggregate
+    public function show(int $tenantId, int $documentId): DocumentAggregate
     {
-        return $this->getDocumentQuery->execute($documentId);
+        return $this->getDocumentQuery->execute($tenantId, $documentId);
     }
 
     /**
@@ -63,10 +64,14 @@ class DocumentOrchestrator
         return $this->listDocumentsQuery->execute($filters, $perPage);
     }
 
-    public function changeStatus(int $documentId, string $toStatus, ?string $actionName = null): DocumentAggregate
-    {
-        return DB::transaction(function () use ($documentId, $toStatus, $actionName): DocumentAggregate {
-            $aggregate = $this->getDocumentQuery->execute($documentId);
+    public function changeStatus(
+        int $tenantId,
+        int $documentId,
+        string $toStatus,
+        ?string $actionName = null
+    ): DocumentAggregate {
+        return DB::transaction(function () use ($tenantId, $documentId, $toStatus, $actionName): DocumentAggregate {
+            $aggregate = $this->getDocumentQuery->execute($tenantId, $documentId);
             $updatedAggregate = $this->changeDocumentStatusAction->execute($aggregate, $toStatus, $actionName);
 
             return $this->documentRepository->update($updatedAggregate);
@@ -76,14 +81,168 @@ class DocumentOrchestrator
     /**
      * @return array<string, mixed>
      */
-    public function uploadAttachment(int $documentId, UploadedFile $file): array
+    public function uploadAttachment(int $tenantId, int $documentId, UploadedFile $file): array
     {
-        return DB::transaction(function () use ($documentId, $file): array {
-            $this->getDocumentQuery->execute($documentId);
+        return DB::transaction(function () use ($tenantId, $documentId, $file): array {
+            $this->getDocumentQuery->execute($tenantId, $documentId);
 
             $payload = $this->uploadDocumentAttachmentAction->execute($file);
+            $payload['tenant_id'] = $tenantId;
 
             return $this->documentRepository->storeAttachment($documentId, $payload);
         });
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function addComment(int $tenantId, int $documentId, array $payload): array
+    {
+        return $this->documentRepository->addComment($tenantId, $documentId, $payload);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function addActivity(int $tenantId, int $documentId, array $payload): array
+    {
+        return $this->documentRepository->addActivity($tenantId, $documentId, $payload);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function addEvent(int $tenantId, int $documentId, array $payload): array
+    {
+        return $this->documentRepository->addEvent($tenantId, $documentId, $payload);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function addPermission(int $tenantId, int $documentId, array $payload): array
+    {
+        return $this->documentRepository->addPermission($tenantId, $documentId, $payload);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function addRelation(int $tenantId, int $documentId, array $payload): array
+    {
+        return $this->documentRepository->addRelation($tenantId, $documentId, $payload);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listComments(int $tenantId, int $documentId): array
+    {
+        return $this->documentRepository->listComments($tenantId, $documentId);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listActivities(int $tenantId, int $documentId): array
+    {
+        return $this->documentRepository->listActivities($tenantId, $documentId);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listEvents(int $tenantId, int $documentId): array
+    {
+        return $this->documentRepository->listEvents($tenantId, $documentId);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listPermissions(int $tenantId, int $documentId): array
+    {
+        return $this->documentRepository->listPermissions($tenantId, $documentId);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listRelations(int $tenantId, int $documentId): array
+    {
+        return $this->documentRepository->listRelations($tenantId, $documentId);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function createDocumentType(int $tenantId, array $payload): array
+    {
+        return $this->documentRepository->createDocumentType($tenantId, $payload);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listDocumentTypes(): array
+    {
+        return $this->documentRepository->listDocumentTypes();
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function createItemType(int $tenantId, array $payload): array
+    {
+        return $this->documentRepository->createItemType($tenantId, $payload);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listItemTypes(): array
+    {
+        return $this->documentRepository->listItemTypes();
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function createDocumentDefinition(int $tenantId, array $payload): array
+    {
+        return $this->documentRepository->createDocumentDefinition($tenantId, $payload);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listDocumentDefinitions(int $tenantId): array
+    {
+        return $this->documentRepository->listDocumentDefinitions($tenantId);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function createItemDefinition(int $tenantId, array $payload): array
+    {
+        return $this->documentRepository->createItemDefinition($tenantId, $payload);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listItemDefinitions(int $tenantId): array
+    {
+        return $this->documentRepository->listItemDefinitions($tenantId);
     }
 }

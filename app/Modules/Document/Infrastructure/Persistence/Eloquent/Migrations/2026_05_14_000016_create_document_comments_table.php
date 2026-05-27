@@ -10,10 +10,13 @@ return new class extends Migration
     {
         Schema::create('document_comments', function (Blueprint $table): void {
             $table->id();
+            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->foreignId('document_id')->constrained('documents')->cascadeOnDelete();
             $table->text('comment');
             $table->unsignedBigInteger('author_id')->nullable();
             $table->timestamps();
+
+            $table->index(['tenant_id', 'document_id'], 'document_comments_tenant_document_index');
         });
     }
 

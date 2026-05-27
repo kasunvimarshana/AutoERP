@@ -10,6 +10,7 @@ return new class extends Migration
     {
         Schema::create('document_status_histories', function (Blueprint $table): void {
             $table->id();
+            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->foreignId('document_id')->constrained('documents')->cascadeOnDelete();
             $table->string('from_status')->nullable();
             $table->string('to_status');
@@ -18,6 +19,7 @@ return new class extends Migration
             $table->text('reason')->nullable();
             $table->timestamps();
 
+            $table->index(['tenant_id', 'document_id'], 'document_status_histories_tenant_document_index');
             $table->index(['document_id', 'created_at'], 'document_status_histories_document_index');
         });
     }

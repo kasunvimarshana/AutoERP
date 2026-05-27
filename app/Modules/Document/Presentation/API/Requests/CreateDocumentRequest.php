@@ -21,7 +21,8 @@ class CreateDocumentRequest extends FormRequest
             'items' => ['required', 'array', 'min:1'],
             'items.*.item_type' => ['required', 'string', 'max:100'],
             'items.*.description' => ['nullable', 'string', 'max:255'],
-            'items.*.data' => ['required', 'array'],
+            'items.*.line_total' => ['required', 'numeric'],
+            'items.*.data' => ['nullable', 'array'],
         ];
     }
 }

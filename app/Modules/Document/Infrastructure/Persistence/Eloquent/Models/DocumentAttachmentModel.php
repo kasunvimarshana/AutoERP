@@ -9,6 +9,7 @@ class DocumentAttachmentModel extends Model
     protected $table = 'document_attachments';
 
     protected $fillable = [
+        'tenant_id',
         'document_id',
         'disk',
         'directory',

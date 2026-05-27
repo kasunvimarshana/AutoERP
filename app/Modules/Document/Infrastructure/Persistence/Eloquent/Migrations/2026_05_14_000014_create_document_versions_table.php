@@ -10,6 +10,7 @@ return new class extends Migration
     {
         Schema::create('document_versions', function (Blueprint $table): void {
             $table->id();
+            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->foreignId('document_id')->constrained('documents')->cascadeOnDelete();
             $table->unsignedInteger('version');
             $table->json('document_snapshot');
@@ -18,7 +19,8 @@ return new class extends Migration
             $table->string('change_reason')->nullable();
             $table->timestamps();
 
-            $table->unique(['document_id', 'version'], 'document_versions_unique');
+            $table->index(['tenant_id', 'document_id'], 'document_versions_tenant_document_index');
+            $table->unique(['tenant_id', 'document_id', 'version'], 'document_versions_unique');
         });
     }
 

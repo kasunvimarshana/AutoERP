@@ -10,10 +10,14 @@ class ChangeDocumentStatusAction
 {
     public function __construct(
         private readonly DocumentWorkflowRepositoryInterface $workflowRepository,
-    ) {}
+    ) {
+    }
 
-    public function execute(DocumentAggregate $aggregate, string $toStatus, ?string $actionName = null): DocumentAggregate
-    {
+    public function execute(
+        DocumentAggregate $aggregate,
+        string $toStatus,
+        ?string $actionName = null
+    ): DocumentAggregate {
         $workflow = $this->workflowRepository->findActive(
             $aggregate->document->tenantId,
             $aggregate->document->documentTypeId,
@@ -34,13 +38,17 @@ class ChangeDocumentStatusAction
                 }
             }
 
-            throw new InvalidDocumentStatusTransitionException("Transition [{$currentStatus} -> {$toStatus}] is not configured.");
+            throw new InvalidDocumentStatusTransitionException(
+                "Transition [{$currentStatus} -> {$toStatus}] is not configured."
+            );
         }
 
         $allowed = config('document.default_status_transitions')[$currentStatus] ?? [];
 
         if (! in_array($toStatus, $allowed, true)) {
-            throw new InvalidDocumentStatusTransitionException("Transition [{$currentStatus} -> {$toStatus}] is not allowed.");
+            throw new InvalidDocumentStatusTransitionException(
+                "Transition [{$currentStatus} -> {$toStatus}] is not allowed."
+            );
         }
 
         $aggregate->document->status = $toStatus;

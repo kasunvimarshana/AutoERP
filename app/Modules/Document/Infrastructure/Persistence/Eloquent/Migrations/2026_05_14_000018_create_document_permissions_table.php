@@ -10,14 +10,16 @@ return new class extends Migration
     {
         Schema::create('document_permissions', function (Blueprint $table): void {
             $table->id();
+            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->foreignId('document_id')->constrained('documents')->cascadeOnDelete();
             $table->string('principal_type');
             $table->string('principal_identifier');
             $table->string('ability');
             $table->timestamps();
 
+            $table->index(['tenant_id', 'document_id'], 'document_permissions_tenant_document_index');
             $table->unique(
-                ['document_id', 'principal_type', 'principal_identifier', 'ability'],
+                ['tenant_id', 'document_id', 'principal_type', 'principal_identifier', 'ability'],
                 'document_permissions_unique'
             );
         });

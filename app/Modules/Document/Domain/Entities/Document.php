@@ -24,5 +24,6 @@ class Document
         public ?int $createdBy,
         public ?int $updatedBy,
         public array $attachments = [],
-    ) {}
+    ) {
+    }
 }

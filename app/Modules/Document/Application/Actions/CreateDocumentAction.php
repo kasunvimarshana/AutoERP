@@ -9,23 +9,22 @@ use Modules\Document\Domain\Entities\DocumentItem;
 use Modules\Document\Domain\Exceptions\DocumentValidationException;
 use Modules\Document\Domain\Repositories\DocumentDefinitionRepositoryInterface;
 use Modules\Document\Domain\Repositories\DocumentTypeRepositoryInterface;
-use Modules\Document\Domain\Services\DocumentDomainService;
 
 class CreateDocumentAction
 {
     public function __construct(
         private readonly DocumentDefinitionRepositoryInterface $definitionRepository,
         private readonly DocumentTypeRepositoryInterface $documentTypeRepository,
-        private readonly DocumentDomainService $domainService,
-        private readonly CalculateItemTotalAction $calculateItemTotalAction,
-    ) {}
+        private readonly DocumentFieldValidationService $fieldValidationService,
+    ) {
+    }
 
     public function execute(CreateDocumentDTO $dto, string $documentNumber): DocumentAggregate
     {
         $definition = $this->definitionRepository->findActive($dto->tenantId, $dto->documentTypeId);
 
         if ($definition !== null) {
-            $this->domainService->validateHeaderDefinition($dto->data, $definition->headerSchema);
+            $this->fieldValidationService->validateHeaderData($dto->data, $definition->headerSchema);
         }
 
         $defaultStatus = $this->documentTypeRepository->findDefaultStatusById($dto->documentTypeId) ?? 'draft';
@@ -54,7 +53,7 @@ class CreateDocumentAction
         $items = [];
 
         foreach ($dto->items as $index => $itemPayload) {
-            $itemType = (string) ($itemPayload['item_type'] ?? 'inventory');
+            $itemType = (string) ($itemPayload['item_type'] ?? 'generic');
             $itemData = is_array($itemPayload['data'] ?? null) ? $itemPayload['data'] : [];
 
             if (
@@ -67,13 +66,9 @@ class CreateDocumentAction
                 );
             }
 
-            $this->domainService->validateItemDefinition($itemData, $itemType, $dto->tenantId);
+            $this->fieldValidationService->validateItemData($itemData, $itemType, $dto->tenantId);
 
-            $lineTotal = $this->calculateItemTotalAction->execute(
-                array_merge($itemPayload, $itemData),
-                $itemType,
-                $dto->tenantId,
-            );
+            $lineTotal = $this->normalizeLineTotal($itemPayload['line_total'] ?? 0);
 
             $items[] = new DocumentItem(
                 id: null,
@@ -91,5 +86,18 @@ class CreateDocumentAction
         $aggregate->calculateTotals();
 
         return $aggregate;
+    }
+
+    private function normalizeLineTotal(mixed $value): string
+    {
+        if ($value === null || $value === '') {
+            return '0.0000';
+        }
+
+        if (! is_numeric($value)) {
+            throw new DocumentValidationException('Each item line_total must be numeric.');
+        }
+
+        return number_format((float) $value, 4, '.', '');
     }
 }

@@ -9,7 +9,7 @@ interface DocumentRepositoryInterface
 {
     public function save(DocumentAggregate $aggregate): DocumentAggregate;
 
-    public function findById(int $id): ?DocumentAggregate;
+    public function findById(int $tenantId, int $id): ?DocumentAggregate;
 
     public function update(DocumentAggregate $aggregate): DocumentAggregate;
 
@@ -25,4 +25,103 @@ interface DocumentRepositoryInterface
      * @return array<string, mixed>
      */
     public function storeAttachment(int $documentId, array $payload): array;
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function addComment(int $tenantId, int $documentId, array $payload): array;
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function addActivity(int $tenantId, int $documentId, array $payload): array;
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function addEvent(int $tenantId, int $documentId, array $payload): array;
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function addPermission(int $tenantId, int $documentId, array $payload): array;
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function addRelation(int $tenantId, int $documentId, array $payload): array;
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listComments(int $tenantId, int $documentId): array;
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listActivities(int $tenantId, int $documentId): array;
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listEvents(int $tenantId, int $documentId): array;
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listPermissions(int $tenantId, int $documentId): array;
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listRelations(int $tenantId, int $documentId): array;
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function createDocumentType(int $tenantId, array $payload): array;
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listDocumentTypes(): array;
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function createItemType(int $tenantId, array $payload): array;
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listItemTypes(): array;
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function createDocumentDefinition(int $tenantId, array $payload): array;
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listDocumentDefinitions(int $tenantId): array;
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function createItemDefinition(int $tenantId, array $payload): array;
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listItemDefinitions(int $tenantId): array;
 }

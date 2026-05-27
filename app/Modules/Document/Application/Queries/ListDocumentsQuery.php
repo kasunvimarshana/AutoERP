@@ -8,8 +8,9 @@ use Modules\Document\Domain\Repositories\DocumentRepositoryInterface;
 class ListDocumentsQuery
 {
     public function __construct(
-        private readonly DocumentRepositoryInterface $repository,
-    ) {}
+        private readonly DocumentRepositoryInterface $repository
+    ) {
+    }
 
     /**
      * @param  array<string, mixed>  $filters

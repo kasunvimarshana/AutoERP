@@ -6,8 +6,12 @@ use Illuminate\Support\Facades\DB;
 
 class SequenceService
 {
-    public function nextNumber(int $tenantId, ?int $organizationUnitId, string $documentType, ?string $date = null): string
-    {
+    public function nextNumber(
+        int $tenantId,
+        ?int $organizationUnitId,
+        string $documentType,
+        ?string $date = null
+    ): string {
         $date = $date ?? now()->toDateString();
         $periodValue = date('Y', strtotime($date));
 
@@ -25,7 +29,7 @@ class SequenceService
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $organizationUnitId,
                     'document_type' => $documentType,
-                    'prefix' => strtoupper(substr($documentType, 0, 3)).'-',
+                    'prefix' => strtoupper(substr($documentType, 0, 3)) . '-',
                     'suffix' => '',
                     'padding' => 5,
                     'next_number' => 2,
@@ -48,8 +52,8 @@ class SequenceService
             }
 
             return ($sequence->prefix ?? '')
-                .str_pad((string) $currentNumber, (int) ($sequence->padding ?? 5), '0', STR_PAD_LEFT)
-                .($sequence->suffix ?? '');
+                . str_pad((string) $currentNumber, (int) ($sequence->padding ?? 5), '0', STR_PAD_LEFT)
+                . ($sequence->suffix ?? '');
         });
     }
 }

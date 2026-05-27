@@ -10,6 +10,7 @@ return new class extends Migration
     {
         Schema::create('document_attachments', function (Blueprint $table): void {
             $table->id();
+            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->foreignId('document_id')->constrained('documents')->cascadeOnDelete();
             $table->string('disk')->default('local');
             $table->string('directory')->nullable();
@@ -20,6 +21,8 @@ return new class extends Migration
             $table->string('checksum')->nullable();
             $table->unsignedBigInteger('uploaded_by')->nullable();
             $table->timestamps();
+
+            $table->index(['tenant_id', 'document_id'], 'document_attachments_tenant_document_index');
         });
     }
 

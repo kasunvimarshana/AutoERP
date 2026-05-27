@@ -12,5 +12,6 @@ class DocumentItem
         public string $lineTotal,
         public int $sequence,
         public array $data,
-    ) {}
+    ) {
+    }
 }

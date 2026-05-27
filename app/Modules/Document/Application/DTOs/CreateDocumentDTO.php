@@ -19,5 +19,6 @@ class CreateDocumentDTO
         public ?string $notes = null,
         public array $data = [],
         public array $items = [],
-    ) {}
+    ) {
+    }
 }

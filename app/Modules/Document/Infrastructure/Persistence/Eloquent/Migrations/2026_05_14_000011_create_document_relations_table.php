@@ -10,11 +10,13 @@ return new class extends Migration
     {
         Schema::create('document_relations', function (Blueprint $table): void {
             $table->id();
+            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->foreignId('source_document_id')->constrained('documents')->cascadeOnDelete();
             $table->foreignId('target_document_id')->constrained('documents')->cascadeOnDelete();
             $table->string('relation_type')->default('reference');
             $table->timestamps();
 
+            $table->index(['tenant_id', 'source_document_id'], 'document_relations_tenant_source_index');
             $table->unique(
                 ['source_document_id', 'target_document_id', 'relation_type'],
                 'document_relations_unique'

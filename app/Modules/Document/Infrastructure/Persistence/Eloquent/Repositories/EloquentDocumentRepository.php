@@ -37,8 +37,11 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
             'updated_by' => $aggregate->document->updatedBy,
         ]);
 
+        $this->persistDocumentFieldValues($aggregate->document->tenantId, $model->id, $aggregate->document->data);
+
         foreach ($aggregate->items as $item) {
-            DocumentItemModel::create([
+            $itemModel = DocumentItemModel::create([
+                'tenant_id' => $aggregate->document->tenantId,
                 'document_id' => $model->id,
                 'item_type' => $item->itemType,
                 'description' => $item->description,
@@ -46,9 +49,12 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
                 'sequence' => $item->sequence,
                 'data' => $item->data,
             ]);
+
+            $this->persistDocumentItemFieldValues($aggregate->document->tenantId, $itemModel->id, $item->data);
         }
 
         DB::table('document_versions')->insert([
+            'tenant_id' => $aggregate->document->tenantId,
             'document_id' => $model->id,
             'version' => 1,
             'document_snapshot' => json_encode($model->fresh()->toArray(), JSON_THROW_ON_ERROR),
@@ -60,6 +66,7 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
         ]);
 
         DB::table('document_events')->insert([
+            'tenant_id' => $aggregate->document->tenantId,
             'document_id' => $model->id,
             'event_type' => 'document.created',
             'payload' => json_encode(['status' => $model->status], JSON_THROW_ON_ERROR),
@@ -69,6 +76,7 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
         ]);
 
         DB::table('document_status_histories')->insert([
+            'tenant_id' => $aggregate->document->tenantId,
             'document_id' => $model->id,
             'from_status' => null,
             'to_status' => $model->status,
@@ -79,15 +87,16 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
             'updated_at' => now(),
         ]);
 
-        $saved = $this->findById($model->id);
+        $saved = $this->findById($aggregate->document->tenantId, $model->id);
 
         return $saved ?? $aggregate;
     }
 
-    public function findById(int $id): ?DocumentAggregate
+    public function findById(int $tenantId, int $id): ?DocumentAggregate
     {
         $model = DocumentModel::query()
             ->with(['items', 'attachments'])
+            ->where('tenant_id', $tenantId)
             ->find($id);
 
         if ($model === null) {
@@ -139,7 +148,9 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
 
     public function update(DocumentAggregate $aggregate): DocumentAggregate
     {
-        $model = DocumentModel::query()->findOrFail($aggregate->document->id);
+        $model = DocumentModel::query()
+            ->where('tenant_id', $aggregate->document->tenantId)
+            ->findOrFail($aggregate->document->id);
         $previousStatus = $model->status;
 
         $model->update([
@@ -149,11 +160,14 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
             'updated_by' => $aggregate->document->updatedBy,
         ]);
 
+        $this->persistDocumentFieldValues($aggregate->document->tenantId, $model->id, $aggregate->document->data);
+
         $nextVersion = (int) DB::table('document_versions')
             ->where('document_id', $model->id)
             ->max('version') + 1;
 
         DB::table('document_versions')->insert([
+            'tenant_id' => $aggregate->document->tenantId,
             'document_id' => $model->id,
             'version' => $nextVersion,
             'document_snapshot' => json_encode($model->fresh()->toArray(), JSON_THROW_ON_ERROR),
@@ -165,6 +179,7 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
         ]);
 
         DB::table('document_status_histories')->insert([
+            'tenant_id' => $aggregate->document->tenantId,
             'document_id' => $model->id,
             'from_status' => $previousStatus,
             'to_status' => $aggregate->document->status,
@@ -176,6 +191,7 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
         ]);
 
         DB::table('document_events')->insert([
+            'tenant_id' => $aggregate->document->tenantId,
             'document_id' => $model->id,
             'event_type' => 'document.status_changed',
             'payload' => json_encode([
@@ -187,7 +203,7 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
             'updated_at' => now(),
         ]);
 
-        return $this->findById($model->id) ?? $aggregate;
+        return $this->findById($aggregate->document->tenantId, $model->id) ?? $aggregate;
     }
 
     public function delete(int $id): bool
@@ -199,9 +215,11 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
 
     public function paginate(array $filters, int $perPage = 15): LengthAwarePaginator
     {
+        $tenantId = (int) ($filters['tenant_id'] ?? 0);
+
         return DocumentModel::query()
             ->with('type')
-            ->when(isset($filters['tenant_id']), fn ($query) => $query->where('tenant_id', $filters['tenant_id']))
+            ->where('tenant_id', $tenantId)
             ->when(
                 isset($filters['document_type_id']),
                 fn ($query) => $query->where('document_type_id', $filters['document_type_id']),
@@ -220,6 +238,8 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
 
     public function storeAttachment(int $documentId, array $payload): array
     {
+        $document = $this->requireDocument((int) $payload['tenant_id'], $documentId);
+
         /** @var UploadedFile $uploadedFile */
         $uploadedFile = $payload['uploaded_file'];
         $path = $uploadedFile->storeAs(
@@ -229,6 +249,7 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
         );
 
         $attachment = DocumentAttachmentModel::create([
+            'tenant_id' => $document->tenant_id,
             'document_id' => $documentId,
             'disk' => $payload['disk'],
             'directory' => dirname($path) === '.' ? null : dirname($path),
@@ -241,6 +262,7 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
         ]);
 
         DB::table('document_events')->insert([
+            'tenant_id' => $document->tenant_id,
             'document_id' => $documentId,
             'event_type' => 'document.attachment_uploaded',
             'payload' => json_encode(['attachment_id' => $attachment->id], JSON_THROW_ON_ERROR),
@@ -258,5 +280,461 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
             'disk' => $attachment->disk,
             'directory' => $attachment->directory,
         ];
+    }
+
+    public function addComment(int $tenantId, int $documentId, array $payload): array
+    {
+        $document = $this->requireDocument($tenantId, $documentId);
+
+        $id = DB::table('document_comments')->insertGetId([
+            'tenant_id' => $document->tenant_id,
+            'document_id' => $documentId,
+            'comment' => (string) $payload['comment'],
+            'author_id' => $payload['author_id'] ?? null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return (array) DB::table('document_comments')->where('id', $id)->first();
+    }
+
+    public function addActivity(int $tenantId, int $documentId, array $payload): array
+    {
+        $document = $this->requireDocument($tenantId, $documentId);
+
+        $id = DB::table('document_activities')->insertGetId([
+            'tenant_id' => $document->tenant_id,
+            'document_id' => $documentId,
+            'activity_type' => (string) $payload['activity_type'],
+            'description' => $payload['description'] ?? null,
+            'performed_by' => $payload['performed_by'] ?? null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return (array) DB::table('document_activities')->where('id', $id)->first();
+    }
+
+    public function addEvent(int $tenantId, int $documentId, array $payload): array
+    {
+        $document = $this->requireDocument($tenantId, $documentId);
+
+        $id = DB::table('document_events')->insertGetId([
+            'tenant_id' => $document->tenant_id,
+            'document_id' => $documentId,
+            'event_type' => (string) $payload['event_type'],
+            'payload' => json_encode($payload['payload'] ?? [], JSON_THROW_ON_ERROR),
+            'performed_by' => $payload['performed_by'] ?? null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return (array) DB::table('document_events')->where('id', $id)->first();
+    }
+
+    public function addPermission(int $tenantId, int $documentId, array $payload): array
+    {
+        $document = $this->requireDocument($tenantId, $documentId);
+
+        $id = DB::table('document_permissions')->insertGetId([
+            'tenant_id' => $document->tenant_id,
+            'document_id' => $documentId,
+            'principal_type' => (string) $payload['principal_type'],
+            'principal_identifier' => (string) $payload['principal_identifier'],
+            'ability' => (string) $payload['ability'],
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return (array) DB::table('document_permissions')->where('id', $id)->first();
+    }
+
+    public function addRelation(int $tenantId, int $documentId, array $payload): array
+    {
+        $document = $this->requireDocument($tenantId, $documentId);
+        $target = $this->requireDocument($tenantId, (int) $payload['target_document_id']);
+
+        $id = DB::table('document_relations')->insertGetId([
+            'tenant_id' => $document->tenant_id,
+            'source_document_id' => $document->id,
+            'target_document_id' => $target->id,
+            'relation_type' => $payload['relation_type'] ?? 'reference',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return (array) DB::table('document_relations')->where('id', $id)->first();
+    }
+
+    public function listComments(int $tenantId, int $documentId): array
+    {
+        return DB::table('document_comments')
+            ->where('tenant_id', $tenantId)
+            ->where('document_id', $documentId)
+            ->orderByDesc('id')
+            ->get()
+            ->map(static fn ($row): array => (array) $row)
+            ->all();
+    }
+
+    public function listActivities(int $tenantId, int $documentId): array
+    {
+        return DB::table('document_activities')
+            ->where('tenant_id', $tenantId)
+            ->where('document_id', $documentId)
+            ->orderByDesc('id')
+            ->get()
+            ->map(static fn ($row): array => (array) $row)
+            ->all();
+    }
+
+    public function listEvents(int $tenantId, int $documentId): array
+    {
+        return DB::table('document_events')
+            ->where('tenant_id', $tenantId)
+            ->where('document_id', $documentId)
+            ->orderByDesc('id')
+            ->get()
+            ->map(static fn ($row): array => (array) $row)
+            ->all();
+    }
+
+    public function listPermissions(int $tenantId, int $documentId): array
+    {
+        return DB::table('document_permissions')
+            ->where('tenant_id', $tenantId)
+            ->where('document_id', $documentId)
+            ->orderByDesc('id')
+            ->get()
+            ->map(static fn ($row): array => (array) $row)
+            ->all();
+    }
+
+    public function listRelations(int $tenantId, int $documentId): array
+    {
+        return DB::table('document_relations')
+            ->where('tenant_id', $tenantId)
+            ->where(function ($query) use ($documentId): void {
+                $query->where('source_document_id', $documentId)
+                    ->orWhere('target_document_id', $documentId);
+            })
+            ->orderByDesc('id')
+            ->get()
+            ->map(static fn ($row): array => (array) $row)
+            ->all();
+    }
+
+    public function createDocumentType(int $tenantId, array $payload): array
+    {
+        $id = DB::table('document_types')->insertGetId([
+            'name' => (string) $payload['name'],
+            'code' => (string) $payload['code'],
+            'default_status' => (string) ($payload['default_status'] ?? 'draft'),
+            'is_active' => (bool) ($payload['is_active'] ?? true),
+            'requires_source' => (bool) ($payload['requires_source'] ?? false),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return (array) DB::table('document_types')->where('id', $id)->first();
+    }
+
+    public function listDocumentTypes(): array
+    {
+        return DB::table('document_types')
+            ->orderBy('name')
+            ->get()
+            ->map(static fn ($row): array => (array) $row)
+            ->all();
+    }
+
+    public function createItemType(int $tenantId, array $payload): array
+    {
+        $id = DB::table('document_item_types')->insertGetId([
+            'name' => (string) $payload['name'],
+            'code' => (string) $payload['code'],
+            'display_name' => (string) $payload['display_name'],
+            'is_active' => (bool) ($payload['is_active'] ?? true),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return (array) DB::table('document_item_types')->where('id', $id)->first();
+    }
+
+    public function listItemTypes(): array
+    {
+        return DB::table('document_item_types')
+            ->orderBy('display_name')
+            ->get()
+            ->map(static fn ($row): array => (array) $row)
+            ->all();
+    }
+
+    public function createDocumentDefinition(int $tenantId, array $payload): array
+    {
+        $fields = is_array($payload['fields'] ?? null) ? $payload['fields'] : [];
+        $allowedItemTypes = is_array($payload['allowed_item_types'] ?? null)
+            ? $payload['allowed_item_types']
+            : [];
+
+        $headerSchema = [];
+        foreach ($fields as $field) {
+            $key = (string) ($field['field_key'] ?? '');
+            if ($key === '') {
+                continue;
+            }
+
+            $headerSchema[$key] = [
+                'required' => (bool) ($field['is_required'] ?? false),
+                'type' => (string) ($field['data_type'] ?? 'text'),
+            ];
+        }
+
+        $id = DB::table('document_definitions')->insertGetId([
+            'tenant_id' => $tenantId,
+            'document_type_id' => (int) $payload['document_type_id'],
+            'version' => (int) ($payload['version'] ?? 1),
+            'name' => (string) $payload['name'],
+            'header_schema' => json_encode($headerSchema, JSON_THROW_ON_ERROR),
+            'allowed_item_types' => json_encode($allowedItemTypes, JSON_THROW_ON_ERROR),
+            'validation_rules' => json_encode($payload['validation_rules'] ?? [], JSON_THROW_ON_ERROR),
+            'form_layout' => json_encode($payload['form_layout'] ?? [], JSON_THROW_ON_ERROR),
+            'is_active' => (bool) ($payload['is_active'] ?? true),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        foreach ($fields as $index => $field) {
+            DB::table('document_definition_fields')->insert([
+                'tenant_id' => $tenantId,
+                'document_definition_id' => $id,
+                'field_key' => (string) $field['field_key'],
+                'label' => (string) ($field['label'] ?? $field['field_key']),
+                'data_type' => (string) ($field['data_type'] ?? 'text'),
+                'is_required' => (bool) ($field['is_required'] ?? false),
+                'display_order' => (int) ($field['display_order'] ?? ($index + 1)),
+                'default_value' => isset($field['default_value']) ? (string) $field['default_value'] : null,
+                'validation_rule' => isset($field['validation_rule']) ? (string) $field['validation_rule'] : null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return [
+            'definition' => (array) DB::table('document_definitions')->where('id', $id)->first(),
+            'fields' => DB::table('document_definition_fields')
+                ->where('document_definition_id', $id)
+                ->orderBy('display_order')
+                ->get()
+                ->map(static fn ($row): array => (array) $row)
+                ->all(),
+        ];
+    }
+
+    public function listDocumentDefinitions(int $tenantId): array
+    {
+        return DB::table('document_definitions as dd')
+            ->join('document_types as dt', 'dt.id', '=', 'dd.document_type_id')
+            ->where('dd.tenant_id', $tenantId)
+            ->orderByDesc('dd.id')
+            ->get(['dd.*', 'dt.name as document_type_name', 'dt.code as document_type_code'])
+            ->map(static fn ($row): array => (array) $row)
+            ->all();
+    }
+
+    public function createItemDefinition(int $tenantId, array $payload): array
+    {
+        $fields = is_array($payload['fields'] ?? null) ? $payload['fields'] : [];
+        $fieldSchema = [];
+
+        foreach ($fields as $field) {
+            $key = (string) ($field['field_key'] ?? '');
+            if ($key === '') {
+                continue;
+            }
+
+            $fieldSchema[$key] = [
+                'required' => (bool) ($field['is_required'] ?? false),
+                'type' => (string) ($field['data_type'] ?? 'text'),
+            ];
+        }
+
+        $id = DB::table('document_item_definitions')->insertGetId([
+            'tenant_id' => $tenantId,
+            'item_type_id' => (int) $payload['item_type_id'],
+            'version' => (int) ($payload['version'] ?? 1),
+            'name' => (string) $payload['name'],
+            'field_schema' => json_encode($fieldSchema, JSON_THROW_ON_ERROR),
+            'validation_rules' => json_encode($payload['validation_rules'] ?? [], JSON_THROW_ON_ERROR),
+            'calculation_rule' => null,
+            'is_active' => (bool) ($payload['is_active'] ?? true),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        foreach ($fields as $index => $field) {
+            DB::table('document_item_definition_fields')->insert([
+                'tenant_id' => $tenantId,
+                'document_item_definition_id' => $id,
+                'field_key' => (string) $field['field_key'],
+                'label' => (string) ($field['label'] ?? $field['field_key']),
+                'data_type' => (string) ($field['data_type'] ?? 'text'),
+                'is_required' => (bool) ($field['is_required'] ?? false),
+                'display_order' => (int) ($field['display_order'] ?? ($index + 1)),
+                'default_value' => isset($field['default_value']) ? (string) $field['default_value'] : null,
+                'validation_rule' => isset($field['validation_rule']) ? (string) $field['validation_rule'] : null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return [
+            'definition' => (array) DB::table('document_item_definitions')->where('id', $id)->first(),
+            'fields' => DB::table('document_item_definition_fields')
+                ->where('document_item_definition_id', $id)
+                ->orderBy('display_order')
+                ->get()
+                ->map(static fn ($row): array => (array) $row)
+                ->all(),
+        ];
+    }
+
+    public function listItemDefinitions(int $tenantId): array
+    {
+        return DB::table('document_item_definitions as did')
+            ->join('document_item_types as dit', 'dit.id', '=', 'did.item_type_id')
+            ->where('did.tenant_id', $tenantId)
+            ->orderByDesc('did.id')
+            ->get(['did.*', 'dit.name as item_type_name', 'dit.code as item_type_code'])
+            ->map(static fn ($row): array => (array) $row)
+            ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $values
+     */
+    private function persistDocumentFieldValues(int $tenantId, int $documentId, array $values): void
+    {
+        DB::table('document_field_values')
+            ->where('tenant_id', $tenantId)
+            ->where('document_id', $documentId)
+            ->delete();
+
+        foreach ($values as $fieldKey => $value) {
+            if (! is_scalar($value) && $value !== null) {
+                continue;
+            }
+
+            DB::table('document_field_values')->insert([
+                'tenant_id' => $tenantId,
+                'document_id' => $documentId,
+                'field_key' => (string) $fieldKey,
+                ...$this->typedValueColumns($value),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $values
+     */
+    private function persistDocumentItemFieldValues(int $tenantId, int $documentItemId, array $values): void
+    {
+        DB::table('document_item_field_values')
+            ->where('tenant_id', $tenantId)
+            ->where('document_item_id', $documentItemId)
+            ->delete();
+
+        foreach ($values as $fieldKey => $value) {
+            if (! is_scalar($value) && $value !== null) {
+                continue;
+            }
+
+            DB::table('document_item_field_values')->insert([
+                'tenant_id' => $tenantId,
+                'document_item_id' => $documentItemId,
+                'field_key' => (string) $fieldKey,
+                ...$this->typedValueColumns($value),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function typedValueColumns(mixed $value): array
+    {
+        $columns = [
+            'value_type' => 'string',
+            'value_string' => null,
+            'value_number' => null,
+            'value_boolean' => null,
+            'value_date' => null,
+            'value_datetime' => null,
+            'value_text' => null,
+            'value_reference_type' => null,
+            'value_reference_id' => null,
+        ];
+
+        if ($value === null) {
+            return $columns;
+        }
+
+        if (is_bool($value)) {
+            $columns['value_type'] = 'boolean';
+            $columns['value_boolean'] = $value;
+
+            return $columns;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            $columns['value_type'] = 'number';
+            $columns['value_number'] = (string) number_format((float) $value, 4, '.', '');
+
+            return $columns;
+        }
+
+        $stringValue = (string) $value;
+        $columns['value_string'] = mb_substr($stringValue, 0, 255);
+        if (mb_strlen($stringValue) > 255) {
+            $columns['value_text'] = $stringValue;
+            $columns['value_type'] = 'text';
+
+            return $columns;
+        }
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $stringValue) === 1) {
+            $columns['value_type'] = 'date';
+            $columns['value_date'] = $stringValue;
+
+            return $columns;
+        }
+
+        if (strtotime($stringValue) !== false && str_contains($stringValue, ':')) {
+            $columns['value_type'] = 'datetime';
+            $columns['value_datetime'] = date('Y-m-d H:i:s', strtotime($stringValue));
+
+            return $columns;
+        }
+
+        return $columns;
+    }
+
+    private function requireDocument(int $tenantId, int $documentId): object
+    {
+        $document = DB::table('documents')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $documentId)
+            ->first();
+
+        if ($document === null) {
+            throw new \RuntimeException('Document not found for current tenant context.');
+        }
+
+        return $document;
     }
 }

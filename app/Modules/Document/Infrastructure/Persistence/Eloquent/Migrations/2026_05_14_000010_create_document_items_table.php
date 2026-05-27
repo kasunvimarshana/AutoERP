@@ -11,6 +11,7 @@ return new class extends Migration
     {
         Schema::create('document_items', function (Blueprint $table): void {
             $table->id();
+            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->foreignId('document_id')->constrained('documents')->cascadeOnDelete();
             $table->string('item_type');
             $table->string('description')->nullable();
@@ -19,6 +20,7 @@ return new class extends Migration
             $table->json('data')->nullable();
             $table->timestamps();
 
+            $table->index(['tenant_id', 'document_id'], 'document_items_tenant_document_index');
             $table->index(['document_id', 'sequence'], 'document_items_document_sequence_index');
             $table->index(['item_type'], 'document_items_type_index');
         });
