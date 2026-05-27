@@ -13,13 +13,12 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->foreignId('document_id')->constrained('documents')->cascadeOnDelete();
             $table->unsignedInteger('version');
-            $table->json('document_snapshot');
-            $table->json('items_snapshot');
             $table->unsignedBigInteger('changed_by')->nullable();
             $table->string('change_reason')->nullable();
             $table->timestamps();
 
             $table->index(['tenant_id', 'document_id'], 'document_versions_tenant_document_index');
+            $table->index(['tenant_id', 'created_at'], 'document_versions_tenant_created_at_index');
             $table->unique(['tenant_id', 'document_id', 'version'], 'document_versions_unique');
         });
     }

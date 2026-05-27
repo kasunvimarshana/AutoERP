@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -15,18 +14,13 @@ return new class extends Migration
             $table->foreignId('item_type_id')->constrained('document_item_types')->cascadeOnDelete();
             $table->unsignedInteger('version')->default(1);
             $table->string('name');
-            $table->json('field_schema');
-            $table->json('validation_rules')->nullable();
             $table->text('calculation_rule')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 
             $table->unique(['tenant_id', 'item_type_id', 'version'], 'document_item_definitions_unique');
+            $table->index(['tenant_id', 'is_active'], 'document_item_definitions_tenant_active_index');
         });
-
-        if (DB::getDriverName() === 'pgsql') {
-            DB::statement('CREATE INDEX document_item_definitions_field_schema_gin ON document_item_definitions USING GIN (field_schema)');
-        }
     }
 
     public function down(): void

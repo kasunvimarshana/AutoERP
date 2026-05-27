@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -24,7 +23,6 @@ return new class extends Migration
             $table->decimal('discount_total', 20, 4)->default(0);
             $table->decimal('tax_total', 20, 4)->default(0);
             $table->decimal('grand_total', 20, 4)->default(0);
-            $table->json('data')->nullable();
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();
@@ -34,11 +32,8 @@ return new class extends Migration
             $table->unique(['tenant_id', 'document_number'], 'documents_tenant_number_unique');
             $table->index(['tenant_id', 'document_type_id', 'status'], 'documents_tenant_type_status_index');
             $table->index(['tenant_id', 'document_date'], 'documents_tenant_date_index');
+            $table->index(['tenant_id', 'created_at'], 'documents_tenant_created_at_index');
         });
-
-        if (DB::getDriverName() === 'pgsql') {
-            DB::statement('CREATE INDEX documents_data_gin ON documents USING GIN (data)');
-        }
     }
 
     public function down(): void

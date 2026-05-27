@@ -8,15 +8,14 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('document_field_values', function (Blueprint $table): void {
+        Schema::create('document_metadata_values', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('document_id')->constrained('documents')->cascadeOnDelete();
-            $table->foreignId('field_definition_id')
-                ->nullable()
-                ->constrained('document_definition_fields')
-                ->nullOnDelete();
-            $table->string('field_key', 120);
+            $table->foreignId('metadata_definition_id')
+                ->constrained('document_metadata_definitions')
+                ->cascadeOnDelete();
+            $table->string('entity_type', 100);
+            $table->unsignedBigInteger('entity_id');
             $table->string('value_type', 40);
             $table->string('value_string')->nullable();
             $table->bigInteger('value_integer')->nullable();
@@ -30,19 +29,21 @@ return new class extends Migration
             $table->unsignedBigInteger('value_reference_id')->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'document_id', 'field_key'], 'document_field_values_unique');
-            $table->index(['tenant_id', 'field_key'], 'document_field_values_tenant_field_key_index');
-            $table->index(
-                ['tenant_id', 'document_id', 'value_type'],
-                'document_field_values_tenant_document_type_index'
+            $table->unique(
+                ['tenant_id', 'metadata_definition_id', 'entity_type', 'entity_id'],
+                'document_metadata_values_unique'
             );
-            $table->index(['field_definition_id'], 'document_field_values_field_definition_index');
-            $table->index(['tenant_id', 'created_at'], 'document_field_values_tenant_created_at_index');
+            $table->index(
+                ['tenant_id', 'entity_type', 'entity_id'],
+                'document_metadata_values_entity_index'
+            );
+            $table->index(['tenant_id', 'value_type'], 'document_metadata_values_value_type_index');
+            $table->index(['tenant_id', 'created_at'], 'document_metadata_values_created_at_index');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('document_field_values');
+        Schema::dropIfExists('document_metadata_values');
     }
 };

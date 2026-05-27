@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -17,17 +16,13 @@ return new class extends Migration
             $table->string('description')->nullable();
             $table->decimal('line_total', 20, 4)->default(0);
             $table->unsignedInteger('sequence')->default(1);
-            $table->json('data')->nullable();
             $table->timestamps();
 
             $table->index(['tenant_id', 'document_id'], 'document_items_tenant_document_index');
             $table->index(['document_id', 'sequence'], 'document_items_document_sequence_index');
             $table->index(['item_type'], 'document_items_type_index');
+            $table->index(['tenant_id', 'created_at'], 'document_items_tenant_created_at_index');
         });
-
-        if (DB::getDriverName() === 'pgsql') {
-            DB::statement('CREATE INDEX document_items_data_gin ON document_items USING GIN (data)');
-        }
     }
 
     public function down(): void
