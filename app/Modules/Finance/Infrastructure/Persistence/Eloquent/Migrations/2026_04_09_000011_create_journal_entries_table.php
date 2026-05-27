@@ -13,13 +13,22 @@ return new class extends Migration
         Schema::create('journal_entries', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
+            $table->foreignId('tenant_id')
+                ->constrained('tenants', 'id')
+                ->cascadeOnDelete()
+                ->comment('Multi-tenant owner reference');
+            $table->foreignId('organization_unit_id')
+                ->nullable()
+                ->constrained('organization_units', 'id')
+                ->nullOnDelete()
+                ->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->foreignId('fiscal_period_id')->nullable()->constrained('fiscal_periods')->nullOnDelete();
             $table->string('entry_number');
-            $table->string('entry_type')->default('MANUAL')->comment('MANUAL, AUTO, SYSTEM, OPENING, CLOSING, ADJUSTMENT');
+            $table->string('entry_type')
+                ->default('MANUAL')
+                ->comment('MANUAL, AUTO, SYSTEM, OPENING, CLOSING, ADJUSTMENT');
             $table->string('reference_type')->nullable()->comment('Polymorphic reference (Document, Payment, etc.)');
             $table->unsignedBigInteger('reference_id')->nullable();
             $table->text('description')->nullable();

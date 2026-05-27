@@ -16,6 +16,7 @@ use Modules\Finance\Presentation\Http\Controllers\BudgetLineController;
 use Modules\Finance\Presentation\Http\Controllers\CostCenterController;
 use Modules\Finance\Presentation\Http\Controllers\FiscalPeriodController;
 use Modules\Finance\Presentation\Http\Controllers\FiscalYearController;
+use Modules\Finance\Presentation\Http\Controllers\FinanceCoreController;
 use Modules\Finance\Presentation\Http\Controllers\JournalEntryController;
 use Modules\Finance\Presentation\Http\Controllers\JournalEntryLineController;
 use Modules\Finance\Presentation\Http\Controllers\PaymentTermController;
@@ -41,6 +42,23 @@ Route::prefix('api/finance')
     ])
     ->name('finance.')
     ->group(function (): void {
+        Route::post('core/journal-entries/generate-from-event', [
+            FinanceCoreController::class,
+            'generateJournalEntryFromEvent',
+        ])->name('core.journal-entries.generate-from-event');
+        Route::post('core/journal-entries/{journalEntry}/post-to-ledger', [
+            FinanceCoreController::class,
+            'postJournalEntryToLedger',
+        ])->name('core.journal-entries.post-to-ledger');
+        Route::post('core/fiscal-periods/{fiscalPeriod}/close', [
+            FinanceCoreController::class,
+            'closeFiscalPeriod',
+        ])->name('core.fiscal-periods.close');
+        Route::post('core/ledger/recalculate-balances', [
+            FinanceCoreController::class,
+            'recalculateLedgerBalances',
+        ])->name('core.ledger.recalculate-balances');
+
         Route::post('journal-entries/{journalEntry}/engines/post', [JournalEngineController::class, 'post'])
             ->name('journal-entries.engines.post');
         Route::post('journal-entries/{journalEntry}/engines/reverse', [JournalEngineController::class, 'reverse'])

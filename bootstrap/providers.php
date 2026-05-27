@@ -13,6 +13,7 @@ return [
     Modules\SystemUser\Infrastructure\Providers\SystemUserServiceProvider::class,
     Modules\OrganizationUnit\Infrastructure\Providers\OrganizationUnitServiceProvider::class,
     Modules\Finance\Infrastructure\Providers\FinanceServiceProvider::class,
+    Modules\Finance\Infrastructure\Providers\FinanceCoreServiceProvider::class,
     Modules\Vehicle\Infrastructure\Providers\VehicleServiceProvider::class,
     Modules\HR\Infrastructure\Providers\HrServiceProvider::class,
     Modules\Item\Infrastructure\Providers\ItemServiceProvider::class,
