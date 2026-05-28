@@ -18,6 +18,9 @@ use Modules\Inventory\Application\Contracts\Services\InventoryCostLayerServiceIn
 use Modules\Inventory\Application\Contracts\Services\StockMovementServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\StockLevelServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\TraceLogServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\StockAdjustmentLineServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\CycleCountLineServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\StockTransferLineServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\StockLedgerServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\StockAdjustmentServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\StockReservationServiceInterface;
@@ -172,6 +175,9 @@ use Modules\Inventory\Application\Services\InventoryCostLayerService;
 use Modules\Inventory\Application\Services\StockMovementService;
 use Modules\Inventory\Application\Services\StockLevelService;
 use Modules\Inventory\Application\Services\TraceLogService;
+use Modules\Inventory\Application\Services\StockAdjustmentLineService;
+use Modules\Inventory\Application\Services\CycleCountLineService;
+use Modules\Inventory\Application\Services\StockTransferLineService;
 use Modules\Inventory\Application\Services\StockLedgerService;
 use Modules\Inventory\Application\Services\StockAdjustmentService;
 use Modules\Inventory\Application\Services\StockReservationService;
@@ -409,6 +415,9 @@ final class InventoryServiceProvider extends ServiceProvider
                 StockMovementServiceInterface::class => StockMovementService::class,
                 StockLevelServiceInterface::class => StockLevelService::class,
                 TraceLogServiceInterface::class => TraceLogService::class,
+                StockAdjustmentLineServiceInterface::class => StockAdjustmentLineService::class,
+                CycleCountLineServiceInterface::class => CycleCountLineService::class,
+                StockTransferLineServiceInterface::class => StockTransferLineService::class,
                 StockLedgerServiceInterface::class => StockLedgerService::class,
                 StockAdjustmentServiceInterface::class => StockAdjustmentService::class,
                 StockReservationServiceInterface::class => StockReservationService::class,
