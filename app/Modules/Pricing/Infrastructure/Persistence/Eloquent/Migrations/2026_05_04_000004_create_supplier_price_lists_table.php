@@ -13,17 +13,28 @@ return new class extends Migration
         Schema::create('supplier_price_lists', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
+            $table->foreignId('tenant_id')
+                ->constrained('tenants', 'id')
+                ->cascadeOnDelete()
+                ->comment('Multi-tenant owner reference');
+            $table->foreignId('organization_unit_id')
+                ->nullable()
+                ->constrained('organization_units', 'id')
+                ->nullOnDelete()
+                ->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->foreignId('supplier_id')->constrained('suppliers', 'id')->cascadeOnDelete();
             $table->foreignId('price_list_id')->constrained('price_lists', 'id')->cascadeOnDelete();
             $table->unsignedInteger('priority')->default(0);
+            $table->boolean('is_active')->default(true);
+            $table->date('valid_from')->nullable();
+            $table->date('valid_to')->nullable();
 
             $table->timestamps();
 
             $table->unique(['tenant_id', 'supplier_id', 'price_list_id'], 'supplier_price_lists_unique_uk');
+            $table->index(['tenant_id', 'supplier_id', 'priority'], 'supplier_price_lists_supplier_priority_idx');
         });
     }
 

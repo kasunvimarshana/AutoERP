@@ -3,10 +3,11 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Modules\Pricing\Presentation\Http\Controllers\CustomerPriceListController;
 use Modules\Pricing\Presentation\Http\Controllers\PriceListController;
 use Modules\Pricing\Presentation\Http\Controllers\PriceListItemController;
+use Modules\Pricing\Presentation\Http\Controllers\PriceResolverController;
 use Modules\Pricing\Presentation\Http\Controllers\SupplierPriceListController;
-use Modules\Pricing\Presentation\Http\Controllers\CustomerPriceListController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');
@@ -26,6 +27,7 @@ Route::prefix('api/pricing')
     ])
     ->name('pricing.')
     ->group(function (): void {
+        Route::post('resolve-price', [PriceResolverController::class, 'resolve'])->name('resolve-price');
         Route::apiResource('price-lists', PriceListController::class);
         Route::apiResource('price-list-items', PriceListItemController::class);
         Route::apiResource('supplier-price-lists', SupplierPriceListController::class);

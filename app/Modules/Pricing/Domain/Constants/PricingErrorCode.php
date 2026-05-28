@@ -8,4 +8,5 @@ final class PricingErrorCode
 {
     public const INVALID_VALUE = 'PRICING_INVALID_VALUE';
     public const NOT_FOUND = 'PRICING_NOT_FOUND';
+    public const CONFLICT = 'PRICING_CONFLICT';
 }

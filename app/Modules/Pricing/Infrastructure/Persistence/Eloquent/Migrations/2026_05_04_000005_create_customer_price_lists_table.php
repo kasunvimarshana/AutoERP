@@ -20,10 +20,14 @@ return new class extends Migration
             $table->foreignId('customer_id')->constrained('customers', 'id')->cascadeOnDelete();
             $table->foreignId('price_list_id')->constrained('price_lists', 'id')->cascadeOnDelete();
             $table->unsignedInteger('priority')->default(0);
+            $table->boolean('is_active')->default(true);
+            $table->date('valid_from')->nullable();
+            $table->date('valid_to')->nullable();
 
             $table->timestamps();
 
             $table->unique(['tenant_id', 'customer_id', 'price_list_id'], 'customer_price_lists_unique_uk');
+            $table->index(['tenant_id', 'customer_id', 'priority'], 'customer_price_lists_customer_priority_idx');
         });
     }
 
