@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace Modules\Finance\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Finance\Application\Contracts\Services\FinancePostingServiceInterface;
+use Modules\Finance\Application\Contracts\Services\FiscalPeriodServiceInterface;
+use Modules\Finance\Application\Contracts\Services\PaymentTermServiceInterface;
+use Modules\Finance\Application\Contracts\Services\TaxCalculationServiceInterface;
 use Modules\Finance\Application\Contracts\UseCases\JournalEngines\PostJournalEntryServiceInterface;
 use Modules\Finance\Application\Contracts\UseCases\JournalEngines\ReverseJournalEntryServiceInterface;
 use Modules\Finance\Application\Contracts\UseCases\Accounts\CreateAccountServiceInterface;
@@ -207,6 +211,10 @@ use Modules\Finance\Application\UseCases\TaxRules\DeleteTaxRuleService;
 use Modules\Finance\Application\UseCases\TaxRules\GetTaxRuleService;
 use Modules\Finance\Application\UseCases\TaxRules\ListTaxRulesService;
 use Modules\Finance\Application\UseCases\TaxRules\UpdateTaxRuleService;
+use Modules\Finance\Application\Services\FinancePostingService;
+use Modules\Finance\Application\Services\FiscalPeriodService;
+use Modules\Finance\Application\Services\PaymentTermService;
+use Modules\Finance\Application\Services\TaxCalculationService;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\AccountModel;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\ApTransactionModel;
 use Modules\Finance\Infrastructure\Persistence\Eloquent\Models\ArTransactionModel;
@@ -344,82 +352,98 @@ final class FinanceServiceProvider extends ServiceProvider
                 DeleteBankReconciliationServiceInterface::class => DeleteBankReconciliationService::class,
                 PostJournalEntryServiceInterface::class => PostJournalEntryService::class,
                 ReverseJournalEntryServiceInterface::class => ReverseJournalEntryService::class,
+                FiscalPeriodServiceInterface::class => FiscalPeriodService::class,
+                FinancePostingServiceInterface::class => FinancePostingService::class,
+                TaxCalculationServiceInterface::class => TaxCalculationService::class,
+                PaymentTermServiceInterface::class => PaymentTermService::class,
             ] as $contract => $implementation
         ) {
             $this->app->singleton($contract, $implementation);
         }
 
         $this->app->singleton(AccountRepositoryInterface::class, function (): AccountRepositoryInterface {
-            return new EloquentAccountRepository(new AccountModel());
+            return new EloquentAccountRepository($this->app->make(AccountModel::class));
         });
 
         $this->app->singleton(FiscalYearRepositoryInterface::class, function (): FiscalYearRepositoryInterface {
-            return new EloquentFiscalYearRepository(new FiscalYearModel());
+            return new EloquentFiscalYearRepository($this->app->make(FiscalYearModel::class));
         });
 
         $this->app->singleton(FiscalPeriodRepositoryInterface::class, function (): FiscalPeriodRepositoryInterface {
-            return new EloquentFiscalPeriodRepository(new FiscalPeriodModel());
+            return new EloquentFiscalPeriodRepository($this->app->make(FiscalPeriodModel::class));
         });
 
         $this->app->singleton(PaymentTermRepositoryInterface::class, function (): PaymentTermRepositoryInterface {
-            return new EloquentPaymentTermRepository(new PaymentTermModel());
+            return new EloquentPaymentTermRepository($this->app->make(PaymentTermModel::class));
         });
 
         $this->app->singleton(TaxGroupRepositoryInterface::class, function (): TaxGroupRepositoryInterface {
-            return new EloquentTaxGroupRepository(new TaxGroupModel());
+            return new EloquentTaxGroupRepository($this->app->make(TaxGroupModel::class));
         });
 
         $this->app->singleton(TaxRateRepositoryInterface::class, function (): TaxRateRepositoryInterface {
-            return new EloquentTaxRateRepository(new TaxRateModel());
+            return new EloquentTaxRateRepository($this->app->make(TaxRateModel::class));
         });
 
         $this->app->singleton(TaxRuleRepositoryInterface::class, function (): TaxRuleRepositoryInterface {
-            return new EloquentTaxRuleRepository(new TaxRuleModel());
+            return new EloquentTaxRuleRepository($this->app->make(TaxRuleModel::class));
         });
 
         $this->app->singleton(ApTransactionRepositoryInterface::class, function (): ApTransactionRepositoryInterface {
-            return new EloquentApTransactionRepository(new ApTransactionModel());
+            return new EloquentApTransactionRepository($this->app->make(ApTransactionModel::class));
         });
 
         $this->app->singleton(ArTransactionRepositoryInterface::class, function (): ArTransactionRepositoryInterface {
-            return new EloquentArTransactionRepository(new ArTransactionModel());
+            return new EloquentArTransactionRepository($this->app->make(ArTransactionModel::class));
         });
 
         $this->app->singleton(CostCenterRepositoryInterface::class, function (): CostCenterRepositoryInterface {
-            return new EloquentCostCenterRepository(new CostCenterModel());
+            return new EloquentCostCenterRepository($this->app->make(CostCenterModel::class));
         });
 
         $this->app->singleton(JournalEntryRepositoryInterface::class, function (): JournalEntryRepositoryInterface {
-            return new EloquentJournalEntryRepository(new JournalEntryModel());
+            return new EloquentJournalEntryRepository($this->app->make(JournalEntryModel::class));
         });
 
-        $this->app->singleton(JournalEntryLineRepositoryInterface::class, function (): JournalEntryLineRepositoryInterface {
-            return new EloquentJournalEntryLineRepository(new JournalEntryLineModel());
-        });
+        $this->app->singleton(
+            JournalEntryLineRepositoryInterface::class,
+            function (): JournalEntryLineRepositoryInterface {
+                return new EloquentJournalEntryLineRepository($this->app->make(JournalEntryLineModel::class));
+            },
+        );
 
         $this->app->singleton(BudgetRepositoryInterface::class, function (): BudgetRepositoryInterface {
-            return new EloquentBudgetRepository(new BudgetModel());
+            return new EloquentBudgetRepository($this->app->make(BudgetModel::class));
         });
 
         $this->app->singleton(BudgetLineRepositoryInterface::class, function (): BudgetLineRepositoryInterface {
-            return new EloquentBudgetLineRepository(new BudgetLineModel());
+            return new EloquentBudgetLineRepository($this->app->make(BudgetLineModel::class));
         });
 
         $this->app->singleton(BankAccountRepositoryInterface::class, function (): BankAccountRepositoryInterface {
-            return new EloquentBankAccountRepository(new BankAccountModel());
+            return new EloquentBankAccountRepository($this->app->make(BankAccountModel::class));
         });
 
-        $this->app->singleton(BankCategoryRuleRepositoryInterface::class, function (): BankCategoryRuleRepositoryInterface {
-            return new EloquentBankCategoryRuleRepository(new BankCategoryRuleModel());
-        });
+        $this->app->singleton(
+            BankCategoryRuleRepositoryInterface::class,
+            function (): BankCategoryRuleRepositoryInterface {
+                return new EloquentBankCategoryRuleRepository($this->app->make(BankCategoryRuleModel::class));
+            },
+        );
 
-        $this->app->singleton(BankTransactionRepositoryInterface::class, function (): BankTransactionRepositoryInterface {
-            return new EloquentBankTransactionRepository(new BankTransactionModel());
-        });
+        $this->app->singleton(
+            BankTransactionRepositoryInterface::class,
+            function (): BankTransactionRepositoryInterface {
+                return new EloquentBankTransactionRepository($this->app->make(BankTransactionModel::class));
+            },
+        );
 
-        $this->app->singleton(BankReconciliationRepositoryInterface::class, function (): BankReconciliationRepositoryInterface {
-            return new EloquentBankReconciliationRepository(new BankReconciliationModel());
-        });
+        $this->app->singleton(
+            BankReconciliationRepositoryInterface::class,
+            function (): BankReconciliationRepositoryInterface {
+                return new EloquentBankReconciliationRepository($this->app->make(BankReconciliationModel::class));
+            },
+        );
     }
 
     public function boot(): void

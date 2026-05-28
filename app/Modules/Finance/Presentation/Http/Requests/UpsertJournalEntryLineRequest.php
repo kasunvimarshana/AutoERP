@@ -10,7 +10,7 @@ final class UpsertJournalEntryLineRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return auth()->check();
+        return $this->user() !== null;
     }
 
     /**
@@ -28,15 +28,15 @@ final class UpsertJournalEntryLineRequest extends FormRequest
             'journal_entry_id' => ['required', 'integer', 'min:1', 'exists:journal_entries,id', ],
             'account_id' => ['required', 'integer', 'min:1', 'exists:accounts,id', ],
             'description' => ['nullable', 'string', ],
-            'debit_amount' => ['nullable', 'numeric', ],
-            'credit_amount' => ['nullable', 'numeric', ],
+            'debit_amount' => ['nullable', 'numeric', 'gt:0', 'required_without:credit_amount'],
+            'credit_amount' => ['nullable', 'numeric', 'gt:0', 'required_without:debit_amount'],
             'currency_id' => ['nullable', 'integer', 'min:1', 'exists:currencies,id', ],
-            'exchange_rate' => ['nullable', 'numeric', ],
-            'base_debit_amount' => ['nullable', 'numeric', ],
-            'base_credit_amount' => ['nullable', 'numeric', ],
+            'exchange_rate' => ['nullable', 'numeric', 'gt:0'],
+            'base_debit_amount' => ['nullable', 'numeric', 'gte:0'],
+            'base_credit_amount' => ['nullable', 'numeric', 'gte:0'],
             'cost_center_id' => ['nullable', 'integer', 'min:1', 'exists:cost_centers,id', ],
             'tax_rate_id' => ['nullable', 'integer', 'min:1', 'exists:tax_rates,id', ],
-            'tax_amount' => ['nullable', 'numeric', ],
+            'tax_amount' => ['nullable', 'numeric', 'gte:0'],
             'line_number' => ['nullable', 'integer', 'min:1', ],
         ];
     }

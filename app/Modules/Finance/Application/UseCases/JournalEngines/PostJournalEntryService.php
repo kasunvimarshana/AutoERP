@@ -7,6 +7,8 @@ namespace Modules\Finance\Application\UseCases\JournalEngines;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
+use Modules\Finance\Application\Contracts\Services\FiscalPeriodServiceInterface;
+use Modules\Finance\Application\Repositories\AccountRepositoryInterface;
 use Modules\Finance\Application\Contracts\UseCases\JournalEngines\PostJournalEntryServiceInterface;
 use Modules\Finance\Application\Repositories\JournalEntryLineRepositoryInterface;
 use Modules\Finance\Application\Repositories\JournalEntryRepositoryInterface;
@@ -19,6 +21,8 @@ final class PostJournalEntryService implements PostJournalEntryServiceInterface
     public function __construct(
         private readonly JournalEntryRepositoryInterface $entries,
         private readonly JournalEntryLineRepositoryInterface $lines,
+        private readonly AccountRepositoryInterface $accounts,
+        private readonly FiscalPeriodServiceInterface $fiscalPeriodService,
     ) {
     }
 
@@ -56,9 +60,27 @@ final class PostJournalEntryService implements PostJournalEntryServiceInterface
             }
 
             $result = $this->entries->transaction(function () use ($entry, $payload): array {
-                $lines = $this->lines->list(['journal_entry_id' => (int) $entry->id()]);
-                if ($lines === []) {
+                $tenantId = (int) $entry->get('tenant_id');
+                $organizationUnitId = $entry->get('organization_unit_id') !== null
+                    ? (int) $entry->get('organization_unit_id')
+                    : null;
+
+                $lines = $this->lines->listByJournalEntry((int) $entry->id());
+                if (count($lines) < 2) {
                     throw new \RuntimeException(FinanceErrorCode::UNBALANCED_JOURNAL_ENTRY);
+                }
+
+                foreach ($lines as $line) {
+                    $debit = (float) $line->get('debit_amount', 0);
+                    $credit = (float) $line->get('credit_amount', 0);
+                    if (($debit <= 0 && $credit <= 0) || ($debit > 0 && $credit > 0)) {
+                        throw new \RuntimeException(FinanceErrorCode::INVALID_JOURNAL_LINE);
+                    }
+
+                    $accountId = (int) $line->get('account_id', 0);
+                    if ($this->accounts->findPostableById($accountId, $tenantId) === null) {
+                        throw new \RuntimeException(FinanceErrorCode::ACCOUNT_NOT_POSTABLE);
+                    }
                 }
 
                 $totals = $this->calculateTotals($lines);
@@ -75,11 +97,24 @@ final class PostJournalEntryService implements PostJournalEntryServiceInterface
                     ? (string) $payload['posting_date']
                     : (string) $entry->get('posting_date', $entry->get('entry_date'));
 
+                $openPeriodResult = $this->fiscalPeriodService->requireOpenPeriod(
+                    $tenantId,
+                    $postingDate,
+                    $organizationUnitId,
+                );
+
+                if ($openPeriodResult->isFailure()) {
+                    throw new \RuntimeException(FinanceErrorCode::FISCAL_PERIOD_NOT_OPEN);
+                }
+
+                $fiscalPeriod = $openPeriodResult->valueOrFail();
+
                 $updated = $this->entries->update((int) $entry->id(), [
                     'status' => JournalEntryStatus::POSTED,
                     'posting_date' => $postingDate,
                     'posted_by' => $postedBy,
                     'posted_at' => now(),
+                    'fiscal_period_id' => $entry->get('fiscal_period_id') ?? $fiscalPeriod->id(),
                     'row_version' => ((int) $entry->get('row_version', 1)) + 1,
                 ]);
 
@@ -92,8 +127,14 @@ final class PostJournalEntryService implements PostJournalEntryServiceInterface
 
             return Result::success($result);
         } catch (Throwable $exception) {
-            $code = $exception->getMessage() === FinanceErrorCode::UNBALANCED_JOURNAL_ENTRY
-                ? FinanceErrorCode::UNBALANCED_JOURNAL_ENTRY
+            $knownCodes = [
+                FinanceErrorCode::UNBALANCED_JOURNAL_ENTRY,
+                FinanceErrorCode::INVALID_JOURNAL_LINE,
+                FinanceErrorCode::ACCOUNT_NOT_POSTABLE,
+                FinanceErrorCode::FISCAL_PERIOD_NOT_OPEN,
+            ];
+            $code = in_array($exception->getMessage(), $knownCodes, true)
+                ? $exception->getMessage()
                 : FinanceErrorCode::INVALID_VALUE;
 
             return Result::failure(new Error($code, $exception->getMessage()));

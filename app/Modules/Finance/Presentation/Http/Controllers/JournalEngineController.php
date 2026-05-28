@@ -6,6 +6,7 @@ namespace Modules\Finance\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
+use Modules\Finance\Domain\Constants\FinanceErrorCode;
 use Modules\Finance\Application\Contracts\UseCases\JournalEngines\PostJournalEntryServiceInterface;
 use Modules\Finance\Application\Contracts\UseCases\JournalEngines\ReverseJournalEntryServiceInterface;
 use Modules\Finance\Presentation\Http\Requests\PostJournalEntryRequest;
@@ -27,7 +28,7 @@ final class JournalEngineController extends Controller
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
-            $status = $error->code === 'FINANCE_NOT_FOUND' ? 404 : 422;
+            $status = $error->code === FinanceErrorCode::NOT_FOUND ? 404 : 422;
 
             return response()->json([
                 'message' => $error->message,
@@ -47,7 +48,7 @@ final class JournalEngineController extends Controller
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
-            $status = $error->code === 'FINANCE_NOT_FOUND' ? 404 : 422;
+            $status = $error->code === FinanceErrorCode::NOT_FOUND ? 404 : 422;
 
             return response()->json([
                 'message' => $error->message,
@@ -56,6 +57,6 @@ final class JournalEngineController extends Controller
             ], $status);
         }
 
-        return response()->json(['data' => $result->valueOrFail()->toArray()]);
+        return response()->json(['data' => $result->valueOrFail()]);
     }
 }
