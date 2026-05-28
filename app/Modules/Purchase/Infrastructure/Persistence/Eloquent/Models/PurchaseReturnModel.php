@@ -25,7 +25,7 @@ final class PurchaseReturnModel extends CoreModel
             'supplier_id' => 'integer',
             'original_purchase_order_id' => 'integer',
             'original_grn_id' => 'integer',
-            'original_invoice_id' => 'integer',
+            'original_document_id' => 'integer',
             'currency_id' => 'integer',
             'exchange_rate' => 'decimal:4',
             'return_date' => 'date',
@@ -42,7 +42,19 @@ final class PurchaseReturnModel extends CoreModel
             'debit_note_total' => 'decimal:4',
             'credit_note_total' => 'decimal:4',
             'grand_total' => 'decimal:4',
-            'created_by' => 'integer'
+            'is_without_original' => 'boolean',
+            'created_by' => 'integer',
+            'updated_by' => 'integer',
+            'submitted_by' => 'integer',
+            'approved_by' => 'integer',
+            'posted_by' => 'integer',
+            'cancelled_by' => 'integer',
+            'reversed_by' => 'integer',
+            'submitted_at' => 'datetime',
+            'approved_at' => 'datetime',
+            'posted_at' => 'datetime',
+            'cancelled_at' => 'datetime',
+            'reversed_at' => 'datetime',
         ]);
     }
 }

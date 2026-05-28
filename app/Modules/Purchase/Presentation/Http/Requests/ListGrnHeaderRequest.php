@@ -27,7 +27,7 @@ final class ListGrnHeaderRequest extends FormRequest
             'warehouse_id' => ['nullable', 'integer', 'min:1', 'exists:warehouses,id'],
             'grn_number' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'string', 'max:255'],
-            'invoice_status' => ['nullable', 'string', 'max:255']
+            'document_status' => ['nullable', 'string', 'max:255']
         ];
     }
 }

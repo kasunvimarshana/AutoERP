@@ -20,8 +20,8 @@ return new class extends Migration
             $table->foreignId('warehouse_id')->constrained('warehouses', 'id')->restrictOnDelete();
             $table->foreignId('purchase_order_id')->nullable()->constrained('purchase_orders', 'id')->nullOnDelete();
             $table->string('grn_number');
-            $table->string('status')->default('draft')->comment('draft, confirmed');
-            $table->string('invoice_status')->default('not_invoiced')->comment('not_invoiced, partially_invoiced, closed');
+            $table->string('status')->default('draft')->comment('draft, submitted, inspected, confirmed, posted, partially_documented, documented, cancelled, reversed');
+            $table->string('document_status')->default('not_documented')->comment('not_documented, partially_documented, documented, reversed');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 4)->default(1);
             $table->date('received_date');
@@ -52,6 +52,17 @@ return new class extends Migration
 
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
+            $table->unsignedBigInteger('updated_by')->nullable();
+            $table->unsignedBigInteger('submitted_by')->nullable();
+            $table->unsignedBigInteger('confirmed_by')->nullable();
+            $table->unsignedBigInteger('posted_by')->nullable();
+            $table->unsignedBigInteger('cancelled_by')->nullable();
+            $table->unsignedBigInteger('reversed_by')->nullable();
+            $table->timestamp('submitted_at')->nullable();
+            $table->timestamp('confirmed_at')->nullable();
+            $table->timestamp('posted_at')->nullable();
+            $table->timestamp('cancelled_at')->nullable();
+            $table->timestamp('reversed_at')->nullable();
 
             $table->timestamps();
             $table->softDeletes();

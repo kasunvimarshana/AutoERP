@@ -1,0 +1,575 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Purchase\Application\Services;
+
+use Modules\Core\Application\DTO\DataRecord;
+use Modules\Core\Application\Results\Error;
+use Modules\Core\Application\Results\Result;
+use Modules\Document\Application\DTOs\CreateDocumentDTO;
+use Modules\Document\Application\Services\DocumentOrchestrator;
+use Modules\Finance\Application\Contracts\Services\FinancePostingServiceInterface;
+use Modules\Inventory\Application\Contracts\UseCases\StockMovements\CreateStockMovementServiceInterface;
+use Modules\Payment\Application\Contracts\Services\AdvancePaymentAllocationServiceInterface;
+use Modules\Payment\Application\Contracts\Services\PaymentAllocationServiceInterface;
+use Modules\Purchase\Application\Contracts\Services\PurchaseWorkflowServiceInterface;
+use Modules\Purchase\Application\Repositories\GrnHeaderRepositoryInterface;
+use Modules\Purchase\Application\Repositories\GrnLineRepositoryInterface;
+use Modules\Purchase\Application\Repositories\PurchaseDocumentLinkRepositoryInterface;
+use Modules\Purchase\Application\Repositories\PurchaseOrderLineRepositoryInterface;
+use Modules\Purchase\Application\Repositories\PurchaseOrderRepositoryInterface;
+use Modules\Purchase\Application\Repositories\PurchasePaymentAllocationRepositoryInterface;
+use Modules\Purchase\Application\Repositories\PurchaseReturnLineRepositoryInterface;
+use Modules\Purchase\Application\Repositories\PurchaseReturnRepositoryInterface;
+use Modules\Purchase\Application\Repositories\PurchaseStatusHistoryRepositoryInterface;
+use Modules\Purchase\Domain\Constants\PurchaseErrorCode;
+use Throwable;
+
+final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
+{
+    public function __construct(
+        private readonly PurchaseOrderRepositoryInterface $purchaseOrderRepository,
+        private readonly PurchaseOrderLineRepositoryInterface $purchaseOrderLineRepository,
+        private readonly GrnHeaderRepositoryInterface $grnHeaderRepository,
+        private readonly GrnLineRepositoryInterface $grnLineRepository,
+        private readonly PurchaseReturnRepositoryInterface $purchaseReturnRepository,
+        private readonly PurchaseReturnLineRepositoryInterface $purchaseReturnLineRepository,
+        private readonly PurchaseDocumentLinkRepositoryInterface $purchaseDocumentLinkRepository,
+        private readonly PurchasePaymentAllocationRepositoryInterface $purchasePaymentAllocationRepository,
+        private readonly PurchaseStatusHistoryRepositoryInterface $purchaseStatusHistoryRepository,
+        private readonly DocumentOrchestrator $documentOrchestrator,
+        private readonly PaymentAllocationServiceInterface $paymentAllocationService,
+        private readonly AdvancePaymentAllocationServiceInterface $advancePaymentAllocationService,
+        private readonly CreateStockMovementServiceInterface $createStockMovementService,
+        private readonly FinancePostingServiceInterface $financePostingService,
+    ) {
+    }
+
+    public function transition(string $entityType, int|string $id, array $payload): Result
+    {
+        try {
+            $status = strtolower(trim((string) ($payload['status'] ?? '')));
+            if ($status === '') {
+                return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'status is required.'));
+            }
+
+            $record = $this->findEntity($entityType, $id);
+            if (! $record instanceof DataRecord) {
+                return Result::failure(new Error(PurchaseErrorCode::NOT_FOUND, 'Purchase entity not found.'));
+            }
+
+            $tenantId = (int) ($payload['tenant_id'] ?? 0);
+            if (! $this->isTenantMatch($record, $tenantId)) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Cross-tenant transition is not allowed.',
+                ));
+            }
+
+            $actorId = isset($payload['actor_id']) ? (int) $payload['actor_id'] : null;
+            $fields = [
+                'status' => $status,
+                'updated_by' => $actorId,
+            ];
+
+            if ($status === 'submitted') {
+                $fields['submitted_by'] = $actorId;
+                $fields['submitted_at'] = now()->toDateTimeString();
+            }
+
+            if ($status === 'approved') {
+                $fields['approved_by'] = $actorId;
+                $fields['approved_at'] = now()->toDateTimeString();
+            }
+
+            if ($status === 'confirmed') {
+                $fields['confirmed_by'] = $actorId;
+                $fields['confirmed_at'] = now()->toDateTimeString();
+            }
+
+            if ($status === 'posted') {
+                $fields['posted_by'] = $actorId;
+                $fields['posted_at'] = now()->toDateTimeString();
+            }
+
+            if ($status === 'cancelled') {
+                $fields['cancelled_by'] = $actorId;
+                $fields['cancelled_at'] = now()->toDateTimeString();
+            }
+
+            if ($status === 'reversed') {
+                $fields['reversed_by'] = $actorId;
+                $fields['reversed_at'] = now()->toDateTimeString();
+                if ($this->supportsDocumentStatus($entityType)) {
+                    $fields['document_status'] = 'reversed';
+                }
+            }
+
+            $updated = $this->updateEntity($entityType, $id, $fields);
+
+            $this->purchaseStatusHistoryRepository->create([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $record->get('organization_unit_id'),
+                'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
+                'entity_type' => $entityType,
+                'entity_id' => (int) $record->id(),
+                'from_status' => (string) $record->get('status', ''),
+                'to_status' => $status,
+                'reason' => $payload['reason'] ?? null,
+                'changed_by' => $actorId,
+                'changed_at' => now()->toDateTimeString(),
+            ]);
+
+            return Result::success($updated);
+        } catch (Throwable $exception) {
+            return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, $exception->getMessage()));
+        }
+    }
+
+    public function createDocument(string $entityType, int|string $id, array $payload): Result
+    {
+        try {
+            $record = $this->findEntity($entityType, $id);
+            if (! $record instanceof DataRecord) {
+                return Result::failure(new Error(PurchaseErrorCode::NOT_FOUND, 'Purchase entity not found.'));
+            }
+
+            $tenantId = (int) ($payload['tenant_id'] ?? 0);
+            if (! $this->isTenantMatch($record, $tenantId)) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Cross-tenant document creation is not allowed.',
+                ));
+            }
+
+            $documentTypeId = isset($payload['document_type_id']) ? (int) $payload['document_type_id'] : 0;
+            if ($documentTypeId < 1) {
+                return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'document_type_id is required.'));
+            }
+
+            $items = $this->resolveDocumentItems($entityType, (int) $record->id(), $payload);
+            if ($items === []) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'At least one document item is required.',
+                ));
+            }
+
+            $documentDate = (string) ($payload['document_date'] ?? now()->toDateString());
+            $dto = new CreateDocumentDTO(
+                tenantId: $tenantId,
+                documentTypeId: $documentTypeId,
+                documentDate: $documentDate,
+                organizationUnitId: $record->get('organization_unit_id') !== null
+                    ? (int) $record->get('organization_unit_id')
+                    : null,
+                ownerId: isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
+                partyId: $record->get('supplier_id') !== null ? (int) $record->get('supplier_id') : null,
+                dueDate: isset($payload['due_date']) ? (string) $payload['due_date'] : null,
+                notes: isset($payload['notes']) ? (string) $payload['notes'] : null,
+                data: [
+                    'source_type' => $entityType,
+                    'source_id' => (int) $record->id(),
+                    'purchase_reference' => $record->get('reference'),
+                    'purchase_number' => $record->get('po_number')
+                        ?? $record->get('grn_number')
+                        ?? $record->get('return_number'),
+                ],
+                items: $items,
+            );
+
+            $documentAggregate = $this->documentOrchestrator->create($dto);
+            $documentId = $documentAggregate->document->id;
+            if (! is_int($documentId) || $documentId < 1) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Document creation did not return a valid document id.',
+                ));
+            }
+
+            $this->purchaseDocumentLinkRepository->create([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $record->get('organization_unit_id'),
+                'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
+                'source_type' => $entityType,
+                'source_id' => (int) $record->id(),
+                'source_line_id' => null,
+                'document_id' => $documentId,
+                'document_line_id' => null,
+                'linked_quantity' => null,
+                'linked_amount' => (float) ($record->get('grand_total') ?? 0),
+                'status' => 'active',
+                'linked_at' => now()->toDateTimeString(),
+                'created_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
+            ]);
+
+            $nextDocumentStatus = $this->supportsDocumentStatus($entityType) ? 'documented' : null;
+            if ($nextDocumentStatus !== null) {
+                $this->updateEntity($entityType, $id, [
+                    'document_status' => $nextDocumentStatus,
+                    'updated_by' => $payload['actor_id'] ?? null,
+                ]);
+            }
+
+            return Result::success([
+                'source_type' => $entityType,
+                'source_id' => (int) $record->id(),
+                'document_id' => $documentId,
+                'document_number' => $documentAggregate->document->documentNumber,
+            ]);
+        } catch (Throwable $exception) {
+            return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, $exception->getMessage()));
+        }
+    }
+
+    public function allocatePayment(string $entityType, int|string $id, array $payload): Result
+    {
+        try {
+            $record = $this->findEntity($entityType, $id);
+            if (! $record instanceof DataRecord) {
+                return Result::failure(new Error(PurchaseErrorCode::NOT_FOUND, 'Purchase entity not found.'));
+            }
+
+            $tenantId = (int) ($payload['tenant_id'] ?? 0);
+            if (! $this->isTenantMatch($record, $tenantId)) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Cross-tenant payment allocation is not allowed.',
+                ));
+            }
+
+            $documentId = isset($payload['document_id']) ? (int) $payload['document_id'] : 0;
+            if ($documentId < 1) {
+                $documentId = $this->resolveLatestDocumentId($entityType, (int) $record->id(), $tenantId);
+            }
+            if ($documentId < 1) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'A linked document is required before allocating payment.',
+                ));
+            }
+
+            $allocatedAmount = round((float) ($payload['allocated_amount'] ?? 0), 4);
+            if ($allocatedAmount <= 0) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'allocated_amount must be greater than zero.',
+                ));
+            }
+
+            if (isset($payload['payment_id'])) {
+                $allocationResult = $this->paymentAllocationService->createAllocation([
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => $record->get('organization_unit_id'),
+                    'payment_id' => (int) $payload['payment_id'],
+                    'document_type' => $entityType,
+                    'document_id' => $documentId,
+                    'allocated_amount' => $allocatedAmount,
+                    'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
+                    'reference' => $payload['reference'] ?? null,
+                ]);
+            } elseif (isset($payload['advance_payment_id'])) {
+                $allocationResult = $this->advancePaymentAllocationService->createAllocation([
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => $record->get('organization_unit_id'),
+                    'advance_payment_id' => (int) $payload['advance_payment_id'],
+                    'document_type' => $entityType,
+                    'document_id' => $documentId,
+                    'allocated_amount' => $allocatedAmount,
+                    'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
+                    'reference' => $payload['reference'] ?? null,
+                ]);
+            } else {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'payment_id or advance_payment_id is required.',
+                ));
+            }
+
+            if ($allocationResult->isFailure()) {
+                return $allocationResult;
+            }
+
+            $this->purchasePaymentAllocationRepository->create([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $record->get('organization_unit_id'),
+                'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
+                'document_id' => $documentId,
+                'payment_id' => isset($payload['payment_id']) ? (int) $payload['payment_id'] : null,
+                'advance_payment_id' => isset($payload['advance_payment_id'])
+                    ? (int) $payload['advance_payment_id']
+                    : null,
+                'allocated_amount' => $allocatedAmount,
+                'currency_id' => isset($payload['currency_id']) ? (int) $payload['currency_id'] : null,
+                'base_allocated_amount' => isset($payload['base_allocated_amount'])
+                    ? round((float) $payload['base_allocated_amount'], 4)
+                    : null,
+                'status' => 'active',
+                'allocated_at' => now()->toDateTimeString(),
+                'created_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
+            ]);
+
+            return Result::success($allocationResult->valueOrFail());
+        } catch (Throwable $exception) {
+            return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, $exception->getMessage()));
+        }
+    }
+
+    public function postInventory(string $entityType, int|string $id, array $payload): Result
+    {
+        try {
+            $record = $this->findEntity($entityType, $id);
+            if (! $record instanceof DataRecord) {
+                return Result::failure(new Error(PurchaseErrorCode::NOT_FOUND, 'Purchase entity not found.'));
+            }
+
+            $tenantId = (int) ($payload['tenant_id'] ?? 0);
+            if (! $this->isTenantMatch($record, $tenantId)) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Cross-tenant inventory posting is not allowed.',
+                ));
+            }
+
+            $lineRecords = $this->resolveLines($entityType, (int) $record->id());
+            if ($lineRecords === []) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'No lines found for inventory posting.',
+                ));
+            }
+
+            foreach ($lineRecords as $line) {
+                $quantity = $entityType === 'purchase_return'
+                    ? (float) $line->get('return_qty', 0)
+                    : (float) $line->get('received_qty', 0);
+                if ($quantity <= 0) {
+                    continue;
+                }
+
+                $direction = $entityType === 'purchase_return' ? 'OUT' : 'IN';
+                $movementType = $entityType === 'purchase_return' ? 'PURCHASE_RETURN' : 'PURCHASE_GRN';
+
+                $movementResult = $this->createStockMovementService->execute([
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => $record->get('organization_unit_id'),
+                    'direction' => $direction,
+                    'movement_type' => $movementType,
+                    'item_id' => (int) $line->get('item_id', 0),
+                    'variant_id' => $line->get('variant_id'),
+                    'batch_id' => $line->get('batch_id'),
+                    'serial_id' => $line->get('serial_id'),
+                    'location_id' => $line->get('location_id'),
+                    'warehouse_id' => $line->get('warehouse_id') ?? $record->get('warehouse_id'),
+                    'source_type' => $entityType,
+                    'source_id' => (int) $record->id(),
+                    'source_line_id' => (int) $line->id(),
+                    'transaction_uom_id' => (int) $line->get('uom_id', 0),
+                    'base_uom_id' => (int) $line->get('uom_id', 0),
+                    'quantity' => $quantity,
+                    'base_quantity' => $quantity,
+                    'quantity_in' => $direction === 'IN' ? $quantity : 0,
+                    'quantity_out' => $direction === 'OUT' ? $quantity : 0,
+                    'base_quantity_in' => $direction === 'IN' ? $quantity : 0,
+                    'base_quantity_out' => $direction === 'OUT' ? $quantity : 0,
+                    'unit_cost' => (float) $line->get('unit_price', 0),
+                    'total_cost' => round($quantity * (float) $line->get('unit_price', 0), 4),
+                    'status' => 'POSTED',
+                    'performed_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
+                    'performed_at' => now()->toDateTimeString(),
+                    'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
+                ]);
+
+                if ($movementResult->isFailure()) {
+                    return $movementResult;
+                }
+            }
+
+            if ($entityType === 'grn_header') {
+                $this->updateEntity($entityType, $id, [
+                    'status' => 'posted',
+                    'posted_by' => $payload['actor_id'] ?? null,
+                    'posted_at' => now()->toDateTimeString(),
+                    'updated_by' => $payload['actor_id'] ?? null,
+                ]);
+            }
+
+            return Result::success(['posted' => true]);
+        } catch (Throwable $exception) {
+            return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, $exception->getMessage()));
+        }
+    }
+
+    public function postFinance(string $entityType, int|string $id, array $payload): Result
+    {
+        try {
+            $record = $this->findEntity($entityType, $id);
+            if (! $record instanceof DataRecord) {
+                return Result::failure(new Error(PurchaseErrorCode::NOT_FOUND, 'Purchase entity not found.'));
+            }
+
+            $tenantId = (int) ($payload['tenant_id'] ?? 0);
+            if (! $this->isTenantMatch($record, $tenantId)) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Cross-tenant finance posting is not allowed.',
+                ));
+            }
+
+            $entryPayload = is_array($payload['entry_payload'] ?? null) ? $payload['entry_payload'] : [];
+            $linesPayload = is_array($payload['lines_payload'] ?? null) ? $payload['lines_payload'] : [];
+            if ($entryPayload === [] || $linesPayload === []) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'entry_payload and lines_payload are required.',
+                ));
+            }
+
+            $entryPayload['tenant_id'] = $tenantId;
+            $entryPayload['organization_unit_id'] = $entryPayload['organization_unit_id']
+                ?? $record->get('organization_unit_id');
+            $entryPayload['source_type'] = $entryPayload['source_type'] ?? $entityType;
+            $entryPayload['source_id'] = $entryPayload['source_id'] ?? (int) $record->id();
+
+            $postingResult = $this->financePostingService->postFromSource($entryPayload, $linesPayload);
+            if ($postingResult->isFailure()) {
+                return $postingResult;
+            }
+
+            return Result::success($postingResult->valueOrFail());
+        } catch (Throwable $exception) {
+            return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, $exception->getMessage()));
+        }
+    }
+
+    public function reverseFinance(string $entityType, int|string $id, array $payload): Result
+    {
+        try {
+            $record = $this->findEntity($entityType, $id);
+            if (! $record instanceof DataRecord) {
+                return Result::failure(new Error(PurchaseErrorCode::NOT_FOUND, 'Purchase entity not found.'));
+            }
+
+            $tenantId = (int) ($payload['tenant_id'] ?? 0);
+            if (! $this->isTenantMatch($record, $tenantId)) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Cross-tenant finance reversal is not allowed.',
+                ));
+            }
+
+            $journalEntryId = $payload['journal_entry_id'] ?? null;
+            if (! is_int($journalEntryId) && ! is_string($journalEntryId)) {
+                return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'journal_entry_id is required.'));
+            }
+
+            return $this->financePostingService->reverseByEntryId($journalEntryId, [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $record->get('organization_unit_id'),
+                'reason' => $payload['reason'] ?? null,
+                'reversed_by' => $payload['actor_id'] ?? null,
+            ]);
+        } catch (Throwable $exception) {
+            return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, $exception->getMessage()));
+        }
+    }
+
+    private function findEntity(string $entityType, int|string $id): ?DataRecord
+    {
+        return match ($entityType) {
+            'purchase_order' => $this->purchaseOrderRepository->findById($id),
+            'grn_header' => $this->grnHeaderRepository->findById($id),
+            'purchase_return' => $this->purchaseReturnRepository->findById($id),
+            default => null,
+        };
+    }
+
+    private function updateEntity(string $entityType, int|string $id, array $payload): DataRecord
+    {
+        return match ($entityType) {
+            'purchase_order' => $this->purchaseOrderRepository->update($id, $payload),
+            'grn_header' => $this->grnHeaderRepository->update($id, $payload),
+            'purchase_return' => $this->purchaseReturnRepository->update($id, $payload),
+            default => throw new \InvalidArgumentException('Unsupported entity type.'),
+        };
+    }
+
+    /** @return list<DataRecord> */
+    private function resolveLines(string $entityType, int $entityId): array
+    {
+        return match ($entityType) {
+            'purchase_order' => $this->purchaseOrderLineRepository->list(['purchase_order_id' => $entityId]),
+            'grn_header' => $this->grnLineRepository->list(['grn_header_id' => $entityId]),
+            'purchase_return' => $this->purchaseReturnLineRepository->list(['purchase_return_id' => $entityId]),
+            default => [],
+        };
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function resolveDocumentItems(string $entityType, int $entityId, array $payload): array
+    {
+        $providedItems = $payload['items'] ?? null;
+        if (is_array($providedItems) && $providedItems !== []) {
+            return $providedItems;
+        }
+
+        $records = $this->resolveLines($entityType, $entityId);
+        $items = [];
+
+        foreach ($records as $line) {
+            $qty = $entityType === 'purchase_return'
+                ? (float) $line->get('return_qty', 0)
+                : (float) $line->get('received_qty', $line->get('ordered_qty', 0));
+            $lineTotal = (float) $line->get('line_total_with_tax', $line->get('line_total', 0));
+            if ($qty <= 0 || $lineTotal <= 0) {
+                continue;
+            }
+
+            $items[] = [
+                'item_type' => 'purchase_line',
+                'description' => $line->get('description'),
+                'line_total' => $lineTotal,
+                'data' => [
+                    'source_line_id' => (int) $line->id(),
+                    'item_id' => $line->get('item_id'),
+                    'variant_id' => $line->get('variant_id'),
+                    'uom_id' => $line->get('uom_id'),
+                    'quantity' => $qty,
+                    'unit_price' => (float) $line->get('unit_price', 0),
+                    'discount_amount' => (float) $line->get('discount_amount', 0),
+                    'tax_amount' => (float) $line->get('tax_amount', 0),
+                ],
+            ];
+        }
+
+        return $items;
+    }
+
+    private function supportsDocumentStatus(string $entityType): bool
+    {
+        return in_array($entityType, ['purchase_order', 'grn_header'], true);
+    }
+
+    private function isTenantMatch(DataRecord $record, int $tenantId): bool
+    {
+        return $tenantId > 0 && $tenantId === (int) $record->get('tenant_id', 0);
+    }
+
+    private function resolveLatestDocumentId(string $entityType, int $sourceId, int $tenantId): int
+    {
+        $links = $this->purchaseDocumentLinkRepository->list([
+            'tenant_id' => $tenantId,
+            'source_type' => $entityType,
+            'source_id' => $sourceId,
+            'status' => 'active',
+        ]);
+
+        $latest = end($links);
+        if (! $latest instanceof DataRecord) {
+            return 0;
+        }
+
+        return (int) $latest->get('document_id', 0);
+    }
+}

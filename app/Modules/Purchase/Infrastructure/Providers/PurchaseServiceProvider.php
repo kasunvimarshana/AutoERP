@@ -35,12 +35,18 @@ use Modules\Purchase\Application\Contracts\UseCases\PurchaseReturns\DeletePurcha
 use Modules\Purchase\Application\Contracts\UseCases\PurchaseReturns\GetPurchaseReturnServiceInterface;
 use Modules\Purchase\Application\Contracts\UseCases\PurchaseReturns\ListPurchaseReturnsServiceInterface;
 use Modules\Purchase\Application\Contracts\UseCases\PurchaseReturns\UpdatePurchaseReturnServiceInterface;
+use Modules\Purchase\Application\Contracts\Services\PurchaseWorkflowServiceInterface;
 use Modules\Purchase\Application\Repositories\GrnHeaderRepositoryInterface;
 use Modules\Purchase\Application\Repositories\GrnLineRepositoryInterface;
+use Modules\Purchase\Application\Repositories\PurchaseDocumentLinkRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchaseOrderLineRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchaseOrderRepositoryInterface;
+use Modules\Purchase\Application\Repositories\PurchasePaymentAllocationRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchaseReturnLineRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchaseReturnRepositoryInterface;
+use Modules\Purchase\Application\Repositories\PurchaseSettingRepositoryInterface;
+use Modules\Purchase\Application\Repositories\PurchaseStatusHistoryRepositoryInterface;
+use Modules\Purchase\Application\Services\PurchaseWorkflowService;
 use Modules\Purchase\Application\UseCases\GrnHeaders\CreateGrnHeaderService;
 use Modules\Purchase\Application\UseCases\GrnHeaders\DeleteGrnHeaderService;
 use Modules\Purchase\Application\UseCases\GrnHeaders\GetGrnHeaderService;
@@ -73,16 +79,24 @@ use Modules\Purchase\Application\UseCases\PurchaseReturns\ListPurchaseReturnsSer
 use Modules\Purchase\Application\UseCases\PurchaseReturns\UpdatePurchaseReturnService;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\GrnHeaderModel;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\GrnLineModel;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\PurchaseDocumentLinkModel;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\PurchaseOrderLineModel;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\PurchaseOrderModel;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\PurchasePaymentAllocationModel;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\PurchaseReturnLineModel;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\PurchaseReturnModel;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\PurchaseSettingModel;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\Models\PurchaseStatusHistoryModel;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentPurchaseDocumentLinkRepository;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentGrnHeaderRepository;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentGrnLineRepository;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentPurchaseOrderLineRepository;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentPurchaseOrderRepository;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentPurchasePaymentAllocationRepository;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentPurchaseReturnLineRepository;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentPurchaseReturnRepository;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentPurchaseSettingRepository;
+use Modules\Purchase\Infrastructure\Persistence\Eloquent\Repositories\EloquentPurchaseStatusHistoryRepository;
 
 final class PurchaseServiceProvider extends ServiceProvider
 {
@@ -122,6 +136,7 @@ final class PurchaseServiceProvider extends ServiceProvider
                 CreatePurchaseReturnLineServiceInterface::class => CreatePurchaseReturnLineService::class,
                 UpdatePurchaseReturnLineServiceInterface::class => UpdatePurchaseReturnLineService::class,
                 DeletePurchaseReturnLineServiceInterface::class => DeletePurchaseReturnLineService::class,
+                PurchaseWorkflowServiceInterface::class => PurchaseWorkflowService::class,
             ] as $contract => $implementation
         ) {
             $this->app->singleton($contract, $implementation);
@@ -130,9 +145,12 @@ final class PurchaseServiceProvider extends ServiceProvider
         $this->app->singleton(PurchaseOrderRepositoryInterface::class, function (): PurchaseOrderRepositoryInterface {
             return new EloquentPurchaseOrderRepository(new PurchaseOrderModel());
         });
-        $this->app->singleton(PurchaseOrderLineRepositoryInterface::class, function (): PurchaseOrderLineRepositoryInterface {
-            return new EloquentPurchaseOrderLineRepository(new PurchaseOrderLineModel());
-        });
+        $this->app->singleton(
+            PurchaseOrderLineRepositoryInterface::class,
+            function (): PurchaseOrderLineRepositoryInterface {
+                return new EloquentPurchaseOrderLineRepository(new PurchaseOrderLineModel());
+            }
+        );
         $this->app->singleton(GrnHeaderRepositoryInterface::class, function (): GrnHeaderRepositoryInterface {
             return new EloquentGrnHeaderRepository(new GrnHeaderModel());
         });
@@ -142,9 +160,36 @@ final class PurchaseServiceProvider extends ServiceProvider
         $this->app->singleton(PurchaseReturnRepositoryInterface::class, function (): PurchaseReturnRepositoryInterface {
             return new EloquentPurchaseReturnRepository(new PurchaseReturnModel());
         });
-        $this->app->singleton(PurchaseReturnLineRepositoryInterface::class, function (): PurchaseReturnLineRepositoryInterface {
-            return new EloquentPurchaseReturnLineRepository(new PurchaseReturnLineModel());
-        });
+        $this->app->singleton(
+            PurchaseReturnLineRepositoryInterface::class,
+            function (): PurchaseReturnLineRepositoryInterface {
+                return new EloquentPurchaseReturnLineRepository(new PurchaseReturnLineModel());
+            }
+        );
+        $this->app->singleton(
+            PurchaseSettingRepositoryInterface::class,
+            function (): PurchaseSettingRepositoryInterface {
+                return new EloquentPurchaseSettingRepository(new PurchaseSettingModel());
+            }
+        );
+        $this->app->singleton(
+            PurchaseDocumentLinkRepositoryInterface::class,
+            function (): PurchaseDocumentLinkRepositoryInterface {
+                return new EloquentPurchaseDocumentLinkRepository(new PurchaseDocumentLinkModel());
+            }
+        );
+        $this->app->singleton(
+            PurchasePaymentAllocationRepositoryInterface::class,
+            function (): PurchasePaymentAllocationRepositoryInterface {
+                return new EloquentPurchasePaymentAllocationRepository(new PurchasePaymentAllocationModel());
+            }
+        );
+        $this->app->singleton(
+            PurchaseStatusHistoryRepositoryInterface::class,
+            function (): PurchaseStatusHistoryRepositoryInterface {
+                return new EloquentPurchaseStatusHistoryRepository(new PurchaseStatusHistoryModel());
+            }
+        );
     }
 
     public function boot(): void

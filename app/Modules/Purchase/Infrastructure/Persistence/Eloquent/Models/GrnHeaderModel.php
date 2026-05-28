@@ -41,7 +41,18 @@ final class GrnHeaderModel extends CoreModel
             'debit_note_total' => 'decimal:4',
             'credit_note_total' => 'decimal:4',
             'grand_total' => 'decimal:4',
-            'created_by' => 'integer'
+            'created_by' => 'integer',
+            'updated_by' => 'integer',
+            'submitted_by' => 'integer',
+            'confirmed_by' => 'integer',
+            'posted_by' => 'integer',
+            'cancelled_by' => 'integer',
+            'reversed_by' => 'integer',
+            'submitted_at' => 'datetime',
+            'confirmed_at' => 'datetime',
+            'posted_at' => 'datetime',
+            'cancelled_at' => 'datetime',
+            'reversed_at' => 'datetime',
         ]);
     }
 }

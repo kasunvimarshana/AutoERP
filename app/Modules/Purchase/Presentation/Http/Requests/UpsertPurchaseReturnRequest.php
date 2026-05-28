@@ -29,7 +29,7 @@ final class UpsertPurchaseReturnRequest extends FormRequest
             'supplier_id' => array_merge($required, ['integer', 'min:1', 'exists:suppliers,id']),
             'original_purchase_order_id' => ['nullable', 'integer', 'min:1', 'exists:purchase_orders,id'],
             'original_grn_id' => ['nullable', 'integer', 'min:1', 'exists:grn_headers,id'],
-            'original_invoice_id' => ['nullable', 'integer', 'min:1', 'exists:invoices,id'],
+            'original_document_id' => ['nullable', 'integer', 'min:1', 'exists:documents,id'],
             'return_number' => array_merge($required, ['string', 'max:255']),
             'status' => ['nullable', 'string', 'max:255'],
             'currency_id' => ['nullable', 'integer', 'min:1', 'exists:currencies,id'],

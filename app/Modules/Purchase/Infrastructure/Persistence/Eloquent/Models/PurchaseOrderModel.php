@@ -29,6 +29,7 @@ final class PurchaseOrderModel extends CoreModel
             'order_date' => 'date',
             'expected_date' => 'date',
             'price_list_id' => 'integer',
+            'payment_term_id' => 'integer',
             'subtotal' => 'decimal:4',
             'line_tax_total' => 'decimal:4',
             'line_discount_total' => 'decimal:4',
@@ -43,7 +44,18 @@ final class PurchaseOrderModel extends CoreModel
             'grand_total' => 'decimal:4',
             'paid_amount' => 'decimal:4',
             'balance' => 'decimal:4',
-            'created_by' => 'integer'
+            'created_by' => 'integer',
+            'updated_by' => 'integer',
+            'submitted_by' => 'integer',
+            'approved_by' => 'integer',
+            'confirmed_by' => 'integer',
+            'cancelled_by' => 'integer',
+            'reversed_by' => 'integer',
+            'submitted_at' => 'datetime',
+            'approved_at' => 'datetime',
+            'confirmed_at' => 'datetime',
+            'cancelled_at' => 'datetime',
+            'reversed_at' => 'datetime',
         ]);
     }
 }

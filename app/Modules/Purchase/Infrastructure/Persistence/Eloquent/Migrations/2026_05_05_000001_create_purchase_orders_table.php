@@ -19,13 +19,14 @@ return new class extends Migration
             $table->foreignId('supplier_id')->constrained('suppliers', 'id')->restrictOnDelete();
             $table->foreignId('warehouse_id')->constrained('warehouses', 'id')->restrictOnDelete();
             $table->string('po_number');
-            $table->string('status')->default('draft')->comment('draft, confirmed, partially_received, received, cancelled');
-            $table->string('invoice_status')->default('not_invoiced')->comment('not_invoiced, partially_invoiced, closed');
+            $table->string('status')->default('draft')->comment('draft, submitted, approved, confirmed, partially_received, received, partially_documented, documented, closed, cancelled, reversed');
+            $table->string('document_status')->default('not_documented')->comment('not_documented, partially_documented, documented, reversed');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 4)->default(1);
             $table->date('order_date');
             $table->date('expected_date')->nullable();
             $table->foreignId('price_list_id')->nullable()->constrained('price_lists', 'id')->nullOnDelete();
+            $table->foreignId('payment_term_id')->nullable()->constrained('payment_terms', 'id')->nullOnDelete();
 
             // Line-derived totals - strictly SUM over lines
             $table->decimal('subtotal', 20, 4)->default(0)->comment('SUM(line.gross_amount)');
@@ -55,6 +56,17 @@ return new class extends Migration
 
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
+            $table->unsignedBigInteger('updated_by')->nullable();
+            $table->unsignedBigInteger('submitted_by')->nullable();
+            $table->unsignedBigInteger('approved_by')->nullable();
+            $table->unsignedBigInteger('confirmed_by')->nullable();
+            $table->unsignedBigInteger('cancelled_by')->nullable();
+            $table->unsignedBigInteger('reversed_by')->nullable();
+            $table->timestamp('submitted_at')->nullable();
+            $table->timestamp('approved_at')->nullable();
+            $table->timestamp('confirmed_at')->nullable();
+            $table->timestamp('cancelled_at')->nullable();
+            $table->timestamp('reversed_at')->nullable();
 
             $table->timestamps();
             $table->softDeletes();

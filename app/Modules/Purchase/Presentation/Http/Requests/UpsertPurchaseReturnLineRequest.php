@@ -29,6 +29,7 @@ final class UpsertPurchaseReturnLineRequest extends FormRequest
             'purchase_return_id' => array_merge($required, ['integer', 'min:1', 'exists:purchase_returns,id']),
             'original_grn_line_id' => ['nullable', 'integer', 'min:1', 'exists:grn_lines,id'],
             'original_purchase_order_line_id' => ['nullable', 'integer', 'min:1', 'exists:purchase_order_lines,id'],
+            'original_document_line_id' => ['nullable', 'integer', 'min:1', 'exists:document_items,id'],
             'item_id' => array_merge($required, ['integer', 'min:1', 'exists:items,id']),
             'variant_id' => ['nullable', 'integer', 'min:1', 'exists:item_variants,id'],
             'batch_id' => ['nullable', 'integer', 'min:1', 'exists:batches,id'],

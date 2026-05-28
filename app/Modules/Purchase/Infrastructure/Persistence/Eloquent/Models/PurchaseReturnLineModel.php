@@ -25,6 +25,7 @@ final class PurchaseReturnLineModel extends CoreModel
             'purchase_return_id' => 'integer',
             'original_grn_line_id' => 'integer',
             'original_purchase_order_line_id' => 'integer',
+            'original_document_line_id' => 'integer',
             'item_id' => 'integer',
             'variant_id' => 'integer',
             'batch_id' => 'integer',

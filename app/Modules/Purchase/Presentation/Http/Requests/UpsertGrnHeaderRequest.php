@@ -31,7 +31,7 @@ final class UpsertGrnHeaderRequest extends FormRequest
             'purchase_order_id' => ['nullable', 'integer', 'min:1', 'exists:purchase_orders,id'],
             'grn_number' => array_merge($required, ['string', 'max:255']),
             'status' => ['nullable', 'string', 'max:255'],
-            'invoice_status' => ['nullable', 'string', 'max:255'],
+            'document_status' => ['nullable', 'string', 'max:255'],
             'currency_id' => ['nullable', 'integer', 'min:1', 'exists:currencies,id'],
             'exchange_rate' => ['nullable', 'numeric'],
             'received_date' => array_merge($required, ['date']),
