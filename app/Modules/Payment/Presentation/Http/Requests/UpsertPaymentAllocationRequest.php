@@ -28,8 +28,13 @@ final class UpsertPaymentAllocationRequest extends FormRequest
             'payment_id' => array_merge($required, ['integer', 'min:1', 'exists:payments,id']),
             'document_type' => array_merge($required, ['string', 'max:255']),
             'document_id' => array_merge($required, ['integer', 'min:1']),
+            'document_line_id' => ['nullable', 'integer', 'min:1'],
             'reference' => ['nullable', 'string', 'max:255'],
-            'allocated_amount' => array_merge($required, ['numeric'])
+            'allocated_amount' => array_merge($required, ['numeric', 'gt:0']),
+            'currency_id' => ['nullable', 'integer', 'min:1', 'exists:currencies,id'],
+            'base_allocated_amount' => ['nullable', 'numeric', 'gt:0'],
+            'allocation_date' => ['nullable', 'date'],
+            'status' => ['nullable', 'in:active,reversed'],
         ];
     }
 }

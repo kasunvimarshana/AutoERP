@@ -27,11 +27,16 @@ final class UpsertWriteOffRequest extends FormRequest
             'metadata' => ['nullable', 'array'],
             'document_type' => array_merge($required, ['string', 'max:255']),
             'document_id' => array_merge($required, ['integer', 'min:1']),
-            'amount' => array_merge($required, ['numeric']),
+            'amount' => array_merge($required, ['numeric', 'gt:0']),
             'reason' => ['nullable', 'string', 'max:255'],
             'journal_entry_id' => ['nullable', 'integer', 'min:1', 'exists:journal_entries,id'],
+            'status' => ['nullable', 'in:draft,approved,posted,reversed,cancelled'],
             'reference' => ['nullable', 'string', 'max:255'],
-            'created_by' => ['nullable', 'integer', 'min:1']
+            'created_by' => ['nullable', 'integer', 'min:1', 'exists:users,id'],
+            'approved_by' => ['nullable', 'integer', 'min:1', 'exists:users,id'],
+            'posted_by' => ['nullable', 'integer', 'min:1', 'exists:users,id'],
+            'approved_at' => ['nullable', 'date'],
+            'posted_at' => ['nullable', 'date'],
         ];
     }
 }

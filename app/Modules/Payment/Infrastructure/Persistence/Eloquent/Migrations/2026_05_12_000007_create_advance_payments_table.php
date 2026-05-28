@@ -22,6 +22,9 @@ return new class extends Migration
             $table->string('reference')->nullable();
             $table->string('advance_number');
             $table->decimal('amount', 20, 4);
+            $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete();
+            $table->decimal('exchange_rate', 20, 4)->default(1);
+            $table->decimal('base_amount', 20, 4)->nullable();
             $table->decimal('remaining_amount', 20, 4);
             $table->date('advance_date');
             $table->string('type')->nullable()->comment('customer, supplier');
@@ -29,11 +32,16 @@ return new class extends Migration
             $table->foreignId('payment_id')->nullable()->constrained('payments')->nullOnDelete();
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
+            $table->foreignId('refunded_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('cancelled_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->timestamp('refunded_at')->nullable();
+            $table->timestamp('cancelled_at')->nullable();
 
             $table->timestamps();
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'advance_number'], 'advance_payments_advance_number_uk');
+            $table->index(['tenant_id', 'party_type', 'party_id', 'status'], 'advance_payments_party_status_idx');
         });
     }
 

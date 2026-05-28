@@ -26,9 +26,14 @@ final class UpsertCashRegisterRequest extends FormRequest
             'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
             'metadata' => ['nullable', 'array'],
             'name' => array_merge($required, ['string', 'max:255']),
+            'code' => ['nullable', 'string', 'max:64'],
             'cash_account_id' => array_merge($required, ['integer', 'min:1', 'exists:accounts,id']),
-            'opening_balance' => ['nullable', 'numeric'],
-            'current_balance' => ['nullable', 'numeric'],
+            'opening_balance' => ['nullable', 'numeric', 'gte:0'],
+            'current_balance' => ['nullable', 'numeric', 'gte:0'],
+            'status' => ['nullable', 'in:closed,open,reconciled'],
+            'assigned_user_id' => ['nullable', 'integer', 'min:1', 'exists:users,id'],
+            'opened_at' => ['nullable', 'date'],
+            'closed_at' => ['nullable', 'date'],
             'is_active' => ['nullable', 'boolean']
         ];
     }

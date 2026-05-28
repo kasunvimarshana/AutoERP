@@ -18,12 +18,16 @@ return new class extends Migration
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->string('name')->comment('Cash, Bank Transfer, Check, Credit Card, Gift Card, etc');
+            $table->string('code')->nullable()->comment('Stable tenant-level method code');
             $table->string('type')->default('bank_transfer')->comment('cash, bank_transfer, card, check, other');
             $table->foreignId('account_id')->nullable()->constrained('accounts')->nullOnDelete();
             $table->boolean('is_active')->default(true);
 
             $table->timestamps();
             $table->softDeletes();
+
+            $table->unique(['tenant_id', 'code'], 'payment_methods_tenant_code_uk');
+            $table->index(['tenant_id', 'type', 'is_active'], 'payment_methods_type_active_idx');
         });
     }
 

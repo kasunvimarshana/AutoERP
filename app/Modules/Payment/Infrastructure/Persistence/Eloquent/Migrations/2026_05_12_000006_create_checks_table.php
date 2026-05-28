@@ -22,18 +22,22 @@ return new class extends Migration
             $table->string('party_type')->nullable();
             $table->unsignedBigInteger('party_id')->nullable();
             $table->foreignId('bank_account_id')->constrained('bank_accounts');
+            $table->foreignId('payment_id')->nullable()->constrained('payments')->nullOnDelete();
             $table->date('check_date');
             $table->date('due_date')->nullable()->comment('when it can be deposited/cashed');
             $table->decimal('amount', 20, 4);
             $table->string('status')->default('pending')->comment('pending, deposited, cleared, bounced, cancelled');
             $table->date('clearance_date')->nullable();
+            $table->string('reference')->nullable();
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
+            $table->foreignId('cleared_by')->nullable()->constrained('users')->nullOnDelete();
 
             $table->timestamps();
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'check_number', 'bank_account_id'], 'checks_number_bank_account_uk');
+            $table->index(['tenant_id', 'status', 'due_date'], 'checks_status_due_date_idx');
         });
     }
 

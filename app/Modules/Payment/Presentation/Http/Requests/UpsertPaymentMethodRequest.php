@@ -26,7 +26,8 @@ final class UpsertPaymentMethodRequest extends FormRequest
             'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
             'metadata' => ['nullable', 'array'],
             'name' => array_merge($required, ['string', 'max:255']),
-            'type' => ['nullable', 'string', 'max:255'],
+            'code' => ['nullable', 'string', 'max:64'],
+            'type' => ['nullable', 'in:cash,bank_transfer,card,check,online,wallet,credit_note,advance,other'],
             'account_id' => ['nullable', 'integer', 'min:1', 'exists:accounts,id'],
             'is_active' => ['nullable', 'boolean']
         ];

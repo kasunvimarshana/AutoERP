@@ -6,25 +6,21 @@ namespace Modules\Payment\Application\UseCases\Payments;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
+use Modules\Payment\Application\Contracts\Services\PaymentServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\Payments\CreatePaymentServiceInterface;
-use Modules\Payment\Application\Repositories\PaymentRepositoryInterface;
 use Modules\Payment\Domain\Constants\PaymentErrorCode;
 use Throwable;
 
 final class CreatePaymentService implements CreatePaymentServiceInterface
 {
-    public function __construct(private readonly PaymentRepositoryInterface $repository)
+    public function __construct(private readonly PaymentServiceInterface $paymentService)
     {
     }
 
     public function execute(array $payload): Result
     {
         try {
-            if (! array_key_exists('row_version', $payload)) {
-                $payload['row_version'] = 1;
-            }
-
-            return Result::success($this->repository->create($payload));
+            return $this->paymentService->createPayment($payload);
         } catch (Throwable $exception) {
             return Result::failure(new Error(PaymentErrorCode::INVALID_VALUE, $exception->getMessage()));
         }

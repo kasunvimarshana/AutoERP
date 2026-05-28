@@ -5,14 +5,20 @@ declare(strict_types=1);
 namespace Modules\Payment\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Payment\Application\Contracts\Services\AdvancePaymentAllocationServiceInterface;
+use Modules\Payment\Application\Contracts\Services\AdvancePaymentServiceInterface;
+use Modules\Payment\Application\Contracts\Services\PaymentAllocationServiceInterface;
+use Modules\Payment\Application\Contracts\Services\PaymentServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\PaymentEngines\AllocatePaymentDocumentServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\PaymentEngines\SettlePaymentStatusServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\PaymentEngines\UnallocatePaymentDocumentServiceInterface;
-use Modules\Payment\Application\Contracts\UseCases\AdvancePaymentAllocations\CreateAdvancePaymentAllocationServiceInterface;
-use Modules\Payment\Application\Contracts\UseCases\AdvancePaymentAllocations\DeleteAdvancePaymentAllocationServiceInterface;
-use Modules\Payment\Application\Contracts\UseCases\AdvancePaymentAllocations\GetAdvancePaymentAllocationServiceInterface;
-use Modules\Payment\Application\Contracts\UseCases\AdvancePaymentAllocations\ListAdvancePaymentAllocationsServiceInterface;
-use Modules\Payment\Application\Contracts\UseCases\AdvancePaymentAllocations\UpdateAdvancePaymentAllocationServiceInterface;
+use Modules\Payment\Application\Contracts\UseCases\AdvancePaymentAllocations\{
+    CreateAdvancePaymentAllocationServiceInterface,
+    DeleteAdvancePaymentAllocationServiceInterface,
+    GetAdvancePaymentAllocationServiceInterface,
+    ListAdvancePaymentAllocationsServiceInterface,
+    UpdateAdvancePaymentAllocationServiceInterface,
+};
 use Modules\Payment\Application\Contracts\UseCases\AdvancePayments\CreateAdvancePaymentServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\AdvancePayments\DeleteAdvancePaymentServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\AdvancePayments\GetAdvancePaymentServiceInterface;
@@ -110,6 +116,10 @@ use Modules\Payment\Application\UseCases\WriteOffs\DeleteWriteOffService;
 use Modules\Payment\Application\UseCases\WriteOffs\GetWriteOffService;
 use Modules\Payment\Application\UseCases\WriteOffs\ListWriteOffsService;
 use Modules\Payment\Application\UseCases\WriteOffs\UpdateWriteOffService;
+use Modules\Payment\Application\Services\AdvancePaymentAllocationService;
+use Modules\Payment\Application\Services\AdvancePaymentService;
+use Modules\Payment\Application\Services\PaymentAllocationService;
+use Modules\Payment\Application\Services\PaymentService;
 use Modules\Payment\Infrastructure\Persistence\Eloquent\Models\AdvancePaymentAllocationModel;
 use Modules\Payment\Infrastructure\Persistence\Eloquent\Models\AdvancePaymentModel;
 use Modules\Payment\Infrastructure\Persistence\Eloquent\Models\CashRegisterModel;
@@ -185,6 +195,10 @@ final class PaymentServiceProvider extends ServiceProvider
                 AllocatePaymentDocumentServiceInterface::class => AllocatePaymentDocumentService::class,
                 UnallocatePaymentDocumentServiceInterface::class => UnallocatePaymentDocumentService::class,
                 SettlePaymentStatusServiceInterface::class => SettlePaymentStatusService::class,
+                PaymentServiceInterface::class => PaymentService::class,
+                PaymentAllocationServiceInterface::class => PaymentAllocationService::class,
+                AdvancePaymentServiceInterface::class => AdvancePaymentService::class,
+                AdvancePaymentAllocationServiceInterface::class => AdvancePaymentAllocationService::class,
             ] as $contract => $implementation
         ) {
             $this->app->singleton($contract, $implementation);
@@ -199,9 +213,12 @@ final class PaymentServiceProvider extends ServiceProvider
         $this->app->singleton(PaymentRepositoryInterface::class, function (): PaymentRepositoryInterface {
             return new EloquentPaymentRepository(new PaymentModel());
         });
-        $this->app->singleton(PaymentAllocationRepositoryInterface::class, function (): PaymentAllocationRepositoryInterface {
-            return new EloquentPaymentAllocationRepository(new PaymentAllocationModel());
-        });
+        $this->app->singleton(
+            PaymentAllocationRepositoryInterface::class,
+            function (): PaymentAllocationRepositoryInterface {
+                return new EloquentPaymentAllocationRepository(new PaymentAllocationModel());
+            },
+        );
         $this->app->singleton(CashRegisterRepositoryInterface::class, function (): CashRegisterRepositoryInterface {
             return new EloquentCashRegisterRepository(new CashRegisterModel());
         });
@@ -211,9 +228,12 @@ final class PaymentServiceProvider extends ServiceProvider
         $this->app->singleton(AdvancePaymentRepositoryInterface::class, function (): AdvancePaymentRepositoryInterface {
             return new EloquentAdvancePaymentRepository(new AdvancePaymentModel());
         });
-        $this->app->singleton(AdvancePaymentAllocationRepositoryInterface::class, function (): AdvancePaymentAllocationRepositoryInterface {
-            return new EloquentAdvancePaymentAllocationRepository(new AdvancePaymentAllocationModel());
-        });
+        $this->app->singleton(
+            AdvancePaymentAllocationRepositoryInterface::class,
+            function (): AdvancePaymentAllocationRepositoryInterface {
+                return new EloquentAdvancePaymentAllocationRepository(new AdvancePaymentAllocationModel());
+            },
+        );
         $this->app->singleton(WriteOffRepositoryInterface::class, function (): WriteOffRepositoryInterface {
             return new EloquentWriteOffRepository(new WriteOffModel());
         });

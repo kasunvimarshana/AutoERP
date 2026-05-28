@@ -20,13 +20,19 @@ return new class extends Migration
             $table->foreignId('advance_payment_id')->constrained('advance_payments')->cascadeOnDelete();
             $table->string('document_type')->comment('the invoice/credit note being settled');
             $table->unsignedBigInteger('document_id');
+            $table->unsignedBigInteger('document_line_id')->nullable();
             $table->string('reference')->nullable();
             $table->decimal('allocated_amount', 20, 4);
+            $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete();
+            $table->decimal('base_allocated_amount', 20, 4)->nullable();
+            $table->date('allocation_date')->nullable();
+            $table->string('status')->default('active')->comment('active, reversed');
 
             $table->timestamps();
 
             $table->unique(['tenant_id', 'advance_payment_id', 'document_type', 'document_id'], 'advance_payment_allocations_document_uk');
             $table->index(['tenant_id', 'document_type', 'document_id'], 'advance_payment_allocations_document_lookup_idx');
+            $table->index(['tenant_id', 'advance_payment_id', 'status'], 'advance_payment_allocations_status_idx');
         });
     }
 

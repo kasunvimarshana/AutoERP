@@ -6,25 +6,21 @@ namespace Modules\Payment\Application\UseCases\AdvancePaymentAllocations;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
+use Modules\Payment\Application\Contracts\Services\AdvancePaymentAllocationServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\AdvancePaymentAllocations\CreateAdvancePaymentAllocationServiceInterface;
-use Modules\Payment\Application\Repositories\AdvancePaymentAllocationRepositoryInterface;
 use Modules\Payment\Domain\Constants\PaymentErrorCode;
 use Throwable;
 
 final class CreateAdvancePaymentAllocationService implements CreateAdvancePaymentAllocationServiceInterface
 {
-    public function __construct(private readonly AdvancePaymentAllocationRepositoryInterface $repository)
+    public function __construct(private readonly AdvancePaymentAllocationServiceInterface $advancePaymentAllocationService)
     {
     }
 
     public function execute(array $payload): Result
     {
         try {
-            if (! array_key_exists('row_version', $payload)) {
-                $payload['row_version'] = 1;
-            }
-
-            return Result::success($this->repository->create($payload));
+            return $this->advancePaymentAllocationService->createAllocation($payload);
         } catch (Throwable $exception) {
             return Result::failure(new Error(PaymentErrorCode::INVALID_VALUE, $exception->getMessage()));
         }

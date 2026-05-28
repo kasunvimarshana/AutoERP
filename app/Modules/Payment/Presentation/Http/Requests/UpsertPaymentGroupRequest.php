@@ -25,7 +25,12 @@ final class UpsertPaymentGroupRequest extends FormRequest
             'row_version' => ['nullable', 'integer', 'min:0'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
             'metadata' => ['nullable', 'array'],
-            'transaction_number' => ['nullable', 'string', 'max:255']
+            'transaction_number' => ['nullable', 'string', 'max:255'],
+            'group_type' => ['nullable', 'string', 'max:100'],
+            'direction' => ['nullable', 'in:inbound,outbound'],
+            'total_amount' => ['nullable', 'numeric', 'gte:0'],
+            'status' => ['nullable', 'in:draft,posted,reconciled,voided'],
+            'reference' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

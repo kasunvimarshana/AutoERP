@@ -22,12 +22,18 @@ return new class extends Migration
             $table->decimal('amount', 20, 4);
             $table->string('reason')->nullable();
             $table->foreignId('journal_entry_id')->nullable()->constrained('journal_entries')->nullOnDelete();
+            $table->string('status')->default('draft')->comment('draft, approved, posted, reversed, cancelled');
             $table->string('reference')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
+            $table->foreignId('approved_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('posted_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->timestamp('approved_at')->nullable();
+            $table->timestamp('posted_at')->nullable();
 
             $table->timestamps();
 
             $table->index(['tenant_id', 'document_type', 'document_id'], 'write_offs_document_idx');
+            $table->index(['tenant_id', 'status'], 'write_offs_status_idx');
         });
     }
 
