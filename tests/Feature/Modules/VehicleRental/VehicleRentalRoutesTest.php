@@ -11,51 +11,47 @@ final class VehicleRentalRoutesTest extends TestCase
 {
     public function testVehicleRentalRoutesAreRegistered(): void
     {
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessor-agreements.index'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessor-agreements.store'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessor-agreements.show'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessor-agreements.update'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessor-agreements.destroy'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessee-agreements.index'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessee-agreements.store'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessee-agreements.show'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessee-agreements.update'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessee-agreements.destroy'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessor-running-charts.index'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessor-running-charts.store'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessor-running-charts.show'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessor-running-charts.update'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessor-running-charts.destroy'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessee-running-charts.index'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessee-running-charts.store'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessee-running-charts.show'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessee-running-charts.update'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessee-running-charts.destroy'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessor-agreement-credit-notes.index'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessor-agreement-credit-notes.store'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessor-agreement-credit-notes.show'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessor-agreement-credit-notes.update'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessor-agreement-credit-notes.destroy'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessor-agreement-debit-notes.index'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessor-agreement-debit-notes.store'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessor-agreement-debit-notes.show'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessor-agreement-debit-notes.update'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessor-agreement-debit-notes.destroy'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessee-agreement-credit-notes.index'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessee-agreement-credit-notes.store'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessee-agreement-credit-notes.show'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessee-agreement-credit-notes.update'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessee-agreement-credit-notes.destroy'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessee-agreement-debit-notes.index'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessee-agreement-debit-notes.store'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessee-agreement-debit-notes.show'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessee-agreement-debit-notes.update'));
-        self::assertTrue(Route::has('vehiclerental.vehicle-rental-lessee-agreement-debit-notes.destroy'));
+        self::assertTrue(Route::has('vehiclerental.agreements.index'));
+        self::assertTrue(Route::has('vehiclerental.agreements.store'));
+        self::assertTrue(Route::has('vehiclerental.agreements.show'));
+        self::assertTrue(Route::has('vehiclerental.agreements.update'));
+        self::assertTrue(Route::has('vehiclerental.running-charts.index'));
+        self::assertTrue(Route::has('vehiclerental.running-charts.store'));
+        self::assertTrue(Route::has('vehiclerental.running-charts.show'));
+        self::assertTrue(Route::has('vehiclerental.running-charts.update'));
+        self::assertTrue(Route::has('vehiclerental.agreements.lines.sync'));
+        self::assertTrue(Route::has('vehiclerental.agreements.rates.sync'));
+        self::assertTrue(Route::has('vehiclerental.agreements.rate-rules.sync'));
+        self::assertTrue(Route::has('vehiclerental.agreements.extra-charges.sync'));
+        self::assertTrue(Route::has('vehiclerental.agreements.billing-preview'));
+        self::assertTrue(Route::has('vehiclerental.running-charts.lines.sync'));
+        self::assertTrue(Route::has('vehiclerental.replacements.store'));
+        self::assertTrue(Route::has('vehiclerental.replacements.update'));
+        self::assertTrue(Route::has('vehiclerental.breakdowns.store'));
+        self::assertTrue(Route::has('vehiclerental.breakdowns.update'));
+        self::assertTrue(Route::has('vehiclerental.settings.show'));
+        self::assertTrue(Route::has('vehiclerental.settings.upsert'));
+        self::assertTrue(Route::has('vehiclerental.settings.initialize'));
+        self::assertTrue(Route::has('vehiclerental.status-history.show'));
+        self::assertTrue(Route::has('vehiclerental.vehicle-availability.show'));
+        self::assertTrue(Route::has('vehiclerental.provider-payables.index'));
+        self::assertTrue(Route::has('vehiclerental.workflow.agreements.transition'));
+        self::assertTrue(Route::has('vehiclerental.workflow.running-charts.transition'));
+        self::assertTrue(Route::has('vehiclerental.workflow.invoice'));
+        self::assertTrue(Route::has('vehiclerental.workflow.payments.allocate'));
+        self::assertTrue(Route::has('vehiclerental.workflow.provider-payables.store'));
+        self::assertTrue(Route::has('vehiclerental.workflow.provider-payables.payments.allocate'));
+        self::assertTrue(Route::has('vehiclerental.workflow.finance.post'));
+        self::assertTrue(Route::has('vehiclerental.workflow.finance.reverse'));
+        self::assertTrue(Route::has('vehiclerental.integration.invoice'));
+        self::assertTrue(Route::has('vehiclerental.integration.payments.allocate'));
+        self::assertTrue(Route::has('vehiclerental.integration.provider-payables.store'));
+        self::assertTrue(Route::has('vehiclerental.integration.provider-payables.payments.allocate'));
     }
 
     public function testVehicleRentalRoutesUseContextMiddlewares(): void
     {
-        $route = Route::getRoutes()->getByName('vehiclerental.vehicle-rental-lessor-agreements.index');
+        $route = Route::getRoutes()->getByName('vehiclerental.agreements.index');
 
         self::assertNotNull($route);
 
