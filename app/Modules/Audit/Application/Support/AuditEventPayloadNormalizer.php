@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Audit\Infrastructure\Support;
+namespace Modules\Audit\Application\Support;
 
 final class AuditEventPayloadNormalizer
 {

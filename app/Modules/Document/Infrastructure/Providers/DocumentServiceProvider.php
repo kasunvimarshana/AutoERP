@@ -3,9 +3,9 @@
 namespace Modules\Document\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Document\Application\Contracts\SequenceServiceInterface;
 use Modules\Document\Application\Queries\GetDocumentQuery;
 use Modules\Document\Application\Queries\ListDocumentsQuery;
-use Modules\Document\Application\Services\SequenceService;
 use Modules\Document\Domain\Repositories\DocumentDefinitionRepositoryInterface;
 use Modules\Document\Domain\Repositories\DocumentItemDefinitionRepositoryInterface;
 use Modules\Document\Domain\Repositories\DocumentRepositoryInterface;
@@ -16,6 +16,7 @@ use Modules\Document\Infrastructure\Persistence\Eloquent\Repositories\EloquentDo
 use Modules\Document\Infrastructure\Persistence\Eloquent\Repositories\EloquentDocumentRepository;
 use Modules\Document\Infrastructure\Persistence\Eloquent\Repositories\EloquentDocumentTypeRepository;
 use Modules\Document\Infrastructure\Persistence\Eloquent\Repositories\EloquentDocumentWorkflowRepository;
+use Modules\Document\Infrastructure\Services\SequenceService;
 
 class DocumentServiceProvider extends ServiceProvider
 {
@@ -34,7 +35,7 @@ class DocumentServiceProvider extends ServiceProvider
         );
         $this->app->singleton(DocumentTypeRepositoryInterface::class, EloquentDocumentTypeRepository::class);
         $this->app->singleton(DocumentWorkflowRepositoryInterface::class, EloquentDocumentWorkflowRepository::class);
-        $this->app->singleton(SequenceService::class, SequenceService::class);
+        $this->app->singleton(SequenceServiceInterface::class, SequenceService::class);
         $this->app->singleton(ListDocumentsQuery::class, ListDocumentsQuery::class);
         $this->app->singleton(GetDocumentQuery::class, GetDocumentQuery::class);
     }

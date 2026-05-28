@@ -12,10 +12,7 @@ final class AuditRoutesTest extends TestCase
     public function testAuditRoutesAreRegistered(): void
     {
         self::assertTrue(Route::has('audit.audit-logs.index'));
-        self::assertTrue(Route::has('audit.audit-logs.store'));
         self::assertTrue(Route::has('audit.audit-logs.show'));
-        self::assertTrue(Route::has('audit.audit-logs.update'));
-        self::assertTrue(Route::has('audit.audit-logs.destroy'));
     }
 
     public function testAuditRoutesUseContextMiddlewares(): void

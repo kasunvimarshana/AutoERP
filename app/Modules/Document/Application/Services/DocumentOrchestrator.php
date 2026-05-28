@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Modules\Document\Application\Actions\ChangeDocumentStatusAction;
 use Modules\Document\Application\Actions\CreateDocumentAction;
 use Modules\Document\Application\Actions\UploadDocumentAttachmentAction;
+use Modules\Document\Application\Contracts\SequenceServiceInterface;
 use Modules\Document\Application\DTOs\CreateDocumentDTO;
 use Modules\Document\Application\Queries\GetDocumentQuery;
 use Modules\Document\Application\Queries\ListDocumentsQuery;
@@ -26,7 +27,7 @@ class DocumentOrchestrator
         private readonly GetDocumentQuery $getDocumentQuery,
         private readonly DocumentRepositoryInterface $documentRepository,
         private readonly DocumentTypeRepositoryInterface $documentTypeRepository,
-        private readonly SequenceService $sequenceService,
+        private readonly SequenceServiceInterface $sequenceService,
     ) {
     }
 

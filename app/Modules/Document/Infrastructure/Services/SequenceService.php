@@ -1,16 +1,19 @@
 <?php
 
-namespace Modules\Document\Application\Services;
+declare(strict_types=1);
+
+namespace Modules\Document\Infrastructure\Services;
 
 use Illuminate\Support\Facades\DB;
+use Modules\Document\Application\Contracts\SequenceServiceInterface;
 
-class SequenceService
+final class SequenceService implements SequenceServiceInterface
 {
     public function nextNumber(
         int $tenantId,
         ?int $organizationUnitId,
         string $documentType,
-        ?string $date = null
+        ?string $date = null,
     ): string {
         $date = $date ?? now()->toDateString();
         $periodValue = date('Y', strtotime($date));

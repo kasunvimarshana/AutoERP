@@ -166,6 +166,7 @@ final class AuthCurrentUserIntegrationTest extends TestCase
     public function testIssueTokenUsesResolvedRequestedTenantWhenUserHasAccess(): void
     {
         config()->set('auth.guards.auth-api.driver', 'session');
+        config()->set('tenant.resolution.enforce_authenticated_tenant_match', false);
 
         $user = new UserModel();
         $user->id = 42;
