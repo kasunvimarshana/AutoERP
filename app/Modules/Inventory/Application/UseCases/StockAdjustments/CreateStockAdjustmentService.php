@@ -6,25 +6,21 @@ namespace Modules\Inventory\Application\UseCases\StockAdjustments;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
+use Modules\Inventory\Application\Contracts\Services\StockAdjustmentServiceInterface;
 use Modules\Inventory\Application\Contracts\UseCases\StockAdjustments\CreateStockAdjustmentServiceInterface;
-use Modules\Inventory\Application\Repositories\StockAdjustmentRepositoryInterface;
 use Modules\Inventory\Domain\Constants\InventoryErrorCode;
 use Throwable;
 
 final class CreateStockAdjustmentService implements CreateStockAdjustmentServiceInterface
 {
-    public function __construct(private readonly StockAdjustmentRepositoryInterface $repository)
+    public function __construct(private readonly StockAdjustmentServiceInterface $stockAdjustmentService)
     {
     }
 
     public function execute(array $payload): Result
     {
         try {
-            if (! array_key_exists('row_version', $payload)) {
-                $payload['row_version'] = 1;
-            }
-
-            return Result::success($this->repository->create($payload));
+            return $this->stockAdjustmentService->createAdjustment($payload);
         } catch (Throwable $exception) {
             return Result::failure(new Error(InventoryErrorCode::INVALID_VALUE, $exception->getMessage()));
         }

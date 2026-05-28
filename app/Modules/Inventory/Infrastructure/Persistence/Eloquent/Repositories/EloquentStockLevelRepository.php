@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Infrastructure\Persistence\Eloquent\Repositories;
 
-use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
 use Modules\Inventory\Application\Repositories\StockLevelRepositoryInterface;
 use Modules\Inventory\Domain\Constants\InventoryAllocationMethod;
@@ -24,7 +23,7 @@ final class EloquentStockLevelRepository extends EloquentRepository implements S
         unset($criteria[InventoryDimension::LOT_NUMBER]);
 
         $query = $this->applyCriteria($this->query(), $criteria)
-            ->whereRaw('(quantity_on_hand - quantity_reserved) > 0');
+            ->whereRaw('(quantity_on_hand - quantity_reserved - quantity_blocked) > 0');
 
         if (is_string($lotNumber) && trim($lotNumber) !== '') {
             $query

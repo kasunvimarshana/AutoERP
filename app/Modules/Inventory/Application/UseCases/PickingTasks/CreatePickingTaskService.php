@@ -6,25 +6,21 @@ namespace Modules\Inventory\Application\UseCases\PickingTasks;
 
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
+use Modules\Inventory\Application\Contracts\Services\PickingTaskServiceInterface;
 use Modules\Inventory\Application\Contracts\UseCases\PickingTasks\CreatePickingTaskServiceInterface;
-use Modules\Inventory\Application\Repositories\PickingTaskRepositoryInterface;
 use Modules\Inventory\Domain\Constants\InventoryErrorCode;
 use Throwable;
 
 final class CreatePickingTaskService implements CreatePickingTaskServiceInterface
 {
-    public function __construct(private readonly PickingTaskRepositoryInterface $repository)
+    public function __construct(private readonly PickingTaskServiceInterface $pickingTaskService)
     {
     }
 
     public function execute(array $payload): Result
     {
         try {
-            if (! array_key_exists('row_version', $payload)) {
-                $payload['row_version'] = 1;
-            }
-
-            return Result::success($this->repository->create($payload));
+            return $this->pickingTaskService->createTask($payload);
         } catch (Throwable $exception) {
             return Result::failure(new Error(InventoryErrorCode::INVALID_VALUE, $exception->getMessage()));
         }
