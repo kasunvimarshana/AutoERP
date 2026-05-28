@@ -35,12 +35,22 @@ use Modules\Sales\Application\Contracts\UseCases\SalesReturns\DeleteSalesReturnS
 use Modules\Sales\Application\Contracts\UseCases\SalesReturns\GetSalesReturnServiceInterface;
 use Modules\Sales\Application\Contracts\UseCases\SalesReturns\ListSalesReturnsServiceInterface;
 use Modules\Sales\Application\Contracts\UseCases\SalesReturns\UpdateSalesReturnServiceInterface;
+use Modules\Sales\Application\Contracts\Services\SalesIntegrationServiceInterface;
+use Modules\Sales\Application\Contracts\Services\SalesManagementServiceInterface;
+use Modules\Sales\Application\Contracts\Services\SalesWorkflowServiceInterface;
+use Modules\Sales\Application\Repositories\SalesDocumentLinkRepositoryInterface;
+use Modules\Sales\Application\Repositories\SalesPaymentAllocationRepositoryInterface;
+use Modules\Sales\Application\Repositories\SalesSettingRepositoryInterface;
+use Modules\Sales\Application\Repositories\SalesStatusHistoryRepositoryInterface;
 use Modules\Sales\Application\Repositories\GdnHeaderRepositoryInterface;
 use Modules\Sales\Application\Repositories\GdnLineRepositoryInterface;
 use Modules\Sales\Application\Repositories\SalesOrderLineRepositoryInterface;
 use Modules\Sales\Application\Repositories\SalesOrderRepositoryInterface;
 use Modules\Sales\Application\Repositories\SalesReturnLineRepositoryInterface;
 use Modules\Sales\Application\Repositories\SalesReturnRepositoryInterface;
+use Modules\Sales\Application\Services\SalesIntegrationService;
+use Modules\Sales\Application\Services\SalesManagementService;
+use Modules\Sales\Application\Services\SalesWorkflowService;
 use Modules\Sales\Application\UseCases\GdnHeaders\CreateGdnHeaderService;
 use Modules\Sales\Application\UseCases\GdnHeaders\DeleteGdnHeaderService;
 use Modules\Sales\Application\UseCases\GdnHeaders\GetGdnHeaderService;
@@ -73,16 +83,24 @@ use Modules\Sales\Application\UseCases\SalesReturns\ListSalesReturnsService;
 use Modules\Sales\Application\UseCases\SalesReturns\UpdateSalesReturnService;
 use Modules\Sales\Infrastructure\Persistence\Eloquent\Models\GdnHeaderModel;
 use Modules\Sales\Infrastructure\Persistence\Eloquent\Models\GdnLineModel;
+use Modules\Sales\Infrastructure\Persistence\Eloquent\Models\SalesDocumentLinkModel;
 use Modules\Sales\Infrastructure\Persistence\Eloquent\Models\SalesOrderLineModel;
 use Modules\Sales\Infrastructure\Persistence\Eloquent\Models\SalesOrderModel;
+use Modules\Sales\Infrastructure\Persistence\Eloquent\Models\SalesPaymentAllocationModel;
 use Modules\Sales\Infrastructure\Persistence\Eloquent\Models\SalesReturnLineModel;
 use Modules\Sales\Infrastructure\Persistence\Eloquent\Models\SalesReturnModel;
+use Modules\Sales\Infrastructure\Persistence\Eloquent\Models\SalesSettingModel;
+use Modules\Sales\Infrastructure\Persistence\Eloquent\Models\SalesStatusHistoryModel;
 use Modules\Sales\Infrastructure\Persistence\Eloquent\Repositories\EloquentGdnHeaderRepository;
 use Modules\Sales\Infrastructure\Persistence\Eloquent\Repositories\EloquentGdnLineRepository;
+use Modules\Sales\Infrastructure\Persistence\Eloquent\Repositories\EloquentSalesDocumentLinkRepository;
 use Modules\Sales\Infrastructure\Persistence\Eloquent\Repositories\EloquentSalesOrderLineRepository;
 use Modules\Sales\Infrastructure\Persistence\Eloquent\Repositories\EloquentSalesOrderRepository;
+use Modules\Sales\Infrastructure\Persistence\Eloquent\Repositories\EloquentSalesPaymentAllocationRepository;
 use Modules\Sales\Infrastructure\Persistence\Eloquent\Repositories\EloquentSalesReturnLineRepository;
 use Modules\Sales\Infrastructure\Persistence\Eloquent\Repositories\EloquentSalesReturnRepository;
+use Modules\Sales\Infrastructure\Persistence\Eloquent\Repositories\EloquentSalesSettingRepository;
+use Modules\Sales\Infrastructure\Persistence\Eloquent\Repositories\EloquentSalesStatusHistoryRepository;
 
 final class SalesServiceProvider extends ServiceProvider
 {
@@ -122,6 +140,9 @@ final class SalesServiceProvider extends ServiceProvider
                 CreateSalesReturnLineServiceInterface::class => CreateSalesReturnLineService::class,
                 UpdateSalesReturnLineServiceInterface::class => UpdateSalesReturnLineService::class,
                 DeleteSalesReturnLineServiceInterface::class => DeleteSalesReturnLineService::class,
+                SalesManagementServiceInterface::class => SalesManagementService::class,
+                SalesIntegrationServiceInterface::class => SalesIntegrationService::class,
+                SalesWorkflowServiceInterface::class => SalesWorkflowService::class,
             ] as $contract => $implementation
         ) {
             $this->app->singleton($contract, $implementation);
@@ -142,9 +163,33 @@ final class SalesServiceProvider extends ServiceProvider
         $this->app->singleton(SalesReturnRepositoryInterface::class, function (): SalesReturnRepositoryInterface {
             return new EloquentSalesReturnRepository(new SalesReturnModel());
         });
-        $this->app->singleton(SalesReturnLineRepositoryInterface::class, function (): SalesReturnLineRepositoryInterface {
-            return new EloquentSalesReturnLineRepository(new SalesReturnLineModel());
+        $this->app->singleton(
+            SalesReturnLineRepositoryInterface::class,
+            function (): SalesReturnLineRepositoryInterface {
+                return new EloquentSalesReturnLineRepository(new SalesReturnLineModel());
+            }
+        );
+        $this->app->singleton(SalesSettingRepositoryInterface::class, function (): SalesSettingRepositoryInterface {
+            return new EloquentSalesSettingRepository(new SalesSettingModel());
         });
+        $this->app->singleton(
+            SalesDocumentLinkRepositoryInterface::class,
+            function (): SalesDocumentLinkRepositoryInterface {
+                return new EloquentSalesDocumentLinkRepository(new SalesDocumentLinkModel());
+            }
+        );
+        $this->app->singleton(
+            SalesPaymentAllocationRepositoryInterface::class,
+            function (): SalesPaymentAllocationRepositoryInterface {
+                return new EloquentSalesPaymentAllocationRepository(new SalesPaymentAllocationModel());
+            }
+        );
+        $this->app->singleton(
+            SalesStatusHistoryRepositoryInterface::class,
+            function (): SalesStatusHistoryRepositoryInterface {
+                return new EloquentSalesStatusHistoryRepository(new SalesStatusHistoryModel());
+            }
+        );
     }
 
     public function boot(): void

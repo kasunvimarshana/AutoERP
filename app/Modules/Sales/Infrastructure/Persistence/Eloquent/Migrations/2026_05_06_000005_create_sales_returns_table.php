@@ -11,15 +11,22 @@ return new class extends Migration
         Schema::create('sales_returns', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
+            $table->foreignId('tenant_id')
+                ->constrained('tenants', 'id')
+                ->cascadeOnDelete()
+                ->comment('Multi-tenant owner reference');
+            $table->foreignId('organization_unit_id')
+                ->nullable()
+                ->constrained('organization_units', 'id')
+                ->nullOnDelete()
+                ->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->string('reference')->nullable();
             $table->foreignId('customer_id')->constrained('customers', 'id')->restrictOnDelete();
             $table->foreignId('original_sales_order_id')->nullable()->constrained('sales_orders', 'id')->nullOnDelete();
             $table->foreignId('original_gdn_id')->nullable()->constrained('gdn_headers', 'id')->nullOnDelete();
-            $table->foreignId('original_invoice_id')->nullable()->constrained('invoices', 'id')->nullOnDelete();
+            $table->foreignId('original_document_id')->nullable()->constrained('documents', 'id')->nullOnDelete();
             $table->string('return_number');
             $table->string('status')->default('draft')->comment('draft, approved, closed, cancelled');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->nullOnDelete();
@@ -41,11 +48,20 @@ return new class extends Migration
             $table->decimal('header_tax_amount', 20, 4)->default(0);
 
             // Final totals combine line rollups and header adjustments
-            $table->decimal('discount_total', 20, 4)->default(0)->comment('Application-calculated: line_discount_total + header_discount_amount');
-            $table->decimal('tax_total', 20, 4)->default(0)->comment('Application-calculated: line_tax_total + header_tax_amount');
+            $table->decimal('discount_total', 20, 4)
+                ->default(0)
+                ->comment('Application-calculated: line_discount_total + header_discount_amount');
+            $table->decimal('tax_total', 20, 4)
+                ->default(0)
+                ->comment('Application-calculated: line_tax_total + header_tax_amount');
             $table->decimal('debit_note_total', 20, 4)->default(0)->comment('SUM of debit notes');
             $table->decimal('credit_note_total', 20, 4)->default(0)->comment('SUM of credit notes');
-            $table->decimal('grand_total', 20, 4)->default(0)->comment('Application-calculated: subtotal - discount_total + tax_total + debit_note_total - credit_note_total - line_restocking_total');
+            $table->decimal('grand_total', 20, 4)
+                ->default(0)
+                ->comment(
+                    'Application-calculated: subtotal - discount_total + tax_total + '
+                    . 'debit_note_total - credit_note_total - line_restocking_total'
+                );
 
             $table->foreignId('tax_account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();
             $table->foreignId('discount_account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();
