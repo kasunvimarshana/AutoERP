@@ -10,6 +10,7 @@ use Illuminate\Routing\Controller;
 use Modules\Core\Application\Results\Result;
 use Modules\Purchase\Application\Contracts\Services\PurchaseIntegrationServiceInterface;
 use Modules\Purchase\Application\Contracts\Services\PurchaseManagementServiceInterface;
+use Modules\Purchase\Presentation\Http\Requests\CalculatePurchaseInvoiceRequest;
 
 final class PurchaseInvoiceController extends Controller
 {
@@ -339,9 +340,9 @@ final class PurchaseInvoiceController extends Controller
         return $this->respond($this->management->getAvailableGrnLinesForDocument($tenantId, $grnHeaderId));
     }
 
-    public function calculateInvoice(Request $request): JsonResponse
+    public function calculateInvoice(CalculatePurchaseInvoiceRequest $request): JsonResponse
     {
-        $payload = $this->withContext($request);
+        $payload = array_merge($this->withContext($request), $request->validated());
 
         return $this->respond($this->management->calculateInvoicePreview($payload));
     }

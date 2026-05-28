@@ -95,4 +95,40 @@ final class SalesInvoiceControllerIntegrationTest extends TestCase
             ],
         ]);
     }
+
+    public function testCalculateInvoiceReturns422WhenLinesMissing(): void
+    {
+        $integration = $this->createMock(SalesIntegrationServiceInterface::class);
+        $management = $this->createMock(SalesManagementServiceInterface::class);
+
+        $management->expects(self::never())->method('calculateInvoicePreview');
+
+        $this->app->instance(SalesIntegrationServiceInterface::class, $integration);
+        $this->app->instance(SalesManagementServiceInterface::class, $management);
+
+        $response = $this->postJson('/api/sales/calculate-invoice', []);
+
+        $response->assertStatus(422)->assertJsonValidationErrors(['lines']);
+    }
+
+    public function testCalculateInvoiceReturns422WhenUnitPriceMissing(): void
+    {
+        $integration = $this->createMock(SalesIntegrationServiceInterface::class);
+        $management = $this->createMock(SalesManagementServiceInterface::class);
+
+        $management->expects(self::never())->method('calculateInvoicePreview');
+
+        $this->app->instance(SalesIntegrationServiceInterface::class, $integration);
+        $this->app->instance(SalesManagementServiceInterface::class, $management);
+
+        $response = $this->postJson('/api/sales/calculate-invoice', [
+            'lines' => [
+                [
+                    'quantity' => 2,
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(422)->assertJsonValidationErrors(['lines.0.unit_price']);
+    }
 }

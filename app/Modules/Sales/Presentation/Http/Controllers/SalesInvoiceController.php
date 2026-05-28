@@ -10,6 +10,7 @@ use Illuminate\Routing\Controller;
 use Modules\Core\Application\Results\Result;
 use Modules\Sales\Application\Contracts\Services\SalesIntegrationServiceInterface;
 use Modules\Sales\Application\Contracts\Services\SalesManagementServiceInterface;
+use Modules\Sales\Presentation\Http\Requests\CalculateSalesInvoiceRequest;
 
 final class SalesInvoiceController extends Controller
 {
@@ -339,9 +340,9 @@ final class SalesInvoiceController extends Controller
         return $this->respond($this->management->getAvailableGdnLinesForDocument($tenantId, $gdnHeaderId));
     }
 
-    public function calculateInvoice(Request $request): JsonResponse
+    public function calculateInvoice(CalculateSalesInvoiceRequest $request): JsonResponse
     {
-        $payload = $this->withContext($request);
+        $payload = array_merge($this->withContext($request), $request->validated());
 
         return $this->respond($this->management->calculateInvoicePreview($payload));
     }

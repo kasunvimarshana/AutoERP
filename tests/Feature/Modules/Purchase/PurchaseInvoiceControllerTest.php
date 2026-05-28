@@ -122,4 +122,40 @@ final class PurchaseInvoiceControllerTest extends TestCase
         $response->assertOk();
         $this->assertCount(2, (array) $response->json('data.line_changes'));
     }
+
+    public function testCalculateInvoiceReturns422WhenLinesMissing(): void
+    {
+        $integration = $this->createMock(PurchaseIntegrationServiceInterface::class);
+        $management = $this->createMock(PurchaseManagementServiceInterface::class);
+
+        $management->expects(self::never())->method('calculateInvoicePreview');
+
+        $this->app->instance(PurchaseIntegrationServiceInterface::class, $integration);
+        $this->app->instance(PurchaseManagementServiceInterface::class, $management);
+
+        $response = $this->postJson('/api/purchase/calculate-invoice', []);
+
+        $response->assertStatus(422)->assertJsonValidationErrors(['lines']);
+    }
+
+    public function testCalculateInvoiceReturns422WhenUnitPriceMissing(): void
+    {
+        $integration = $this->createMock(PurchaseIntegrationServiceInterface::class);
+        $management = $this->createMock(PurchaseManagementServiceInterface::class);
+
+        $management->expects(self::never())->method('calculateInvoicePreview');
+
+        $this->app->instance(PurchaseIntegrationServiceInterface::class, $integration);
+        $this->app->instance(PurchaseManagementServiceInterface::class, $management);
+
+        $response = $this->postJson('/api/purchase/calculate-invoice', [
+            'lines' => [
+                [
+                    'quantity' => 2,
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(422)->assertJsonValidationErrors(['lines.0.unit_price']);
+    }
 }
