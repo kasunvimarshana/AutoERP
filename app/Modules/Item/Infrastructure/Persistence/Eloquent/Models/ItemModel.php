@@ -28,6 +28,8 @@ final class ItemModel extends CoreModel
             'base_uom_id' => 'integer',
             'purchase_uom_id' => 'integer',
             'sales_uom_id' => 'integer',
+            'service_uom_id' => 'integer',
+            'rental_uom_id' => 'integer',
             'tax_group_id' => 'integer',
             'default_currency_id' => 'integer',
             'is_batch_tracked' => 'boolean',

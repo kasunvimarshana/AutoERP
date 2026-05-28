@@ -37,6 +37,8 @@ final class ListItemRequest extends FormRequest
             'base_uom_id' => ['nullable', 'integer', 'min:1'],
             'purchase_uom_id' => ['nullable', 'integer', 'min:1'],
             'sales_uom_id' => ['nullable', 'integer', 'min:1'],
+            'service_uom_id' => ['nullable', 'integer', 'min:1'],
+            'rental_uom_id' => ['nullable', 'integer', 'min:1'],
             'tax_group_id' => ['nullable', 'integer', 'min:1'],
             'default_currency_id' => ['nullable', 'integer', 'min:1'],
             'is_batch_tracked' => ['nullable', 'boolean'],

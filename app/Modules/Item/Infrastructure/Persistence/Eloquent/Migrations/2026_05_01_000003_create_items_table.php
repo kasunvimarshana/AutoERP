@@ -33,6 +33,8 @@ return new class extends Migration
             $table->foreignId('base_uom_id')->constrained('unit_of_measures');
             $table->foreignId('purchase_uom_id')->nullable()->constrained('unit_of_measures');
             $table->foreignId('sales_uom_id')->nullable()->constrained('unit_of_measures');
+            $table->foreignId('service_uom_id')->nullable()->constrained('unit_of_measures');
+            $table->foreignId('rental_uom_id')->nullable()->constrained('unit_of_measures');
 
             $table->foreignId('tax_group_id')->nullable()->constrained('tax_groups')->nullOnDelete();
 

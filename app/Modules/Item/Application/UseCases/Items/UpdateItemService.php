@@ -14,9 +14,18 @@ use Throwable;
 
 final class UpdateItemService implements UpdateItemServiceInterface
 {
+    private const NESTED_KEYS = [
+        'attributes',
+        'variants',
+        'combo_items',
+        'uom_conversions',
+        'metadata_values',
+    ];
+
     public function __construct(
         private readonly ItemRepositoryInterface $repository,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
+        private readonly ItemNestedRelationsService $nestedRelationsService,
     ) {
     }
 
@@ -33,10 +42,40 @@ final class UpdateItemService implements UpdateItemServiceInterface
             }
 
             $payload['tenant_id'] = $tenantId;
+            $nested = $this->extractNestedPayload($payload);
 
-            return Result::success($this->repository->update($id, $payload));
+            $record = $this->repository->transaction(function () use ($id, $payload, $tenantId, $nested) {
+                $updated = $this->repository->update($id, $payload);
+                $itemId = (int) $updated->id();
+
+                $this->nestedRelationsService->syncForItem($tenantId, $itemId, $payload, $nested, true);
+
+                return $this->repository->findByIdInTenant($itemId, $tenantId) ?? $updated;
+            });
+
+            return Result::success($record);
         } catch (Throwable $exception) {
             return Result::failure(new Error(ItemErrorCode::INVALID_VALUE, $exception->getMessage()));
         }
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function extractNestedPayload(array &$payload): array
+    {
+        $nested = [];
+
+        foreach (self::NESTED_KEYS as $key) {
+            if (! array_key_exists($key, $payload)) {
+                continue;
+            }
+
+            $nested[$key] = $payload[$key];
+            unset($payload[$key]);
+        }
+
+        return $nested;
     }
 }

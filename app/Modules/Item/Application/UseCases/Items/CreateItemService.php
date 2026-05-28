@@ -14,9 +14,18 @@ use Throwable;
 
 final class CreateItemService implements CreateItemServiceInterface
 {
+    private const NESTED_KEYS = [
+        'attributes',
+        'variants',
+        'combo_items',
+        'uom_conversions',
+        'metadata_values',
+    ];
+
     public function __construct(
         private readonly ItemRepositoryInterface $repository,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
+        private readonly ItemNestedRelationsService $nestedRelationsService,
     ) {
     }
 
@@ -29,14 +38,44 @@ final class CreateItemService implements CreateItemServiceInterface
             }
 
             $payload['tenant_id'] = $tenantId;
+            $nested = $this->extractNestedPayload($payload);
 
             if (! array_key_exists('row_version', $payload)) {
                 $payload['row_version'] = 1;
             }
 
-            return Result::success($this->repository->create($payload));
+            $record = $this->repository->transaction(function () use ($payload, $tenantId, $nested) {
+                $created = $this->repository->create($payload);
+                $itemId = (int) $created->id();
+
+                $this->nestedRelationsService->syncForItem($tenantId, $itemId, $payload, $nested, false);
+
+                return $this->repository->findByIdInTenant($itemId, $tenantId) ?? $created;
+            });
+
+            return Result::success($record);
         } catch (Throwable $exception) {
             return Result::failure(new Error(ItemErrorCode::INVALID_VALUE, $exception->getMessage()));
         }
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function extractNestedPayload(array &$payload): array
+    {
+        $nested = [];
+
+        foreach (self::NESTED_KEYS as $key) {
+            if (! array_key_exists($key, $payload)) {
+                continue;
+            }
+
+            $nested[$key] = $payload[$key];
+            unset($payload[$key]);
+        }
+
+        return $nested;
     }
 }
