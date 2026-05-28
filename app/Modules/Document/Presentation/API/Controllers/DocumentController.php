@@ -153,6 +153,7 @@ class DocumentController extends Controller
     {
         $payload = $request->validate([
             'event_type' => ['required', 'string', 'max:180'],
+            'attributes' => ['nullable', 'array'],
             'payload' => ['nullable', 'array'],
             'performed_by' => ['nullable', 'integer'],
         ]);
@@ -275,8 +276,16 @@ class DocumentController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'is_active' => ['nullable', 'boolean'],
             'allowed_item_types' => ['nullable', 'array'],
-            'allowed_item_types.*' => ['string', 'max:120'],
+            'allowed_item_types.*' => ['nullable'],
+            'settings' => ['nullable', 'array'],
             'validation_rules' => ['nullable', 'array'],
+            'sections' => ['nullable', 'array'],
+            'sections.*.section_key' => ['nullable', 'string', 'max:120'],
+            'sections.*.label' => ['nullable', 'string', 'max:180'],
+            'sections.*.display_order' => ['nullable', 'integer', 'min:1'],
+            'sections.*.is_visible' => ['nullable', 'boolean'],
+            'sections.*.field_keys' => ['nullable', 'array'],
+            'sections.*.field_keys.*' => ['string', 'max:120'],
             'form_layout' => ['nullable', 'array'],
             'fields' => ['nullable', 'array'],
             'fields.*.field_key' => ['required_with:fields', 'string', 'max:120'],
@@ -311,6 +320,7 @@ class DocumentController extends Controller
             'version' => ['nullable', 'integer', 'min:1'],
             'name' => ['required', 'string', 'max:255'],
             'is_active' => ['nullable', 'boolean'],
+            'settings' => ['nullable', 'array'],
             'validation_rules' => ['nullable', 'array'],
             'fields' => ['nullable', 'array'],
             'fields.*.field_key' => ['required_with:fields', 'string', 'max:120'],

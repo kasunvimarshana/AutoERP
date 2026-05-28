@@ -25,7 +25,6 @@ class DocumentModel extends Model
         'discount_total',
         'tax_total',
         'grand_total',
-        'data',
         'notes',
         'created_by',
         'updated_by',
@@ -34,7 +33,6 @@ class DocumentModel extends Model
     protected $casts = [
         'document_date' => 'date:Y-m-d',
         'due_date' => 'date:Y-m-d',
-        'data' => 'array',
     ];
 
     public function items()

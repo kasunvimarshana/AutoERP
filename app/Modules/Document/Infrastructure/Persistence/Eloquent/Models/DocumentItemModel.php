@@ -15,10 +15,5 @@ class DocumentItemModel extends Model
         'description',
         'line_total',
         'sequence',
-        'data',
-    ];
-
-    protected $casts = [
-        'data' => 'array',
     ];
 }
