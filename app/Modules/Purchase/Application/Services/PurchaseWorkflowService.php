@@ -11,8 +11,10 @@ use Modules\Document\Application\DTOs\CreateDocumentDTO;
 use Modules\Document\Application\Services\DocumentOrchestrator;
 use Modules\Finance\Application\Contracts\Services\FinancePostingServiceInterface;
 use Modules\Inventory\Application\Contracts\UseCases\StockMovements\CreateStockMovementServiceInterface;
+use Modules\Item\Application\Repositories\ItemRepositoryInterface;
 use Modules\Payment\Application\Contracts\Services\AdvancePaymentAllocationServiceInterface;
 use Modules\Payment\Application\Contracts\Services\PaymentAllocationServiceInterface;
+use Modules\Pricing\Application\Contracts\Services\PriceResolverServiceInterface;
 use Modules\Purchase\Application\Contracts\Services\PurchaseWorkflowServiceInterface;
 use Modules\Purchase\Application\Repositories\GrnHeaderRepositoryInterface;
 use Modules\Purchase\Application\Repositories\GrnLineRepositoryInterface;
@@ -24,10 +26,52 @@ use Modules\Purchase\Application\Repositories\PurchaseReturnLineRepositoryInterf
 use Modules\Purchase\Application\Repositories\PurchaseReturnRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchaseStatusHistoryRepositoryInterface;
 use Modules\Purchase\Domain\Constants\PurchaseErrorCode;
+use Modules\UOM\Application\Contracts\Services\UomConversionServiceInterface;
+use Modules\UOM\Application\Repositories\UnitOfMeasureRepositoryInterface;
 use Throwable;
 
 final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
 {
+    private const ENTITY_TYPES = ['purchase_order', 'grn_header', 'purchase_return'];
+
+    /** @var array<string, list<string>> */
+    private const ALLOWED_STATUS_TRANSITIONS = [
+        'purchase_order' => [
+            'draft',
+            'submitted',
+            'approved',
+            'confirmed',
+            'partially_received',
+            'received',
+            'partially_documented',
+            'documented',
+            'closed',
+            'cancelled',
+            'reversed',
+        ],
+        'grn_header' => [
+            'draft',
+            'submitted',
+            'inspected',
+            'confirmed',
+            'posted',
+            'partially_documented',
+            'documented',
+            'cancelled',
+            'reversed',
+        ],
+        'purchase_return' => [
+            'draft',
+            'submitted',
+            'approved',
+            'posted',
+            'refunded',
+            'closed',
+            'cancelled',
+            'reversed',
+        ],
+    ];
+
     public function __construct(
         private readonly PurchaseOrderRepositoryInterface $purchaseOrderRepository,
         private readonly PurchaseOrderLineRepositoryInterface $purchaseOrderLineRepository,
@@ -43,15 +87,27 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
         private readonly AdvancePaymentAllocationServiceInterface $advancePaymentAllocationService,
         private readonly CreateStockMovementServiceInterface $createStockMovementService,
         private readonly FinancePostingServiceInterface $financePostingService,
+        private readonly PriceResolverServiceInterface $priceResolverService,
+        private readonly ItemRepositoryInterface $itemRepository,
+        private readonly UnitOfMeasureRepositoryInterface $unitOfMeasureRepository,
+        private readonly UomConversionServiceInterface $uomConversionService,
     ) {
     }
 
     public function transition(string $entityType, int|string $id, array $payload): Result
     {
         try {
+            if (! in_array($entityType, self::ENTITY_TYPES, true)) {
+                return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'Unsupported entity_type.'));
+            }
+
             $status = strtolower(trim((string) ($payload['status'] ?? '')));
             if ($status === '') {
                 return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'status is required.'));
+            }
+
+            if (! in_array($status, self::ALLOWED_STATUS_TRANSITIONS[$entityType], true)) {
+                return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'Invalid status for entity type.'));
             }
 
             $record = $this->findEntity($entityType, $id);
@@ -67,61 +123,76 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 ));
             }
 
+            if ((string) $record->get('status', '') === 'reversed') {
+                return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'Reversed records are immutable.'));
+            }
+
             $actorId = isset($payload['actor_id']) ? (int) $payload['actor_id'] : null;
-            $fields = [
-                'status' => $status,
-                'updated_by' => $actorId,
-            ];
 
-            if ($status === 'submitted') {
-                $fields['submitted_by'] = $actorId;
-                $fields['submitted_at'] = now()->toDateTimeString();
-            }
+            return $this->withinEntityTransaction($entityType, function () use (
+                $entityType,
+                $id,
+                $status,
+                $actorId,
+                $tenantId,
+                $record,
+                $payload,
+            ): Result {
+                $fields = [
+                    'status' => $status,
+                    'updated_by' => $actorId,
+                ];
 
-            if ($status === 'approved') {
-                $fields['approved_by'] = $actorId;
-                $fields['approved_at'] = now()->toDateTimeString();
-            }
-
-            if ($status === 'confirmed') {
-                $fields['confirmed_by'] = $actorId;
-                $fields['confirmed_at'] = now()->toDateTimeString();
-            }
-
-            if ($status === 'posted') {
-                $fields['posted_by'] = $actorId;
-                $fields['posted_at'] = now()->toDateTimeString();
-            }
-
-            if ($status === 'cancelled') {
-                $fields['cancelled_by'] = $actorId;
-                $fields['cancelled_at'] = now()->toDateTimeString();
-            }
-
-            if ($status === 'reversed') {
-                $fields['reversed_by'] = $actorId;
-                $fields['reversed_at'] = now()->toDateTimeString();
-                if ($this->supportsDocumentStatus($entityType)) {
-                    $fields['document_status'] = 'reversed';
+                if ($status === 'submitted') {
+                    $fields['submitted_by'] = $actorId;
+                    $fields['submitted_at'] = now()->toDateTimeString();
                 }
-            }
 
-            $updated = $this->updateEntity($entityType, $id, $fields);
+                if ($status === 'approved') {
+                    $fields['approved_by'] = $actorId;
+                    $fields['approved_at'] = now()->toDateTimeString();
+                }
 
-            $this->purchaseStatusHistoryRepository->create([
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => $record->get('organization_unit_id'),
-                'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
-                'entity_type' => $entityType,
-                'entity_id' => (int) $record->id(),
-                'from_status' => (string) $record->get('status', ''),
-                'to_status' => $status,
-                'reason' => $payload['reason'] ?? null,
-                'changed_by' => $actorId,
-                'changed_at' => now()->toDateTimeString(),
-            ]);
+                if ($status === 'confirmed') {
+                    $fields['confirmed_by'] = $actorId;
+                    $fields['confirmed_at'] = now()->toDateTimeString();
+                }
 
-            return Result::success($updated);
+                if ($status === 'posted') {
+                    $fields['posted_by'] = $actorId;
+                    $fields['posted_at'] = now()->toDateTimeString();
+                }
+
+                if ($status === 'cancelled') {
+                    $fields['cancelled_by'] = $actorId;
+                    $fields['cancelled_at'] = now()->toDateTimeString();
+                }
+
+                if ($status === 'reversed') {
+                    $fields['reversed_by'] = $actorId;
+                    $fields['reversed_at'] = now()->toDateTimeString();
+                    if ($this->supportsDocumentStatus($entityType)) {
+                        $fields['document_status'] = 'reversed';
+                    }
+                }
+
+                $updated = $this->updateEntity($entityType, $id, $fields);
+
+                $this->purchaseStatusHistoryRepository->create([
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => $record->get('organization_unit_id'),
+                    'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
+                    'entity_type' => $entityType,
+                    'entity_id' => (int) $record->id(),
+                    'from_status' => (string) $record->get('status', ''),
+                    'to_status' => $status,
+                    'reason' => $payload['reason'] ?? null,
+                    'changed_by' => $actorId,
+                    'changed_at' => now()->toDateTimeString(),
+                ]);
+
+                return Result::success($updated);
+            });
         } catch (Throwable $exception) {
             return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, $exception->getMessage()));
         }
@@ -130,6 +201,10 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
     public function createDocument(string $entityType, int|string $id, array $payload): Result
     {
         try {
+            if (! in_array($entityType, self::ENTITY_TYPES, true)) {
+                return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'Unsupported entity_type.'));
+            }
+
             $record = $this->findEntity($entityType, $id);
             if (! $record instanceof DataRecord) {
                 return Result::failure(new Error(PurchaseErrorCode::NOT_FOUND, 'Purchase entity not found.'));
@@ -148,76 +223,85 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'document_type_id is required.'));
             }
 
-            $items = $this->resolveDocumentItems($entityType, (int) $record->id(), $payload);
-            if ($items === []) {
-                return Result::failure(new Error(
-                    PurchaseErrorCode::INVALID_VALUE,
-                    'At least one document item is required.',
-                ));
-            }
+            return $this->withinEntityTransaction($entityType, function () use (
+                $entityType,
+                $id,
+                $payload,
+                $record,
+                $tenantId,
+                $documentTypeId,
+            ): Result {
+                $items = $this->resolveDocumentItems($entityType, (int) $record->id(), $payload, $record);
+                if ($items === []) {
+                    return Result::failure(new Error(
+                        PurchaseErrorCode::INVALID_VALUE,
+                        'At least one document item is required.',
+                    ));
+                }
 
-            $documentDate = (string) ($payload['document_date'] ?? now()->toDateString());
-            $dto = new CreateDocumentDTO(
-                tenantId: $tenantId,
-                documentTypeId: $documentTypeId,
-                documentDate: $documentDate,
-                organizationUnitId: $record->get('organization_unit_id') !== null
-                    ? (int) $record->get('organization_unit_id')
-                    : null,
-                ownerId: isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
-                partyId: $record->get('supplier_id') !== null ? (int) $record->get('supplier_id') : null,
-                dueDate: isset($payload['due_date']) ? (string) $payload['due_date'] : null,
-                notes: isset($payload['notes']) ? (string) $payload['notes'] : null,
-                data: [
+                $documentDate = (string) ($payload['document_date'] ?? now()->toDateString());
+                $dto = new CreateDocumentDTO(
+                    tenantId: $tenantId,
+                    documentTypeId: $documentTypeId,
+                    documentDate: $documentDate,
+                    organizationUnitId: $record->get('organization_unit_id') !== null
+                        ? (int) $record->get('organization_unit_id')
+                        : null,
+                    ownerId: isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
+                    partyId: $record->get('supplier_id') !== null ? (int) $record->get('supplier_id') : null,
+                    dueDate: isset($payload['due_date']) ? (string) $payload['due_date'] : null,
+                    notes: isset($payload['notes']) ? (string) $payload['notes'] : null,
+                    data: [
+                        'source_type' => $entityType,
+                        'source_id' => (int) $record->id(),
+                        'purchase_reference' => $record->get('reference'),
+                        'purchase_number' => $record->get('po_number')
+                            ?? $record->get('grn_number')
+                            ?? $record->get('return_number'),
+                    ],
+                    items: $items,
+                );
+
+                $documentAggregate = $this->documentOrchestrator->create($dto);
+                $documentId = $documentAggregate->document->id;
+                if (! is_int($documentId) || $documentId < 1) {
+                    return Result::failure(new Error(
+                        PurchaseErrorCode::INVALID_VALUE,
+                        'Document creation did not return a valid document id.',
+                    ));
+                }
+
+                $this->purchaseDocumentLinkRepository->create([
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => $record->get('organization_unit_id'),
+                    'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
                     'source_type' => $entityType,
                     'source_id' => (int) $record->id(),
-                    'purchase_reference' => $record->get('reference'),
-                    'purchase_number' => $record->get('po_number')
-                        ?? $record->get('grn_number')
-                        ?? $record->get('return_number'),
-                ],
-                items: $items,
-            );
-
-            $documentAggregate = $this->documentOrchestrator->create($dto);
-            $documentId = $documentAggregate->document->id;
-            if (! is_int($documentId) || $documentId < 1) {
-                return Result::failure(new Error(
-                    PurchaseErrorCode::INVALID_VALUE,
-                    'Document creation did not return a valid document id.',
-                ));
-            }
-
-            $this->purchaseDocumentLinkRepository->create([
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => $record->get('organization_unit_id'),
-                'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
-                'source_type' => $entityType,
-                'source_id' => (int) $record->id(),
-                'source_line_id' => null,
-                'document_id' => $documentId,
-                'document_line_id' => null,
-                'linked_quantity' => null,
-                'linked_amount' => (float) ($record->get('grand_total') ?? 0),
-                'status' => 'active',
-                'linked_at' => now()->toDateTimeString(),
-                'created_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
-            ]);
-
-            $nextDocumentStatus = $this->supportsDocumentStatus($entityType) ? 'documented' : null;
-            if ($nextDocumentStatus !== null) {
-                $this->updateEntity($entityType, $id, [
-                    'document_status' => $nextDocumentStatus,
-                    'updated_by' => $payload['actor_id'] ?? null,
+                    'source_line_id' => null,
+                    'document_id' => $documentId,
+                    'document_line_id' => null,
+                    'linked_quantity' => null,
+                    'linked_amount' => (float) ($record->get('grand_total') ?? 0),
+                    'status' => 'active',
+                    'linked_at' => now()->toDateTimeString(),
+                    'created_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
                 ]);
-            }
 
-            return Result::success([
-                'source_type' => $entityType,
-                'source_id' => (int) $record->id(),
-                'document_id' => $documentId,
-                'document_number' => $documentAggregate->document->documentNumber,
-            ]);
+                $nextDocumentStatus = $this->supportsDocumentStatus($entityType) ? 'documented' : null;
+                if ($nextDocumentStatus !== null) {
+                    $this->updateEntity($entityType, $id, [
+                        'document_status' => $nextDocumentStatus,
+                        'updated_by' => $payload['actor_id'] ?? null,
+                    ]);
+                }
+
+                return Result::success([
+                    'source_type' => $entityType,
+                    'source_id' => (int) $record->id(),
+                    'document_id' => $documentId,
+                    'document_number' => $documentAggregate->document->documentNumber,
+                ]);
+            });
         } catch (Throwable $exception) {
             return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, $exception->getMessage()));
         }
@@ -226,6 +310,10 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
     public function allocatePayment(string $entityType, int|string $id, array $payload): Result
     {
         try {
+            if (! in_array($entityType, self::ENTITY_TYPES, true)) {
+                return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'Unsupported entity_type.'));
+            }
+
             $record = $this->findEntity($entityType, $id);
             if (! $record instanceof DataRecord) {
                 return Result::failure(new Error(PurchaseErrorCode::NOT_FOUND, 'Purchase entity not found.'));
@@ -258,59 +346,68 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 ));
             }
 
-            if (isset($payload['payment_id'])) {
-                $allocationResult = $this->paymentAllocationService->createAllocation([
+            return $this->withinEntityTransaction($entityType, function () use (
+                $payload,
+                $tenantId,
+                $record,
+                $entityType,
+                $documentId,
+                $allocatedAmount,
+            ): Result {
+                if (isset($payload['payment_id'])) {
+                    $allocationResult = $this->paymentAllocationService->createAllocation([
+                        'tenant_id' => $tenantId,
+                        'organization_unit_id' => $record->get('organization_unit_id'),
+                        'payment_id' => (int) $payload['payment_id'],
+                        'document_type' => $entityType,
+                        'document_id' => $documentId,
+                        'allocated_amount' => $allocatedAmount,
+                        'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
+                        'reference' => $payload['reference'] ?? null,
+                    ]);
+                } elseif (isset($payload['advance_payment_id'])) {
+                    $allocationResult = $this->advancePaymentAllocationService->createAllocation([
+                        'tenant_id' => $tenantId,
+                        'organization_unit_id' => $record->get('organization_unit_id'),
+                        'advance_payment_id' => (int) $payload['advance_payment_id'],
+                        'document_type' => $entityType,
+                        'document_id' => $documentId,
+                        'allocated_amount' => $allocatedAmount,
+                        'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
+                        'reference' => $payload['reference'] ?? null,
+                    ]);
+                } else {
+                    return Result::failure(new Error(
+                        PurchaseErrorCode::INVALID_VALUE,
+                        'payment_id or advance_payment_id is required.',
+                    ));
+                }
+
+                if ($allocationResult->isFailure()) {
+                    return $allocationResult;
+                }
+
+                $this->purchasePaymentAllocationRepository->create([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $record->get('organization_unit_id'),
-                    'payment_id' => (int) $payload['payment_id'],
-                    'document_type' => $entityType,
-                    'document_id' => $documentId,
-                    'allocated_amount' => $allocatedAmount,
                     'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
-                    'reference' => $payload['reference'] ?? null,
-                ]);
-            } elseif (isset($payload['advance_payment_id'])) {
-                $allocationResult = $this->advancePaymentAllocationService->createAllocation([
-                    'tenant_id' => $tenantId,
-                    'organization_unit_id' => $record->get('organization_unit_id'),
-                    'advance_payment_id' => (int) $payload['advance_payment_id'],
-                    'document_type' => $entityType,
                     'document_id' => $documentId,
+                    'payment_id' => isset($payload['payment_id']) ? (int) $payload['payment_id'] : null,
+                    'advance_payment_id' => isset($payload['advance_payment_id'])
+                        ? (int) $payload['advance_payment_id']
+                        : null,
                     'allocated_amount' => $allocatedAmount,
-                    'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
-                    'reference' => $payload['reference'] ?? null,
+                    'currency_id' => isset($payload['currency_id']) ? (int) $payload['currency_id'] : null,
+                    'base_allocated_amount' => isset($payload['base_allocated_amount'])
+                        ? round((float) $payload['base_allocated_amount'], 4)
+                        : null,
+                    'status' => 'active',
+                    'allocated_at' => now()->toDateTimeString(),
+                    'created_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
                 ]);
-            } else {
-                return Result::failure(new Error(
-                    PurchaseErrorCode::INVALID_VALUE,
-                    'payment_id or advance_payment_id is required.',
-                ));
-            }
 
-            if ($allocationResult->isFailure()) {
-                return $allocationResult;
-            }
-
-            $this->purchasePaymentAllocationRepository->create([
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => $record->get('organization_unit_id'),
-                'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
-                'document_id' => $documentId,
-                'payment_id' => isset($payload['payment_id']) ? (int) $payload['payment_id'] : null,
-                'advance_payment_id' => isset($payload['advance_payment_id'])
-                    ? (int) $payload['advance_payment_id']
-                    : null,
-                'allocated_amount' => $allocatedAmount,
-                'currency_id' => isset($payload['currency_id']) ? (int) $payload['currency_id'] : null,
-                'base_allocated_amount' => isset($payload['base_allocated_amount'])
-                    ? round((float) $payload['base_allocated_amount'], 4)
-                    : null,
-                'status' => 'active',
-                'allocated_at' => now()->toDateTimeString(),
-                'created_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
-            ]);
-
-            return Result::success($allocationResult->valueOrFail());
+                return Result::success($allocationResult->valueOrFail());
+            });
         } catch (Throwable $exception) {
             return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, $exception->getMessage()));
         }
@@ -319,6 +416,13 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
     public function postInventory(string $entityType, int|string $id, array $payload): Result
     {
         try {
+            if (! in_array($entityType, ['grn_header', 'purchase_return'], true)) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Inventory posting is supported only for GRN and Purchase Return.',
+                ));
+            }
+
             $record = $this->findEntity($entityType, $id);
             if (! $record instanceof DataRecord) {
                 return Result::failure(new Error(PurchaseErrorCode::NOT_FOUND, 'Purchase entity not found.'));
@@ -340,62 +444,108 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 ));
             }
 
-            foreach ($lineRecords as $line) {
-                $quantity = $entityType === 'purchase_return'
-                    ? (float) $line->get('return_qty', 0)
-                    : (float) $line->get('received_qty', 0);
-                if ($quantity <= 0) {
-                    continue;
+
+            return $this->withinEntityTransaction($entityType, function () use (
+                $lineRecords,
+                $entityType,
+                $tenantId,
+                $record,
+                $payload,
+                $id,
+            ): Result {
+                foreach ($lineRecords as $line) {
+                    $quantity = $entityType === 'purchase_return'
+                        ? (float) $line->get('return_qty', 0)
+                        : (float) $line->get('received_qty', 0);
+                    if ($quantity <= 0) {
+                        continue;
+                    }
+
+                    $itemId = (int) $line->get('item_id', 0);
+                    if (! $this->itemRepository->findByIdInTenant($itemId, $tenantId) instanceof DataRecord) {
+                        return Result::failure(new Error(
+                            PurchaseErrorCode::INVALID_VALUE,
+                            'Inventory posting failed because item is not available in tenant scope.',
+                        ));
+                    }
+
+                    $transactionUomId = (int) $line->get('uom_id', 0);
+                    $transactionUom = $this->unitOfMeasureRepository->findById($transactionUomId);
+                    if (! $transactionUom instanceof DataRecord) {
+                        return Result::failure(new Error(
+                            PurchaseErrorCode::INVALID_VALUE,
+                            'Inventory posting failed because transaction UOM is invalid.',
+                        ));
+                    }
+
+                    $baseUomResult = $this->uomConversionService->getBaseUnit(
+                        (string) $transactionUom->get('type', ''),
+                        $tenantId,
+                    );
+                    if ($baseUomResult->isFailure()) {
+                        return $baseUomResult;
+                    }
+
+                    $baseUom = $baseUomResult->valueOrFail();
+                    $baseQuantityResult = $this->uomConversionService->normalizeToBase(
+                        $quantity,
+                        $transactionUomId,
+                        $tenantId,
+                    );
+                    if ($baseQuantityResult->isFailure()) {
+                        return $baseQuantityResult;
+                    }
+
+                    $baseQuantity = (float) $baseQuantityResult->valueOrFail();
+                    $direction = $entityType === 'purchase_return' ? 'OUT' : 'IN';
+                    $movementType = $entityType === 'purchase_return' ? 'PURCHASE_RETURN' : 'PURCHASE_GRN';
+
+                    $movementResult = $this->createStockMovementService->execute([
+                        'tenant_id' => $tenantId,
+                        'organization_unit_id' => $record->get('organization_unit_id'),
+                        'direction' => $direction,
+                        'movement_type' => $movementType,
+                        'item_id' => $itemId,
+                        'variant_id' => $line->get('variant_id'),
+                        'batch_id' => $line->get('batch_id'),
+                        'serial_id' => $line->get('serial_id'),
+                        'location_id' => $line->get('location_id'),
+                        'warehouse_id' => $line->get('warehouse_id') ?? $record->get('warehouse_id'),
+                        'source_type' => $entityType,
+                        'source_id' => (int) $record->id(),
+                        'source_line_id' => (int) $line->id(),
+                        'transaction_uom_id' => $transactionUomId,
+                        'base_uom_id' => (int) $baseUom->id(),
+                        'quantity' => $quantity,
+                        'base_quantity' => $baseQuantity,
+                        'quantity_in' => $direction === 'IN' ? $quantity : 0,
+                        'quantity_out' => $direction === 'OUT' ? $quantity : 0,
+                        'base_quantity_in' => $direction === 'IN' ? $baseQuantity : 0,
+                        'base_quantity_out' => $direction === 'OUT' ? $baseQuantity : 0,
+                        'unit_cost' => (float) $line->get('unit_price', 0),
+                        'total_cost' => round($quantity * (float) $line->get('unit_price', 0), 4),
+                        'status' => 'POSTED',
+                        'performed_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
+                        'performed_at' => now()->toDateTimeString(),
+                        'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
+                    ]);
+
+                    if ($movementResult->isFailure()) {
+                        return $movementResult;
+                    }
                 }
 
-                $direction = $entityType === 'purchase_return' ? 'OUT' : 'IN';
-                $movementType = $entityType === 'purchase_return' ? 'PURCHASE_RETURN' : 'PURCHASE_GRN';
-
-                $movementResult = $this->createStockMovementService->execute([
-                    'tenant_id' => $tenantId,
-                    'organization_unit_id' => $record->get('organization_unit_id'),
-                    'direction' => $direction,
-                    'movement_type' => $movementType,
-                    'item_id' => (int) $line->get('item_id', 0),
-                    'variant_id' => $line->get('variant_id'),
-                    'batch_id' => $line->get('batch_id'),
-                    'serial_id' => $line->get('serial_id'),
-                    'location_id' => $line->get('location_id'),
-                    'warehouse_id' => $line->get('warehouse_id') ?? $record->get('warehouse_id'),
-                    'source_type' => $entityType,
-                    'source_id' => (int) $record->id(),
-                    'source_line_id' => (int) $line->id(),
-                    'transaction_uom_id' => (int) $line->get('uom_id', 0),
-                    'base_uom_id' => (int) $line->get('uom_id', 0),
-                    'quantity' => $quantity,
-                    'base_quantity' => $quantity,
-                    'quantity_in' => $direction === 'IN' ? $quantity : 0,
-                    'quantity_out' => $direction === 'OUT' ? $quantity : 0,
-                    'base_quantity_in' => $direction === 'IN' ? $quantity : 0,
-                    'base_quantity_out' => $direction === 'OUT' ? $quantity : 0,
-                    'unit_cost' => (float) $line->get('unit_price', 0),
-                    'total_cost' => round($quantity * (float) $line->get('unit_price', 0), 4),
-                    'status' => 'POSTED',
-                    'performed_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
-                    'performed_at' => now()->toDateTimeString(),
-                    'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
-                ]);
-
-                if ($movementResult->isFailure()) {
-                    return $movementResult;
+                if ($entityType === 'grn_header') {
+                    $this->updateEntity($entityType, $id, [
+                        'status' => 'posted',
+                        'posted_by' => $payload['actor_id'] ?? null,
+                        'posted_at' => now()->toDateTimeString(),
+                        'updated_by' => $payload['actor_id'] ?? null,
+                    ]);
                 }
-            }
 
-            if ($entityType === 'grn_header') {
-                $this->updateEntity($entityType, $id, [
-                    'status' => 'posted',
-                    'posted_by' => $payload['actor_id'] ?? null,
-                    'posted_at' => now()->toDateTimeString(),
-                    'updated_by' => $payload['actor_id'] ?? null,
-                ]);
-            }
-
-            return Result::success(['posted' => true]);
+                return Result::success(['posted' => true]);
+            });
         } catch (Throwable $exception) {
             return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, $exception->getMessage()));
         }
@@ -404,6 +554,10 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
     public function postFinance(string $entityType, int|string $id, array $payload): Result
     {
         try {
+            if (! in_array($entityType, self::ENTITY_TYPES, true)) {
+                return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'Unsupported entity_type.'));
+            }
+
             $record = $this->findEntity($entityType, $id);
             if (! $record instanceof DataRecord) {
                 return Result::failure(new Error(PurchaseErrorCode::NOT_FOUND, 'Purchase entity not found.'));
@@ -432,12 +586,14 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
             $entryPayload['source_type'] = $entryPayload['source_type'] ?? $entityType;
             $entryPayload['source_id'] = $entryPayload['source_id'] ?? (int) $record->id();
 
-            $postingResult = $this->financePostingService->postFromSource($entryPayload, $linesPayload);
-            if ($postingResult->isFailure()) {
-                return $postingResult;
-            }
+            return $this->withinEntityTransaction($entityType, function () use ($entryPayload, $linesPayload): Result {
+                $postingResult = $this->financePostingService->postFromSource($entryPayload, $linesPayload);
+                if ($postingResult->isFailure()) {
+                    return $postingResult;
+                }
 
-            return Result::success($postingResult->valueOrFail());
+                return Result::success($postingResult->valueOrFail());
+            });
         } catch (Throwable $exception) {
             return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, $exception->getMessage()));
         }
@@ -446,6 +602,10 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
     public function reverseFinance(string $entityType, int|string $id, array $payload): Result
     {
         try {
+            if (! in_array($entityType, self::ENTITY_TYPES, true)) {
+                return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'Unsupported entity_type.'));
+            }
+
             $record = $this->findEntity($entityType, $id);
             if (! $record instanceof DataRecord) {
                 return Result::failure(new Error(PurchaseErrorCode::NOT_FOUND, 'Purchase entity not found.'));
@@ -464,12 +624,19 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'journal_entry_id is required.'));
             }
 
-            return $this->financePostingService->reverseByEntryId($journalEntryId, [
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => $record->get('organization_unit_id'),
-                'reason' => $payload['reason'] ?? null,
-                'reversed_by' => $payload['actor_id'] ?? null,
-            ]);
+            return $this->withinEntityTransaction($entityType, function () use (
+                $journalEntryId,
+                $tenantId,
+                $record,
+                $payload,
+            ): Result {
+                return $this->financePostingService->reverseByEntryId($journalEntryId, [
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => $record->get('organization_unit_id'),
+                    'reason' => $payload['reason'] ?? null,
+                    'reversed_by' => $payload['actor_id'] ?? null,
+                ]);
+            });
         } catch (Throwable $exception) {
             return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, $exception->getMessage()));
         }
@@ -482,6 +649,16 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
             'grn_header' => $this->grnHeaderRepository->findById($id),
             'purchase_return' => $this->purchaseReturnRepository->findById($id),
             default => null,
+        };
+    }
+
+    private function withinEntityTransaction(string $entityType, callable $callback): Result
+    {
+        return match ($entityType) {
+            'purchase_order' => $this->purchaseOrderRepository->transaction($callback),
+            'grn_header' => $this->grnHeaderRepository->transaction($callback),
+            'purchase_return' => $this->purchaseReturnRepository->transaction($callback),
+            default => Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'Unsupported entity type.')),
         };
     }
 
@@ -507,8 +684,12 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
     }
 
     /** @return list<array<string, mixed>> */
-    private function resolveDocumentItems(string $entityType, int $entityId, array $payload): array
-    {
+    private function resolveDocumentItems(
+        string $entityType,
+        int $entityId,
+        array $payload,
+        ?DataRecord $header = null,
+    ): array {
         $providedItems = $payload['items'] ?? null;
         if (is_array($providedItems) && $providedItems !== []) {
             return $providedItems;
@@ -521,8 +702,49 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
             $qty = $entityType === 'purchase_return'
                 ? (float) $line->get('return_qty', 0)
                 : (float) $line->get('received_qty', $line->get('ordered_qty', 0));
+            if ($qty <= 0) {
+                continue;
+            }
+
+            $unitPrice = (float) $line->get('unit_price', 0);
             $lineTotal = (float) $line->get('line_total_with_tax', $line->get('line_total', 0));
-            if ($qty <= 0 || $lineTotal <= 0) {
+
+            if (($unitPrice <= 0 || $lineTotal <= 0) && $header instanceof DataRecord) {
+                $priceResult = $this->priceResolverService->resolvePrice([
+                    'tenant_id' => (int) $header->get('tenant_id', 0),
+                    'item_id' => (int) $line->get('item_id', 0),
+                    'quantity' => $qty,
+                    'uom_id' => (int) $line->get('uom_id', 0),
+                    'party_type' => 'supplier',
+                    'party_id' => (int) $header->get('supplier_id', 0),
+                    'price_list_id' => $header->get('price_list_id') !== null
+                        ? (int) $header->get('price_list_id')
+                        : null,
+                    'currency_id' => $header->get('currency_id') !== null
+                        ? (int) $header->get('currency_id')
+                        : null,
+                    'source_type' => $entityType,
+                    'source_id' => $entityId,
+                    'date' => now()->toDateString(),
+                ]);
+
+                if ($priceResult->isSuccess()) {
+                    $priceData = $priceResult->valueOrFail();
+                    if ($priceData instanceof DataRecord) {
+                        $lineTotal = (float) $priceData->get('final_amount', $lineTotal);
+                        $resolvedUnitPrice = (float) $priceData->get('base_unit_price', $unitPrice);
+                        if ($resolvedUnitPrice > 0) {
+                            $unitPrice = $resolvedUnitPrice;
+                        }
+                    }
+                }
+            }
+
+            if ($lineTotal <= 0) {
+                $lineTotal = round($qty * max($unitPrice, 0), 4);
+            }
+
+            if ($lineTotal <= 0) {
                 continue;
             }
 
@@ -536,7 +758,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                     'variant_id' => $line->get('variant_id'),
                     'uom_id' => $line->get('uom_id'),
                     'quantity' => $qty,
-                    'unit_price' => (float) $line->get('unit_price', 0),
+                    'unit_price' => $unitPrice,
                     'discount_amount' => (float) $line->get('discount_amount', 0),
                     'tax_amount' => (float) $line->get('tax_amount', 0),
                 ],

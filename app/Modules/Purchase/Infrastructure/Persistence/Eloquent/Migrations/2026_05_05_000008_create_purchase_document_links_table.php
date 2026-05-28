@@ -21,7 +21,10 @@ return new class extends Migration
             $table->unsignedBigInteger('source_id');
             $table->unsignedBigInteger('source_line_id')->nullable();
             $table->foreignId('document_id')->constrained('documents', 'id')->cascadeOnDelete();
-            $table->unsignedBigInteger('document_line_id')->nullable();
+            $table->foreignId('document_line_id')
+                ->nullable()
+                ->constrained('document_items')
+                ->nullOnDelete();
             $table->decimal('linked_quantity', 20, 4)->nullable();
             $table->decimal('linked_amount', 20, 4)->default(0);
             $table->string('status')->default('active')->comment('active, reversed');

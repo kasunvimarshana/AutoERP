@@ -41,6 +41,12 @@ final class PurchaseRoutesTest extends TestCase
         self::assertTrue(Route::has('purchase.purchase-return-lines.show'));
         self::assertTrue(Route::has('purchase.purchase-return-lines.update'));
         self::assertTrue(Route::has('purchase.purchase-return-lines.destroy'));
+        self::assertTrue(Route::has('purchase.workflows.transition'));
+        self::assertTrue(Route::has('purchase.workflows.document'));
+        self::assertTrue(Route::has('purchase.workflows.payment.allocate'));
+        self::assertTrue(Route::has('purchase.workflows.inventory.post'));
+        self::assertTrue(Route::has('purchase.workflows.finance.post'));
+        self::assertTrue(Route::has('purchase.workflows.finance.reverse'));
     }
 
     public function testPurchaseRoutesUseContextMiddlewares(): void
