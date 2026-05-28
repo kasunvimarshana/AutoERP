@@ -15,14 +15,23 @@ final class UomConversionResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        if ($this->resource instanceof DataRecord) {
-            return $this->resource->toArray();
-        }
+        $data = $this->resource instanceof DataRecord
+            ? $this->resource->toArray()
+            : (is_array($this->resource) ? $this->resource : []);
 
-        if (is_array($this->resource)) {
-            return $this->resource;
-        }
-
-        return [];
+        return [
+            'id'                   => $data['id'] ?? null,
+            'tenant_id'            => $data['tenant_id'] ?? null,
+            'organization_unit_id' => $data['organization_unit_id'] ?? null,
+            'from_uom_id'          => $data['from_uom_id'] ?? null,
+            'to_uom_id'            => $data['to_uom_id'] ?? null,
+            'factor'               => $data['factor'] ?? null,
+            'item_id'              => $data['item_id'] ?? null,
+            'is_bidirectional'     => $data['is_bidirectional'] ?? true,
+            'is_active'            => $data['is_active'] ?? true,
+            'metadata'             => $data['metadata'] ?? null,
+            'created_at'           => $data['created_at'] ?? null,
+            'updated_at'           => $data['updated_at'] ?? null,
+        ];
     }
 }

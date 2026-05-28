@@ -26,8 +26,6 @@ final class ListUnitOfMeasuresService implements ListUnitOfMeasuresServiceInterf
                 ? min($perPage, (int) config('uom.pagination.max_per_page', UomDefaults::MAX_PER_PAGE))
                 : (int) config('uom.pagination.default_per_page', UomDefaults::DEFAULT_PER_PAGE);
 
-            unset($criteria['search']);
-
             return Result::success($this->repository->page($criteria, $resolvedPerPage, $resolvedPage));
         } catch (Throwable $exception) {
             return Result::failure(new Error(UomErrorCode::INVALID_VALUE, $exception->getMessage()));

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Modules\UOM\Presentation\Http\Controllers\ConvertUomController;
 use Modules\UOM\Presentation\Http\Controllers\UnitOfMeasureController;
 use Modules\UOM\Presentation\Http\Controllers\UomConversionController;
 
@@ -24,6 +25,7 @@ Route::prefix('api/uom')
     ])
     ->name('uom.')
     ->group(function (): void {
+        Route::post('convert', ConvertUomController::class)->name('convert');
         Route::apiResource('units-of-measure', UnitOfMeasureController::class);
         Route::apiResource('uom-conversions', UomConversionController::class);
     });

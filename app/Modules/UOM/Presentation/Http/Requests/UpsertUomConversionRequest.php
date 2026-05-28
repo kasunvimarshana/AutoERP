@@ -10,7 +10,7 @@ final class UpsertUomConversionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return auth()->check();
+        return $this->user() !== null;
     }
 
     /**
@@ -26,8 +26,13 @@ final class UpsertUomConversionRequest extends FormRequest
             'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
             'metadata' => ['nullable', 'array'],
             'from_uom_id' => array_merge($required, ['integer', 'min:1', 'exists:unit_of_measures,id']),
-            'to_uom_id' => array_merge($required, ['integer', 'min:1', 'exists:unit_of_measures,id']),
-            'factor' => array_merge($required, ['numeric']),
+            'to_uom_id' => array_merge($required, [
+                'integer',
+                'min:1',
+                'exists:unit_of_measures,id',
+                'different:from_uom_id',
+            ]),
+            'factor' => array_merge($required, ['numeric', 'gt:0']),
             'item_id' => ['nullable', 'integer', 'min:1', 'exists:items,id'],
             'is_bidirectional' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],

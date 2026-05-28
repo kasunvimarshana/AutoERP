@@ -12,6 +12,7 @@ use Modules\UOM\Application\Contracts\UseCases\UnitOfMeasures\DeleteUnitOfMeasur
 use Modules\UOM\Application\Contracts\UseCases\UnitOfMeasures\GetUnitOfMeasureServiceInterface;
 use Modules\UOM\Application\Contracts\UseCases\UnitOfMeasures\ListUnitOfMeasuresServiceInterface;
 use Modules\UOM\Application\Contracts\UseCases\UnitOfMeasures\UpdateUnitOfMeasureServiceInterface;
+use Modules\UOM\Domain\Constants\UomErrorCode;
 use Modules\UOM\Presentation\Http\Requests\ListUnitOfMeasureRequest;
 use Modules\UOM\Presentation\Http\Requests\UpsertUnitOfMeasureRequest;
 use Modules\UOM\Presentation\Http\Resources\UnitOfMeasureResource;
@@ -85,7 +86,7 @@ final class UnitOfMeasureController extends Controller
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
-            $status = $error->code === 'UOM_NOT_FOUND' ? 404 : 422;
+            $status = $error->code === UomErrorCode::NOT_FOUND ? 404 : 422;
 
             return response()->json(['message' => $error->message], $status);
         }

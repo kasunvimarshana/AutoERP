@@ -15,14 +15,21 @@ final class UnitOfMeasureResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        if ($this->resource instanceof DataRecord) {
-            return $this->resource->toArray();
-        }
+        $data = $this->resource instanceof DataRecord
+            ? $this->resource->toArray()
+            : (is_array($this->resource) ? $this->resource : []);
 
-        if (is_array($this->resource)) {
-            return $this->resource;
-        }
-
-        return [];
+        return [
+            'id'                   => $data['id'] ?? null,
+            'tenant_id'            => $data['tenant_id'] ?? null,
+            'organization_unit_id' => $data['organization_unit_id'] ?? null,
+            'name'                 => $data['name'] ?? null,
+            'symbol'               => $data['symbol'] ?? null,
+            'type'                 => $data['type'] ?? null,
+            'is_base'              => $data['is_base'] ?? false,
+            'metadata'             => $data['metadata'] ?? null,
+            'created_at'           => $data['created_at'] ?? null,
+            'updated_at'           => $data['updated_at'] ?? null,
+        ];
     }
 }

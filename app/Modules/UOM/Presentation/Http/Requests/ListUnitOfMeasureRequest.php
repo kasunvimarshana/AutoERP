@@ -10,7 +10,7 @@ final class ListUnitOfMeasureRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return auth()->check();
+        return $this->user() !== null;
     }
 
     /**
@@ -25,6 +25,7 @@ final class ListUnitOfMeasureRequest extends FormRequest
             'per_page' => ['nullable', 'integer', 'min:1', 'max:' . (int) config('uom.pagination.max_per_page', 200)],
             'name' => ['nullable', 'string', 'max:255'],
             'symbol' => ['nullable', 'string', 'max:255'],
+            'search' => ['nullable', 'string', 'max:255'],
             'type' => ['nullable', 'string', 'max:255'],
             'is_base' => ['nullable', 'boolean'],
         ];

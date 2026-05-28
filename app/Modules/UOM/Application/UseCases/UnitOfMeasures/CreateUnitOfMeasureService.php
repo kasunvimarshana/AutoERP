@@ -20,8 +20,14 @@ final class CreateUnitOfMeasureService implements CreateUnitOfMeasureServiceInte
     public function execute(array $payload): Result
     {
         try {
-            if (! array_key_exists('row_version', $payload)) {
-                $payload['row_version'] = 1;
+            if (
+                isset($payload['tenant_id'], $payload['name'])
+                && $this->repository->exists([
+                    'tenant_id' => (int) $payload['tenant_id'],
+                    'name' => (string) $payload['name'],
+                ])
+            ) {
+                return Result::failure(new Error(UomErrorCode::DUPLICATE_NAME, 'Unit of measure name already exists.'));
             }
 
             return Result::success($this->repository->create($payload));

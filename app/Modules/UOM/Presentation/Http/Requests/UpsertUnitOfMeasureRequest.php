@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace Modules\UOM\Presentation\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Modules\UOM\Domain\Constants\UomType;
 
 final class UpsertUnitOfMeasureRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return auth()->check();
+        return $this->user() !== null;
     }
 
     /**
@@ -27,7 +28,7 @@ final class UpsertUnitOfMeasureRequest extends FormRequest
             'metadata' => ['nullable', 'array'],
             'name' => array_merge($required, ['string', 'max:255']),
             'symbol' => array_merge($required, ['string', 'max:255']),
-            'type' => ['nullable', 'string', 'max:255'],
+            'type' => ['nullable', 'string', 'in:' . implode(',', UomType::all())],
             'is_base' => ['nullable', 'boolean'],
         ];
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\UOM\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\UOM\Application\Contracts\Services\UomConversionServiceInterface;
 use Modules\UOM\Application\Contracts\UseCases\UnitOfMeasures\CreateUnitOfMeasureServiceInterface;
 use Modules\UOM\Application\Contracts\UseCases\UnitOfMeasures\DeleteUnitOfMeasureServiceInterface;
 use Modules\UOM\Application\Contracts\UseCases\UnitOfMeasures\GetUnitOfMeasureServiceInterface;
@@ -17,6 +18,7 @@ use Modules\UOM\Application\Contracts\UseCases\UomConversions\ListUomConversions
 use Modules\UOM\Application\Contracts\UseCases\UomConversions\UpdateUomConversionServiceInterface;
 use Modules\UOM\Application\Repositories\UnitOfMeasureRepositoryInterface;
 use Modules\UOM\Application\Repositories\UomConversionRepositoryInterface;
+use Modules\UOM\Application\Services\UomConversionService;
 use Modules\UOM\Application\UseCases\UnitOfMeasures\CreateUnitOfMeasureService;
 use Modules\UOM\Application\UseCases\UnitOfMeasures\DeleteUnitOfMeasureService;
 use Modules\UOM\Application\UseCases\UnitOfMeasures\GetUnitOfMeasureService;
@@ -38,15 +40,28 @@ final class UomServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__ . '/../Config/uom.php', 'uom');
 
+        // Repository bindings Ã¢â‚¬â€ use container resolution for model injection
+        $this->app->singleton(UnitOfMeasureRepositoryInterface::class, function (): UnitOfMeasureRepositoryInterface {
+            return new EloquentUnitOfMeasureRepository($this->app->make(UnitOfMeasureModel::class));
+        });
+
+        $this->app->singleton(UomConversionRepositoryInterface::class, function (): UomConversionRepositoryInterface {
+            return new EloquentUomConversionRepository($this->app->make(UomConversionModel::class));
+        });
+
+        // Reusable conversion service
+        $this->app->singleton(UomConversionServiceInterface::class, UomConversionService::class);
+
+        // Use case bindings
         foreach (
             [
-                ListUnitOfMeasuresServiceInterface::class => ListUnitOfMeasuresService::class,
-                GetUnitOfMeasureServiceInterface::class => GetUnitOfMeasureService::class,
+                ListUnitOfMeasuresServiceInterface::class  => ListUnitOfMeasuresService::class,
+                GetUnitOfMeasureServiceInterface::class    => GetUnitOfMeasureService::class,
                 CreateUnitOfMeasureServiceInterface::class => CreateUnitOfMeasureService::class,
                 UpdateUnitOfMeasureServiceInterface::class => UpdateUnitOfMeasureService::class,
                 DeleteUnitOfMeasureServiceInterface::class => DeleteUnitOfMeasureService::class,
-                ListUomConversionsServiceInterface::class => ListUomConversionsService::class,
-                GetUomConversionServiceInterface::class => GetUomConversionService::class,
+                ListUomConversionsServiceInterface::class  => ListUomConversionsService::class,
+                GetUomConversionServiceInterface::class    => GetUomConversionService::class,
                 CreateUomConversionServiceInterface::class => CreateUomConversionService::class,
                 UpdateUomConversionServiceInterface::class => UpdateUomConversionService::class,
                 DeleteUomConversionServiceInterface::class => DeleteUomConversionService::class,
@@ -54,14 +69,6 @@ final class UomServiceProvider extends ServiceProvider
         ) {
             $this->app->singleton($contract, $implementation);
         }
-
-        $this->app->singleton(UnitOfMeasureRepositoryInterface::class, function (): UnitOfMeasureRepositoryInterface {
-            return new EloquentUnitOfMeasureRepository(new UnitOfMeasureModel());
-        });
-
-        $this->app->singleton(UomConversionRepositoryInterface::class, function (): UomConversionRepositoryInterface {
-            return new EloquentUomConversionRepository(new UomConversionModel());
-        });
     }
 
     public function boot(): void

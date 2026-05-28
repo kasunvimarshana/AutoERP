@@ -12,6 +12,7 @@ use Modules\UOM\Application\Contracts\UseCases\UomConversions\DeleteUomConversio
 use Modules\UOM\Application\Contracts\UseCases\UomConversions\GetUomConversionServiceInterface;
 use Modules\UOM\Application\Contracts\UseCases\UomConversions\ListUomConversionsServiceInterface;
 use Modules\UOM\Application\Contracts\UseCases\UomConversions\UpdateUomConversionServiceInterface;
+use Modules\UOM\Domain\Constants\UomErrorCode;
 use Modules\UOM\Presentation\Http\Requests\ListUomConversionRequest;
 use Modules\UOM\Presentation\Http\Requests\UpsertUomConversionRequest;
 use Modules\UOM\Presentation\Http\Resources\UomConversionResource;
@@ -85,7 +86,7 @@ final class UomConversionController extends Controller
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
-            $status = $error->code === 'UOM_NOT_FOUND' ? 404 : 422;
+            $status = $error->code === UomErrorCode::NOT_FOUND ? 404 : 422;
 
             return response()->json(['message' => $error->message], $status);
         }
