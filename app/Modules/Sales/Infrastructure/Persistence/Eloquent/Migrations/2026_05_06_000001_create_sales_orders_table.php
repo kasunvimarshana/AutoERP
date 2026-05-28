@@ -49,6 +49,10 @@ return new class extends Migration
             $table->decimal('paid_amount', 20, 4)->default(0);
             $table->decimal('balance', 20, 4)->default(0)->comment('Application-calculated: grand_total - paid_amount');
 
+            $table->foreignId('tax_account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();
+            $table->foreignId('discount_account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();
+            $table->foreignId('sales_account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();
+
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
 
