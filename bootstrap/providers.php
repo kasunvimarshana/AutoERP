@@ -10,7 +10,6 @@ return [
     Modules\User\Infrastructure\Providers\UserServiceProvider::class,
     Modules\Tenant\Infrastructure\Providers\TenantServiceProvider::class,
     Modules\Sequence\Infrastructure\Providers\SequenceServiceProvider::class,
-    Modules\SystemUser\Infrastructure\Providers\SystemUserServiceProvider::class,
     Modules\OrganizationUnit\Infrastructure\Providers\OrganizationUnitServiceProvider::class,
     Modules\Finance\Infrastructure\Providers\FinanceServiceProvider::class,
     Modules\Vehicle\Infrastructure\Providers\VehicleServiceProvider::class,
