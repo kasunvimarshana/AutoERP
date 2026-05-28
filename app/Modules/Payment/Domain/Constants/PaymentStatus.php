@@ -9,6 +9,7 @@ final class PaymentStatus
     public const DRAFT = 'draft';
     public const POSTED = 'posted';
     public const RECONCILED = 'reconciled';
+    public const REVERSED = 'reversed';
     public const VOIDED = 'voided';
 
     /**
@@ -20,6 +21,7 @@ final class PaymentStatus
             self::DRAFT,
             self::POSTED,
             self::RECONCILED,
+            self::REVERSED,
             self::VOIDED,
         ];
     }
@@ -37,7 +39,8 @@ final class PaymentStatus
         return [
             self::DRAFT => [self::POSTED, self::VOIDED],
             self::POSTED => [self::RECONCILED, self::VOIDED],
-            self::RECONCILED => [self::POSTED],
+            self::RECONCILED => [self::POSTED, self::REVERSED],
+            self::REVERSED => [],
             self::VOIDED => [],
         ];
     }

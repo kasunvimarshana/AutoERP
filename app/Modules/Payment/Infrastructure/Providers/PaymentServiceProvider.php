@@ -8,7 +8,11 @@ use Illuminate\Support\ServiceProvider;
 use Modules\Payment\Application\Contracts\Services\AdvancePaymentAllocationServiceInterface;
 use Modules\Payment\Application\Contracts\Services\AdvancePaymentServiceInterface;
 use Modules\Payment\Application\Contracts\Services\PaymentAllocationServiceInterface;
+use Modules\Payment\Application\Contracts\Services\PaymentPostingServiceInterface;
+use Modules\Payment\Application\Contracts\Services\PaymentReversalServiceInterface;
+use Modules\Payment\Application\Contracts\Services\RefundServiceInterface;
 use Modules\Payment\Application\Contracts\Services\PaymentServiceInterface;
+use Modules\Payment\Application\Contracts\Services\WriteOffServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\PaymentEngines\AllocatePaymentDocumentServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\PaymentEngines\SettlePaymentStatusServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\PaymentEngines\UnallocatePaymentDocumentServiceInterface;
@@ -118,8 +122,12 @@ use Modules\Payment\Application\UseCases\WriteOffs\ListWriteOffsService;
 use Modules\Payment\Application\UseCases\WriteOffs\UpdateWriteOffService;
 use Modules\Payment\Application\Services\AdvancePaymentAllocationService;
 use Modules\Payment\Application\Services\AdvancePaymentService;
+use Modules\Payment\Application\Services\PaymentPostingService;
+use Modules\Payment\Application\Services\PaymentReversalService;
 use Modules\Payment\Application\Services\PaymentAllocationService;
 use Modules\Payment\Application\Services\PaymentService;
+use Modules\Payment\Application\Services\RefundService;
+use Modules\Payment\Application\Services\WriteOffService;
 use Modules\Payment\Infrastructure\Persistence\Eloquent\Models\AdvancePaymentAllocationModel;
 use Modules\Payment\Infrastructure\Persistence\Eloquent\Models\AdvancePaymentModel;
 use Modules\Payment\Infrastructure\Persistence\Eloquent\Models\CashRegisterModel;
@@ -199,6 +207,10 @@ final class PaymentServiceProvider extends ServiceProvider
                 PaymentAllocationServiceInterface::class => PaymentAllocationService::class,
                 AdvancePaymentServiceInterface::class => AdvancePaymentService::class,
                 AdvancePaymentAllocationServiceInterface::class => AdvancePaymentAllocationService::class,
+                PaymentPostingServiceInterface::class => PaymentPostingService::class,
+                PaymentReversalServiceInterface::class => PaymentReversalService::class,
+                RefundServiceInterface::class => RefundService::class,
+                WriteOffServiceInterface::class => WriteOffService::class,
             ] as $contract => $implementation
         ) {
             $this->app->singleton($contract, $implementation);

@@ -38,6 +38,12 @@ Route::prefix('api/payment')
             ->name('payments.engines.unallocate');
         Route::post('payments/{payment}/engines/status', [PaymentEngineController::class, 'settleStatus'])
             ->name('payments.engines.status');
+        Route::post('payments/{payment}/engines/post', [PaymentEngineController::class, 'post'])
+            ->name('payments.engines.post');
+        Route::post('payments/{payment}/engines/reverse', [PaymentEngineController::class, 'reverse'])
+            ->name('payments.engines.reverse');
+        Route::post('payments/{payment}/engines/refund', [PaymentEngineController::class, 'refund'])
+            ->name('payments.engines.refund');
         Route::apiResource('payment-methods', PaymentMethodController::class);
         Route::apiResource('payment-groups', PaymentGroupController::class);
         Route::apiResource('payments', PaymentController::class);
