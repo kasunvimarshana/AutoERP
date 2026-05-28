@@ -1614,6 +1614,54 @@ final class PurchaseWorkflowServiceTest extends TestCase
         );
     }
 
+    public function testTransitionFailsWhenIdempotencyKeySignatureConflicts(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(905)
+            ->willReturn(new DataRecord([
+                'id' => 905,
+                'tenant_id' => 1,
+                'organization_unit_id' => 12,
+                'status' => 'draft',
+            ]));
+
+        $this->purchaseStatusHistoryRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'entity_type' => 'purchase_order',
+                'entity_id' => 905,
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 5,
+                    'to_status' => 'submitted',
+                    'metadata' => [
+                        'idempotency_key' => 'idem-tr-sig-1',
+                        'workflow_action' => 'transition',
+                        'target_status' => 'submitted',
+                        'idempotency_signature' => 'existing-signature',
+                    ],
+                ]),
+            ]);
+
+        $result = $this->service->transition('purchase_order', 905, [
+            'tenant_id' => 1,
+            'status' => 'submitted',
+            'idempotency_key' => 'idem-tr-sig-1',
+        ]);
+
+        self::assertTrue($result->isFailure());
+        self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
+        self::assertSame(
+            'idempotency_key is already used with a different request payload.',
+            $result->errorOrFail()->message,
+        );
+    }
+
     public function testReverseFinanceReturnsIdempotentReplayWhenKeyAlreadyExists(): void
     {
         $this->purchaseOrderRepository
@@ -1706,6 +1754,102 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
         self::assertSame(
             'idempotency_key is already used with a different request payload.',
+            $result->errorOrFail()->message,
+        );
+    }
+
+    public function testReverseFinanceFailsWhenIdempotencyKeySignatureConflicts(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(906)
+            ->willReturn(new DataRecord([
+                'id' => 906,
+                'tenant_id' => 1,
+                'organization_unit_id' => 12,
+                'status' => 'documented',
+            ]));
+
+        $this->purchaseStatusHistoryRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'entity_type' => 'purchase_order',
+                'entity_id' => 906,
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 6,
+                    'metadata' => [
+                        'idempotency_key' => 'idem-rf-sig-1',
+                        'workflow_action' => 'finance_reverse',
+                        'journal_entry_id' => '900',
+                        'idempotency_signature' => 'existing-signature',
+                    ],
+                ]),
+            ]);
+
+        $result = $this->service->reverseFinance('purchase_order', 906, [
+            'tenant_id' => 1,
+            'journal_entry_id' => 900,
+            'idempotency_key' => 'idem-rf-sig-1',
+        ]);
+
+        self::assertTrue($result->isFailure());
+        self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
+        self::assertSame(
+            'idempotency_key is already used with a different request payload.',
+            $result->errorOrFail()->message,
+        );
+    }
+
+    public function testReverseFinanceFailsWhenIdempotentHistoryLacksReplayJournalMetadata(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(907)
+            ->willReturn(new DataRecord([
+                'id' => 907,
+                'tenant_id' => 1,
+                'organization_unit_id' => 12,
+                'status' => 'documented',
+            ]));
+
+        $this->purchaseStatusHistoryRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'entity_type' => 'purchase_order',
+                'entity_id' => 907,
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 7,
+                    'metadata' => [
+                        'idempotency_key' => 'idem-rf-legacy-1',
+                        'workflow_action' => 'finance_reverse',
+                    ],
+                ]),
+            ]);
+
+        $this->financePostingService
+            ->expects(self::never())
+            ->method('reverseByEntryId');
+
+        $result = $this->service->reverseFinance('purchase_order', 907, [
+            'tenant_id' => 1,
+            'journal_entry_id' => 901,
+            'idempotency_key' => 'idem-rf-legacy-1',
+        ]);
+
+        self::assertTrue($result->isFailure());
+        self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
+        self::assertSame(
+            'idempotency_key cannot be safely replayed due to missing finance reversal metadata.',
             $result->errorOrFail()->message,
         );
     }

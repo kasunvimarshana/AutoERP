@@ -1082,6 +1082,13 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
 
                     $metadata = $replay->get('metadata', []);
                     $replayedJournalEntryId = is_array($metadata) ? ($metadata['journal_entry_id'] ?? null) : null;
+                    if ($replayedJournalEntryId === null || trim((string) $replayedJournalEntryId) === '') {
+                        return Result::failure(new Error(
+                            PurchaseErrorCode::INVALID_VALUE,
+                            'idempotency_key cannot be safely replayed due to missing finance reversal metadata.',
+                        ));
+                    }
+
                     if (
                         $replayedJournalEntryId !== null
                         && (string) $replayedJournalEntryId !== (string) $journalEntryId
