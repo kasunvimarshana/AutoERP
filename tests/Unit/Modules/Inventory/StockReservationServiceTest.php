@@ -74,4 +74,121 @@ final class StockReservationServiceTest extends TestCase
         self::assertTrue($result->isFailure());
         self::assertSame(InventoryErrorCode::INSUFFICIENT_STOCK, $result->errorOrFail()->code);
     }
+
+    public function testItRejectsStructuralReservationUpdateFields(): void
+    {
+        $reservationRepository = $this->createMock(StockReservationRepositoryInterface::class);
+        $stockLevelRepository = $this->createMock(StockLevelRepositoryInterface::class);
+        $itemRepository = $this->createMock(ItemRepositoryInterface::class);
+        $uomConversionService = $this->createMock(UomConversionServiceInterface::class);
+        $batchRepository = $this->createMock(BatchRepositoryInterface::class);
+        $serialRepository = $this->createMock(SerialRepositoryInterface::class);
+
+        $reservationRepository
+            ->method('findById')
+            ->with(77)
+            ->willReturn(new DataRecord([
+                'id' => 77,
+                'status' => 'ACTIVE',
+            ]));
+
+        $reservationRepository->expects(self::never())->method('update');
+
+        $service = new StockReservationService(
+            $reservationRepository,
+            $stockLevelRepository,
+            $itemRepository,
+            $uomConversionService,
+            $batchRepository,
+            $serialRepository,
+        );
+
+        $result = $service->updateReservation(77, ['quantity' => 10]);
+
+        self::assertTrue($result->isFailure());
+        self::assertSame(InventoryErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
+    }
+
+    public function testItAllowsMutableReservationFieldsForActiveReservation(): void
+    {
+        $reservationRepository = $this->createMock(StockReservationRepositoryInterface::class);
+        $stockLevelRepository = $this->createMock(StockLevelRepositoryInterface::class);
+        $itemRepository = $this->createMock(ItemRepositoryInterface::class);
+        $uomConversionService = $this->createMock(UomConversionServiceInterface::class);
+        $batchRepository = $this->createMock(BatchRepositoryInterface::class);
+        $serialRepository = $this->createMock(SerialRepositoryInterface::class);
+
+        $reservationRepository
+            ->method('findById')
+            ->with(77)
+            ->willReturn(new DataRecord([
+                'id' => 77,
+                'status' => 'ACTIVE',
+            ]));
+
+        $reservationRepository
+            ->expects(self::once())
+            ->method('update')
+            ->with(77, [
+                'expires_at' => '2026-12-31 23:59:59',
+                'notes' => 'hold for fulfillment',
+            ])
+            ->willReturn(new DataRecord([
+                'id' => 77,
+                'status' => 'ACTIVE',
+                'expires_at' => '2026-12-31 23:59:59',
+                'notes' => 'hold for fulfillment',
+            ]));
+
+        $service = new StockReservationService(
+            $reservationRepository,
+            $stockLevelRepository,
+            $itemRepository,
+            $uomConversionService,
+            $batchRepository,
+            $serialRepository,
+        );
+
+        $result = $service->updateReservation(77, [
+            'expires_at' => '2026-12-31 23:59:59',
+            'notes' => 'hold for fulfillment',
+        ]);
+
+        self::assertTrue($result->isSuccess());
+        self::assertSame(77, $result->valueOrFail()->id());
+    }
+
+    public function testItRejectsNonNoteUpdatesForClosedReservation(): void
+    {
+        $reservationRepository = $this->createMock(StockReservationRepositoryInterface::class);
+        $stockLevelRepository = $this->createMock(StockLevelRepositoryInterface::class);
+        $itemRepository = $this->createMock(ItemRepositoryInterface::class);
+        $uomConversionService = $this->createMock(UomConversionServiceInterface::class);
+        $batchRepository = $this->createMock(BatchRepositoryInterface::class);
+        $serialRepository = $this->createMock(SerialRepositoryInterface::class);
+
+        $reservationRepository
+            ->method('findById')
+            ->with(77)
+            ->willReturn(new DataRecord([
+                'id' => 77,
+                'status' => 'CONSUMED',
+            ]));
+
+        $reservationRepository->expects(self::never())->method('update');
+
+        $service = new StockReservationService(
+            $reservationRepository,
+            $stockLevelRepository,
+            $itemRepository,
+            $uomConversionService,
+            $batchRepository,
+            $serialRepository,
+        );
+
+        $result = $service->updateReservation(77, ['expires_at' => '2026-12-31 23:59:59']);
+
+        self::assertTrue($result->isFailure());
+        self::assertSame(InventoryErrorCode::INVALID_RESERVATION_STATUS, $result->errorOrFail()->code);
+    }
 }

@@ -18,6 +18,12 @@ interface StockReservationServiceInterface
      * @param array<string, mixed> $payload
      * @return Result<\Modules\Core\Application\DTO\DataRecord>
      */
+    public function updateReservation(int|string $reservationId, array $payload): Result;
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return Result<\Modules\Core\Application\DTO\DataRecord>
+     */
     public function release(int|string $reservationId, array $payload = []): Result;
 
     /**

@@ -19,6 +19,41 @@ use Throwable;
 
 final class StockReservationService implements StockReservationServiceInterface
 {
+    /** @var array<int, string> */
+    private const STRUCTURAL_RESERVATION_FIELDS = [
+        'tenant_id',
+        'organization_unit_id',
+        'item_id',
+        'variant_id',
+        'batch_id',
+        'serial_id',
+        'warehouse_id',
+        'location_id',
+        'transaction_uom_id',
+        'base_uom_id',
+        'uom_id',
+        'quantity',
+        'base_quantity',
+        'quantity_consumed',
+        'quantity_released',
+        'status',
+        'released_by',
+        'consumed_by',
+        'released_at',
+        'consumed_at',
+    ];
+
+    /** @var array<int, string> */
+    private const MUTABLE_RESERVATION_FIELDS = [
+        'reserved_for_type',
+        'reserved_for_id',
+        'expires_at',
+        'unit_cost',
+        'reserved_by',
+        'notes',
+        'metadata',
+    ];
+
     public function __construct(
         private readonly StockReservationRepositoryInterface $stockReservationRepository,
         private readonly StockLevelRepositoryInterface $stockLevelRepository,
@@ -122,6 +157,58 @@ final class StockReservationService implements StockReservationServiceInterface
     public function release(int|string $reservationId, array $payload = []): Result
     {
         return $this->adjustReservation($reservationId, $payload, 'release');
+    }
+
+    public function updateReservation(int|string $reservationId, array $payload): Result
+    {
+        try {
+            $reservation = $this->stockReservationRepository->findById($reservationId);
+            if ($reservation === null) {
+                return Result::failure(new Error(
+                    InventoryErrorCode::RESERVATION_NOT_FOUND,
+                    'Stock reservation not found.',
+                ));
+            }
+
+            $structuralFields = $this->payloadIntersection($payload, self::STRUCTURAL_RESERVATION_FIELDS);
+            if ($structuralFields !== []) {
+                return Result::failure(new Error(
+                    InventoryErrorCode::INVALID_VALUE,
+                    'Reservation structural fields are immutable; use reserve/release/consume workflows.',
+                    ['immutable_fields' => $structuralFields],
+                ));
+            }
+
+            $updatePayload = $this->payloadSubset($payload, self::MUTABLE_RESERVATION_FIELDS);
+            if ($updatePayload === []) {
+                return Result::failure(new Error(
+                    InventoryErrorCode::INVALID_VALUE,
+                    'No mutable reservation fields were provided for update.',
+                ));
+            }
+
+            if (isset($updatePayload['unit_cost']) && (float) $updatePayload['unit_cost'] < 0) {
+                return Result::failure(new Error(
+                    InventoryErrorCode::INVALID_VALUE,
+                    'unit_cost must be greater than or equal to zero.',
+                ));
+            }
+
+            $status = strtoupper((string) $reservation->get('status', 'ACTIVE'));
+            if (in_array($status, ['CONSUMED', 'RELEASED', 'EXPIRED', 'CANCELLED'], true)) {
+                $mutableForClosed = $this->payloadSubset($updatePayload, ['notes', 'metadata']);
+                if (count($mutableForClosed) !== count($updatePayload)) {
+                    return Result::failure(new Error(
+                        InventoryErrorCode::INVALID_RESERVATION_STATUS,
+                        'Closed reservations allow only notes and metadata updates.',
+                    ));
+                }
+            }
+
+            return Result::success($this->stockReservationRepository->update($reservationId, $updatePayload));
+        } catch (Throwable $exception) {
+            return Result::failure(new Error(InventoryErrorCode::INVALID_VALUE, $exception->getMessage()));
+        }
     }
 
     public function consume(int|string $reservationId, array $payload = []): Result
@@ -380,5 +467,39 @@ final class StockReservationService implements StockReservationServiceInterface
         $matches = $this->stockLevelRepository->list($criteria);
 
         return $matches[0] ?? null;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @param array<int, string> $allowedFields
+     * @return array<string, mixed>
+     */
+    private function payloadSubset(array $payload, array $allowedFields): array
+    {
+        $subset = [];
+        foreach ($allowedFields as $field) {
+            if (array_key_exists($field, $payload)) {
+                $subset[$field] = $payload[$field];
+            }
+        }
+
+        return $subset;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @param array<int, string> $fields
+     * @return array<int, string>
+     */
+    private function payloadIntersection(array $payload, array $fields): array
+    {
+        $present = [];
+        foreach ($fields as $field) {
+            if (array_key_exists($field, $payload)) {
+                $present[] = $field;
+            }
+        }
+
+        return $present;
     }
 }
