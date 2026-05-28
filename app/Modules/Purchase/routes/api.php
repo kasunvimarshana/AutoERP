@@ -10,6 +10,7 @@ use Modules\Purchase\Presentation\Http\Controllers\GrnLineController;
 use Modules\Purchase\Presentation\Http\Controllers\PurchaseReturnController;
 use Modules\Purchase\Presentation\Http\Controllers\PurchaseReturnLineController;
 use Modules\Purchase\Presentation\Http\Controllers\PurchaseManagementController;
+use Modules\Purchase\Presentation\Http\Controllers\PurchaseIntegrationController;
 use Modules\Purchase\Presentation\Http\Controllers\PurchaseWorkflowController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
@@ -86,6 +87,59 @@ Route::prefix('api/purchase')
             ->name('lookups.returnable-lines');
         Route::get('lookups/payable-documents', [PurchaseManagementController::class, 'payableDocuments'])
             ->name('lookups.payable-documents');
+
+        Route::prefix('integrations')
+            ->group(function (): void {
+                Route::prefix('workflows/{entityType}/{id}')
+                    ->whereIn('entityType', ['purchase_order', 'grn_header', 'purchase_return'])
+                    ->group(function (): void {
+                        Route::get('documents', [PurchaseIntegrationController::class, 'listDocuments'])
+                            ->name('integrations.documents.index');
+                        Route::post('documents', [PurchaseIntegrationController::class, 'createDocument'])
+                            ->name('integrations.documents.store');
+                        Route::get('documents/{documentId}', [PurchaseIntegrationController::class, 'showDocument'])
+                            ->name('integrations.documents.show');
+                        Route::post(
+                            'documents/{documentId}/status',
+                            [PurchaseIntegrationController::class, 'changeDocumentStatus']
+                        )->name('integrations.documents.status');
+                        Route::post(
+                            'documents/{documentId}/lines/match',
+                            [PurchaseIntegrationController::class, 'matchDocumentLine']
+                        )->name('integrations.documents.lines.match');
+                        Route::post(
+                            'documents/{documentId}/lines/unmatch',
+                            [PurchaseIntegrationController::class, 'unmatchDocumentLine']
+                        )->name('integrations.documents.lines.unmatch');
+
+                        Route::post('payments', [PurchaseIntegrationController::class, 'createPayment'])
+                            ->name('integrations.payments.store');
+                        Route::post('advances', [PurchaseIntegrationController::class, 'createAdvance'])
+                            ->name('integrations.advances.store');
+                        Route::post('payments/allocate', [PurchaseIntegrationController::class, 'allocatePayment'])
+                            ->name('integrations.payments.allocate');
+                        Route::post('advances/apply', [PurchaseIntegrationController::class, 'applyAdvance'])
+                            ->name('integrations.advances.apply');
+                        Route::get('payments/allocations', [
+                            PurchaseIntegrationController::class,
+                            'listPaymentAllocations',
+                        ])->name('integrations.payments.allocations');
+                        Route::get('payments/summary', [PurchaseIntegrationController::class, 'sourcePaymentSummary'])
+                            ->name('integrations.payments.summary');
+                    });
+
+                Route::get('suppliers/payables', [PurchaseIntegrationController::class, 'supplierPayables'])
+                    ->name('integrations.suppliers.payables');
+                Route::get('suppliers/advances', [PurchaseIntegrationController::class, 'supplierAdvanceBalances'])
+                    ->name('integrations.suppliers.advances');
+
+                Route::post('payments/{paymentId}/post', [PurchaseIntegrationController::class, 'postPayment'])
+                    ->name('integrations.payments.post');
+                Route::post('payments/{paymentId}/reverse', [PurchaseIntegrationController::class, 'reversePayment'])
+                    ->name('integrations.payments.reverse');
+                Route::post('payments/{paymentId}/refund', [PurchaseIntegrationController::class, 'refundPayment'])
+                    ->name('integrations.payments.refund');
+            });
 
         Route::prefix('workflows/{entityType}/{id}')
             ->whereIn('entityType', ['purchase_order', 'grn_header', 'purchase_return'])

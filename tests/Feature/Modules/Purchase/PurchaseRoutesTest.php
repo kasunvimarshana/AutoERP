@@ -64,6 +64,23 @@ final class PurchaseRoutesTest extends TestCase
         self::assertTrue(Route::has('purchase.lookups.grn-lines.available-for-document'));
         self::assertTrue(Route::has('purchase.lookups.returnable-lines'));
         self::assertTrue(Route::has('purchase.lookups.payable-documents'));
+        self::assertTrue(Route::has('purchase.integrations.documents.index'));
+        self::assertTrue(Route::has('purchase.integrations.documents.store'));
+        self::assertTrue(Route::has('purchase.integrations.documents.show'));
+        self::assertTrue(Route::has('purchase.integrations.documents.status'));
+        self::assertTrue(Route::has('purchase.integrations.documents.lines.match'));
+        self::assertTrue(Route::has('purchase.integrations.documents.lines.unmatch'));
+        self::assertTrue(Route::has('purchase.integrations.payments.store'));
+        self::assertTrue(Route::has('purchase.integrations.advances.store'));
+        self::assertTrue(Route::has('purchase.integrations.payments.allocate'));
+        self::assertTrue(Route::has('purchase.integrations.advances.apply'));
+        self::assertTrue(Route::has('purchase.integrations.payments.allocations'));
+        self::assertTrue(Route::has('purchase.integrations.payments.summary'));
+        self::assertTrue(Route::has('purchase.integrations.suppliers.payables'));
+        self::assertTrue(Route::has('purchase.integrations.suppliers.advances'));
+        self::assertTrue(Route::has('purchase.integrations.payments.post'));
+        self::assertTrue(Route::has('purchase.integrations.payments.reverse'));
+        self::assertTrue(Route::has('purchase.integrations.payments.refund'));
     }
 
     public function testPurchaseRoutesUseContextMiddlewares(): void
