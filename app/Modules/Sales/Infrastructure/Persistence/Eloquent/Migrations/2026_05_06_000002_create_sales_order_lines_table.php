@@ -11,8 +11,15 @@ return new class extends Migration
         Schema::create('sales_order_lines', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
+            $table->foreignId('tenant_id')
+                ->constrained('tenants', 'id')
+                ->cascadeOnDelete()
+                ->comment('Multi-tenant owner reference');
+            $table->foreignId('organization_unit_id')
+                ->nullable()
+                ->constrained('organization_units', 'id')
+                ->nullOnDelete()
+                ->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->string('reference')->nullable();
@@ -26,9 +33,18 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->foreignId('uom_id')->constrained('unit_of_measures', 'id')->restrictOnDelete();
             $table->decimal('ordered_qty', 20, 4);
+            $table->decimal('ordered_base_qty', 20, 4)->default(0);
+            $table->decimal('reserved_qty', 20, 4)->default(0);
+            $table->decimal('picked_qty', 20, 4)->default(0);
             $table->decimal('delivered_qty', 20, 4)->default(0);
             $table->decimal('rejected_qty', 20, 4)->default(0);
             $table->decimal('invoiced_qty', 20, 4)->default(0);
+            $table->decimal('returned_qty', 20, 4)->default(0);
+            $table->decimal('cancelled_qty', 20, 4)->default(0);
+            $table->decimal('outstanding_qty', 20, 4)->default(0);
+            $table->string('reservation_status')->default('not_reserved');
+            $table->string('delivery_status')->default('not_delivered');
+            $table->string('document_status')->default('not_documented');
             $table->decimal('unit_price', 20, 4);
             $table->decimal('unit_cost', 20, 4)->nullable();
 
@@ -52,7 +68,11 @@ return new class extends Migration
                 ->comment('Application-calculated total including tax');
 
             // Line posting account
-            $table->foreignId('account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete()->comment('Account used for posting this line');
+            $table->foreignId('account_id')
+                ->nullable()
+                ->constrained('accounts', 'id')
+                ->nullOnDelete()
+                ->comment('Account used for posting this line');
 
             $table->timestamps();
             $table->softDeletes();

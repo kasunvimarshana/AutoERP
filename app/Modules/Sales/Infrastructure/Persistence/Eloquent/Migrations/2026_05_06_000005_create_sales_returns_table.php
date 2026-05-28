@@ -29,10 +29,17 @@ return new class extends Migration
             $table->foreignId('original_document_id')->nullable()->constrained('documents', 'id')->nullOnDelete();
             $table->string('return_number');
             $table->string('status')->default('draft')->comment('draft, approved, closed, cancelled');
+            $table->string('refund_status')
+                ->default('not_refunded')
+                ->comment('not_refunded, partially_refunded, refunded');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 4)->default(1);
             $table->date('return_date');
             $table->string('return_reason')->nullable();
+
+            $table->decimal('return_qty_total', 20, 4)->default(0);
+            $table->decimal('restocked_qty_total', 20, 4)->default(0);
+            $table->decimal('scrapped_qty_total', 20, 4)->default(0);
 
             // Line-derived totals - strictly SUM over lines
             $table->decimal('subtotal', 20, 4)->default(0)->comment('SUM(line.gross_amount)');
@@ -69,6 +76,17 @@ return new class extends Migration
 
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
+            $table->unsignedBigInteger('updated_by')->nullable();
+            $table->unsignedBigInteger('submitted_by')->nullable();
+            $table->timestamp('submitted_at')->nullable();
+            $table->unsignedBigInteger('approved_by')->nullable();
+            $table->timestamp('approved_at')->nullable();
+            $table->unsignedBigInteger('posted_by')->nullable();
+            $table->timestamp('posted_at')->nullable();
+            $table->unsignedBigInteger('cancelled_by')->nullable();
+            $table->timestamp('cancelled_at')->nullable();
+            $table->unsignedBigInteger('reversed_by')->nullable();
+            $table->timestamp('reversed_at')->nullable();
 
             $table->timestamps();
             $table->softDeletes();

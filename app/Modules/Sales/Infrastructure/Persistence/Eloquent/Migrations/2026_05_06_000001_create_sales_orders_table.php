@@ -11,21 +11,45 @@ return new class extends Migration
         Schema::create('sales_orders', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
+            $table->foreignId('tenant_id')
+                ->constrained('tenants', 'id')
+                ->cascadeOnDelete()
+                ->comment('Multi-tenant owner reference');
+            $table->foreignId('organization_unit_id')
+                ->nullable()
+                ->constrained('organization_units', 'id')
+                ->nullOnDelete()
+                ->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->string('reference')->nullable();
             $table->foreignId('customer_id')->constrained('customers', 'id')->restrictOnDelete();
             $table->foreignId('warehouse_id')->constrained('warehouses', 'id')->restrictOnDelete();
             $table->string('so_number');
-            $table->string('status')->default('draft')->comment('draft, confirmed, partially_delivered, delivered, cancelled');
-            $table->string('invoice_status')->default('not_invoiced')->comment('not_invoiced, partially_invoiced, closed');
+            $table->string('status')
+                ->default('draft')
+                ->comment('draft, confirmed, partially_delivered, delivered, cancelled');
+            $table->string('invoice_status')
+                ->default('not_invoiced')
+                ->comment('not_invoiced, partially_invoiced, closed');
+            $table->string('reservation_status')
+                ->default('not_reserved')
+                ->comment('not_reserved, partially_reserved, reserved, released');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 4)->default(1);
             $table->date('order_date');
             $table->date('requested_delivery_date')->nullable();
             $table->foreignId('price_list_id')->nullable()->constrained('price_lists', 'id')->nullOnDelete();
+
+            // Operational quantity rollups derived from line lifecycle quantities.
+            $table->decimal('ordered_qty_total', 20, 4)->default(0);
+            $table->decimal('reserved_qty_total', 20, 4)->default(0);
+            $table->decimal('picked_qty_total', 20, 4)->default(0);
+            $table->decimal('delivered_qty_total', 20, 4)->default(0);
+            $table->decimal('invoiced_qty_total', 20, 4)->default(0);
+            $table->decimal('returned_qty_total', 20, 4)->default(0);
+            $table->decimal('cancelled_qty_total', 20, 4)->default(0);
+            $table->decimal('outstanding_qty_total', 20, 4)->default(0);
 
             // Line-derived totals - strictly SUM over lines
             $table->decimal('subtotal', 20, 4)->default(0)->comment('SUM(line.gross_amount)');
@@ -40,11 +64,20 @@ return new class extends Migration
             $table->decimal('header_tax_amount', 20, 4)->default(0);
 
             // Final totals combine line rollups and header adjustments
-            $table->decimal('discount_total', 20, 4)->default(0)->comment('Application-calculated: line_discount_total + header_discount_amount');
-            $table->decimal('tax_total', 20, 4)->default(0)->comment('Application-calculated: line_tax_total + header_tax_amount');
+            $table->decimal('discount_total', 20, 4)
+                ->default(0)
+                ->comment('Application-calculated: line_discount_total + header_discount_amount');
+            $table->decimal('tax_total', 20, 4)
+                ->default(0)
+                ->comment('Application-calculated: line_tax_total + header_tax_amount');
             $table->decimal('debit_note_total', 20, 4)->default(0)->comment('SUM of debit notes');
             $table->decimal('credit_note_total', 20, 4)->default(0)->comment('SUM of credit notes');
-            $table->decimal('grand_total', 20, 4)->default(0)->comment('Application-calculated: subtotal - discount_total + tax_total + debit_note_total - credit_note_total');
+            $table->decimal('grand_total', 20, 4)
+                ->default(0)
+                ->comment(
+                    'Application-calculated: subtotal - discount_total + tax_total + '
+                    . 'debit_note_total - credit_note_total'
+                );
 
             $table->decimal('paid_amount', 20, 4)->default(0);
             $table->decimal('balance', 20, 4)->default(0)->comment('Application-calculated: grand_total - paid_amount');
@@ -55,6 +88,19 @@ return new class extends Migration
 
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
+            $table->unsignedBigInteger('updated_by')->nullable();
+            $table->unsignedBigInteger('submitted_by')->nullable();
+            $table->timestamp('submitted_at')->nullable();
+            $table->unsignedBigInteger('approved_by')->nullable();
+            $table->timestamp('approved_at')->nullable();
+            $table->unsignedBigInteger('confirmed_by')->nullable();
+            $table->timestamp('confirmed_at')->nullable();
+            $table->unsignedBigInteger('posted_by')->nullable();
+            $table->timestamp('posted_at')->nullable();
+            $table->unsignedBigInteger('cancelled_by')->nullable();
+            $table->timestamp('cancelled_at')->nullable();
+            $table->unsignedBigInteger('reversed_by')->nullable();
+            $table->timestamp('reversed_at')->nullable();
 
             $table->timestamps();
             $table->softDeletes();

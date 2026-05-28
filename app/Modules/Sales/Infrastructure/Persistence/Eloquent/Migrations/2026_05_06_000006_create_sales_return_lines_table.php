@@ -11,14 +11,24 @@ return new class extends Migration
         Schema::create('sales_return_lines', function (Blueprint $table): void {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
+            $table->foreignId('tenant_id')
+                ->constrained('tenants', 'id')
+                ->cascadeOnDelete()
+                ->comment('Multi-tenant owner reference');
+            $table->foreignId('organization_unit_id')
+                ->nullable()
+                ->constrained('organization_units', 'id')
+                ->nullOnDelete()
+                ->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->string('reference')->nullable();
             $table->foreignId('sales_return_id')->constrained('sales_returns', 'id')->cascadeOnDelete();
             $table->foreignId('original_gdn_line_id')->nullable()->constrained('gdn_lines', 'id')->nullOnDelete();
-            $table->foreignId('original_sales_order_line_id')->nullable()->constrained('sales_order_lines', 'id')->nullOnDelete();
+            $table->foreignId('original_sales_order_line_id')
+                ->nullable()
+                ->constrained('sales_order_lines', 'id')
+                ->nullOnDelete();
             $table->foreignId('item_id')->constrained('items', 'id')->restrictOnDelete();
             $table->foreignId('variant_id')->nullable()->constrained('item_variants', 'id')->nullOnDelete();
             $table->foreignId('batch_id')->nullable()->constrained('batches', 'id')->nullOnDelete();
@@ -28,6 +38,11 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->foreignId('uom_id')->constrained('unit_of_measures', 'id')->restrictOnDelete();
             $table->decimal('return_qty', 20, 4);
+            $table->decimal('return_base_qty', 20, 4)->default(0);
+            $table->decimal('restock_qty', 20, 4)->default(0);
+            $table->decimal('scrap_qty', 20, 4)->default(0);
+            $table->decimal('refund_qty', 20, 4)->default(0);
+            $table->decimal('write_off_qty', 20, 4)->default(0);
             $table->decimal('unit_price', 20, 4);
             $table->decimal('unit_cost', 20, 4)->nullable();
 
@@ -57,7 +72,11 @@ return new class extends Migration
                 ->comment('Application-calculated total including tax');
 
             // Line posting account
-            $table->foreignId('account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete()->comment('Account used for posting this line');
+            $table->foreignId('account_id')
+                ->nullable()
+                ->constrained('accounts', 'id')
+                ->nullOnDelete()
+                ->comment('Account used for posting this line');
 
             $table->timestamps();
             $table->softDeletes();

@@ -65,12 +65,12 @@ final class SalesInvoiceController extends Controller
     public function storeFromSo(Request $request): JsonResponse
     {
         $payload = $this->withContext($request);
-        $purchaseOrderId = (int) ($payload['sales_order_id'] ?? 0);
-        if ($purchaseOrderId < 1) {
+        $salesOrderId = (int) ($payload['sales_order_id'] ?? 0);
+        if ($salesOrderId < 1) {
             return response()->json(['message' => 'sales_order_id is required.'], 422);
         }
 
-        return $this->respond($this->integration->createSourceDocument('sales_order', $purchaseOrderId, $payload));
+        return $this->respond($this->integration->createSourceDocument('sales_order', $salesOrderId, $payload));
     }
 
     public function storeFromGdn(Request $request): JsonResponse
@@ -319,12 +319,12 @@ final class SalesInvoiceController extends Controller
     {
         $payload = $this->withContext($request);
         $tenantId = (int) ($payload['tenant_id'] ?? 0);
-        $purchaseOrderId = (int) ($payload['sales_order_id'] ?? 0);
-        if ($tenantId < 1 || $purchaseOrderId < 1) {
+        $salesOrderId = (int) ($payload['sales_order_id'] ?? 0);
+        if ($tenantId < 1 || $salesOrderId < 1) {
             return response()->json(['message' => 'tenant_id and sales_order_id are required.'], 422);
         }
 
-        return $this->respond($this->management->getAvailableSalesOrderLinesForGdn($tenantId, $purchaseOrderId));
+        return $this->respond($this->management->getAvailableSalesOrderLinesForInvoice($tenantId, $salesOrderId));
     }
 
     public function availableGdnLinesForInvoice(Request $request): JsonResponse

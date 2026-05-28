@@ -107,8 +107,9 @@ final class SalesPaymentController extends Controller
     {
         $payload = $this->withContext($request);
         $payload['target_status'] = 'voided';
+        $payload['status'] = 'voided';
 
-        return $this->respond($this->updatePayment->execute($id, ['status' => 'voided']));
+        return $this->respond($this->updatePayment->execute($id, $payload));
     }
 
     public function reverse(Request $request, int|string $id): JsonResponse

@@ -117,6 +117,7 @@ final class SalesRoutesTest extends TestCase
         self::assertTrue(Route::has('sales.calculate-invoice'));
         self::assertTrue(Route::has('sales.validate-uom'));
         self::assertTrue(Route::has('sales.preview-payment-allocation'));
+        self::assertTrue(Route::has('sales.stock-availability'));
     }
 
     public function testSalesRoutesUseContextMiddlewares(): void

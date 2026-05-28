@@ -119,6 +119,16 @@ final class SalesManagementController extends Controller
         return $this->respond($this->service->getReceivableDocuments($tenantId, $customerId));
     }
 
+    public function stockAvailability(Request $request): JsonResponse
+    {
+        $tenantId = (int) ($request->input('tenant_id', 0));
+        $itemId = (int) ($request->input('item_id', 0));
+        $warehouseId = $request->has('warehouse_id') ? (int) $request->input('warehouse_id') : null;
+        $locationId = $request->has('location_id') ? (int) $request->input('location_id') : null;
+
+        return $this->respond($this->service->getStockAvailability($tenantId, $itemId, $warehouseId, $locationId));
+    }
+
     private function respond(Result $result): JsonResponse
     {
         if ($result->isFailure()) {

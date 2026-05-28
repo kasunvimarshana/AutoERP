@@ -96,7 +96,7 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
             if (! $headerLink instanceof DataRecord) {
                 return Result::failure(new Error(
                     SalesErrorCode::NOT_FOUND,
-                    'Document is not linked with the requested purchase source.',
+                    'Document is not linked with the requested sales source.',
                 ));
             }
 
@@ -132,7 +132,7 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
             if (! $headerLink instanceof DataRecord) {
                 return Result::failure(new Error(
                     SalesErrorCode::NOT_FOUND,
-                    'Document is not linked with the requested purchase source.',
+                    'Document is not linked with the requested sales source.',
                 ));
             }
 
@@ -173,7 +173,7 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
             if (! $headerLink instanceof DataRecord) {
                 return Result::failure(new Error(
                     SalesErrorCode::NOT_FOUND,
-                    'Document is not linked with the requested purchase source.',
+                    'Document is not linked with the requested sales source.',
                 ));
             }
 
@@ -192,7 +192,7 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
             if (! $sourceLine instanceof DataRecord) {
                 return Result::failure(new Error(
                     SalesErrorCode::NOT_FOUND,
-                    'Source line not found for this purchase entity.',
+                    'Source line not found for this sales entity.',
                 ));
             }
 
@@ -279,7 +279,7 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
             if (! $headerLink instanceof DataRecord) {
                 return Result::failure(new Error(
                     SalesErrorCode::NOT_FOUND,
-                    'Document is not linked with the requested purchase source.',
+                    'Document is not linked with the requested sales source.',
                 ));
             }
 

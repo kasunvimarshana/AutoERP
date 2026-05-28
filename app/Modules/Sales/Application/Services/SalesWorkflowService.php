@@ -42,8 +42,8 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
             'submitted',
             'approved',
             'confirmed',
-            'partially_received',
-            'received',
+            'partially_delivered',
+            'delivered',
             'partially_documented',
             'documented',
             'closed',
@@ -79,9 +79,9 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
             'draft' => ['submitted', 'cancelled'],
             'submitted' => ['approved', 'cancelled'],
             'approved' => ['confirmed', 'cancelled'],
-            'confirmed' => ['partially_received', 'received', 'partially_documented', 'documented', 'cancelled'],
-            'partially_received' => ['received', 'partially_documented', 'documented', 'cancelled'],
-            'received' => ['partially_documented', 'documented', 'closed', 'cancelled'],
+            'confirmed' => ['partially_delivered', 'delivered', 'partially_documented', 'documented', 'cancelled'],
+            'partially_delivered' => ['delivered', 'partially_documented', 'documented', 'cancelled'],
+            'delivered' => ['partially_documented', 'documented', 'closed', 'cancelled'],
             'partially_documented' => ['documented', 'closed', 'cancelled'],
             'documented' => ['closed', 'reversed'],
             'closed' => ['reversed'],
@@ -360,12 +360,12 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
             if (
                 $entityType === 'sales_order'
                 && $settings instanceof DataRecord
-                && $settings->get('allow_direct_sales_document', true) === false
+                && $settings->get('allow_direct_sales_invoice', true) === false
                 && ! $this->hasEligibleGdnForSalesOrder((int) $record->id(), $tenantId)
             ) {
                 return Result::failure(new Error(
                     SalesErrorCode::INVALID_VALUE,
-                    'Sales settings require GRN before direct purchase document creation.',
+                    'Sales settings require GDN before direct sales invoice creation.',
                 ));
             }
 
@@ -733,7 +733,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
             if (! in_array($entityType, ['gdn_header', 'sales_return'], true)) {
                 return Result::failure(new Error(
                     SalesErrorCode::INVALID_VALUE,
-                    'Inventory posting is supported only for GRN and Sales Return.',
+                    'Inventory posting is supported only for GDN and Sales Return.',
                 ));
             }
 
@@ -848,7 +848,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
 
                     $baseQuantity = (float) $baseQuantityResult->valueOrFail();
                     $direction = $entityType === 'sales_return' ? 'OUT' : 'IN';
-                    $movementType = $entityType === 'sales_return' ? 'PURCHASE_RETURN' : 'PURCHASE_GRN';
+                    $movementType = $entityType === 'sales_return' ? 'SALES_RETURN' : 'SALES_GDN';
 
                     $movementResult = $this->createStockMovementService->execute([
                         'tenant_id' => $tenantId,

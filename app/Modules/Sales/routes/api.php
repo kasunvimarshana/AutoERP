@@ -134,6 +134,8 @@ Route::prefix('api/sales')
             ->name('validate-uom');
         Route::post('preview-payment-allocation', [SalesPaymentController::class, 'previewPaymentAllocation'])
             ->name('preview-payment-allocation');
+        Route::get('stock-availability', [SalesManagementController::class, 'stockAvailability'])
+            ->name('stock-availability');
 
         Route::post('sales-orders/with-lines', [SalesManagementController::class, 'upsertSalesOrderWithLines'])
             ->name('sales-orders.with-lines.store');
