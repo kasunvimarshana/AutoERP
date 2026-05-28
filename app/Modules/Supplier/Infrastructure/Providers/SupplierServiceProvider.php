@@ -31,10 +31,17 @@ use Modules\Supplier\Application\Contracts\UseCases\SupplierVehicles\GetSupplier
 use Modules\Supplier\Application\Contracts\UseCases\SupplierVehicles\ListSupplierVehiclesServiceInterface;
 use Modules\Supplier\Application\Contracts\UseCases\SupplierVehicles\UpdateSupplierVehicleServiceInterface;
 use Modules\Supplier\Application\Repositories\SupplierAddressRepositoryInterface;
+use Modules\Supplier\Application\Repositories\SupplierBankAccountRepositoryInterface;
+use Modules\Supplier\Application\Repositories\SupplierCategoryRepositoryInterface;
 use Modules\Supplier\Application\Repositories\SupplierContactRepositoryInterface;
 use Modules\Supplier\Application\Repositories\SupplierItemRepositoryInterface;
 use Modules\Supplier\Application\Repositories\SupplierRepositoryInterface;
+use Modules\Supplier\Application\Repositories\SupplierStatusHistoryRepositoryInterface;
+use Modules\Supplier\Application\Repositories\SupplierTaxProfileRepositoryInterface;
+use Modules\Supplier\Application\Repositories\SupplierUserAccountRepositoryInterface;
 use Modules\Supplier\Application\Repositories\SupplierVehicleRepositoryInterface;
+use Modules\Supplier\Application\Contracts\Services\SupplierManagementServiceInterface;
+use Modules\Supplier\Application\Services\SupplierManagementService;
 use Modules\Supplier\Application\UseCases\SupplierAddresses\CreateSupplierAddressService;
 use Modules\Supplier\Application\UseCases\SupplierAddresses\DeleteSupplierAddressService;
 use Modules\Supplier\Application\UseCases\SupplierAddresses\GetSupplierAddressService;
@@ -61,14 +68,24 @@ use Modules\Supplier\Application\UseCases\SupplierVehicles\GetSupplierVehicleSer
 use Modules\Supplier\Application\UseCases\SupplierVehicles\ListSupplierVehiclesService;
 use Modules\Supplier\Application\UseCases\SupplierVehicles\UpdateSupplierVehicleService;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierAddressModel;
+use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierBankAccountModel;
+use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierCategoryModel;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierContactModel;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierItemModel;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierModel;
+use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierStatusHistoryModel;
+use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierTaxProfileModel;
+use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierUserAccountModel;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Models\SupplierVehicleModel;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Repositories\EloquentSupplierAddressRepository;
+use Modules\Supplier\Infrastructure\Persistence\Eloquent\Repositories\EloquentSupplierBankAccountRepository;
+use Modules\Supplier\Infrastructure\Persistence\Eloquent\Repositories\EloquentSupplierCategoryRepository;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Repositories\EloquentSupplierContactRepository;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Repositories\EloquentSupplierItemRepository;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Repositories\EloquentSupplierRepository;
+use Modules\Supplier\Infrastructure\Persistence\Eloquent\Repositories\EloquentSupplierStatusHistoryRepository;
+use Modules\Supplier\Infrastructure\Persistence\Eloquent\Repositories\EloquentSupplierTaxProfileRepository;
+use Modules\Supplier\Infrastructure\Persistence\Eloquent\Repositories\EloquentSupplierUserAccountRepository;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Repositories\EloquentSupplierVehicleRepository;
 
 final class SupplierServiceProvider extends ServiceProvider
@@ -79,6 +96,7 @@ final class SupplierServiceProvider extends ServiceProvider
 
         foreach (
             [
+                SupplierManagementServiceInterface::class => SupplierManagementService::class,
                 ListSuppliersServiceInterface::class => ListSuppliersService::class,
                 GetSupplierServiceInterface::class => GetSupplierService::class,
                 CreateSupplierServiceInterface::class => CreateSupplierService::class,
@@ -112,18 +130,57 @@ final class SupplierServiceProvider extends ServiceProvider
         $this->app->singleton(SupplierRepositoryInterface::class, function (): SupplierRepositoryInterface {
             return new EloquentSupplierRepository(new SupplierModel());
         });
-        $this->app->singleton(SupplierContactRepositoryInterface::class, function (): SupplierContactRepositoryInterface {
-            return new EloquentSupplierContactRepository(new SupplierContactModel());
-        });
-        $this->app->singleton(SupplierAddressRepositoryInterface::class, function (): SupplierAddressRepositoryInterface {
-            return new EloquentSupplierAddressRepository(new SupplierAddressModel());
-        });
-        $this->app->singleton(SupplierVehicleRepositoryInterface::class, function (): SupplierVehicleRepositoryInterface {
-            return new EloquentSupplierVehicleRepository(new SupplierVehicleModel());
-        });
+        $this->app->singleton(
+            SupplierContactRepositoryInterface::class,
+            function (): SupplierContactRepositoryInterface {
+                return new EloquentSupplierContactRepository(new SupplierContactModel());
+            },
+        );
+        $this->app->singleton(
+            SupplierAddressRepositoryInterface::class,
+            function (): SupplierAddressRepositoryInterface {
+                return new EloquentSupplierAddressRepository(new SupplierAddressModel());
+            },
+        );
+        $this->app->singleton(
+            SupplierVehicleRepositoryInterface::class,
+            function (): SupplierVehicleRepositoryInterface {
+                return new EloquentSupplierVehicleRepository(new SupplierVehicleModel());
+            },
+        );
         $this->app->singleton(SupplierItemRepositoryInterface::class, function (): SupplierItemRepositoryInterface {
             return new EloquentSupplierItemRepository(new SupplierItemModel());
         });
+        $this->app->singleton(
+            SupplierCategoryRepositoryInterface::class,
+            function (): SupplierCategoryRepositoryInterface {
+                return new EloquentSupplierCategoryRepository(new SupplierCategoryModel());
+            },
+        );
+        $this->app->singleton(
+            SupplierBankAccountRepositoryInterface::class,
+            function (): SupplierBankAccountRepositoryInterface {
+                return new EloquentSupplierBankAccountRepository(new SupplierBankAccountModel());
+            },
+        );
+        $this->app->singleton(
+            SupplierTaxProfileRepositoryInterface::class,
+            function (): SupplierTaxProfileRepositoryInterface {
+                return new EloquentSupplierTaxProfileRepository(new SupplierTaxProfileModel());
+            },
+        );
+        $this->app->singleton(
+            SupplierUserAccountRepositoryInterface::class,
+            function (): SupplierUserAccountRepositoryInterface {
+                return new EloquentSupplierUserAccountRepository(new SupplierUserAccountModel());
+            },
+        );
+        $this->app->singleton(
+            SupplierStatusHistoryRepositoryInterface::class,
+            function (): SupplierStatusHistoryRepositoryInterface {
+                return new EloquentSupplierStatusHistoryRepository(new SupplierStatusHistoryModel());
+            },
+        );
     }
 
     public function boot(): void

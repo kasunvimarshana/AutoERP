@@ -21,7 +21,13 @@ final class UpsertSupplierVehicleRequest extends FormRequest
         $required = $this->isMethod('post') ? ['required'] : ['sometimes'];
 
         return [
-
+            'tenant_id' => ['nullable', 'integer', 'min:1'],
+            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'metadata' => ['nullable', 'array'],
+            'supplier_id' => array_merge($required, ['integer', 'min:1', 'exists:suppliers,id']),
+            'vehicle_id' => array_merge($required, ['integer', 'min:1', 'exists:vehicles,id']),
+            'is_current' => ['nullable', 'boolean'],
+            'is_active' => ['nullable', 'boolean'],
         ];
     }
 }

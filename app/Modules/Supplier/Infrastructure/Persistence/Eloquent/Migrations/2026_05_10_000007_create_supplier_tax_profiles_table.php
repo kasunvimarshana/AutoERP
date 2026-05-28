@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('supplier_contacts', function (Blueprint $table) {
+        Schema::create('supplier_tax_profiles', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')
@@ -24,17 +24,13 @@ return new class extends Migration
                 ->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
-            $table->foreignId('supplier_id')->constrained('suppliers')->cascadeOnDelete();
-            $table->string('name');
-            $table->string('designation')->nullable();
-            $table->string('department')->nullable();
-            $table->string('email')->nullable();
-            $table->string('phone')->nullable();
-            $table->string('mobile')->nullable();
-            $table->string('whatsapp')->nullable();
-            $table->boolean('is_billing_contact')->default(false);
-            $table->boolean('is_procurement_contact')->default(false);
-            $table->boolean('is_primary')->default(false);
+            $table->foreignId('supplier_id')->constrained('suppliers', 'id')->cascadeOnDelete();
+            $table->string('tax_identifier', 120)->nullable();
+            $table->string('vat_identifier', 120)->nullable();
+            $table->string('tax_type', 80)->nullable();
+            $table->decimal('withholding_rate', 10, 4)->nullable();
+            $table->boolean('is_tax_exempt')->default(false);
+            $table->date('tax_exempt_until')->nullable();
             $table->boolean('is_active')->default(true);
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();
@@ -42,14 +38,12 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['supplier_id', 'email'], 'supplier_contacts_email_uk');
-            $table->index(['tenant_id', 'supplier_id', 'is_primary'], 'supplier_contacts_primary_idx');
-            $table->index(['tenant_id', 'supplier_id', 'is_active'], 'supplier_contacts_active_idx');
+            $table->unique(['tenant_id', 'supplier_id'], 'supplier_tax_profiles_supplier_uk');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('supplier_contacts');
+        Schema::dropIfExists('supplier_tax_profiles');
     }
 };

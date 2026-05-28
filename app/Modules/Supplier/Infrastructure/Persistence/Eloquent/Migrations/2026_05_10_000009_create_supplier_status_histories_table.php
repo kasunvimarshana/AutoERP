@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('supplier_items', function (Blueprint $table) {
+        Schema::create('supplier_status_histories', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')
@@ -25,24 +25,20 @@ return new class extends Migration
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->foreignId('supplier_id')->constrained('suppliers', 'id')->cascadeOnDelete();
-            $table->foreignId('item_id')->constrained('items', 'id')->cascadeOnDelete();
-            $table->foreignId('variant_id')->nullable()->constrained('item_variants', 'id')->nullOnDelete();
-            $table->string('supplier_sku')->nullable();
-            $table->unsignedInteger('lead_time_days')->nullable();
-            $table->decimal('min_order_qty', 20, 4)->default(1);
-            $table->boolean('is_preferred')->default(false);
-            $table->decimal('last_purchase_price', 20, 4)->nullable();
+            $table->string('from_status', 60)->nullable();
+            $table->string('to_status', 60);
+            $table->string('reason', 255)->nullable();
+            $table->unsignedBigInteger('changed_by')->nullable();
+            $table->timestamp('changed_at')->useCurrent();
+
             $table->timestamps();
 
-            $table->unique(
-                ['tenant_id', 'supplier_id', 'item_id', 'variant_id'],
-                'supplier_items_supplier_item_variant_uk',
-            );
+            $table->index(['tenant_id', 'supplier_id', 'changed_at'], 'supplier_status_histories_supplier_changed_idx');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('supplier_items');
+        Schema::dropIfExists('supplier_status_histories');
     }
 };

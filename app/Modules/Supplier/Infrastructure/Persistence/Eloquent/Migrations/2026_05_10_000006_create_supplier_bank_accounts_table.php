@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('supplier_contacts', function (Blueprint $table) {
+        Schema::create('supplier_bank_accounts', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')
@@ -24,16 +24,16 @@ return new class extends Migration
                 ->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
-            $table->foreignId('supplier_id')->constrained('suppliers')->cascadeOnDelete();
-            $table->string('name');
-            $table->string('designation')->nullable();
-            $table->string('department')->nullable();
-            $table->string('email')->nullable();
-            $table->string('phone')->nullable();
-            $table->string('mobile')->nullable();
-            $table->string('whatsapp')->nullable();
-            $table->boolean('is_billing_contact')->default(false);
-            $table->boolean('is_procurement_contact')->default(false);
+            $table->foreignId('supplier_id')->constrained('suppliers', 'id')->cascadeOnDelete();
+            $table->string('account_name', 180);
+            $table->string('account_number', 120);
+            $table->string('iban', 120)->nullable();
+            $table->string('swift_code', 50)->nullable();
+            $table->string('bank_name', 180);
+            $table->string('branch_name', 180)->nullable();
+            $table->string('bank_code', 60)->nullable();
+            $table->string('branch_code', 60)->nullable();
+            $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->nullOnDelete();
             $table->boolean('is_primary')->default(false);
             $table->boolean('is_active')->default(true);
             $table->unsignedBigInteger('created_by')->nullable();
@@ -42,14 +42,14 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['supplier_id', 'email'], 'supplier_contacts_email_uk');
-            $table->index(['tenant_id', 'supplier_id', 'is_primary'], 'supplier_contacts_primary_idx');
-            $table->index(['tenant_id', 'supplier_id', 'is_active'], 'supplier_contacts_active_idx');
+            $table->index(['tenant_id', 'supplier_id', 'is_primary'], 'supplier_bank_accounts_primary_idx');
+            $table->index(['tenant_id', 'supplier_id', 'is_active'], 'supplier_bank_accounts_active_idx');
+            $table->index(['tenant_id', 'account_number'], 'supplier_bank_accounts_account_number_idx');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('supplier_contacts');
+        Schema::dropIfExists('supplier_bank_accounts');
     }
 };

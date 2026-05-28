@@ -4,14 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Supplier\Infrastructure\Persistence\Eloquent\Models;
 
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\CoreModel;
 
-final class SupplierContactModel extends CoreModel
+final class SupplierStatusHistoryModel extends CoreModel
 {
-    use SoftDeletes;
-
-    protected $table = 'supplier_contacts';
+    protected $table = 'supplier_status_histories';
 
     protected $guarded = ['id'];
 
@@ -21,10 +18,8 @@ final class SupplierContactModel extends CoreModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'supplier_id' => 'integer',
-            'is_billing_contact' => 'boolean',
-            'is_procurement_contact' => 'boolean',
-            'is_primary' => 'boolean',
-            'is_active' => 'boolean',
+            'changed_by' => 'integer',
+            'changed_at' => 'datetime',
             'metadata' => 'array',
             'row_version' => 'integer',
         ]);

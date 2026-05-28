@@ -21,8 +21,16 @@ final class ListSupplierRequest extends FormRequest
         return [
             'tenant_id' => ['nullable', 'integer', 'min:1', 'exists:tenants,id'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
+            'status' => ['nullable', 'string', 'max:60'],
+            'is_active' => ['nullable', 'boolean'],
+            'search' => ['nullable', 'string', 'max:255'],
             'page' => ['nullable', 'integer', 'min:1'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:' . (int) config('supplier.pagination.max_per_page', 200)],
+            'per_page' => [
+                'nullable',
+                'integer',
+                'min:1',
+                'max:' . (int) config('supplier.pagination.max_per_page', 200),
+            ],
         ];
     }
 }
