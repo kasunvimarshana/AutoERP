@@ -9,6 +9,9 @@ use Modules\Inventory\Application\Contracts\Services\CycleCountServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\ReceiptInspectionServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\PickingTaskServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\PutAwayTaskServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\ValuationConfigServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\TransferOrderLineServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\TransferOrderServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\StockLedgerServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\StockAdjustmentServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\StockReservationServiceInterface;
@@ -154,6 +157,9 @@ use Modules\Inventory\Application\Services\CycleCountService;
 use Modules\Inventory\Application\Services\ReceiptInspectionService;
 use Modules\Inventory\Application\Services\PickingTaskService;
 use Modules\Inventory\Application\Services\PutAwayTaskService;
+use Modules\Inventory\Application\Services\ValuationConfigService;
+use Modules\Inventory\Application\Services\TransferOrderLineService;
+use Modules\Inventory\Application\Services\TransferOrderService;
 use Modules\Inventory\Application\Services\StockLedgerService;
 use Modules\Inventory\Application\Services\StockAdjustmentService;
 use Modules\Inventory\Application\Services\StockReservationService;
@@ -382,6 +388,9 @@ final class InventoryServiceProvider extends ServiceProvider
                 ReceiptInspectionServiceInterface::class => ReceiptInspectionService::class,
                 PickingTaskServiceInterface::class => PickingTaskService::class,
                 PutAwayTaskServiceInterface::class => PutAwayTaskService::class,
+                ValuationConfigServiceInterface::class => ValuationConfigService::class,
+                TransferOrderServiceInterface::class => TransferOrderService::class,
+                TransferOrderLineServiceInterface::class => TransferOrderLineService::class,
                 StockLedgerServiceInterface::class => StockLedgerService::class,
                 StockAdjustmentServiceInterface::class => StockAdjustmentService::class,
                 StockReservationServiceInterface::class => StockReservationService::class,

@@ -10,7 +10,7 @@ final class UpsertTransferOrderRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return auth()->check();
+        return true;
     }
 
     /**
@@ -21,7 +21,19 @@ final class UpsertTransferOrderRequest extends FormRequest
         $required = $this->isMethod('post') ? ['required'] : ['sometimes'];
 
         return [
-
+            'tenant_id' => [...$required, 'integer', 'min:1'],
+            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'metadata' => ['nullable', 'array'],
+            'from_warehouse_id' => [...$required, 'integer', 'min:1'],
+            'to_warehouse_id' => [...$required, 'integer', 'min:1'],
+            'transfer_number' => [...$required, 'string', 'max:100'],
+            'status' => ['nullable', 'string', 'in:DRAFT,PENDING,COMPLETED,CANCELLED'],
+            'request_date' => [...$required, 'date'],
+            'expected_date' => ['nullable', 'date'],
+            'shipped_date' => ['nullable', 'date'],
+            'received_date' => ['nullable', 'date'],
+            'notes' => ['nullable', 'string'],
+            'row_version' => ['nullable', 'integer', 'min:1'],
         ];
     }
 }
