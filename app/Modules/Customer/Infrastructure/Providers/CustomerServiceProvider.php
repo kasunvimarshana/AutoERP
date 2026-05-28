@@ -25,10 +25,17 @@ use Modules\Customer\Application\Contracts\UseCases\CustomerVehicles\DeleteCusto
 use Modules\Customer\Application\Contracts\UseCases\CustomerVehicles\GetCustomerVehicleServiceInterface;
 use Modules\Customer\Application\Contracts\UseCases\CustomerVehicles\ListCustomerVehiclesServiceInterface;
 use Modules\Customer\Application\Contracts\UseCases\CustomerVehicles\UpdateCustomerVehicleServiceInterface;
+use Modules\Customer\Application\Contracts\Services\CustomerManagementServiceInterface;
 use Modules\Customer\Application\Repositories\CustomerAddressRepositoryInterface;
+use Modules\Customer\Application\Repositories\CustomerCategoryRepositoryInterface;
 use Modules\Customer\Application\Repositories\CustomerContactRepositoryInterface;
+use Modules\Customer\Application\Repositories\CustomerCreditProfileRepositoryInterface;
 use Modules\Customer\Application\Repositories\CustomerRepositoryInterface;
+use Modules\Customer\Application\Repositories\CustomerStatusHistoryRepositoryInterface;
+use Modules\Customer\Application\Repositories\CustomerTaxProfileRepositoryInterface;
+use Modules\Customer\Application\Repositories\CustomerUserAccountRepositoryInterface;
 use Modules\Customer\Application\Repositories\CustomerVehicleRepositoryInterface;
+use Modules\Customer\Application\Services\CustomerManagementService;
 use Modules\Customer\Application\UseCases\CustomerAddresses\CreateCustomerAddressService;
 use Modules\Customer\Application\UseCases\CustomerAddresses\DeleteCustomerAddressService;
 use Modules\Customer\Application\UseCases\CustomerAddresses\GetCustomerAddressService;
@@ -50,12 +57,22 @@ use Modules\Customer\Application\UseCases\CustomerVehicles\GetCustomerVehicleSer
 use Modules\Customer\Application\UseCases\CustomerVehicles\ListCustomerVehiclesService;
 use Modules\Customer\Application\UseCases\CustomerVehicles\UpdateCustomerVehicleService;
 use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerAddressModel;
+use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerCategoryModel;
 use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerContactModel;
+use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerCreditProfileModel;
 use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerModel;
+use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerStatusHistoryModel;
+use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerTaxProfileModel;
+use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerUserAccountModel;
 use Modules\Customer\Infrastructure\Persistence\Eloquent\Models\CustomerVehicleModel;
 use Modules\Customer\Infrastructure\Persistence\Eloquent\Repositories\EloquentCustomerAddressRepository;
+use Modules\Customer\Infrastructure\Persistence\Eloquent\Repositories\EloquentCustomerCategoryRepository;
 use Modules\Customer\Infrastructure\Persistence\Eloquent\Repositories\EloquentCustomerContactRepository;
+use Modules\Customer\Infrastructure\Persistence\Eloquent\Repositories\EloquentCustomerCreditProfileRepository;
 use Modules\Customer\Infrastructure\Persistence\Eloquent\Repositories\EloquentCustomerRepository;
+use Modules\Customer\Infrastructure\Persistence\Eloquent\Repositories\EloquentCustomerStatusHistoryRepository;
+use Modules\Customer\Infrastructure\Persistence\Eloquent\Repositories\EloquentCustomerTaxProfileRepository;
+use Modules\Customer\Infrastructure\Persistence\Eloquent\Repositories\EloquentCustomerUserAccountRepository;
 use Modules\Customer\Infrastructure\Persistence\Eloquent\Repositories\EloquentCustomerVehicleRepository;
 
 final class CustomerServiceProvider extends ServiceProvider
@@ -86,6 +103,7 @@ final class CustomerServiceProvider extends ServiceProvider
                 CreateCustomerVehicleServiceInterface::class => CreateCustomerVehicleService::class,
                 UpdateCustomerVehicleServiceInterface::class => UpdateCustomerVehicleService::class,
                 DeleteCustomerVehicleServiceInterface::class => DeleteCustomerVehicleService::class,
+                CustomerManagementServiceInterface::class => CustomerManagementService::class,
             ] as $contract => $implementation
         ) {
             $this->app->singleton($contract, $implementation);
@@ -94,15 +112,54 @@ final class CustomerServiceProvider extends ServiceProvider
         $this->app->singleton(CustomerRepositoryInterface::class, function (): CustomerRepositoryInterface {
             return new EloquentCustomerRepository(new CustomerModel());
         });
-        $this->app->singleton(CustomerContactRepositoryInterface::class, function (): CustomerContactRepositoryInterface {
-            return new EloquentCustomerContactRepository(new CustomerContactModel());
-        });
-        $this->app->singleton(CustomerAddressRepositoryInterface::class, function (): CustomerAddressRepositoryInterface {
-            return new EloquentCustomerAddressRepository(new CustomerAddressModel());
-        });
-        $this->app->singleton(CustomerVehicleRepositoryInterface::class, function (): CustomerVehicleRepositoryInterface {
-            return new EloquentCustomerVehicleRepository(new CustomerVehicleModel());
-        });
+        $this->app->singleton(
+            CustomerContactRepositoryInterface::class,
+            static function (): CustomerContactRepositoryInterface {
+                return new EloquentCustomerContactRepository(new CustomerContactModel());
+            },
+        );
+        $this->app->singleton(
+            CustomerAddressRepositoryInterface::class,
+            static function (): CustomerAddressRepositoryInterface {
+                return new EloquentCustomerAddressRepository(new CustomerAddressModel());
+            },
+        );
+        $this->app->singleton(
+            CustomerVehicleRepositoryInterface::class,
+            static function (): CustomerVehicleRepositoryInterface {
+                return new EloquentCustomerVehicleRepository(new CustomerVehicleModel());
+            },
+        );
+        $this->app->singleton(
+            CustomerCategoryRepositoryInterface::class,
+            static function (): CustomerCategoryRepositoryInterface {
+                return new EloquentCustomerCategoryRepository(new CustomerCategoryModel());
+            },
+        );
+        $this->app->singleton(
+            CustomerTaxProfileRepositoryInterface::class,
+            static function (): CustomerTaxProfileRepositoryInterface {
+                return new EloquentCustomerTaxProfileRepository(new CustomerTaxProfileModel());
+            },
+        );
+        $this->app->singleton(
+            CustomerCreditProfileRepositoryInterface::class,
+            static function (): CustomerCreditProfileRepositoryInterface {
+                return new EloquentCustomerCreditProfileRepository(new CustomerCreditProfileModel());
+            },
+        );
+        $this->app->singleton(
+            CustomerUserAccountRepositoryInterface::class,
+            static function (): CustomerUserAccountRepositoryInterface {
+                return new EloquentCustomerUserAccountRepository(new CustomerUserAccountModel());
+            },
+        );
+        $this->app->singleton(
+            CustomerStatusHistoryRepositoryInterface::class,
+            static function (): CustomerStatusHistoryRepositoryInterface {
+                return new EloquentCustomerStatusHistoryRepository(new CustomerStatusHistoryModel());
+            },
+        );
     }
 
     public function boot(): void

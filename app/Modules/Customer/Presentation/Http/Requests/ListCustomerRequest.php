@@ -21,12 +21,11 @@ final class ListCustomerRequest extends FormRequest
         return [
             'tenant_id' => ['nullable', 'integer', 'min:1', 'exists:tenants,id'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
+            'status' => ['nullable', 'string', 'max:60'],
+            'is_active' => ['nullable', 'boolean'],
+            'search' => ['nullable', 'string', 'max:255'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:' . (int) config('customer.pagination.max_per_page', 200)],
-            'user_id' => ['nullable', 'integer', 'min:1', 'exists:users,id'],
-            'registration_number' => ['nullable', 'string', 'max:255'],
-            'type' => ['nullable', 'string', 'max:255'],
-            'status' => ['nullable', 'string', 'max:255']
         ];
     }
 }

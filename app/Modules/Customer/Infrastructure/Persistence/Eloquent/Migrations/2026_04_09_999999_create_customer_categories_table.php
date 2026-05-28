@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('customer_contacts', function (Blueprint $table) {
+        Schema::create('customer_categories', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')
@@ -24,30 +24,25 @@ return new class extends Migration
                 ->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
-            $table->foreignId('customer_id')->constrained('customers')->cascadeOnDelete();
-            $table->string('contact_name', 180);
-            $table->string('designation', 180)->nullable();
-            $table->string('department', 180)->nullable();
-            $table->string('email')->nullable();
-            $table->string('phone', 100)->nullable();
-            $table->string('mobile', 100)->nullable();
-            $table->boolean('is_primary')->default(false);
+            $table->string('category_code', 50);
+            $table->string('category_name', 120);
+            $table->foreignId('parent_id')->nullable()->constrained('customer_categories', 'id')->nullOnDelete();
+            $table->text('description')->nullable();
             $table->boolean('is_active')->default(true);
-            $table->text('notes')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();
 
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['tenant_id', 'customer_id', 'is_primary'], 'customer_contacts_primary_idx');
-            $table->index(['tenant_id', 'customer_id', 'is_active'], 'customer_contacts_active_idx');
-            $table->index(['tenant_id', 'email'], 'customer_contacts_email_idx');
+            $table->unique(['tenant_id', 'category_code'], 'customer_categories_code_uk');
+            $table->index(['tenant_id', 'category_name'], 'customer_categories_name_idx');
+            $table->index(['tenant_id', 'is_active'], 'customer_categories_active_idx');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('customer_contacts');
+        Schema::dropIfExists('customer_categories');
     }
 };

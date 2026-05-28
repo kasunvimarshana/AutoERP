@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('customer_contacts', function (Blueprint $table) {
+        Schema::create('customer_credit_profiles', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')
@@ -24,30 +24,27 @@ return new class extends Migration
                 ->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
-            $table->foreignId('customer_id')->constrained('customers')->cascadeOnDelete();
-            $table->string('contact_name', 180);
-            $table->string('designation', 180)->nullable();
-            $table->string('department', 180)->nullable();
-            $table->string('email')->nullable();
-            $table->string('phone', 100)->nullable();
-            $table->string('mobile', 100)->nullable();
-            $table->boolean('is_primary')->default(false);
+            $table->foreignId('customer_id')->constrained('customers', 'id')->cascadeOnDelete();
+            $table->decimal('credit_limit', 20, 4)->nullable();
+            $table->unsignedInteger('credit_days')->nullable();
+            $table->boolean('credit_hold')->default(false);
+            $table->string('credit_hold_reason', 255)->nullable();
+            $table->boolean('allow_credit_override')->default(false);
+            $table->unsignedBigInteger('credit_hold_by')->nullable();
+            $table->timestamp('credit_hold_at')->nullable();
             $table->boolean('is_active')->default(true);
-            $table->text('notes')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();
 
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['tenant_id', 'customer_id', 'is_primary'], 'customer_contacts_primary_idx');
-            $table->index(['tenant_id', 'customer_id', 'is_active'], 'customer_contacts_active_idx');
-            $table->index(['tenant_id', 'email'], 'customer_contacts_email_idx');
+            $table->unique(['tenant_id', 'customer_id'], 'customer_credit_profiles_customer_uk');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('customer_contacts');
+        Schema::dropIfExists('customer_credit_profiles');
     }
 };

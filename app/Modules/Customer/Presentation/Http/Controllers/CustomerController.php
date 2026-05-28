@@ -6,24 +6,23 @@ namespace Modules\Customer\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
+use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\DTO\PagedResult;
-use Modules\Customer\Application\Contracts\UseCases\Customers\CreateCustomerServiceInterface;
-use Modules\Customer\Application\Contracts\UseCases\Customers\DeleteCustomerServiceInterface;
-use Modules\Customer\Application\Contracts\UseCases\Customers\GetCustomerServiceInterface;
-use Modules\Customer\Application\Contracts\UseCases\Customers\ListCustomersServiceInterface;
-use Modules\Customer\Application\Contracts\UseCases\Customers\UpdateCustomerServiceInterface;
+use Modules\Customer\Application\Contracts\Services\CustomerManagementServiceInterface;
 use Modules\Customer\Presentation\Http\Requests\ListCustomerRequest;
+use Modules\Customer\Presentation\Http\Requests\CustomerDeactivateUserAccessRequest;
+use Modules\Customer\Presentation\Http\Requests\CustomerFinanceDefaultsRequest;
+use Modules\Customer\Presentation\Http\Requests\CustomerLinkUserRequest;
+use Modules\Customer\Presentation\Http\Requests\CustomerLookupRequest;
+use Modules\Customer\Presentation\Http\Requests\CustomerStatusTransitionRequest;
+use Modules\Customer\Presentation\Http\Requests\CustomerUserAccessRequest;
 use Modules\Customer\Presentation\Http\Requests\UpsertCustomerRequest;
 use Modules\Customer\Presentation\Http\Resources\CustomerResource;
 
 final class CustomerController extends Controller
 {
     public function __construct(
-        private readonly ListCustomersServiceInterface $listService,
-        private readonly GetCustomerServiceInterface $getService,
-        private readonly CreateCustomerServiceInterface $createService,
-        private readonly UpdateCustomerServiceInterface $updateService,
-        private readonly DeleteCustomerServiceInterface $deleteService,
+        private readonly CustomerManagementServiceInterface $service,
     ) {
     }
 
@@ -34,7 +33,7 @@ final class CustomerController extends Controller
         $page = (int) ($validated['page'] ?? 0);
         unset($validated['per_page'], $validated['page']);
 
-        $result = $this->listService->execute($validated, $perPage, $page);
+        $result = $this->service->listCustomers($validated, $perPage, $page);
 
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 422);
@@ -59,7 +58,7 @@ final class CustomerController extends Controller
 
     public function show(int|string $id): JsonResponse|CustomerResource
     {
-        $result = $this->getService->execute($id);
+        $result = $this->service->getCustomer($id);
 
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 404);
@@ -70,7 +69,7 @@ final class CustomerController extends Controller
 
     public function store(UpsertCustomerRequest $request): JsonResponse|CustomerResource
     {
-        $result = $this->createService->execute($request->validated());
+        $result = $this->service->createCustomer($request->validated());
 
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 422);
@@ -81,7 +80,7 @@ final class CustomerController extends Controller
 
     public function update(UpsertCustomerRequest $request, int|string $id): JsonResponse|CustomerResource
     {
-        $result = $this->updateService->execute($id, $request->validated());
+        $result = $this->service->updateCustomer($id, $request->validated());
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
@@ -95,12 +94,225 @@ final class CustomerController extends Controller
 
     public function destroy(int|string $id): JsonResponse
     {
-        $result = $this->deleteService->execute($id);
+        $result = $this->service->safeDeleteCustomer($id);
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 404);
+            $error = $result->errorOrFail();
+            $status = $error->code === 'CUSTOMER_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
         }
 
         return response()->json(null, 204);
+    }
+
+    public function status(CustomerStatusTransitionRequest $request, int|string $id): JsonResponse|CustomerResource
+    {
+        $validated = $request->validated();
+        $result = $this->service->changeStatus($id, (string) $validated['status'], $validated['reason'] ?? null);
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'CUSTOMER_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return new CustomerResource($result->valueOrFail());
+    }
+
+    public function lookup(CustomerLookupRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+        $result = $this->service->lookupCustomers((string) ($validated['q'] ?? ''), (int) ($validated['limit'] ?? 20));
+
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
+        }
+
+        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())]);
+    }
+
+    public function validateForSales(int|string $id): JsonResponse
+    {
+        $result = $this->service->validateCustomerForSales($id);
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'CUSTOMER_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())]);
+    }
+
+    public function validateForVehicleService(int|string $id): JsonResponse
+    {
+        $result = $this->service->validateCustomerForVehicleService($id);
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'CUSTOMER_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())]);
+    }
+
+    public function validateForVehicleRental(int|string $id): JsonResponse
+    {
+        $result = $this->service->validateCustomerForVehicleRental($id);
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'CUSTOMER_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())]);
+    }
+
+    public function creditCheck(CustomerFinanceDefaultsRequest $request, int|string $id): JsonResponse
+    {
+        $validated = $request->validated();
+        $requestedAmount = isset($validated['requested_amount']) ? (float) $validated['requested_amount'] : null;
+
+        $result = $this->service->checkCustomerCreditLimit($id, $requestedAmount);
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'CUSTOMER_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())]);
+    }
+
+    public function financeDefaults(int|string $id): JsonResponse
+    {
+        $result = $this->service->getFinanceDefaults($id);
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'CUSTOMER_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())]);
+    }
+
+    public function updateFinanceDefaults(CustomerFinanceDefaultsRequest $request, int|string $id): JsonResponse
+    {
+        $result = $this->service->updateFinanceDefaults($id, $request->validated());
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'CUSTOMER_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())]);
+    }
+
+    public function taxProfile(int|string $id): JsonResponse
+    {
+        $result = $this->service->getCustomerTaxProfile($id);
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'CUSTOMER_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())]);
+    }
+
+    public function listUserAccesses(int|string $id): JsonResponse
+    {
+        $result = $this->service->listCustomerUserAccounts($id);
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'CUSTOMER_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())]);
+    }
+
+    public function createUserAccess(CustomerUserAccessRequest $request, int|string $id): JsonResponse
+    {
+        $result = $this->service->createCustomerUserAccess($id, $request->validated());
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'CUSTOMER_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())], 201);
+    }
+
+    public function linkExistingUser(CustomerLinkUserRequest $request, int|string $id): JsonResponse
+    {
+        $result = $this->service->linkExistingUser($id, $request->validated());
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'CUSTOMER_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())], 201);
+    }
+
+    public function deactivateUserAccess(
+        CustomerDeactivateUserAccessRequest $request,
+        int|string $customerId,
+        int|string $accessId,
+    ): JsonResponse {
+        $result = $this->service->deactivateCustomerUserAccess($customerId, $accessId, $request->validated());
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'CUSTOMER_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())]);
+    }
+
+    public function unlinkUserAccess(int|string $customerId, int|string $accessId): JsonResponse
+    {
+        $result = $this->service->unlinkCustomerUserAccess($customerId, $accessId);
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'CUSTOMER_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(null, 204);
+    }
+
+    private function normalizeResponseValue(mixed $value): mixed
+    {
+        if ($value instanceof DataRecord) {
+            return $value->toArray();
+        }
+
+        return $value;
     }
 }

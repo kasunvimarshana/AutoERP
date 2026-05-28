@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('customer_contacts', function (Blueprint $table) {
+        Schema::create('customer_user_accounts', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')
@@ -24,30 +24,29 @@ return new class extends Migration
                 ->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
-            $table->foreignId('customer_id')->constrained('customers')->cascadeOnDelete();
-            $table->string('contact_name', 180);
-            $table->string('designation', 180)->nullable();
-            $table->string('department', 180)->nullable();
-            $table->string('email')->nullable();
-            $table->string('phone', 100)->nullable();
-            $table->string('mobile', 100)->nullable();
+            $table->foreignId('customer_id')->constrained('customers', 'id')->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained('users', 'id')->cascadeOnDelete();
+            $table->string('access_role', 60)->default('customer_portal');
             $table->boolean('is_primary')->default(false);
-            $table->boolean('is_active')->default(true);
-            $table->text('notes')->nullable();
+            $table->string('access_status', 40)->default('active')->comment('active, invited, inactive, revoked');
+            $table->timestamp('invited_at')->nullable();
+            $table->timestamp('activated_at')->nullable();
+            $table->timestamp('deactivated_at')->nullable();
+            $table->unsignedBigInteger('linked_user_by')->nullable();
+            $table->unsignedBigInteger('invited_by')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();
 
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['tenant_id', 'customer_id', 'is_primary'], 'customer_contacts_primary_idx');
-            $table->index(['tenant_id', 'customer_id', 'is_active'], 'customer_contacts_active_idx');
-            $table->index(['tenant_id', 'email'], 'customer_contacts_email_idx');
+            $table->unique(['tenant_id', 'customer_id', 'user_id'], 'customer_user_accounts_customer_user_uk');
+            $table->index(['tenant_id', 'customer_id', 'access_status'], 'customer_user_accounts_status_idx');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('customer_contacts');
+        Schema::dropIfExists('customer_user_accounts');
     }
 };

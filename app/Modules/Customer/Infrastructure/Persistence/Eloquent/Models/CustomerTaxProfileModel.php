@@ -7,11 +7,11 @@ namespace Modules\Customer\Infrastructure\Persistence\Eloquent\Models;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\CoreModel;
 
-final class CustomerContactModel extends CoreModel
+final class CustomerTaxProfileModel extends CoreModel
 {
     use SoftDeletes;
 
-    protected $table = 'customer_contacts';
+    protected $table = 'customer_tax_profiles';
 
     protected $guarded = ['id'];
 
@@ -19,14 +19,15 @@ final class CustomerContactModel extends CoreModel
     {
         return array_merge(parent::casts(), [
             'tenant_id' => 'integer',
-            'row_version' => 'integer',
             'organization_unit_id' => 'integer',
-            'metadata' => 'array',
             'customer_id' => 'integer',
-            'is_primary' => 'boolean',
+            'tax_group_id' => 'integer',
+            'tax_exempt' => 'boolean',
+            'valid_from' => 'date',
+            'valid_to' => 'date',
             'is_active' => 'boolean',
-            'created_by' => 'integer',
-            'updated_by' => 'integer',
+            'metadata' => 'array',
+            'row_version' => 'integer',
         ]);
     }
 }
