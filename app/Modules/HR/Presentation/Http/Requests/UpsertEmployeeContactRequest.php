@@ -21,17 +21,17 @@ final class UpsertEmployeeContactRequest extends FormRequest
         $required = $this->isMethod('post') ? ['required'] : ['sometimes'];
 
         return [
-            'tenant_id' => array_merge($required, ['integer', 'min:1', 'exists:tenants,id']),
-            'row_version' => ['nullable', 'integer', 'min:0'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
             'metadata' => ['nullable', 'array'],
-            'employee_id' => array_merge($required, ['integer', 'min:1', 'exists:employees,id']),
-            'name' => array_merge($required, ['string', 'max:255']),
-            'relationship' => ['nullable', 'string', 'max:255'],
-            'email' => ['nullable', 'string', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:255'],
+            'contact_type' => ['nullable', 'string', 'max:50'],
+            'contact_name' => array_merge($required, ['string', 'max:180']),
+            'relationship' => ['nullable', 'string', 'max:120'],
+            'email' => ['nullable', 'email:rfc,dns', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:100'],
+            'mobile' => ['nullable', 'string', 'max:100'],
             'is_primary' => ['nullable', 'boolean'],
             'is_emergency' => ['nullable', 'boolean'],
+            'is_active' => ['nullable', 'boolean'],
+            'notes' => ['nullable', 'string'],
         ];
     }
 }

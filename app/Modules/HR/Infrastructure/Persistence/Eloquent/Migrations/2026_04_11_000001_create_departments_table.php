@@ -13,13 +13,21 @@ return new class extends Migration
         Schema::create('departments', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
+            $table->foreignId('tenant_id')
+                ->constrained('tenants', 'id')
+                ->cascadeOnDelete()
+                ->comment('Multi-tenant owner reference');
+            $table->foreignId('organization_unit_id')
+                ->nullable()
+                ->constrained('organization_units', 'id')
+                ->nullOnDelete()
+                ->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->foreignId('parent_id')->nullable()->constrained('departments')->nullOnDelete();
-            $table->string('name');
-            $table->string('code')->nullable();
+            $table->foreignId('manager_employee_id')->nullable()->constrained('employees', 'id')->nullOnDelete();
+            $table->string('department_code', 50);
+            $table->string('department_name', 160);
             $table->unsignedInteger('depth')->default(0);
             $table->string('path')->nullable();
             $table->boolean('is_active')->default(true);
@@ -30,8 +38,10 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'code'], 'departments_code_uk');
+            $table->unique(['tenant_id', 'department_code'], 'departments_code_uk');
+            $table->index(['tenant_id', 'department_name'], 'departments_name_idx');
             $table->index(['tenant_id', 'parent_id'], 'departments_parent_idx');
+            $table->index(['tenant_id', 'is_active'], 'departments_active_idx');
         });
     }
 

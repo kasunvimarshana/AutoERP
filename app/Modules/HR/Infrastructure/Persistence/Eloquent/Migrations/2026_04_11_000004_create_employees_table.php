@@ -13,45 +13,59 @@ return new class extends Migration
         Schema::create('employees', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
+            $table->foreignId('tenant_id')
+                ->constrained('tenants', 'id')
+                ->cascadeOnDelete()
+                ->comment('Multi-tenant owner reference');
+            $table->foreignId('organization_unit_id')
+                ->nullable()
+                ->constrained('organization_units', 'id')
+                ->nullOnDelete()
+                ->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
-            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->string('code')->nullable();
-            $table->string('registration_number');
+            $table->string('employee_code', 60);
+            $table->string('first_name', 120);
+            $table->string('last_name', 120)->nullable();
+            $table->string('display_name', 180)->nullable();
+            $table->string('full_name', 220)->nullable();
+            $table->string('gender', 30)->nullable();
+            $table->date('date_of_birth')->nullable();
+            $table->string('national_id_number', 120)->nullable();
+            $table->string('passport_number', 120)->nullable();
+            $table->string('email')->nullable();
+            $table->string('phone', 100)->nullable();
+            $table->string('mobile', 100)->nullable();
             $table->foreignId('department_id')->nullable()->constrained('departments')->nullOnDelete();
             $table->foreignId('designation_id')->nullable()->constrained('designations')->nullOnDelete();
             $table->foreignId('employment_type_id')->nullable()->constrained('employment_types')->nullOnDelete();
-            $table->date('hire_date');
-            $table->date('confirmation_date')->nullable();
-            $table->date('termination_date')->nullable();
-            $table->string('termination_reason')->nullable();
-            $table->string('status')->default('active');
-            $table->string('personal_email')->nullable();
-            // $table->string('work_email')->nullable();
-            $table->string('phone')->nullable();
-            $table->string('mobile')->nullable();
-            $table->text('address_line1')->nullable();
-            $table->text('address_line2')->nullable();
-            $table->string('city')->nullable();
-            $table->string('state')->nullable();
-            $table->string('postal_code')->nullable();
-            $table->foreignId('country_id')->nullable()->constrained('countries')->nullOnDelete();
-            $table->string('tax_number')->nullable();
-            $table->string('social_security_number')->nullable();
-            $table->string('bank_name')->nullable();
-            $table->string('bank_account_number')->nullable();
-            $table->string('bank_routing_number')->nullable();
+            $table->date('joining_date')->nullable();
+            $table->date('leaving_date')->nullable();
+            $table->string('employment_status', 60)->default('draft');
+            $table->boolean('is_active')->default(false);
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();
+            $table->unsignedBigInteger('activated_by')->nullable();
+            $table->unsignedBigInteger('deactivated_by')->nullable();
+            $table->unsignedBigInteger('suspended_by')->nullable();
+            $table->unsignedBigInteger('terminated_by')->nullable();
+            $table->unsignedBigInteger('archived_by')->nullable();
+            $table->timestamp('activated_at')->nullable();
+            $table->timestamp('deactivated_at')->nullable();
+            $table->timestamp('suspended_at')->nullable();
+            $table->timestamp('terminated_at')->nullable();
+            $table->timestamp('archived_at')->nullable();
 
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['tenant_id', 'registration_number'], 'employees_registration_number_uk');
-            $table->index(['tenant_id', 'user_id'], 'employees_user_idx');
+            $table->unique(['tenant_id', 'employee_code'], 'employees_employee_code_uk');
+            $table->index(['tenant_id', 'full_name'], 'employees_full_name_idx');
+            $table->index(['tenant_id', 'employment_status', 'is_active'], 'employees_status_active_idx');
+            $table->index(['tenant_id', 'department_id'], 'employees_department_idx');
+            $table->index(['tenant_id', 'designation_id'], 'employees_designation_idx');
+            $table->index(['tenant_id', 'email'], 'employees_email_idx');
         });
     }
 

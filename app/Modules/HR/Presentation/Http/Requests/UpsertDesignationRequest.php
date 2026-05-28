@@ -21,16 +21,14 @@ final class UpsertDesignationRequest extends FormRequest
         $required = $this->isMethod('post') ? ['required'] : ['sometimes'];
 
         return [
-            'tenant_id' => array_merge($required, ['integer', 'min:1', 'exists:tenants,id']),
-            'row_version' => ['nullable', 'integer', 'min:0'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
+            'tenant_id' => ['nullable', 'integer', 'min:1'],
+            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'metadata' => ['nullable', 'array'],
-            'name' => array_merge($required, ['string', 'max:255']),
-            'code' => ['nullable', 'string', 'max:255'],
+            'department_id' => ['nullable', 'integer', 'min:1', 'exists:departments,id'],
+            'designation_name' => array_merge($required, ['string', 'max:160']),
+            'designation_code' => array_merge($required, ['string', 'max:50']),
             'is_active' => ['nullable', 'boolean'],
             'description' => ['nullable', 'string'],
-            'created_by' => ['nullable', 'integer', 'min:0'],
-            'updated_by' => ['nullable', 'integer', 'min:0'],
         ];
     }
 }

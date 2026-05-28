@@ -23,6 +23,7 @@ final class DepartmentModel extends CoreModel
             'organization_unit_id' => 'integer',
             'metadata' => 'array',
             'parent_id' => 'integer',
+            'manager_employee_id' => 'integer',
             'depth' => 'integer',
             'is_active' => 'boolean',
             'created_by' => 'integer',

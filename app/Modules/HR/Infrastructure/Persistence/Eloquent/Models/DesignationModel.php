@@ -22,6 +22,7 @@ final class DesignationModel extends CoreModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'metadata' => 'array',
+            'department_id' => 'integer',
             'is_active' => 'boolean',
             'created_by' => 'integer',
             'updated_by' => 'integer',

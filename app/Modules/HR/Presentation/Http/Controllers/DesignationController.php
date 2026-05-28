@@ -7,11 +7,7 @@ namespace Modules\HR\Presentation\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\Application\DTO\PagedResult;
-use Modules\HR\Application\Contracts\UseCases\Designations\CreateDesignationServiceInterface;
-use Modules\HR\Application\Contracts\UseCases\Designations\DeleteDesignationServiceInterface;
-use Modules\HR\Application\Contracts\UseCases\Designations\GetDesignationServiceInterface;
-use Modules\HR\Application\Contracts\UseCases\Designations\ListDesignationsServiceInterface;
-use Modules\HR\Application\Contracts\UseCases\Designations\UpdateDesignationServiceInterface;
+use Modules\HR\Application\Contracts\Services\HrEmployeeManagementServiceInterface;
 use Modules\HR\Presentation\Http\Requests\ListDesignationRequest;
 use Modules\HR\Presentation\Http\Requests\UpsertDesignationRequest;
 use Modules\HR\Presentation\Http\Resources\DesignationResource;
@@ -19,11 +15,7 @@ use Modules\HR\Presentation\Http\Resources\DesignationResource;
 final class DesignationController extends Controller
 {
     public function __construct(
-        private readonly ListDesignationsServiceInterface $listService,
-        private readonly GetDesignationServiceInterface $getService,
-        private readonly CreateDesignationServiceInterface $createService,
-        private readonly UpdateDesignationServiceInterface $updateService,
-        private readonly DeleteDesignationServiceInterface $deleteService,
+        private readonly HrEmployeeManagementServiceInterface $service,
     ) {
     }
 
@@ -34,7 +26,7 @@ final class DesignationController extends Controller
         $page = (int) ($validated['page'] ?? 0);
         unset($validated['per_page'], $validated['page']);
 
-        $result = $this->listService->execute($validated, $perPage, $page);
+        $result = $this->service->listDesignations($validated, $perPage, $page);
 
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 422);
@@ -59,7 +51,7 @@ final class DesignationController extends Controller
 
     public function show(int|string $id): JsonResponse|DesignationResource
     {
-        $result = $this->getService->execute($id);
+        $result = $this->service->getDesignation($id);
 
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 404);
@@ -70,7 +62,7 @@ final class DesignationController extends Controller
 
     public function store(UpsertDesignationRequest $request): JsonResponse|DesignationResource
     {
-        $result = $this->createService->execute($request->validated());
+        $result = $this->service->createDesignation($request->validated());
 
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 422);
@@ -81,7 +73,7 @@ final class DesignationController extends Controller
 
     public function update(UpsertDesignationRequest $request, int|string $id): JsonResponse|DesignationResource
     {
-        $result = $this->updateService->execute($id, $request->validated());
+        $result = $this->service->updateDesignation($id, $request->validated());
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
@@ -95,12 +87,6 @@ final class DesignationController extends Controller
 
     public function destroy(int|string $id): JsonResponse
     {
-        $result = $this->deleteService->execute($id);
-
-        if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 404);
-        }
-
-        return response()->json(null, 204);
+        return response()->json(['message' => 'Hard delete is disabled for designations.'], 422);
     }
 }

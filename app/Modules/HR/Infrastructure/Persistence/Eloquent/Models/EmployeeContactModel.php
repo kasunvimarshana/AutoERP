@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\HR\Infrastructure\Persistence\Eloquent\Models;
 
-
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\CoreModel;
 
 final class EmployeeContactModel extends CoreModel
 {
-
+    use SoftDeletes;
 
     protected $table = 'employee_contacts';
 
@@ -25,6 +25,9 @@ final class EmployeeContactModel extends CoreModel
             'employee_id' => 'integer',
             'is_primary' => 'boolean',
             'is_emergency' => 'boolean',
+            'is_active' => 'boolean',
+            'created_by' => 'integer',
+            'updated_by' => 'integer',
         ]);
     }
 }

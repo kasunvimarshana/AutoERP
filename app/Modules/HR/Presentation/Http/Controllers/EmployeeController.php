@@ -6,12 +6,15 @@ namespace Modules\HR\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
+use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\DTO\PagedResult;
-use Modules\HR\Application\Contracts\UseCases\Employees\CreateEmployeeServiceInterface;
-use Modules\HR\Application\Contracts\UseCases\Employees\DeleteEmployeeServiceInterface;
-use Modules\HR\Application\Contracts\UseCases\Employees\GetEmployeeServiceInterface;
-use Modules\HR\Application\Contracts\UseCases\Employees\ListEmployeesServiceInterface;
-use Modules\HR\Application\Contracts\UseCases\Employees\UpdateEmployeeServiceInterface;
+use Modules\HR\Application\Contracts\Services\HrEmployeeManagementServiceInterface;
+use Modules\HR\Presentation\Http\Requests\EmployeeLookupRequest;
+use Modules\HR\Presentation\Http\Requests\EmployeeStatusTransitionRequest;
+use Modules\HR\Presentation\Http\Requests\EmployeeUserAccessDeactivateRequest;
+use Modules\HR\Presentation\Http\Requests\EmployeeUserAccessRequest;
+use Modules\HR\Presentation\Http\Requests\LinkExistingEmployeeUserRequest;
+use Modules\HR\Presentation\Http\Requests\UpsertEmployeeEmploymentDetailRequest;
 use Modules\HR\Presentation\Http\Requests\ListEmployeeRequest;
 use Modules\HR\Presentation\Http\Requests\UpsertEmployeeRequest;
 use Modules\HR\Presentation\Http\Resources\EmployeeResource;
@@ -19,11 +22,7 @@ use Modules\HR\Presentation\Http\Resources\EmployeeResource;
 final class EmployeeController extends Controller
 {
     public function __construct(
-        private readonly ListEmployeesServiceInterface $listService,
-        private readonly GetEmployeeServiceInterface $getService,
-        private readonly CreateEmployeeServiceInterface $createService,
-        private readonly UpdateEmployeeServiceInterface $updateService,
-        private readonly DeleteEmployeeServiceInterface $deleteService,
+        private readonly HrEmployeeManagementServiceInterface $service,
     ) {
     }
 
@@ -34,7 +33,7 @@ final class EmployeeController extends Controller
         $page = (int) ($validated['page'] ?? 0);
         unset($validated['per_page'], $validated['page']);
 
-        $result = $this->listService->execute($validated, $perPage, $page);
+        $result = $this->service->listEmployees($validated, $perPage, $page);
 
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 422);
@@ -59,7 +58,7 @@ final class EmployeeController extends Controller
 
     public function show(int|string $id): JsonResponse|EmployeeResource
     {
-        $result = $this->getService->execute($id);
+        $result = $this->service->getEmployee($id);
 
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 404);
@@ -70,7 +69,7 @@ final class EmployeeController extends Controller
 
     public function store(UpsertEmployeeRequest $request): JsonResponse|EmployeeResource
     {
-        $result = $this->createService->execute($request->validated());
+        $result = $this->service->createEmployee($request->validated());
 
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 422);
@@ -81,7 +80,7 @@ final class EmployeeController extends Controller
 
     public function update(UpsertEmployeeRequest $request, int|string $id): JsonResponse|EmployeeResource
     {
-        $result = $this->updateService->execute($id, $request->validated());
+        $result = $this->service->updateEmployee($id, $request->validated());
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
@@ -95,12 +94,205 @@ final class EmployeeController extends Controller
 
     public function destroy(int|string $id): JsonResponse
     {
-        $result = $this->deleteService->execute($id);
+        $result = $this->service->safeDeleteEmployee($id);
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 404);
+            $error = $result->errorOrFail();
+            $status = $error->code === 'HR_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
         }
 
         return response()->json(null, 204);
+    }
+
+    public function status(EmployeeStatusTransitionRequest $request, int|string $id): JsonResponse
+    {
+        $validated = $request->validated();
+        $result = $this->service->changeEmployeeStatus(
+            $id,
+            (string) $validated['employment_status'],
+            $validated['reason'] ?? null,
+        );
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'HR_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())]);
+    }
+
+    public function lookup(EmployeeLookupRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+        $result = $this->service->lookupEmployees((string) ($validated['q'] ?? ''), (int) ($validated['limit'] ?? 20));
+
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
+        }
+
+        return response()->json(['data' => $result->valueOrFail()]);
+    }
+
+    public function activeList(EmployeeLookupRequest $request): JsonResponse
+    {
+        $result = $this->service->listActiveEmployees((int) ($request->validated()['limit'] ?? 50));
+
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
+        }
+
+        return response()->json(['data' => $result->valueOrFail()]);
+    }
+
+    public function validateForVehicleService(int|string $id): JsonResponse
+    {
+        $result = $this->service->validateEmployeeForVehicleService($id);
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'HR_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(['data' => $result->valueOrFail()]);
+    }
+
+    public function byDepartment(int|string $departmentId): JsonResponse
+    {
+        $result = $this->service->getEmployeesByDepartment($departmentId);
+
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
+        }
+
+        return response()->json(['data' => $result->valueOrFail()]);
+    }
+
+    public function byDesignation(int|string $designationId): JsonResponse
+    {
+        $result = $this->service->getEmployeesByDesignation($designationId);
+
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
+        }
+
+        return response()->json(['data' => $result->valueOrFail()]);
+    }
+
+    public function employmentDetails(int|string $id): JsonResponse
+    {
+        $result = $this->service->getEmploymentDetails($id);
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'HR_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(['data' => $result->valueOrFail()]);
+    }
+
+    public function updateEmploymentDetails(
+        UpsertEmployeeEmploymentDetailRequest $request,
+        int|string $id,
+    ): JsonResponse {
+        $result = $this->service->updateEmploymentDetails($id, $request->validated());
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'HR_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())]);
+    }
+
+    public function listUserAccesses(int|string $id): JsonResponse
+    {
+        $result = $this->service->listEmployeeUserAccounts($id);
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'HR_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(['data' => $result->valueOrFail()]);
+    }
+
+    public function createUserAccess(EmployeeUserAccessRequest $request, int|string $id): JsonResponse
+    {
+        $result = $this->service->createEmployeeUserAccess($id, $request->validated());
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'HR_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())], 201);
+    }
+
+    public function linkExistingUser(LinkExistingEmployeeUserRequest $request, int|string $id): JsonResponse
+    {
+        $result = $this->service->linkExistingUserToEmployee($id, $request->validated());
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'HR_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())], 201);
+    }
+
+    public function deactivateUserAccess(
+        EmployeeUserAccessDeactivateRequest $request,
+        int|string $employeeId,
+        int|string $accessId,
+    ): JsonResponse {
+        $result = $this->service->deactivateEmployeeUserAccess($employeeId, $accessId, $request->validated());
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'HR_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())]);
+    }
+
+    public function unlinkUserAccess(int|string $employeeId, int|string $accessId): JsonResponse
+    {
+        $result = $this->service->unlinkEmployeeUserAccess($employeeId, $accessId);
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'HR_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(null, 204);
+    }
+
+    private function normalizeResponseValue(mixed $value): mixed
+    {
+        if ($value instanceof DataRecord) {
+            return $value->toArray();
+        }
+
+        return $value;
     }
 }

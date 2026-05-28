@@ -13,20 +13,37 @@ return new class extends Migration
         Schema::create('employee_contacts', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
+            $table->foreignId('tenant_id')
+                ->constrained('tenants', 'id')
+                ->cascadeOnDelete()
+                ->comment('Multi-tenant owner reference');
+            $table->foreignId('organization_unit_id')
+                ->nullable()
+                ->constrained('organization_units', 'id')
+                ->nullOnDelete()
+                ->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->foreignId('employee_id')->constrained('employees')->cascadeOnDelete();
-            $table->string('name');
+            $table->string('contact_type', 50)->default('family');
+            $table->string('contact_name', 180);
             $table->string('relationship')->nullable();
             $table->string('email')->nullable();
-            $table->string('phone')->nullable();
+            $table->string('phone', 100)->nullable();
+            $table->string('mobile', 100)->nullable();
             $table->boolean('is_primary')->default(false);
             $table->boolean('is_emergency')->default(false);
+            $table->boolean('is_active')->default(true);
+            $table->text('notes')->nullable();
+            $table->unsignedBigInteger('created_by')->nullable();
+            $table->unsignedBigInteger('updated_by')->nullable();
 
             $table->timestamps();
+            $table->softDeletes();
+
             $table->index(['tenant_id', 'employee_id'], 'employee_contacts_employee_idx');
+            $table->index(['tenant_id', 'employee_id', 'is_primary'], 'employee_contacts_primary_idx');
+            $table->index(['tenant_id', 'employee_id', 'is_emergency'], 'employee_contacts_emergency_idx');
         });
     }
 

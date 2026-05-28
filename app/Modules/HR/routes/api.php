@@ -8,6 +8,7 @@ use Modules\HR\Presentation\Http\Controllers\DesignationController;
 use Modules\HR\Presentation\Http\Controllers\EmploymentTypeController;
 use Modules\HR\Presentation\Http\Controllers\EmployeeController;
 use Modules\HR\Presentation\Http\Controllers\EmployeeContactController;
+use Modules\HR\Presentation\Http\Controllers\EmployeeAddressController;
 use Modules\HR\Presentation\Http\Controllers\EmployeeDocumentController;
 use Modules\HR\Presentation\Http\Controllers\EmployeeContractController;
 use Modules\HR\Presentation\Http\Controllers\BiometricDeviceController;
@@ -52,8 +53,59 @@ Route::prefix('api/hr')
         Route::apiResource('departments', DepartmentController::class);
         Route::apiResource('designations', DesignationController::class);
         Route::apiResource('employment-types', EmploymentTypeController::class);
+
+        Route::get('employees/lookup', [EmployeeController::class, 'lookup'])->name('employees.lookup');
+        Route::get('employees/active', [EmployeeController::class, 'activeList'])->name('employees.active-list');
+        Route::get('employees/by-department/{departmentId}', [EmployeeController::class, 'byDepartment'])
+            ->name('employees.by-department');
+        Route::get('employees/by-designation/{designationId}', [EmployeeController::class, 'byDesignation'])
+            ->name('employees.by-designation');
         Route::apiResource('employees', EmployeeController::class);
-        Route::apiResource('employee-contacts', EmployeeContactController::class);
+        Route::patch('employees/{employee}/status', [EmployeeController::class, 'status'])->name('employees.status');
+        Route::get(
+            'employees/{employee}/validate-for-vehicle-service',
+            [EmployeeController::class, 'validateForVehicleService'],
+        )
+            ->name('employees.validate-for-vehicle-service');
+        Route::get('employees/{employee}/employment-details', [EmployeeController::class, 'employmentDetails'])
+            ->name('employees.employment-details.show');
+        Route::put('employees/{employee}/employment-details', [EmployeeController::class, 'updateEmploymentDetails'])
+            ->name('employees.employment-details.update');
+
+        Route::get('employees/{employee}/contacts', [EmployeeContactController::class, 'index'])
+            ->name('employees.contacts.index');
+        Route::post('employees/{employee}/contacts', [EmployeeContactController::class, 'store'])
+            ->name('employees.contacts.store');
+        Route::get('employees/{employee}/contacts/{contact}', [EmployeeContactController::class, 'show'])
+            ->name('employees.contacts.show');
+        Route::put('employees/{employee}/contacts/{contact}', [EmployeeContactController::class, 'update'])
+            ->name('employees.contacts.update');
+        Route::delete('employees/{employee}/contacts/{contact}', [EmployeeContactController::class, 'destroy'])
+            ->name('employees.contacts.destroy');
+
+        Route::get('employees/{employee}/addresses', [EmployeeAddressController::class, 'index'])
+            ->name('employees.addresses.index');
+        Route::post('employees/{employee}/addresses', [EmployeeAddressController::class, 'store'])
+            ->name('employees.addresses.store');
+        Route::put('employees/{employee}/addresses/{address}', [EmployeeAddressController::class, 'update'])
+            ->name('employees.addresses.update');
+        Route::delete('employees/{employee}/addresses/{address}', [EmployeeAddressController::class, 'destroy'])
+            ->name('employees.addresses.destroy');
+
+        Route::get('employees/{employee}/user-accesses', [EmployeeController::class, 'listUserAccesses'])
+            ->name('employees.user-accesses.index');
+        Route::post('employees/{employee}/user-accesses', [EmployeeController::class, 'createUserAccess'])
+            ->name('employees.user-accesses.store');
+        Route::post('employees/{employee}/user-accesses/link-existing', [EmployeeController::class, 'linkExistingUser'])
+            ->name('employees.user-accesses.link-existing');
+        Route::patch(
+            'employees/{employee}/user-accesses/{access}/deactivate',
+            [EmployeeController::class, 'deactivateUserAccess'],
+        )
+            ->name('employees.user-accesses.deactivate');
+        Route::delete('employees/{employee}/user-accesses/{access}', [EmployeeController::class, 'unlinkUserAccess'])
+            ->name('employees.user-accesses.unlink');
+
         Route::apiResource('employee-documents', EmployeeDocumentController::class);
         Route::apiResource('employee-contracts', EmployeeContractController::class);
         Route::apiResource('biometric-devices', BiometricDeviceController::class);

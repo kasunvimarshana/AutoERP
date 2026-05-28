@@ -7,11 +7,7 @@ namespace Modules\HR\Presentation\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\Application\DTO\PagedResult;
-use Modules\HR\Application\Contracts\UseCases\Departments\CreateDepartmentServiceInterface;
-use Modules\HR\Application\Contracts\UseCases\Departments\DeleteDepartmentServiceInterface;
-use Modules\HR\Application\Contracts\UseCases\Departments\GetDepartmentServiceInterface;
-use Modules\HR\Application\Contracts\UseCases\Departments\ListDepartmentsServiceInterface;
-use Modules\HR\Application\Contracts\UseCases\Departments\UpdateDepartmentServiceInterface;
+use Modules\HR\Application\Contracts\Services\HrEmployeeManagementServiceInterface;
 use Modules\HR\Presentation\Http\Requests\ListDepartmentRequest;
 use Modules\HR\Presentation\Http\Requests\UpsertDepartmentRequest;
 use Modules\HR\Presentation\Http\Resources\DepartmentResource;
@@ -19,11 +15,7 @@ use Modules\HR\Presentation\Http\Resources\DepartmentResource;
 final class DepartmentController extends Controller
 {
     public function __construct(
-        private readonly ListDepartmentsServiceInterface $listService,
-        private readonly GetDepartmentServiceInterface $getService,
-        private readonly CreateDepartmentServiceInterface $createService,
-        private readonly UpdateDepartmentServiceInterface $updateService,
-        private readonly DeleteDepartmentServiceInterface $deleteService,
+        private readonly HrEmployeeManagementServiceInterface $service,
     ) {
     }
 
@@ -34,7 +26,7 @@ final class DepartmentController extends Controller
         $page = (int) ($validated['page'] ?? 0);
         unset($validated['per_page'], $validated['page']);
 
-        $result = $this->listService->execute($validated, $perPage, $page);
+        $result = $this->service->listDepartments($validated, $perPage, $page);
 
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 422);
@@ -59,7 +51,7 @@ final class DepartmentController extends Controller
 
     public function show(int|string $id): JsonResponse|DepartmentResource
     {
-        $result = $this->getService->execute($id);
+        $result = $this->service->getDepartment($id);
 
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 404);
@@ -70,7 +62,7 @@ final class DepartmentController extends Controller
 
     public function store(UpsertDepartmentRequest $request): JsonResponse|DepartmentResource
     {
-        $result = $this->createService->execute($request->validated());
+        $result = $this->service->createDepartment($request->validated());
 
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 422);
@@ -81,7 +73,7 @@ final class DepartmentController extends Controller
 
     public function update(UpsertDepartmentRequest $request, int|string $id): JsonResponse|DepartmentResource
     {
-        $result = $this->updateService->execute($id, $request->validated());
+        $result = $this->service->updateDepartment($id, $request->validated());
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
@@ -95,12 +87,6 @@ final class DepartmentController extends Controller
 
     public function destroy(int|string $id): JsonResponse
     {
-        $result = $this->deleteService->execute($id);
-
-        if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 404);
-        }
-
-        return response()->json(null, 204);
+        return response()->json(['message' => 'Hard delete is disabled for departments.'], 422);
     }
 }

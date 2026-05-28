@@ -21,19 +21,17 @@ final class UpsertDepartmentRequest extends FormRequest
         $required = $this->isMethod('post') ? ['required'] : ['sometimes'];
 
         return [
-            'tenant_id' => array_merge($required, ['integer', 'min:1', 'exists:tenants,id']),
-            'row_version' => ['nullable', 'integer', 'min:0'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
+            'tenant_id' => ['nullable', 'integer', 'min:1'],
+            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'metadata' => ['nullable', 'array'],
             'parent_id' => ['nullable', 'integer', 'min:1', 'exists:departments,id'],
-            'name' => array_merge($required, ['string', 'max:255']),
-            'code' => ['nullable', 'string', 'max:255'],
+            'manager_employee_id' => ['nullable', 'integer', 'min:1', 'exists:employees,id'],
+            'department_name' => array_merge($required, ['string', 'max:160']),
+            'department_code' => array_merge($required, ['string', 'max:50']),
             'depth' => ['nullable', 'integer', 'min:0'],
             'path' => ['nullable', 'string', 'max:255'],
             'is_active' => ['nullable', 'boolean'],
             'description' => ['nullable', 'string'],
-            'created_by' => ['nullable', 'integer', 'min:0'],
-            'updated_by' => ['nullable', 'integer', 'min:0'],
         ];
     }
 }

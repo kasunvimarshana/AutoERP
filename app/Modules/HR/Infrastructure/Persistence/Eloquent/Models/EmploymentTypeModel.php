@@ -24,6 +24,7 @@ final class EmploymentTypeModel extends CoreModel
             'metadata' => 'array',
             'is_active' => 'boolean',
             'created_by' => 'integer',
+            'updated_by' => 'integer',
         ]);
     }
 }

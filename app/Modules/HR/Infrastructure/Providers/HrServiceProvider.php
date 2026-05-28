@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\HR\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\HR\Application\Contracts\Services\HrEmployeeManagementServiceInterface;
 use Modules\HR\Application\Contracts\UseCases\AttendanceLogs\CreateAttendanceLogServiceInterface;
 use Modules\HR\Application\Contracts\UseCases\AttendanceLogs\DeleteAttendanceLogServiceInterface;
 use Modules\HR\Application\Contracts\UseCases\AttendanceLogs\GetAttendanceLogServiceInterface;
@@ -302,6 +303,7 @@ use Modules\HR\Application\UseCases\Shifts\DeleteShiftService;
 use Modules\HR\Application\UseCases\Shifts\GetShiftService;
 use Modules\HR\Application\UseCases\Shifts\ListShiftsService;
 use Modules\HR\Application\UseCases\Shifts\UpdateShiftService;
+use Modules\HR\Application\Services\HrEmployeeManagementService;
 use Modules\HR\Infrastructure\Persistence\Eloquent\Models\AttendanceLogModel;
 use Modules\HR\Infrastructure\Persistence\Eloquent\Models\AttendanceRecordModel;
 use Modules\HR\Infrastructure\Persistence\Eloquent\Models\BiometricDeviceModel;
@@ -362,6 +364,8 @@ final class HrServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__ . '/../Config/hr.php', 'hr');
+
+        $this->app->singleton(HrEmployeeManagementServiceInterface::class, HrEmployeeManagementService::class);
 
         foreach (
             [
@@ -594,3 +598,4 @@ final class HrServiceProvider extends ServiceProvider
         $this->loadMigrationsFrom(__DIR__ . '/../../Infrastructure/Persistence/Eloquent/Migrations');
     }
 }
+
