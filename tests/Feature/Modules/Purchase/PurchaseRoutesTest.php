@@ -81,6 +81,42 @@ final class PurchaseRoutesTest extends TestCase
         self::assertTrue(Route::has('purchase.integrations.payments.post'));
         self::assertTrue(Route::has('purchase.integrations.payments.reverse'));
         self::assertTrue(Route::has('purchase.integrations.payments.refund'));
+        self::assertTrue(Route::has('purchase.purchase-invoices.index'));
+        self::assertTrue(Route::has('purchase.purchase-invoices.show'));
+        self::assertTrue(Route::has('purchase.purchase-invoices.store'));
+        self::assertTrue(Route::has('purchase.purchase-invoices.from-po'));
+        self::assertTrue(Route::has('purchase.purchase-invoices.from-grn'));
+        self::assertTrue(Route::has('purchase.purchase-invoices.from-multiple-grns'));
+        self::assertTrue(Route::has('purchase.purchase-invoices.update'));
+        self::assertTrue(Route::has('purchase.purchase-invoices.destroy'));
+        self::assertTrue(Route::has('purchase.purchase-invoices.post'));
+        self::assertTrue(Route::has('purchase.purchase-invoices.cancel'));
+        self::assertTrue(Route::has('purchase.purchase-invoices.reverse'));
+        self::assertTrue(Route::has('purchase.purchase-invoices.lines.index'));
+        self::assertTrue(Route::has('purchase.purchase-invoices.lines.store'));
+        self::assertTrue(Route::has('purchase.purchase-invoice-lines.update'));
+        self::assertTrue(Route::has('purchase.purchase-invoice-lines.destroy'));
+        self::assertTrue(Route::has('purchase.purchase-payments.index'));
+        self::assertTrue(Route::has('purchase.purchase-payments.show'));
+        self::assertTrue(Route::has('purchase.purchase-payments.store'));
+        self::assertTrue(Route::has('purchase.purchase-payments.update'));
+        self::assertTrue(Route::has('purchase.purchase-payments.destroy'));
+        self::assertTrue(Route::has('purchase.purchase-payments.post'));
+        self::assertTrue(Route::has('purchase.purchase-payments.void'));
+        self::assertTrue(Route::has('purchase.purchase-payments.reverse'));
+        self::assertTrue(Route::has('purchase.purchase-payments.allocate'));
+        self::assertTrue(Route::has('purchase.purchase-payments.allocations'));
+        self::assertTrue(Route::has('purchase.purchase-advances.store'));
+        self::assertTrue(Route::has('purchase.purchase-advances.allocate'));
+        self::assertTrue(Route::has('purchase.purchase-refunds.store'));
+        self::assertTrue(Route::has('purchase.purchase-write-offs.store'));
+        self::assertTrue(Route::has('purchase.supplier-outstanding'));
+        self::assertTrue(Route::has('purchase.invoice-payment-status'));
+        self::assertTrue(Route::has('purchase.available-po-lines-for-invoice'));
+        self::assertTrue(Route::has('purchase.available-grn-lines-for-invoice'));
+        self::assertTrue(Route::has('purchase.calculate-invoice'));
+        self::assertTrue(Route::has('purchase.validate-uom'));
+        self::assertTrue(Route::has('purchase.preview-payment-allocation'));
     }
 
     public function testPurchaseRoutesUseContextMiddlewares(): void

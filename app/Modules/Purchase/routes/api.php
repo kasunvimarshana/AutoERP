@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Modules\Purchase\Presentation\Http\Controllers\PurchaseOrderController;
 use Modules\Purchase\Presentation\Http\Controllers\PurchaseOrderLineController;
+use Modules\Purchase\Presentation\Http\Controllers\PurchaseInvoiceController;
+use Modules\Purchase\Presentation\Http\Controllers\PurchasePaymentController;
 use Modules\Purchase\Presentation\Http\Controllers\GrnHeaderController;
 use Modules\Purchase\Presentation\Http\Controllers\GrnLineController;
 use Modules\Purchase\Presentation\Http\Controllers\PurchaseReturnController;
@@ -37,6 +39,101 @@ Route::prefix('api/purchase')
         Route::apiResource('grn-lines', GrnLineController::class);
         Route::apiResource('purchase-returns', PurchaseReturnController::class);
         Route::apiResource('purchase-return-lines', PurchaseReturnLineController::class);
+
+        Route::get('purchase-invoices', [PurchaseInvoiceController::class, 'index'])
+            ->name('purchase-invoices.index');
+        Route::get('purchase-invoices/{id}', [PurchaseInvoiceController::class, 'show'])
+            ->whereNumber('id')
+            ->name('purchase-invoices.show');
+        Route::post('purchase-invoices', [PurchaseInvoiceController::class, 'store'])
+            ->name('purchase-invoices.store');
+        Route::post('purchase-invoices/from-po', [PurchaseInvoiceController::class, 'storeFromPo'])
+            ->name('purchase-invoices.from-po');
+        Route::post('purchase-invoices/from-grn', [PurchaseInvoiceController::class, 'storeFromGrn'])
+            ->name('purchase-invoices.from-grn');
+        Route::post('purchase-invoices/from-multiple-grns', [PurchaseInvoiceController::class, 'storeFromMultipleGrns'])
+            ->name('purchase-invoices.from-multiple-grns');
+        Route::match(['put', 'patch'], 'purchase-invoices/{id}', [PurchaseInvoiceController::class, 'update'])
+            ->whereNumber('id')
+            ->name('purchase-invoices.update');
+        Route::delete('purchase-invoices/{id}', [PurchaseInvoiceController::class, 'destroy'])
+            ->whereNumber('id')
+            ->name('purchase-invoices.destroy');
+        Route::post('purchase-invoices/{id}/post', [PurchaseInvoiceController::class, 'post'])
+            ->whereNumber('id')
+            ->name('purchase-invoices.post');
+        Route::post('purchase-invoices/{id}/cancel', [PurchaseInvoiceController::class, 'cancel'])
+            ->whereNumber('id')
+            ->name('purchase-invoices.cancel');
+        Route::post('purchase-invoices/{id}/reverse', [PurchaseInvoiceController::class, 'reverse'])
+            ->whereNumber('id')
+            ->name('purchase-invoices.reverse');
+        Route::get('purchase-invoices/{id}/lines', [PurchaseInvoiceController::class, 'lines'])
+            ->whereNumber('id')
+            ->name('purchase-invoices.lines.index');
+        Route::post('purchase-invoices/{id}/lines', [PurchaseInvoiceController::class, 'createLine'])
+            ->whereNumber('id')
+            ->name('purchase-invoices.lines.store');
+        Route::patch('purchase-invoice-lines/{id}', [PurchaseInvoiceController::class, 'updateLine'])
+            ->whereNumber('id')
+            ->name('purchase-invoice-lines.update');
+        Route::delete('purchase-invoice-lines/{id}', [PurchaseInvoiceController::class, 'deleteLine'])
+            ->whereNumber('id')
+            ->name('purchase-invoice-lines.destroy');
+
+        Route::get('purchase-payments', [PurchasePaymentController::class, 'index'])
+            ->name('purchase-payments.index');
+        Route::get('purchase-payments/{id}', [PurchasePaymentController::class, 'show'])
+            ->whereNumber('id')
+            ->name('purchase-payments.show');
+        Route::post('purchase-payments', [PurchasePaymentController::class, 'store'])
+            ->name('purchase-payments.store');
+        Route::patch('purchase-payments/{id}', [PurchasePaymentController::class, 'update'])
+            ->whereNumber('id')
+            ->name('purchase-payments.update');
+        Route::delete('purchase-payments/{id}', [PurchasePaymentController::class, 'destroy'])
+            ->whereNumber('id')
+            ->name('purchase-payments.destroy');
+        Route::post('purchase-payments/{id}/post', [PurchasePaymentController::class, 'post'])
+            ->whereNumber('id')
+            ->name('purchase-payments.post');
+        Route::post('purchase-payments/{id}/void', [PurchasePaymentController::class, 'void'])
+            ->whereNumber('id')
+            ->name('purchase-payments.void');
+        Route::post('purchase-payments/{id}/reverse', [PurchasePaymentController::class, 'reverse'])
+            ->whereNumber('id')
+            ->name('purchase-payments.reverse');
+        Route::post('purchase-payments/{id}/allocate', [PurchasePaymentController::class, 'allocate'])
+            ->whereNumber('id')
+            ->name('purchase-payments.allocate');
+        Route::get('purchase-payments/{id}/allocations', [PurchasePaymentController::class, 'allocations'])
+            ->whereNumber('id')
+            ->name('purchase-payments.allocations');
+
+        Route::post('purchase-advances', [PurchasePaymentController::class, 'createAdvance'])
+            ->name('purchase-advances.store');
+        Route::post('purchase-advances/{id}/allocate', [PurchasePaymentController::class, 'allocateAdvance'])
+            ->whereNumber('id')
+            ->name('purchase-advances.allocate');
+        Route::post('purchase-refunds', [PurchasePaymentController::class, 'refund'])
+            ->name('purchase-refunds.store');
+        Route::post('purchase-write-offs', [PurchasePaymentController::class, 'writeOff'])
+            ->name('purchase-write-offs.store');
+
+        Route::get('supplier-outstanding', [PurchasePaymentController::class, 'supplierOutstanding'])
+            ->name('supplier-outstanding');
+        Route::get('invoice-payment-status', [PurchasePaymentController::class, 'invoicePaymentStatus'])
+            ->name('invoice-payment-status');
+        Route::get('available-po-lines-for-invoice', [PurchaseInvoiceController::class, 'availablePoLinesForInvoice'])
+            ->name('available-po-lines-for-invoice');
+        Route::get('available-grn-lines-for-invoice', [PurchaseInvoiceController::class, 'availableGrnLinesForInvoice'])
+            ->name('available-grn-lines-for-invoice');
+        Route::post('calculate-invoice', [PurchaseInvoiceController::class, 'calculateInvoice'])
+            ->name('calculate-invoice');
+        Route::post('validate-uom', [PurchaseInvoiceController::class, 'validateUom'])
+            ->name('validate-uom');
+        Route::post('preview-payment-allocation', [PurchasePaymentController::class, 'previewPaymentAllocation'])
+            ->name('preview-payment-allocation');
 
         Route::post('purchase-orders/with-lines', [PurchaseManagementController::class, 'upsertPurchaseOrderWithLines'])
             ->name('purchase-orders.with-lines.store');
