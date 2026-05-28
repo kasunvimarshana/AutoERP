@@ -7,6 +7,9 @@ namespace Tests\Unit\Modules\Purchase;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Results\Result;
 use Modules\Document\Application\Services\DocumentOrchestrator;
+use Modules\Document\Domain\Aggregates\DocumentAggregate;
+use Modules\Document\Domain\Entities\Document;
+use Modules\Document\Domain\Entities\DocumentItem;
 use Modules\Finance\Application\Contracts\Services\FinancePostingServiceInterface;
 use Modules\Inventory\Application\Contracts\UseCases\StockMovements\CreateStockMovementServiceInterface;
 use Modules\Item\Application\Repositories\ItemRepositoryInterface;
@@ -21,6 +24,7 @@ use Modules\Purchase\Application\Repositories\PurchaseOrderRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchasePaymentAllocationRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchaseReturnLineRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchaseReturnRepositoryInterface;
+use Modules\Purchase\Application\Repositories\PurchaseSettingRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchaseStatusHistoryRepositoryInterface;
 use Modules\Purchase\Application\Services\PurchaseWorkflowService;
 use Modules\Purchase\Domain\Constants\PurchaseErrorCode;
@@ -39,6 +43,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
     private PurchaseReturnLineRepositoryInterface&MockObject $purchaseReturnLineRepository;
     private PurchaseDocumentLinkRepositoryInterface&MockObject $purchaseDocumentLinkRepository;
     private PurchasePaymentAllocationRepositoryInterface&MockObject $purchasePaymentAllocationRepository;
+    private PurchaseSettingRepositoryInterface&MockObject $purchaseSettingRepository;
     private PurchaseStatusHistoryRepositoryInterface&MockObject $purchaseStatusHistoryRepository;
     private DocumentOrchestrator&MockObject $documentOrchestrator;
     private PaymentAllocationServiceInterface&MockObject $paymentAllocationService;
@@ -66,6 +71,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         $this->purchasePaymentAllocationRepository = $this->createMock(
             PurchasePaymentAllocationRepositoryInterface::class,
         );
+        $this->purchaseSettingRepository = $this->createMock(PurchaseSettingRepositoryInterface::class);
         $this->purchaseStatusHistoryRepository = $this->createMock(PurchaseStatusHistoryRepositoryInterface::class);
         $this->documentOrchestrator = $this->createMock(DocumentOrchestrator::class);
         $this->paymentAllocationService = $this->createMock(PaymentAllocationServiceInterface::class);
@@ -96,6 +102,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
             $this->purchaseReturnLineRepository,
             $this->purchaseDocumentLinkRepository,
             $this->purchasePaymentAllocationRepository,
+            $this->purchaseSettingRepository,
             $this->purchaseStatusHistoryRepository,
             $this->documentOrchestrator,
             $this->paymentAllocationService,
@@ -216,6 +223,11 @@ final class PurchaseWorkflowServiceTest extends TestCase
 
     public function testCreateDocumentRequiresDocumentTypeId(): void
     {
+        $this->purchaseSettingRepository
+            ->expects(self::exactly(2))
+            ->method('list')
+            ->willReturnOnConsecutiveCalls([], []);
+
         $this->purchaseOrderRepository
             ->expects(self::once())
             ->method('findById')
@@ -603,5 +615,281 @@ final class PurchaseWorkflowServiceTest extends TestCase
 
         self::assertTrue($result->isFailure());
         self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
+    }
+
+    public function testTransitionToReversedSucceedsWhenDocumentLinksExistButNoActiveAllocations(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(120)
+            ->willReturn(new DataRecord([
+                'id' => 120,
+                'tenant_id' => 1,
+                'status' => 'documented',
+                'organization_unit_id' => 12,
+            ]));
+
+        $this->purchaseDocumentLinkRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'source_type' => 'purchase_order',
+                'source_id' => 120,
+                'status' => 'active',
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 301,
+                    'tenant_id' => 1,
+                    'document_id' => 9001,
+                    'status' => 'active',
+                ]),
+            ]);
+
+        $this->purchasePaymentAllocationRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'document_id' => 9001,
+                'status' => 'active',
+            ])
+            ->willReturn([]);
+
+        $this->grnHeaderRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'purchase_order_id' => 120,
+            ])
+            ->willReturn([]);
+
+        $this->purchaseReturnRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'original_purchase_order_id' => 120,
+            ])
+            ->willReturn([]);
+
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('update')
+            ->with(120, self::callback(static function (array $payload): bool {
+                return (string) ($payload['status'] ?? '') === 'reversed'
+                    && (string) ($payload['document_status'] ?? '') === 'reversed';
+            }))
+            ->willReturn(new DataRecord([
+                'id' => 120,
+                'tenant_id' => 1,
+                'status' => 'reversed',
+            ]));
+
+        $this->purchaseStatusHistoryRepository
+            ->expects(self::once())
+            ->method('create')
+            ->with(self::callback(static function (array $payload): bool {
+                return (string) ($payload['entity_type'] ?? '') === 'purchase_order'
+                    && (string) ($payload['from_status'] ?? '') === 'documented'
+                    && (string) ($payload['to_status'] ?? '') === 'reversed';
+            }))
+            ->willReturn(new DataRecord(['id' => 1]));
+
+        $result = $this->service->transition('purchase_order', 120, [
+            'tenant_id' => 1,
+            'status' => 'reversed',
+            'actor_id' => 9,
+            'reason' => 'Document rollback completed',
+            'finance_reversed' => true,
+        ]);
+
+        self::assertTrue($result->isSuccess());
+    }
+
+    public function testAllocatePaymentFailsWhenPaymentAndAdvancePaymentAreBothProvided(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(10)
+            ->willReturn(new DataRecord([
+                'id' => 10,
+                'tenant_id' => 1,
+                'organization_unit_id' => 12,
+                'status' => 'documented',
+            ]));
+
+        $result = $this->service->allocatePayment('purchase_order', 10, [
+            'tenant_id' => 1,
+            'document_id' => 500,
+            'payment_id' => 41,
+            'advance_payment_id' => 51,
+            'allocated_amount' => 100,
+        ]);
+
+        self::assertTrue($result->isFailure());
+        self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
+        self::assertSame(
+            'Use either payment_id or advance_payment_id, not both.',
+            $result->errorOrFail()->message,
+        );
+    }
+
+    public function testCreateDocumentFailsWhenSettingsRequireGrnBeforeDirectPurchaseDocument(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(33)
+            ->willReturn(new DataRecord([
+                'id' => 33,
+                'tenant_id' => 1,
+                'supplier_id' => 20,
+                'organization_unit_id' => 12,
+                'status' => 'confirmed',
+            ]));
+
+        $this->purchaseSettingRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'organization_unit_id' => 12,
+                'is_active' => true,
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 1,
+                    'tenant_id' => 1,
+                    'allow_direct_purchase_document' => false,
+                ]),
+            ]);
+
+        $this->grnHeaderRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'purchase_order_id' => 33,
+            ])
+            ->willReturn([]);
+
+        $result = $this->service->createDocument('purchase_order', 33, [
+            'tenant_id' => 1,
+            'document_type_id' => 44,
+            'actor_id' => 77,
+        ]);
+
+        self::assertTrue($result->isFailure());
+        self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
+    }
+
+    public function testCreateDocumentUsesSettingsDefaultDocumentTypeWhenNotProvided(): void
+    {
+        $this->purchaseDocumentLinkRepository
+            ->method('list')
+            ->willReturn([]);
+
+        $this->purchaseReturnRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(72)
+            ->willReturn(new DataRecord([
+                'id' => 72,
+                'tenant_id' => 1,
+                'supplier_id' => 20,
+                'organization_unit_id' => 12,
+                'status' => 'approved',
+                'return_number' => 'PR-72',
+            ]));
+
+        $this->purchaseSettingRepository
+            ->expects(self::once())
+            ->method('list')
+            ->willReturn([
+                new DataRecord([
+                    'id' => 1,
+                    'tenant_id' => 1,
+                    'purchase_return_document_definition_id' => 77,
+                ]),
+            ]);
+
+        $this->purchaseReturnLineRepository
+            ->expects(self::exactly(2))
+            ->method('list')
+            ->with(['purchase_return_id' => 72])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 801,
+                    'item_id' => 11,
+                    'uom_id' => 3,
+                    'return_qty' => 2,
+                    'unit_price' => 15,
+                    'line_total_with_tax' => 30,
+                ]),
+            ]);
+
+        $this->purchaseDocumentLinkRepository
+            ->method('create')
+            ->willReturn(new DataRecord(['id' => 1]));
+
+        $this->documentOrchestrator
+            ->expects(self::once())
+            ->method('create')
+            ->with(self::callback(static function ($dto): bool {
+                return (int) ($dto->documentTypeId ?? 0) === 77
+                    && (int) ($dto->tenantId ?? 0) === 1;
+            }))
+            ->willReturn(new DocumentAggregate(
+                new Document(
+                    id: 9901,
+                    tenantId: 1,
+                    organizationUnitId: 12,
+                    documentTypeId: 77,
+                    documentNumber: 'PDR-0001',
+                    documentDate: '2026-05-28',
+                    dueDate: null,
+                    status: 'draft',
+                    ownerId: 7,
+                    partyId: 20,
+                    subtotal: '30.0000',
+                    discountTotal: '0.0000',
+                    taxTotal: '0.0000',
+                    grandTotal: '30.0000',
+                    data: [],
+                    notes: null,
+                    createdBy: 7,
+                    updatedBy: 7,
+                ),
+                [
+                    new DocumentItem(
+                        id: 5001,
+                        documentId: 9901,
+                        itemType: 'purchase_line',
+                        description: null,
+                        lineTotal: '30.0000',
+                        sequence: 1,
+                        data: [
+                            'source_line_id' => 801,
+                            'quantity' => 2,
+                        ],
+                    ),
+                ],
+            ));
+
+        $result = $this->service->createDocument('purchase_return', 72, [
+            'tenant_id' => 1,
+            'actor_id' => 7,
+        ]);
+
+        self::assertTrue(
+            $result->isSuccess(),
+            $result->isFailure() ? $result->errorOrFail()->message : 'Expected success.',
+        );
+        self::assertSame(9901, (int) (($result->valueOrFail()['document_id'] ?? 0)));
     }
 }

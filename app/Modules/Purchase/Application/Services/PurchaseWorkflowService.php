@@ -24,6 +24,7 @@ use Modules\Purchase\Application\Repositories\PurchaseOrderRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchasePaymentAllocationRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchaseReturnLineRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchaseReturnRepositoryInterface;
+use Modules\Purchase\Application\Repositories\PurchaseSettingRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchaseStatusHistoryRepositoryInterface;
 use Modules\Purchase\Domain\Constants\PurchaseErrorCode;
 use Modules\UOM\Application\Contracts\Services\UomConversionServiceInterface;
@@ -119,6 +120,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
         private readonly PurchaseReturnLineRepositoryInterface $purchaseReturnLineRepository,
         private readonly PurchaseDocumentLinkRepositoryInterface $purchaseDocumentLinkRepository,
         private readonly PurchasePaymentAllocationRepositoryInterface $purchasePaymentAllocationRepository,
+        private readonly PurchaseSettingRepositoryInterface $purchaseSettingRepository,
         private readonly PurchaseStatusHistoryRepositoryInterface $purchaseStatusHistoryRepository,
         private readonly DocumentOrchestrator $documentOrchestrator,
         private readonly PaymentAllocationServiceInterface $paymentAllocationService,
@@ -313,6 +315,22 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 ));
             }
 
+            $settings = $this->resolveActiveSettings($tenantId, $record->get('organization_unit_id') !== null
+                ? (int) $record->get('organization_unit_id')
+                : null);
+
+            if (
+                $entityType === 'purchase_order'
+                && $settings instanceof DataRecord
+                && $settings->get('allow_direct_purchase_document', true) === false
+                && ! $this->hasEligibleGrnForPurchaseOrder((int) $record->id(), $tenantId)
+            ) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Purchase settings require GRN before direct purchase document creation.',
+                ));
+            }
+
             if (in_array(strtolower((string) $record->get('status', '')), ['cancelled', 'reversed'], true)) {
                 return Result::failure(new Error(
                     PurchaseErrorCode::INVALID_VALUE,
@@ -321,6 +339,10 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
             }
 
             $documentTypeId = isset($payload['document_type_id']) ? (int) $payload['document_type_id'] : 0;
+            if ($documentTypeId < 1 && $settings instanceof DataRecord) {
+                $documentTypeId = $this->resolveDefaultDocumentTypeIdFromSettings($entityType, $settings);
+            }
+
             if ($documentTypeId < 1) {
                 return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'document_type_id is required.'));
             }
@@ -339,6 +361,16 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                         PurchaseErrorCode::INVALID_VALUE,
                         'At least one document item is required.',
                     ));
+                }
+
+                $quantityValidation = $this->validateDocumentQuantities(
+                    $entityType,
+                    (int) $record->id(),
+                    $tenantId,
+                    $items,
+                );
+                if ($quantityValidation->isFailure()) {
+                    return $quantityValidation;
                 }
 
                 $documentDate = (string) ($payload['document_date'] ?? now()->toDateString());
@@ -388,6 +420,31 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                     'linked_at' => now()->toDateTimeString(),
                     'created_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
                 ]);
+
+                foreach ($documentAggregate->items as $documentItem) {
+                    $sourceLineId = (int) ($documentItem->data['source_line_id'] ?? 0);
+                    if ($sourceLineId < 1) {
+                        continue;
+                    }
+
+                    $this->purchaseDocumentLinkRepository->create([
+                        'tenant_id' => $tenantId,
+                        'organization_unit_id' => $record->get('organization_unit_id'),
+                        'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
+                        'source_type' => $entityType,
+                        'source_id' => (int) $record->id(),
+                        'source_line_id' => $sourceLineId,
+                        'document_id' => $documentId,
+                        'document_line_id' => $documentItem->id,
+                        'linked_quantity' => isset($documentItem->data['quantity'])
+                            ? round((float) $documentItem->data['quantity'], 4)
+                            : null,
+                        'linked_amount' => round((float) $documentItem->lineTotal, 4),
+                        'status' => 'active',
+                        'linked_at' => now()->toDateTimeString(),
+                        'created_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
+                    ]);
+                }
 
                 $nextDocumentStatus = $this->supportsDocumentStatus($entityType) ? 'documented' : null;
                 if ($nextDocumentStatus !== null) {
@@ -455,6 +512,15 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 ));
             }
 
+            $hasPaymentId = isset($payload['payment_id']);
+            $hasAdvancePaymentId = isset($payload['advance_payment_id']);
+            if ($hasPaymentId && $hasAdvancePaymentId) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Use either payment_id or advance_payment_id, not both.',
+                ));
+            }
+
             return $this->withinEntityTransaction($entityType, function () use (
                 $payload,
                 $tenantId,
@@ -509,7 +575,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                     'currency_id' => isset($payload['currency_id']) ? (int) $payload['currency_id'] : null,
                     'base_allocated_amount' => isset($payload['base_allocated_amount'])
                         ? round((float) $payload['base_allocated_amount'], 4)
-                        : null,
+                        : $allocatedAmount,
                     'status' => 'active',
                     'allocated_at' => now()->toDateTimeString(),
                     'created_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
@@ -925,6 +991,65 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
         return (int) $latest->get('document_id', 0);
     }
 
+    private function resolveActiveSettings(int $tenantId, ?int $organizationUnitId): ?DataRecord
+    {
+        if ($organizationUnitId !== null && $organizationUnitId > 0) {
+            $orgScopedSettings = $this->purchaseSettingRepository->list([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+                'is_active' => true,
+            ]);
+
+            $orgScoped = end($orgScopedSettings);
+            if ($orgScoped instanceof DataRecord) {
+                return $orgScoped;
+            }
+        }
+
+        $tenantScopedSettings = $this->purchaseSettingRepository->list([
+            'tenant_id' => $tenantId,
+            'is_active' => true,
+        ]);
+
+        $tenantScoped = end($tenantScopedSettings);
+        return $tenantScoped instanceof DataRecord ? $tenantScoped : null;
+    }
+
+    private function resolveDefaultDocumentTypeIdFromSettings(string $entityType, DataRecord $settings): int
+    {
+        return match ($entityType) {
+            'purchase_order' => (int) ($settings->get('purchase_invoice_document_definition_id')
+                ?? $settings->get('purchase_order_document_definition_id')
+                ?? 0),
+            'grn_header' => (int) ($settings->get('purchase_invoice_document_definition_id')
+                ?? $settings->get('grn_document_definition_id')
+                ?? 0),
+            'purchase_return' => (int) ($settings->get('purchase_return_document_definition_id') ?? 0),
+            default => 0,
+        };
+    }
+
+    private function hasEligibleGrnForPurchaseOrder(int $purchaseOrderId, int $tenantId): bool
+    {
+        $grns = $this->grnHeaderRepository->list([
+            'tenant_id' => $tenantId,
+            'purchase_order_id' => $purchaseOrderId,
+        ]);
+
+        foreach ($grns as $grn) {
+            if (! $grn instanceof DataRecord) {
+                continue;
+            }
+
+            $status = strtolower((string) $grn->get('status', ''));
+            if (! in_array($status, ['draft', 'cancelled', 'reversed'], true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function isAllowedStatusTransition(string $entityType, string $from, string $to): bool
     {
         if ($from === $to) {
@@ -977,7 +1102,97 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
             }
         }
 
-        return false;
+        return true;
+    }
+
+    /** @param list<array<string, mixed>> $items */
+    private function validateDocumentQuantities(
+        string $entityType,
+        int $sourceId,
+        int $tenantId,
+        array $items,
+    ): Result {
+        $lineRecords = $this->resolveLines($entityType, $sourceId);
+        if ($lineRecords === []) {
+            return Result::failure(new Error(
+                PurchaseErrorCode::INVALID_VALUE,
+                'No source lines found for document quantity validation.',
+            ));
+        }
+
+        $availableByLineId = [];
+        foreach ($lineRecords as $lineRecord) {
+            if (! $lineRecord instanceof DataRecord) {
+                continue;
+            }
+
+            $lineId = (int) $lineRecord->id();
+            if ($lineId < 1) {
+                continue;
+            }
+
+            $availableByLineId[$lineId] = round($this->resolveDocumentableQuantity($entityType, $lineRecord), 4);
+        }
+
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $sourceLineId = (int) ($item['data']['source_line_id'] ?? 0);
+            if ($sourceLineId < 1) {
+                continue;
+            }
+
+            if (! array_key_exists($sourceLineId, $availableByLineId)) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Document item references an unknown source line.',
+                ));
+            }
+
+            $requestedQuantity = round((float) ($item['data']['quantity'] ?? 0), 4);
+            if ($requestedQuantity <= 0) {
+                continue;
+            }
+
+            $existingLinks = $this->purchaseDocumentLinkRepository->list([
+                'tenant_id' => $tenantId,
+                'source_type' => $entityType,
+                'source_id' => $sourceId,
+                'source_line_id' => $sourceLineId,
+                'status' => 'active',
+            ]);
+
+            $alreadyLinkedQuantity = 0.0;
+            foreach ($existingLinks as $existingLink) {
+                if (! $existingLink instanceof DataRecord) {
+                    continue;
+                }
+
+                $alreadyLinkedQuantity += (float) $existingLink->get('linked_quantity', 0);
+            }
+
+            $maxQuantity = (float) $availableByLineId[$sourceLineId];
+            if (($alreadyLinkedQuantity + $requestedQuantity) - $maxQuantity > 0.0001) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Document quantity exceeds available quantity for one or more source lines.',
+                ));
+            }
+        }
+
+        return Result::success(true);
+    }
+
+    private function resolveDocumentableQuantity(string $entityType, DataRecord $line): float
+    {
+        return match ($entityType) {
+            'purchase_order' => (float) $line->get('ordered_qty', 0),
+            'grn_header' => (float) $line->get('received_qty', 0),
+            'purchase_return' => (float) $line->get('return_qty', 0),
+            default => 0.0,
+        };
     }
 
     private function hasUnfinalizedDependentEntities(string $entityType, int $sourceId, int $tenantId): bool
