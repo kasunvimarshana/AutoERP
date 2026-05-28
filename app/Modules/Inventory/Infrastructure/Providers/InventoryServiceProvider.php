@@ -6,7 +6,9 @@ namespace Modules\Inventory\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Modules\Inventory\Application\Contracts\Services\CycleCountServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\ReceiptInspectionServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\PickingTaskServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\PutAwayTaskServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\StockLedgerServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\StockAdjustmentServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\StockReservationServiceInterface;
@@ -149,7 +151,9 @@ use Modules\Inventory\Application\UseCases\InventoryCostLayers\GetInventoryCostL
 use Modules\Inventory\Application\UseCases\InventoryCostLayers\ListInventoryCostLayersService;
 use Modules\Inventory\Application\UseCases\InventoryCostLayers\UpdateInventoryCostLayerService;
 use Modules\Inventory\Application\Services\CycleCountService;
+use Modules\Inventory\Application\Services\ReceiptInspectionService;
 use Modules\Inventory\Application\Services\PickingTaskService;
+use Modules\Inventory\Application\Services\PutAwayTaskService;
 use Modules\Inventory\Application\Services\StockLedgerService;
 use Modules\Inventory\Application\Services\StockAdjustmentService;
 use Modules\Inventory\Application\Services\StockReservationService;
@@ -375,7 +379,9 @@ final class InventoryServiceProvider extends ServiceProvider
                 UpdatePickingTaskServiceInterface::class => UpdatePickingTaskService::class,
                 DeletePickingTaskServiceInterface::class => DeletePickingTaskService::class,
                 CycleCountServiceInterface::class => CycleCountService::class,
+                ReceiptInspectionServiceInterface::class => ReceiptInspectionService::class,
                 PickingTaskServiceInterface::class => PickingTaskService::class,
+                PutAwayTaskServiceInterface::class => PutAwayTaskService::class,
                 StockLedgerServiceInterface::class => StockLedgerService::class,
                 StockAdjustmentServiceInterface::class => StockAdjustmentService::class,
                 StockReservationServiceInterface::class => StockReservationService::class,
