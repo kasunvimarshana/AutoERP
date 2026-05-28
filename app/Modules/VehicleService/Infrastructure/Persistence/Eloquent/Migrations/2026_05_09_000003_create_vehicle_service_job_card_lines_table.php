@@ -20,14 +20,29 @@ return new class extends Migration
             $table->string('reference')->nullable();
             $table->foreignId('job_card_id')->constrained('vehicle_service_job_cards')->cascadeOnDelete();
             $table->foreignId('item_id')->constrained('items', 'id')->restrictOnDelete();
+            $table->string('line_type')->default('inventory')->comment('inventory, labor, external_service, customer_supplied');
+            $table->unsignedBigInteger('combo_group_key')->nullable()->comment('Groups exploded combo component lines');
+            $table->foreignId('combo_parent_line_id')->nullable()->constrained('vehicle_service_job_card_lines', 'id')->nullOnDelete();
+            $table->foreignId('combo_item_id')->nullable()->constrained('combo_items', 'id')->nullOnDelete();
+            $table->boolean('is_combo_component')->default(false);
             $table->foreignId('variant_id')->nullable()->constrained('item_variants', 'id')->nullOnDelete();
             $table->foreignId('batch_id')->nullable()->constrained('batches', 'id')->nullOnDelete();
             $table->foreignId('serial_id')->nullable()->constrained('serials', 'id')->nullOnDelete();
             $table->foreignId('warehouse_id')->nullable()->constrained('warehouses', 'id')->nullOnDelete();
             $table->foreignId('location_id')->nullable()->constrained('warehouse_locations', 'id')->nullOnDelete();
+            $table->boolean('is_customer_supplied')->default(false);
+            $table->boolean('is_external_service')->default(false);
+            $table->boolean('requires_stock_movement')->default(true);
             $table->text('description')->nullable();
             $table->foreignId('uom_id')->constrained('unit_of_measures', 'id')->restrictOnDelete();
             $table->decimal('quantity', 20, 4);
+            $table->decimal('quantity_base', 20, 4)->default(0);
+            $table->decimal('reserved_qty', 20, 4)->default(0);
+            $table->decimal('consumed_qty', 20, 4)->default(0);
+            $table->decimal('returned_qty', 20, 4)->default(0);
+            $table->decimal('cancelled_qty', 20, 4)->default(0);
+            $table->decimal('outstanding_qty', 20, 4)->default(0);
+            $table->string('inventory_status')->default('pending')->comment('pending, reserved, consumed, returned, cancelled');
             $table->decimal('unit_price', 20, 4);
             $table->decimal('unit_cost', 20, 4)->nullable();
 
@@ -56,6 +71,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['tenant_id', 'job_card_id'], 'vehicle_service_job_card_lines_job_card_idx');
+            $table->index(['tenant_id', 'line_type'], 'vehicle_service_job_card_lines_type_idx');
         });
     }
 

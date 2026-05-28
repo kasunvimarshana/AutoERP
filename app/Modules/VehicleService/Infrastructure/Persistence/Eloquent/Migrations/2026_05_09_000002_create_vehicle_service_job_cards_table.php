@@ -25,16 +25,31 @@ return new class extends Migration
             $table->foreignId('warehouse_id')->nullable()->constrained('warehouses')->restrictOnDelete();
             $table->string('priority')->default('medium')->comment('low, medium, high, critical');
             $table->string('status')->default('open')->comment('open, in_progress, waiting_parts, completed, invoiced, cancelled');
+            $table->string('inventory_status')->default('pending')->comment('pending, reserved, consumed, partially_consumed, reversed');
+            $table->string('invoice_status')->default('pending')->comment('pending, partially_invoiced, invoiced, reversed');
+            $table->string('payment_status')->default('unpaid')->comment('unpaid, partially_paid, paid, overpaid, refunded');
+            $table->string('finance_status')->default('draft')->comment('draft, posted, reversed');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 4)->default(1);
             $table->text('reported_issue')->nullable();
             $table->text('resolution_notes')->nullable();
+            $table->text('technician_notes')->nullable();
+            $table->text('customer_feedback')->nullable();
             $table->dateTime('start_datetime')->nullable();
             $table->dateTime('completed_datetime')->nullable();
+            $table->dateTime('received_at')->nullable();
+            $table->dateTime('ready_for_delivery_at')->nullable();
+            $table->dateTime('delivered_at')->nullable();
+            $table->dateTime('cancelled_at')->nullable();
+            $table->dateTime('reversed_at')->nullable();
             $table->decimal('estimated_hours', 20, 4)->nullable();
             $table->decimal('actual_hours', 20, 4)->nullable();
             $table->dateTime('promised_delivery_date_time')->nullable();
             $table->boolean('warranty_eligible')->default(false);
+            $table->boolean('is_customer_approval_required')->default(false);
+            $table->boolean('is_customer_approved')->default(false);
+            $table->dateTime('customer_approved_at')->nullable();
+            $table->unsignedBigInteger('customer_approved_by')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();
             $table->foreignId('price_list_id')->nullable()->constrained('price_lists')->nullOnDelete();
@@ -71,7 +86,10 @@ return new class extends Migration
             $table->decimal('credit_note_total', 20, 4)->default(0)->comment('SUM of credit notes');
             $table->decimal('grand_total', 20, 4)->default(0)->comment('Application-calculated: all subtotals - discount_total + tax_total + debit_note_total - credit_note_total');
 
+            $table->decimal('advance_amount', 20, 4)->default(0);
             $table->decimal('paid_amount', 20, 4)->default(0);
+            $table->decimal('refund_amount', 20, 4)->default(0);
+            $table->decimal('write_off_amount', 20, 4)->default(0);
             $table->decimal('balance', 20, 4)->default(0)->comment('Application-calculated: grand_total - paid_amount');
 
             $table->text('notes')->nullable();
@@ -80,6 +98,9 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'job_card_number'], 'vehicle_service_job_cards_job_card_number_uk');
+            $table->index(['tenant_id', 'status'], 'vehicle_service_job_cards_status_idx');
+            $table->index(['tenant_id', 'invoice_status'], 'vehicle_service_job_cards_invoice_status_idx');
+            $table->index(['tenant_id', 'payment_status'], 'vehicle_service_job_cards_payment_status_idx');
         });
     }
 

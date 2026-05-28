@@ -199,6 +199,19 @@ final class VehicleServiceServiceProvider extends ServiceProvider
             $this->app->singleton($contract, $implementation);
         }
 
+        $this->app->singleton(
+            \Modules\VehicleService\Application\Contracts\Services\VehicleServiceManagementServiceInterface::class,
+            \Modules\VehicleService\Application\Services\VehicleServiceManagementService::class,
+        );
+        $this->app->singleton(
+            \Modules\VehicleService\Application\Contracts\Services\VehicleServiceWorkflowServiceInterface::class,
+            \Modules\VehicleService\Application\Services\VehicleServiceWorkflowService::class,
+        );
+        $this->app->singleton(
+            \Modules\VehicleService\Application\Contracts\Services\VehicleServiceIntegrationServiceInterface::class,
+            \Modules\VehicleService\Application\Services\VehicleServiceIntegrationService::class,
+        );
+
         $this->app->singleton(VehicleServiceTypeRepositoryInterface::class, function (): VehicleServiceTypeRepositoryInterface {
             return new EloquentVehicleServiceTypeRepository(new VehicleServiceTypeModel());
         });
@@ -229,6 +242,62 @@ final class VehicleServiceServiceProvider extends ServiceProvider
         $this->app->singleton(VehicleServiceInspectionLineRepositoryInterface::class, function (): VehicleServiceInspectionLineRepositoryInterface {
             return new EloquentVehicleServiceInspectionLineRepository(new VehicleServiceInspectionLineModel());
         });
+        $this->app->singleton(
+            \Modules\VehicleService\Application\Repositories\VehicleServiceSettingRepositoryInterface::class,
+            function (): \Modules\VehicleService\Application\Repositories\VehicleServiceSettingRepositoryInterface {
+                return new \Modules\VehicleService\Infrastructure\Persistence\Eloquent\Repositories\EloquentVehicleServiceSettingRepository(
+                    new \Modules\VehicleService\Infrastructure\Persistence\Eloquent\Models\VehicleServiceSettingModel(),
+                );
+            },
+        );
+        $this->app->singleton(
+            \Modules\VehicleService\Application\Repositories\VehicleServiceJobExternalServiceRepositoryInterface::class,
+            function (): \Modules\VehicleService\Application\Repositories\VehicleServiceJobExternalServiceRepositoryInterface {
+                return new \Modules\VehicleService\Infrastructure\Persistence\Eloquent\Repositories\EloquentVehicleServiceJobExternalServiceRepository(
+                    new \Modules\VehicleService\Infrastructure\Persistence\Eloquent\Models\VehicleServiceJobExternalServiceModel(),
+                );
+            },
+        );
+        $this->app->singleton(
+            \Modules\VehicleService\Application\Repositories\VehicleServiceJobCustomerSuppliedItemRepositoryInterface::class,
+            function (): \Modules\VehicleService\Application\Repositories\VehicleServiceJobCustomerSuppliedItemRepositoryInterface {
+                return new \Modules\VehicleService\Infrastructure\Persistence\Eloquent\Repositories\EloquentVehicleServiceJobCustomerSuppliedItemRepository(
+                    new \Modules\VehicleService\Infrastructure\Persistence\Eloquent\Models\VehicleServiceJobCustomerSuppliedItemModel(),
+                );
+            },
+        );
+        $this->app->singleton(
+            \Modules\VehicleService\Application\Repositories\VehicleServiceJobStatusHistoryRepositoryInterface::class,
+            function (): \Modules\VehicleService\Application\Repositories\VehicleServiceJobStatusHistoryRepositoryInterface {
+                return new \Modules\VehicleService\Infrastructure\Persistence\Eloquent\Repositories\EloquentVehicleServiceJobStatusHistoryRepository(
+                    new \Modules\VehicleService\Infrastructure\Persistence\Eloquent\Models\VehicleServiceJobStatusHistoryModel(),
+                );
+            },
+        );
+        $this->app->singleton(
+            \Modules\VehicleService\Application\Repositories\VehicleServiceJobDocumentLinkRepositoryInterface::class,
+            function (): \Modules\VehicleService\Application\Repositories\VehicleServiceJobDocumentLinkRepositoryInterface {
+                return new \Modules\VehicleService\Infrastructure\Persistence\Eloquent\Repositories\EloquentVehicleServiceJobDocumentLinkRepository(
+                    new \Modules\VehicleService\Infrastructure\Persistence\Eloquent\Models\VehicleServiceJobDocumentLinkModel(),
+                );
+            },
+        );
+        $this->app->singleton(
+            \Modules\VehicleService\Application\Repositories\VehicleServiceJobPaymentLinkRepositoryInterface::class,
+            function (): \Modules\VehicleService\Application\Repositories\VehicleServiceJobPaymentLinkRepositoryInterface {
+                return new \Modules\VehicleService\Infrastructure\Persistence\Eloquent\Repositories\EloquentVehicleServiceJobPaymentLinkRepository(
+                    new \Modules\VehicleService\Infrastructure\Persistence\Eloquent\Models\VehicleServiceJobPaymentLinkModel(),
+                );
+            },
+        );
+        $this->app->singleton(
+            \Modules\VehicleService\Application\Repositories\VehicleServiceJobInventoryLinkRepositoryInterface::class,
+            function (): \Modules\VehicleService\Application\Repositories\VehicleServiceJobInventoryLinkRepositoryInterface {
+                return new \Modules\VehicleService\Infrastructure\Persistence\Eloquent\Repositories\EloquentVehicleServiceJobInventoryLinkRepository(
+                    new \Modules\VehicleService\Infrastructure\Persistence\Eloquent\Models\VehicleServiceJobInventoryLinkModel(),
+                );
+            },
+        );
     }
 
     public function boot(): void

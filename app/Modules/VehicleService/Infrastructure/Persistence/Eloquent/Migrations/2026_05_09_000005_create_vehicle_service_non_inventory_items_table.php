@@ -19,6 +19,8 @@ return new class extends Migration
 
             $table->string('reference')->nullable();
             $table->foreignId('job_card_id')->constrained('vehicle_service_job_cards')->cascadeOnDelete();
+            $table->string('source_type')->default('internal')->comment('internal, external_service, customer_supplied');
+            $table->boolean('is_billable')->default(true);
             $table->string('name');
             $table->text('description')->nullable();
             $table->foreignId('uom_id')->constrained('unit_of_measures', 'id')->restrictOnDelete();
@@ -51,6 +53,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['tenant_id', 'job_card_id'], 'vehicle_service_non_inventory_items_job_card_idx');
+            $table->index(['tenant_id', 'source_type'], 'vehicle_service_non_inventory_items_source_idx');
         });
     }
 

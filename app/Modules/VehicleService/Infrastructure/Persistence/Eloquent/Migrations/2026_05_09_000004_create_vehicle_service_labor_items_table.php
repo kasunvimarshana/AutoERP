@@ -21,6 +21,11 @@ return new class extends Migration
             $table->foreignId('job_card_id')->constrained('vehicle_service_job_cards')->cascadeOnDelete();
             $table->foreignId('item_id')->constrained('items', 'id')->restrictOnDelete();
             $table->foreignId('combo_item_id')->nullable()->constrained('combo_items', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('combo_group_key')->nullable();
+            $table->foreignId('combo_parent_line_id')->nullable()->constrained('vehicle_service_labor_items', 'id')->nullOnDelete();
+            $table->boolean('is_combo_component')->default(false);
+            $table->string('status')->default('planned')->comment('planned, assigned, in_progress, completed, cancelled');
+            $table->boolean('requires_assignment')->default(true);
             $table->text('description')->nullable();
             $table->foreignId('uom_id')->constrained('unit_of_measures', 'id')->restrictOnDelete();
             $table->decimal('quantity', 20, 4);
@@ -50,6 +55,9 @@ return new class extends Migration
             $table->string('incentive_type')->nullable()->comment('percentage, fixed');
             $table->decimal('incentive_value', 20, 4)->default(0);
             $table->decimal('incentive_amount', 20, 4)->default(0)->comment('Calculated incentive amount');
+            $table->decimal('actual_hours', 20, 4)->nullable();
+            $table->unsignedBigInteger('completed_by')->nullable();
+            $table->dateTime('completed_at')->nullable();
 
             // Line posting account
             $table->foreignId('account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete()->comment('Account used for posting this line');
@@ -57,6 +65,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['tenant_id', 'job_card_id'], 'vehicle_service_labor_items_job_card_idx');
+            $table->index(['tenant_id', 'status'], 'vehicle_service_labor_items_status_idx');
         });
     }
 

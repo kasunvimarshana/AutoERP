@@ -31,14 +31,22 @@ return new class extends Migration
             $table->string('incentive_type')->nullable()->comment('percentage, fixed');
             $table->decimal('incentive_value', 20, 4)->default(0);
             $table->decimal('incentive_amount', 20, 4)->default(0)->comment('Calculated incentive amount');
+            $table->string('split_type')->default('percentage')->comment('percentage, fixed');
+            $table->decimal('split_value', 20, 4)->default(0);
+            $table->decimal('split_amount', 20, 4)->default(0);
+            $table->string('status')->default('assigned')->comment('assigned, in_progress, completed, cancelled');
             // Role of the technician (e.g., lead, assistant)
             $table->string('role')->nullable()->comment('lead, assistant, supervisor');
+            $table->unsignedBigInteger('assigned_by')->nullable();
+            $table->unsignedBigInteger('completed_by')->nullable();
+            $table->dateTime('completed_at')->nullable();
             $table->text('notes')->nullable();
 
             $table->timestamps();
 
             $table->unique(['tenant_id', 'labor_item_id', 'employee_id'], 'vehicle_service_labor_assignments_labor_item_employee_uk');
             $table->index(['tenant_id', 'employee_id'], 'vehicle_service_labor_assignments_employee_idx');
+            $table->index(['tenant_id', 'status'], 'vehicle_service_labor_assignments_status_idx');
         });
     }
 

@@ -61,6 +61,28 @@ final class VehicleServiceRoutesTest extends TestCase
         self::assertTrue(Route::has('vehicleservice.vehicle-service-inspection-lines.show'));
         self::assertTrue(Route::has('vehicleservice.vehicle-service-inspection-lines.update'));
         self::assertTrue(Route::has('vehicleservice.vehicle-service-inspection-lines.destroy'));
+        self::assertTrue(Route::has('vehicleservice.job-cards.aggregate.store'));
+        self::assertTrue(Route::has('vehicleservice.job-cards.aggregate.update'));
+        self::assertTrue(Route::has('vehicleservice.job-cards.lines.sync'));
+        self::assertTrue(Route::has('vehicleservice.job-cards.labor-items.sync'));
+        self::assertTrue(Route::has('vehicleservice.job-cards.external-services.sync'));
+        self::assertTrue(Route::has('vehicleservice.job-cards.customer-supplied-items.sync'));
+        self::assertTrue(Route::has('vehicleservice.settings.show'));
+        self::assertTrue(Route::has('vehicleservice.settings.upsert'));
+        self::assertTrue(Route::has('vehicleservice.settings.initialize'));
+        self::assertTrue(Route::has('vehicleservice.status-history.show'));
+        self::assertTrue(Route::has('vehicleservice.stock-availability.show'));
+        self::assertTrue(Route::has('vehicleservice.job-cards.invoiceable'));
+        self::assertTrue(Route::has('vehicleservice.job-cards.receivable'));
+        self::assertTrue(Route::has('vehicleservice.workflow.transition'));
+        self::assertTrue(Route::has('vehicleservice.workflow.invoice'));
+        self::assertTrue(Route::has('vehicleservice.workflow.payments.allocate'));
+        self::assertTrue(Route::has('vehicleservice.workflow.inventory.post'));
+        self::assertTrue(Route::has('vehicleservice.workflow.finance.post'));
+        self::assertTrue(Route::has('vehicleservice.workflow.finance.reverse'));
+        self::assertTrue(Route::has('vehicleservice.integration.invoice'));
+        self::assertTrue(Route::has('vehicleservice.integration.payments.allocate'));
+        self::assertTrue(Route::has('vehicleservice.integration.inventory.post'));
     }
 
     public function testVehicleServiceRoutesUseContextMiddlewares(): void
