@@ -163,6 +163,23 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 ));
             }
 
+            $idempotencyKey = $this->normalizeIdempotencyKey($payload['idempotency_key'] ?? null);
+            if ($idempotencyKey !== '') {
+                $replay = $this->findIdempotentActionHistory(
+                    $tenantId,
+                    $entityType,
+                    (int) $record->id(),
+                    $idempotencyKey,
+                    'transition',
+                );
+                if (
+                    $replay instanceof DataRecord
+                    && strtolower((string) $replay->get('to_status', '')) === $status
+                ) {
+                    return Result::success($record);
+                }
+            }
+
             if ((string) $record->get('status', '') === 'reversed') {
                 return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'Reversed records are immutable.'));
             }
@@ -234,6 +251,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 $tenantId,
                 $record,
                 $payload,
+                $idempotencyKey,
             ): Result {
                 $fields = [
                     'status' => $status,
@@ -275,10 +293,14 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
 
                 $updated = $this->updateEntity($entityType, $id, $fields);
 
+                $metadata = $this->metadataWithIdempotencyKey($payload, $idempotencyKey);
+                $metadata['workflow_action'] = 'transition';
+                $metadata['target_status'] = $status;
+
                 $this->purchaseStatusHistoryRepository->create([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $record->get('organization_unit_id'),
-                    'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
+                    'metadata' => $metadata,
                     'entity_type' => $entityType,
                     'entity_id' => (int) $record->id(),
                     'from_status' => (string) $record->get('status', ''),
@@ -338,9 +360,31 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 ));
             }
 
+            $idempotencyKey = $this->normalizeIdempotencyKey($payload['idempotency_key'] ?? null);
+            if ($idempotencyKey !== '') {
+                $idempotentDocument = $this->findIdempotentDocumentLink(
+                    $tenantId,
+                    $entityType,
+                    (int) $record->id(),
+                    $idempotencyKey,
+                );
+                if ($idempotentDocument instanceof DataRecord) {
+                    return Result::success([
+                        'source_type' => $entityType,
+                        'source_id' => (int) $record->id(),
+                        'document_id' => (int) $idempotentDocument->get('document_id', 0),
+                        'document_number' => $this->resolveDocumentNumber(
+                            $tenantId,
+                            (int) $idempotentDocument->get('document_id', 0),
+                        ),
+                        'idempotent_replay' => true,
+                    ]);
+                }
+            }
+
             $documentTypeId = isset($payload['document_type_id']) ? (int) $payload['document_type_id'] : 0;
             if ($documentTypeId < 1 && $settings instanceof DataRecord) {
-                $documentTypeId = $this->resolveDefaultDocumentTypeIdFromSettings($entityType, $settings);
+                $documentTypeId = $this->resolveDefaultDocumentTypeIdFromSettings($entityType, $settings, $tenantId);
             }
 
             if ($documentTypeId < 1) {
@@ -354,6 +398,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 $record,
                 $tenantId,
                 $documentTypeId,
+                $idempotencyKey,
             ): Result {
                 $items = $this->resolveDocumentItems($entityType, (int) $record->id(), $payload, $record);
                 if ($items === []) {
@@ -408,7 +453,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 $this->purchaseDocumentLinkRepository->create([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $record->get('organization_unit_id'),
-                    'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
+                    'metadata' => $this->metadataWithIdempotencyKey($payload, $idempotencyKey),
                     'source_type' => $entityType,
                     'source_id' => (int) $record->id(),
                     'source_line_id' => null,
@@ -430,7 +475,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                     $this->purchaseDocumentLinkRepository->create([
                         'tenant_id' => $tenantId,
                         'organization_unit_id' => $record->get('organization_unit_id'),
-                        'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
+                        'metadata' => $this->metadataWithIdempotencyKey($payload, $idempotencyKey),
                         'source_type' => $entityType,
                         'source_id' => (int) $record->id(),
                         'source_line_id' => $sourceLineId,
@@ -521,6 +566,43 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 ));
             }
 
+            $idempotencyKey = $this->normalizeIdempotencyKey($payload['idempotency_key'] ?? null);
+            if ($idempotencyKey !== '') {
+                $idempotentAllocation = $this->findIdempotentPaymentAllocation($tenantId, $documentId, $idempotencyKey);
+                if ($idempotentAllocation instanceof DataRecord) {
+                    return Result::success([
+                        'allocation_id' => (int) $idempotentAllocation->id(),
+                        'document_id' => $documentId,
+                        'idempotent_replay' => true,
+                    ]);
+                }
+            }
+
+            $maxAllocatableAmount = $this->resolveMaxAllocatableAmount($tenantId, $documentId);
+            if ($maxAllocatableAmount > 0) {
+                $existingAllocations = $this->purchasePaymentAllocationRepository->list([
+                    'tenant_id' => $tenantId,
+                    'document_id' => $documentId,
+                    'status' => 'active',
+                ]);
+
+                $allocatedSoFar = 0.0;
+                foreach ($existingAllocations as $allocation) {
+                    if (! $allocation instanceof DataRecord) {
+                        continue;
+                    }
+
+                    $allocatedSoFar += (float) $allocation->get('allocated_amount', 0);
+                }
+
+                if (($allocatedSoFar + $allocatedAmount) - $maxAllocatableAmount > 0.0001) {
+                    return Result::failure(new Error(
+                        PurchaseErrorCode::INVALID_VALUE,
+                        'Allocation exceeds document allocatable amount.',
+                    ));
+                }
+            }
+
             return $this->withinEntityTransaction($entityType, function () use (
                 $payload,
                 $tenantId,
@@ -528,6 +610,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 $entityType,
                 $documentId,
                 $allocatedAmount,
+                $idempotencyKey,
             ): Result {
                 if (isset($payload['payment_id'])) {
                     $allocationResult = $this->paymentAllocationService->createAllocation([
@@ -565,7 +648,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 $this->purchasePaymentAllocationRepository->create([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $record->get('organization_unit_id'),
-                    'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
+                    'metadata' => $this->metadataWithIdempotencyKey($payload, $idempotencyKey),
                     'document_id' => $documentId,
                     'payment_id' => isset($payload['payment_id']) ? (int) $payload['payment_id'] : null,
                     'advance_payment_id' => isset($payload['advance_payment_id'])
@@ -618,6 +701,23 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 ));
             }
 
+            $idempotencyKey = $this->normalizeIdempotencyKey($payload['idempotency_key'] ?? null);
+            if ($idempotencyKey !== '') {
+                $replay = $this->findIdempotentActionHistory(
+                    $tenantId,
+                    $entityType,
+                    (int) $record->id(),
+                    $idempotencyKey,
+                    'inventory_post',
+                );
+                if ($replay instanceof DataRecord) {
+                    return Result::success([
+                        'posted' => true,
+                        'idempotent_replay' => true,
+                    ]);
+                }
+            }
+
             $lineRecords = $this->resolveLines($entityType, (int) $record->id());
             if ($lineRecords === []) {
                 return Result::failure(new Error(
@@ -634,6 +734,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 $record,
                 $payload,
                 $id,
+                $idempotencyKey,
             ): Result {
                 foreach ($lineRecords as $line) {
                     $quantity = $entityType === 'purchase_return'
@@ -726,6 +827,24 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                     ]);
                 }
 
+                $fromStatus = strtolower((string) $record->get('status', ''));
+                $toStatus = $entityType === 'grn_header' ? 'posted' : $fromStatus;
+                $metadata = $this->metadataWithIdempotencyKey($payload, $idempotencyKey);
+                $metadata['workflow_action'] = 'inventory_post';
+
+                $this->purchaseStatusHistoryRepository->create([
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => $record->get('organization_unit_id'),
+                    'metadata' => $metadata,
+                    'entity_type' => $entityType,
+                    'entity_id' => (int) $record->id(),
+                    'from_status' => $fromStatus,
+                    'to_status' => $toStatus,
+                    'reason' => 'inventory_post',
+                    'changed_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
+                    'changed_at' => now()->toDateTimeString(),
+                ]);
+
                 return Result::success(['posted' => true]);
             });
         } catch (Throwable $exception) {
@@ -769,17 +888,59 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 ));
             }
 
+            $idempotencyKey = $this->normalizeIdempotencyKey($payload['idempotency_key'] ?? null);
+            if ($idempotencyKey !== '') {
+                $replay = $this->findIdempotentActionHistory(
+                    $tenantId,
+                    $entityType,
+                    (int) $record->id(),
+                    $idempotencyKey,
+                    'finance_post',
+                );
+                if ($replay instanceof DataRecord) {
+                    return Result::success([
+                        'posted' => true,
+                        'idempotent_replay' => true,
+                    ]);
+                }
+            }
+
             $entryPayload['tenant_id'] = $tenantId;
             $entryPayload['organization_unit_id'] = $entryPayload['organization_unit_id']
                 ?? $record->get('organization_unit_id');
             $entryPayload['source_type'] = $entryPayload['source_type'] ?? $entityType;
             $entryPayload['source_id'] = $entryPayload['source_id'] ?? (int) $record->id();
 
-            return $this->withinEntityTransaction($entityType, function () use ($entryPayload, $linesPayload): Result {
+            return $this->withinEntityTransaction($entityType, function () use (
+                $entryPayload,
+                $linesPayload,
+                $payload,
+                $record,
+                $entityType,
+                $tenantId,
+                $idempotencyKey,
+            ): Result {
                 $postingResult = $this->financePostingService->postFromSource($entryPayload, $linesPayload);
                 if ($postingResult->isFailure()) {
                     return $postingResult;
                 }
+
+                $status = strtolower((string) $record->get('status', ''));
+                $metadata = $this->metadataWithIdempotencyKey($payload, $idempotencyKey);
+                $metadata['workflow_action'] = 'finance_post';
+
+                $this->purchaseStatusHistoryRepository->create([
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => $record->get('organization_unit_id'),
+                    'metadata' => $metadata,
+                    'entity_type' => $entityType,
+                    'entity_id' => (int) $record->id(),
+                    'from_status' => $status,
+                    'to_status' => $status,
+                    'reason' => 'finance_post',
+                    'changed_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
+                    'changed_at' => now()->toDateTimeString(),
+                ]);
 
                 return Result::success($postingResult->valueOrFail());
             });
@@ -820,18 +981,66 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'journal_entry_id is required.'));
             }
 
+            $idempotencyKey = $this->normalizeIdempotencyKey($payload['idempotency_key'] ?? null);
+            if ($idempotencyKey !== '') {
+                $replay = $this->findIdempotentActionHistory(
+                    $tenantId,
+                    $entityType,
+                    (int) $record->id(),
+                    $idempotencyKey,
+                    'finance_reverse',
+                );
+
+                if ($replay instanceof DataRecord) {
+                    $metadata = $replay->get('metadata', []);
+                    $replayedJournalEntryId = is_array($metadata) ? ($metadata['journal_entry_id'] ?? null) : null;
+                    if ((string) $replayedJournalEntryId === (string) $journalEntryId) {
+                        return Result::success([
+                            'reversed' => true,
+                            'idempotent_replay' => true,
+                        ]);
+                    }
+                }
+            }
+
             return $this->withinEntityTransaction($entityType, function () use (
                 $journalEntryId,
                 $tenantId,
                 $record,
                 $payload,
+                $entityType,
+                $idempotencyKey,
             ): Result {
-                return $this->financePostingService->reverseByEntryId($journalEntryId, [
+                $reversalResult = $this->financePostingService->reverseByEntryId($journalEntryId, [
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $record->get('organization_unit_id'),
                     'reason' => $payload['reason'] ?? null,
                     'reversed_by' => $payload['actor_id'] ?? null,
                 ]);
+
+                if ($reversalResult->isFailure()) {
+                    return $reversalResult;
+                }
+
+                $status = strtolower((string) $record->get('status', ''));
+                $metadata = $this->metadataWithIdempotencyKey($payload, $idempotencyKey);
+                $metadata['workflow_action'] = 'finance_reverse';
+                $metadata['journal_entry_id'] = (string) $journalEntryId;
+
+                $this->purchaseStatusHistoryRepository->create([
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => $record->get('organization_unit_id'),
+                    'metadata' => $metadata,
+                    'entity_type' => $entityType,
+                    'entity_id' => (int) $record->id(),
+                    'from_status' => $status,
+                    'to_status' => $status,
+                    'reason' => 'finance_reverse',
+                    'changed_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
+                    'changed_at' => now()->toDateTimeString(),
+                ]);
+
+                return $reversalResult;
             });
         } catch (Throwable $exception) {
             return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, $exception->getMessage()));
@@ -991,6 +1200,162 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
         return (int) $latest->get('document_id', 0);
     }
 
+    private function resolveMaxAllocatableAmount(int $tenantId, int $documentId): float
+    {
+        $links = $this->purchaseDocumentLinkRepository->list([
+            'tenant_id' => $tenantId,
+            'document_id' => $documentId,
+            'status' => 'active',
+        ]);
+
+        $maxAmount = 0.0;
+        foreach ($links as $link) {
+            if (! $link instanceof DataRecord) {
+                continue;
+            }
+
+            if ((int) $link->get('source_line_id', 0) > 0 || (int) $link->get('document_line_id', 0) > 0) {
+                continue;
+            }
+
+            $maxAmount = max($maxAmount, (float) $link->get('linked_amount', 0));
+        }
+
+        return round($maxAmount, 4);
+    }
+
+    private function findIdempotentDocumentLink(
+        int $tenantId,
+        string $entityType,
+        int $sourceId,
+        string $idempotencyKey,
+    ): ?DataRecord {
+        $links = $this->purchaseDocumentLinkRepository->list([
+            'tenant_id' => $tenantId,
+            'source_type' => $entityType,
+            'source_id' => $sourceId,
+            'status' => 'active',
+        ]);
+
+        foreach ($links as $link) {
+            if (! $link instanceof DataRecord) {
+                continue;
+            }
+
+            if ((int) $link->get('source_line_id', 0) > 0 || (int) $link->get('document_line_id', 0) > 0) {
+                continue;
+            }
+
+            $metadata = $link->get('metadata', []);
+            if (! is_array($metadata)) {
+                continue;
+            }
+
+            if ((string) ($metadata['idempotency_key'] ?? '') === $idempotencyKey) {
+                return $link;
+            }
+        }
+
+        return null;
+    }
+
+    private function findIdempotentPaymentAllocation(
+        int $tenantId,
+        int $documentId,
+        string $idempotencyKey,
+    ): ?DataRecord {
+        $allocations = $this->purchasePaymentAllocationRepository->list([
+            'tenant_id' => $tenantId,
+            'document_id' => $documentId,
+            'status' => 'active',
+        ]);
+
+        foreach ($allocations as $allocation) {
+            if (! $allocation instanceof DataRecord) {
+                continue;
+            }
+
+            $metadata = $allocation->get('metadata', []);
+            if (! is_array($metadata)) {
+                continue;
+            }
+
+            if ((string) ($metadata['idempotency_key'] ?? '') === $idempotencyKey) {
+                return $allocation;
+            }
+        }
+
+        return null;
+    }
+
+    private function findIdempotentActionHistory(
+        int $tenantId,
+        string $entityType,
+        int $entityId,
+        string $idempotencyKey,
+        string $action,
+    ): ?DataRecord {
+        $histories = $this->purchaseStatusHistoryRepository->list([
+            'tenant_id' => $tenantId,
+            'entity_type' => $entityType,
+            'entity_id' => $entityId,
+        ]);
+
+        foreach ($histories as $history) {
+            if (! $history instanceof DataRecord) {
+                continue;
+            }
+
+            $metadata = $history->get('metadata', []);
+            if (! is_array($metadata)) {
+                continue;
+            }
+
+            if ((string) ($metadata['idempotency_key'] ?? '') !== $idempotencyKey) {
+                continue;
+            }
+
+            if ((string) ($metadata['workflow_action'] ?? '') !== $action) {
+                continue;
+            }
+
+            return $history;
+        }
+
+        return null;
+    }
+
+    private function normalizeIdempotencyKey(mixed $value): string
+    {
+        return is_string($value) ? trim($value) : '';
+    }
+
+    /** @return array<string, mixed> */
+    private function metadataWithIdempotencyKey(array $payload, string $idempotencyKey): array
+    {
+        $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
+        if ($idempotencyKey !== '') {
+            $metadata['idempotency_key'] = $idempotencyKey;
+        }
+
+        return $metadata;
+    }
+
+    private function resolveDocumentNumber(int $tenantId, int $documentId): ?string
+    {
+        if ($documentId < 1) {
+            return null;
+        }
+
+        try {
+            $aggregate = $this->documentOrchestrator->show($tenantId, $documentId);
+
+            return $aggregate->document->documentNumber;
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
     private function resolveActiveSettings(int $tenantId, ?int $organizationUnitId): ?DataRecord
     {
         if ($organizationUnitId !== null && $organizationUnitId > 0) {
@@ -1015,9 +1380,12 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
         return $tenantScoped instanceof DataRecord ? $tenantScoped : null;
     }
 
-    private function resolveDefaultDocumentTypeIdFromSettings(string $entityType, DataRecord $settings): int
-    {
-        return match ($entityType) {
+    private function resolveDefaultDocumentTypeIdFromSettings(
+        string $entityType,
+        DataRecord $settings,
+        int $tenantId,
+    ): int {
+        $definitionId = match ($entityType) {
             'purchase_order' => (int) ($settings->get('purchase_invoice_document_definition_id')
                 ?? $settings->get('purchase_order_document_definition_id')
                 ?? 0),
@@ -1027,6 +1395,25 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
             'purchase_return' => (int) ($settings->get('purchase_return_document_definition_id') ?? 0),
             default => 0,
         };
+
+        if ($definitionId < 1) {
+            return 0;
+        }
+
+        $definitions = $this->documentOrchestrator->listDocumentDefinitions($tenantId);
+        foreach ($definitions as $definition) {
+            if (! is_array($definition)) {
+                continue;
+            }
+
+            if ((int) ($definition['id'] ?? 0) !== $definitionId) {
+                continue;
+            }
+
+            return (int) ($definition['document_type_id'] ?? 0);
+        }
+
+        return 0;
     }
 
     private function hasEligibleGrnForPurchaseOrder(int $purchaseOrderId, int $tenantId): bool

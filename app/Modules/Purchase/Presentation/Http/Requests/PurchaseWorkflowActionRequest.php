@@ -23,6 +23,7 @@ final class PurchaseWorkflowActionRequest extends FormRequest
             'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
             'actor_id' => ['nullable', 'integer', 'min:1'],
             'metadata' => ['nullable', 'array'],
+            'idempotency_key' => ['nullable', 'string', 'max:128'],
             'status' => ['nullable', 'string', 'max:255'],
             'reason' => ['nullable', 'string'],
             'document_type_id' => ['nullable', 'integer', 'min:1', 'exists:document_types,id'],

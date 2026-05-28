@@ -92,6 +92,9 @@ final class PurchaseWorkflowServiceTest extends TestCase
         $this->purchaseReturnRepository
             ->method('transaction')
             ->willReturnCallback(static fn (callable $callback): mixed => $callback());
+        $this->purchaseStatusHistoryRepository
+            ->method('create')
+            ->willReturn(new DataRecord(['id' => 1]));
 
         $this->service = new PurchaseWorkflowService(
             $this->purchaseOrderRepository,
@@ -818,6 +821,14 @@ final class PurchaseWorkflowServiceTest extends TestCase
                 ]),
             ]);
 
+        $this->documentOrchestrator
+            ->expects(self::once())
+            ->method('listDocumentDefinitions')
+            ->with(1)
+            ->willReturn([
+                ['id' => 77, 'document_type_id' => 44],
+            ]);
+
         $this->purchaseReturnLineRepository
             ->expects(self::exactly(2))
             ->method('list')
@@ -841,7 +852,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
             ->expects(self::once())
             ->method('create')
             ->with(self::callback(static function ($dto): bool {
-                return (int) ($dto->documentTypeId ?? 0) === 77
+                return (int) ($dto->documentTypeId ?? 0) === 44
                     && (int) ($dto->tenantId ?? 0) === 1;
             }))
             ->willReturn(new DocumentAggregate(
@@ -849,7 +860,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
                     id: 9901,
                     tenantId: 1,
                     organizationUnitId: 12,
-                    documentTypeId: 77,
+                    documentTypeId: 44,
                     documentNumber: 'PDR-0001',
                     documentDate: '2026-05-28',
                     dueDate: null,
@@ -891,5 +902,518 @@ final class PurchaseWorkflowServiceTest extends TestCase
             $result->isFailure() ? $result->errorOrFail()->message : 'Expected success.',
         );
         self::assertSame(9901, (int) (($result->valueOrFail()['document_id'] ?? 0)));
+    }
+
+    public function testCreateDocumentFailsWhenRequestedQuantityExceedsAvailableLineQuantity(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(501)
+            ->willReturn(new DataRecord([
+                'id' => 501,
+                'tenant_id' => 1,
+                'supplier_id' => 20,
+                'organization_unit_id' => 12,
+                'status' => 'confirmed',
+            ]));
+
+        $this->purchaseSettingRepository
+            ->expects(self::exactly(2))
+            ->method('list')
+            ->willReturnOnConsecutiveCalls([], []);
+
+        $this->purchaseOrderLineRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with(['purchase_order_id' => 501])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 900,
+                    'ordered_qty' => 5,
+                ]),
+            ]);
+
+        $this->purchaseDocumentLinkRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'source_type' => 'purchase_order',
+                'source_id' => 501,
+                'source_line_id' => 900,
+                'status' => 'active',
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 1,
+                    'linked_quantity' => 4,
+                ]),
+            ]);
+
+        $result = $this->service->createDocument('purchase_order', 501, [
+            'tenant_id' => 1,
+            'document_type_id' => 11,
+            'items' => [
+                [
+                    'item_type' => 'purchase_line',
+                    'line_total' => 100,
+                    'data' => [
+                        'source_line_id' => 900,
+                        'quantity' => 2,
+                    ],
+                ],
+            ],
+        ]);
+
+        self::assertTrue($result->isFailure());
+        self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
+        self::assertSame(
+            'Document quantity exceeds available quantity for one or more source lines.',
+            $result->errorOrFail()->message,
+        );
+    }
+
+    public function testAllocatePaymentFailsWhenAllocationExceedsLinkedDocumentAmount(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(601)
+            ->willReturn(new DataRecord([
+                'id' => 601,
+                'tenant_id' => 1,
+                'organization_unit_id' => 12,
+                'status' => 'documented',
+            ]));
+
+        $this->purchaseDocumentLinkRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'document_id' => 2001,
+                'status' => 'active',
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 1,
+                    'source_line_id' => null,
+                    'document_line_id' => null,
+                    'linked_amount' => 100,
+                ]),
+            ]);
+
+        $this->purchasePaymentAllocationRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'document_id' => 2001,
+                'status' => 'active',
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 91,
+                    'allocated_amount' => 90,
+                    'status' => 'active',
+                ]),
+            ]);
+
+        $result = $this->service->allocatePayment('purchase_order', 601, [
+            'tenant_id' => 1,
+            'document_id' => 2001,
+            'payment_id' => 41,
+            'allocated_amount' => 15,
+        ]);
+
+        self::assertTrue($result->isFailure());
+        self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
+        self::assertSame('Allocation exceeds document allocatable amount.', $result->errorOrFail()->message);
+    }
+
+    public function testAllocatePaymentSucceedsAtAllocationBoundary(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(602)
+            ->willReturn(new DataRecord([
+                'id' => 602,
+                'tenant_id' => 1,
+                'organization_unit_id' => 12,
+                'status' => 'documented',
+            ]));
+
+        $this->purchaseDocumentLinkRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'document_id' => 2002,
+                'status' => 'active',
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 1,
+                    'source_line_id' => null,
+                    'document_line_id' => null,
+                    'linked_amount' => 100,
+                ]),
+            ]);
+
+        $this->purchasePaymentAllocationRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'document_id' => 2002,
+                'status' => 'active',
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 92,
+                    'allocated_amount' => 90,
+                    'status' => 'active',
+                ]),
+            ]);
+
+        $this->paymentAllocationService
+            ->expects(self::once())
+            ->method('createAllocation')
+            ->with(self::callback(static function (array $payload): bool {
+                return (int) ($payload['payment_id'] ?? 0) === 41
+                    && (float) ($payload['allocated_amount'] ?? 0) === 10.0
+                    && (int) ($payload['document_id'] ?? 0) === 2002;
+            }))
+            ->willReturn(Result::success(['allocation_id' => 555]));
+
+        $this->purchasePaymentAllocationRepository
+            ->expects(self::once())
+            ->method('create')
+            ->with(self::callback(static function (array $payload): bool {
+                return (int) ($payload['document_id'] ?? 0) === 2002
+                    && (float) ($payload['allocated_amount'] ?? 0) === 10.0
+                    && (float) ($payload['base_allocated_amount'] ?? 0) === 10.0;
+            }))
+            ->willReturn(new DataRecord(['id' => 93]));
+
+        $result = $this->service->allocatePayment('purchase_order', 602, [
+            'tenant_id' => 1,
+            'document_id' => 2002,
+            'payment_id' => 41,
+            'allocated_amount' => 10,
+            'actor_id' => 7,
+        ]);
+
+        self::assertTrue($result->isSuccess());
+    }
+
+    public function testCreateDocumentReturnsIdempotentReplayWhenKeyAlreadyExists(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(700)
+            ->willReturn(new DataRecord([
+                'id' => 700,
+                'tenant_id' => 1,
+                'supplier_id' => 20,
+                'organization_unit_id' => 12,
+                'status' => 'confirmed',
+            ]));
+
+        $this->purchaseSettingRepository
+            ->expects(self::exactly(2))
+            ->method('list')
+            ->willReturnOnConsecutiveCalls([], []);
+
+        $this->purchaseDocumentLinkRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'source_type' => 'purchase_order',
+                'source_id' => 700,
+                'status' => 'active',
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 1,
+                    'document_id' => 4444,
+                    'source_line_id' => null,
+                    'document_line_id' => null,
+                    'metadata' => ['idempotency_key' => 'idem-doc-1'],
+                ]),
+            ]);
+
+        $this->documentOrchestrator
+            ->expects(self::once())
+            ->method('show')
+            ->with(1, 4444)
+            ->willReturn(new DocumentAggregate(
+                new Document(
+                    id: 4444,
+                    tenantId: 1,
+                    organizationUnitId: 12,
+                    documentTypeId: 44,
+                    documentNumber: 'PINV-4444',
+                    documentDate: '2026-05-28',
+                    dueDate: null,
+                    status: 'draft',
+                    ownerId: 7,
+                    partyId: 20,
+                    subtotal: '100.0000',
+                    discountTotal: '0.0000',
+                    taxTotal: '0.0000',
+                    grandTotal: '100.0000',
+                    data: [],
+                    notes: null,
+                    createdBy: 7,
+                    updatedBy: 7,
+                ),
+                [],
+            ));
+
+        $this->documentOrchestrator
+            ->expects(self::never())
+            ->method('create');
+
+        $result = $this->service->createDocument('purchase_order', 700, [
+            'tenant_id' => 1,
+            'idempotency_key' => 'idem-doc-1',
+        ]);
+
+        self::assertTrue($result->isSuccess());
+        self::assertSame(4444, (int) ($result->valueOrFail()['document_id'] ?? 0));
+        self::assertTrue((bool) ($result->valueOrFail()['idempotent_replay'] ?? false));
+    }
+
+    public function testAllocatePaymentReturnsIdempotentReplayWhenKeyAlreadyExists(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(701)
+            ->willReturn(new DataRecord([
+                'id' => 701,
+                'tenant_id' => 1,
+                'organization_unit_id' => 12,
+                'status' => 'documented',
+            ]));
+
+        $this->purchasePaymentAllocationRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'document_id' => 9001,
+                'status' => 'active',
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 6001,
+                    'metadata' => ['idempotency_key' => 'idem-pay-1'],
+                    'allocated_amount' => 10,
+                ]),
+            ]);
+
+        $this->paymentAllocationService
+            ->expects(self::never())
+            ->method('createAllocation');
+
+        $result = $this->service->allocatePayment('purchase_order', 701, [
+            'tenant_id' => 1,
+            'document_id' => 9001,
+            'payment_id' => 41,
+            'allocated_amount' => 10,
+            'idempotency_key' => 'idem-pay-1',
+        ]);
+
+        self::assertTrue($result->isSuccess());
+        self::assertSame(6001, (int) ($result->valueOrFail()['allocation_id'] ?? 0));
+        self::assertTrue((bool) ($result->valueOrFail()['idempotent_replay'] ?? false));
+    }
+
+    public function testPostInventoryReturnsIdempotentReplayWhenKeyAlreadyExists(): void
+    {
+        $this->purchaseReturnRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(801)
+            ->willReturn(new DataRecord([
+                'id' => 801,
+                'tenant_id' => 1,
+                'organization_unit_id' => 12,
+                'status' => 'posted',
+            ]));
+
+        $this->purchaseStatusHistoryRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'entity_type' => 'purchase_return',
+                'entity_id' => 801,
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 1,
+                    'metadata' => [
+                        'idempotency_key' => 'idem-inv-1',
+                        'workflow_action' => 'inventory_post',
+                    ],
+                ]),
+            ]);
+
+        $this->createStockMovementService
+            ->expects(self::never())
+            ->method('execute');
+
+        $result = $this->service->postInventory('purchase_return', 801, [
+            'tenant_id' => 1,
+            'idempotency_key' => 'idem-inv-1',
+        ]);
+
+        self::assertTrue($result->isSuccess());
+        self::assertTrue((bool) ($result->valueOrFail()['idempotent_replay'] ?? false));
+    }
+
+    public function testPostFinanceReturnsIdempotentReplayWhenKeyAlreadyExists(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(802)
+            ->willReturn(new DataRecord([
+                'id' => 802,
+                'tenant_id' => 1,
+                'organization_unit_id' => 12,
+                'status' => 'documented',
+            ]));
+
+        $this->purchaseStatusHistoryRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'entity_type' => 'purchase_order',
+                'entity_id' => 802,
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 2,
+                    'metadata' => [
+                        'idempotency_key' => 'idem-fin-1',
+                        'workflow_action' => 'finance_post',
+                    ],
+                ]),
+            ]);
+
+        $this->financePostingService
+            ->expects(self::never())
+            ->method('postFromSource');
+
+        $result = $this->service->postFinance('purchase_order', 802, [
+            'tenant_id' => 1,
+            'entry_payload' => ['memo' => 'purchase accrual'],
+            'lines_payload' => [['account_id' => 1, 'debit' => 100]],
+            'idempotency_key' => 'idem-fin-1',
+        ]);
+
+        self::assertTrue($result->isSuccess());
+        self::assertTrue((bool) ($result->valueOrFail()['idempotent_replay'] ?? false));
+    }
+
+    public function testTransitionReturnsIdempotentReplayWhenHistoryExistsForSameTargetStatus(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(901)
+            ->willReturn(new DataRecord([
+                'id' => 901,
+                'tenant_id' => 1,
+                'organization_unit_id' => 12,
+                'status' => 'draft',
+            ]));
+
+        $this->purchaseStatusHistoryRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'entity_type' => 'purchase_order',
+                'entity_id' => 901,
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 1,
+                    'to_status' => 'submitted',
+                    'metadata' => [
+                        'idempotency_key' => 'idem-tr-1',
+                        'workflow_action' => 'transition',
+                        'target_status' => 'submitted',
+                    ],
+                ]),
+            ]);
+
+        $this->purchaseOrderRepository
+            ->expects(self::never())
+            ->method('update');
+
+        $result = $this->service->transition('purchase_order', 901, [
+            'tenant_id' => 1,
+            'status' => 'submitted',
+            'idempotency_key' => 'idem-tr-1',
+        ]);
+
+        self::assertTrue($result->isSuccess());
+    }
+
+    public function testReverseFinanceReturnsIdempotentReplayWhenKeyAlreadyExists(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(902)
+            ->willReturn(new DataRecord([
+                'id' => 902,
+                'tenant_id' => 1,
+                'organization_unit_id' => 12,
+                'status' => 'documented',
+            ]));
+
+        $this->purchaseStatusHistoryRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'entity_type' => 'purchase_order',
+                'entity_id' => 902,
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 2,
+                    'metadata' => [
+                        'idempotency_key' => 'idem-rf-1',
+                        'workflow_action' => 'finance_reverse',
+                        'journal_entry_id' => '777',
+                    ],
+                ]),
+            ]);
+
+        $this->financePostingService
+            ->expects(self::never())
+            ->method('reverseByEntryId');
+
+        $result = $this->service->reverseFinance('purchase_order', 902, [
+            'tenant_id' => 1,
+            'journal_entry_id' => 777,
+            'idempotency_key' => 'idem-rf-1',
+        ]);
+
+        self::assertTrue($result->isSuccess());
+        self::assertTrue((bool) ($result->valueOrFail()['idempotent_replay'] ?? false));
     }
 }
