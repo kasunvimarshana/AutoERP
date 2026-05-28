@@ -132,6 +132,88 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
     }
 
+    public function testTransitionFailsWhenStatusPathIsNotAllowed(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(10)
+            ->willReturn(new DataRecord([
+                'id' => 10,
+                'tenant_id' => 1,
+                'status' => 'draft',
+                'organization_unit_id' => 12,
+            ]));
+
+        $result = $this->service->transition('purchase_order', 10, [
+            'tenant_id' => 1,
+            'status' => 'documented',
+            'actor_id' => 99,
+        ]);
+
+        self::assertTrue($result->isFailure());
+        self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
+    }
+
+    public function testTransitionToCancelledFailsWhenActiveDependenciesExist(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(15)
+            ->willReturn(new DataRecord([
+                'id' => 15,
+                'tenant_id' => 1,
+                'status' => 'submitted',
+                'organization_unit_id' => 12,
+            ]));
+
+        $this->purchaseDocumentLinkRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'source_type' => 'purchase_order',
+                'source_id' => 15,
+                'status' => 'active',
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 1,
+                    'tenant_id' => 1,
+                    'document_id' => 5001,
+                    'status' => 'active',
+                ]),
+            ]);
+
+        $this->purchasePaymentAllocationRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'document_id' => 5001,
+                'status' => 'active',
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 70,
+                    'tenant_id' => 1,
+                    'document_id' => 5001,
+                    'allocated_amount' => 100,
+                    'status' => 'active',
+                ]),
+            ]);
+
+        $result = $this->service->transition('purchase_order', 15, [
+            'tenant_id' => 1,
+            'status' => 'cancelled',
+            'actor_id' => 11,
+        ]);
+
+        self::assertTrue($result->isFailure());
+        self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
+    }
+
     public function testCreateDocumentRequiresDocumentTypeId(): void
     {
         $this->purchaseOrderRepository
@@ -266,6 +348,257 @@ final class PurchaseWorkflowServiceTest extends TestCase
             'tenant_id' => 1,
             'entry_payload' => [],
             'lines_payload' => [],
+        ]);
+
+        self::assertTrue($result->isFailure());
+        self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
+    }
+
+    public function testTransitionToReversedRequiresReason(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(88)
+            ->willReturn(new DataRecord([
+                'id' => 88,
+                'tenant_id' => 1,
+                'status' => 'closed',
+                'organization_unit_id' => 12,
+            ]));
+
+        $this->purchaseDocumentLinkRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'source_type' => 'purchase_order',
+                'source_id' => 88,
+                'status' => 'active',
+            ])
+            ->willReturn([]);
+
+        $this->grnHeaderRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'purchase_order_id' => 88,
+            ])
+            ->willReturn([]);
+
+        $this->purchaseReturnRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'original_purchase_order_id' => 88,
+            ])
+            ->willReturn([]);
+
+        $result = $this->service->transition('purchase_order', 88, [
+            'tenant_id' => 1,
+            'status' => 'reversed',
+            'actor_id' => 9,
+            'finance_reversed' => true,
+            'reason' => '   ',
+        ]);
+
+        self::assertTrue($result->isFailure());
+        self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
+    }
+
+    public function testTransitionToReversedRequiresFinanceAcknowledgementForClosedPurchaseOrder(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(89)
+            ->willReturn(new DataRecord([
+                'id' => 89,
+                'tenant_id' => 1,
+                'status' => 'closed',
+                'organization_unit_id' => 12,
+            ]));
+
+        $this->purchaseDocumentLinkRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'source_type' => 'purchase_order',
+                'source_id' => 89,
+                'status' => 'active',
+            ])
+            ->willReturn([]);
+
+        $this->grnHeaderRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'purchase_order_id' => 89,
+            ])
+            ->willReturn([]);
+
+        $this->purchaseReturnRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'original_purchase_order_id' => 89,
+            ])
+            ->willReturn([]);
+
+        $result = $this->service->transition('purchase_order', 89, [
+            'tenant_id' => 1,
+            'status' => 'reversed',
+            'actor_id' => 9,
+            'reason' => 'Test reversal',
+        ]);
+
+        self::assertTrue($result->isFailure());
+        self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
+    }
+
+    public function testTransitionToReversedRequiresInventoryAcknowledgementForPostedGrn(): void
+    {
+        $this->grnHeaderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(55)
+            ->willReturn(new DataRecord([
+                'id' => 55,
+                'tenant_id' => 1,
+                'status' => 'posted',
+                'organization_unit_id' => 12,
+            ]));
+
+        $this->purchaseDocumentLinkRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'source_type' => 'grn_header',
+                'source_id' => 55,
+                'status' => 'active',
+            ])
+            ->willReturn([]);
+
+        $this->purchaseReturnRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'original_grn_id' => 55,
+            ])
+            ->willReturn([]);
+
+        $result = $this->service->transition('grn_header', 55, [
+            'tenant_id' => 1,
+            'status' => 'reversed',
+            'actor_id' => 9,
+            'reason' => 'Reverse after stock rollback',
+            'finance_reversed' => true,
+        ]);
+
+        self::assertTrue($result->isFailure());
+        self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
+    }
+
+    public function testTransitionToCancelledFailsWhenPurchaseOrderHasUnfinalizedGrnDependency(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(91)
+            ->willReturn(new DataRecord([
+                'id' => 91,
+                'tenant_id' => 1,
+                'status' => 'submitted',
+                'organization_unit_id' => 12,
+            ]));
+
+        $this->purchaseDocumentLinkRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'source_type' => 'purchase_order',
+                'source_id' => 91,
+                'status' => 'active',
+            ])
+            ->willReturn([]);
+
+        $this->grnHeaderRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'purchase_order_id' => 91,
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 120,
+                    'status' => 'posted',
+                ]),
+            ]);
+
+        $result = $this->service->transition('purchase_order', 91, [
+            'tenant_id' => 1,
+            'status' => 'cancelled',
+            'actor_id' => 1,
+        ]);
+
+        self::assertTrue($result->isFailure());
+        self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
+    }
+
+    public function testTransitionToReversedFailsWhenGrnHasUnfinalizedReturnDependency(): void
+    {
+        $this->grnHeaderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(92)
+            ->willReturn(new DataRecord([
+                'id' => 92,
+                'tenant_id' => 1,
+                'status' => 'documented',
+                'organization_unit_id' => 12,
+            ]));
+
+        $this->purchaseDocumentLinkRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'source_type' => 'grn_header',
+                'source_id' => 92,
+                'status' => 'active',
+            ])
+            ->willReturn([]);
+
+        $this->purchaseReturnRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'original_grn_id' => 92,
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 210,
+                    'status' => 'posted',
+                ]),
+            ]);
+
+        $result = $this->service->transition('grn_header', 92, [
+            'tenant_id' => 1,
+            'status' => 'reversed',
+            'actor_id' => 9,
+            'reason' => 'reverse',
+            'finance_reversed' => true,
+            'inventory_reversed' => true,
         ]);
 
         self::assertTrue($result->isFailure());

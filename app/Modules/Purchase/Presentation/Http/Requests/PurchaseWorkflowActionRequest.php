@@ -39,6 +39,8 @@ final class PurchaseWorkflowActionRequest extends FormRequest
             'entry_payload' => ['nullable', 'array'],
             'lines_payload' => ['nullable', 'array'],
             'journal_entry_id' => ['nullable', 'integer', 'min:1'],
+            'finance_reversed' => ['nullable', 'boolean'],
+            'inventory_reversed' => ['nullable', 'boolean'],
             'reference' => ['nullable', 'string', 'max:255'],
         ];
     }

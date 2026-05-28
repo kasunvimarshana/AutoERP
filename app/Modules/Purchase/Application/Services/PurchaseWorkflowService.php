@@ -72,6 +72,44 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
         ],
     ];
 
+    /** @var array<string, array<string, list<string>>> */
+    private const STATUS_TRANSITION_MATRIX = [
+        'purchase_order' => [
+            'draft' => ['submitted', 'cancelled'],
+            'submitted' => ['approved', 'cancelled'],
+            'approved' => ['confirmed', 'cancelled'],
+            'confirmed' => ['partially_received', 'received', 'partially_documented', 'documented', 'cancelled'],
+            'partially_received' => ['received', 'partially_documented', 'documented', 'cancelled'],
+            'received' => ['partially_documented', 'documented', 'closed', 'cancelled'],
+            'partially_documented' => ['documented', 'closed', 'cancelled'],
+            'documented' => ['closed', 'reversed'],
+            'closed' => ['reversed'],
+            'cancelled' => ['reversed'],
+            'reversed' => [],
+        ],
+        'grn_header' => [
+            'draft' => ['submitted', 'cancelled'],
+            'submitted' => ['inspected', 'confirmed', 'cancelled'],
+            'inspected' => ['confirmed', 'cancelled'],
+            'confirmed' => ['posted', 'cancelled'],
+            'posted' => ['partially_documented', 'documented', 'reversed'],
+            'partially_documented' => ['documented', 'reversed'],
+            'documented' => ['reversed'],
+            'cancelled' => ['reversed'],
+            'reversed' => [],
+        ],
+        'purchase_return' => [
+            'draft' => ['submitted', 'cancelled'],
+            'submitted' => ['approved', 'cancelled'],
+            'approved' => ['posted', 'cancelled'],
+            'posted' => ['refunded', 'closed', 'reversed'],
+            'refunded' => ['closed', 'reversed'],
+            'closed' => ['reversed'],
+            'cancelled' => ['reversed'],
+            'reversed' => [],
+        ],
+    ];
+
     public function __construct(
         private readonly PurchaseOrderRepositoryInterface $purchaseOrderRepository,
         private readonly PurchaseOrderLineRepositoryInterface $purchaseOrderLineRepository,
@@ -125,6 +163,63 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
 
             if ((string) $record->get('status', '') === 'reversed') {
                 return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'Reversed records are immutable.'));
+            }
+
+            $currentStatus = strtolower((string) $record->get('status', ''));
+            if (! $this->isAllowedStatusTransition($entityType, $currentStatus, $status)) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Transition is not allowed for current status.',
+                ));
+            }
+
+            if (
+                ($status === 'cancelled' || $status === 'reversed')
+                && ! $this->canFinalizeEntity($entityType, (int) $record->id(), $tenantId)
+            ) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Entity has active document/payment dependencies; finalize them first.',
+                ));
+            }
+
+            if (
+                ($status === 'cancelled' || $status === 'reversed')
+                && $this->hasUnfinalizedDependentEntities($entityType, (int) $record->id(), $tenantId)
+            ) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Entity has downstream Purchase dependencies that must be finalized first.',
+                ));
+            }
+
+            if ($status === 'reversed' && trim((string) ($payload['reason'] ?? '')) === '') {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'reason is required when reversing.',
+                ));
+            }
+
+            if ($status === 'reversed') {
+                if (
+                    $this->requiresFinanceReversalAcknowledgement($entityType, $currentStatus)
+                    && ($payload['finance_reversed'] ?? false) !== true
+                ) {
+                    return Result::failure(new Error(
+                        PurchaseErrorCode::INVALID_VALUE,
+                        'finance_reversed=true is required before status reversal.',
+                    ));
+                }
+
+                if (
+                    $this->requiresInventoryReversalAcknowledgement($entityType, $currentStatus)
+                    && ($payload['inventory_reversed'] ?? false) !== true
+                ) {
+                    return Result::failure(new Error(
+                        PurchaseErrorCode::INVALID_VALUE,
+                        'inventory_reversed=true is required before status reversal.',
+                    ));
+                }
             }
 
             $actorId = isset($payload['actor_id']) ? (int) $payload['actor_id'] : null;
@@ -215,6 +310,13 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 return Result::failure(new Error(
                     PurchaseErrorCode::INVALID_VALUE,
                     'Cross-tenant document creation is not allowed.',
+                ));
+            }
+
+            if (in_array(strtolower((string) $record->get('status', '')), ['cancelled', 'reversed'], true)) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Cannot create documents for cancelled/reversed entities.',
                 ));
             }
 
@@ -327,6 +429,13 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 ));
             }
 
+            if (in_array(strtolower((string) $record->get('status', '')), ['cancelled', 'reversed'], true)) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Cannot allocate payments for cancelled/reversed entities.',
+                ));
+            }
+
             $documentId = isset($payload['document_id']) ? (int) $payload['document_id'] : 0;
             if ($documentId < 1) {
                 $documentId = $this->resolveLatestDocumentId($entityType, (int) $record->id(), $tenantId);
@@ -433,6 +542,13 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 return Result::failure(new Error(
                     PurchaseErrorCode::INVALID_VALUE,
                     'Cross-tenant inventory posting is not allowed.',
+                ));
+            }
+
+            if (in_array(strtolower((string) $record->get('status', '')), ['cancelled', 'reversed'], true)) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Cannot post inventory for cancelled/reversed entities.',
                 ));
             }
 
@@ -571,6 +687,13 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 ));
             }
 
+            if (in_array(strtolower((string) $record->get('status', '')), ['cancelled', 'reversed'], true)) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Cannot post finance for cancelled/reversed entities.',
+                ));
+            }
+
             $entryPayload = is_array($payload['entry_payload'] ?? null) ? $payload['entry_payload'] : [];
             $linesPayload = is_array($payload['lines_payload'] ?? null) ? $payload['lines_payload'] : [];
             if ($entryPayload === [] || $linesPayload === []) {
@@ -616,6 +739,13 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 return Result::failure(new Error(
                     PurchaseErrorCode::INVALID_VALUE,
                     'Cross-tenant finance reversal is not allowed.',
+                ));
+            }
+
+            if (strtolower((string) $record->get('status', '')) === 'reversed') {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Entity is already reversed.',
                 ));
             }
 
@@ -793,5 +923,137 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
         }
 
         return (int) $latest->get('document_id', 0);
+    }
+
+    private function isAllowedStatusTransition(string $entityType, string $from, string $to): bool
+    {
+        if ($from === $to) {
+            return true;
+        }
+
+        $nextStates = self::STATUS_TRANSITION_MATRIX[$entityType][$from] ?? null;
+        if (! is_array($nextStates)) {
+            return false;
+        }
+
+        return in_array($to, $nextStates, true);
+    }
+
+    private function canFinalizeEntity(string $entityType, int $sourceId, int $tenantId): bool
+    {
+        $activeLinks = $this->purchaseDocumentLinkRepository->list([
+            'tenant_id' => $tenantId,
+            'source_type' => $entityType,
+            'source_id' => $sourceId,
+            'status' => 'active',
+        ]);
+
+        if ($activeLinks === []) {
+            return true;
+        }
+
+        $documentIds = [];
+        foreach ($activeLinks as $link) {
+            if (! $link instanceof DataRecord) {
+                continue;
+            }
+
+            $documentId = (int) $link->get('document_id', 0);
+            if ($documentId > 0) {
+                $documentIds[] = $documentId;
+            }
+        }
+
+        $documentIds = array_values(array_unique($documentIds));
+        foreach ($documentIds as $documentId) {
+            $activeAllocations = $this->purchasePaymentAllocationRepository->list([
+                'tenant_id' => $tenantId,
+                'document_id' => $documentId,
+                'status' => 'active',
+            ]);
+
+            if ($activeAllocations !== []) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    private function hasUnfinalizedDependentEntities(string $entityType, int $sourceId, int $tenantId): bool
+    {
+        if ($entityType === 'purchase_order') {
+            $dependentGrns = $this->grnHeaderRepository->list([
+                'tenant_id' => $tenantId,
+                'purchase_order_id' => $sourceId,
+            ]);
+
+            foreach ($dependentGrns as $grn) {
+                if (! $grn instanceof DataRecord) {
+                    continue;
+                }
+
+                if (! in_array(strtolower((string) $grn->get('status', '')), ['cancelled', 'reversed'], true)) {
+                    return true;
+                }
+            }
+
+            $dependentReturns = $this->purchaseReturnRepository->list([
+                'tenant_id' => $tenantId,
+                'original_purchase_order_id' => $sourceId,
+            ]);
+
+            foreach ($dependentReturns as $return) {
+                if (! $return instanceof DataRecord) {
+                    continue;
+                }
+
+                $returnStatus = strtolower((string) $return->get('status', ''));
+                if (! in_array($returnStatus, ['closed', 'cancelled', 'reversed'], true)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        if ($entityType === 'grn_header') {
+            $dependentReturns = $this->purchaseReturnRepository->list([
+                'tenant_id' => $tenantId,
+                'original_grn_id' => $sourceId,
+            ]);
+
+            foreach ($dependentReturns as $return) {
+                if (! $return instanceof DataRecord) {
+                    continue;
+                }
+
+                $returnStatus = strtolower((string) $return->get('status', ''));
+                if (! in_array($returnStatus, ['closed', 'cancelled', 'reversed'], true)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private function requiresFinanceReversalAcknowledgement(string $entityType, string $currentStatus): bool
+    {
+        return match ($entityType) {
+            'purchase_order' => in_array($currentStatus, ['documented', 'closed'], true),
+            'grn_header' => in_array($currentStatus, ['posted', 'partially_documented', 'documented'], true),
+            'purchase_return' => in_array($currentStatus, ['posted', 'refunded', 'closed'], true),
+            default => false,
+        };
+    }
+
+    private function requiresInventoryReversalAcknowledgement(string $entityType, string $currentStatus): bool
+    {
+        return match ($entityType) {
+            'grn_header' => in_array($currentStatus, ['posted', 'partially_documented', 'documented'], true),
+            'purchase_return' => in_array($currentStatus, ['posted', 'refunded', 'closed'], true),
+            default => false,
+        };
     }
 }
