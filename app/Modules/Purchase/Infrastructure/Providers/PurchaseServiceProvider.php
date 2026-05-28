@@ -35,6 +35,7 @@ use Modules\Purchase\Application\Contracts\UseCases\PurchaseReturns\DeletePurcha
 use Modules\Purchase\Application\Contracts\UseCases\PurchaseReturns\GetPurchaseReturnServiceInterface;
 use Modules\Purchase\Application\Contracts\UseCases\PurchaseReturns\ListPurchaseReturnsServiceInterface;
 use Modules\Purchase\Application\Contracts\UseCases\PurchaseReturns\UpdatePurchaseReturnServiceInterface;
+use Modules\Purchase\Application\Contracts\Services\PurchaseManagementServiceInterface;
 use Modules\Purchase\Application\Contracts\Services\PurchaseWorkflowServiceInterface;
 use Modules\Purchase\Application\Repositories\GrnHeaderRepositoryInterface;
 use Modules\Purchase\Application\Repositories\GrnLineRepositoryInterface;
@@ -47,6 +48,7 @@ use Modules\Purchase\Application\Repositories\PurchaseReturnRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchaseSettingRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchaseStatusHistoryRepositoryInterface;
 use Modules\Purchase\Application\Services\PurchaseWorkflowService;
+use Modules\Purchase\Application\Services\PurchaseManagementService;
 use Modules\Purchase\Application\UseCases\GrnHeaders\CreateGrnHeaderService;
 use Modules\Purchase\Application\UseCases\GrnHeaders\DeleteGrnHeaderService;
 use Modules\Purchase\Application\UseCases\GrnHeaders\GetGrnHeaderService;
@@ -136,6 +138,7 @@ final class PurchaseServiceProvider extends ServiceProvider
                 CreatePurchaseReturnLineServiceInterface::class => CreatePurchaseReturnLineService::class,
                 UpdatePurchaseReturnLineServiceInterface::class => UpdatePurchaseReturnLineService::class,
                 DeletePurchaseReturnLineServiceInterface::class => DeletePurchaseReturnLineService::class,
+                PurchaseManagementServiceInterface::class => PurchaseManagementService::class,
                 PurchaseWorkflowServiceInterface::class => PurchaseWorkflowService::class,
             ] as $contract => $implementation
         ) {

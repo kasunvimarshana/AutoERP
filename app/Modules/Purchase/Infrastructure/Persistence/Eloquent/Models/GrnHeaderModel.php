@@ -25,6 +25,8 @@ final class GrnHeaderModel extends CoreModel
             'supplier_id' => 'integer',
             'warehouse_id' => 'integer',
             'purchase_order_id' => 'integer',
+            'inspection_status' => 'string',
+            'putaway_status' => 'string',
             'currency_id' => 'integer',
             'exchange_rate' => 'decimal:4',
             'received_date' => 'date',

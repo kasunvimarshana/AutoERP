@@ -9,6 +9,7 @@ use Modules\Purchase\Presentation\Http\Controllers\GrnHeaderController;
 use Modules\Purchase\Presentation\Http\Controllers\GrnLineController;
 use Modules\Purchase\Presentation\Http\Controllers\PurchaseReturnController;
 use Modules\Purchase\Presentation\Http\Controllers\PurchaseReturnLineController;
+use Modules\Purchase\Presentation\Http\Controllers\PurchaseManagementController;
 use Modules\Purchase\Presentation\Http\Controllers\PurchaseWorkflowController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
@@ -36,6 +37,56 @@ Route::prefix('api/purchase')
         Route::apiResource('purchase-returns', PurchaseReturnController::class);
         Route::apiResource('purchase-return-lines', PurchaseReturnLineController::class);
 
+        Route::post('purchase-orders/with-lines', [PurchaseManagementController::class, 'upsertPurchaseOrderWithLines'])
+            ->name('purchase-orders.with-lines.store');
+        Route::put('purchase-orders/{id}/with-lines', [
+            PurchaseManagementController::class,
+            'updatePurchaseOrderWithLines',
+        ])
+            ->name('purchase-orders.with-lines.update');
+        Route::put('purchase-orders/{id}/lines/sync', [PurchaseManagementController::class, 'syncPurchaseOrderLines'])
+            ->name('purchase-orders.lines.sync');
+
+        Route::post('grn-headers/with-lines', [PurchaseManagementController::class, 'upsertGrnWithLines'])
+            ->name('grn-headers.with-lines.store');
+        Route::put('grn-headers/{id}/with-lines', [PurchaseManagementController::class, 'updateGrnWithLines'])
+            ->name('grn-headers.with-lines.update');
+        Route::put('grn-headers/{id}/lines/sync', [PurchaseManagementController::class, 'syncGrnLines'])
+            ->name('grn-headers.lines.sync');
+
+        Route::post('purchase-returns/with-lines', [
+            PurchaseManagementController::class,
+            'upsertPurchaseReturnWithLines',
+        ])
+            ->name('purchase-returns.with-lines.store');
+        Route::put('purchase-returns/{id}/with-lines', [
+            PurchaseManagementController::class,
+            'updatePurchaseReturnWithLines',
+        ])
+            ->name('purchase-returns.with-lines.update');
+        Route::put('purchase-returns/{id}/lines/sync', [PurchaseManagementController::class, 'syncPurchaseReturnLines'])
+            ->name('purchase-returns.lines.sync');
+
+        Route::get('settings', [PurchaseManagementController::class, 'showSettings'])
+            ->name('settings.show');
+        Route::put('settings', [PurchaseManagementController::class, 'upsertSettings'])
+            ->name('settings.upsert');
+        Route::post('settings/initialize', [PurchaseManagementController::class, 'initializeSettings'])
+            ->name('settings.initialize');
+
+        Route::get('lookups/purchase-orders/{purchaseOrderId}/available-lines', [
+            PurchaseManagementController::class,
+            'availablePurchaseOrderLinesForGrn',
+        ])->name('lookups.purchase-order-lines.available-for-grn');
+        Route::get('lookups/grn-headers/{grnHeaderId}/available-document-lines', [
+            PurchaseManagementController::class,
+            'availableGrnLinesForDocument',
+        ])->name('lookups.grn-lines.available-for-document');
+        Route::get('lookups/returnable-lines', [PurchaseManagementController::class, 'returnableLines'])
+            ->name('lookups.returnable-lines');
+        Route::get('lookups/payable-documents', [PurchaseManagementController::class, 'payableDocuments'])
+            ->name('lookups.payable-documents');
+
         Route::prefix('workflows/{entityType}/{id}')
             ->whereIn('entityType', ['purchase_order', 'grn_header', 'purchase_return'])
             ->group(function (): void {
@@ -51,5 +102,7 @@ Route::prefix('api/purchase')
                     ->name('workflows.finance.post');
                 Route::post('finance/reverse', [PurchaseWorkflowController::class, 'reverseFinance'])
                     ->name('workflows.finance.reverse');
+                Route::get('history', [PurchaseManagementController::class, 'statusHistory'])
+                    ->name('workflows.history');
             });
     });

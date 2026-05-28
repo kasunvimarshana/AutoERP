@@ -29,7 +29,11 @@ return new class extends Migration
             $table->foreignId('uom_id')->constrained('unit_of_measures', 'id')->restrictOnDelete();
             $table->decimal('expected_qty', 20, 4)->default(0);
             $table->decimal('received_qty', 20, 4);
+            $table->decimal('accepted_qty', 20, 4)->default(0);
             $table->decimal('rejected_qty', 20, 4)->default(0);
+            $table->decimal('damaged_qty', 20, 4)->default(0);
+            $table->decimal('inspected_qty', 20, 4)->default(0);
+            $table->decimal('putaway_qty', 20, 4)->default(0);
             $table->decimal('returned_qty', 20, 4)->default(0);
             $table->decimal('documented_qty', 20, 4)->default(0);
             $table->decimal('unit_price', 20, 4);
@@ -60,6 +64,7 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->index(['tenant_id', 'grn_header_id'], 'grn_lines_header_idx');
+            $table->index(['tenant_id', 'grn_header_id', 'accepted_qty'], 'grn_lines_header_accepted_idx');
             $table->index(['tenant_id', 'purchase_order_line_id'], 'grn_lines_purchase_order_line_idx');
             $table->index(['tenant_id', 'item_id', 'variant_id'], 'grn_lines_item_variant_idx');
         });

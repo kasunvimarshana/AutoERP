@@ -47,6 +47,23 @@ final class PurchaseRoutesTest extends TestCase
         self::assertTrue(Route::has('purchase.workflows.inventory.post'));
         self::assertTrue(Route::has('purchase.workflows.finance.post'));
         self::assertTrue(Route::has('purchase.workflows.finance.reverse'));
+        self::assertTrue(Route::has('purchase.workflows.history'));
+        self::assertTrue(Route::has('purchase.purchase-orders.with-lines.store'));
+        self::assertTrue(Route::has('purchase.purchase-orders.with-lines.update'));
+        self::assertTrue(Route::has('purchase.purchase-orders.lines.sync'));
+        self::assertTrue(Route::has('purchase.grn-headers.with-lines.store'));
+        self::assertTrue(Route::has('purchase.grn-headers.with-lines.update'));
+        self::assertTrue(Route::has('purchase.grn-headers.lines.sync'));
+        self::assertTrue(Route::has('purchase.purchase-returns.with-lines.store'));
+        self::assertTrue(Route::has('purchase.purchase-returns.with-lines.update'));
+        self::assertTrue(Route::has('purchase.purchase-returns.lines.sync'));
+        self::assertTrue(Route::has('purchase.settings.show'));
+        self::assertTrue(Route::has('purchase.settings.upsert'));
+        self::assertTrue(Route::has('purchase.settings.initialize'));
+        self::assertTrue(Route::has('purchase.lookups.purchase-order-lines.available-for-grn'));
+        self::assertTrue(Route::has('purchase.lookups.grn-lines.available-for-document'));
+        self::assertTrue(Route::has('purchase.lookups.returnable-lines'));
+        self::assertTrue(Route::has('purchase.lookups.payable-documents'));
     }
 
     public function testPurchaseRoutesUseContextMiddlewares(): void
