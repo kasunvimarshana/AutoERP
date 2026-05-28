@@ -103,4 +103,28 @@ final class ItemController extends Controller
 
         return response()->json(null, 204);
     }
+
+    public function activate(int|string $id): JsonResponse|ItemResource
+    {
+        return $this->setActiveState($id, true);
+    }
+
+    public function deactivate(int|string $id): JsonResponse|ItemResource
+    {
+        return $this->setActiveState($id, false);
+    }
+
+    private function setActiveState(int|string $id, bool $active): JsonResponse|ItemResource
+    {
+        $result = $this->updateService->execute($id, ['is_active' => $active]);
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'ITEM_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return new ItemResource($result->valueOrFail());
+    }
 }

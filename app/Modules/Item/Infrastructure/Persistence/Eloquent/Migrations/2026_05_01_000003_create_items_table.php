@@ -19,10 +19,12 @@ return new class extends Migration
 
             $table->foreignId('category_id')->nullable()->constrained('item_categories')->nullOnDelete();
             $table->foreignId('brand_id')->nullable()->constrained('item_brands')->nullOnDelete();
+            $table->foreignId('item_type_id')->nullable()->constrained('item_types')->nullOnDelete();
             $table->string('type')->default('PHYSICAL')->comment('PHYSICAL, SERVICE, DIGITAL, COMBO, VARIABLE');
             $table->string('name');
             $table->string('slug')->nullable()->comment('URL-friendly unique name indicator');
             $table->string('sku')->nullable();
+            $table->string('barcode')->nullable();
             $table->text('description')->nullable();
             $table->string('image_path')->nullable();
             $table->string('status')->default('DRAFT')->comment('DRAFT, ACTIVE, INACTIVE, DISCONTINUED');
@@ -39,6 +41,13 @@ return new class extends Migration
             $table->boolean('is_lot_tracked')->default(false);
             $table->boolean('is_serial_tracked')->default(false);
             $table->boolean('is_stockable')->default(false);
+            $table->boolean('is_purchasable')->default(true);
+            $table->boolean('is_sellable')->default(true);
+            $table->boolean('is_service')->default(false);
+            $table->boolean('is_rentable')->default(false);
+            $table->boolean('is_chargeable')->default(false);
+            $table->boolean('is_taxable')->default(false);
+            $table->boolean('is_variable')->default(false);
             $table->string('valuation_method')->nullable()->comment('Defines the inventory cost flow assumption and stock valuation policy used for financial costing, inventory asset capitalization, and cost recognition (FIFO, LIFO, Weighted Average, Standard Cost, or Specific Identification)'); // Inventory costing strategy used to determine stock issue valuation and financial inventory asset calculation such as FIFO, LIFO, Weighted Average, Standard Cost, or Specific Identification
             $table->string('allocation_method')->nullable()->comment('Defines the proportional allocation basis used to distribute shared costs, operational charges, resources, or overhead amounts across related items or transactions'); // Cost or resource distribution strategy used to proportionally allocate shared operational, logistics, freight, service, or overhead expenses across items based on quantity, value, weight, volume, time, or percentage
             $table->decimal('standard_cost', 20, 4)->nullable()->comment('Pre-determined target baseline asset value');
@@ -66,6 +75,7 @@ return new class extends Migration
             // Pricing
             $table->decimal('cost_price', 20, 4)->nullable()->comment('Actual supplier acquisition rate per piece');
             $table->decimal('sales_price', 20, 4)->nullable()->comment('Standard commercial customer checkout baseline rate');
+            $table->foreignId('default_currency_id')->nullable()->constrained('currencies')->nullOnDelete();
 
             // Service fields
             $table->decimal('estimated_service_time_hours', 20, 4)->nullable();
@@ -87,9 +97,12 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'name'], 'items_name_uk');
+            $table->unique(['tenant_id', 'sku'], 'items_tenant_sku_uk');
             $table->index(['tenant_id', 'type'], 'items_type_idx');
             $table->index(['tenant_id', 'is_active'], 'items_active_idx');
             $table->index(['tenant_id', 'name'], 'items_name_idx');
+            $table->index(['tenant_id', 'barcode'], 'items_tenant_barcode_idx');
+            $table->index(['tenant_id', 'item_type_id'], 'items_tenant_item_type_idx');
         });
     }
 

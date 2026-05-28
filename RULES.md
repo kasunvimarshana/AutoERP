@@ -1,3 +1,11 @@
+Rule: Always inspect existing migrations first. Update the original migration for schema changes instead of creating patch migrations. Create new migrations only for new tables or major new features. Keep schemas DRY, clean, and maintain a single source of truth per table.
+
+---
+
+Rule: Implement module-related seeders inside `app\Modules\*\Infrastructure\Persistence\Eloquent\Seeders` and keep all seeding logic scoped to its respective module.
+
+---
+
 DATABASE SCHEMA EVOLUTION RULE
 
 Database structure, relationships, normalization, constraints, indexes, migrations, and schema design MAY be modified ONLY when necessary to improve:

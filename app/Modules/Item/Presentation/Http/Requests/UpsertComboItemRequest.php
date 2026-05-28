@@ -10,7 +10,7 @@ final class UpsertComboItemRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return auth()->check();
+        return $this->user() !== null;
     }
 
     /**
@@ -21,20 +21,23 @@ final class UpsertComboItemRequest extends FormRequest
         $required = $this->isMethod('post') ? ['required'] : ['sometimes'];
 
         return [
-            'tenant_id' => array_merge($required, ['integer', 'min:1', 'exists:tenants,id']),
+            'tenant_id' => ['nullable', 'integer', 'min:1', 'exists:tenants,id'],
             'row_version' => ['nullable', 'integer', 'min:0'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
             'metadata' => ['nullable', 'array'],
-            'combo_item_id' => array_merge($required, ['integer', 'min:1', 'exists:items,id']),
+            'combo_item_id' => array_merge(
+                $required,
+                ['integer', 'min:1', 'exists:items,id', 'different:component_item_id'],
+            ),
             'component_item_id' => array_merge($required, ['integer', 'min:1', 'exists:items,id']),
             'component_variant_id' => ['nullable', 'integer', 'min:1', 'exists:item_variants,id'],
-            'sort_order' => ['nullable', 'integer'],
-            'quantity' => array_merge($required, ['numeric']),
+            'sort_order' => ['nullable', 'integer', 'min:0'],
+            'quantity' => array_merge($required, ['numeric', 'gt:0']),
             'uom_id' => array_merge($required, ['integer', 'min:1', 'exists:unit_of_measures,id']),
-            'standard_cost' => ['nullable', 'numeric'],
-            'cost_price' => ['nullable', 'numeric'],
-            'sales_price' => ['nullable', 'numeric'],
-            'incentive_value' => ['nullable', 'numeric'],
+            'standard_cost' => ['nullable', 'numeric', 'min:0'],
+            'cost_price' => ['nullable', 'numeric', 'min:0'],
+            'sales_price' => ['nullable', 'numeric', 'min:0'],
+            'incentive_value' => ['nullable', 'numeric', 'min:0'],
         ];
     }
 }

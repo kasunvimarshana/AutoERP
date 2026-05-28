@@ -36,6 +36,8 @@ Route::prefix('api/item')
         Route::apiResource('item-categories', ItemCategoryController::class);
         Route::apiResource('item-brands', ItemBrandController::class);
         Route::apiResource('items', ItemController::class);
+        Route::patch('items/{item}/activate', [ItemController::class, 'activate'])->name('items.activate');
+        Route::patch('items/{item}/deactivate', [ItemController::class, 'deactivate'])->name('items.deactivate');
         Route::apiResource('item-attribute-groups', ItemAttributeGroupController::class);
         Route::apiResource('item-attributes', ItemAttributeController::class);
         Route::apiResource('item-attribute-values', ItemAttributeValueController::class);

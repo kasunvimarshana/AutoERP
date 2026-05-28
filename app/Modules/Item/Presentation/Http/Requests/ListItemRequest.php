@@ -10,7 +10,7 @@ final class ListItemRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return auth()->check();
+        return $this->user() !== null;
     }
 
     /**
@@ -23,22 +23,33 @@ final class ListItemRequest extends FormRequest
             'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:' . (int) config('item.pagination.max_per_page', 200)],
+            'search' => ['nullable', 'string', 'max:255'],
             'category_id' => ['nullable', 'integer', 'min:1'],
             'brand_id' => ['nullable', 'integer', 'min:1'],
+            'item_type_id' => ['nullable', 'integer', 'min:1'],
             'type' => ['nullable', 'string', 'max:255'],
             'name' => ['nullable', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255'],
             'sku' => ['nullable', 'string', 'max:255'],
+            'barcode' => ['nullable', 'string', 'max:255'],
             'image_path' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'string', 'max:255'],
             'base_uom_id' => ['nullable', 'integer', 'min:1'],
             'purchase_uom_id' => ['nullable', 'integer', 'min:1'],
             'sales_uom_id' => ['nullable', 'integer', 'min:1'],
             'tax_group_id' => ['nullable', 'integer', 'min:1'],
+            'default_currency_id' => ['nullable', 'integer', 'min:1'],
             'is_batch_tracked' => ['nullable', 'boolean'],
             'is_lot_tracked' => ['nullable', 'boolean'],
             'is_serial_tracked' => ['nullable', 'boolean'],
             'is_stockable' => ['nullable', 'boolean'],
+            'is_purchasable' => ['nullable', 'boolean'],
+            'is_sellable' => ['nullable', 'boolean'],
+            'is_service' => ['nullable', 'boolean'],
+            'is_rentable' => ['nullable', 'boolean'],
+            'is_chargeable' => ['nullable', 'boolean'],
+            'is_taxable' => ['nullable', 'boolean'],
+            'is_variable' => ['nullable', 'boolean'],
             'income_account_id' => ['nullable', 'integer', 'min:1'],
             'cogs_account_id' => ['nullable', 'integer', 'min:1'],
             'inventory_account_id' => ['nullable', 'integer', 'min:1'],
