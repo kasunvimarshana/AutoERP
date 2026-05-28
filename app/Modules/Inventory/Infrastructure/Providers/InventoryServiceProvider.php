@@ -12,6 +12,10 @@ use Modules\Inventory\Application\Contracts\Services\PutAwayTaskServiceInterface
 use Modules\Inventory\Application\Contracts\Services\ValuationConfigServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\TransferOrderLineServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\TransferOrderServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\BatchServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\SerialServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\InventoryCostLayerServiceInterface;
+use Modules\Inventory\Application\Contracts\Services\StockMovementServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\StockLedgerServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\StockAdjustmentServiceInterface;
 use Modules\Inventory\Application\Contracts\Services\StockReservationServiceInterface;
@@ -160,6 +164,10 @@ use Modules\Inventory\Application\Services\PutAwayTaskService;
 use Modules\Inventory\Application\Services\ValuationConfigService;
 use Modules\Inventory\Application\Services\TransferOrderLineService;
 use Modules\Inventory\Application\Services\TransferOrderService;
+use Modules\Inventory\Application\Services\BatchService;
+use Modules\Inventory\Application\Services\SerialService;
+use Modules\Inventory\Application\Services\InventoryCostLayerService;
+use Modules\Inventory\Application\Services\StockMovementService;
 use Modules\Inventory\Application\Services\StockLedgerService;
 use Modules\Inventory\Application\Services\StockAdjustmentService;
 use Modules\Inventory\Application\Services\StockReservationService;
@@ -391,6 +399,10 @@ final class InventoryServiceProvider extends ServiceProvider
                 ValuationConfigServiceInterface::class => ValuationConfigService::class,
                 TransferOrderServiceInterface::class => TransferOrderService::class,
                 TransferOrderLineServiceInterface::class => TransferOrderLineService::class,
+                BatchServiceInterface::class => BatchService::class,
+                SerialServiceInterface::class => SerialService::class,
+                InventoryCostLayerServiceInterface::class => InventoryCostLayerService::class,
+                StockMovementServiceInterface::class => StockMovementService::class,
                 StockLedgerServiceInterface::class => StockLedgerService::class,
                 StockAdjustmentServiceInterface::class => StockAdjustmentService::class,
                 StockReservationServiceInterface::class => StockReservationService::class,
