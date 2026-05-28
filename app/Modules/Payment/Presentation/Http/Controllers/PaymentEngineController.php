@@ -9,6 +9,7 @@ use Illuminate\Routing\Controller;
 use Modules\Payment\Application\Contracts\UseCases\PaymentEngines\AllocatePaymentDocumentServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\PaymentEngines\SettlePaymentStatusServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\PaymentEngines\UnallocatePaymentDocumentServiceInterface;
+use Modules\Payment\Application\Contracts\Services\PaymentAllocationServiceInterface;
 use Modules\Payment\Application\Contracts\Services\PaymentPostingServiceInterface;
 use Modules\Payment\Application\Contracts\Services\PaymentReversalServiceInterface;
 use Modules\Payment\Application\Contracts\Services\RefundServiceInterface;
@@ -22,6 +23,7 @@ final class PaymentEngineController extends Controller
         private readonly AllocatePaymentDocumentServiceInterface $allocatePaymentDocumentService,
         private readonly UnallocatePaymentDocumentServiceInterface $unallocatePaymentDocumentService,
         private readonly SettlePaymentStatusServiceInterface $settlePaymentStatusService,
+        private readonly PaymentAllocationServiceInterface $paymentAllocationService,
         private readonly PaymentPostingServiceInterface $paymentPostingService,
         private readonly PaymentReversalServiceInterface $paymentReversalService,
         private readonly RefundServiceInterface $refundService,
@@ -73,6 +75,26 @@ final class PaymentEngineController extends Controller
         int|string $payment,
     ): JsonResponse {
         $result = $this->settlePaymentStatusService->execute($payment, $request->validated());
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'PAYMENT_NOT_FOUND' ? 404 : 422;
+
+            return response()->json([
+                'message' => $error->message,
+                'code' => $error->code,
+                'context' => $error->context,
+            ], $status);
+        }
+
+        return response()->json(['data' => $result->valueOrFail()]);
+    }
+
+    public function previewAllocation(
+        AllocatePaymentDocumentRequest $request,
+        int|string $payment,
+    ): JsonResponse {
+        $result = $this->paymentAllocationService->previewAllocation($payment, $request->validated());
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();

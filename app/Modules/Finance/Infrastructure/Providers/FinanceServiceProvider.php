@@ -9,6 +9,7 @@ use Modules\Finance\Application\Contracts\Services\FinancePostingServiceInterfac
 use Modules\Finance\Application\Contracts\Services\FiscalPeriodServiceInterface;
 use Modules\Finance\Application\Contracts\Services\PaymentTermServiceInterface;
 use Modules\Finance\Application\Contracts\Services\TaxCalculationServiceInterface;
+use Modules\Finance\Application\Contracts\UseCases\JournalEngines\PreviewJournalEntryPostingServiceInterface;
 use Modules\Finance\Application\Contracts\UseCases\JournalEngines\PostJournalEntryServiceInterface;
 use Modules\Finance\Application\Contracts\UseCases\JournalEngines\ReverseJournalEntryServiceInterface;
 use Modules\Finance\Application\Contracts\UseCases\Accounts\CreateAccountServiceInterface;
@@ -190,6 +191,7 @@ use Modules\Finance\Application\UseCases\JournalEntryLines\GetJournalEntryLineSe
 use Modules\Finance\Application\UseCases\JournalEntryLines\ListJournalEntryLinesService;
 use Modules\Finance\Application\UseCases\JournalEntryLines\UpdateJournalEntryLineService;
 use Modules\Finance\Application\UseCases\JournalEngines\PostJournalEntryService;
+use Modules\Finance\Application\UseCases\JournalEngines\PreviewJournalEntryPostingService;
 use Modules\Finance\Application\UseCases\JournalEngines\ReverseJournalEntryService;
 use Modules\Finance\Application\UseCases\PaymentTerms\CreatePaymentTermService;
 use Modules\Finance\Application\UseCases\PaymentTerms\DeletePaymentTermService;
@@ -351,6 +353,7 @@ final class FinanceServiceProvider extends ServiceProvider
                 UpdateBankReconciliationServiceInterface::class => UpdateBankReconciliationService::class,
                 DeleteBankReconciliationServiceInterface::class => DeleteBankReconciliationService::class,
                 PostJournalEntryServiceInterface::class => PostJournalEntryService::class,
+                PreviewJournalEntryPostingServiceInterface::class => PreviewJournalEntryPostingService::class,
                 ReverseJournalEntryServiceInterface::class => ReverseJournalEntryService::class,
                 FiscalPeriodServiceInterface::class => FiscalPeriodService::class,
                 FinancePostingServiceInterface::class => FinancePostingService::class,

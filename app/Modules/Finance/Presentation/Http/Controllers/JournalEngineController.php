@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Finance\Domain\Constants\FinanceErrorCode;
 use Modules\Finance\Application\Contracts\UseCases\JournalEngines\PostJournalEntryServiceInterface;
+use Modules\Finance\Application\Contracts\UseCases\JournalEngines\PreviewJournalEntryPostingServiceInterface;
 use Modules\Finance\Application\Contracts\UseCases\JournalEngines\ReverseJournalEntryServiceInterface;
 use Modules\Finance\Presentation\Http\Requests\PostJournalEntryRequest;
 use Modules\Finance\Presentation\Http\Requests\ReverseJournalEntryRequest;
@@ -16,8 +17,29 @@ final class JournalEngineController extends Controller
 {
     public function __construct(
         private readonly PostJournalEntryServiceInterface $postJournalEntryService,
+        private readonly PreviewJournalEntryPostingServiceInterface $previewJournalEntryPostingService,
         private readonly ReverseJournalEntryServiceInterface $reverseJournalEntryService,
     ) {
+    }
+
+    public function previewPost(
+        PostJournalEntryRequest $request,
+        int|string $journalEntry,
+    ): JsonResponse {
+        $result = $this->previewJournalEntryPostingService->execute($journalEntry, $request->validated());
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === FinanceErrorCode::NOT_FOUND ? 404 : 422;
+
+            return response()->json([
+                'message' => $error->message,
+                'code' => $error->code,
+                'context' => $error->context,
+            ], $status);
+        }
+
+        return response()->json(['data' => $result->valueOrFail()]);
     }
 
     public function post(

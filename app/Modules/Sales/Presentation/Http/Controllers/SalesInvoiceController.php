@@ -342,41 +342,8 @@ final class SalesInvoiceController extends Controller
     public function calculateInvoice(Request $request): JsonResponse
     {
         $payload = $this->withContext($request);
-        $lines = is_array($payload['lines'] ?? null) ? $payload['lines'] : [];
 
-        $subtotal = 0.0;
-        $taxTotal = 0.0;
-        $discountTotal = 0.0;
-
-        foreach ($lines as $line) {
-            if (! is_array($line)) {
-                continue;
-            }
-
-            $qty = round((float) ($line['quantity'] ?? $line['linked_quantity'] ?? 0), 4);
-            $unitPrice = round((float) ($line['unit_price'] ?? 0), 4);
-            $lineGross = round($qty * $unitPrice, 4);
-            $lineDiscount = round((float) ($line['discount_amount'] ?? 0), 4);
-            $lineTax = round((float) ($line['tax_amount'] ?? 0), 4);
-
-            $subtotal += $lineGross;
-            $discountTotal += $lineDiscount;
-            $taxTotal += $lineTax;
-        }
-
-        $subtotal = round($subtotal, 4);
-        $discountTotal = round($discountTotal, 4);
-        $taxTotal = round($taxTotal, 4);
-        $grandTotal = round(max(0.0, $subtotal - $discountTotal + $taxTotal), 4);
-
-        return response()->json([
-            'data' => [
-                'subtotal' => $subtotal,
-                'discount_total' => $discountTotal,
-                'tax_total' => $taxTotal,
-                'grand_total' => $grandTotal,
-            ],
-        ]);
+        return $this->respond($this->management->calculateInvoicePreview($payload));
     }
 
     public function validateUom(Request $request): JsonResponse

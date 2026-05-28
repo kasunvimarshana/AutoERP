@@ -35,4 +35,6 @@ interface PurchaseManagementServiceInterface
     public function getReturnableLines(string $sourceType, int $sourceId, int $tenantId): Result;
 
     public function getPayableDocuments(int $tenantId, ?int $supplierId): Result;
+
+    public function calculateInvoicePreview(array $payload): Result;
 }

@@ -666,6 +666,77 @@ final class SalesManagementService implements SalesManagementServiceInterface
         }
     }
 
+    public function calculateInvoicePreview(array $payload): Result
+    {
+        try {
+            $lines = is_array($payload['lines'] ?? null) ? $payload['lines'] : [];
+
+            $subtotal = 0.0;
+            $taxTotal = 0.0;
+            $discountTotal = 0.0;
+            $linePreviews = [];
+
+            foreach ($lines as $line) {
+                if (! is_array($line)) {
+                    continue;
+                }
+
+                $qty = round((float) ($line['quantity'] ?? $line['linked_quantity'] ?? 0), 4);
+                $unitPrice = round((float) ($line['unit_price'] ?? 0), 4);
+                $lineGross = round($qty * $unitPrice, 4);
+
+                $discountAmount = array_key_exists('discount_amount', $line)
+                    ? round((float) ($line['discount_amount'] ?? 0), 4)
+                    : $this->resolveDiscountAmount(
+                        $lineGross,
+                        (string) ($line['discount_type'] ?? ''),
+                        round((float) ($line['discount_value'] ?? 0), 4),
+                    );
+
+                $lineTax = array_key_exists('tax_amount', $line)
+                    ? round((float) ($line['tax_amount'] ?? 0), 4)
+                    : round(
+                        max(0.0, $lineGross - $discountAmount)
+                        * round((float) ($line['tax_rate'] ?? 0), 6)
+                        / 100,
+                        4,
+                    );
+
+                $lineNet = round(max(0.0, $lineGross - $discountAmount), 4);
+
+                $subtotal += $lineGross;
+                $discountTotal += $discountAmount;
+                $taxTotal += $lineTax;
+
+                $linePreviews[] = [
+                    'line_id' => $line['id'] ?? null,
+                    'quantity' => $qty,
+                    'unit_price' => $unitPrice,
+                    'gross_amount' => $lineGross,
+                    'discount_amount' => $discountAmount,
+                    'tax_amount' => $lineTax,
+                    'line_total' => $lineNet,
+                    'line_total_with_tax' => round($lineNet + $lineTax, 4),
+                ];
+            }
+
+            $subtotal = round($subtotal, 4);
+            $discountTotal = round($discountTotal, 4);
+            $taxTotal = round($taxTotal, 4);
+            $grandTotal = round(max(0.0, $subtotal - $discountTotal + $taxTotal), 4);
+
+            return Result::success([
+                'subtotal' => $subtotal,
+                'discount_total' => $discountTotal,
+                'tax_total' => $taxTotal,
+                'grand_total' => $grandTotal,
+                'lines' => $linePreviews,
+            ]);
+        } catch (Throwable $exception) {
+            return Result::failure(new Error(SalesErrorCode::INVALID_VALUE, $exception->getMessage()));
+        }
+    }
+
     /** @return array<string, mixed> */
     private function extractHeaderPayload(array $payload): array
     {

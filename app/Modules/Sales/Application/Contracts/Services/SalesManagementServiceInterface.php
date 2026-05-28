@@ -44,4 +44,6 @@ interface SalesManagementServiceInterface
         ?int $warehouseId,
         ?int $locationId,
     ): Result;
+
+    public function calculateInvoicePreview(array $payload): Result;
 }

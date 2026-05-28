@@ -34,6 +34,11 @@ Route::prefix('api/payment')
     ->group(function (): void {
         Route::post('payments/{payment}/engines/allocate', [PaymentEngineController::class, 'allocate'])
             ->name('payments.engines.allocate');
+        Route::post(
+            'payments/{payment}/engines/preview-allocation',
+            [PaymentEngineController::class, 'previewAllocation']
+        )
+            ->name('payments.engines.preview-allocation');
         Route::post('payments/{payment}/engines/unallocate', [PaymentEngineController::class, 'unallocate'])
             ->name('payments.engines.unallocate');
         Route::post('payments/{payment}/engines/status', [PaymentEngineController::class, 'settleStatus'])

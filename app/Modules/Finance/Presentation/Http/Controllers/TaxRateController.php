@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Modules\Finance\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Modules\Core\Application\DTO\PagedResult;
+use Modules\Finance\Application\Contracts\Services\TaxCalculationServiceInterface;
 use Modules\Finance\Application\Contracts\UseCases\TaxRates\CreateTaxRateServiceInterface;
 use Modules\Finance\Application\Contracts\UseCases\TaxRates\DeleteTaxRateServiceInterface;
 use Modules\Finance\Application\Contracts\UseCases\TaxRates\GetTaxRateServiceInterface;
@@ -24,7 +26,37 @@ final class TaxRateController extends Controller
         private readonly CreateTaxRateServiceInterface $createService,
         private readonly UpdateTaxRateServiceInterface $updateService,
         private readonly DeleteTaxRateServiceInterface $deleteService,
+        private readonly TaxCalculationServiceInterface $taxCalculationService,
     ) {
+    }
+
+    public function previewCalculation(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'tenant_id' => ['required', 'integer', 'min:1'],
+            'tax_group_id' => ['required', 'integer', 'min:1'],
+            'taxable_amount' => ['required', 'numeric', 'min:0'],
+            'posting_date' => ['nullable', 'date'],
+        ]);
+
+        $result = $this->taxCalculationService->calculate(
+            (int) $validated['tenant_id'],
+            (int) $validated['tax_group_id'],
+            (float) $validated['taxable_amount'],
+            isset($validated['posting_date']) ? (string) $validated['posting_date'] : null,
+        );
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+
+            return response()->json([
+                'message' => $error->message,
+                'code' => $error->code,
+                'context' => $error->context,
+            ], 422);
+        }
+
+        return response()->json(['data' => $result->valueOrFail()]);
     }
 
     public function index(ListTaxRateRequest $request): JsonResponse

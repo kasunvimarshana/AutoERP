@@ -113,6 +113,73 @@ final class PaymentAllocationService implements PaymentAllocationServiceInterfac
         }
     }
 
+    public function previewAllocation(int|string $paymentId, array $payload): Result
+    {
+        try {
+            $payment = $this->paymentRepository->findById($paymentId);
+            if (! $payment instanceof DataRecord) {
+                return Result::failure(new Error(PaymentErrorCode::NOT_FOUND, 'Payment not found.'));
+            }
+
+            if (strtolower((string) $payment->get('status', PaymentStatus::DRAFT)) === PaymentStatus::VOIDED) {
+                return Result::failure(new Error(
+                    PaymentErrorCode::INVALID_VALUE,
+                    'Voided payments cannot be allocated.',
+                ));
+            }
+
+            $tenantId = (int) ($payload['tenant_id'] ?? $payment->get('tenant_id', 0));
+            if ($tenantId < 1 || $tenantId !== (int) $payment->get('tenant_id', 0)) {
+                return Result::failure(new Error(
+                    PaymentErrorCode::INVALID_VALUE,
+                    'Cross-tenant allocation is not allowed.',
+                ));
+            }
+
+            $allocatedAmount = round((float) ($payload['allocated_amount'] ?? 0), 4);
+            if ($allocatedAmount <= 0) {
+                return Result::failure(new Error(
+                    PaymentErrorCode::INVALID_VALUE,
+                    'allocated_amount must be greater than zero.',
+                ));
+            }
+
+            $currentTotal = $this->sumPaymentAllocations((int) $paymentId);
+            $paymentAmount = round((float) $payment->get('amount', 0), 4);
+            $unallocatedAmount = round(max(0.0, $paymentAmount - $currentTotal), 4);
+
+            $documentType = trim((string) ($payload['document_type'] ?? ''));
+            $documentId = isset($payload['document_id']) ? (int) $payload['document_id'] : 0;
+            $isDuplicate = false;
+
+            if ($documentType !== '' && $documentId > 0) {
+                $existing = $this->paymentAllocationRepository->list([
+                    'payment_id' => (int) $paymentId,
+                    'document_type' => $documentType,
+                    'document_id' => $documentId,
+                ]);
+                $isDuplicate = $existing !== [];
+            }
+
+            $canAllocate = $allocatedAmount <= $unallocatedAmount && ! $isDuplicate;
+
+            return Result::success([
+                'payment_id' => (int) $paymentId,
+                'payment_amount' => $paymentAmount,
+                'allocated_amount_total' => $currentTotal,
+                'unallocated_amount' => $unallocatedAmount,
+                'requested_allocation_amount' => $allocatedAmount,
+                'document_type' => $documentType !== '' ? $documentType : null,
+                'document_id' => $documentId > 0 ? $documentId : null,
+                'duplicate_allocation_exists' => $isDuplicate,
+                'can_allocate' => $canAllocate,
+                'remaining_after_allocation' => round(max(0.0, $unallocatedAmount - $allocatedAmount), 4),
+            ]);
+        } catch (Throwable $exception) {
+            return Result::failure(new Error(PaymentErrorCode::INVALID_VALUE, $exception->getMessage()));
+        }
+    }
+
     public function updateAllocation(int|string $id, array $payload): Result
     {
         try {

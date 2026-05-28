@@ -43,8 +43,15 @@ Route::prefix('api/finance')
     ->group(function (): void {
         Route::post('journal-entries/{journalEntry}/engines/post', [JournalEngineController::class, 'post'])
             ->name('journal-entries.engines.post');
+        Route::post(
+            'journal-entries/{journalEntry}/engines/preview-posting',
+            [JournalEngineController::class, 'previewPost']
+        )
+            ->name('journal-entries.engines.preview-posting');
         Route::post('journal-entries/{journalEntry}/engines/reverse', [JournalEngineController::class, 'reverse'])
             ->name('journal-entries.engines.reverse');
+        Route::post('tax/preview-calculate', [TaxRateController::class, 'previewCalculation'])
+            ->name('tax.preview-calculate');
         Route::apiResource('accounts', AccountController::class);
         Route::apiResource('fiscal-years', FiscalYearController::class);
         Route::apiResource('fiscal-periods', FiscalPeriodController::class);
