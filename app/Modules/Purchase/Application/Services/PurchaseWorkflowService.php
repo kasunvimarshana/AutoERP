@@ -164,6 +164,9 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
             }
 
             $idempotencyKey = $this->normalizeIdempotencyKey($payload['idempotency_key'] ?? null);
+            $idempotencySignature = $idempotencyKey !== ''
+                ? $this->buildIdempotencySignature('transition', $payload)
+                : '';
             if ($idempotencyKey !== '') {
                 $replay = $this->findIdempotentActionHistory(
                     $tenantId,
@@ -172,10 +175,22 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                     $idempotencyKey,
                     'transition',
                 );
-                if (
-                    $replay instanceof DataRecord
-                    && strtolower((string) $replay->get('to_status', '')) === $status
-                ) {
+                if ($replay instanceof DataRecord) {
+                    $replayTargetStatus = strtolower((string) $replay->get('to_status', ''));
+                    if ($replayTargetStatus !== $status) {
+                        return Result::failure(new Error(
+                            PurchaseErrorCode::INVALID_VALUE,
+                            'idempotency_key is already used with a different request payload.',
+                        ));
+                    }
+
+                    if ($this->hasIdempotencySignatureConflict($replay->get('metadata', []), $idempotencySignature)) {
+                        return Result::failure(new Error(
+                            PurchaseErrorCode::INVALID_VALUE,
+                            'idempotency_key is already used with a different request payload.',
+                        ));
+                    }
+
                     return Result::success($record);
                 }
             }
@@ -252,6 +267,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 $record,
                 $payload,
                 $idempotencyKey,
+                $idempotencySignature,
             ): Result {
                 $fields = [
                     'status' => $status,
@@ -293,7 +309,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
 
                 $updated = $this->updateEntity($entityType, $id, $fields);
 
-                $metadata = $this->metadataWithIdempotencyKey($payload, $idempotencyKey);
+                $metadata = $this->metadataWithIdempotencyKey($payload, $idempotencyKey, $idempotencySignature);
                 $metadata['workflow_action'] = 'transition';
                 $metadata['target_status'] = $status;
 
@@ -361,6 +377,9 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
             }
 
             $idempotencyKey = $this->normalizeIdempotencyKey($payload['idempotency_key'] ?? null);
+            $idempotencySignature = $idempotencyKey !== ''
+                ? $this->buildIdempotencySignature('create_document', $payload)
+                : '';
             if ($idempotencyKey !== '') {
                 $idempotentDocument = $this->findIdempotentDocumentLink(
                     $tenantId,
@@ -369,6 +388,18 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                     $idempotencyKey,
                 );
                 if ($idempotentDocument instanceof DataRecord) {
+                    if (
+                        $this->hasIdempotencySignatureConflict(
+                            $idempotentDocument->get('metadata', []),
+                            $idempotencySignature,
+                        )
+                    ) {
+                        return Result::failure(new Error(
+                            PurchaseErrorCode::INVALID_VALUE,
+                            'idempotency_key is already used with a different request payload.',
+                        ));
+                    }
+
                     return Result::success([
                         'source_type' => $entityType,
                         'source_id' => (int) $record->id(),
@@ -399,6 +430,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 $tenantId,
                 $documentTypeId,
                 $idempotencyKey,
+                $idempotencySignature,
             ): Result {
                 $items = $this->resolveDocumentItems($entityType, (int) $record->id(), $payload, $record);
                 if ($items === []) {
@@ -453,7 +485,11 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 $this->purchaseDocumentLinkRepository->create([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $record->get('organization_unit_id'),
-                    'metadata' => $this->metadataWithIdempotencyKey($payload, $idempotencyKey),
+                    'metadata' => $this->metadataWithIdempotencyKey(
+                        $payload,
+                        $idempotencyKey,
+                        $idempotencySignature,
+                    ),
                     'source_type' => $entityType,
                     'source_id' => (int) $record->id(),
                     'source_line_id' => null,
@@ -475,7 +511,11 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                     $this->purchaseDocumentLinkRepository->create([
                         'tenant_id' => $tenantId,
                         'organization_unit_id' => $record->get('organization_unit_id'),
-                        'metadata' => $this->metadataWithIdempotencyKey($payload, $idempotencyKey),
+                        'metadata' => $this->metadataWithIdempotencyKey(
+                            $payload,
+                            $idempotencyKey,
+                            $idempotencySignature,
+                        ),
                         'source_type' => $entityType,
                         'source_id' => (int) $record->id(),
                         'source_line_id' => $sourceLineId,
@@ -567,9 +607,24 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
             }
 
             $idempotencyKey = $this->normalizeIdempotencyKey($payload['idempotency_key'] ?? null);
+            $idempotencySignature = $idempotencyKey !== ''
+                ? $this->buildIdempotencySignature('allocate_payment', $payload)
+                : '';
             if ($idempotencyKey !== '') {
                 $idempotentAllocation = $this->findIdempotentPaymentAllocation($tenantId, $documentId, $idempotencyKey);
                 if ($idempotentAllocation instanceof DataRecord) {
+                    if (
+                        $this->hasIdempotencySignatureConflict(
+                            $idempotentAllocation->get('metadata', []),
+                            $idempotencySignature,
+                        )
+                    ) {
+                        return Result::failure(new Error(
+                            PurchaseErrorCode::INVALID_VALUE,
+                            'idempotency_key is already used with a different request payload.',
+                        ));
+                    }
+
                     return Result::success([
                         'allocation_id' => (int) $idempotentAllocation->id(),
                         'document_id' => $documentId,
@@ -611,6 +666,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 $documentId,
                 $allocatedAmount,
                 $idempotencyKey,
+                $idempotencySignature,
             ): Result {
                 if (isset($payload['payment_id'])) {
                     $allocationResult = $this->paymentAllocationService->createAllocation([
@@ -648,7 +704,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 $this->purchasePaymentAllocationRepository->create([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $record->get('organization_unit_id'),
-                    'metadata' => $this->metadataWithIdempotencyKey($payload, $idempotencyKey),
+                    'metadata' => $this->metadataWithIdempotencyKey($payload, $idempotencyKey, $idempotencySignature),
                     'document_id' => $documentId,
                     'payment_id' => isset($payload['payment_id']) ? (int) $payload['payment_id'] : null,
                     'advance_payment_id' => isset($payload['advance_payment_id'])
@@ -702,6 +758,9 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
             }
 
             $idempotencyKey = $this->normalizeIdempotencyKey($payload['idempotency_key'] ?? null);
+            $idempotencySignature = $idempotencyKey !== ''
+                ? $this->buildIdempotencySignature('inventory_post', $payload)
+                : '';
             if ($idempotencyKey !== '') {
                 $replay = $this->findIdempotentActionHistory(
                     $tenantId,
@@ -711,6 +770,13 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                     'inventory_post',
                 );
                 if ($replay instanceof DataRecord) {
+                    if ($this->hasIdempotencySignatureConflict($replay->get('metadata', []), $idempotencySignature)) {
+                        return Result::failure(new Error(
+                            PurchaseErrorCode::INVALID_VALUE,
+                            'idempotency_key is already used with a different request payload.',
+                        ));
+                    }
+
                     return Result::success([
                         'posted' => true,
                         'idempotent_replay' => true,
@@ -735,6 +801,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 $payload,
                 $id,
                 $idempotencyKey,
+                $idempotencySignature,
             ): Result {
                 foreach ($lineRecords as $line) {
                     $quantity = $entityType === 'purchase_return'
@@ -829,7 +896,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
 
                 $fromStatus = strtolower((string) $record->get('status', ''));
                 $toStatus = $entityType === 'grn_header' ? 'posted' : $fromStatus;
-                $metadata = $this->metadataWithIdempotencyKey($payload, $idempotencyKey);
+                $metadata = $this->metadataWithIdempotencyKey($payload, $idempotencyKey, $idempotencySignature);
                 $metadata['workflow_action'] = 'inventory_post';
 
                 $this->purchaseStatusHistoryRepository->create([
@@ -889,6 +956,9 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
             }
 
             $idempotencyKey = $this->normalizeIdempotencyKey($payload['idempotency_key'] ?? null);
+            $idempotencySignature = $idempotencyKey !== ''
+                ? $this->buildIdempotencySignature('finance_post', $payload)
+                : '';
             if ($idempotencyKey !== '') {
                 $replay = $this->findIdempotentActionHistory(
                     $tenantId,
@@ -898,6 +968,13 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                     'finance_post',
                 );
                 if ($replay instanceof DataRecord) {
+                    if ($this->hasIdempotencySignatureConflict($replay->get('metadata', []), $idempotencySignature)) {
+                        return Result::failure(new Error(
+                            PurchaseErrorCode::INVALID_VALUE,
+                            'idempotency_key is already used with a different request payload.',
+                        ));
+                    }
+
                     return Result::success([
                         'posted' => true,
                         'idempotent_replay' => true,
@@ -919,6 +996,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 $entityType,
                 $tenantId,
                 $idempotencyKey,
+                $idempotencySignature,
             ): Result {
                 $postingResult = $this->financePostingService->postFromSource($entryPayload, $linesPayload);
                 if ($postingResult->isFailure()) {
@@ -926,7 +1004,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 }
 
                 $status = strtolower((string) $record->get('status', ''));
-                $metadata = $this->metadataWithIdempotencyKey($payload, $idempotencyKey);
+                $metadata = $this->metadataWithIdempotencyKey($payload, $idempotencyKey, $idempotencySignature);
                 $metadata['workflow_action'] = 'finance_post';
 
                 $this->purchaseStatusHistoryRepository->create([
@@ -982,6 +1060,9 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
             }
 
             $idempotencyKey = $this->normalizeIdempotencyKey($payload['idempotency_key'] ?? null);
+            $idempotencySignature = $idempotencyKey !== ''
+                ? $this->buildIdempotencySignature('finance_reverse', $payload)
+                : '';
             if ($idempotencyKey !== '') {
                 $replay = $this->findIdempotentActionHistory(
                     $tenantId,
@@ -992,8 +1073,25 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 );
 
                 if ($replay instanceof DataRecord) {
+                    if ($this->hasIdempotencySignatureConflict($replay->get('metadata', []), $idempotencySignature)) {
+                        return Result::failure(new Error(
+                            PurchaseErrorCode::INVALID_VALUE,
+                            'idempotency_key is already used with a different request payload.',
+                        ));
+                    }
+
                     $metadata = $replay->get('metadata', []);
                     $replayedJournalEntryId = is_array($metadata) ? ($metadata['journal_entry_id'] ?? null) : null;
+                    if (
+                        $replayedJournalEntryId !== null
+                        && (string) $replayedJournalEntryId !== (string) $journalEntryId
+                    ) {
+                        return Result::failure(new Error(
+                            PurchaseErrorCode::INVALID_VALUE,
+                            'idempotency_key is already used with a different request payload.',
+                        ));
+                    }
+
                     if ((string) $replayedJournalEntryId === (string) $journalEntryId) {
                         return Result::success([
                             'reversed' => true,
@@ -1010,6 +1108,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 $payload,
                 $entityType,
                 $idempotencyKey,
+                $idempotencySignature,
             ): Result {
                 $reversalResult = $this->financePostingService->reverseByEntryId($journalEntryId, [
                     'tenant_id' => $tenantId,
@@ -1023,7 +1122,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 }
 
                 $status = strtolower((string) $record->get('status', ''));
-                $metadata = $this->metadataWithIdempotencyKey($payload, $idempotencyKey);
+                $metadata = $this->metadataWithIdempotencyKey($payload, $idempotencyKey, $idempotencySignature);
                 $metadata['workflow_action'] = 'finance_reverse';
                 $metadata['journal_entry_id'] = (string) $journalEntryId;
 
@@ -1330,12 +1429,74 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
         return is_string($value) ? trim($value) : '';
     }
 
-    /** @return array<string, mixed> */
-    private function metadataWithIdempotencyKey(array $payload, string $idempotencyKey): array
+    private function buildIdempotencySignature(string $action, array $payload): string
     {
+        $normalized = $payload;
+        unset($normalized['idempotency_key']);
+
+        $canonical = [
+            'action' => $action,
+            'payload' => $this->normalizeValueForSignature($normalized),
+        ];
+
+        $json = json_encode($canonical, JSON_UNESCAPED_SLASHES);
+        if (! is_string($json)) {
+            return '';
+        }
+
+        return hash('sha256', $json);
+    }
+
+    private function normalizeValueForSignature(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        if (array_is_list($value)) {
+            $normalizedList = [];
+            foreach ($value as $item) {
+                $normalizedList[] = $this->normalizeValueForSignature($item);
+            }
+
+            return $normalizedList;
+        }
+
+        $normalizedMap = [];
+        foreach ($value as $key => $item) {
+            $normalizedMap[(string) $key] = $this->normalizeValueForSignature($item);
+        }
+        ksort($normalizedMap);
+
+        return $normalizedMap;
+    }
+
+    private function hasIdempotencySignatureConflict(mixed $metadataValue, string $requestSignature): bool
+    {
+        if (! is_array($metadataValue) || $requestSignature === '') {
+            return false;
+        }
+
+        $storedSignature = (string) ($metadataValue['idempotency_signature'] ?? '');
+        if ($storedSignature === '') {
+            return false;
+        }
+
+        return ! hash_equals($storedSignature, $requestSignature);
+    }
+
+    /** @return array<string, mixed> */
+    private function metadataWithIdempotencyKey(
+        array $payload,
+        string $idempotencyKey,
+        string $idempotencySignature = '',
+    ): array {
         $metadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
         if ($idempotencyKey !== '') {
             $metadata['idempotency_key'] = $idempotencyKey;
+        }
+        if ($idempotencySignature !== '') {
+            $metadata['idempotency_signature'] = $idempotencySignature;
         }
 
         return $metadata;

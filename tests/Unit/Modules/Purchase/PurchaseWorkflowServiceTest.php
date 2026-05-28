@@ -1189,6 +1189,61 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertTrue((bool) ($result->valueOrFail()['idempotent_replay'] ?? false));
     }
 
+    public function testCreateDocumentFailsWhenIdempotencyKeyIsReusedWithDifferentPayload(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(703)
+            ->willReturn(new DataRecord([
+                'id' => 703,
+                'tenant_id' => 1,
+                'supplier_id' => 20,
+                'organization_unit_id' => 12,
+                'status' => 'confirmed',
+            ]));
+
+        $this->purchaseSettingRepository
+            ->expects(self::exactly(2))
+            ->method('list')
+            ->willReturnOnConsecutiveCalls([], []);
+
+        $this->purchaseDocumentLinkRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'source_type' => 'purchase_order',
+                'source_id' => 703,
+                'status' => 'active',
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 1,
+                    'document_id' => 4444,
+                    'source_line_id' => null,
+                    'document_line_id' => null,
+                    'metadata' => [
+                        'idempotency_key' => 'idem-doc-conflict-1',
+                        'idempotency_signature' => 'other-signature',
+                    ],
+                ]),
+            ]);
+
+        $result = $this->service->createDocument('purchase_order', 703, [
+            'tenant_id' => 1,
+            'document_type_id' => 44,
+            'idempotency_key' => 'idem-doc-conflict-1',
+        ]);
+
+        self::assertTrue($result->isFailure());
+        self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
+        self::assertSame(
+            'idempotency_key is already used with a different request payload.',
+            $result->errorOrFail()->message,
+        );
+    }
+
     public function testAllocatePaymentReturnsIdempotentReplayWhenKeyAlreadyExists(): void
     {
         $this->purchaseOrderRepository
@@ -1235,6 +1290,53 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertTrue((bool) ($result->valueOrFail()['idempotent_replay'] ?? false));
     }
 
+    public function testAllocatePaymentFailsWhenIdempotencyKeyIsReusedWithDifferentPayload(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(704)
+            ->willReturn(new DataRecord([
+                'id' => 704,
+                'tenant_id' => 1,
+                'organization_unit_id' => 12,
+                'status' => 'documented',
+            ]));
+
+        $this->purchasePaymentAllocationRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'document_id' => 9002,
+                'status' => 'active',
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 6002,
+                    'metadata' => [
+                        'idempotency_key' => 'idem-pay-conflict-1',
+                        'idempotency_signature' => 'different-signature',
+                    ],
+                ]),
+            ]);
+
+        $result = $this->service->allocatePayment('purchase_order', 704, [
+            'tenant_id' => 1,
+            'document_id' => 9002,
+            'payment_id' => 41,
+            'allocated_amount' => 10,
+            'idempotency_key' => 'idem-pay-conflict-1',
+        ]);
+
+        self::assertTrue($result->isFailure());
+        self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
+        self::assertSame(
+            'idempotency_key is already used with a different request payload.',
+            $result->errorOrFail()->message,
+        );
+    }
+
     public function testPostInventoryReturnsIdempotentReplayWhenKeyAlreadyExists(): void
     {
         $this->purchaseReturnRepository
@@ -1277,6 +1379,53 @@ final class PurchaseWorkflowServiceTest extends TestCase
 
         self::assertTrue($result->isSuccess());
         self::assertTrue((bool) ($result->valueOrFail()['idempotent_replay'] ?? false));
+    }
+
+    public function testPostInventoryFailsWhenIdempotencyKeyIsReusedWithDifferentPayload(): void
+    {
+        $this->grnHeaderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(801)
+            ->willReturn(new DataRecord([
+                'id' => 801,
+                'tenant_id' => 1,
+                'organization_unit_id' => 12,
+                'status' => 'approved',
+            ]));
+
+        $this->purchaseStatusHistoryRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'entity_type' => 'grn_header',
+                'entity_id' => 801,
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 11,
+                    'metadata' => [
+                        'idempotency_key' => 'idem-inv-conflict-1',
+                        'workflow_action' => 'inventory_post',
+                        'idempotency_signature' => 'existing-signature',
+                    ],
+                ]),
+            ]);
+
+        $result = $this->service->postInventory('grn_header', 801, [
+            'tenant_id' => 1,
+            'movement_type' => 'in',
+            'warehouse_id' => 5,
+            'idempotency_key' => 'idem-inv-conflict-1',
+        ]);
+
+        self::assertTrue($result->isFailure());
+        self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
+        self::assertSame(
+            'idempotency_key is already used with a different request payload.',
+            $result->errorOrFail()->message,
+        );
     }
 
     public function testPostFinanceReturnsIdempotentReplayWhenKeyAlreadyExists(): void
@@ -1325,6 +1474,53 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertTrue((bool) ($result->valueOrFail()['idempotent_replay'] ?? false));
     }
 
+    public function testPostFinanceFailsWhenIdempotencyKeyIsReusedWithDifferentPayload(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(802)
+            ->willReturn(new DataRecord([
+                'id' => 802,
+                'tenant_id' => 1,
+                'organization_unit_id' => 12,
+                'status' => 'documented',
+            ]));
+
+        $this->purchaseStatusHistoryRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'entity_type' => 'purchase_order',
+                'entity_id' => 802,
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 12,
+                    'metadata' => [
+                        'idempotency_key' => 'idem-fin-conflict-1',
+                        'workflow_action' => 'finance_post',
+                        'idempotency_signature' => 'existing-signature',
+                    ],
+                ]),
+            ]);
+
+        $result = $this->service->postFinance('purchase_order', 802, [
+            'tenant_id' => 1,
+            'entry_payload' => ['memo' => 'changed payload'],
+            'lines_payload' => [['account_id' => 5, 'debit' => 25]],
+            'idempotency_key' => 'idem-fin-conflict-1',
+        ]);
+
+        self::assertTrue($result->isFailure());
+        self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
+        self::assertSame(
+            'idempotency_key is already used with a different request payload.',
+            $result->errorOrFail()->message,
+        );
+    }
+
     public function testTransitionReturnsIdempotentReplayWhenHistoryExistsForSameTargetStatus(): void
     {
         $this->purchaseOrderRepository
@@ -1371,6 +1567,53 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertTrue($result->isSuccess());
     }
 
+    public function testTransitionFailsWhenIdempotencyKeyIsReusedWithDifferentTargetStatus(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(903)
+            ->willReturn(new DataRecord([
+                'id' => 903,
+                'tenant_id' => 1,
+                'organization_unit_id' => 12,
+                'status' => 'draft',
+            ]));
+
+        $this->purchaseStatusHistoryRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'entity_type' => 'purchase_order',
+                'entity_id' => 903,
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 3,
+                    'to_status' => 'submitted',
+                    'metadata' => [
+                        'idempotency_key' => 'idem-tr-2',
+                        'workflow_action' => 'transition',
+                        'target_status' => 'submitted',
+                    ],
+                ]),
+            ]);
+
+        $result = $this->service->transition('purchase_order', 903, [
+            'tenant_id' => 1,
+            'status' => 'approved',
+            'idempotency_key' => 'idem-tr-2',
+        ]);
+
+        self::assertTrue($result->isFailure());
+        self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
+        self::assertSame(
+            'idempotency_key is already used with a different request payload.',
+            $result->errorOrFail()->message,
+        );
+    }
+
     public function testReverseFinanceReturnsIdempotentReplayWhenKeyAlreadyExists(): void
     {
         $this->purchaseOrderRepository
@@ -1415,5 +1658,55 @@ final class PurchaseWorkflowServiceTest extends TestCase
 
         self::assertTrue($result->isSuccess());
         self::assertTrue((bool) ($result->valueOrFail()['idempotent_replay'] ?? false));
+    }
+
+    public function testReverseFinanceFailsWhenIdempotencyKeyIsReusedWithDifferentJournalEntryId(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(904)
+            ->willReturn(new DataRecord([
+                'id' => 904,
+                'tenant_id' => 1,
+                'organization_unit_id' => 12,
+                'status' => 'documented',
+            ]));
+
+        $this->purchaseStatusHistoryRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with([
+                'tenant_id' => 1,
+                'entity_type' => 'purchase_order',
+                'entity_id' => 904,
+            ])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 4,
+                    'metadata' => [
+                        'idempotency_key' => 'idem-rf-2',
+                        'workflow_action' => 'finance_reverse',
+                        'journal_entry_id' => '888',
+                    ],
+                ]),
+            ]);
+
+        $this->financePostingService
+            ->expects(self::never())
+            ->method('reverseByEntryId');
+
+        $result = $this->service->reverseFinance('purchase_order', 904, [
+            'tenant_id' => 1,
+            'journal_entry_id' => 889,
+            'idempotency_key' => 'idem-rf-2',
+        ]);
+
+        self::assertTrue($result->isFailure());
+        self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
+        self::assertSame(
+            'idempotency_key is already used with a different request payload.',
+            $result->errorOrFail()->message,
+        );
     }
 }
