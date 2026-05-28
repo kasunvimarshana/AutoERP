@@ -10,42 +10,58 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('recurring_vouchers', function (Blueprint $table) {
+        Schema::create('voucher_types', function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
-            $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
-            $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
+            $table->unsignedBigInteger('row_version')->default(1);
+            $table->foreignId('tenant_id')
+                ->constrained('tenants')
+                ->cascadeOnDelete();
+            $table->foreignId('organization_unit_id')
+                ->nullable()
+                ->constrained('organization_units')
+                ->nullOnDelete();
+            $table->json('metadata')->nullable();
 
-            $table->string('name')->comment('e.g., Monthly Rent, Annual Insurance');
-            $table->string('type')->default('expense')->comment('expense, income');
-            $table->string('sub_type')->nullable()->comment('electricity, phone, rent, commission, misc_income, interest');
-            $table->string('party_type')->nullable()->comment('customer, supplier, employee, other');
-            $table->unsignedBigInteger('party_id')->nullable();
-            $table->string('reference')->nullable();
-            $table->text('description')->nullable();
-            $table->foreignId('account_id')->constrained('accounts')->comment('primary expense/income account');
-            $table->foreignId('contra_account_id')->constrained('accounts')->comment('bank/cash/payable');
-            $table->foreignId('tax_rate_id')->nullable()->constrained('tax_rates')->nullOnDelete()->comment('applied tax rate');
-            $table->decimal('tax_rate', 20, 4)->default(0)->comment('cached tax rate for historical accuracy');
-            $table->decimal('amount', 20, 4);
-            $table->decimal('tax_amount', 20, 4)->default(0);
-            $table->decimal('total_amount', 20, 4);
-            $table->string('frequency')->default('monthly')->comment('daily, weekly, monthly, quarterly, yearly');
-            $table->unsignedInteger('interval')->default(1)->comment('every X frequency (e.g., every 3 months)');
-            $table->date('start_date');
-            $table->date('end_date')->nullable();
-            $table->date('next_run_date');
+            $table->string('name');
+            $table->string('code', 120);
+            $table->string('direction')
+                ->comment('payable, receivable, journal, transfer');
+            $table->string('posting_behavior')->default('manual');
+            $table->json('allowed_payment_methods')->nullable();
+            $table->json('status_workflow')->nullable();
+
+            $table->foreignId('default_cash_account_id')->nullable()->constrained('accounts')->nullOnDelete();
+            $table->foreignId('default_bank_account_id')->nullable()->constrained('accounts')->nullOnDelete();
+            $table->foreignId('default_expense_account_id')
+                ->nullable()
+                ->constrained('accounts')
+                ->nullOnDelete();
+            $table->foreignId('default_receivable_account_id')->nullable()->constrained('accounts')->nullOnDelete();
+            $table->foreignId('default_payable_account_id')->nullable()->constrained('accounts')->nullOnDelete();
+            $table->foreignId('default_tax_account_id')->nullable()->constrained('accounts')->nullOnDelete();
+
+            $table->foreignId('document_type_id')->nullable()->constrained('document_types')->nullOnDelete();
+            $table->foreignId('document_definition_id')->nullable()->constrained('document_definitions')->nullOnDelete();
+
+            $table->boolean('requires_approval')->default(true);
+            $table->boolean('allow_direct_posting')->default(false);
+            $table->boolean('allow_reversal')->default(true);
+            $table->boolean('allow_partial_allocation')->default(true);
             $table->boolean('is_active')->default(true);
+
             $table->unsignedBigInteger('created_by')->nullable();
+            $table->unsignedBigInteger('updated_by')->nullable();
 
             $table->timestamps();
             $table->softDeletes();
+
+            $table->unique(['tenant_id', 'organization_unit_id', 'code'], 'voucher_types_tenant_org_code_uk');
+            $table->index(['tenant_id', 'is_active'], 'voucher_types_tenant_active_idx');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('recurring_vouchers');
+        Schema::dropIfExists('voucher_types');
     }
 };

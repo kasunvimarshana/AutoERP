@@ -5,102 +5,110 @@ declare(strict_types=1);
 namespace Modules\Voucher\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Modules\Core\Application\DTO\PagedResult;
-use Modules\Voucher\Application\Contracts\UseCases\Vouchers\CreateVoucherServiceInterface;
-use Modules\Voucher\Application\Contracts\UseCases\Vouchers\DeleteVoucherServiceInterface;
-use Modules\Voucher\Application\Contracts\UseCases\Vouchers\GetVoucherServiceInterface;
-use Modules\Voucher\Application\Contracts\UseCases\Vouchers\ListVouchersServiceInterface;
-use Modules\Voucher\Application\Contracts\UseCases\Vouchers\UpdateVoucherServiceInterface;
-use Modules\Voucher\Presentation\Http\Requests\ListVoucherRequest;
+use Modules\Core\Application\DTO\DataRecord;
+use Modules\Core\Application\Results\Result;
+use Modules\Voucher\Application\Contracts\Services\VoucherManagementServiceInterface;
+use Modules\Voucher\Presentation\Http\Requests\UpsertVoucherAllocationRequest;
+use Modules\Voucher\Presentation\Http\Requests\UpsertVoucherLinesRequest;
 use Modules\Voucher\Presentation\Http\Requests\UpsertVoucherRequest;
 use Modules\Voucher\Presentation\Http\Resources\VoucherResource;
 
 final class VoucherController extends Controller
 {
-    public function __construct(
-        private readonly ListVouchersServiceInterface $listService,
-        private readonly GetVoucherServiceInterface $getService,
-        private readonly CreateVoucherServiceInterface $createService,
-        private readonly UpdateVoucherServiceInterface $updateService,
-        private readonly DeleteVoucherServiceInterface $deleteService,
-    ) {
+    public function __construct(private readonly VoucherManagementServiceInterface $service)
+    {
     }
 
-    public function index(ListVoucherRequest $request): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $validated = $request->validated();
-        $perPage = (int) ($validated['per_page'] ?? 0);
-        $page = (int) ($validated['page'] ?? 0);
-        unset($validated['per_page'], $validated['page']);
-
-        $result = $this->listService->execute($validated, $perPage, $page);
-
-        if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 422);
-        }
-
-        $pageResult = $result->valueOrFail();
-        if (! $pageResult instanceof PagedResult) {
-            return response()->json(['message' => 'Unexpected list response.'], 500);
-        }
-
-        return response()->json([
-            'data' => VoucherResource::collection($pageResult->items)->resolve(),
-            'meta' => [
-                'total' => $pageResult->total,
-                'page' => $pageResult->page,
-                'per_page' => $pageResult->perPage,
-                'page_count' => $pageResult->pageCount(),
-                'has_more' => $pageResult->hasMore(),
-            ],
-        ]);
+        return $this->respond($this->service->list($request->all()));
     }
 
-    public function show(int|string $id): JsonResponse|VoucherResource
+    public function store(UpsertVoucherRequest $request): JsonResponse
     {
-        $result = $this->getService->execute($id);
-
-        if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 404);
-        }
-
-        return new VoucherResource($result->valueOrFail());
+        return $this->respond($this->service->create($request->validated()));
     }
 
-    public function store(UpsertVoucherRequest $request): JsonResponse|VoucherResource
+    public function show(int $voucher): JsonResponse
     {
-        $result = $this->createService->execute($request->validated());
-
-        if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 422);
-        }
-
-        return (new VoucherResource($result->valueOrFail()))->response()->setStatusCode(201);
+        return $this->respond($this->service->getById($voucher));
     }
 
-    public function update(UpsertVoucherRequest $request, int|string $id): JsonResponse|VoucherResource
+    public function update(UpsertVoucherRequest $request, int $voucher): JsonResponse
     {
-        $result = $this->updateService->execute($id, $request->validated());
+        return $this->respond($this->service->update($voucher, $request->validated()));
+    }
 
+    public function destroy(int $voucher): JsonResponse
+    {
+        return $this->respond($this->service->delete($voucher));
+    }
+
+    public function upsertLines(UpsertVoucherLinesRequest $request, int $voucher): JsonResponse
+    {
+        return $this->respond($this->service->upsertLines($voucher, $request->validated('lines', [])));
+    }
+
+    public function allocations(int $voucher): JsonResponse
+    {
+        return $this->respond($this->service->listAllocations($voucher));
+    }
+
+    public function addAllocation(UpsertVoucherAllocationRequest $request, int $voucher): JsonResponse
+    {
+        return $this->respond($this->service->addAllocation($voucher, $request->validated()));
+    }
+
+    public function updateAllocation(UpsertVoucherAllocationRequest $request, int $allocation): JsonResponse
+    {
+        return $this->respond($this->service->updateAllocation($allocation, $request->validated()));
+    }
+
+    private function respond(Result $result): JsonResponse
+    {
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
-            $status = $error->code === 'VOUCHER_NOT_FOUND' ? 404 : 422;
+            $statusCode = $error->code === 'VOUCHER_NOT_FOUND' ? 404 : 422;
 
-            return response()->json(['message' => $error->message], $status);
+            return response()->json([
+                'message' => $error->message,
+                'code' => $error->code,
+                'meta' => $error->context,
+            ], $statusCode);
         }
 
-        return new VoucherResource($result->valueOrFail());
-    }
-
-    public function destroy(int|string $id): JsonResponse
-    {
-        $result = $this->deleteService->execute($id);
-
-        if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 404);
+        $value = $result->valueOrFail();
+        if ($value instanceof DataRecord) {
+            return response()->json(['data' => new VoucherResource($value->toArray())]);
         }
 
-        return response()->json(null, 204);
+        if (is_array($value) && isset($value['id'])) {
+            return response()->json(['data' => new VoucherResource($value)]);
+        }
+
+        if (is_array($value)) {
+            $allRecords = true;
+            foreach ($value as $item) {
+                if (! $item instanceof DataRecord) {
+                    $allRecords = false;
+                    break;
+                }
+            }
+
+            if ($allRecords) {
+                $rows = array_map(
+                    static function (DataRecord $record): array {
+                        return (new VoucherResource($record->toArray()))->toArray(request());
+                    },
+                    $value,
+                );
+
+                return response()->json(['data' => $rows]);
+            }
+        }
+
+        return response()->json(['data' => $value]);
     }
 }

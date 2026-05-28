@@ -5,32 +5,50 @@ declare(strict_types=1);
 namespace Modules\Voucher\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Modules\Voucher\Application\Contracts\UseCases\RecurringVouchers\CreateRecurringVoucherServiceInterface;
-use Modules\Voucher\Application\Contracts\UseCases\RecurringVouchers\DeleteRecurringVoucherServiceInterface;
-use Modules\Voucher\Application\Contracts\UseCases\RecurringVouchers\GetRecurringVoucherServiceInterface;
-use Modules\Voucher\Application\Contracts\UseCases\RecurringVouchers\ListRecurringVouchersServiceInterface;
-use Modules\Voucher\Application\Contracts\UseCases\RecurringVouchers\UpdateRecurringVoucherServiceInterface;
-use Modules\Voucher\Application\Contracts\UseCases\Vouchers\CreateVoucherServiceInterface;
-use Modules\Voucher\Application\Contracts\UseCases\Vouchers\DeleteVoucherServiceInterface;
-use Modules\Voucher\Application\Contracts\UseCases\Vouchers\GetVoucherServiceInterface;
-use Modules\Voucher\Application\Contracts\UseCases\Vouchers\ListVouchersServiceInterface;
-use Modules\Voucher\Application\Contracts\UseCases\Vouchers\UpdateVoucherServiceInterface;
-use Modules\Voucher\Application\Repositories\RecurringVoucherRepositoryInterface;
+use Modules\Voucher\Application\Contracts\Services\VoucherManagementServiceInterface;
+use Modules\Voucher\Application\Contracts\Services\VoucherTypeServiceInterface;
+use Modules\Voucher\Application\Contracts\Services\VoucherUtilityServiceInterface;
+use Modules\Voucher\Application\Contracts\Services\VoucherWorkflowServiceInterface;
+use Modules\Voucher\Application\Repositories\VoucherAllocationRepositoryInterface;
+use Modules\Voucher\Application\Repositories\VoucherApprovalRepositoryInterface;
+use Modules\Voucher\Application\Repositories\VoucherDocumentLinkRepositoryInterface;
+use Modules\Voucher\Application\Repositories\VoucherFinancePostingLinkRepositoryInterface;
+use Modules\Voucher\Application\Repositories\VoucherLineRepositoryInterface;
+use Modules\Voucher\Application\Repositories\VoucherMetadataDefinitionRepositoryInterface;
+use Modules\Voucher\Application\Repositories\VoucherMetadataValueRepositoryInterface;
+use Modules\Voucher\Application\Repositories\VoucherPaymentLinkRepositoryInterface;
 use Modules\Voucher\Application\Repositories\VoucherRepositoryInterface;
-use Modules\Voucher\Application\UseCases\RecurringVouchers\CreateRecurringVoucherService;
-use Modules\Voucher\Application\UseCases\RecurringVouchers\DeleteRecurringVoucherService;
-use Modules\Voucher\Application\UseCases\RecurringVouchers\GetRecurringVoucherService;
-use Modules\Voucher\Application\UseCases\RecurringVouchers\ListRecurringVouchersService;
-use Modules\Voucher\Application\UseCases\RecurringVouchers\UpdateRecurringVoucherService;
-use Modules\Voucher\Application\UseCases\Vouchers\CreateVoucherService;
-use Modules\Voucher\Application\UseCases\Vouchers\DeleteVoucherService;
-use Modules\Voucher\Application\UseCases\Vouchers\GetVoucherService;
-use Modules\Voucher\Application\UseCases\Vouchers\ListVouchersService;
-use Modules\Voucher\Application\UseCases\Vouchers\UpdateVoucherService;
-use Modules\Voucher\Infrastructure\Persistence\Eloquent\Models\RecurringVoucherModel;
+use Modules\Voucher\Application\Repositories\VoucherSettingRepositoryInterface;
+use Modules\Voucher\Application\Repositories\VoucherStatusHistoryRepositoryInterface;
+use Modules\Voucher\Application\Repositories\VoucherTypeRepositoryInterface;
+use Modules\Voucher\Application\Services\VoucherManagementService;
+use Modules\Voucher\Application\Services\VoucherTypeService;
+use Modules\Voucher\Application\Services\VoucherUtilityService;
+use Modules\Voucher\Application\Services\VoucherWorkflowService;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Models\VoucherAllocationModel;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Models\VoucherApprovalModel;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Models\VoucherDocumentLinkModel;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Models\VoucherFinancePostingLinkModel;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Models\VoucherLineModel;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Models\VoucherMetadataDefinitionModel;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Models\VoucherMetadataValueModel;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Models\VoucherPaymentLinkModel;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Models\VoucherSettingModel;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Models\VoucherStatusHistoryModel;
 use Modules\Voucher\Infrastructure\Persistence\Eloquent\Models\VoucherModel;
-use Modules\Voucher\Infrastructure\Persistence\Eloquent\Repositories\EloquentRecurringVoucherRepository;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Models\VoucherTypeModel;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Repositories\EloquentVoucherAllocationRepository;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Repositories\EloquentVoucherApprovalRepository;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Repositories\EloquentVoucherDocumentLinkRepository;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Repositories\EloquentVoucherFinancePostingLinkRepository;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Repositories\EloquentVoucherLineRepository;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Repositories\EloquentVoucherMetadataDefinitionRepository;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Repositories\EloquentVoucherMetadataValueRepository;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Repositories\EloquentVoucherPaymentLinkRepository;
 use Modules\Voucher\Infrastructure\Persistence\Eloquent\Repositories\EloquentVoucherRepository;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Repositories\EloquentVoucherSettingRepository;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Repositories\EloquentVoucherStatusHistoryRepository;
+use Modules\Voucher\Infrastructure\Persistence\Eloquent\Repositories\EloquentVoucherTypeRepository;
 
 final class VoucherServiceProvider extends ServiceProvider
 {
@@ -40,16 +58,10 @@ final class VoucherServiceProvider extends ServiceProvider
 
         foreach (
             [
-                ListVouchersServiceInterface::class => ListVouchersService::class,
-                GetVoucherServiceInterface::class => GetVoucherService::class,
-                CreateVoucherServiceInterface::class => CreateVoucherService::class,
-                UpdateVoucherServiceInterface::class => UpdateVoucherService::class,
-                DeleteVoucherServiceInterface::class => DeleteVoucherService::class,
-                ListRecurringVouchersServiceInterface::class => ListRecurringVouchersService::class,
-                GetRecurringVoucherServiceInterface::class => GetRecurringVoucherService::class,
-                CreateRecurringVoucherServiceInterface::class => CreateRecurringVoucherService::class,
-                UpdateRecurringVoucherServiceInterface::class => UpdateRecurringVoucherService::class,
-                DeleteRecurringVoucherServiceInterface::class => DeleteRecurringVoucherService::class,
+                VoucherTypeServiceInterface::class => VoucherTypeService::class,
+                VoucherManagementServiceInterface::class => VoucherManagementService::class,
+                VoucherWorkflowServiceInterface::class => VoucherWorkflowService::class,
+                VoucherUtilityServiceInterface::class => VoucherUtilityService::class,
             ] as $contract => $implementation
         ) {
             $this->app->singleton($contract, $implementation);
@@ -58,9 +70,65 @@ final class VoucherServiceProvider extends ServiceProvider
         $this->app->singleton(VoucherRepositoryInterface::class, function (): VoucherRepositoryInterface {
             return new EloquentVoucherRepository(new VoucherModel());
         });
-        $this->app->singleton(RecurringVoucherRepositoryInterface::class, function (): RecurringVoucherRepositoryInterface {
-            return new EloquentRecurringVoucherRepository(new RecurringVoucherModel());
+
+        $this->app->singleton(VoucherSettingRepositoryInterface::class, function (): VoucherSettingRepositoryInterface {
+            return new EloquentVoucherSettingRepository(new VoucherSettingModel());
         });
+
+        $this->app->singleton(VoucherTypeRepositoryInterface::class, function (): VoucherTypeRepositoryInterface {
+            return new EloquentVoucherTypeRepository(new VoucherTypeModel());
+        });
+
+        $this->app->singleton(VoucherLineRepositoryInterface::class, function (): VoucherLineRepositoryInterface {
+            return new EloquentVoucherLineRepository(new VoucherLineModel());
+        });
+
+        $this->app->singleton(VoucherAllocationRepositoryInterface::class, function (): VoucherAllocationRepositoryInterface {
+            return new EloquentVoucherAllocationRepository(new VoucherAllocationModel());
+        });
+
+        $this->app->singleton(VoucherApprovalRepositoryInterface::class, function (): VoucherApprovalRepositoryInterface {
+            return new EloquentVoucherApprovalRepository(new VoucherApprovalModel());
+        });
+
+        $this->app->singleton(
+            VoucherStatusHistoryRepositoryInterface::class,
+            function (): VoucherStatusHistoryRepositoryInterface {
+                return new EloquentVoucherStatusHistoryRepository(new VoucherStatusHistoryModel());
+            }
+        );
+
+        $this->app->singleton(
+            VoucherDocumentLinkRepositoryInterface::class,
+            function (): VoucherDocumentLinkRepositoryInterface {
+                return new EloquentVoucherDocumentLinkRepository(new VoucherDocumentLinkModel());
+            }
+        );
+
+        $this->app->singleton(VoucherPaymentLinkRepositoryInterface::class, function (): VoucherPaymentLinkRepositoryInterface {
+            return new EloquentVoucherPaymentLinkRepository(new VoucherPaymentLinkModel());
+        });
+
+        $this->app->singleton(
+            VoucherFinancePostingLinkRepositoryInterface::class,
+            function (): VoucherFinancePostingLinkRepositoryInterface {
+                return new EloquentVoucherFinancePostingLinkRepository(new VoucherFinancePostingLinkModel());
+            }
+        );
+
+        $this->app->singleton(
+            VoucherMetadataDefinitionRepositoryInterface::class,
+            function (): VoucherMetadataDefinitionRepositoryInterface {
+                return new EloquentVoucherMetadataDefinitionRepository(new VoucherMetadataDefinitionModel());
+            }
+        );
+
+        $this->app->singleton(
+            VoucherMetadataValueRepositoryInterface::class,
+            function (): VoucherMetadataValueRepositoryInterface {
+                return new EloquentVoucherMetadataValueRepository(new VoucherMetadataValueModel());
+            }
+        );
     }
 
     public function boot(): void

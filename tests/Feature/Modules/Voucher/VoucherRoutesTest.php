@@ -11,16 +11,36 @@ final class VoucherRoutesTest extends TestCase
 {
     public function testVoucherRoutesAreRegistered(): void
     {
+        self::assertTrue(Route::has('voucher.types.index'));
+        self::assertTrue(Route::has('voucher.types.store'));
+        self::assertTrue(Route::has('voucher.types.show'));
+        self::assertTrue(Route::has('voucher.types.update'));
+        self::assertTrue(Route::has('voucher.types.activate'));
+        self::assertTrue(Route::has('voucher.types.deactivate'));
+
         self::assertTrue(Route::has('voucher.vouchers.index'));
         self::assertTrue(Route::has('voucher.vouchers.store'));
         self::assertTrue(Route::has('voucher.vouchers.show'));
         self::assertTrue(Route::has('voucher.vouchers.update'));
         self::assertTrue(Route::has('voucher.vouchers.destroy'));
-        self::assertTrue(Route::has('voucher.recurring-vouchers.index'));
-        self::assertTrue(Route::has('voucher.recurring-vouchers.store'));
-        self::assertTrue(Route::has('voucher.recurring-vouchers.show'));
-        self::assertTrue(Route::has('voucher.recurring-vouchers.update'));
-        self::assertTrue(Route::has('voucher.recurring-vouchers.destroy'));
+
+        self::assertTrue(Route::has('voucher.vouchers.lines.upsert'));
+        self::assertTrue(Route::has('voucher.vouchers.allocations.index'));
+        self::assertTrue(Route::has('voucher.vouchers.allocations.store'));
+        self::assertTrue(Route::has('voucher.allocations.update'));
+
+        self::assertTrue(Route::has('voucher.vouchers.submit'));
+        self::assertTrue(Route::has('voucher.vouchers.approve'));
+        self::assertTrue(Route::has('voucher.vouchers.reject'));
+        self::assertTrue(Route::has('voucher.vouchers.post'));
+        self::assertTrue(Route::has('voucher.vouchers.cancel'));
+        self::assertTrue(Route::has('voucher.vouchers.reverse'));
+        self::assertTrue(Route::has('voucher.vouchers.history'));
+
+        self::assertTrue(Route::has('voucher.utilities.preview-number'));
+        self::assertTrue(Route::has('voucher.utilities.validate-balance'));
+        self::assertTrue(Route::has('voucher.utilities.validate-payment-method'));
+        self::assertTrue(Route::has('voucher.utilities.preview-posting'));
     }
 
     public function testVoucherRoutesUseContextMiddlewares(): void
