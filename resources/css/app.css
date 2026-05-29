@@ -7,6 +7,10 @@
 @source '../js/**/*.jsx';
 @source '../js/**/*.ts';
 @source '../js/**/*.tsx';
+@source '../ts/**/*.js';
+@source '../ts/**/*.jsx';
+@source '../ts/**/*.ts';
+@source '../ts/**/*.tsx';
 
 @theme {
     --font-sans: 'IBM Plex Sans', 'Segoe UI', sans-serif;
@@ -33,7 +37,8 @@
     }
 
     body {
-        @apply min-h-full bg-[radial-gradient(circle_at_top_left,_rgba(47,145,137,0.16),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(216,180,254,0.12),_transparent_24%),linear-gradient(180deg,_#fbfbf8_0%,_#f4f7f5_42%,_#eef2f1_100%)] text-slate-900 antialiased;
+        @apply min-h-full text-slate-900 antialiased;
+        background-image: radial-gradient(circle at top left, rgba(47, 145, 137, 0.16), transparent 28%), radial-gradient(circle at top right, rgba(216, 180, 254, 0.12), transparent 24%), linear-gradient(180deg, #fbfbf8 0%, #f4f7f5 42%, #eef2f1 100%);
         font-family: var(--font-sans);
     }
 
@@ -49,5 +54,9 @@
 @layer utilities {
     .font-display {
         font-family: var(--font-display);
+    }
+
+    .app-shell-inner {
+        max-width: 1560px;
     }
 }
