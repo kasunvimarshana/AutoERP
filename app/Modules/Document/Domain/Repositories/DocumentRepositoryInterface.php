@@ -82,6 +82,42 @@ interface DocumentRepositoryInterface
     public function listRelations(int $tenantId, int $documentId): array;
 
     /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listAttachments(int $tenantId, int $documentId): array;
+
+    public function removeAttachment(int $tenantId, int $documentId, int $attachmentId): bool;
+
+    public function removeRelation(int $tenantId, int $documentId, int $relationId): bool;
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listVersions(int $tenantId, int $documentId): array;
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getVersion(int $tenantId, int $documentId, int $versionId): ?array;
+
+    /**
+     * @param  array<int, array<string, mixed>>  $permissions
+     * @return array<int, array<string, mixed>>
+     */
+    public function replacePermissions(int $tenantId, int $documentId, array $permissions): array;
+
+    /**
+     * @param  array<int, array<string, mixed>>  $metadata
+     * @return array<int, array<string, mixed>>
+     */
+    public function updateDocumentMetadata(int $tenantId, int $documentId, array $metadata): array;
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listDocumentLines(int $tenantId, int $documentId): array;
+
+    /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
@@ -91,6 +127,17 @@ interface DocumentRepositoryInterface
      * @return array<int, array<string, mixed>>
      */
     public function listDocumentTypes(): array;
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getDocumentType(int $typeId): ?array;
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function updateDocumentType(int $tenantId, int $typeId, array $payload): array;
 
     /**
      * @param  array<string, mixed>  $payload
@@ -113,6 +160,45 @@ interface DocumentRepositoryInterface
      * @return array<int, array<string, mixed>>
      */
     public function listDocumentDefinitions(int $tenantId): array;
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getDocumentDefinition(int $tenantId, int $definitionId): ?array;
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function updateDocumentDefinition(int $tenantId, int $definitionId, array $payload): array;
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listTemplates(int $tenantId): array;
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getTemplate(int $tenantId, int $templateId): ?array;
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function createTemplate(int $tenantId, array $payload): array;
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function updateTemplate(int $tenantId, int $templateId, array $payload): array;
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function createRenderLog(int $tenantId, array $payload): array;
 
     /**
      * @param  array<string, mixed>  $payload

@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace Modules\Pricing\Presentation\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Modules\Pricing\Presentation\Http\Requests\Concerns\ResolvesPricingTenant;
 
 final class UpsertPriceListItemRequest extends FormRequest
 {
+    use ResolvesPricingTenant;
+
     public function authorize(): bool
     {
         return true;

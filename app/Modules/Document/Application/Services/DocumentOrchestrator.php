@@ -180,6 +180,66 @@ class DocumentOrchestrator
     }
 
     /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listAttachments(int $tenantId, int $documentId): array
+    {
+        return $this->documentRepository->listAttachments($tenantId, $documentId);
+    }
+
+    public function removeAttachment(int $tenantId, int $documentId, int $attachmentId): bool
+    {
+        return $this->documentRepository->removeAttachment($tenantId, $documentId, $attachmentId);
+    }
+
+    public function removeRelation(int $tenantId, int $documentId, int $relationId): bool
+    {
+        return $this->documentRepository->removeRelation($tenantId, $documentId, $relationId);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listVersions(int $tenantId, int $documentId): array
+    {
+        return $this->documentRepository->listVersions($tenantId, $documentId);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getVersion(int $tenantId, int $documentId, int $versionId): ?array
+    {
+        return $this->documentRepository->getVersion($tenantId, $documentId, $versionId);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $permissions
+     * @return array<int, array<string, mixed>>
+     */
+    public function updatePermissions(int $tenantId, int $documentId, array $permissions): array
+    {
+        return $this->documentRepository->replacePermissions($tenantId, $documentId, $permissions);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $metadata
+     * @return array<int, array<string, mixed>>
+     */
+    public function updateDocumentMetadata(int $tenantId, int $documentId, array $metadata): array
+    {
+        return $this->documentRepository->updateDocumentMetadata($tenantId, $documentId, $metadata);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listDocumentLines(int $tenantId, int $documentId): array
+    {
+        return $this->documentRepository->listDocumentLines($tenantId, $documentId);
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
@@ -194,6 +254,23 @@ class DocumentOrchestrator
     public function listDocumentTypes(): array
     {
         return $this->documentRepository->listDocumentTypes();
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getDocumentType(int $typeId): ?array
+    {
+        return $this->documentRepository->getDocumentType($typeId);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function updateDocumentType(int $tenantId, int $typeId, array $payload): array
+    {
+        return $this->documentRepository->updateDocumentType($tenantId, $typeId, $payload);
     }
 
     /**
@@ -228,6 +305,100 @@ class DocumentOrchestrator
     public function listDocumentDefinitions(int $tenantId): array
     {
         return $this->documentRepository->listDocumentDefinitions($tenantId);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getDocumentDefinition(int $tenantId, int $definitionId): ?array
+    {
+        return $this->documentRepository->getDocumentDefinition($tenantId, $definitionId);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function updateDocumentDefinition(int $tenantId, int $definitionId, array $payload): array
+    {
+        return $this->documentRepository->updateDocumentDefinition($tenantId, $definitionId, $payload);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listTemplates(int $tenantId): array
+    {
+        return $this->documentRepository->listTemplates($tenantId);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getTemplate(int $tenantId, int $templateId): ?array
+    {
+        return $this->documentRepository->getTemplate($tenantId, $templateId);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function createTemplate(int $tenantId, array $payload): array
+    {
+        return $this->documentRepository->createTemplate($tenantId, $payload);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function updateTemplate(int $tenantId, int $templateId, array $payload): array
+    {
+        return $this->documentRepository->updateTemplate($tenantId, $templateId, $payload);
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    public function previewTemplate(int $tenantId, array $input): array
+    {
+        $template = isset($input['template_id'])
+            ? $this->documentRepository->getTemplate($tenantId, (int) $input['template_id'])
+            : null;
+
+        $rendered = strtr(
+            (string) (($template['body_content'] ?? null) ?: '{{document_title}}' . PHP_EOL . '{{document_body}}'),
+            [
+                '{{document_title}}' => (string) ($input['title'] ?? 'Document Preview'),
+                '{{document_body}}' => (string) ($input['body'] ?? 'Backend-rendered preview body'),
+                '{{document_number}}' => (string) ($input['document_number'] ?? 'PREVIEW'),
+            ],
+        );
+
+        $this->documentRepository->createRenderLog($tenantId, [
+            'document_template_id' => $template['id'] ?? null,
+            'render_type' => 'template-preview',
+            'status' => 'rendered',
+            'message' => 'Template preview rendered.',
+        ]);
+
+        return [
+            'input' => $input,
+            'rendered' => [
+                'html' => nl2br(e($rendered)),
+                'text' => $rendered,
+                'template_id' => $template['id'] ?? null,
+                'template_name' => $template['template_name'] ?? null,
+            ],
+            'metadata' => [
+                'official' => false,
+                'business_logic_free' => true,
+            ],
+            'warnings' => [],
+            'errors' => [],
+        ];
     }
 
     /**

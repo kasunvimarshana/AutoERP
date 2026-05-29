@@ -1,0 +1,1 @@
+export { ItemTypeBadge } from './ItemBadges';

@@ -35,7 +35,9 @@ final class SupplierTaxProfileController extends Controller
             'supplier_id' => (int) $supplierId,
         ]);
 
-        return response()->json(['data' => $records[0]->toArray() ?? null]);
+        $profile = $records[0] ?? null;
+
+        return response()->json(['data' => $profile?->toArray()]);
     }
 
     public function upsert(UpsertSupplierTaxProfileRequest $request, int|string $supplierId): JsonResponse

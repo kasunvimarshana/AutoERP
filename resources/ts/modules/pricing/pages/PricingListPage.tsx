@@ -1,5 +1,5 @@
-import { PricingPage } from './PricingPage';
+import { PriceListPage } from './PriceListPage';
 
 export function PricingListPage() {
-    return <PricingPage />;
+    return <PriceListPage />;
 }

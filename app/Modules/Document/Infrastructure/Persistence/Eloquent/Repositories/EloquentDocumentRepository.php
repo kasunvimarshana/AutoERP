@@ -6,6 +6,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Modules\Document\Domain\Aggregates\DocumentAggregate;
 use Modules\Document\Domain\Entities\Document;
 use Modules\Document\Domain\Entities\DocumentItem;
@@ -407,14 +408,189 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
             ->all();
     }
 
+    public function listAttachments(int $tenantId, int $documentId): array
+    {
+        return DB::table('document_attachments')
+            ->where('tenant_id', $tenantId)
+            ->where('document_id', $documentId)
+            ->orderByDesc('id')
+            ->get()
+            ->map(static fn ($row): array => (array) $row)
+            ->all();
+    }
+
+    public function removeAttachment(int $tenantId, int $documentId, int $attachmentId): bool
+    {
+        return DB::table('document_attachments')
+            ->where('tenant_id', $tenantId)
+            ->where('document_id', $documentId)
+            ->where('id', $attachmentId)
+            ->delete() > 0;
+    }
+
+    public function removeRelation(int $tenantId, int $documentId, int $relationId): bool
+    {
+        return DB::table('document_relations')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $relationId)
+            ->where(function ($query) use ($documentId): void {
+                $query->where('source_document_id', $documentId)
+                    ->orWhere('target_document_id', $documentId);
+            })
+            ->delete() > 0;
+    }
+
+    public function listVersions(int $tenantId, int $documentId): array
+    {
+        return DB::table('document_versions')
+            ->where('tenant_id', $tenantId)
+            ->where('document_id', $documentId)
+            ->orderByDesc('version')
+            ->get()
+            ->map(static fn ($row): array => (array) $row)
+            ->all();
+    }
+
+    public function getVersion(int $tenantId, int $documentId, int $versionId): ?array
+    {
+        $row = DB::table('document_versions')
+            ->where('tenant_id', $tenantId)
+            ->where('document_id', $documentId)
+            ->where('id', $versionId)
+            ->first();
+
+        return $row === null ? null : (array) $row;
+    }
+
+    public function replacePermissions(int $tenantId, int $documentId, array $permissions): array
+    {
+        DB::table('document_permissions')
+            ->where('tenant_id', $tenantId)
+            ->where('document_id', $documentId)
+            ->delete();
+
+        foreach ($permissions as $permission) {
+            DB::table('document_permissions')->insert([
+                'tenant_id' => $tenantId,
+                'document_id' => $documentId,
+                'principal_type' => (string) ($permission['principal_type'] ?? 'role'),
+                'principal_identifier' => (string) ($permission['principal_identifier'] ?? ''),
+                'ability' => (string) ($permission['ability'] ?? 'view'),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return $this->listPermissions($tenantId, $documentId);
+    }
+
+    public function updateDocumentMetadata(int $tenantId, int $documentId, array $metadata): array
+    {
+        $this->assertDocumentExists($tenantId, $documentId);
+
+        DB::transaction(function () use ($tenantId, $documentId, $metadata): void {
+            foreach (array_values($metadata) as $index => $entry) {
+                $fieldKey = (string) $entry['field_key'];
+                $value = $entry['value'] ?? null;
+                $valueType = (string) ($entry['value_type'] ?? $this->inferValueType($value));
+
+                $definitionId = DB::table('document_metadata_definitions')
+                    ->where('tenant_id', $tenantId)
+                    ->where('entity_type', 'document')
+                    ->where('metadata_key', $fieldKey)
+                    ->value('id');
+
+                if ($definitionId === null) {
+                    $definitionId = DB::table('document_metadata_definitions')->insertGetId([
+                        'tenant_id' => $tenantId,
+                        'entity_type' => 'document',
+                        'metadata_key' => $fieldKey,
+                        'label' => (string) ($entry['label'] ?? str($fieldKey)->replace('_', ' ')->title()),
+                        'data_type' => $valueType,
+                        'is_required' => false,
+                        'is_active' => true,
+                        'display_order' => $index + 1,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+
+                DB::table('document_metadata_values')->updateOrInsert(
+                    [
+                        'tenant_id' => $tenantId,
+                        'metadata_definition_id' => $definitionId,
+                        'entity_type' => 'document',
+                        'entity_id' => $documentId,
+                    ],
+                    [
+                        ...$this->typedValueColumns($value),
+                        'value_type' => $valueType,
+                        'updated_at' => now(),
+                        'created_at' => now(),
+                    ],
+                );
+            }
+
+            $this->recordEvent($tenantId, $documentId, 'document.metadata_updated', [
+                'field_count' => count($metadata),
+            ]);
+        });
+
+        return $this->listDocumentMetadata($tenantId, $documentId);
+    }
+
+    public function listDocumentLines(int $tenantId, int $documentId): array
+    {
+        $this->assertDocumentExists($tenantId, $documentId);
+
+        $orderColumn = Schema::hasColumn('document_items', 'line_no') ? 'line_no' : 'sequence';
+
+        return DB::table('document_items')
+            ->where('tenant_id', $tenantId)
+            ->where('document_id', $documentId)
+            ->orderBy($orderColumn)
+            ->get()
+            ->map(static fn ($row): array => [
+                'id' => $row->id,
+                'document_id' => $row->document_id,
+                'line_no' => $row->line_no ?? $row->sequence ?? null,
+                'line_type' => $row->line_type ?? $row->item_type ?? 'line',
+                'item_label' => $row->item_label ?? null,
+                'description' => $row->description ?? null,
+                'quantity' => $row->quantity ?? null,
+                'uom_label' => $row->uom_label ?? null,
+                'unit_price' => $row->unit_price ?? null,
+                'discount_amount' => $row->discount_amount ?? null,
+                'tax_amount' => $row->tax_amount ?? null,
+                'line_total' => $row->line_total ?? null,
+                'source_line_type' => $row->source_line_type ?? null,
+                'source_line_id' => $row->source_line_id ?? null,
+                'display_order' => $row->display_order ?? $row->sequence ?? null,
+                'created_at' => $row->created_at ?? null,
+                'updated_at' => $row->updated_at ?? null,
+            ])
+            ->all();
+    }
+
     public function createDocumentType(int $tenantId, array $payload): array
     {
         $id = DB::table('document_types')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $payload['organization_unit_id'] ?? null,
             'name' => (string) $payload['name'],
             'code' => (string) $payload['code'],
+            'description' => $payload['description'] ?? null,
+            'module_scope' => (string) ($payload['module_scope'] ?? 'shared'),
             'default_status' => (string) ($payload['default_status'] ?? 'draft'),
             'is_active' => (bool) ($payload['is_active'] ?? true),
             'requires_source' => (bool) ($payload['requires_source'] ?? false),
+            'supports_items' => (bool) ($payload['supports_items'] ?? true),
+            'supports_attachments' => (bool) ($payload['supports_attachments'] ?? true),
+            'supports_comments' => (bool) ($payload['supports_comments'] ?? true),
+            'supports_versions' => (bool) ($payload['supports_versions'] ?? true),
+            'supports_workflow' => (bool) ($payload['supports_workflow'] ?? true),
+            'created_by' => $payload['created_by'] ?? null,
+            'updated_by' => $payload['updated_by'] ?? null,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -429,6 +605,37 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
             ->get()
             ->map(static fn ($row): array => (array) $row)
             ->all();
+    }
+
+    public function getDocumentType(int $typeId): ?array
+    {
+        $row = DB::table('document_types')->where('id', $typeId)->first();
+
+        return $row === null ? null : (array) $row;
+    }
+
+    public function updateDocumentType(int $tenantId, int $typeId, array $payload): array
+    {
+        DB::table('document_types')
+            ->where('id', $typeId)
+            ->update([
+                'name' => (string) ($payload['name'] ?? ''),
+                'code' => (string) ($payload['code'] ?? ''),
+                'description' => $payload['description'] ?? null,
+                'module_scope' => (string) ($payload['module_scope'] ?? 'shared'),
+                'default_status' => (string) ($payload['default_status'] ?? 'draft'),
+                'is_active' => (bool) ($payload['is_active'] ?? true),
+                'requires_source' => (bool) ($payload['requires_source'] ?? false),
+                'supports_items' => (bool) ($payload['supports_items'] ?? true),
+                'supports_attachments' => (bool) ($payload['supports_attachments'] ?? true),
+                'supports_comments' => (bool) ($payload['supports_comments'] ?? true),
+                'supports_versions' => (bool) ($payload['supports_versions'] ?? true),
+                'supports_workflow' => (bool) ($payload['supports_workflow'] ?? true),
+                'tenant_id' => $tenantId,
+                'updated_at' => now(),
+            ]);
+
+        return (array) DB::table('document_types')->where('id', $typeId)->first();
     }
 
     public function createItemType(int $tenantId, array $payload): array
@@ -464,10 +671,21 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
 
         $id = DB::table('document_definitions')->insertGetId([
             'tenant_id' => $tenantId,
+            'organization_unit_id' => $payload['organization_unit_id'] ?? null,
             'document_type_id' => (int) $payload['document_type_id'],
+            'definition_code' => $payload['definition_code'] ?? ($payload['settings']['code'] ?? null),
             'version' => (int) ($payload['version'] ?? 1),
             'name' => (string) $payload['name'],
+            'description' => $payload['description'] ?? ($payload['settings']['description'] ?? null),
+            'source_module' => (string) ($payload['source_module'] ?? ($payload['settings']['source_module'] ?? 'shared')),
+            'template_id' => isset($payload['template_id']) ? (int) $payload['template_id'] : null,
+            'sequence_id' => isset($payload['sequence_id']) ? (int) $payload['sequence_id'] : null,
+            'workflow_id' => isset($payload['workflow_id']) ? (int) $payload['workflow_id'] : null,
+            'default_status' => (string) ($payload['default_status'] ?? 'draft'),
+            'supports_versions' => (bool) ($payload['supports_versions'] ?? true),
             'is_active' => (bool) ($payload['is_active'] ?? true),
+            'created_by' => $payload['created_by'] ?? null,
+            'updated_by' => $payload['updated_by'] ?? null,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -480,9 +698,12 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
                 'label' => (string) ($field['label'] ?? $field['field_key']),
                 'data_type' => (string) ($field['data_type'] ?? 'text'),
                 'is_required' => (bool) ($field['is_required'] ?? false),
+                'is_readonly' => (bool) ($field['is_readonly'] ?? false),
                 'display_order' => (int) ($field['display_order'] ?? ($index + 1)),
                 'default_value' => isset($field['default_value']) ? (string) $field['default_value'] : null,
                 'validation_rule' => isset($field['validation_rule']) ? (string) $field['validation_rule'] : null,
+                'section_key' => $field['section_key'] ?? null,
+                'is_active' => (bool) ($field['is_active'] ?? true),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -630,6 +851,132 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
 
             return $definition;
         })->all();
+    }
+
+    public function getDocumentDefinition(int $tenantId, int $definitionId): ?array
+    {
+        $definitions = $this->listDocumentDefinitions($tenantId);
+
+        foreach ($definitions as $definition) {
+            if ((int) $definition['id'] === $definitionId) {
+                return $definition;
+            }
+        }
+
+        return null;
+    }
+
+    public function updateDocumentDefinition(int $tenantId, int $definitionId, array $payload): array
+    {
+        DB::table('document_definitions')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $definitionId)
+            ->update([
+                'document_type_id' => (int) ($payload['document_type_id'] ?? 0),
+                'definition_code' => $payload['definition_code'] ?? ($payload['settings']['code'] ?? null),
+                'version' => (int) ($payload['version'] ?? 1),
+                'name' => (string) ($payload['name'] ?? ''),
+                'description' => $payload['description'] ?? ($payload['settings']['description'] ?? null),
+                'source_module' => (string) ($payload['source_module'] ?? ($payload['settings']['source_module'] ?? 'shared')),
+                'template_id' => isset($payload['template_id']) ? (int) $payload['template_id'] : null,
+                'sequence_id' => isset($payload['sequence_id']) ? (int) $payload['sequence_id'] : null,
+                'workflow_id' => isset($payload['workflow_id']) ? (int) $payload['workflow_id'] : null,
+                'default_status' => (string) ($payload['default_status'] ?? 'draft'),
+                'supports_versions' => (bool) ($payload['supports_versions'] ?? true),
+                'is_active' => (bool) ($payload['is_active'] ?? true),
+                'updated_at' => now(),
+            ]);
+
+        return $this->getDocumentDefinition($tenantId, $definitionId) ?? [];
+    }
+
+    public function listTemplates(int $tenantId): array
+    {
+        if (! Schema::hasTable('document_templates')) {
+            return [];
+        }
+
+        return DB::table('document_templates')
+            ->where(function ($query) use ($tenantId): void {
+                $query->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
+            })
+            ->orderBy('template_name')
+            ->get()
+            ->map(static fn ($row): array => (array) $row)
+            ->all();
+    }
+
+    public function getTemplate(int $tenantId, int $templateId): ?array
+    {
+        $row = DB::table('document_templates')
+            ->where(function ($query) use ($tenantId): void {
+                $query->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
+            })
+            ->where('id', $templateId)
+            ->first();
+
+        return $row === null ? null : (array) $row;
+    }
+
+    public function createTemplate(int $tenantId, array $payload): array
+    {
+        $id = DB::table('document_templates')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $payload['organization_unit_id'] ?? null,
+            'document_type_id' => $payload['document_type_id'] ?? null,
+            'template_code' => (string) $payload['template_code'],
+            'template_name' => (string) $payload['template_name'],
+            'layout_type' => (string) ($payload['layout_type'] ?? 'html'),
+            'header_content' => $payload['header_content'] ?? null,
+            'body_content' => $payload['body_content'] ?? null,
+            'footer_content' => $payload['footer_content'] ?? null,
+            'is_active' => (bool) ($payload['is_active'] ?? true),
+            'created_by' => $payload['created_by'] ?? null,
+            'updated_by' => $payload['updated_by'] ?? null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return (array) DB::table('document_templates')->where('id', $id)->first();
+    }
+
+    public function updateTemplate(int $tenantId, int $templateId, array $payload): array
+    {
+        DB::table('document_templates')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $templateId)
+            ->update([
+                'document_type_id' => $payload['document_type_id'] ?? null,
+                'template_code' => (string) ($payload['template_code'] ?? ''),
+                'template_name' => (string) ($payload['template_name'] ?? ''),
+                'layout_type' => (string) ($payload['layout_type'] ?? 'html'),
+                'header_content' => $payload['header_content'] ?? null,
+                'body_content' => $payload['body_content'] ?? null,
+                'footer_content' => $payload['footer_content'] ?? null,
+                'is_active' => (bool) ($payload['is_active'] ?? true),
+                'updated_by' => $payload['updated_by'] ?? null,
+                'updated_at' => now(),
+            ]);
+
+        return (array) DB::table('document_templates')->where('id', $templateId)->first();
+    }
+
+    public function createRenderLog(int $tenantId, array $payload): array
+    {
+        $id = DB::table('document_render_logs')->insertGetId([
+            'tenant_id' => $tenantId,
+            'document_id' => $payload['document_id'] ?? null,
+            'document_template_id' => $payload['document_template_id'] ?? null,
+            'render_type' => (string) ($payload['render_type'] ?? 'preview'),
+            'status' => (string) ($payload['status'] ?? 'rendered'),
+            'rendered_by' => $payload['rendered_by'] ?? null,
+            'rendered_at' => now(),
+            'message' => $payload['message'] ?? null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return (array) DB::table('document_render_logs')->where('id', $id)->first();
     }
 
     public function createItemDefinition(int $tenantId, array $payload): array
@@ -799,6 +1146,68 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
                 'updated_at' => now(),
             ]);
         }
+    }
+
+    private function assertDocumentExists(int $tenantId, int $documentId): void
+    {
+        DB::table('documents')
+            ->where('tenant_id', $tenantId)
+            ->where('id', $documentId)
+            ->exists() || abort(404, 'Document not found.');
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function listDocumentMetadata(int $tenantId, int $documentId): array
+    {
+        return DB::table('document_metadata_values as values')
+            ->join('document_metadata_definitions as definitions', 'definitions.id', '=', 'values.metadata_definition_id')
+            ->where('values.tenant_id', $tenantId)
+            ->where('values.entity_type', 'document')
+            ->where('values.entity_id', $documentId)
+            ->orderBy('definitions.display_order')
+            ->get([
+                'values.id',
+                'definitions.metadata_key as field_key',
+                'definitions.label',
+                'definitions.data_type',
+                'values.value_type',
+                'values.value_string',
+                'values.value_integer',
+                'values.value_decimal',
+                'values.value_boolean',
+                'values.value_date',
+                'values.value_datetime',
+                'values.value_text',
+                'values.value_file_id',
+                'values.value_reference_type',
+                'values.value_reference_id',
+                'values.created_at',
+                'values.updated_at',
+            ])
+            ->map(fn ($row): array => [
+                'id' => $row->id,
+                'field_key' => $row->field_key,
+                'label' => $row->label,
+                'value_type' => $row->value_type,
+                'value' => $this->fromTypedValueRecord($row),
+                'created_at' => $row->created_at,
+                'updated_at' => $row->updated_at,
+            ])
+            ->all();
+    }
+
+    private function inferValueType(mixed $value): string
+    {
+        return match (true) {
+            is_bool($value) => 'boolean',
+            is_int($value) => 'integer',
+            is_float($value) => 'decimal',
+            is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 => 'date',
+            is_string($value) && mb_strlen($value) > 255 => 'text',
+            default => 'string',
+        };
     }
 
     /**

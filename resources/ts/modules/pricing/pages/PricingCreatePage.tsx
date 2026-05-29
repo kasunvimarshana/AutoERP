@@ -1,5 +1,5 @@
-import { PricingPage } from './PricingPage';
+import { PricingRuleCreatePage } from './PricingRuleCreatePage';
 
 export function PricingCreatePage() {
-    return <PricingPage />;
+    return <PricingRuleCreatePage />;
 }

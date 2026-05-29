@@ -1,5 +1,5 @@
-import { UomPage } from './UomPage';
+import { UomUnitCreatePage } from './UomUnitCreatePage';
 
 export function UomCreatePage() {
-    return <UomPage />;
+    return <UomUnitCreatePage />;
 }

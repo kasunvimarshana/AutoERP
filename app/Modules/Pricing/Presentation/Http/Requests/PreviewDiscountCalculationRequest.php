@@ -6,9 +6,12 @@ namespace Modules\Pricing\Presentation\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
+use Modules\Pricing\Presentation\Http\Requests\Concerns\ResolvesPricingTenant;
 
 final class PreviewDiscountCalculationRequest extends FormRequest
 {
+    use ResolvesPricingTenant;
+
     public function authorize(): bool
     {
         return true;
