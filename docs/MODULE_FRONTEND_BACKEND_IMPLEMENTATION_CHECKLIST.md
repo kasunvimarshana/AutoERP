@@ -2,6 +2,8 @@
 
 Generated from `app/Modules`, `ARCHITECTURE.md`, and `application_business_context_requirements.md`.
 
+Last reviewed: 2026-05-29.
+
 ## Global Contract
 
 - Frontend must collect input, call APIs, display backend previews/results, and allow edits only where backend validation permits.
@@ -12,10 +14,11 @@ Generated from `app/Modules`, `ARCHITECTURE.md`, and `application_business_conte
 
 ## Verification Summary
 
-- `php artisan route:list --path=api` loads successfully and reports 1,139 API routes.
+- `php artisan route:list --path=api` loads successfully and reports 1,170 API routes.
 - All module controllers referenced by module route files are registered. Only `AbstractUserCrudController` is intentionally unrouted.
 - Route/controller container resolution for module routes succeeds. The only resolution failures are non-module Passport OAuth routes due local key/env setup.
 - No missing controller classes were found for `app/Modules/*/routes/api.php`.
+- Focused feature tests for Sales, Purchase, VehicleService, and VehicleRental pass after backend-calculation hardening. The full suite still has unrelated Auth/Tenant/User/Example failures and `.phpunit.result.cache` write warnings in this sandbox.
 
 ## Shared Response Structure
 
@@ -38,6 +41,12 @@ All resource responses should follow:
 ```
 
 List endpoints should return Laravel paginated resources with `data`, `links`, and `meta`. Engine/preview endpoints should return backend-calculated previews only, never require frontend-calculated totals as authoritative input.
+
+## Authoritative Calculation Contract
+
+Frontend payloads may include user-entered quantities, selected item/UOM/tax group/rate IDs, requested discount type/value where a module supports it, dates, parties, notes, and source references. Frontend payloads must not be trusted for `discount_amount`, `tax_amount`, `subtotal`, `line_total`, `line_total_with_tax`, `grand_total`, `balance`, inventory quantities, finance postings, allocation balances, status transitions, approval state, document numbers, or tenant ownership.
+
+Backend services must recalculate and persist those values before returning responses. If no valid tax group or pricing/discount rule exists, the backend must return a zero or rejected calculation according to the module rule instead of accepting a frontend-calculated fallback.
 
 ## Module Checklists
 
@@ -235,10 +244,10 @@ List endpoints should return Laravel paginated resources with `data`, `links`, a
 
 ### Pricing
 
-1. Frontend endpoint checklist: resolve price, CRUD price lists/items, pricing rules/conditions, discounts/rules, pricing tiers, supplier price lists, customer price lists; read-only price histories.
-2. Missing endpoint list: standalone discount preview endpoint and deeper automatic price-history capture for every pricing mutation.
-3. Required request payloads: tenant, item, party, quantity, UOM, date, currency, source type/id, list/item/rule data.
-4. Required response structures: resolved unit price, discount breakdown, effective quantity/UOM, selected price list/rules.
+1. Frontend endpoint checklist: resolve price; preview discount calculation; CRUD price lists/items, pricing rules/conditions, discounts/rules, pricing tiers, supplier price lists, customer price lists; read-only price histories.
+2. Missing endpoint list: deeper automatic price-history capture for every pricing mutation.
+3. Required request payloads: tenant, item, party, quantity, UOM, date, currency, source type/id, list/item/rule data; for discount preview, base amount, quantity, and discount type/value or discount list.
+4. Required response structures: resolved unit price, discount breakdown, effective quantity/UOM, selected price list/rules, applied discounts, discount amount, net amount.
 5. Backend-only responsibilities: pricing, discount calculation, UOM normalization.
 6. Frontend-only responsibilities: request price previews and display returned breakdown.
 7. Business logic in backend: price list priority, party-specific pricing, discount eligibility.
@@ -246,8 +255,8 @@ List endpoints should return Laravel paginated resources with `data`, `links`, a
 9. Validation rules: active list/date/currency, item exists in tenant, valid UOM conversion.
 10. Transaction/rollback requirements: price list aggregate writes and history capture.
 11. Core dependencies: Tenant, Item, UOM, Customer, Supplier.
-12. Missing features: standalone discount preview and richer history capture.
-13. Issues/fixes required: pricing rule/discount/tier/history API surface added; keep frontend using `resolve-price` for authoritative calculated pricing.
+12. Missing features: richer history capture.
+13. Issues/fixes required: added `POST /api/pricing/discounts/preview-calculate`; discount service now caps applied discounts at the base amount; keep frontend using `resolve-price` and discount preview for authoritative calculated pricing.
 
 ### Purchase
 
@@ -258,12 +267,12 @@ List endpoints should return Laravel paginated resources with `data`, `links`, a
 5. Backend-only responsibilities: purchase totals, tax/discount, inventory receipt/return, AP posting, supplier payments.
 6. Frontend-only responsibilities: capture PO/GRN/return/payment inputs and show backend previews.
 7. Business logic in backend: optional purchase workflows, approval/status transitions.
-8. Calculations in backend: totals, taxes, discounts, received/returnable/payable quantities, AP balances.
+8. Calculations in backend: line/header discounts, tax via tax groups, subtotals, grand totals, balances, received/returnable/payable quantities, AP balances.
 9. Validation rules: supplier eligibility, item/UOM, non-negative qty, no over-receipt/over-return/over-payment, tenant scope.
 10. Transaction/rollback requirements: header plus lines; GRN plus stock; invoice plus AP; payment plus allocation; finance post/reverse.
 11. Core dependencies: Supplier, Item, UOM, Warehouse, Inventory, Finance, Payment, Document, Sequence, Audit.
 12. Missing features: purchase request/RFQ and landed cost.
-13. Issues/fixes required: no broken endpoints found.
+13. Issues/fixes required: backend hardened so preview and line sync no longer trust frontend `discount_amount`, `tax_amount`, header tax/discount amount, totals, or balance fields.
 
 ### Sales
 
@@ -274,12 +283,12 @@ List endpoints should return Laravel paginated resources with `data`, `links`, a
 5. Backend-only responsibilities: sales totals, tax/discount, stock issue/return, AR posting, receipts/refunds.
 6. Frontend-only responsibilities: collect sale/delivery/invoice/payment inputs and display previews.
 7. Business logic in backend: configurable stock deduction point, credit eligibility, status transitions.
-8. Calculations in backend: totals, taxes, discounts, deliverable/returnable/receivable quantities, AR balances.
+8. Calculations in backend: line/header discounts, tax via tax groups, subtotals, grand totals, balances, deliverable/returnable/receivable quantities, AR balances.
 9. Validation rules: customer eligibility, item/UOM, stock availability, no over-delivery/return/payment, tenant scope.
 10. Transaction/rollback requirements: header plus lines; delivery plus stock; invoice plus AR; receipt plus allocation; finance post/reverse.
 11. Core dependencies: Customer, Item, UOM, Warehouse, Inventory, Finance, Payment, Pricing, Document, Sequence, Audit.
 12. Missing features: quotation/proforma/credit note resource.
-13. Issues/fixes required: no broken endpoints found.
+13. Issues/fixes required: backend hardened so preview and line sync no longer trust frontend `discount_amount`, `tax_amount`, header tax/discount amount, totals, or balance fields.
 
 ### Sequence
 
@@ -386,28 +395,28 @@ List endpoints should return Laravel paginated resources with `data`, `links`, a
 5. Backend-only responsibilities: rental billing, overtime/night/weekend/double-rate, provider payable, vehicle availability.
 6. Frontend-only responsibilities: collect agreement/usage and show backend billing preview.
 7. Business logic in backend: agreement lifecycle, with/without driver rules, replacement impact.
-8. Calculations in backend: km/hour/day/month charges, extra charges, tax/discount/totals, provider margins.
+8. Calculations in backend: km/hour/day/month charges, extra charges, taxes via tax groups, authoritative line totals, provider margins.
 9. Validation rules: vehicle availability, valid rates/rules, no overlapping agreements, tenant/provider refs.
 10. Transaction/rollback requirements: agreement aggregate; running chart plus totals; invoice/payment/provider payable/finance posting.
 11. Core dependencies: Vehicle, Customer, Supplier, HR/User driver refs, Pricing, Finance, Payment, Document, Sequence, Audit.
 12. Missing features: quotation/calendar/damage-refund resources.
-13. Issues/fixes required: no broken endpoints found.
+13. Issues/fixes required: agreement line and extra-charge sync now overwrite frontend `discount_amount`, `tax_amount`, and totals; request tenant checks now validate ID shape while tenant middleware/service owns tenant authorization.
 
 ### VehicleService
 
-1. Frontend endpoint checklist: CRUD service types, job cards, job card lines, labor items/assignments, non-inventory items, inspections/lines, diagnostics/lines; aggregate job card create/update; sync lines/labor/non-inventory/customer-supplied/external services; settings; status history; stock availability; invoiceable/receivable job cards; workflow transition/invoice/payment/inventory/finance post/reverse; integration invoice/payment/inventory.
+1. Frontend endpoint checklist: CRUD service types, job cards, job card lines, labor items/assignments, non-inventory items, inspections/lines, diagnostics/lines; aggregate job card create/update; sync lines/labor/non-inventory/customer-supplied/external services; invoice preview; settings; status history; stock availability; invoiceable/receivable job cards; workflow transition/invoice/payment/inventory/finance post/reverse; integration invoice/payment/inventory.
 2. Missing endpoint list: service appointment/scheduler, combo expansion preview, technician incentive payroll export.
 3. Required request payloads: job card header, vehicle/customer/supervisor, service/labor/spare/non-inventory/customer-supplied/external lines, assignments, workflow/payment actions.
 4. Required response structures: job card with all calculated line totals, labor incentives, stock/invoice/payment/posting refs, status history.
 5. Backend-only responsibilities: service totals, labor incentives, stock consumption, invoice/payment/finance, combo expansion.
 6. Frontend-only responsibilities: collect job details and show backend-calculated previews.
 7. Business logic in backend: service lifecycle, customer-supplied/non-inventory/external-service behavior.
-8. Calculations in backend: line totals, discounts, taxes, incentives, stock consumption, balances.
+8. Calculations in backend: line/header discounts, tax via tax groups, service invoice preview, labor incentives, stock consumption, balances.
 9. Validation rules: vehicle/customer eligibility, item stockability, labor assignment shares, no over-consumption, tenant scope.
 10. Transaction/rollback requirements: job aggregate; inventory post; invoice/payment; finance post/reverse.
 11. Core dependencies: Customer, Vehicle, HR, Item, UOM, Inventory, Finance, Payment, Document, Sequence, Audit.
 12. Missing features: scheduler/combo preview/incentive export.
-13. Issues/fixes required: no broken endpoints found.
+13. Issues/fixes required: added `POST /api/vehicle-service/job-cards/{jobCardId}/invoice-preview` and `POST /api/vehicle-service/job-cards/{jobCardId}/non-inventory-items/sync`; job-card aggregates now recalculate line totals, taxes, discounts, incentives, header adjustments, grand total, and balance in backend.
 
 ### Voucher
 
@@ -443,8 +452,11 @@ List endpoints should return Laravel paginated resources with `data`, `links`, a
 
 ## Priority Fix Plan
 
-1. Implemented frontend-facing Pricing routes/controllers for pricing rules, rule conditions, discounts, discount rules, pricing tiers, and read-only price history; next step is adding deeper history capture on every pricing mutation.
-2. Add report/read-model endpoints: finance ledgers/trial balance, stock ledger/trace, customer/supplier statements, HR payroll/leave previews.
-3. Add document render/download/template-preview endpoints so frontend never generates official documents.
-4. Add first-class workflow engines still listed as feature gaps: HR payroll/leave approval, Sales quotation/credit note, Purchase request/RFQ/landed cost, VehicleService scheduler/combo preview, VehicleRental quotation/calendar/damage/refund.
-5. Fix local Passport/OAuth key configuration before testing non-module OAuth routes.
+1. Implemented backend hardening for Sales, Purchase, VehicleService, and VehicleRental so frontend-calculated taxes, discounts, totals, balances, and selected rental/service totals are not authoritative.
+2. Added VehicleService invoice preview and non-inventory aggregate sync endpoints.
+3. Fixed VehicleRental request-layer tenant validation so mocked/controller tests and tenant middleware/service responsibilities are not bypassed by direct request `exists` queries.
+4. Added Pricing discount preview endpoint and capped backend discount calculation at the base amount.
+5. Add report/read-model endpoints: finance ledgers/trial balance, stock ledger/trace, customer/supplier statements, HR payroll/leave previews.
+6. Add document render/download/template-preview endpoints so frontend never generates official documents.
+7. Add first-class workflow engines still listed as feature gaps: HR payroll/leave approval, Sales quotation/credit note, Purchase request/RFQ/landed cost, VehicleService scheduler/combo preview, VehicleRental quotation/calendar/damage/refund.
+8. Fix local Passport/OAuth key configuration and existing Auth/Tenant/User test failures before relying on a full-suite green status.

@@ -22,7 +22,7 @@ Scope: `app/Modules` migrations, routes, controllers, services/actions, requests
 | UOM conversion | `POST /api/uom/convert` |
 | Price resolving | `POST /api/pricing/resolve-price` |
 | Tax calculation | `POST /api/finance/tax/preview-calculate` |
-| Discount calculation | included in Pricing resolver; standalone discount preview remains a gap |
+| Discount calculation | `POST /api/pricing/discounts/preview-calculate`; also included in Pricing resolver |
 | Finance posting preview | `POST /api/finance/journal-entries/{journalEntry}/engines/preview-posting`, Voucher preview posting |
 
 ## Module Endpoint And Responsibility Matrix
@@ -42,7 +42,7 @@ Scope: `app/Modules` migrations, routes, controllers, services/actions, requests
 | Item | items, variants, attributes, combos, identifiers | combo expansion preview, item availability | item type/stockability/combo expansion | item setup UI |
 | OrganizationUnit | org units/types/settings/docs | org tree, inheritance preview, assignment matrix | hierarchy/context validation | tree/settings UI |
 | Payment | payment masters/payments/allocations/advances/checks/write-offs/engines | wallet/statement endpoints | payment balances, allocation, settlement, posting/refund | collect payment input |
-| Pricing | price lists/items, rules/conditions, discounts/rules, tiers, histories, resolve-price | standalone discount preview, deeper history capture | price, discount, tier, UOM normalization | request/display pricing result |
+| Pricing | price lists/items, rules/conditions, discounts/rules, tiers, histories, resolve-price, discount preview | deeper history capture | price, discount, tier, UOM normalization | request/display pricing result |
 | Purchase | PO/GRN/returns/invoice preview/payment preview/settings/lookups/integration/workflows | purchase request/RFQ, first-class supplier invoice, landed cost | totals, tax, discount, GRN stock, AP/posting/payment | collect purchasing inputs |
 | Sales | SO/GDN/returns/invoices/invoice preview/payment preview/settings/lookups/integration/workflows | quotations/proforma, credit note resource | totals, tax, discount, stock issue, AR/posting/payment | collect sales inputs |
 | Sequence | sequence CRUD/preview/generate/rollback | reservation/commit workflow | document numbering/concurrency | show backend numbers |
@@ -66,6 +66,7 @@ Scope: `app/Modules` migrations, routes, controllers, services/actions, requests
 ## Existing Fix From Previous Pass
 
 - Added Pricing API surface for pricing rules, pricing rule conditions, discounts, discount rules, pricing tiers, and read-only price histories.
+- Added Pricing discount preview endpoint and capped backend-applied discounts at the base amount.
 
 ## Backend-Only Logic Rules To Enforce
 

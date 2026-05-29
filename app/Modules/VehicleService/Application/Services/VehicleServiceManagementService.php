@@ -7,6 +7,7 @@ namespace Modules\VehicleService\Application\Services;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
+use Modules\Finance\Application\Contracts\Services\TaxCalculationServiceInterface;
 use Modules\Inventory\Application\Repositories\StockLevelRepositoryInterface;
 use Modules\VehicleService\Application\Contracts\Services\VehicleServiceManagementServiceInterface;
 use Modules\VehicleService\Application\Repositories\VehicleServiceJobCardLineRepositoryInterface;
@@ -34,8 +35,8 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
         private readonly VehicleServiceSettingRepositoryInterface $settingRepository,
         private readonly VehicleServiceJobPaymentLinkRepositoryInterface $paymentLinkRepository,
         private readonly StockLevelRepositoryInterface $stockLevelRepository,
-    ) {
-    }
+        private readonly TaxCalculationServiceInterface $taxCalculationService,
+    ) {}
 
     public function upsertJobCardAggregate(?int $id, array $payload): Result
     {
@@ -80,6 +81,17 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
                     ]);
                     if ($syncExternal->isFailure()) {
                         return $syncExternal;
+                    }
+                }
+
+                if (is_array($payload['non_inventory_items'] ?? null)) {
+                    $syncNonInventory = $this->syncNonInventoryItems($jobCardId, [
+                        'tenant_id' => $tenantId,
+                        'organization_unit_id' => $organizationUnitId,
+                        'non_inventory_items' => $payload['non_inventory_items'],
+                    ]);
+                    if ($syncNonInventory->isFailure()) {
+                        return $syncNonInventory;
                     }
                 }
 
@@ -128,18 +140,20 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
                 $lineId = isset($linePayload['id']) ? (int) $linePayload['id'] : null;
                 if ((bool) ($linePayload['_delete'] ?? false) && $lineId !== null) {
                     $this->jobCardLineRepository->delete($lineId);
+
                     continue;
                 }
 
-                $upsert = $this->withDefaultRowVersion([
+                $upsert = $this->withDefaultRowVersion($this->hydrateLineTotals([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $organizationUnitId,
                     'job_card_id' => $jobCardId,
                     ...$linePayload,
-                ]);
+                ]));
 
                 if ($lineId === null) {
                     $this->jobCardLineRepository->create($upsert);
+
                     continue;
                 }
 
@@ -177,22 +191,75 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
                 $lineId = isset($linePayload['id']) ? (int) $linePayload['id'] : null;
                 if ((bool) ($linePayload['_delete'] ?? false) && $lineId !== null) {
                     $this->laborItemRepository->delete($lineId);
+
                     continue;
                 }
 
-                $upsert = $this->withDefaultRowVersion([
+                $upsert = $this->withDefaultRowVersion($this->hydrateLineTotals([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $organizationUnitId,
                     'job_card_id' => $jobCardId,
                     ...$linePayload,
-                ]);
+                ], true));
 
                 if ($lineId === null) {
                     $this->laborItemRepository->create($upsert);
+
                     continue;
                 }
 
                 $this->laborItemRepository->update($lineId, $upsert);
+            }
+
+            $this->recalculateJobCardTotals($jobCardId, $tenantId);
+
+            return Result::success([
+                'job_card_id' => $jobCardId,
+                'synced' => true,
+            ]);
+        } catch (Throwable $exception) {
+            return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, $exception->getMessage()));
+        }
+    }
+
+    public function syncNonInventoryItems(int $jobCardId, array $payload): Result
+    {
+        try {
+            $jobCard = $this->jobCardRepository->findById($jobCardId);
+            if (! $jobCard instanceof DataRecord) {
+                return Result::failure(new Error(VehicleServiceErrorCode::NOT_FOUND, 'Job card not found.'));
+            }
+
+            $tenantId = (int) ($payload['tenant_id'] ?? $jobCard->get('tenant_id', 0));
+            $organizationUnitId = $payload['organization_unit_id'] ?? $jobCard->get('organization_unit_id');
+            $items = is_array($payload['non_inventory_items'] ?? null) ? $payload['non_inventory_items'] : [];
+
+            foreach ($items as $linePayload) {
+                if (! is_array($linePayload)) {
+                    continue;
+                }
+
+                $lineId = isset($linePayload['id']) ? (int) $linePayload['id'] : null;
+                if ((bool) ($linePayload['_delete'] ?? false) && $lineId !== null) {
+                    $this->nonInventoryItemRepository->delete($lineId);
+
+                    continue;
+                }
+
+                $upsert = $this->withDefaultRowVersion($this->hydrateLineTotals([
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => $organizationUnitId,
+                    'job_card_id' => $jobCardId,
+                    ...$linePayload,
+                ]));
+
+                if ($lineId === null) {
+                    $this->nonInventoryItemRepository->create($upsert);
+
+                    continue;
+                }
+
+                $this->nonInventoryItemRepository->update($lineId, $upsert);
             }
 
             $this->recalculateJobCardTotals($jobCardId, $tenantId);
@@ -226,18 +293,20 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
                 $lineId = isset($linePayload['id']) ? (int) $linePayload['id'] : null;
                 if ((bool) ($linePayload['_delete'] ?? false) && $lineId !== null) {
                     $this->externalServiceRepository->delete($lineId);
+
                     continue;
                 }
 
-                $upsert = $this->withDefaultRowVersion([
+                $upsert = $this->withDefaultRowVersion($this->hydrateExternalServiceTotals([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $organizationUnitId,
                     'job_card_id' => $jobCardId,
                     ...$linePayload,
-                ]);
+                ]));
 
                 if ($lineId === null) {
                     $this->externalServiceRepository->create($upsert);
+
                     continue;
                 }
 
@@ -277,6 +346,7 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
                 $lineId = isset($linePayload['id']) ? (int) $linePayload['id'] : null;
                 if ((bool) ($linePayload['_delete'] ?? false) && $lineId !== null) {
                     $this->customerSuppliedItemRepository->delete($lineId);
+
                     continue;
                 }
 
@@ -289,6 +359,7 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
 
                 if ($lineId === null) {
                     $this->customerSuppliedItemRepository->create($upsert);
+
                     continue;
                 }
 
@@ -456,6 +527,80 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
         }
     }
 
+    public function calculateInvoicePreview(array $payload): Result
+    {
+        try {
+            $tenantId = (int) ($payload['tenant_id'] ?? 0);
+            $groups = [
+                'lines' => is_array($payload['lines'] ?? null) ? $payload['lines'] : [],
+                'labor_items' => is_array($payload['labor_items'] ?? null) ? $payload['labor_items'] : [],
+                'non_inventory_items' => is_array($payload['non_inventory_items'] ?? null)
+                    ? $payload['non_inventory_items']
+                    : [],
+                'external_services' => is_array($payload['external_services'] ?? null)
+                    ? $payload['external_services']
+                    : [],
+            ];
+
+            $response = ['lines' => [], 'labor_items' => [], 'non_inventory_items' => [], 'external_services' => []];
+            $subtotal = 0.0;
+            $discountTotal = 0.0;
+            $taxTotal = 0.0;
+
+            foreach (['lines', 'labor_items', 'non_inventory_items'] as $group) {
+                foreach ($groups[$group] as $line) {
+                    if (! is_array($line)) {
+                        continue;
+                    }
+                    $preview = $this->hydrateLineTotals(array_merge($line, ['tenant_id' => $tenantId]));
+                    $response[$group][] = $preview;
+                    $subtotal += (float) $preview['gross_amount'];
+                    $discountTotal += (float) $preview['discount_amount'];
+                    $taxTotal += (float) $preview['tax_amount'];
+                }
+            }
+
+            foreach ($groups['external_services'] as $line) {
+                if (! is_array($line)) {
+                    continue;
+                }
+                $preview = $this->hydrateExternalServiceTotals(array_merge($line, ['tenant_id' => $tenantId]));
+                $response['external_services'][] = $preview;
+                $subtotal += (float) $preview['line_total'];
+                $discountTotal += (float) $preview['discount_amount'];
+                $taxTotal += (float) $preview['tax_amount'];
+            }
+
+            $headerDiscountAmount = $this->resolveDiscountAmount(
+                max(0.0, $subtotal - $discountTotal),
+                (string) ($payload['header_discount_type'] ?? ''),
+                round((float) ($payload['header_discount_value'] ?? 0), 4),
+            );
+            $headerTaxAmount = $this->resolveTaxAmount(
+                $tenantId,
+                isset($payload['header_tax_group_id']) ? (int) $payload['header_tax_group_id'] : null,
+                max(0.0, $subtotal - $discountTotal - $headerDiscountAmount),
+                $payload['posting_date'] ?? null,
+            );
+
+            $discountTotal = round($discountTotal + $headerDiscountAmount, 4);
+            $taxTotal = round($taxTotal + $headerTaxAmount, 4);
+            $grandTotal = round(max(0.0, $subtotal - $discountTotal + $taxTotal), 4);
+
+            return Result::success([
+                'subtotal' => round($subtotal, 4),
+                'header_discount_amount' => $headerDiscountAmount,
+                'header_tax_amount' => $headerTaxAmount,
+                'discount_total' => $discountTotal,
+                'tax_total' => $taxTotal,
+                'grand_total' => $grandTotal,
+                ...$response,
+            ]);
+        } catch (Throwable $exception) {
+            return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, $exception->getMessage()));
+        }
+    }
+
     private function recalculateJobCardTotals(int $jobCardId, int $tenantId): void
     {
         $lineItems = $this->jobCardLineRepository->list([
@@ -490,9 +635,28 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
         $nonInventoryDiscount = $this->sumDecimal($nonInventoryItems, 'discount_amount')
             + $this->sumDecimal($externalServices, 'discount_amount');
 
-        $discountTotal = $partsDiscount + $laborDiscount + $nonInventoryDiscount;
-        $taxTotal = $partsTax + $laborTax + $nonInventoryTax;
-        $grandTotal = $partsSubtotal + $laborSubtotal + $nonInventorySubtotal - $discountTotal + $taxTotal;
+        $jobCard = $this->jobCardRepository->findById($jobCardId);
+        if (! $jobCard instanceof DataRecord) {
+            return;
+        }
+
+        $lineDiscountTotal = $partsDiscount + $laborDiscount + $nonInventoryDiscount;
+        $lineTaxTotal = $partsTax + $laborTax + $nonInventoryTax;
+        $subtotal = $partsSubtotal + $laborSubtotal + $nonInventorySubtotal;
+        $headerDiscountAmount = $this->resolveDiscountAmount(
+            max(0.0, $subtotal - $lineDiscountTotal),
+            (string) $jobCard->get('header_discount_type', ''),
+            round((float) $jobCard->get('header_discount_value', 0), 4),
+        );
+        $headerTaxAmount = $this->resolveTaxAmount(
+            (int) $jobCard->get('tenant_id', 0),
+            $jobCard->get('header_tax_group_id') !== null ? (int) $jobCard->get('header_tax_group_id') : null,
+            max(0.0, $subtotal - $lineDiscountTotal - $headerDiscountAmount),
+            null,
+        );
+        $discountTotal = $lineDiscountTotal + $headerDiscountAmount;
+        $taxTotal = $lineTaxTotal + $headerTaxAmount;
+        $grandTotal = $subtotal - $discountTotal + $taxTotal;
 
         $this->jobCardRepository->update($jobCardId, [
             'subtotal' => $partsSubtotal,
@@ -504,6 +668,8 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
             'non_inventory_item_subtotal' => $nonInventorySubtotal,
             'non_inventory_item_tax_total' => $nonInventoryTax,
             'non_inventory_item_discount_total' => $nonInventoryDiscount,
+            'header_discount_amount' => $headerDiscountAmount,
+            'header_tax_amount' => $headerTaxAmount,
             'discount_total' => $discountTotal,
             'tax_total' => $taxTotal,
             'grand_total' => $grandTotal,
@@ -528,11 +694,120 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
             $payload['id'],
             $payload['lines'],
             $payload['labor_items'],
+            $payload['non_inventory_items'],
             $payload['external_services'],
             $payload['customer_supplied_items'],
+            $payload['subtotal'],
+            $payload['line_tax_total'],
+            $payload['line_discount_total'],
+            $payload['non_inventory_item_subtotal'],
+            $payload['non_inventory_item_tax_total'],
+            $payload['non_inventory_item_discount_total'],
+            $payload['labor_item_subtotal'],
+            $payload['labor_item_tax_total'],
+            $payload['labor_item_discount_total'],
+            $payload['header_discount_amount'],
+            $payload['header_tax_amount'],
+            $payload['discount_total'],
+            $payload['tax_total'],
+            $payload['grand_total'],
+            $payload['balance'],
         );
 
         return $payload;
+    }
+
+    private function hydrateLineTotals(array $line, bool $includeIncentive = false): array
+    {
+        $quantity = round((float) ($line['quantity'] ?? 0), 4);
+        $unitPrice = round((float) ($line['unit_price'] ?? 0), 4);
+        $grossAmount = round($quantity * $unitPrice, 4);
+        $discountAmount = $this->resolveDiscountAmount(
+            $grossAmount,
+            (string) ($line['discount_type'] ?? ''),
+            round((float) ($line['discount_value'] ?? 0), 4),
+        );
+        $lineTotal = round(max(0.0, $grossAmount - $discountAmount), 4);
+        $taxAmount = $this->resolveTaxAmount(
+            (int) ($line['tenant_id'] ?? 0),
+            isset($line['tax_group_id']) ? (int) $line['tax_group_id'] : null,
+            $lineTotal,
+            $line['posting_date'] ?? null,
+        );
+
+        $line['quantity'] = $quantity;
+        $line['unit_price'] = $unitPrice;
+        $line['gross_amount'] = $grossAmount;
+        $line['discount_amount'] = $discountAmount;
+        $line['tax_amount'] = $taxAmount;
+        $line['line_total'] = $lineTotal;
+        $line['line_total_with_tax'] = round($lineTotal + $taxAmount, 4);
+
+        if ($includeIncentive) {
+            $line['incentive_amount'] = $this->resolveDiscountAmount(
+                $lineTotal,
+                (string) ($line['incentive_type'] ?? ''),
+                round((float) ($line['incentive_value'] ?? 0), 4),
+            );
+        }
+
+        return $line;
+    }
+
+    private function hydrateExternalServiceTotals(array $line): array
+    {
+        $quantity = round((float) ($line['quantity'] ?? 1), 4);
+        $unitPrice = round((float) ($line['unit_price'] ?? 0), 4);
+        $grossAmount = round($quantity * $unitPrice, 4);
+        $discountAmount = $this->resolveDiscountAmount(
+            $grossAmount,
+            (string) ($line['discount_type'] ?? ''),
+            round((float) ($line['discount_value'] ?? 0), 4),
+        );
+
+        $line['quantity'] = $quantity;
+        $line['unit_price'] = $unitPrice;
+        $line['discount_amount'] = $discountAmount;
+        $line['tax_amount'] = 0.0;
+        $line['line_total'] = $grossAmount;
+
+        return $line;
+    }
+
+    private function resolveDiscountAmount(float $grossAmount, string $discountType, float $discountValue): float
+    {
+        if ($discountValue <= 0) {
+            return 0.0;
+        }
+
+        $type = strtolower(trim($discountType));
+        if ($type === 'percentage') {
+            return round(min($grossAmount, ($grossAmount * $discountValue) / 100), 4);
+        }
+
+        return round(min($grossAmount, $discountValue), 4);
+    }
+
+    private function resolveTaxAmount(int $tenantId, ?int $taxGroupId, float $taxableAmount, mixed $postingDate = null): float
+    {
+        if ($tenantId < 1 || $taxGroupId === null || $taxGroupId < 1 || $taxableAmount <= 0) {
+            return 0.0;
+        }
+
+        $result = $this->taxCalculationService->calculate(
+            $tenantId,
+            $taxGroupId,
+            $taxableAmount,
+            $postingDate !== null ? (string) $postingDate : null,
+        );
+
+        if ($result->isFailure()) {
+            return 0.0;
+        }
+
+        $tax = $result->valueOrFail();
+
+        return round((float) ($tax['tax_amount'] ?? 0), 4);
     }
 
     private function withDefaultRowVersion(array $payload): array

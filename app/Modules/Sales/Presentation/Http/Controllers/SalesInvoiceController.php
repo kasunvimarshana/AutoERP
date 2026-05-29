@@ -17,8 +17,7 @@ final class SalesInvoiceController extends Controller
     public function __construct(
         private readonly SalesIntegrationServiceInterface $integration,
         private readonly SalesManagementServiceInterface $management,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -143,6 +142,7 @@ final class SalesInvoiceController extends Controller
                         'action' => 'delete',
                         'result' => $unmatch->valueOrFail(),
                     ];
+
                     continue;
                 }
 
@@ -342,7 +342,7 @@ final class SalesInvoiceController extends Controller
 
     public function calculateInvoice(CalculateSalesInvoiceRequest $request): JsonResponse
     {
-        $payload = array_merge($this->withContext($request), $request->validated());
+        $payload = $request->validated();
 
         return $this->respond($this->management->calculateInvoicePreview($payload));
     }

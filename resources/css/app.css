@@ -3,60 +3,27 @@
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../**/*.blade.php';
-@source '../js/**/*.js';
-@source '../js/**/*.jsx';
-@source '../js/**/*.ts';
-@source '../js/**/*.tsx';
-@source '../ts/**/*.js';
-@source '../ts/**/*.jsx';
-@source '../ts/**/*.ts';
-@source '../ts/**/*.tsx';
+@source '../**/*.js';
+@source '../ts/**/*.{ts,tsx}';
 
 @theme {
-    --font-sans: 'IBM Plex Sans', 'Segoe UI', sans-serif;
-    --font-display: 'Space Grotesk', 'IBM Plex Sans', 'Segoe UI', sans-serif;
-    --color-brand-50: #eff7f7;
-    --color-brand-100: #d7efee;
-    --color-brand-200: #b7e2df;
-    --color-brand-300: #8fd0cb;
-    --color-brand-400: #5db8b0;
-    --color-brand-500: #2f9189;
-    --color-brand-600: #1f746d;
-    --color-brand-700: #185c57;
-    --color-brand-800: #184845;
-    --color-brand-900: #183735;
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
 }
 
 @layer base {
-    :root {
-        color-scheme: light;
-    }
-
     html {
-        @apply h-full bg-stone-50;
+        background: #f5f7fb;
     }
 
     body {
-        @apply min-h-full text-slate-900 antialiased;
-        background-image: radial-gradient(circle at top left, rgba(47, 145, 137, 0.16), transparent 28%), radial-gradient(circle at top right, rgba(216, 180, 254, 0.12), transparent 24%), linear-gradient(180deg, #fbfbf8 0%, #f4f7f5 42%, #eef2f1 100%);
+        min-height: 100vh;
+        background: #f5f7fb;
+        color: #111827;
         font-family: var(--font-sans);
     }
 
-    ::selection {
-        background: rgba(47, 145, 137, 0.2);
-    }
-
-    a {
-        @apply transition-colors duration-150;
-    }
-}
-
-@layer utilities {
-    .font-display {
-        font-family: var(--font-display);
-    }
-
-    .app-shell-inner {
-        max-width: 1560px;
+    * {
+        box-sizing: border-box;
     }
 }

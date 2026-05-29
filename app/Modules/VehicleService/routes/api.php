@@ -3,18 +3,18 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceTypeController;
-use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceJobCardController;
-use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceJobCardLineController;
-use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceLaborItemController;
-use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceNonInventoryItemController;
-use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceLaborAssignmentController;
 use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceDiagnosticController;
 use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceDiagnosticLineController;
 use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceInspectionController;
 use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceInspectionLineController;
 use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceIntegrationController;
+use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceJobCardController;
+use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceJobCardLineController;
+use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceLaborAssignmentController;
+use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceLaborItemController;
 use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceManagementController;
+use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceNonInventoryItemController;
+use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceTypeController;
 use Modules\VehicleService\Presentation\Http\Controllers\VehicleServiceWorkflowController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
@@ -28,7 +28,7 @@ $currentOrganizationUnitMiddleware = (string) config(
 Route::prefix('api/vehicle-service')
     ->middleware([
         'api',
-        'auth:' . $protectedGuard,
+        'auth:'.$protectedGuard,
         $currentUserMiddleware,
         $currentTenantMiddleware,
         $currentOrganizationUnitMiddleware,
@@ -83,6 +83,10 @@ Route::prefix('api/vehicle-service')
             [VehicleServiceManagementController::class, 'syncLaborItems'],
         )->name('job-cards.labor-items.sync');
         Route::post(
+            'job-cards/{jobCardId}/non-inventory-items/sync',
+            [VehicleServiceManagementController::class, 'syncNonInventoryItems'],
+        )->name('job-cards.non-inventory-items.sync');
+        Route::post(
             'job-cards/{jobCardId}/external-services/sync',
             [VehicleServiceManagementController::class, 'syncExternalServices'],
         )->name('job-cards.external-services.sync');
@@ -115,6 +119,10 @@ Route::prefix('api/vehicle-service')
             'invoiceable-job-cards',
             [VehicleServiceManagementController::class, 'invoiceableJobCards'],
         )->name('job-cards.invoiceable');
+        Route::post(
+            'job-cards/{jobCardId}/invoice-preview',
+            [VehicleServiceManagementController::class, 'invoicePreview'],
+        )->name('job-cards.invoice-preview');
         Route::get(
             'receivable-job-cards',
             [VehicleServiceManagementController::class, 'receivableJobCards'],

@@ -1,79 +1,76 @@
-import { Button } from '../../../components/ui/Button';
-import { DataTable, type DataTableColumn } from '../../../components/tables';
-import { FormField } from '../../../components/forms/FormField';
-import { Input } from '../../../components/ui/Input';
-import { SectionCard } from '../../../components/forms/SectionCard';
-import { Select } from '../../../components/ui/Select';
-import type { CrewMember, SubItem } from '../types';
-import { AssignedCrewTable } from './AssignedCrewTable';
-import { assignedCrew, crewMembers, subItems } from '../mockData';
+import { AssignedSubItemsTable } from './AssignedSubItemsTable';
+import { CrewMembersTable } from './CrewMembersTable';
+import { SubItemForm } from './SubItemForm';
+import { SubItemsTable } from './SubItemsTable';
+import { Button } from '../../../shared/components/ui/Button';
+import { Select } from '../../../shared/components/ui/Select';
+import { Textarea } from '../../../shared/components/ui/Textarea';
+import { useVehicleServiceMock } from '../hooks/useVehicleServiceMock';
 
 export function CrewAssignmentPanel() {
-    const subItemColumns: DataTableColumn<SubItem>[] = [
-        { key: 'crewId', header: 'CREW ID', render: (item) => item.crewId },
-        { key: 'name', header: 'Crew Name', render: (item) => item.crewName },
-        { key: 'allow', header: 'Allow', render: (item) => item.allow.toFixed(2) },
-    ];
-
-    const crewColumns: DataTableColumn<CrewMember>[] = [
-        { key: 'id', header: 'CREW ID', render: (item) => item.id },
-        { key: 'name', header: 'Crew Name', render: (item) => item.name },
-        { key: 'allow', header: 'Allow', render: (item) => <span className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">${item.allow.toFixed(2)}</span> },
-    ];
+    const data = useVehicleServiceMock();
+    const serviceOptions = data.serviceItems.map((item) => ({ label: item.label, value: item.id }));
+    const supervisorOptions = data.supervisors.map((supervisor) => ({ label: supervisor.label, value: supervisor.id }));
 
     return (
-        <SectionCard title="Crew Assignment" description="Reference-only crew allocation screen matching the second screenshot.">
-            <div className="grid gap-4 xl:grid-cols-2">
-                <div className="rounded-[1.15rem] border border-slate-200/80 bg-white p-5">
-                    <div className="grid gap-4 xl:grid-cols-2">
-                        <FormField label="Service Item" required>
-                            <Select defaultValue="Full service">
-                                <option>Full service</option>
-                                <option>Engine service</option>
-                                <option>Brake service</option>
-                            </Select>
-                        </FormField>
-                        <FormField label="Supervisor name" required>
-                            <Select defaultValue="270">
-                                <option value="">Select</option>
-                                {crewMembers.map((member) => (
-                                    <option key={member.id} value={member.id}>
-                                        {member.name}
-                                    </option>
-                                ))}
-                            </Select>
-                        </FormField>
-                    </div>
+        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+            <div className="grid gap-6 rounded-lg border border-slate-200 p-5 md:grid-cols-2">
+                <label className="space-y-2">
+                    <span className="text-sm font-semibold text-slate-600">Service Item</span>
+                    <Select defaultValue="full-service" options={serviceOptions} />
+                </label>
+                <label className="space-y-2">
+                    <span className="text-sm font-semibold text-slate-600">Supervicer name</span>
+                    <Select options={supervisorOptions} placeholder="Select" />
+                </label>
+            </div>
+
+            <div className="mt-6 rounded-lg border border-slate-100 p-5">
+                <div className="grid gap-8 lg:grid-cols-2">
+                    <section className="space-y-4">
+                        <h2 className="text-base font-bold text-slate-950">Sub items</h2>
+                        <SubItemsTable items={data.subItems} />
+                    </section>
+                    <section className="space-y-4">
+                        <h2 className="text-base font-bold text-slate-950">All Crew members</h2>
+                        <CrewMembersTable members={data.crewMembers} />
+                    </section>
                 </div>
 
-                <div className="rounded-[1.15rem] border border-slate-200/80 bg-white p-5">
-                    <div className="grid gap-4 xl:grid-cols-2">
-                        <div>
-                            <h4 className="mb-3 font-semibold text-slate-950">Sub items</h4>
-                            <DataTable columns={subItemColumns} getRowKey={(row) => row.id} rows={subItems} />
-                        </div>
-                        <div>
-                            <h4 className="mb-3 font-semibold text-slate-950">All Crew members</h4>
-                            <DataTable columns={crewColumns} getRowKey={(row) => row.id} rows={crewMembers} />
-                        </div>
+                <div className="mt-8">
+                    <SubItemForm />
+                </div>
+
+                <section className="mt-10 space-y-4">
+                    <h2 className="text-base font-bold text-slate-950">Assigned Sub items</h2>
+                    <AssignedSubItemsTable items={data.assignedSubItems} />
+                </section>
+
+                <div className="mt-24 border-t border-slate-200 pt-5">
+                    <div className="flex justify-end gap-3">
+                        <Button variant="secondary">Discard</Button>
+                        <Button variant="blue">Next ›</Button>
                     </div>
                 </div>
             </div>
 
-            <div className="grid items-end gap-4 md:grid-cols-[0.7fr_1.4fr_1fr_auto]">
-                <FormField label="Sub Item ID">
-                    <Input defaultValue="271" />
-                </FormField>
-                <FormField label="Sub Item Name">
-                    <Input defaultValue="Finishing" />
-                </FormField>
-                <FormField label="Price">
-                    <Input defaultValue="100.00" />
-                </FormField>
-                <Button variant="secondary">ADD</Button>
+            <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6">
+                <h2 className="text-lg font-bold text-slate-950">🔧 Sub Item</h2>
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <label className="space-y-2">
+                        <span className="text-sm font-semibold text-slate-600">Service Item</span>
+                        <Select options={serviceOptions} placeholder="Select Item" />
+                    </label>
+                    <label className="space-y-2">
+                        <span className="text-sm font-semibold text-slate-600">Sub Item</span>
+                        <Select options={data.subItems.map((item) => ({ label: item.name, value: item.crewId }))} placeholder="Select Sub Item" />
+                    </label>
+                </div>
+                <label className="mt-5 block space-y-2">
+                    <span className="text-sm font-semibold text-slate-600">Description</span>
+                    <Textarea placeholder="Enter detailed service description..." />
+                </label>
             </div>
-
-            <AssignedCrewTable rows={assignedCrew} />
-        </SectionCard>
+        </div>
     );
 }

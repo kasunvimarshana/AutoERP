@@ -34,6 +34,8 @@ Route::prefix('api/pricing')
     ->name('pricing.')
     ->group(function (): void {
         Route::post('resolve-price', [PriceResolverController::class, 'resolve'])->name('resolve-price');
+        Route::post('discounts/preview-calculate', [PriceResolverController::class, 'previewDiscountCalculation'])
+            ->name('discounts.preview-calculate');
         Route::apiResource('price-lists', PriceListController::class);
         Route::apiResource('price-list-items', PriceListItemController::class);
         Route::apiResource('pricing-rules', PricingRuleController::class);

@@ -46,8 +46,12 @@ final class DiscountService implements DiscountServiceInterface
                 $value = (float) ($discount['discount_value'] ?? 0);
                 $type = strtolower((string) ($discount['discount_type'] ?? 'percentage'));
                 $currentAmount = $type === 'fixed' ? $value : round($baseAmount * ($value / 100), 4);
-                $discountAmount += $currentAmount;
+                $discountAmount = min($baseAmount, $discountAmount + $currentAmount);
                 $appliedDiscounts[] = $discount;
+
+                if ($discountAmount >= $baseAmount) {
+                    break;
+                }
 
                 if (! (bool) ($discount['is_stackable'] ?? true) || (bool) ($discount['is_exclusive'] ?? false)) {
                     break;

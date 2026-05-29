@@ -19,7 +19,7 @@ final class VehicleRentalRecordRequest extends FormRequest
         $required = $this->isMethod('post') ? 'required' : 'sometimes';
 
         return [
-            'tenant_id' => [$required, 'integer', 'min:1', 'exists:tenants,id'],
+            'tenant_id' => [$required, 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'agreement_id' => ['nullable', 'integer', 'min:1'],
             'running_chart_id' => ['nullable', 'integer', 'min:1'],

@@ -17,7 +17,7 @@ final class VehicleRentalSettingsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tenant_id' => ['required', 'integer', 'min:1', 'exists:tenants,id'],
+            'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'metadata' => ['nullable', 'array'],
         ];

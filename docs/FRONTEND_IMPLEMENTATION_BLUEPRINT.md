@@ -1,57 +1,34 @@
 # Frontend Implementation Blueprint
 
-Generated from `app/Modules`, `ARCHITECTURE.md`, `PLATFORM_ARCHITECTURE.md`, `application_business_context_requirements.md`, and the current module API audit.
+Generated for the modular ERP/business management application from the backend module architecture in `app/Modules`.
 
-## 1. Blueprint Goal
+Last updated: 2026-05-29.
 
-Design a modular frontend that mirrors the backend business-capability architecture.
+## 1. Architecture Contract
 
-The frontend must:
+The frontend is an input, workflow, preview, confirmation, and display application. It must not become a shadow ERP engine.
 
-- be module-aware, tenant-aware, permission-aware, and preview-driven
-- collect user input, call backend APIs, display backend results, and submit confirmed records
-- never own business-critical calculations
-- remain scalable enough for new business modules without reworking the shell
+Frontend must not calculate:
 
-The backend must remain authoritative for:
+- Invoice totals, taxes, discounts, payment balances, finance postings, stock effects, UOM conversions, pricing rules, workflow statuses, returns, refunds, reversals, rental final billing, or vehicle service job invoice totals.
+- Any value persisted as `subtotal`, `discount_amount`, `tax_amount`, `line_total`, `line_total_with_tax`, `grand_total`, `balance`, stock quantity effect, journal amount, allocation balance, document number, or workflow state.
 
-- invoice totals
-- taxes
-- discounts
-- finance postings
-- stock movements
-- payment balances and allocations
-- UOM conversions
-- pricing rules
-- workflow status transitions
-- returns, refunds, reversals
-- rental running chart billing
-- vehicle service invoice totals
+Frontend must:
 
-## 2. Recommended Frontend Stack
+- Collect user input.
+- Call backend list, CRUD, preview, workflow, and posting APIs.
+- Display backend preview/calculation results.
+- Allow edits only to backend-permitted input fields.
+- Submit confirmed records.
+- Render backend status, history, audit, documents, attachments, comments, and validation errors.
 
-- Framework: React + TypeScript
-- App shell: Vite
-- Routing: React Router with route modules
-- Server state: TanStack Query
-- Local form state: React Hook Form + Zod for client-side UX validation only
-- Grid/table: reusable internal `DataTable` built on TanStack Table
-- UI primitives: shared internal component library
-- Auth/session: token/session manager aligned to Auth module responses
-- Permissions: route-level and component-level guards using backend permission codes
-- File uploads: shared upload adapter for Document and Extension attachment flows
-- Testing: Vitest, React Testing Library, Playwright
+Backend must remain authoritative for:
 
-## 3. Frontend Architecture Rules
+- Tenant and organization-unit isolation.
+- Tax, discount, pricing, UOM, stock, payment, finance, document, workflow, approval, return/refund/reversal, audit, and history logic.
+- Transactions and rollbacks for header plus lines, posting, allocation, inventory, and workflow operations.
 
-- Module ownership in frontend must match backend module ownership.
-- Shared entities such as `Customer`, `Supplier`, `Item`, `UOM`, `Pricing`, `Document`, `Payment`, `Finance`, and `Inventory` must be consumed through their APIs, not reimplemented locally.
-- All create/edit flows that affect totals, balances, stock, posting, or workflow must use backend preview endpoints before final confirmation.
-- Frontend-calculated values may exist only for temporary UX feedback such as line ordering, empty-state hints, or unsaved draft indicators. They must never be treated as authoritative business values.
-- Tenant identity comes from auth/session context and backend middleware. Frontend must not treat tenant id in payload as a trust boundary.
-- Each module page must support audit/history visibility where the backend exposes it.
-
-## 4. App Folder Structure
+## 2. Recommended App Folder Structure
 
 ```text
 src/
@@ -59,38 +36,11 @@ src/
     providers/
     router/
     store/
-    layouts/
-      AuthLayout.tsx
-      AppLayout.tsx
-      ModuleWorkspaceLayout.tsx
-    guards/
-      AuthGuard.tsx
-      PermissionGuard.tsx
-      TenantGuard.tsx
-  core/
-    api/
-      client.ts
-      queryKeys.ts
-      errorMapper.ts
-      pagination.ts
-    auth/
-    permissions/
-    session/
-    navigation/
-    utils/
-    types/
-  components/
-    data-display/
-    forms/
-    feedback/
-    overlays/
-    document/
-    workflow/
-    audit/
-    attachments/
-    selectors/
-    finance/
-    inventory/
+    query-client/
+  layouts/
+    AuthLayout/
+    AppLayout/
+    ModuleLayout/
   modules/
     auth/
     dashboard/
@@ -111,1867 +61,1281 @@ src/
     vehicle-service/
     vehicle-rental/
     voucher/
-  hooks/
+  shared/
+    api/
+    components/
+    forms/
+    hooks/
+    permissions/
+    schemas/
+    types/
+    utils/
+  assets/
   styles/
-  test/
 ```
 
-Per module structure:
+Module folder pattern:
 
 ```text
-modules/<module>/
+modules/{module}/
+  api.ts
   routes.tsx
-  api/
+  permissions.ts
+  types.ts
   pages/
+    {Entity}ListPage.tsx
+    {Entity}FormPage.tsx
+    {Entity}DetailPage.tsx
+    {Module}DashboardPage.tsx
+    {Module}SettingsPage.tsx
   components/
   forms/
   tables/
-  hooks/
-  permissions.ts
-  types.ts
 ```
 
-## 5. Route Map
+## 3. State Management Approach
 
-Top-level frontend routes:
+Use server state first:
+
+- TanStack Query or equivalent for API data, caching, pagination, invalidation, optimistic-free updates, and background refetch.
+- A small client store for auth session, active tenant, active organization unit, sidebar state, UI preferences, and transient draft wizard state.
+- Form state kept local with React Hook Form or equivalent.
+- Preview state is server state keyed by current form inputs, never hand-calculated in global state.
+
+Mutation rules:
+
+- Use explicit mutations for create, update, delete, workflow action, preview, post, reverse, allocate, refund.
+- Invalidate list/detail queries after successful mutation.
+- Never mutate cached calculated values manually except by replacing them with backend responses.
+
+## 4. API Client Rules
+
+Every request must include auth and context headers/tokens expected by backend middleware.
+
+Standard client responsibilities:
+
+- Attach bearer token/session credentials.
+- Attach active tenant and organization-unit context if the backend expects context headers.
+- Normalize Laravel validation errors into field errors.
+- Normalize list responses as `data`, `links`, `meta`.
+- Normalize resource responses as `data`.
+- Keep preview responses as returned by backend.
+
+Common response shapes:
+
+```json
+{
+  "data": {},
+  "links": {},
+  "meta": {}
+}
+```
+
+```json
+{
+  "id": 1,
+  "tenant_id": 1,
+  "organization_unit_id": 1,
+  "status": "draft",
+  "lines": [],
+  "metadata": {},
+  "created_at": "ISO-8601",
+  "updated_at": "ISO-8601"
+}
+```
+
+Preview response shape:
+
+```json
+{
+  "input": {},
+  "calculated": {},
+  "breakdown": [],
+  "warnings": [],
+  "errors": []
+}
+```
+
+If an existing backend endpoint returns a flatter preview shape, the module API adapter should preserve the raw data and optionally expose display helpers without changing business values.
+
+## 5. Layouts
+
+Auth layout:
+
+- Login, register, verification, SSO callback, token validation, session expiry.
+- No sidebar.
+
+Main app layout:
+
+- Sidebar navigation.
+- Top navigation with tenant switcher, organization-unit switcher, global search, notifications, user menu.
+- Permission-aware route outlet.
+- Breadcrumbs and command bar.
+
+Module layout:
+
+- Module dashboard.
+- Secondary module tabs where needed.
+- List, form, detail, settings, history, and workflow panels.
+
+Page composition:
+
+- List pages: title, SearchFilterBar, DataTable, ActionDropdown, bulk actions where safe.
+- Form pages: FormSection groups, sticky submit/preview bar, backend validation summary.
+- Detail pages: header summary, StatusBadge, tabs, WorkflowActionPanel, AuditTimeline, AttachmentManager, CommentPanel.
+
+## 6. Navigation Structure
+
+Primary navigation:
+
+- Dashboard
+- Master Data
+  - Customers
+  - Suppliers
+  - Employees
+  - Items
+  - UOM
+  - Pricing
+- Operations
+  - Sales
+  - Purchase
+  - Vehicle Service
+  - Vehicle Rental
+  - Inventory
+  - Payments
+  - Vouchers
+- Finance
+  - Chart of Accounts
+  - Journal Entries
+  - AP/AR
+  - Tax
+  - Banks
+  - Budgets
+- Documents
+  - Document Records
+  - Definitions
+  - Types
+  - Workflows
+  - Sequences
+- Administration
+  - Tenant
+  - Users and Permissions
+  - Organization Units
+  - Configuration
+  - Audit Logs
+
+Menu items must be hidden or disabled by permission. Disabled items should explain missing permission only where appropriate.
+
+## 7. Global Route Map
+
+Authentication:
 
 - `/login`
 - `/register`
 - `/verify`
-- `/app`
-- `/app/dashboard`
-- `/app/document/*`
-- `/app/finance/*`
-- `/app/inventory/*`
-- `/app/payment/*`
-- `/app/item/*`
-- `/app/uom/*`
-- `/app/pricing/*`
-- `/app/supplier/*`
-- `/app/customer/*`
-- `/app/hr/*`
-- `/app/tenant/*`
-- `/app/configuration/*`
-- `/app/purchase/*`
-- `/app/sales/*`
-- `/app/vehicle-service/*`
-- `/app/vehicle-rental/*`
-- `/app/voucher/*`
-- `/app/audit`
-- `/app/settings`
+- `/sso/callback`
+- `/sessions`
 
-Recommended route pattern per entity:
+Core app:
 
-- list: `/app/<module>/<resource>`
-- create: `/app/<module>/<resource>/new`
-- detail: `/app/<module>/<resource>/:id`
-- edit: `/app/<module>/<resource>/:id/edit`
-- preview or workflow panel: `/app/<module>/<resource>/:id/<panel>`
+- `/`
+- `/dashboard`
+- `/settings/profile`
+- `/settings/sessions`
 
-## 6. Navigation And Menu Structure
+Module route pattern:
 
-Primary sidebar groups:
+- `/{module}`
+- `/{module}/{entity}`
+- `/{module}/{entity}/new`
+- `/{module}/{entity}/:id`
+- `/{module}/{entity}/:id/edit`
+- `/{module}/settings`
 
-- Dashboard
-- Operations
-- Masters
-- Finance
-- Mobility
-- Administration
+Business workflow route pattern:
 
-Sidebar menu map:
-
-- Dashboard
-- Operations: Purchase, Sales, Inventory, Payment, Voucher
-- Mobility: Vehicle Service, Vehicle Rental
-- Masters: Item, UOM, Pricing, Customer, Supplier, HR
-- Finance: Finance, Document
-- Administration: Tenant, Configuration, Users, Audit
-
-Top navigation:
-
-- tenant switcher
-- organization unit switcher
-- global search
-- quick create menu
-- notifications
-- current workflow inbox
-- user profile menu
-
-Quick create menu:
-
-- Purchase Order
-- GRN
-- Purchase Invoice
-- Sales Order
-- Sales Invoice
-- Payment
-- Job Card
-- Rental Agreement
-- Voucher
-- Customer
-- Supplier
-- Item
-
-## 7. Shared Page Patterns
-
-- Dashboard page
-- List page with filters and saved views
-- Create/edit workspace with sticky action bar
-- Detail page with tabs
-- Workflow panel
-- Audit/history panel
-- Attachment/comment panel
-- Document preview panel
-- Related records panel
-- Settings page
-
-Detail page tab pattern:
-
-- Summary
-- Lines or details
-- Financials
-- Workflow
-- Documents
-- Attachments
-- Comments
-- Audit
+- `/{module}/{document}/:id/workflow`
+- `/{module}/{document}/:id/payments`
+- `/{module}/{document}/:id/documents`
+- `/{module}/{document}/:id/history`
 
 ## 8. Reusable Components
 
-Core reusable components:
+Data and page components:
 
-- `DataTable`
-- `SearchFilterBar`
-- `StatusBadge`
-- `ActionDropdown`
-- `ConfirmDialog`
-- `FormSection`
-- `DynamicFormRenderer`
-- `EmptyState`
-- `PageHeader`
-- `StickyActionBar`
-- `EntitySummaryCard`
-- `EntityMetaPanel`
-- `ErrorSummary`
-- `PermissionGate`
+- `DataTable`, `SearchFilterBar`, `StatusBadge`, `ActionDropdown`, `ConfirmDialog`, `PageHeader`, `SummaryStrip`, `EmptyState`, `ErrorState`, `PaginationControls`.
 
-Document and workflow components:
+Form components:
 
-- `DocumentPreview`
-- `WorkflowTimeline`
-- `WorkflowActionPanel`
-- `AuditTimeline`
-- `AttachmentManager`
-- `CommentPanel`
-- `RelatedRecordList`
+- `FormSection`, `DynamicFormRenderer`, `FieldError`, `MoneyInput`, `QuantityInput`, `DateRangeInput`, `MetadataEditor`.
 
-Business input components:
+Selector components:
 
-- `MoneyInput`
-- `QuantityInput`
-- `PercentageInput`
-- `UomSelector`
-- `ItemSelector`
-- `CustomerSelector`
-- `SupplierSelector`
-- `EmployeeSelector`
-- `VehicleSelector`
-- `TaxGroupSelector`
-- `WarehouseSelector`
-- `LocationSelector`
-- `PaymentMethodSelector`
-- `BankAccountSelector`
+- `UomSelector`, `ItemSelector`, `CustomerSelector`, `SupplierSelector`, `EmployeeSelector`, `VehicleSelector`, `WarehouseSelector`, `AccountSelector`, `TaxGroupSelector`, `PaymentMethodSelector`, `DocumentTypeSelector`.
 
-Business output components:
+Business preview components:
 
-- `PaymentAllocationTable`
-- `TaxBreakdownPanel`
-- `DiscountPanel`
-- `StockAvailabilityIndicator`
-- `PricePreviewPanel`
-- `PostingPreviewPanel`
-- `BalanceSummaryPanel`
-- `RunningChartPreviewPanel`
-- `ServiceCostPreviewPanel`
+- `DocumentPreview`, `WorkflowTimeline`, `AuditTimeline`, `AttachmentManager`, `CommentPanel`, `PaymentAllocationTable`, `TaxBreakdownPanel`, `DiscountPanel`, `StockAvailabilityIndicator`, `PricePreviewPanel`, `FinancePostingPreview`, `UomConversionPreview`, `RentalBillingPreview`, `ServiceInvoicePreview`.
 
-Profile subforms:
+Reusable forms:
 
-- `AddressForm`
-- `ContactForm`
-- `BankAccountForm`
-- `TaxProfileForm`
-- `CreditProfileForm`
-- `UserAccessForm`
+- `AddressForm`, `ContactForm`, `BankAccountForm`, `UserAccessPanel`, `FinanceDefaultsForm`, `TaxProfileForm`, `LineItemsEditor`, `WorkflowActionPanel`, `DocumentActionPanel`.
 
-## 9. State Management Approach
+## 9. Validation UX
 
-- Use TanStack Query for all server state.
-- Use React Hook Form for local form state.
-- Use lightweight local stores only for shell concerns such as sidebar state, current tenant context snapshot, draft UI preferences, and unsaved wizard step state.
-- Never keep authoritative balances, totals, or posting values in client-side global stores.
-- Keep query keys module-scoped. Example: `['purchase', 'orders', filters]`.
-- Use optimistic UI only for non-critical UX actions such as pinning filters, expanding panels, or updating local notes after backend acknowledgement.
-- For critical writes, invalidate and re-fetch detail and related preview queries after mutation success.
+- Client validation should only check required fields, formats, simple ranges, and local UI completeness.
+- Backend validation remains authoritative.
+- Show field errors from Laravel validation under each field.
+- Show global errors in a dismissible alert.
+- For critical flows, use Preview, Confirm, Submit.
+- Disable submit while preview is stale when the backend requires a preview.
+- On backend warnings, allow continue only when the response marks warnings as non-blocking.
 
-## 10. Permissions Model
+## 10. Permission Model
 
-Permission dimensions:
+Permission naming pattern:
 
-- module access
-- entity view
-- entity create
-- entity update
-- entity delete
-- entity approve
-- entity post
-- entity reverse
-- entity refund
-- entity preview
-- attachment access
-- comment access
-- audit access
-- settings access
+- `{module}.{entity}.view`
+- `{module}.{entity}.create`
+- `{module}.{entity}.update`
+- `{module}.{entity}.delete`
+- `{module}.{entity}.export`
+- `{module}.{entity}.approve`
+- `{module}.{entity}.post`
+- `{module}.{entity}.reverse`
+- `{module}.{entity}.pay`
+- `{module}.{entity}.settings`
 
-Permission map by module:
+UI enforcement:
 
-- Document: `document.view`, `document.manage`, `document.workflow.manage`, `document.preview`
-- Finance: `finance.view`, `finance.journal.post`, `finance.tax.manage`, `finance.bank.reconcile`
-- Inventory: `inventory.view`, `inventory.adjust`, `inventory.transfer`, `inventory.count`, `inventory.preview`
-- Payment: `payment.view`, `payment.create`, `payment.allocate`, `payment.refund`, `payment.reverse`, `payment.preview`
-- Item: `item.view`, `item.create`, `item.update`
-- UOM: `uom.view`, `uom.manage`, `uom.preview`
-- Pricing: `pricing.view`, `pricing.manage`, `pricing.preview`
-- Supplier: `supplier.view`, `supplier.create`, `supplier.update`, `supplier.finance.manage`
-- Customer: `customer.view`, `customer.create`, `customer.update`, `customer.credit.manage`
-- HR: `hr.view`, `hr.manage`, `hr.payroll.manage`
-- Tenant: `tenant.view`, `tenant.manage`, `tenant.lifecycle.manage`
-- Configuration: `configuration.view`, `configuration.manage`
-- Purchase: `purchase.view`, `purchase.create`, `purchase.approve`, `purchase.receive`, `purchase.invoice`, `purchase.pay`, `purchase.return`
-- Sales: `sales.view`, `sales.create`, `sales.approve`, `sales.deliver`, `sales.invoice`, `sales.receive-payment`, `sales.return`
-- VehicleService: `vehicle-service.view`, `vehicle-service.create`, `vehicle-service.invoice`, `vehicle-service.receive-payment`, `vehicle-service.close`
-- VehicleRental: `vehicle-rental.view`, `vehicle-rental.create`, `vehicle-rental.bill`, `vehicle-rental.receive-payment`, `vehicle-rental.close`
-- Voucher: `voucher.view`, `voucher.create`, `voucher.approve`, `voucher.post`, `voucher.reverse`
+- Route guard blocks unauthorized pages.
+- Navigation hides unauthorized modules.
+- Buttons/actions are permission-gated.
+- Backend still enforces every permission. Frontend permissions are UX only.
 
-Frontend permission behavior:
+## 11. Backend Preview Endpoint List
 
-- route guards hide inaccessible modules
-- action buttons render only for allowed transitions
-- tables can hide sensitive columns such as costs or margins based on permissions
-- audit and attachments can be independently permissioned
+Use these before posting or confirming critical records:
 
-## 11. Validation UX Rules
+| Preview | Endpoint |
+| --- | --- |
+| Sales invoice calculation | `POST /api/sales/calculate-invoice` |
+| Purchase invoice calculation | `POST /api/purchase/calculate-invoice` |
+| Vehicle service invoice | `POST /api/vehicle-service/job-cards/{jobCardId}/invoice-preview` |
+| Vehicle rental billing | `POST /api/vehicle-rental/agreements/{agreementId}/billing-preview` |
+| Sales payment allocation | `POST /api/sales/preview-payment-allocation` |
+| Purchase payment allocation | `POST /api/purchase/preview-payment-allocation` |
+| Payment engine allocation | `POST /api/payment/payments/{payment}/engines/preview-allocation` |
+| Stock availability | `POST /api/inventory/engines/stock-availability/preview` |
+| Vehicle service stock availability | `GET /api/vehicle-service/stock-availability` |
+| Vehicle rental availability | `GET /api/vehicle-rental/vehicle-availability` |
+| UOM conversion | `POST /api/uom/convert` |
+| Price resolving | `POST /api/pricing/resolve-price` |
+| Discount calculation | `POST /api/pricing/discounts/preview-calculate` |
+| Tax calculation | `POST /api/finance/tax/preview-calculate` |
+| Finance journal posting | `POST /api/finance/journal-entries/{journalEntry}/engines/preview-posting` |
+| Voucher posting | `GET /api/voucher/utilities/{voucher}/preview-posting` |
+| Voucher number preview | `POST /api/voucher/utilities/preview-number` |
+| Sequence number preview | `POST /api/sequence/sequences/preview-number` |
 
-- Validate required fields, type format, and obvious client-side shape before submit.
-- Use backend responses as the authoritative source for business validation.
-- Show inline field errors, section summaries, and sticky error banners for long forms.
-- Keep preview panels visible after validation failures so users can correct inputs without losing context.
-- For line-heavy documents, highlight the exact row and field returned by backend validation.
-- Treat backend business warnings separately from blocking errors.
+Missing or future preview endpoints:
 
-Validation UX patterns:
+- Document render/template preview.
+- HR payroll preview.
+- HR leave approval impact preview.
+- Item combo expansion preview.
+- Purchase landed cost allocation preview.
+- Sales quotation/proforma preview if added.
+- Rental running-chart standalone calculation preview if separated from agreement billing preview.
 
-- immediate validation for required ids, dates, quantity format, email, phone, and file type
-- deferred validation for submit-only business constraints
-- preview refresh after key inputs change: party, item, quantity, UOM, tax group, warehouse, rental period, service lines
+## 11.1 Module Responsibility And Data Contract Matrix
 
-## 12. Backend Preview Endpoint Checklist
+| Module | Main request payloads | Main response structures | Backend-only logic | Frontend-only responsibilities |
+| --- | --- | --- | --- | --- |
+| Document | Type/definition, source refs, metadata, status action, attachment/comment payloads | Document header, status, version, relations, attachments, comments, activities | Numbering, rendering, versioning, permissions, workflow | Upload files, edit metadata, request previews, show history |
+| Finance | Accounts, periods, journal lines, tax setup, bank/budget fields | Accounts, balanced journals, tax breakdowns, posting previews, AP/AR rows | Double-entry, period locks, tax, AP/AR, posting/reversal | Enter finance setup and journals, display previews |
+| Inventory | Item, UOM, warehouse/location, batch/serial, quantity, source refs | Stock levels, movements, reservations, cost layers, availability previews | Stock effects, reservations, valuation, UOM conversion, traceability | Select/scan stock inputs and show backend availability |
+| Payment | Party/source refs, method, amount, currency, allocation targets | Payment, allocations, unallocated amount, status, refund/reversal data | Allocation, settlement, balances, posting, refunds, write-offs | Capture payment info and display settlement results |
+| Item | Item master, units, attributes, variants, combo lines, metadata | Item profile, variants, combo lines, identifiers, active state | Item type rules, combo validation, UOM validation | Maintain item setup and selectors |
+| UOM | Unit data, conversion factors, from/to UOM, quantity | Conversion result, factor, precision, direction | Compatibility, conversion, rounding | Request conversion and show result |
+| Pricing | Price list/rule/discount/tier data, item/party/date/UOM preview context | Resolved price, applied tiers/discounts, net amount, history rows | Price priority, tiers, discounts, UOM/date/currency logic | Request price/discount previews and display breakdown |
+| Supplier | Supplier master, contacts, addresses, bank/tax/defaults, optional user access | Supplier profile, contacts, defaults, user access, validation result | Supplier eligibility, finance/tax validation, optional user linking | Maintain supplier record and access UI |
+| Customer | Customer master, contacts, addresses, vehicles, tax/credit/defaults, optional user access | Customer profile, credit/tax/defaults, user access, validation result | Credit/outstanding checks, eligibility, optional user linking | Maintain customer record and display checks |
+| HR | Employee master, contacts, addresses, employment details, payroll/leave inputs, optional user access | Employee profile, status history, payroll/leave rows when available | Employee validation, payroll, leave, attendance, user linking | Maintain employee records and HR input screens |
+| Tenant | Tenant, plans, domains, settings, lifecycle action | Tenant profile, settings, domains, lifecycle state | Tenant isolation, lifecycle, provisioning, effective settings | Tenant admin forms and status display |
+| Configuration | Setting keys/values/scopes, feature keys, locale/currency data | Raw/resolved settings, feature state, reference records | Config precedence, cache, feature decisions | Settings UI and reference-data maintenance |
+| Purchase | Supplier, dates, source refs, item lines, UOM, price, tax group, discount inputs, workflow/payment action | PO/GRN/invoice/return/payment with calculated totals, status, refs | Tax, discounts, totals, stock receipt, AP, payments, rollback | Enter purchase documents, call previews, confirm workflow |
+| Sales | Customer, dates, source refs, item lines, UOM, pricing/tax/discount inputs, workflow/payment action | SO/GDN/invoice/return/payment with calculated totals, stock/payment refs | Pricing, tax, discounts, stock issue, AR, COGS, payments, returns | Enter sales documents, call previews, confirm workflow |
+| VehicleService | Job header, customer/vehicle, labor/spares/non-inventory/external/customer-supplied lines, assignments | Job card, invoice preview, stock/payment/posting refs, status history | Invoice totals, labor incentives, stock consumption, finance/payment | Maintain job card input and show service previews |
+| VehicleRental | Agreement terms, vehicle/driver/provider, rates/rules, running chart usage, replacement/breakdown inputs | Agreement, billing preview, running chart totals, provider payable, status | Availability, rental billing, running chart charges, provider payable, finance/payment | Capture agreement/usage and show billing previews |
+| Voucher | Voucher type/header, debit/credit lines, allocations, workflow action | Voucher, lines, allocations, balance validation, posting preview, history | Balance validation, approval, posting, payment integration, reversal | Enter voucher lines and confirm backend workflow |
 
-Required preview endpoints and frontend usage:
+## 12. Module Blueprints
 
-- Purchase invoice calculation preview: use before saving or posting purchase invoice
-- Sales invoice calculation preview: use before saving or posting sales invoice
-- Vehicle service invoice preview: use before invoice generation and before close
-- Vehicle rental invoice preview: use before invoice generation and before provider payable confirmation
-- Payment allocation preview: use before confirming customer, supplier, or rental/service allocations
-- Advance allocation preview: use before applying advances to invoices or agreements
-- Stock availability preview: use when selecting warehouse, location, item, serial, or source document lines
-- UOM conversion preview: use when quantity/UOM is changed
-- Price resolving preview: use whenever item, customer, supplier, quantity, date, or UOM changes
-- Tax or discount calculation preview: use for invoice-like lines before submit
-- Finance posting preview: use before posting journals, vouchers, and document-linked postings
-- Rental running chart calculation preview: use while editing running chart or billing inputs
+### Document
 
-Current backend coverage from the audit:
+Frontend routes:
 
-- `POST /api/purchase/calculate-invoice`
-- `POST /api/sales/calculate-invoice`
-- `POST /api/payment/payments/{payment}/engines/preview-allocation`
-- `POST /api/inventory/engines/stock-availability/preview`
-- `POST /api/uom/convert`
-- `POST /api/pricing/resolve-price`
+- `/documents`
+- `/documents/records`
+- `/documents/records/:id`
+- `/documents/types`
+- `/documents/definitions`
+- `/documents/templates`
+- `/documents/workflows`
+- `/documents/sequences`
+- `/documents/history/:entityType/:entityId`
+
+Screens:
+
+- Document Records, Document Preview, Document History, Attachments/Comments, Document Types, Definitions, Templates, Sequences, Workflows, Steps, Transitions.
+
+APIs:
+
+- `GET/POST /api/document/documents`
+- `GET /api/document/documents/{document}`
+- `PATCH /api/document/documents/{document}/status`
+- `GET/POST /api/document/documents/{document}/attachments`
+- `GET/POST /api/document/documents/{document}/comments`
+- `GET/POST /api/document/documents/{document}/activities`
+- `GET/POST /api/document/documents/{document}/events`
+- `GET/POST /api/document/documents/{document}/permissions`
+- `GET/POST /api/document/documents/{document}/relations`
+- `GET/POST /api/document/types`
+- `GET/POST /api/document/definitions`
+- `GET/POST /api/document/item-types`
+- `GET/POST /api/document/item-definitions`
+- Sequence APIs from `/api/sequence/sequences`.
+
+Form fields:
+
+- Document type, definition, source type/id, title, status action, metadata, attachment file, comment body, permission target, relation target.
+
+Table columns:
+
+- Number, type, title, source, status, owner, version, created at, updated at.
+
+Actions:
+
+- Create, update metadata, preview number, change status, upload attachment, add comment, view versions, manage permissions, manage relations.
+
+Backend calculations:
+
+- Numbering, rendering, versioning, workflow status, permission decisions.
+
+Permissions:
+
+- `document.records.view/create/update`, `document.records.status`, `document.definitions.*`, `document.attachments.*`, `document.comments.*`.
+
+Missing backend endpoints:
+
+- Render/download/PDF/email/template preview.
+- First-class workflow/step/transition management endpoints if workflows must be edited from UI.
+
+### Finance
+
+Frontend routes:
+
+- `/finance`
+- `/finance/accounts`
+- `/finance/fiscal-years`
+- `/finance/fiscal-periods`
+- `/finance/journal-entries`
+- `/finance/journal-entries/:id`
+- `/finance/ap-transactions`
+- `/finance/ar-transactions`
+- `/finance/tax`
+- `/finance/payment-terms`
+- `/finance/cost-centers`
+- `/finance/bank-accounts`
+- `/finance/bank-transactions`
+- `/finance/reconciliations`
+- `/finance/budgets`
+
+Screens:
+
+- Chart of Accounts, Fiscal Years, Fiscal Periods, Journal Entries, AP, AR, Tax Groups/Rates/Rules, Payment Terms, Cost Centers, Bank Accounts, Bank Transactions, Reconciliations, Budgets.
+
+APIs:
+
+- CRUD under `/api/finance/accounts`, `/fiscal-years`, `/fiscal-periods`, `/payment-terms`, `/tax-groups`, `/tax-rates`, `/tax-rules`, `/ap-transactions`, `/ar-transactions`, `/cost-centers`, `/journal-entries`, `/journal-entry-lines`, `/budgets`, `/budget-lines`, `/bank-accounts`, `/bank-transactions`, `/bank-reconciliations`, `/bank-category-rules`.
 - `POST /api/finance/tax/preview-calculate`
 - `POST /api/finance/journal-entries/{journalEntry}/engines/preview-posting`
-- Vehicle service and rental preview flows exist through management and workflow endpoints
+- Journal post/reverse engine endpoints where registered.
 
-Missing or still weak backend preview coverage:
+Form fields:
 
-- standalone discount preview endpoint
-- explicit vehicle service invoice preview endpoint naming
-- explicit vehicle rental running chart preview endpoint naming
-- purchase landed-cost preview if landed cost becomes a first-class flow
+- Account code/name/type/normal balance, fiscal dates, journal date/reference/currency/lines, tax group/rate/rule fields, bank account fields, budget period/lines.
 
-## 13. Backend-Only Logic Checklist
+Table columns:
 
-- document numbering
-- workflow transitions
-- approval workflows
-- document rendering and versioning
-- price list resolution
-- tax calculation
-- discount calculation
-- invoice totals
-- payment allocation and settlement
-- bank reconciliation math
-- stock reservation and movement
-- stock valuation and cost layers
-- UOM conversion and rounding
-- combo item expansion
-- service item and labour validation
-- rental running chart billing
-- provider payable generation
-- finance posting
-- reversal and refund effects
-- tenant isolation checks
-- audit and history capture
-
-## 14. Frontend-Only Responsibility Checklist
-
-- routing and workspace composition
-- session persistence and logout UX
-- filter state and saved views
-- table display and column controls
-- collecting form input
-- autosave of non-authoritative drafts if desired
-- triggering preview calls
-- rendering backend previews
-- rendering validation messages
-- showing audit, attachments, comments, and related records
-- managing navigation and breadcrumbs
-- respecting permissions in the UI
-
-## 15. Module Blueprint
-
-### 15.1 Document
-
-Screens:
-
-- Document Definitions
-- Document Templates
-- Document Types
-- Document Sequences
-- Document Workflows
-- Workflow Steps
-- Workflow Transitions
-- Document Records
-- Document Preview
-- Document History
-- Attachments and Comments
-
-Frontend routes:
-
-- `/app/document/definitions`
-- `/app/document/templates`
-- `/app/document/types`
-- `/app/document/sequences`
-- `/app/document/workflows`
-- `/app/document/records`
-- `/app/document/records/:id`
-- `/app/document/records/:id/preview`
-- `/app/document/records/:id/history`
-
-Required APIs:
-
-- definitions CRUD
-- templates CRUD
-- types CRUD
-- sequences list and preview
-- workflows, steps, and transitions CRUD
-- document records list and detail
-- attachments, comments, events, permissions, relations
-
-Forms:
-
-- definition: code, name, module, model, active
-- template: type, name, engine, content, active
-- sequence: prefix, suffix, padding, reset rule, next-number preview
-- workflow: document type, step list, transition rules, active
-
-Tables:
-
-- definitions: code, name, module, type count, active
-- templates: name, type, version, active, updated at
-- sequences: code, prefix, next number, reset rule, active
-- records: number, type, source module, status, created by, created at
+- Code, name, type, date, reference, debit, credit, status, period, currency, created at.
 
 Actions:
 
-- create, edit, activate, deactivate
-- preview document
-- view version history
-- manage workflow
-- preview next sequence
+- Create/update, preview tax, validate balance, preview posting, post, reverse, lock/unlock if backend added, reconcile.
 
-Backend calculations needed:
+Backend calculations:
 
-- numbering preview
-- rendered data preview
-- allowed transitions
-
-Frontend responsibilities:
-
-- manage setup screens
-- preview backend-rendered documents
-- show workflow timelines and attachments
+- Double-entry validation, fiscal period locks, journal posting, AP/AR balances, tax, reconciliation totals.
 
 Permissions:
 
-- `document.view`
-- `document.manage`
-- `document.workflow.manage`
-- `document.preview`
+- `finance.accounts.*`, `finance.journals.*`, `finance.journals.post/reverse`, `finance.tax.*`, `finance.banks.*`, `finance.budgets.*`.
 
 Missing backend endpoints:
 
-- explicit render or download endpoint naming
-- template preview endpoint
-- PDF or email dispatch endpoints if not already available behind generic document routes
+- Trial balance, ledger report, account statement, period close/reopen, tax reports.
 
-### 15.2 Finance
-
-Screens:
-
-- Chart of Accounts
-- Fiscal Years
-- Fiscal Periods
-- Journal Entries
-- AP Transactions
-- AR Transactions
-- Tax Groups, Rates, Rules
-- Payment Terms
-- Cost Centers
-- Bank Accounts
-- Bank Transactions
-- Reconciliations
-- Budgets
+### Inventory
 
 Frontend routes:
 
-- `/app/finance/accounts`
-- `/app/finance/fiscal-years`
-- `/app/finance/fiscal-periods`
-- `/app/finance/journal-entries`
-- `/app/finance/journal-entries/:id`
-- `/app/finance/ap-transactions`
-- `/app/finance/ar-transactions`
-- `/app/finance/tax`
-- `/app/finance/payment-terms`
-- `/app/finance/cost-centers`
-- `/app/finance/bank-accounts`
-- `/app/finance/bank-transactions`
-- `/app/finance/reconciliations`
-- `/app/finance/budgets`
-
-Required APIs:
-
-- account CRUD
-- fiscal year and period CRUD
-- journal entry and line CRUD
-- posting preview, post, reverse
-- AP and AR transaction CRUD and lookup
-- tax group, rate, rule CRUD and preview calculation
-- payment terms CRUD
-- cost center CRUD
-- bank account and bank transaction CRUD
-- reconciliation workflows
-- budget CRUD
-
-Forms:
-
-- journal: date, reference, memo, currency, lines, cost centers
-- tax: code, type, rate, rule conditions, active
-- bank reconciliation: bank account, statement date, lines, matched items
-
-Tables:
-
-- accounts: code, name, type, parent, active
-- periods: fiscal year, start, end, status
-- journals: number, date, reference, status, debit total, credit total
-- AP or AR: document number, party, due date, outstanding amount, status
-- bank transactions: date, reference, amount, matched status
-
-Actions:
-
-- preview posting
-- post journal
-- reverse journal
-- preview tax
-- reconcile bank statement
-
-Backend calculations needed:
-
-- balanced entries
-- tax preview
-- reconciliation totals
-- outstanding balances
-
-Frontend responsibilities:
-
-- entry forms
-- posting preview display
-- reconciliation workspace
-
-Permissions:
-
-- `finance.view`
-- `finance.journal.post`
-- `finance.tax.manage`
-- `finance.bank.reconcile`
-
-Missing backend endpoints:
-
-- trial balance
-- general ledger
-- tax reports
-- period close and reopen
-
-### 15.3 Inventory
+- `/inventory`
+- `/inventory/stock-levels`
+- `/inventory/movements`
+- `/inventory/reservations`
+- `/inventory/transfers`
+- `/inventory/adjustments`
+- `/inventory/cycle-counts`
+- `/inventory/batches`
+- `/inventory/serials`
+- `/inventory/inspections`
+- `/inventory/put-away`
+- `/inventory/picking`
+- `/inventory/valuation`
+- `/inventory/traceability`
 
 Screens:
 
-- Stock Levels
-- Stock Movements
-- Stock Reservations
-- Stock Transfers
-- Stock Adjustments
-- Cycle Counts
-- Batches
-- Serials
-- Receipt Inspections
-- Put-away Tasks
-- Picking Tasks
-- Valuation and Cost Layers
-- Traceability
+- Stock Levels, Stock Movements, Reservations, Transfers, Adjustments, Cycle Counts, Batches, Serials, Receipt Inspections, Put-away Tasks, Picking Tasks, Valuation/Cost Layers, Traceability.
 
-Frontend routes:
+APIs:
 
-- `/app/inventory/stock-levels`
-- `/app/inventory/movements`
-- `/app/inventory/reservations`
-- `/app/inventory/transfers`
-- `/app/inventory/adjustments`
-- `/app/inventory/cycle-counts`
-- `/app/inventory/batches`
-- `/app/inventory/serials`
-- `/app/inventory/inspections`
-- `/app/inventory/put-away`
-- `/app/inventory/picking`
-- `/app/inventory/valuation`
-- `/app/inventory/traceability`
+- CRUD under `/api/inventory/*` for stock levels, movements, reservations, adjustments, transfers, batches, serials, inspections, tasks, valuation configs, cycle counts.
+- `POST /api/inventory/engines/stock-availability/preview`
+- Allocation/valuation/dimension engine endpoints where registered.
 
-Required APIs:
+Form fields:
 
-- stock, movement, reservation, transfer, adjustment CRUD or actions
-- cycle count flows
-- batch and serial lookups
-- inspection, picking, put-away flows
-- valuation and traceability reads
-- stock availability preview
+- Item, UOM, warehouse, location, batch, serial, quantity, source type/id, reason, notes.
 
-Forms:
+Table columns:
 
-- transfer: from warehouse, to warehouse, lines, reason
-- adjustment: warehouse, item, quantity, UOM, reason, batch or serial
-- cycle count: warehouse, scope, counted lines
-
-Tables:
-
-- stock levels: item, warehouse, location, available, reserved, on hand, UOM
-- movements: date, movement type, item, warehouse, quantity, cost impact
-- transfers: number, source, destination, status, created at
-- cycle counts: count no, warehouse, status, variance lines
+- Item, warehouse, location, batch/serial, on hand, reserved, available, movement type, source, date.
 
 Actions:
 
-- preview availability
-- reserve stock
-- release stock
-- confirm transfer
-- post adjustment
-- finalize cycle count
-- trace item
+- Preview availability, reserve, release, transfer, adjust, count, inspect, put away, pick, view trace.
 
-Backend calculations needed:
+Backend calculations:
 
-- availability
-- conversions
-- valuation
-- reservation effects
-
-Frontend responsibilities:
-
-- scan and select stock references
-- show backend availability and traceability
+- Availability, stock movement, UOM conversion, valuation, cost layers, reservations, reversals.
 
 Permissions:
 
-- `inventory.view`
-- `inventory.adjust`
-- `inventory.transfer`
-- `inventory.count`
-- `inventory.preview`
+- `inventory.stock.view`, `inventory.movements.*`, `inventory.reservations.*`, `inventory.transfers.*`, `inventory.adjustments.*`, `inventory.valuation.view`.
 
 Missing backend endpoints:
 
-- stock ledger report
-- reservation consume or release shortcuts
-- richer traceability summary endpoints if current responses are low-level
+- Stock ledger report, reservation consume/release shortcuts, batch/serial trace report.
 
-### 15.4 Payment
+### Payment
+
+Frontend routes:
+
+- `/payments`
+- `/payments/payments`
+- `/payments/methods`
+- `/payments/groups`
+- `/payments/allocations`
+- `/payments/advances`
+- `/payments/refunds`
+- `/payments/write-offs`
+- `/payments/cash-registers`
+- `/payments/checks`
 
 Screens:
 
-- Payments
-- Payment Methods
-- Payment Groups
-- Payment Allocations
-- Advance Payments
-- Advance Allocations
-- Refunds
-- Write-offs
-- Cash Registers
-- Checks or Cheques
+- Payments, Payment Methods, Payment Groups, Allocations, Advance Payments, Advance Allocations, Refunds, Write-offs, Cash Registers, Checks/Cheques.
 
-Frontend routes:
+APIs:
 
-- `/app/payment/payments`
-- `/app/payment/payments/:id`
-- `/app/payment/methods`
-- `/app/payment/groups`
-- `/app/payment/allocations`
-- `/app/payment/advances`
-- `/app/payment/refunds`
-- `/app/payment/write-offs`
-- `/app/payment/cash-registers`
-- `/app/payment/checks`
+- CRUD under `/api/payment/payment-methods`, `/payment-groups`, `/payments`, `/payment-allocations`, `/advance-payments`, `/advance-payment-allocations`, `/cash-registers`, `/checks`, `/write-offs` where registered.
+- `POST /api/payment/payments/{payment}/engines/preview-allocation`
+- Allocate, unallocate, status, post, reverse, refund engine endpoints.
 
-Required APIs:
+Form fields:
 
-- payment methods and groups CRUD
-- payments CRUD and workflow actions
-- allocation preview and confirm
-- advances and advance allocations
-- refunds and write-offs
-- checks and cash register flows
+- Party type/id, source type/id, method, amount, currency, date, reference, bank/check/cash-register details, allocation lines.
 
-Forms:
+Table columns:
 
-- payment: party, source module, method, amount, currency, bank or register, notes
-- allocation: payment id, candidate documents, selected lines, requested amounts
-- refund: source payment, reason, amount, method
-
-Tables:
-
-- payments: number, party, source type, amount, allocated, balance, status, date
-- allocations: payment, target document, amount, status
-- advances: number, party, amount, allocated, remaining
+- Number, party, method, amount, allocated, unallocated, status, date, reference.
 
 Actions:
 
-- preview allocation
-- allocate
-- unallocate
-- post payment
-- reverse payment
-- create refund
-- write off balance
+- Create, preview allocation, allocate, unallocate, post, reverse, refund, write off, print receipt.
 
-Backend calculations needed:
+Backend calculations:
 
-- allocation breakdown
-- remaining balance
-- settlement effects
-
-Frontend responsibilities:
-
-- drive payment workflows
-- show allocation preview and settlement results
+- Allocation, settlement, AP/AR impact, payment balances, posting, refunds, reversals.
 
 Permissions:
 
-- `payment.view`
-- `payment.create`
-- `payment.allocate`
-- `payment.refund`
-- `payment.reverse`
-- `payment.preview`
+- `payment.payments.*`, `payment.payments.allocate/post/reverse/refund`, `payment.methods.*`, `payment.cash-registers.*`.
 
 Missing backend endpoints:
 
-- wallet or statement views
-- explicit advance preview endpoint if current flow is embedded only in integration actions
+- Payment method availability preview, customer/supplier wallet statement.
 
-### 15.5 Item
+### Item
+
+Frontend routes:
+
+- `/items`
+- `/items/items`
+- `/items/items/new`
+- `/items/items/:id`
+- `/items/categories`
+- `/items/types`
+- `/items/attributes`
+- `/items/variants`
+- `/items/combos`
+- `/items/identifiers`
 
 Screens:
 
-- Items
-- Item Categories
-- Item Types
-- Item Attributes
-- Item Variants
-- Combo or Bundles
-- Item Units
-- Item Pricing References
-- Item Metadata
+- Items, Categories, Types, Attributes, Variants, Combo/Bundles, Item Units, Pricing References, Metadata.
 
-Frontend routes:
+APIs:
 
-- `/app/item/items`
-- `/app/item/items/new`
-- `/app/item/items/:id`
-- `/app/item/categories`
-- `/app/item/types`
-- `/app/item/attributes`
-- `/app/item/variants`
-- `/app/item/combos`
+- `GET/POST /api/item/items`
+- `PATCH /api/item/items/{item}/activate`
+- `PATCH /api/item/items/{item}/deactivate`
+- CRUD for item categories, brands, attributes/groups/values, variants, combo items, identifiers.
 
-Required APIs:
+Form fields:
 
-- item CRUD
-- categories, types, attributes, values CRUD
-- variants CRUD
-- combo items CRUD
-- identifiers and metadata CRUD
+- Code/SKU, name, type, category, brand, base UOM, stockable/service flags, tax defaults, units, attributes, variants, combo components, prices, metadata.
 
-Forms:
+Table columns:
 
-- item master: code, name, type, stockable, default UOM, category, tax defaults
-- variants: option sets, SKU, barcode
-- combo: parent item, component item, quantity, UOM, optional flag
-
-Tables:
-
-- items: code, name, type, category, default UOM, active
-- variants: parent item, option summary, SKU, active
-- combos: parent, component, qty, UOM
+- SKU, name, type, category, brand, UOM, stockable, active, updated at.
 
 Actions:
 
-- create item
-- add nested units, variants, attributes, combo items, metadata
-- activate or deactivate item
+- Create/update, activate/deactivate, add variant, add combo line, attach identifier, open pricing reference.
 
-Backend calculations needed:
+Backend calculations:
 
-- combo expansion preview
-- UOM compatibility for item units
-
-Frontend responsibilities:
-
-- nested form handling
-- item reference selection
+- Combo circular checks, item type rules, UOM validation, nested transaction save.
 
 Permissions:
 
-- `item.view`
-- `item.create`
-- `item.update`
+- `item.items.*`, `item.categories.*`, `item.variants.*`, `item.combos.*`.
 
 Missing backend endpoints:
 
-- combo expansion preview
-- item availability summary endpoint
+- Combo expansion preview, item availability, item price/tax defaults.
 
-### 15.6 UOM
+### UOM
+
+Frontend routes:
+
+- `/uom`
+- `/uom/units`
+- `/uom/conversions`
+- `/uom/convert`
 
 Screens:
 
-- UOM Categories
-- Units
-- Unit Conversions
-- Conversion Preview
+- Units, Unit Conversions, Conversion Preview.
 
-Frontend routes:
+APIs:
 
-- `/app/uom/categories`
-- `/app/uom/units`
-- `/app/uom/conversions`
-- `/app/uom/preview`
+- CRUD under `/api/uom/unit-of-measures`, `/api/uom/uom-conversions`.
+- `POST /api/uom/convert`.
 
-Required APIs:
+Form fields:
 
-- categories CRUD
-- units CRUD
-- conversions CRUD
-- conversion preview
+- Unit code/name/category/type, precision, from UOM, to UOM, factor, item-specific flag, quantity.
 
-Forms:
+Table columns:
 
-- unit: code, name, symbol, category, precision
-- conversion: from unit, to unit, factor, rounding mode, active
-
-Tables:
-
-- units: code, name, category, precision, active
-- conversions: from, to, factor, rounding, active
+- Code, name, category, precision, from, to, factor, active.
 
 Actions:
 
-- preview conversion
-- create conversion
-- edit precision
+- Create/update unit, create/update conversion, preview conversion.
 
-Backend calculations needed:
+Backend calculations:
 
-- converted quantity
-- rounding result
-
-Frontend responsibilities:
-
-- request and display conversion results only
+- Conversion, compatibility validation, precision/rounding.
 
 Permissions:
 
-- `uom.view`
-- `uom.manage`
-- `uom.preview`
+- `uom.units.*`, `uom.conversions.*`, `uom.convert`.
 
 Missing backend endpoints:
 
-- conversion matrix or compatibility summary
+- Conversion matrix and item-specific conversion preview.
 
-### 15.7 Pricing
+### Pricing
+
+Frontend routes:
+
+- `/pricing`
+- `/pricing/price-lists`
+- `/pricing/price-lists/:id`
+- `/pricing/items`
+- `/pricing/rules`
+- `/pricing/rules/:id`
+- `/pricing/discounts`
+- `/pricing/tiers`
+- `/pricing/resolve`
+- `/pricing/history`
 
 Screens:
 
-- Price Lists
-- Price List Items
-- Pricing Rules
-- Rule Conditions
-- Discounts
-- Discount Rules
-- Pricing Tiers
-- Price Resolver Preview
-- Price Histories
+- Price Lists, Price List Items, Pricing Rules, Rule Conditions, Discounts, Discount Rules, Pricing Tiers, Price Resolver Preview, Price History.
 
-Frontend routes:
+APIs:
 
-- `/app/pricing/price-lists`
-- `/app/pricing/price-lists/:id`
-- `/app/pricing/rules`
-- `/app/pricing/discounts`
-- `/app/pricing/tiers`
-- `/app/pricing/resolve`
-- `/app/pricing/history`
+- `POST /api/pricing/resolve-price`
+- `POST /api/pricing/discounts/preview-calculate`
+- CRUD under `/api/pricing/price-lists`, `/price-list-items`, `/pricing-rules`, `/pricing-rule-conditions`, `/discounts`, `/discount-rules`, `/pricing-tiers`, `/supplier-price-lists`, `/customer-price-lists`.
+- Read-only `/api/pricing/price-histories`.
 
-Required APIs:
+Form fields:
 
-- price list CRUD
-- price list item CRUD
-- pricing rule CRUD
-- rule condition CRUD
-- discount CRUD
-- discount rule CRUD
-- pricing tier CRUD
-- resolve price
-- price history list
+- Price list name/code/type/scope/currency/date, item/UOM/price, tier breaks, rule conditions, discount type/value, priority, stackable/exclusive flags.
 
-Forms:
+Table columns:
 
-- price list: code, name, currency, active dates, priority
-- price item: item, UOM, min qty, unit price, currency
-- pricing rule: scope, party or item filters, date filters, priority
-- discount: type, value, cap, active dates
-
-Tables:
-
-- price lists: code, name, currency, priority, active
-- price items: item, UOM, min qty, unit price, effective dates
-- rules: name, scope, priority, active
-- discounts: name, type, value, active
-- history: source, item, old price, new price, changed at
+- Code, name, type, scope, item, price, discount, priority, valid from/to, active.
 
 Actions:
 
-- resolve price preview
-- create and activate price structures
-- inspect price history
+- Resolve price, preview discount, create/update list, add item, add tier, add rule, view history.
 
-Backend calculations needed:
+Backend calculations:
 
-- effective unit price
-- discount breakdown
-- UOM normalization
-
-Frontend responsibilities:
-
-- call `resolve-price`
-- display breakdown and selected rule
+- Price resolution, tier rules, priority, discount logic, currency/UOM/date rules.
 
 Permissions:
 
-- `pricing.view`
-- `pricing.manage`
-- `pricing.preview`
+- `pricing.price-lists.*`, `pricing.rules.*`, `pricing.discounts.*`, `pricing.resolve`, `pricing.history.view`.
 
 Missing backend endpoints:
 
-- standalone discount preview
-- richer history capture by mutation source
+- Deeper automatic price-history capture for every pricing mutation.
 
-### 15.8 Supplier
+### Supplier
+
+Frontend routes:
+
+- `/suppliers`
+- `/suppliers/new`
+- `/suppliers/:id`
+- `/suppliers/:id/edit`
+- `/suppliers/:id/contacts`
+- `/suppliers/:id/addresses`
+- `/suppliers/:id/bank-accounts`
+- `/suppliers/:id/tax-profile`
+- `/suppliers/:id/finance-defaults`
+- `/suppliers/:id/user-access`
 
 Screens:
 
-- Suppliers
-- Supplier Details
-- Supplier Contacts
-- Supplier Addresses
-- Supplier Bank Accounts
-- Supplier Tax Profile
-- Supplier User Access
-- Supplier Finance Defaults
+- Suppliers, Supplier Details, Contacts, Addresses, Bank Accounts, Tax Profile, User Access, Finance Defaults.
 
-Frontend routes:
+APIs:
 
-- `/app/supplier/suppliers`
-- `/app/supplier/suppliers/new`
-- `/app/supplier/suppliers/:id`
-- `/app/supplier/suppliers/:id/edit`
+- CRUD suppliers, contacts, addresses, vehicles/items where registered.
+- Lookup, status, validate for purchase, finance defaults, tax profile, categories, bank accounts, user access/link/deactivate/unlink.
 
-Required APIs:
+Form fields:
 
-- supplier CRUD
-- contacts CRUD
-- addresses CRUD
-- bank accounts CRUD
-- tax profile get or update
-- finance defaults get or update
-- optional user access link or unlink
-- validation or lookup endpoints
+- Code, name, type, status, contact data, address data, bank account data, tax fields, finance account defaults, optional user link.
 
-Forms:
+Table columns:
 
-- supplier master: code, name, type, status
-- contacts: name, role, phone, email
-- addresses: billing, shipping, tax address
-- finance defaults: payment terms, AP account, tax group
-- optional user access: linked user id or invitation
-
-Tables:
-
-- suppliers: code, name, type, tax id, status
-- contacts: name, role, email, phone
-- bank accounts: bank, account no, currency, default
+- Code, name, category, status, tax number, phone, email, payables, updated at.
 
 Actions:
 
-- create supplier without user
-- optionally link user
-- update finance defaults
-- validate supplier for purchasing
+- Create without user, link existing user, create user access, deactivate access, validate for purchase, update finance defaults.
 
-Backend calculations needed:
+Backend calculations:
 
-- none beyond validation summaries
-
-Frontend responsibilities:
-
-- profile management
-- optional user access management
+- Supplier validation, optional user linking, finance defaults, payables/aging where available, tenant validation.
 
 Permissions:
 
-- `supplier.view`
-- `supplier.create`
-- `supplier.update`
-- `supplier.finance.manage`
+- `supplier.suppliers.*`, `supplier.contacts.*`, `supplier.finance-defaults.update`, `supplier.user-access.*`.
 
 Missing backend endpoints:
 
-- supplier statement
-- supplier aging
+- Supplier statement, aging/payables shortcut.
 
-### 15.9 Customer
+### Customer
+
+Frontend routes:
+
+- `/customers`
+- `/customers/new`
+- `/customers/:id`
+- `/customers/:id/edit`
+- `/customers/:id/contacts`
+- `/customers/:id/addresses`
+- `/customers/:id/tax-profile`
+- `/customers/:id/credit-profile`
+- `/customers/:id/finance-defaults`
+- `/customers/:id/user-access`
 
 Screens:
 
-- Customers
-- Customer Details
-- Customer Contacts
-- Customer Addresses
-- Customer Tax Profile
-- Customer Credit Profile
-- Customer User Access
-- Customer Finance Defaults
+- Customers, Customer Details, Contacts, Addresses, Vehicles, Tax Profile, Credit Profile, User Access, Finance Defaults.
 
-Frontend routes:
+APIs:
 
-- `/app/customer/customers`
-- `/app/customer/customers/new`
-- `/app/customer/customers/:id`
-- `/app/customer/customers/:id/edit`
+- CRUD customers, contacts, addresses, vehicles.
+- Lookup, status, validate for sales/vehicle rental/vehicle service, finance defaults, credit check, tax profile, user access/link/deactivate/unlink.
 
-Required APIs:
+Form fields:
 
-- customer CRUD
-- contacts CRUD
-- addresses CRUD
-- tax profile get or update
-- credit profile get or update
-- finance defaults get or update
-- optional user access link or unlink
-- validation and credit check endpoints
+- Code, name, type, status, contacts, addresses, tax fields, credit limit/terms, finance defaults, optional user access.
 
-Forms:
+Table columns:
 
-- customer master: code, name, category, status
-- contacts and addresses
-- tax profile
-- credit profile: limit, terms, hold flag
-- optional user access
-
-Tables:
-
-- customers: code, name, category, credit status, outstanding, status
-- contacts: name, role, email, phone
-- addresses: type, city, country, default
+- Code, name, status, credit limit, outstanding, phone, email, updated at.
 
 Actions:
 
-- create customer without user
-- optionally link user
-- check credit
-- validate customer for sales, service, rental
+- Create without user, link existing user, credit check, validate for sale/service/rental, update defaults.
 
-Backend calculations needed:
+Backend calculations:
 
-- outstanding summary
-- credit exposure
-
-Frontend responsibilities:
-
-- customer profile and credit UI
+- Credit validation, outstanding summary, optional user linking, tenant validation.
 
 Permissions:
 
-- `customer.view`
-- `customer.create`
-- `customer.update`
-- `customer.credit.manage`
+- `customer.customers.*`, `customer.credit-check`, `customer.finance-defaults.update`, `customer.user-access.*`.
 
 Missing backend endpoints:
 
-- customer statement
-- customer aging
-- duplicate detection
+- Customer statement, aging summary, duplicate detection.
 
-### 15.10 HR
+### HR
+
+Frontend routes:
+
+- `/hr`
+- `/hr/employees`
+- `/hr/employees/new`
+- `/hr/employees/:id`
+- `/hr/departments`
+- `/hr/designations`
+- `/hr/employment-types`
+- `/hr/attendance`
+- `/hr/leave`
+- `/hr/payroll`
+- `/hr/performance`
 
 Screens:
 
-- Employees
-- Employee Details
-- Departments
-- Designations
-- Employee Contacts
-- Employee Addresses
-- Employment Details
-- Employee User Access
+- Employees, Employee Details, Departments, Designations, Contacts, Addresses, Employment Details, User Access, Attendance, Leave, Payroll, Performance.
 
-Frontend routes:
+APIs:
 
-- `/app/hr/employees`
-- `/app/hr/employees/new`
-- `/app/hr/employees/:id`
-- `/app/hr/departments`
-- `/app/hr/designations`
+- CRUD departments, designations, employment types, employees, contacts, addresses, documents, contracts, biometric devices, holidays, attendance, shifts, leave, salary, payroll, performance.
+- Employee lookup/active/by department/by designation/status/employment details/user access.
 
-Required APIs:
+Form fields:
 
-- employee CRUD
-- departments CRUD
-- designations CRUD
-- contact and address CRUD
-- employment details CRUD
-- optional user access link or unlink
-- attendance, leave, salary, payroll APIs where exposed
+- Employee code/name, department, designation, employment type, contacts, addresses, contract, salary profile, attendance/leave inputs, optional user access.
 
-Forms:
+Table columns:
 
-- employee master: code, name, department, designation, joining date, active
-- contacts and addresses
-- employment details: supervisor, grade, contract type
-- optional user access
-
-Tables:
-
-- employees: code, name, department, designation, active
-- departments: code, name, manager
-- designations: code, name, level
+- Code, name, department, designation, employment type, status, joined date, updated at.
 
 Actions:
 
-- create employee without user
-- optionally link user
-- maintain organization data
+- Create without user, link user, update employment details, change status, manage contacts/addresses, run payroll when backend preview/finalize exists.
 
-Backend calculations needed:
+Backend calculations:
 
-- payroll preview and posting when implemented
-- leave balance when implemented
-
-Frontend responsibilities:
-
-- employee master and HR setup
+- Employee validation, optional user linking, department/designation validation, payroll/leave/attendance calculations.
 
 Permissions:
 
-- `hr.view`
-- `hr.manage`
-- `hr.payroll.manage`
+- `hr.employees.*`, `hr.departments.*`, `hr.attendance.*`, `hr.leave.*`, `hr.payroll.*`.
 
 Missing backend endpoints:
 
-- payroll preview and finalize
-- leave approval workflows
-- richer HR dashboards
+- Payroll calculation preview/finalize, leave approval workflow, attendance import, payslip post-to-finance.
 
-### 15.11 Tenant
+### Tenant And Configuration
+
+Frontend routes:
+
+- `/admin/tenants`
+- `/admin/tenants/:id`
+- `/admin/configuration`
+- `/admin/configuration/entries`
+- `/admin/configuration/countries`
+- `/admin/configuration/currencies`
+- `/admin/configuration/languages`
+- `/admin/configuration/timezones`
 
 Screens:
 
-- Tenants
-- Tenant Details
-- Domains
-- Plans
-- Tenant Settings
-- Lifecycle
-- Tenant Documents
+- Tenants, Plans, Domains, Tenant Settings, Documents, Configuration Entries, Features, Countries, Currencies, Languages, Timezones.
 
-Frontend routes:
+APIs:
 
-- `/app/tenant/tenants`
-- `/app/tenant/tenants/:id`
-- `/app/tenant/domains`
-- `/app/tenant/plans`
-- `/app/tenant/settings`
+- Tenant CRUD/lifecycle/settings/domains/documents where registered.
+- Configuration entries CRUD/resolve, feature enabled, cache clear, countries/currencies/languages/timezones CRUD.
 
-Required APIs:
+Form fields:
 
-- tenant CRUD
-- domains CRUD
-- plans CRUD or assignment
-- tenant settings
-- lifecycle actions
-- tenant documents
+- Tenant code/name/domain/status/plan, setting key/value/type/scope, feature key, country/currency/language/timezone fields.
 
-Forms:
+Table columns:
 
-- tenant: code, name, status, plan
-- domain: hostname, primary flag
-- settings: locale, currency, timezone, feature set
-
-Tables:
-
-- tenants: code, name, plan, status, created at
-- domains: host, primary, status
+- Code, name, status, plan, domain, key, value, scope, active, updated at.
 
 Actions:
 
-- create tenant
-- change plan
-- activate, suspend, or archive
+- Activate/deactivate/suspend tenant, resolve config, clear cache, update settings.
 
-Backend calculations needed:
+Backend calculations:
 
-- provisioning readiness summaries
-
-Frontend responsibilities:
-
-- tenant admin UX
+- Tenant isolation, lifecycle, effective settings, config precedence/cache.
 
 Permissions:
 
-- `tenant.view`
-- `tenant.manage`
-- `tenant.lifecycle.manage`
+- `tenant.*`, `configuration.entries.*`, `configuration.cache.clear`.
 
 Missing backend endpoints:
 
-- module enablement summary
-- provisioning health
+- Tenant module enablement matrix, provisioning health, configuration schema discovery, bulk import/export.
 
-### 15.12 Configuration
+### Purchase
+
+Frontend routes:
+
+- `/purchase`
+- `/purchase/orders`
+- `/purchase/orders/new`
+- `/purchase/orders/:id`
+- `/purchase/grns`
+- `/purchase/grns/new`
+- `/purchase/grns/:id`
+- `/purchase/invoices`
+- `/purchase/invoices/new`
+- `/purchase/invoices/:id`
+- `/purchase/payments`
+- `/purchase/advances`
+- `/purchase/returns`
+- `/purchase/refunds`
+- `/purchase/settings`
 
 Screens:
 
-- Settings
-- Feature Flags
-- Countries
-- Currencies
-- Languages
-- Timezones
+- Purchase Dashboard, Purchase Orders, PO Create/Edit/Details, GRN Create/Edit/Details, Purchase Invoices, Payments, Advance Payments, Returns, Supplier Refunds, Settings.
 
-Frontend routes:
+APIs:
 
-- `/app/configuration/settings`
-- `/app/configuration/features`
-- `/app/configuration/countries`
-- `/app/configuration/currencies`
-- `/app/configuration/languages`
-- `/app/configuration/timezones`
+- CRUD purchase orders/lines, GRN headers/lines, purchase returns/lines.
+- Purchase invoices CRUD/from PO/from GRN/from multiple GRNs/post/cancel/reverse/lines.
+- Purchase payments CRUD/post/void/reverse/allocate/allocations.
+- Advances, refunds, write-offs.
+- `POST /api/purchase/calculate-invoice`
+- `POST /api/purchase/preview-payment-allocation`
+- Aggregate with-lines/sync endpoints, lookups, settings, workflow/integration endpoints.
 
-Required APIs:
+Form fields:
 
-- config entry CRUD
-- setting resolution
-- feature enablement checks
-- reference-data CRUD
+- Supplier, document date, due date, currency, warehouse, source refs, item lines, quantity, UOM, unit price, tax group, discount type/value, notes.
 
-Forms:
+Table columns:
 
-- setting: key, module, scope, value, value type, active
-- feature flag: code, scope, enabled, rollout notes
-
-Tables:
-
-- settings: key, module, scope, value type, updated at
-- features: code, scope, enabled, updated at
+- Number, supplier, date, status, subtotal, tax, discount, grand total, balance, posted, updated at.
 
 Actions:
 
-- edit settings
-- resolve setting
-- clear cache if permitted
+- Create PO with lines, create GRN from PO, create direct GRN if allowed, create invoice from PO/GRN/multiple GRNs, preview invoice, post/cancel/reverse invoice, make payment, preview/allocate payment, create/allocate advance, create return/refund.
 
-Backend calculations needed:
+Backend calculations:
 
-- effective setting resolution
-
-Frontend responsibilities:
-
-- settings admin and display of resolved values
+- Totals, tax, discount, UOM conversion, inventory receive, AP/journal posting, payment settlement, return effects, rollback.
 
 Permissions:
 
-- `configuration.view`
-- `configuration.manage`
+- `purchase.orders.*`, `purchase.grns.*`, `purchase.invoices.*`, `purchase.invoices.post/reverse`, `purchase.payments.*`, `purchase.returns.*`, `purchase.settings`.
 
 Missing backend endpoints:
 
-- schema discovery
-- bulk import and export
+- Purchase request/RFQ, first-class supplier invoice resource if separate from current purchase invoice API, landed cost allocation.
 
-### 15.13 Purchase
+### Sales
+
+Frontend routes:
+
+- `/sales`
+- `/sales/orders`
+- `/sales/orders/new`
+- `/sales/orders/:id`
+- `/sales/gdns`
+- `/sales/gdns/new`
+- `/sales/gdns/:id`
+- `/sales/invoices`
+- `/sales/invoices/new`
+- `/sales/invoices/:id`
+- `/sales/payments`
+- `/sales/advances`
+- `/sales/returns`
+- `/sales/refunds`
+- `/sales/settings`
 
 Screens:
 
-- Purchase Dashboard
-- Purchase Orders
-- Purchase Order Create or Edit
-- Purchase Order Details
-- GRN
-- GRN Create or Edit
-- GRN Details
-- Purchase Invoices
-- Purchase Invoice Create or Edit
-- Purchase Invoice Details
-- Purchase Payments
-- Advance Payments
-- Purchase Returns
-- Supplier Refunds
-- Purchase Settings
+- Sales Dashboard, Sales Orders, SO Create/Edit/Details, GDN Create/Edit/Details, Sales Invoices, Payments, Customer Advances, Returns, Customer Refunds, Settings.
 
-Frontend routes:
+APIs:
 
-- `/app/purchase/dashboard`
-- `/app/purchase/orders`
-- `/app/purchase/orders/new`
-- `/app/purchase/orders/:id`
-- `/app/purchase/grn`
-- `/app/purchase/grn/new`
-- `/app/purchase/grn/:id`
-- `/app/purchase/invoices`
-- `/app/purchase/invoices/new`
-- `/app/purchase/invoices/:id`
-- `/app/purchase/payments`
-- `/app/purchase/advances`
-- `/app/purchase/returns`
-- `/app/purchase/refunds`
-- `/app/purchase/settings`
+- CRUD sales orders/lines, GDN headers/lines, sales returns/lines.
+- Sales invoices CRUD/from SO/from GDN/from multiple GDNs/post/cancel/reverse/lines.
+- Sales payments CRUD/post/void/reverse/allocate/allocations.
+- Advances, refunds, write-offs.
+- `POST /api/sales/calculate-invoice`
+- `POST /api/sales/preview-payment-allocation`
+- `GET /api/sales/stock-availability`
+- Aggregate with-lines/sync endpoints, lookups, settings, workflow/integration endpoints.
 
-Required APIs:
+Form fields:
 
-- PO, line, GRN, GRN line, return, return line CRUD
-- purchase invoice calculation preview
-- workflow actions
-- integration actions for documents, payments, advances, refunds, reverse
-- supplier payable lookup
-- payment allocation preview
-- settings endpoints
+- Customer, document date, due date, warehouse, currency, item/service lines, quantity, UOM, unit price, tax group, discount type/value, pricing context, notes.
 
-Forms:
+Table columns:
 
-- PO: supplier, dates, warehouse, lines, notes
-- GRN: source PO or direct, warehouse, received lines, inspection status
-- invoice: supplier, source docs, charges, tax group, discount input, lines
-- payment: invoice refs, amount, method
-- return: source invoice or GRN, lines, reason
-
-Tables:
-
-- orders: number, supplier, date, status, total, received status
-- GRN: number, supplier, warehouse, status, received at
-- invoices: number, supplier, due date, total, balance, status
-- returns: number, supplier, source, amount, status
+- Number, customer, date, status, subtotal, tax, discount, grand total, balance, stock status, updated at.
 
 Actions:
 
-- create PO with lines
-- create GRN from PO
-- create direct GRN
-- create invoice from PO, GRN, or multiple GRNs
-- preview invoice calculation
-- post invoice
-- make payment
-- preview payment allocation
-- create advance
-- allocate advance
-- create return
-- create refund
-- cancel or reverse
+- Create SO, preview price/stock, create GDN, create invoice from SO/GDN/multiple GDNs, preview invoice, post/cancel/reverse, receive payment, allocate advance, create return/refund.
 
-Backend calculations needed:
+Backend calculations:
 
-- tax
-- discount
-- totals
-- received quantity effects
-- AP posting preview
-- payment allocation
-
-Frontend responsibilities:
-
-- collect purchasing inputs
-- orchestrate preview-confirm-submit flow
-- show status, history, and related docs
+- Pricing, tax/discount, stock reservation/issue, AR/journal/COGS, payment allocation, returns/refunds, UOM conversion.
 
 Permissions:
 
-- `purchase.view`
-- `purchase.create`
-- `purchase.approve`
-- `purchase.receive`
-- `purchase.invoice`
-- `purchase.pay`
-- `purchase.return`
+- `sales.orders.*`, `sales.gdns.*`, `sales.invoices.*`, `sales.invoices.post/reverse`, `sales.payments.*`, `sales.returns.*`, `sales.settings`.
 
 Missing backend endpoints:
 
-- purchase request or RFQ
-- first-class supplier invoice CRUD if current invoice flow is only embedded
-- landed cost allocation and preview
+- Quotation/proforma, credit note as first-class resource, sales price/tax preview shortcut beyond Pricing/Finance preview APIs.
 
-### 15.14 Sales
+### Vehicle Service
+
+Frontend routes:
+
+- `/vehicle-service`
+- `/vehicle-service/job-cards`
+- `/vehicle-service/job-cards/new`
+- `/vehicle-service/job-cards/:id`
+- `/vehicle-service/job-cards/:id/items`
+- `/vehicle-service/job-cards/:id/labour`
+- `/vehicle-service/job-cards/:id/parts`
+- `/vehicle-service/job-cards/:id/external-services`
+- `/vehicle-service/job-cards/:id/customer-supplied`
+- `/vehicle-service/job-cards/:id/invoice`
+- `/vehicle-service/payments`
+- `/vehicle-service/settings`
 
 Screens:
 
-- Sales Dashboard
-- Sales Orders
-- Sales Order Create or Edit
-- Sales Order Details
-- GDN
-- GDN Create or Edit
-- Sales Invoices
-- Sales Invoice Create or Edit
-- Sales Invoice Details
-- Sales Payments
-- Customer Advances
-- Sales Returns
-- Customer Refunds
-- Sales Settings
+- Service Dashboard, Job Cards, Job Card Create/Edit/Details, Job Items, Labour Assignments, Spare Parts, External Services, Customer-Supplied Items, Service Invoice, Payments, Settings.
 
-Frontend routes:
+APIs:
 
-- `/app/sales/dashboard`
-- `/app/sales/orders`
-- `/app/sales/orders/new`
-- `/app/sales/orders/:id`
-- `/app/sales/gdn`
-- `/app/sales/gdn/new`
-- `/app/sales/gdn/:id`
-- `/app/sales/invoices`
-- `/app/sales/invoices/new`
-- `/app/sales/invoices/:id`
-- `/app/sales/payments`
-- `/app/sales/advances`
-- `/app/sales/returns`
-- `/app/sales/refunds`
-- `/app/sales/settings`
+- CRUD service types, job cards, job card lines, labor items/assignments, non-inventory items, inspections/lines, diagnostics/lines.
+- Aggregate job card create/update.
+- Sync lines/labor/non-inventory/customer-supplied/external services.
+- `POST /api/vehicle-service/job-cards/{jobCardId}/invoice-preview`
+- `GET /api/vehicle-service/stock-availability`
+- Invoiceable/receivable job cards, settings, status history, workflow and integration endpoints.
 
-Required APIs:
+Form fields:
 
-- sales order, line, GDN, return CRUD
-- sales invoice calculation preview
-- workflow actions
-- integration actions for document, stock, finance, payment, reverse, refund
-- stock availability lookup
-- payment and advance allocation previews
-- settings endpoints
+- Customer, vehicle, supervisor, odometer, complaint, diagnosis, service lines, spare parts, labor items, employee assignments, non-inventory items, external services, customer-supplied items, tax group, discount type/value.
 
-Forms:
+Table columns:
 
-- order: customer, dates, warehouse, price context, lines
-- GDN: source order, warehouse, delivery lines
-- invoice: customer, source docs, item lines, tax or discount inputs
-- payment and refund forms
-- return: source invoice or delivery, reason, lines
-
-Tables:
-
-- orders: number, customer, date, status, total
-- GDN: number, customer, status, delivered at
-- invoices: number, customer, due date, total, balance, status
-- returns: number, customer, source, amount, status
+- Job number, customer, vehicle, supervisor, status, opened date, estimated total, invoice status, payment status.
 
 Actions:
 
-- create order
-- reserve stock
-- create GDN
-- create invoice
-- preview invoice calculation
-- post invoice
-- receive payment
-- preview payment allocation
-- allocate advance
-- create return
-- create refund
-- reverse document
+- Create job, add customer/vehicle, assign supervisor, add service/labor/spare/combo items, assign employees, preview stock, sync items, preview invoice, generate invoice, receive payment, close job, post/reverse inventory/finance.
 
-Backend calculations needed:
+Backend calculations:
 
-- price resolving
-- tax and discount
-- totals
-- stock reservation and issue
-- AR posting and COGS preview
-
-Frontend responsibilities:
-
-- gather sales inputs
-- show backend-calculated totals and stock status
+- Combo expansion, stock consumption, labor assignment validation, invoice calculation, finance posting, payment allocation.
 
 Permissions:
 
-- `sales.view`
-- `sales.create`
-- `sales.approve`
-- `sales.deliver`
-- `sales.invoice`
-- `sales.receive-payment`
-- `sales.return`
+- `vehicle-service.job-cards.*`, `vehicle-service.job-cards.invoice`, `vehicle-service.job-cards.inventory`, `vehicle-service.payments.*`, `vehicle-service.settings`.
 
 Missing backend endpoints:
 
-- quotations
-- proforma invoices
-- first-class credit note surface if currently embedded only in return flows
+- Service appointment/scheduler, combo expansion preview, technician incentive payroll export.
 
-### 15.15 Vehicle Service
+### Vehicle Rental
+
+Frontend routes:
+
+- `/vehicle-rental`
+- `/vehicle-rental/availability`
+- `/vehicle-rental/agreements`
+- `/vehicle-rental/agreements/new`
+- `/vehicle-rental/agreements/:id`
+- `/vehicle-rental/running-charts`
+- `/vehicle-rental/running-charts/:id`
+- `/vehicle-rental/invoices`
+- `/vehicle-rental/replacements`
+- `/vehicle-rental/breakdowns`
+- `/vehicle-rental/provider-payables`
+- `/vehicle-rental/payments`
+- `/vehicle-rental/settings`
 
 Screens:
 
-- Service Dashboard
-- Job Cards
-- Job Card Create or Edit
-- Job Card Details
-- Job Items
-- Labour Assignments
-- Spare Parts
-- External Services
-- Customer-Supplied Items
-- Service Invoice
-- Service Payments
-- Service Settings
+- Rental Dashboard, Vehicle Availability, Agreements, Agreement Create/Edit, Running Charts, Running Chart Details, Rental Invoice Preview, Rental Invoices, Replacement Vehicles, Breakdowns, Provider Payables, Payments, Settings.
 
-Frontend routes:
+APIs:
 
-- `/app/vehicle-service/dashboard`
-- `/app/vehicle-service/job-cards`
-- `/app/vehicle-service/job-cards/new`
-- `/app/vehicle-service/job-cards/:id`
-- `/app/vehicle-service/job-cards/:id/labour`
-- `/app/vehicle-service/job-cards/:id/spares`
-- `/app/vehicle-service/invoices`
-- `/app/vehicle-service/payments`
-- `/app/vehicle-service/settings`
+- Agreements/running charts CRUD.
+- Sync agreement lines, rates, rate rules, extra charges.
+- Sync running chart lines.
+- `POST /api/vehicle-rental/agreements/{agreementId}/billing-preview`
+- `GET /api/vehicle-rental/vehicle-availability`
+- Replacements, breakdowns, provider payables, settings, status history, workflow and integration endpoints.
 
-Required APIs:
+Form fields:
 
-- job card aggregate CRUD
-- labour, spare, external service, customer-supplied item sync endpoints
-- stock availability lookups
-- service invoice preview or management actions
-- payment actions
-- workflow and status history
-- settings endpoints
+- Customer, vehicle, driver/provider, dates, rate plan, km/hour/day/month terms, overtime/night/weekend/double-rate rules, running chart readings, extra charges, replacement details, breakdown details.
 
-Forms:
+Table columns:
 
-- job card: customer, vehicle, complaint, supervisor, dates
-- job lines: labour, service, spare, combo items, quantities, employees
-- invoice generation inputs: included lines, adjustments, notes
-- payment form
-
-Tables:
-
-- job cards: number, customer, vehicle, status, advisor, opened at
-- labour lines: employee, task, rate source, hours, status
-- spare lines: item, quantity, warehouse, availability
-- invoices: number, job card, total, balance, status
+- Agreement number, customer, vehicle, driver/provider, start/end, status, estimated total, billed total, outstanding.
 
 Actions:
 
-- create job
-- add customer and vehicle
-- assign supervisor
-- add labour, service, spare, combo items
-- assign employees
-- consume spare parts
-- preview invoice
-- generate invoice
-- receive payment
-- close job
+- Check availability, create agreement, sync rates/rules/lines, add running chart, preview billing, generate invoice, allocate payment, create provider payable, handle replacement/breakdown, post/reverse finance.
 
-Backend calculations needed:
+Backend calculations:
 
-- combo expansion
-- labour assignment validation
-- stock consumption effects
-- invoice totals
-- payment allocation
-
-Frontend responsibilities:
-
-- job workspace orchestration
-- display stock and invoice preview
+- Availability, km/hour/day/month calculations, overtime/night/weekend/double-rate, running chart billing, replacement vehicle logic, customer invoice, provider payable, finance/payment integration.
 
 Permissions:
 
-- `vehicle-service.view`
-- `vehicle-service.create`
-- `vehicle-service.invoice`
-- `vehicle-service.receive-payment`
-- `vehicle-service.close`
+- `vehicle-rental.agreements.*`, `vehicle-rental.running-charts.*`, `vehicle-rental.billing.preview`, `vehicle-rental.provider-payables.*`, `vehicle-rental.payments.*`, `vehicle-rental.settings`.
 
 Missing backend endpoints:
 
-- explicit invoice preview naming
-- scheduler views
-- combo preview
-- payroll or incentive export if needed
+- Rental quotation, rental calendar by vehicle/driver, damage/refund claim resource, standalone running-chart calculation preview if required separately.
 
-### 15.16 Vehicle Rental
+### Voucher
+
+Frontend routes:
+
+- `/vouchers`
+- `/vouchers/types`
+- `/vouchers/vouchers`
+- `/vouchers/vouchers/new`
+- `/vouchers/vouchers/:id`
+- `/vouchers/vouchers/:id/lines`
+- `/vouchers/vouchers/:id/approvals`
+- `/vouchers/vouchers/:id/allocations`
+- `/vouchers/settings`
 
 Screens:
 
-- Rental Dashboard
-- Vehicles Availability
-- Rental Agreements
-- Agreement Create or Edit
-- Running Charts
-- Running Chart Details
-- Rental Invoice Preview
-- Rental Invoices
-- Replacement Vehicles
-- Breakdowns
-- Provider Payables
-- Rental Payments
-- Rental Settings
+- Voucher Dashboard, Voucher Types, Vouchers, Voucher Create/Edit, Details, Lines, Approvals, Allocations, Settings.
 
-Frontend routes:
+APIs:
 
-- `/app/vehicle-rental/dashboard`
-- `/app/vehicle-rental/availability`
-- `/app/vehicle-rental/agreements`
-- `/app/vehicle-rental/agreements/new`
-- `/app/vehicle-rental/agreements/:id`
-- `/app/vehicle-rental/running-charts`
-- `/app/vehicle-rental/running-charts/:id`
-- `/app/vehicle-rental/invoices`
-- `/app/vehicle-rental/provider-payables`
-- `/app/vehicle-rental/payments`
-- `/app/vehicle-rental/settings`
+- Voucher types CRUD/activate/deactivate.
+- Vouchers CRUD.
+- Upsert lines, allocations list/add/update.
+- Submit, approve, reject, post, cancel, reverse, history.
+- `POST /api/voucher/utilities/preview-number`
+- `POST /api/voucher/utilities/validate-balance`
+- `POST /api/voucher/utilities/validate-payment-method`
+- `GET /api/voucher/utilities/{voucher}/preview-posting`
 
-Required APIs:
+Form fields:
 
-- agreement CRUD
-- running chart CRUD
-- sync lines, rates, rules, charges
-- vehicle availability
-- billing preview
-- provider payable actions
-- replacement and breakdown actions
-- workflow, status history, integration actions
-- payment actions
-- settings endpoints
+- Voucher type, date, reference, party/source, debit/credit lines, account, cost center, tax rate, payment method, allocation target, notes.
 
-Forms:
+Table columns:
 
-- agreement: customer, vehicle, rental type, period, rates, driver options, deposit
-- running chart: trip dates, km, hours, route, overtime, night or weekend flags, expenses
-- provider payable: provider, linked agreement or chart, adjustment notes
-- payment form
-
-Tables:
-
-- availability: vehicle, status, available from, current assignment
-- agreements: number, customer, vehicle, period, status, billing status
-- running charts: number, agreement, date range, km, bill status
-- provider payables: number, provider, source, amount, status
+- Number, type, date, reference, status, total amount, debit, credit, posted, updated at.
 
 Actions:
 
-- create agreement
-- check vehicle availability
-- create or edit running chart
-- preview rental billing
-- confirm invoice
-- manage replacement vehicle
-- log breakdown
-- create provider payable
-- receive payment
-- close agreement
+- Preview number, validate balance, validate payment method, preview posting, submit, approve, reject, post, cancel, reverse, manage allocations.
 
-Backend calculations needed:
+Backend calculations:
 
-- availability
-- km, hour, day, month calculations
-- overtime and special-rate rules
-- running chart final billing
-- provider payable generation
-
-Frontend responsibilities:
-
-- agreement and running chart data entry
-- present billing preview and workflow status
+- Debit/credit validation, finance posting, payment integration, approval workflow, reversal.
 
 Permissions:
 
-- `vehicle-rental.view`
-- `vehicle-rental.create`
-- `vehicle-rental.bill`
-- `vehicle-rental.receive-payment`
-- `vehicle-rental.close`
+- `voucher.types.*`, `voucher.vouchers.*`, `voucher.vouchers.submit/approve/reject/post/reverse`, `voucher.allocations.*`.
 
 Missing backend endpoints:
 
-- quotation
-- calendar view endpoint
-- damage claim flow
-- refund endpoints
-- explicit running chart preview naming
+- Voucher templates, recurring vouchers, attachment shortcut.
 
-### 15.17 Voucher
+## 13. Dashboard Widgets
 
-Screens:
+Global dashboard:
 
-- Voucher Dashboard
-- Voucher Types
-- Vouchers
-- Voucher Create or Edit
-- Voucher Details
-- Voucher Lines
-- Voucher Approvals
-- Voucher Allocations
-- Voucher Settings
+- Sales today/month, purchases today/month, open receivables/payables, cash position, low stock, pending approvals, active rentals, open service jobs.
 
-Frontend routes:
+Module dashboards:
 
-- `/app/voucher/dashboard`
-- `/app/voucher/types`
-- `/app/voucher/vouchers`
-- `/app/voucher/vouchers/new`
-- `/app/voucher/vouchers/:id`
-- `/app/voucher/allocations`
-- `/app/voucher/settings`
+- Sales: draft orders, pending deliveries, unpaid invoices, returns, top customers.
+- Purchase: pending POs, GRNs awaiting invoice, unpaid supplier documents, returns.
+- Vehicle Service: open jobs, delayed jobs, invoiceable jobs, parts shortages.
+- Vehicle Rental: available vehicles, active agreements, running charts due, provider payables.
+- Finance: journal drafts, unposted vouchers, tax due, bank reconciliation exceptions.
+- Inventory: low stock, negative stock warnings, pending transfers, cycle counts.
+- Payment: unallocated payments, pending checks, cash register variance.
 
-Required APIs:
+Widgets must use backend summaries when endpoints exist. Until backend summary endpoints exist, use lightweight list counts only and label them as operational lists, not accounting totals.
 
-- voucher type CRUD
-- voucher CRUD
-- voucher line CRUD
-- posting preview, approve, post, reverse
-- allocations
-- settings endpoints
+## 14. Action/Button Plans
 
-Forms:
+Common list actions:
 
-- voucher: type, date, reference, party, memo
-- lines: account, debit or credit, cost center, notes
-- allocation: source, target, amount
+- New, refresh, export if backend exists, filter, column chooser.
 
-Tables:
+Common row actions:
 
-- vouchers: number, type, date, status, debit total, credit total
-- voucher lines: account, debit, credit, cost center
-- approvals: voucher, step, approver, status, acted at
+- View, edit, duplicate where backend supports, delete, activate/deactivate, history.
 
-Actions:
+Workflow actions:
 
-- create voucher
-- preview posting
-- approve
-- post
-- reverse
-- allocate linked balances
+- Submit, approve, reject, post, cancel, reverse, close, reopen only when returned by backend permissions/status or explicitly allowed by endpoint.
 
-Backend calculations needed:
+Critical action flow:
 
-- debit and credit validation
-- posting preview
-- payment integration effects
+- Click action.
+- Open ConfirmDialog.
+- Fetch preview if required.
+- Show backend warnings/calculations.
+- Submit action.
+- Refresh detail, timeline, and related lists.
 
-Frontend responsibilities:
+## 15. Frontend-Only Responsibility Checklist
 
-- voucher entry and approval UI
+- Route users through workflows.
+- Capture clean input.
+- Use selectors for IDs instead of free text where possible.
+- Show backend previews.
+- Show backend validation errors.
+- Show backend status/history/audit.
+- Manage drafts locally only before submission.
+- Provide good keyboard, search, filter, and responsive UX.
+- Never persist or overwrite backend calculated values with local math.
 
-Permissions:
+## 16. Backend-Only Logic Checklist
 
-- `voucher.view`
-- `voucher.create`
-- `voucher.approve`
-- `voucher.post`
-- `voucher.reverse`
+- Tenant/organization validation.
+- User permissions and access policy.
+- Document numbering/rendering/versioning.
+- Workflow transitions and approvals.
+- Tax/discount/pricing/UOM conversion.
+- Invoice/rental/service totals.
+- Stock movements/reservations/valuation.
+- Payment allocation/settlement/refunds/write-offs.
+- Finance postings/reversals/AP/AR/COGS.
+- Payroll/leave/attendance calculations.
+- Audit/history capture.
 
-Missing backend endpoints:
+## 17. Implementation Phases
 
-- recurring voucher templates
-- richer allocation summaries
+Phase 1: Foundation
 
-## 16. Dashboard Widget Plan
+- Auth layout, main layout, sidebar/top nav, route guards, API client, query client, permission hooks, tenant/org switcher, shared DataTable/forms/selectors/dialogs.
 
-Global dashboard widgets:
+Phase 2: Master data
 
-- overdue receivables
-- overdue payables
-- low stock items
-- pending approvals
-- recent payments
-- recent stock movements
-- revenue and expense trend
-- workflow inbox
+- Supplier, Customer, HR employee basics, Item, UOM, Pricing.
+- Include optional user access panels for supplier/customer/employee.
 
-Module dashboard widgets:
+Phase 3: Core operational modules
 
-- Purchase: open PO, pending GRN, supplier invoices due, return value
-- Sales: open orders, pending deliveries, overdue invoices, refund count
-- Inventory: low stock, blocked stock, pending counts, transfer backlog
-- Payment: unallocated payments, refunds pending, advances available
-- Vehicle Service: open jobs, waiting parts, unpaid invoices, closing backlog
-- Vehicle Rental: vehicle utilization, active agreements, running charts pending billing, provider payables due
-- Voucher: vouchers awaiting approval, unposted vouchers, reversals this period
+- Document, Finance, Inventory, Payment.
+- Include previews for UOM, price, discount, tax, stock availability, payment allocation, finance posting.
 
-## 17. Form Field Planning Rules
+Phase 4: Business modules
 
-- Every transactional line form must support item, description, quantity, UOM, requested rate, tax group, discount input, warehouse or location where applicable, notes, and backend preview output.
-- Every master data form must include status, tenant-scoped identifiers, optional metadata, attachment support if relevant, and audit visibility.
-- Party forms must separate profile, contacts, addresses, tax, finance defaults, and optional user access into independent sections.
-- Vehicle service and rental forms must separate operational inputs from financial preview outputs.
+- Purchase, Sales, VehicleService, VehicleRental, Voucher.
+- Build aggregate forms, line editors, preview-confirm-submit flows, workflow panels, payment panels.
 
-## 18. Table Column Planning Rules
+Phase 5: Dashboards, reports, polish
 
-- Every list should include primary identifier, party or entity, status, date, backend total or balance, and updated at.
-- Every transaction table should expose workflow state, financial state, and integration state where relevant.
-- Cost-sensitive columns should be permission-gated.
-- Tables should support saved filters, export, column visibility, and row-level quick actions.
+- Module dashboards, cross-module search, notifications, saved filters, accessibility pass, test coverage, performance tuning.
 
-## 19. Action And Button Planning Rules
+## 18. Testing Checklist
 
-- Primary page actions: create, save draft, preview, submit, approve, post, reverse, refund, close
-- Secondary actions: duplicate, print, download, attach, comment, audit, export
-- Row actions: view, edit, workflow action, preview, delete only where soft-delete or draft-only is allowed
-- Critical actions must open `ConfirmDialog` with backend impact summary if preview is available
+Unit tests:
 
-## 20. Implementation Phases
+- Permission guards.
+- API adapters.
+- Validation error mapping.
+- Component rendering states.
+- Line editor input behavior without calculated math.
 
-### Phase 1: Platform Shell
+Integration tests:
 
-- app layout
-- auth and session handling
-- sidebar and top nav
-- route system
-- API client
-- error handling
-- permission system
-- reusable components foundation
+- Auth flow.
+- Tenant/org switching.
+- List/filter/detail navigation.
+- Create/edit forms with backend validation errors.
+- Preview-confirm-submit workflows.
 
-### Phase 2: Master Data Modules
+End-to-end tests:
 
-- Supplier
-- Customer
-- HR
-- Item
-- UOM
-- Pricing
+- Create customer/supplier/item/UOM/price.
+- Sales order to invoice to payment allocation.
+- Purchase order to GRN to invoice to payment allocation.
+- Vehicle service job to invoice to payment.
+- Vehicle rental agreement to running chart to billing preview.
+- Voucher submit/approve/post/reverse.
 
-### Phase 3: Core Operational Modules
+Regression tests:
 
-- Document
-- Finance
-- Inventory
-- Payment
+- Frontend does not send authoritative calculated fields unless backend request explicitly treats them as ignored/display-only.
+- Stale preview blocks critical submit where required.
+- Permission-hidden actions cannot be triggered through UI.
+- Backend validation errors map to correct fields.
+- Workflow/history/audit refresh after each critical action.
 
-### Phase 4: Business Modules
+## 19. First Build Order
 
-- Purchase
-- Sales
-- Vehicle Service
-- Vehicle Rental
-- Voucher
-
-### Phase 5: Analytics And Hardening
-
-- dashboards
-- reports
-- polish
-- accessibility
-- performance tuning
-- end-to-end testing
-
-## 21. Testing Checklist
-
-- auth login, logout, session expiry, tenant switching
-- route guard coverage per permission
-- module navigation visibility
-- list page loading, filter, sort, pagination, export
-- create and edit forms with client-side and backend validation states
-- preview endpoint usage before critical submit
-- detail page tabs, audit, attachments, comments
-- workflow action visibility and confirmation behavior
-- payment allocation and stock availability preview rendering
-- error handling for 401, 403, 404, 409, 422, 500
-- optimistic UI limited to non-critical interactions
-- tenant isolation in selectors and queries
-- accessibility of tables, dialogs, forms, and keyboard navigation
-- responsive layouts for desktop and tablet operational workflows
-
-## 22. Remaining Backend Risks Affecting Frontend Planning
-
-- Document render and download contract should be made explicit before document preview UI is finalized.
-- Several modules still return generic `DataRecord` payloads. Frontend API typing should use adapters until response contracts are more explicit.
-- Finance reporting endpoints are not yet rich enough for a full accounting dashboard.
-- HR payroll and leave workflows need deeper preview and approval surfaces before building advanced HR operations UI.
-- Vehicle Service and Vehicle Rental would benefit from more explicitly named preview endpoints to simplify frontend orchestration.
-
-## 23. Recommended Next Deliverables After Blueprint Approval
-
-- frontend route manifest file
-- permission code registry
-- shared API type contracts
-- reusable component inventory with props
-- wireframe set for each module
-- implementation backlog per phase
+1. App shell, auth, context, route guards.
+2. Shared API client and response/error normalization.
+3. Shared components and selectors.
+4. Customer, Supplier, Item, UOM, Pricing.
+5. Finance tax preview, Payment allocation preview, Inventory stock preview.
+6. Sales and Purchase invoice forms using backend previews.
+7. VehicleService and VehicleRental aggregate forms using backend previews.
+8. Voucher workflow.
+9. Dashboards and reports.

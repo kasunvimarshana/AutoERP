@@ -12,9 +12,7 @@ use Modules\VehicleService\Application\Contracts\Services\VehicleServiceManageme
 
 final class VehicleServiceManagementController extends Controller
 {
-    public function __construct(private readonly VehicleServiceManagementServiceInterface $service)
-    {
-    }
+    public function __construct(private readonly VehicleServiceManagementServiceInterface $service) {}
 
     public function upsertJobCardAggregate(Request $request): JsonResponse
     {
@@ -34,6 +32,11 @@ final class VehicleServiceManagementController extends Controller
     public function syncLaborItems(Request $request, int $jobCardId): JsonResponse
     {
         return $this->respond($this->service->syncLaborItems($jobCardId, $request->all()));
+    }
+
+    public function syncNonInventoryItems(Request $request, int $jobCardId): JsonResponse
+    {
+        return $this->respond($this->service->syncNonInventoryItems($jobCardId, $request->all()));
     }
 
     public function syncExternalServices(Request $request, int $jobCardId): JsonResponse
@@ -89,6 +92,14 @@ final class VehicleServiceManagementController extends Controller
         $customerId = $request->has('customer_id') ? (int) $request->input('customer_id') : null;
 
         return $this->respond($this->service->getInvoiceableJobCards($tenantId, $customerId));
+    }
+
+    public function invoicePreview(Request $request, int $jobCardId): JsonResponse
+    {
+        $payload = $request->all();
+        $payload['job_card_id'] = $jobCardId;
+
+        return $this->respond($this->service->calculateInvoicePreview($payload));
     }
 
     public function receivableJobCards(Request $request): JsonResponse

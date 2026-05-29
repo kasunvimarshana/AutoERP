@@ -14,6 +14,8 @@ interface VehicleServiceManagementServiceInterface
 
     public function syncLaborItems(int $jobCardId, array $payload): Result;
 
+    public function syncNonInventoryItems(int $jobCardId, array $payload): Result;
+
     public function syncExternalServices(int $jobCardId, array $payload): Result;
 
     public function syncCustomerSuppliedItems(int $jobCardId, array $payload): Result;
@@ -31,4 +33,6 @@ interface VehicleServiceManagementServiceInterface
     public function getInvoiceableJobCards(int $tenantId, ?int $customerId): Result;
 
     public function getReceivableJobCards(int $tenantId, ?int $customerId): Result;
+
+    public function calculateInvoicePreview(array $payload): Result;
 }

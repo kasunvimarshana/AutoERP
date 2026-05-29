@@ -46,9 +46,7 @@ final class CalculateSalesInvoiceRequest extends FormRequest
             'lines.*.unit_price' => ['required', 'numeric', 'gte:0'],
             'lines.*.discount_type' => ['nullable', 'string', 'max:50'],
             'lines.*.discount_value' => ['nullable', 'numeric', 'gte:0'],
-            'lines.*.discount_amount' => ['nullable', 'numeric', 'gte:0'],
-            'lines.*.tax_rate' => ['nullable', 'numeric', 'gte:0'],
-            'lines.*.tax_amount' => ['nullable', 'numeric', 'gte:0'],
+            'lines.*.tax_group_id' => ['nullable', 'integer', 'min:1', 'exists:tax_groups,id'],
         ];
     }
 }

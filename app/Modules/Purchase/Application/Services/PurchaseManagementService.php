@@ -7,6 +7,7 @@ namespace Modules\Purchase\Application\Services;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
+use Modules\Finance\Application\Contracts\Services\TaxCalculationServiceInterface;
 use Modules\Purchase\Application\Contracts\Services\PurchaseManagementServiceInterface;
 use Modules\Purchase\Application\Repositories\GrnHeaderRepositoryInterface;
 use Modules\Purchase\Application\Repositories\GrnLineRepositoryInterface;
@@ -34,8 +35,8 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
         private readonly PurchaseStatusHistoryRepositoryInterface $purchaseStatusHistoryRepository,
         private readonly PurchaseDocumentLinkRepositoryInterface $purchaseDocumentLinkRepository,
         private readonly PurchasePaymentAllocationRepositoryInterface $purchasePaymentAllocationRepository,
-    ) {
-    }
+        private readonly TaxCalculationServiceInterface $taxCalculationService,
+    ) {}
 
     public function upsertPurchaseOrderWithLines(?int $id, array $payload): Result
     {
@@ -93,6 +94,7 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                     $deleteRequested = (bool) ($linePayload['_delete'] ?? false);
                     if ($deleteRequested && $lineId !== null) {
                         $this->purchaseOrderLineRepository->delete($lineId);
+
                         continue;
                     }
 
@@ -178,6 +180,7 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                     $deleteRequested = (bool) ($linePayload['_delete'] ?? false);
                     if ($deleteRequested && $lineId !== null) {
                         $this->grnLineRepository->delete($lineId);
+
                         continue;
                     }
 
@@ -262,6 +265,7 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                     $deleteRequested = (bool) ($linePayload['_delete'] ?? false);
                     if ($deleteRequested && $lineId !== null) {
                         $this->purchaseReturnLineRepository->delete($lineId);
+
                         continue;
                     }
 
@@ -585,24 +589,18 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                 $unitPrice = round((float) ($line['unit_price'] ?? 0), 4);
                 $lineGross = round($qty * $unitPrice, 4);
 
-                $discountAmount = array_key_exists('discount_amount', $line)
-                    ? round((float) ($line['discount_amount'] ?? 0), 4)
-                    : $this->resolveDiscountAmount(
-                        $lineGross,
-                        (string) ($line['discount_type'] ?? ''),
-                        round((float) ($line['discount_value'] ?? 0), 4),
-                    );
-
-                $lineTax = array_key_exists('tax_amount', $line)
-                    ? round((float) ($line['tax_amount'] ?? 0), 4)
-                    : round(
-                        max(0.0, $lineGross - $discountAmount)
-                        * round((float) ($line['tax_rate'] ?? 0), 6)
-                        / 100,
-                        4,
-                    );
-
+                $discountAmount = $this->resolveDiscountAmount(
+                    $lineGross,
+                    (string) ($line['discount_type'] ?? ''),
+                    round((float) ($line['discount_value'] ?? 0), 4),
+                );
                 $lineNet = round(max(0.0, $lineGross - $discountAmount), 4);
+                $lineTax = $this->resolveTaxAmount(
+                    (int) ($payload['tenant_id'] ?? $line['tenant_id'] ?? 0),
+                    isset($line['tax_group_id']) ? (int) $line['tax_group_id'] : null,
+                    $lineNet,
+                    $payload['posting_date'] ?? null,
+                );
 
                 $subtotal += $lineGross;
                 $discountTotal += $discountAmount;
@@ -641,6 +639,17 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
     private function extractHeaderPayload(array $payload): array
     {
         unset($payload['lines']);
+        unset(
+            $payload['subtotal'],
+            $payload['line_tax_total'],
+            $payload['line_discount_total'],
+            $payload['header_discount_amount'],
+            $payload['header_tax_amount'],
+            $payload['discount_total'],
+            $payload['tax_total'],
+            $payload['grand_total'],
+            $payload['balance'],
+        );
 
         return $payload;
     }
@@ -730,10 +739,16 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
         $discountValue = round((float) ($line['discount_value'] ?? 0), 4);
         $discountAmount = $this->resolveDiscountAmount($grossAmount, $discountType, $discountValue);
         $lineTotal = round(max(0.0, $grossAmount - $discountAmount), 4);
-        $taxAmount = round((float) ($line['tax_amount'] ?? 0), 4);
+        $taxAmount = $this->resolveTaxAmount(
+            (int) ($line['tenant_id'] ?? 0),
+            isset($line['tax_group_id']) ? (int) $line['tax_group_id'] : null,
+            $lineTotal,
+            $line['posting_date'] ?? null,
+        );
 
         $line['gross_amount'] = $grossAmount;
         $line['discount_amount'] = $discountAmount;
+        $line['tax_amount'] = $taxAmount;
         $line['line_total'] = $lineTotal;
         $line['line_total_with_tax'] = round($lineTotal + $taxAmount, 4);
 
@@ -754,6 +769,37 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
         return round(min($grossAmount, $discountValue), 4);
     }
 
+    private function resolveTaxAmount(int $tenantId, ?int $taxGroupId, float $taxableAmount, mixed $postingDate = null): float
+    {
+        if ($tenantId < 1 || $taxGroupId === null || $taxGroupId < 1 || $taxableAmount <= 0) {
+            return 0.0;
+        }
+
+        $result = $this->taxCalculationService->calculate(
+            $tenantId,
+            $taxGroupId,
+            $taxableAmount,
+            $postingDate !== null ? (string) $postingDate : null,
+        );
+
+        if ($result->isFailure()) {
+            return 0.0;
+        }
+
+        $tax = $result->valueOrFail();
+
+        return round((float) ($tax['tax_amount'] ?? 0), 4);
+    }
+
+    private function resolveHeaderDiscountAmount(DataRecord $header, float $discountableAmount): float
+    {
+        return $this->resolveDiscountAmount(
+            max(0.0, $discountableAmount),
+            (string) $header->get('header_discount_type', ''),
+            round((float) $header->get('header_discount_value', 0), 4),
+        );
+    }
+
     private function recalculatePurchaseOrderTotals(int $purchaseOrderId, int $tenantId): void
     {
         $lines = $this->purchaseOrderLineRepository->list([
@@ -767,8 +813,16 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                 return;
             }
 
-            $headerDiscountAmount = round((float) $header->get('header_discount_amount', 0), 4);
-            $headerTaxAmount = round((float) $header->get('header_tax_amount', 0), 4);
+            $headerDiscountAmount = $this->resolveHeaderDiscountAmount(
+                $header,
+                $totals['subtotal'] - $totals['line_discount_total'],
+            );
+            $headerTaxAmount = $this->resolveTaxAmount(
+                (int) $header->get('tenant_id', 0),
+                $header->get('header_tax_group_id') !== null ? (int) $header->get('header_tax_group_id') : null,
+                max(0.0, $totals['subtotal'] - $totals['line_discount_total'] - $headerDiscountAmount),
+                $header->get('order_date') ?? $header->get('document_date') ?? null,
+            );
             $debitNoteTotal = round((float) $header->get('debit_note_total', 0), 4);
             $creditNoteTotal = round((float) $header->get('credit_note_total', 0), 4);
             $paidAmount = round((float) $header->get('paid_amount', 0), 4);
@@ -785,6 +839,8 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                 'subtotal' => $totals['subtotal'],
                 'line_tax_total' => $totals['line_tax_total'],
                 'line_discount_total' => $totals['line_discount_total'],
+                'header_discount_amount' => $headerDiscountAmount,
+                'header_tax_amount' => $headerTaxAmount,
                 'discount_total' => $discountTotal,
                 'tax_total' => $taxTotal,
                 'grand_total' => $grandTotal,
@@ -806,8 +862,16 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                 return;
             }
 
-            $headerDiscountAmount = round((float) $header->get('header_discount_amount', 0), 4);
-            $headerTaxAmount = round((float) $header->get('header_tax_amount', 0), 4);
+            $headerDiscountAmount = $this->resolveHeaderDiscountAmount(
+                $header,
+                $totals['subtotal'] - $totals['line_discount_total'],
+            );
+            $headerTaxAmount = $this->resolveTaxAmount(
+                (int) $header->get('tenant_id', 0),
+                $header->get('header_tax_group_id') !== null ? (int) $header->get('header_tax_group_id') : null,
+                max(0.0, $totals['subtotal'] - $totals['line_discount_total'] - $headerDiscountAmount),
+                $header->get('grn_date') ?? $header->get('document_date') ?? null,
+            );
             $debitNoteTotal = round((float) $header->get('debit_note_total', 0), 4);
             $creditNoteTotal = round((float) $header->get('credit_note_total', 0), 4);
 
@@ -822,6 +886,8 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                 'subtotal' => $totals['subtotal'],
                 'line_tax_total' => $totals['line_tax_total'],
                 'line_discount_total' => $totals['line_discount_total'],
+                'header_discount_amount' => $headerDiscountAmount,
+                'header_tax_amount' => $headerTaxAmount,
                 'discount_total' => $discountTotal,
                 'tax_total' => $taxTotal,
                 'grand_total' => $grandTotal,
@@ -842,8 +908,16 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                 return;
             }
 
-            $headerDiscountAmount = round((float) $header->get('header_discount_amount', 0), 4);
-            $headerTaxAmount = round((float) $header->get('header_tax_amount', 0), 4);
+            $headerDiscountAmount = $this->resolveHeaderDiscountAmount(
+                $header,
+                $totals['subtotal'] - $totals['line_discount_total'],
+            );
+            $headerTaxAmount = $this->resolveTaxAmount(
+                (int) $header->get('tenant_id', 0),
+                $header->get('header_tax_group_id') !== null ? (int) $header->get('header_tax_group_id') : null,
+                max(0.0, $totals['subtotal'] - $totals['line_discount_total'] - $headerDiscountAmount),
+                $header->get('return_date') ?? $header->get('document_date') ?? null,
+            );
             $debitNoteTotal = round((float) $header->get('debit_note_total', 0), 4);
             $creditNoteTotal = round((float) $header->get('credit_note_total', 0), 4);
             $lineRestockingTotal = round((float) $totals['line_restocking_total'], 4);
@@ -865,6 +939,8 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                 'line_tax_total' => $totals['line_tax_total'],
                 'line_discount_total' => $totals['line_discount_total'],
                 'line_restocking_total' => $lineRestockingTotal,
+                'header_discount_amount' => $headerDiscountAmount,
+                'header_tax_amount' => $headerTaxAmount,
                 'discount_total' => $discountTotal,
                 'tax_total' => $taxTotal,
                 'grand_total' => $grandTotal,

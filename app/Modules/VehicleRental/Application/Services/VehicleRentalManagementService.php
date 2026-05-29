@@ -7,6 +7,7 @@ namespace Modules\VehicleRental\Application\Services;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
+use Modules\Finance\Application\Contracts\Services\TaxCalculationServiceInterface;
 use Modules\VehicleRental\Application\Contracts\Services\VehicleRentalManagementServiceInterface;
 use Modules\VehicleRental\Application\Repositories\VehicleRentalAgreementLineRepositoryInterface;
 use Modules\VehicleRental\Application\Repositories\VehicleRentalAgreementRateRepositoryInterface;
@@ -46,8 +47,8 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
         private readonly VehicleRentalApprovalHistoryRepositoryInterface $approvalHistoryRepository,
         private readonly VehicleRentalMetadataDefinitionRepositoryInterface $metadataDefinitionRepository,
         private readonly VehicleRentalMetadataValueRepositoryInterface $metadataValueRepository,
-    ) {
-    }
+        private readonly TaxCalculationServiceInterface $taxCalculationService,
+    ) {}
 
     public function listAgreements(int $tenantId, ?string $agreementRole = null): Result
     {
@@ -595,6 +596,7 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
                 $amount = (float) $extraCharge->get('total_amount', 0);
                 if ((string) $extraCharge->get('charge_scope', 'customer') === 'provider') {
                     $extraProviderCharges += $amount;
+
                     continue;
                 }
 
@@ -717,25 +719,37 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
             $lineId = isset($linePayload['id']) ? (int) $linePayload['id'] : null;
             if ((bool) ($linePayload['_delete'] ?? false) && $lineId !== null) {
                 $this->agreementLineRepository->delete($lineId);
+
                 continue;
             }
 
-            $quantity = (float) ($linePayload['quantity'] ?? 0);
-            $unitRate = (float) ($linePayload['unit_rate'] ?? 0);
-            $discountAmount = (float) ($linePayload['discount_amount'] ?? 0);
-            $taxAmount = (float) ($linePayload['tax_amount'] ?? 0);
+            $quantity = round((float) ($linePayload['quantity'] ?? 0), 4);
+            $unitRate = round((float) ($linePayload['unit_rate'] ?? 0), 4);
+            $grossAmount = round($quantity * $unitRate, 4);
+            $discountAmount = 0.0;
+            $taxAmount = $this->resolveTaxAmount(
+                $tenantId,
+                isset($linePayload['tax_group_id']) ? (int) $linePayload['tax_group_id'] : null,
+                max(0.0, $grossAmount - $discountAmount),
+                $linePayload['posting_date'] ?? null,
+            );
 
             $upsert = $this->withDefaultRowVersion([
                 'tenant_id' => $tenantId,
                 'organization_unit_id' => $organizationUnitId,
                 'agreement_id' => $agreementId,
                 'line_number' => $linePayload['line_number'] ?? $nextLineNumber++,
-                'line_total' => round(($quantity * $unitRate) - $discountAmount + $taxAmount, 4),
                 ...$linePayload,
+                'quantity' => $quantity,
+                'unit_rate' => $unitRate,
+                'discount_amount' => $discountAmount,
+                'tax_amount' => $taxAmount,
+                'line_total' => round($grossAmount - $discountAmount + $taxAmount, 4),
             ]);
 
             if ($lineId === null) {
                 $this->agreementLineRepository->create($upsert);
+
                 continue;
             }
 
@@ -759,6 +773,7 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
             $rateId = isset($ratePayload['id']) ? (int) $ratePayload['id'] : null;
             if ((bool) ($ratePayload['_delete'] ?? false) && $rateId !== null) {
                 $this->agreementRateRepository->delete($rateId);
+
                 continue;
             }
 
@@ -771,6 +786,7 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
 
             if ($rateId === null) {
                 $this->agreementRateRepository->create($upsert);
+
                 continue;
             }
 
@@ -794,6 +810,7 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
             $ruleId = isset($rulePayload['id']) ? (int) $rulePayload['id'] : null;
             if ((bool) ($rulePayload['_delete'] ?? false) && $ruleId !== null) {
                 $this->rateRuleRepository->delete($ruleId);
+
                 continue;
             }
 
@@ -806,6 +823,7 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
 
             if ($ruleId === null) {
                 $this->rateRuleRepository->create($upsert);
+
                 continue;
             }
 
@@ -836,6 +854,7 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
             $lineId = isset($linePayload['id']) ? (int) $linePayload['id'] : null;
             if ((bool) ($linePayload['_delete'] ?? false) && $lineId !== null) {
                 $this->runningChartLineRepository->delete($lineId);
+
                 continue;
             }
 
@@ -846,12 +865,13 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
                 'running_chart_id' => $runningChartId,
                 'rental_vehicle_id' => $linePayload['rental_vehicle_id'] ?? $rentalVehicleId,
                 'line_number' => $linePayload['line_number'] ?? $nextLineNumber++,
-                ...$calculated,
                 ...$linePayload,
+                ...$calculated,
             ]);
 
             if ($lineId === null) {
                 $this->runningChartLineRepository->create($upsert);
+
                 continue;
             }
 
@@ -876,24 +896,36 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
             $chargeId = isset($chargePayload['id']) ? (int) $chargePayload['id'] : null;
             if ((bool) ($chargePayload['_delete'] ?? false) && $chargeId !== null) {
                 $this->extraChargeRepository->delete($chargeId);
+
                 continue;
             }
 
-            $quantity = (float) ($chargePayload['quantity'] ?? 0);
-            $unitAmount = (float) ($chargePayload['unit_amount'] ?? 0);
-            $discountAmount = (float) ($chargePayload['discount_amount'] ?? 0);
-            $taxAmount = (float) ($chargePayload['tax_amount'] ?? 0);
+            $quantity = round((float) ($chargePayload['quantity'] ?? 0), 4);
+            $unitAmount = round((float) ($chargePayload['unit_amount'] ?? 0), 4);
+            $grossAmount = round($quantity * $unitAmount, 4);
+            $discountAmount = 0.0;
+            $taxAmount = $this->resolveTaxAmount(
+                $tenantId,
+                isset($chargePayload['tax_group_id']) ? (int) $chargePayload['tax_group_id'] : null,
+                max(0.0, $grossAmount - $discountAmount),
+                $chargePayload['charge_date'] ?? null,
+            );
             $upsert = $this->withDefaultRowVersion([
                 'tenant_id' => $tenantId,
                 'organization_unit_id' => $organizationUnitId,
                 'agreement_id' => $agreementId,
                 'running_chart_id' => $chargePayload['running_chart_id'] ?? $runningChartId,
-                'total_amount' => round(($quantity * $unitAmount) - $discountAmount + $taxAmount, 4),
                 ...$chargePayload,
+                'quantity' => $quantity,
+                'unit_amount' => $unitAmount,
+                'discount_amount' => $discountAmount,
+                'tax_amount' => $taxAmount,
+                'total_amount' => round($grossAmount - $discountAmount + $taxAmount, 4),
             ]);
 
             if ($chargeId === null) {
                 $this->extraChargeRepository->create($upsert);
+
                 continue;
             }
 
@@ -1043,6 +1075,7 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
             $amount = (float) $extraCharge->get('total_amount', 0);
             if ((string) $extraCharge->get('charge_scope', 'customer') === 'provider') {
                 $totals['provider_cost_total'] += $amount;
+
                 continue;
             }
 
@@ -1204,6 +1237,7 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
                     }
                     $usage[$field] += (float) $line->get($field, 0);
                 }
+
                 continue;
             }
 
@@ -1245,6 +1279,28 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
         };
     }
 
+    private function resolveTaxAmount(int $tenantId, ?int $taxGroupId, float $taxableAmount, mixed $postingDate = null): float
+    {
+        if ($tenantId < 1 || $taxGroupId === null || $taxGroupId < 1 || $taxableAmount <= 0) {
+            return 0.0;
+        }
+
+        $result = $this->taxCalculationService->calculate(
+            $tenantId,
+            $taxGroupId,
+            $taxableAmount,
+            $postingDate !== null ? (string) $postingDate : null,
+        );
+
+        if ($result->isFailure()) {
+            return 0.0;
+        }
+
+        $tax = $result->valueOrFail();
+
+        return round((float) ($tax['tax_amount'] ?? 0), 4);
+    }
+
     private function syncMetadataValues(
         string $entityType,
         int $entityId,
@@ -1271,6 +1327,7 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
 
             if ($existingValue instanceof DataRecord) {
                 $this->metadataValueRepository->update((int) $existingValue->id(), $payload);
+
                 continue;
             }
 

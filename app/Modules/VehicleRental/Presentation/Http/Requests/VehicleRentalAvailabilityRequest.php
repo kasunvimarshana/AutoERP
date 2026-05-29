@@ -17,7 +17,7 @@ final class VehicleRentalAvailabilityRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tenant_id' => ['required', 'integer', 'min:1', 'exists:tenants,id'],
+            'tenant_id' => ['required', 'integer', 'min:1'],
             'rental_vehicle_id' => ['required', 'integer', 'min:1'],
             'start_datetime' => ['required', 'date'],
             'end_datetime' => ['nullable', 'date', 'after_or_equal:start_datetime'],
