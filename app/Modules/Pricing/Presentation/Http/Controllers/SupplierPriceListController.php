@@ -24,8 +24,7 @@ final class SupplierPriceListController extends Controller
         private readonly CreateSupplierPriceListServiceInterface $createService,
         private readonly UpdateSupplierPriceListServiceInterface $updateService,
         private readonly DeleteSupplierPriceListServiceInterface $deleteService,
-    ) {
-    }
+    ) {}
 
     public function index(ListSupplierPriceListRequest $request): JsonResponse
     {

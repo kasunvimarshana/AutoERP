@@ -31,7 +31,7 @@ final class UpsertPriceListRequest extends FormRequest
             'is_default' => ['nullable', 'boolean'],
             'valid_from' => ['nullable', 'date'],
             'valid_to' => ['nullable', 'date'],
-            'is_active' => ['nullable', 'boolean']
+            'is_active' => ['nullable', 'boolean'],
         ];
     }
 }

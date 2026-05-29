@@ -38,7 +38,7 @@ final class UpsertPriceListItemRequest extends FormRequest
             'discount_type' => ['nullable', 'string', 'max:255'],
             'discount_value' => ['nullable', 'numeric'],
             'valid_from' => ['nullable', 'date'],
-            'valid_to' => ['nullable', 'date']
+            'valid_to' => ['nullable', 'date'],
         ];
     }
 }

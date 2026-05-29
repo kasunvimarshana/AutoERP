@@ -22,9 +22,9 @@ final class ListSupplierPriceListRequest extends FormRequest
             'tenant_id' => ['nullable', 'integer', 'min:1', 'exists:tenants,id'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
             'page' => ['nullable', 'integer', 'min:1'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:' . (int) config('pricing.pagination.max_per_page', 200)],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:'.(int) config('pricing.pagination.max_per_page', 200)],
             'supplier_id' => ['nullable', 'integer', 'min:1', 'exists:suppliers,id'],
-            'price_list_id' => ['nullable', 'integer', 'min:1', 'exists:price_lists,id']
+            'price_list_id' => ['nullable', 'integer', 'min:1', 'exists:price_lists,id'],
         ];
     }
 }

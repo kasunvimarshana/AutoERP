@@ -24,8 +24,7 @@ final class CustomerPriceListController extends Controller
         private readonly CreateCustomerPriceListServiceInterface $createService,
         private readonly UpdateCustomerPriceListServiceInterface $updateService,
         private readonly DeleteCustomerPriceListServiceInterface $deleteService,
-    ) {
-    }
+    ) {}
 
     public function index(ListCustomerPriceListRequest $request): JsonResponse
     {

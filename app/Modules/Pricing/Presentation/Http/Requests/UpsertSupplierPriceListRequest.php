@@ -27,7 +27,7 @@ final class UpsertSupplierPriceListRequest extends FormRequest
             'metadata' => ['nullable', 'array'],
             'supplier_id' => array_merge($required, ['integer', 'min:1', 'exists:suppliers,id']),
             'price_list_id' => array_merge($required, ['integer', 'min:1', 'exists:price_lists,id']),
-            'priority' => ['nullable', 'integer', 'min:0']
+            'priority' => ['nullable', 'integer', 'min:0'],
         ];
     }
 }

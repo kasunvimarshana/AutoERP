@@ -13,8 +13,7 @@ final class PriceResolverController extends Controller
 {
     public function __construct(
         private readonly PriceResolverServiceInterface $priceResolverService,
-    ) {
-    }
+    ) {}
 
     public function resolve(Request $request): JsonResponse
     {

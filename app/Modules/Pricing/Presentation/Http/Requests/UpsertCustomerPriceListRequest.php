@@ -27,7 +27,7 @@ final class UpsertCustomerPriceListRequest extends FormRequest
             'metadata' => ['nullable', 'array'],
             'customer_id' => array_merge($required, ['integer', 'min:1', 'exists:customers,id']),
             'price_list_id' => array_merge($required, ['integer', 'min:1', 'exists:price_lists,id']),
-            'priority' => ['nullable', 'integer', 'min:0']
+            'priority' => ['nullable', 'integer', 'min:0'],
         ];
     }
 }

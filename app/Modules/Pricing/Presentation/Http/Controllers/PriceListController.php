@@ -24,8 +24,7 @@ final class PriceListController extends Controller
         private readonly CreatePriceListServiceInterface $createService,
         private readonly UpdatePriceListServiceInterface $updateService,
         private readonly DeletePriceListServiceInterface $deleteService,
-    ) {
-    }
+    ) {}
 
     public function index(ListPriceListRequest $request): JsonResponse
     {
