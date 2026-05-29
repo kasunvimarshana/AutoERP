@@ -12,9 +12,7 @@ use Modules\VehicleRental\Application\Contracts\Services\VehicleRentalWorkflowSe
 
 final class VehicleRentalWorkflowController extends Controller
 {
-    public function __construct(private readonly VehicleRentalWorkflowServiceInterface $service)
-    {
-    }
+    public function __construct(private readonly VehicleRentalWorkflowServiceInterface $service) {}
 
     public function transitionAgreement(Request $request, int $agreementId): JsonResponse
     {

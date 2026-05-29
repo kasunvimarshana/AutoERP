@@ -16,8 +16,7 @@ final class InventoryEngineController extends Controller
     public function __construct(
         private readonly CalculateInventoryValuationServiceInterface $calculateInventoryValuationService,
         private readonly AllocateInventoryStockServiceInterface $allocateInventoryStockService,
-    ) {
-    }
+    ) {}
 
     public function calculateValuation(CalculateInventoryValuationRequest $request): JsonResponse
     {
@@ -49,5 +48,10 @@ final class InventoryEngineController extends Controller
         }
 
         return response()->json(['data' => $result->valueOrFail()]);
+    }
+
+    public function previewAvailability(AllocateInventoryStockRequest $request): JsonResponse
+    {
+        return $this->allocateStock($request);
     }
 }

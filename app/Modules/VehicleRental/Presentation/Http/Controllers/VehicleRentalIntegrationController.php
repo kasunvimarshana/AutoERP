@@ -12,9 +12,7 @@ use Modules\VehicleRental\Application\Contracts\Services\VehicleRentalIntegratio
 
 final class VehicleRentalIntegrationController extends Controller
 {
-    public function __construct(private readonly VehicleRentalIntegrationServiceInterface $service)
-    {
-    }
+    public function __construct(private readonly VehicleRentalIntegrationServiceInterface $service) {}
 
     public function createRentalInvoice(Request $request, int $agreementId): JsonResponse
     {

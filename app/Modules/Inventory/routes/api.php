@@ -4,25 +4,25 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Modules\Inventory\Presentation\Http\Controllers\BatchController;
+use Modules\Inventory\Presentation\Http\Controllers\CycleCountHeaderController;
+use Modules\Inventory\Presentation\Http\Controllers\CycleCountLineController;
+use Modules\Inventory\Presentation\Http\Controllers\InventoryCostLayerController;
+use Modules\Inventory\Presentation\Http\Controllers\InventoryEngineController;
+use Modules\Inventory\Presentation\Http\Controllers\PickingTaskController;
+use Modules\Inventory\Presentation\Http\Controllers\PutAwayTaskController;
+use Modules\Inventory\Presentation\Http\Controllers\ReceiptInspectionController;
 use Modules\Inventory\Presentation\Http\Controllers\SerialController;
-use Modules\Inventory\Presentation\Http\Controllers\ValuationConfigController;
+use Modules\Inventory\Presentation\Http\Controllers\StockAdjustmentController;
+use Modules\Inventory\Presentation\Http\Controllers\StockAdjustmentLineController;
 use Modules\Inventory\Presentation\Http\Controllers\StockLevelController;
 use Modules\Inventory\Presentation\Http\Controllers\StockMovementController;
-use Modules\Inventory\Presentation\Http\Controllers\InventoryCostLayerController;
 use Modules\Inventory\Presentation\Http\Controllers\StockReservationController;
 use Modules\Inventory\Presentation\Http\Controllers\StockTransferController;
 use Modules\Inventory\Presentation\Http\Controllers\StockTransferLineController;
-use Modules\Inventory\Presentation\Http\Controllers\StockAdjustmentController;
-use Modules\Inventory\Presentation\Http\Controllers\StockAdjustmentLineController;
-use Modules\Inventory\Presentation\Http\Controllers\CycleCountHeaderController;
-use Modules\Inventory\Presentation\Http\Controllers\CycleCountLineController;
+use Modules\Inventory\Presentation\Http\Controllers\TraceLogController;
 use Modules\Inventory\Presentation\Http\Controllers\TransferOrderController;
 use Modules\Inventory\Presentation\Http\Controllers\TransferOrderLineController;
-use Modules\Inventory\Presentation\Http\Controllers\TraceLogController;
-use Modules\Inventory\Presentation\Http\Controllers\ReceiptInspectionController;
-use Modules\Inventory\Presentation\Http\Controllers\PutAwayTaskController;
-use Modules\Inventory\Presentation\Http\Controllers\PickingTaskController;
-use Modules\Inventory\Presentation\Http\Controllers\InventoryEngineController;
+use Modules\Inventory\Presentation\Http\Controllers\ValuationConfigController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');
@@ -35,7 +35,7 @@ $currentOrganizationUnitMiddleware = (string) config(
 Route::prefix('api/inventory')
     ->middleware([
         'api',
-        'auth:' . $protectedGuard,
+        'auth:'.$protectedGuard,
         $currentUserMiddleware,
         $currentTenantMiddleware,
         $currentOrganizationUnitMiddleware,
@@ -65,4 +65,6 @@ Route::prefix('api/inventory')
             ->name('engines.valuation.calculate');
         Route::post('engines/allocation/allocate', [InventoryEngineController::class, 'allocateStock'])
             ->name('engines.allocation.allocate');
+        Route::post('engines/stock-availability/preview', [InventoryEngineController::class, 'previewAvailability'])
+            ->name('engines.stock-availability.preview');
     });

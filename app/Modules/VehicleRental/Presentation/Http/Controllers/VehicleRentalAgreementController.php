@@ -5,21 +5,22 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Modules\Core\Application\Results\Result;
 use Modules\VehicleRental\Application\Contracts\Services\VehicleRentalManagementServiceInterface;
+use Modules\VehicleRental\Presentation\Http\Requests\ListVehicleRentalAgreementRequest;
+use Modules\VehicleRental\Presentation\Http\Requests\UpsertVehicleRentalAggregateRequest;
+use Modules\VehicleRental\Presentation\Http\Resources\VehicleRentalRecordResource;
 
 final class VehicleRentalAgreementController extends Controller
 {
-    public function __construct(private readonly VehicleRentalManagementServiceInterface $service)
-    {
-    }
+    public function __construct(private readonly VehicleRentalManagementServiceInterface $service) {}
 
-    public function index(Request $request): JsonResponse
+    public function index(ListVehicleRentalAgreementRequest $request): JsonResponse
     {
-        $tenantId = (int) $request->input('tenant_id', 0);
-        $agreementRole = $request->input('agreement_role');
+        $validated = $request->validated();
+        $tenantId = (int) $validated['tenant_id'];
+        $agreementRole = $validated['agreement_role'] ?? null;
 
         return $this->respond($this->service->listAgreements(
             $tenantId,
@@ -27,7 +28,7 @@ final class VehicleRentalAgreementController extends Controller
         ));
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(UpsertVehicleRentalAggregateRequest $request): JsonResponse
     {
         return $this->respond($this->service->upsertAgreementAggregate(null, $request->all()));
     }
@@ -37,7 +38,7 @@ final class VehicleRentalAgreementController extends Controller
         return $this->respond($this->service->getAgreement($agreement));
     }
 
-    public function update(Request $request, int $agreement): JsonResponse
+    public function update(UpsertVehicleRentalAggregateRequest $request, int $agreement): JsonResponse
     {
         return $this->respond($this->service->upsertAgreementAggregate($agreement, $request->all()));
     }
@@ -51,6 +52,6 @@ final class VehicleRentalAgreementController extends Controller
             return response()->json(['message' => $error->message], $statusCode);
         }
 
-        return response()->json(['data' => $result->valueOrFail()]);
+        return response()->json(['data' => (new VehicleRentalRecordResource($result->valueOrFail()))->resolve()]);
     }
 }
