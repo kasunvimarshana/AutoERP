@@ -36,7 +36,7 @@ final class HrRoutesTest extends TestCase
         self::assertTrue(Route::has('hr.employees.by-department'));
         self::assertTrue(Route::has('hr.employees.by-designation'));
         self::assertTrue(Route::has('hr.employees.status'));
-        self::assertTrue(Route::has('hr.employees.validate-for-vehicle-service'));
+        self::assertTrue(Route::has('hr.employees.validate.assignment-context'));
         self::assertTrue(Route::has('hr.employees.employment-details.show'));
         self::assertTrue(Route::has('hr.employees.employment-details.update'));
         self::assertTrue(Route::has('hr.employees.contacts.index'));

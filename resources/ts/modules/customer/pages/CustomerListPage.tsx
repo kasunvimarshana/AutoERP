@@ -51,7 +51,7 @@ export function CustomerListPage() {
                     </Link>
                 }
                 eyebrow="Master Data"
-                subtitle="Customers can be used by Sales, Vehicle Service, and Vehicle Rental. User access is optional and managed separately."
+                subtitle="Customers are reusable billing and relationship profiles. User access is optional and managed separately."
                 title="Customers"
             />
             <div className="grid gap-4 md:grid-cols-3">

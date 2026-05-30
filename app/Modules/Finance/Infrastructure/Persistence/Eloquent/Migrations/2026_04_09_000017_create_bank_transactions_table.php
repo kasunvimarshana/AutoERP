@@ -28,6 +28,10 @@ return new class extends Migration
             $table->string('status')->default('IMPORTED')->comment('IMPORTED, CATEGORIZED, MATCHED, RECONCILED, EXCLUDED');
             $table->foreignId('matched_journal_entry_id')->nullable()->constrained('journal_entries')->nullOnDelete();
             $table->foreignId('category_rule_id')->nullable()->constrained('bank_category_rules')->nullOnDelete();
+            $table->string('source_module')->nullable();
+            $table->string('source_type')->nullable();
+            $table->unsignedBigInteger('source_id')->nullable();
+            $table->string('source_reference')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
 
             $table->timestamps();
@@ -35,6 +39,7 @@ return new class extends Migration
             $table->unique(['tenant_id', 'bank_account_id', 'external_id'], 'bank_transactions_account_external_id_uk');
             $table->index(['tenant_id', 'bank_account_id', 'transaction_date'], 'bank_transactions_date_idx');
             $table->index(['tenant_id', 'status'], 'bank_transactions_status_idx');
+            $table->index(['tenant_id', 'source_module', 'source_type', 'source_id'], 'bank_transactions_source_idx');
         });
     }
 

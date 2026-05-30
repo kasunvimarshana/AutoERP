@@ -29,18 +29,8 @@ Route::prefix('api/customer')
         Route::apiResource('customers', CustomerController::class);
         Route::get('customers-lookup', [CustomerController::class, 'lookup'])->name('customers.lookup');
         Route::patch('customers/{customer}/status', [CustomerController::class, 'status'])->name('customers.status');
-        Route::get('customers/{customer}/validate/sales', [CustomerController::class, 'validateForSales'])
-            ->name('customers.validate.sales');
-        Route::get(
-            'customers/{customer}/validate/vehicle-service',
-            [CustomerController::class, 'validateForVehicleService'],
-        )
-            ->name('customers.validate.vehicle-service');
-        Route::get(
-            'customers/{customer}/validate/vehicle-rental',
-            [CustomerController::class, 'validateForVehicleRental'],
-        )
-            ->name('customers.validate.vehicle-rental');
+        Route::get('customers/{customer}/validate/context/{context}', [CustomerController::class, 'validateForContext'])
+            ->name('customers.validate.context');
         Route::get('customers/{customer}/finance-defaults', [CustomerController::class, 'financeDefaults'])
             ->name('customers.finance-defaults.show');
         Route::put('customers/{customer}/finance-defaults', [CustomerController::class, 'updateFinanceDefaults'])

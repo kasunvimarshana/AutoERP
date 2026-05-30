@@ -34,9 +34,12 @@ return new class extends Migration
             $table->decimal('base_debit_amount', 20, 4)->default(0);
             $table->decimal('base_credit_amount', 20, 4)->default(0);
             $table->foreignId('cost_center_id')->nullable()->constrained('cost_centers')->nullOnDelete();
+            $table->string('party_type')->nullable();
+            $table->unsignedBigInteger('party_id')->nullable();
             $table->foreignId('tax_rate_id')->nullable()->constrained('tax_rates')->nullOnDelete();
             $table->decimal('tax_amount', 20, 4)->default(0);
             $table->unsignedInteger('line_number')->default(1);
+            $table->string('source_line_reference')->nullable()->comment('Generic source line reference');
 
             $table->timestamps();
             // No softDeletes - immutable
@@ -47,6 +50,7 @@ return new class extends Migration
             );
             $table->index(['tenant_id', 'account_id', 'journal_entry_id'], 'journal_entry_lines_account_entry_idx');
             $table->index(['tenant_id', 'journal_entry_id'], 'journal_entry_lines_entry_idx');
+            $table->index(['tenant_id', 'party_type', 'party_id'], 'journal_entry_lines_party_idx');
         });
     }
 

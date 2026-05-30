@@ -1,104 +1,113 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ModuleHeader } from '../../../layouts/components/ModuleHeader';
-import { AuditTimeline } from '../../../shared/components/business/AuditTimeline';
-import { CommentPanel } from '../../../shared/components/business/CommentPanel';
-import { DocumentPreview } from '../../../shared/components/business/DocumentPreview';
-import { StatusBadge } from '../../../shared/components/business/StatusBadge';
-import { DataTable } from '../../../shared/components/data/DataTable';
 import { Button } from '../../../shared/components/ui/Button';
 import { Card } from '../../../shared/components/ui/Card';
 import { Tabs } from '../../../shared/components/ui/Tabs';
-import { jobLines, labourAssignments } from '../mock/vehicleServiceMock';
+import {
+    CustomerSuppliedItemsSection,
+    DiagnosticsPanel,
+    ExternalServicesSection,
+    InspectionPanel,
+    JobCardLineTable,
+    LabourAssignmentPanel,
+    NonInventoryItemsSection,
+    ServiceInvoiceDocumentPanel,
+    ServiceInvoicePreviewPanel,
+    ServicePaymentPanel,
+    SparePartsSection,
+    StockAvailabilityPanel,
+    VehicleServiceActivityTimeline,
+    VehicleServiceFinancePostingPanel,
+    VehicleServicePageHeader,
+    VehicleServicePartyContextPanel,
+    VehicleServiceWorkflowActions,
+} from '../components/VehicleServiceComponents';
+import { getJobCardById } from '../mock/vehicleServiceMock';
+import { vehicleServiceApi } from '../services/vehicleServiceApi';
+import type { VehicleServiceJobCard } from '../types/vehicleService.types';
 
 const detailTabs = [
     { label: 'Overview', value: 'overview' },
     { label: 'Job Lines', value: 'lines' },
-    { label: 'Labour & Assignment', value: 'labour' },
-    { label: 'Invoice Preview', value: 'invoice' },
-    { label: 'Service Payments', value: 'payments' },
-    { label: 'Attachments', value: 'attachments' },
-    { label: 'Comments', value: 'comments' },
-    { label: 'Audit / History', value: 'audit' },
+    { label: 'Labour & Assignments', value: 'labour' },
+    { label: 'Diagnostics', value: 'diagnostics' },
+    { label: 'Inspections', value: 'inspections' },
+    { label: 'Inventory / Stock Usage', value: 'inventory' },
+    { label: 'Invoice / Payments', value: 'invoice' },
+    { label: 'Documents', value: 'documents' },
+    { label: 'Workflow / History', value: 'history' },
+    { label: 'Audit', value: 'audit' },
 ];
 
 export function JobCardDetailPage() {
-    const { id } = useParams();
+    const { id = 'job-001' } = useParams();
     const [activeTab, setActiveTab] = useState('overview');
+    const [jobCard, setJobCard] = useState<VehicleServiceJobCard>(getJobCardById(id));
+
+    useEffect(() => {
+        vehicleServiceApi.jobCards.get(id).then((response) => setJobCard(response.data));
+    }, [id]);
 
     return (
         <div className="space-y-6">
-            <ModuleHeader
-                actions={
-                    <>
-                        <Link to={`/vehicle-service/job-cards/${id ?? 'mock'}/edit`}>
-                            <Button variant="secondary">Edit</Button>
-                        </Link>
-                        <Button variant="blue">Request Backend Preview</Button>
-                    </>
-                }
-                subtitle="Operational detail view. Invoice, payment, stock, workflow, and audit values are backend-owned."
-                title={`Job Card ${id ?? 'JC-MOCK-001'}`}
+            <VehicleServicePageHeader
+                actions={<><Link to={`/vehicle-service/job-cards/${jobCard.id}/diagnostics`}><Button variant="secondary">Diagnostics</Button></Link><Link to={`/vehicle-service/job-cards/${jobCard.id}/inspections`}><Button variant="secondary">Inspections</Button></Link><Link to={`/vehicle-service/job-cards/${jobCard.id}/edit`}><Button>Edit</Button></Link></>}
+                subtitle="Job card detail keeps workshop workflow separate from Sales. Backend owns calculations, workflow state, inventory effects, document generation, payment allocation, and finance posting."
+                title={jobCard.jobCardNumber}
             />
-
             <Card className="p-5">
-                <div className="mb-5 grid gap-4 md:grid-cols-4">
-                    {[
-                        ['Customer', 'Northline Logistics'],
-                        ['Vehicle', 'WP CAD-4521 | Toyota HiAce'],
-                        ['Workflow status', 'In Progress'],
-                        ['Payment status', 'Backend controlled'],
-                    ].map(([label, value]) => (
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4" key={label}>
-                            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p>
-                            <div className="mt-2 text-sm font-semibold text-slate-900">{label.includes('status') ? <StatusBadge status={value} /> : value}</div>
-                        </div>
-                    ))}
-                </div>
                 <Tabs active={activeTab} items={detailTabs} onChange={setActiveTab} />
             </Card>
 
             {activeTab === 'overview' ? (
-                <Card className="p-5">
-                    <h2 className="text-base font-bold text-slate-950">Service overview</h2>
-                    <p className="mt-2 text-sm text-slate-500">
-                        Complaint, diagnosis, intake notes, expected completion, and workflow actions render here once backend detail APIs are connected.
-                    </p>
-                </Card>
+                <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
+                    <Card className="p-5">
+                        <div className="grid gap-4 md:grid-cols-2">
+                            {[
+                                ['Service customer', jobCard.partyContext.serviceCustomer.name],
+                                ['Billing customer', jobCard.partyContext.billingCustomer.name],
+                                ['Payer', jobCard.partyContext.payer.name],
+                                ['Vehicle', jobCard.vehicle],
+                                ['Service type', jobCard.serviceType],
+                                ['Advisor', jobCard.serviceAdvisor],
+                                ['Supervisor', jobCard.supervisor],
+                                ['Odometer', jobCard.odometer],
+                                ['Opened', jobCard.openedAt],
+                                ['Expected completion', jobCard.expectedCompletion],
+                            ].map(([label, value]) => (
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4" key={label}>
+                                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p>
+                                    <p className="mt-1 font-semibold text-slate-900">{value}</p>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="mt-5 grid gap-4 md:grid-cols-2">
+                            <div>
+                                <p className="text-sm font-bold text-slate-900">Complaint</p>
+                                <p className="mt-1 text-sm text-slate-600">{jobCard.customerComplaint}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm font-bold text-slate-900">Initial diagnosis</p>
+                                <p className="mt-1 text-sm text-slate-600">{jobCard.initialDiagnosis}</p>
+                            </div>
+                        </div>
+                    </Card>
+                    <div className="space-y-5">
+                        <VehicleServicePartyContextPanel jobCard={jobCard} />
+                        <VehicleServiceWorkflowActions jobCard={jobCard} />
+                    </div>
+                </div>
             ) : null}
 
-            {activeTab === 'lines' ? (
-                <DataTable
-                    columns={[
-                        { header: 'Category', key: 'category' },
-                        { header: 'Description', key: 'description' },
-                        { header: 'Qty', key: 'quantity' },
-                        { header: 'Unit', key: 'unit' },
-                        { header: 'Stock effect', key: 'stockImpact' },
-                    ]}
-                    getRowKey={(row) => row.id}
-                    rows={jobLines}
-                />
-            ) : null}
-
-            {activeTab === 'labour' ? (
-                <DataTable
-                    columns={[
-                        { header: 'Labour item', key: 'labourItem' },
-                        { header: 'Employee', key: 'employee' },
-                        { header: 'Role', key: 'role' },
-                        { header: 'Share / incentive', key: 'shareRule' },
-                    ]}
-                    getRowKey={(row) => row.id}
-                    rows={labourAssignments}
-                />
-            ) : null}
-
-            {activeTab === 'invoice' ? <DocumentPreview title="Mock Service Invoice Preview" /> : null}
-            {activeTab === 'payments' ? <DocumentPreview title="Mock Service Payment Allocation Preview" /> : null}
-            {activeTab === 'attachments' ? <DocumentPreview title="Attachments placeholder" /> : null}
-            {activeTab === 'comments' ? <CommentPanel /> : null}
-            {activeTab === 'audit' ? <AuditTimeline /> : null}
+            {activeTab === 'lines' ? <div className="space-y-5"><JobCardLineTable rows={jobCard.lines} /><SparePartsSection lines={jobCard.lines} /><NonInventoryItemsSection lines={jobCard.lines} /><CustomerSuppliedItemsSection lines={jobCard.lines} /><ExternalServicesSection lines={jobCard.lines} /></div> : null}
+            {activeTab === 'labour' ? <LabourAssignmentPanel jobCard={jobCard} /> : null}
+            {activeTab === 'diagnostics' ? <DiagnosticsPanel rows={jobCard.diagnostics} /> : null}
+            {activeTab === 'inspections' ? <InspectionPanel rows={jobCard.inspections} /> : null}
+            {activeTab === 'inventory' ? <StockAvailabilityPanel jobCard={jobCard} /> : null}
+            {activeTab === 'invoice' ? <div className="space-y-5"><ServiceInvoicePreviewPanel jobCard={jobCard} /><ServicePaymentPanel payments={jobCard.payments} /><VehicleServiceFinancePostingPanel jobCard={jobCard} /></div> : null}
+            {activeTab === 'documents' ? <ServiceInvoiceDocumentPanel jobCard={jobCard} /> : null}
+            {activeTab === 'history' ? <VehicleServiceActivityTimeline rows={jobCard.audit} /> : null}
+            {activeTab === 'audit' ? <VehicleServiceActivityTimeline rows={jobCard.audit} /> : null}
         </div>
     );
 }

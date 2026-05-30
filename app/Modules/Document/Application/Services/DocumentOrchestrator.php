@@ -251,17 +251,17 @@ class DocumentOrchestrator
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function listDocumentTypes(): array
+    public function listDocumentTypes(int $tenantId): array
     {
-        return $this->documentRepository->listDocumentTypes();
+        return $this->documentRepository->listDocumentTypes($tenantId);
     }
 
     /**
      * @return array<string, mixed>|null
      */
-    public function getDocumentType(int $typeId): ?array
+    public function getDocumentType(int $tenantId, int $typeId): ?array
     {
-        return $this->documentRepository->getDocumentType($typeId);
+        return $this->documentRepository->getDocumentType($tenantId, $typeId);
     }
 
     /**

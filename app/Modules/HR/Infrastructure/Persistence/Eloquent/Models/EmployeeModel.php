@@ -25,6 +25,7 @@ final class EmployeeModel extends CoreModel
             'department_id' => 'integer',
             'designation_id' => 'integer',
             'employment_type_id' => 'integer',
+            'reporting_manager_id' => 'integer',
             'date_of_birth' => 'date',
             'joining_date' => 'date',
             'leaving_date' => 'date',

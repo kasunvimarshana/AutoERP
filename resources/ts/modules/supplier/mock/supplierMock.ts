@@ -6,7 +6,7 @@ import type {
     SupplierCategory,
     SupplierContact,
     SupplierFinanceDefaults,
-    SupplierPurchaseUsageSummary,
+    SupplierBusinessContextSummary,
     SupplierTaxProfile,
     SupplierUserAccess,
 } from '../types/supplier.types';
@@ -122,13 +122,13 @@ export const supplierUserAccess: SupplierUserAccess[] = [
     { email: 'blocked@blockeddiesel.example', id: 'sup-user-002', invitedAt: '2026-04-11', isPrimary: true, lastLogin: '', status: 'deactivated', supplierId: 'sup-004', userName: 'Blocked Diesel Portal' },
 ];
 
-export const supplierPurchaseUsage: SupplierPurchaseUsageSummary[] = [
-    { backendPreviewStatus: 'Mock backend purchase usage', lastPurchaseDate: '2026-05-24', openPurchaseOrders: 'Readonly backend value', payableBalance: 'Backend-owned AP balance', supplierId: 'sup-001', totalPurchases: 'Backend-owned purchase total' },
-    { backendPreviewStatus: 'Mock backend purchase usage', lastPurchaseDate: '2026-05-18', openPurchaseOrders: 'Readonly backend value', payableBalance: 'Backend-owned AP balance', supplierId: 'sup-002', totalPurchases: 'Backend-owned purchase total' },
+export const supplierBusinessContext: SupplierBusinessContextSummary[] = [
+    { backendPreviewStatus: 'Mock backend supplier context', lastActivityDate: '2026-05-24', openSourceDocuments: 'Readonly backend value', payableBalance: 'Backend-owned AP balance', supplierId: 'sup-001', totalActivityValue: 'Backend-owned source total' },
+    { backendPreviewStatus: 'Mock backend supplier context', lastActivityDate: '2026-05-18', openSourceDocuments: 'Readonly backend value', payableBalance: 'Backend-owned AP balance', supplierId: 'sup-002', totalActivityValue: 'Backend-owned source total' },
 ];
 
 export const supplierAuditEntries: SupplierAuditEntry[] = [
-    { actor: 'Procurement', description: 'Supplier profile reviewed for purchase workflow.', id: 'sup-audit-001', time: 'Today 09:40' },
+    { actor: 'Operations', description: 'Supplier profile reviewed for active source contexts.', id: 'sup-audit-001', time: 'Today 09:40' },
     { actor: 'System', description: 'Finance defaults preview requested from backend placeholder.', id: 'sup-audit-002', time: 'Today 10:05' },
 ];
 

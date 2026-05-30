@@ -38,7 +38,7 @@ export function UomUnitListPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader actions={<Link to="/uom/units/new"><Button>New Unit</Button></Link>} eyebrow="UOM" subtitle="Units support inventory, purchase, sales, service, rental, and pricing quantities without frontend conversion calculations." title="Units" />
+            <PageHeader actions={<Link to="/uom/units/new"><Button>New Unit</Button></Link>} eyebrow="UOM" subtitle="Units support receipt, issue, consumption, charge, inventory, and pricing contexts without frontend conversion calculations." title="Units" />
             <div className="grid gap-4 md:grid-cols-3">
                 {[
                     ['Units loaded', String(units.length), 'Mock or backend-normalized records'],

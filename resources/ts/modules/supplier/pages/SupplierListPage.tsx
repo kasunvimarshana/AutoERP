@@ -69,7 +69,7 @@ export function SupplierListPage() {
                     </Link>
                 }
                 eyebrow="Master Data"
-                subtitle="Suppliers are vendor profiles for purchase, service, finance, and payment workflows. User access is optional and managed separately."
+                subtitle="Suppliers are reusable payee/provider profiles. User access is optional and managed separately."
                 title="Suppliers"
             />
             <div className="grid gap-4 md:grid-cols-3">

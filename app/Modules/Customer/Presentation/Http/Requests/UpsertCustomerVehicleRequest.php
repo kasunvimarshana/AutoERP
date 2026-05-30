@@ -25,10 +25,13 @@ final class UpsertCustomerVehicleRequest extends FormRequest
             'row_version' => ['nullable', 'integer', 'min:0'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
             'metadata' => ['nullable', 'array'],
+            'source_context' => ['nullable', 'array'],
             'customer_id' => array_merge($required, ['integer', 'min:1', 'exists:customers,id']),
             'vehicle_id' => array_merge($required, ['integer', 'min:1', 'exists:vehicles,id']),
+            'relationship_type' => ['nullable', 'string', 'max:80'],
+            'vehicle_ownership_id' => ['nullable', 'integer', 'min:1', 'exists:vehicle_ownerships,id'],
             'is_current' => ['nullable', 'boolean'],
-            'is_active' => ['nullable', 'boolean']
+            'is_active' => ['nullable', 'boolean'],
         ];
     }
 }

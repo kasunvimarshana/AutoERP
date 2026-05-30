@@ -38,8 +38,8 @@ export const items: Item[] = [
 export const itemUnits: Record<string, ItemUnit[]> = {
     'item-001': [
         { id: 'unit-001', isBase: true, purpose: 'base', unit: 'pcs' },
-        { id: 'unit-002', isBase: false, purpose: 'purchase', unit: 'box' },
-        { id: 'unit-003', isBase: false, purpose: 'sales', unit: 'pcs' },
+        { id: 'unit-002', isBase: false, purpose: 'receipt', unit: 'box' },
+        { id: 'unit-003', isBase: false, purpose: 'issue', unit: 'pcs' },
     ],
     'item-004': [{ id: 'unit-004', isBase: true, purpose: 'base', unit: 'bundle' }],
 };
@@ -88,8 +88,8 @@ export const itemInventorySummaries: Record<string, ItemInventorySummary> = {
 };
 
 export const itemUsageSummaries: Record<string, ItemUsageSummary> = {
-    'item-001': { inventoryUse: 'Stock movement capable', purchaseUse: 'Purchasable', rentalUse: 'Not rental billing', salesUse: 'Sellable', serviceUse: 'Consumable spare part' },
-    'item-004': { inventoryUse: 'Backend expands components', purchaseUse: 'Not directly purchased', rentalUse: 'Not rental billing', salesUse: 'Invoiceable combo', serviceUse: 'Service package' },
+    'item-001': { chargeUse: 'Chargeable when selected by a source module', consumptionUse: 'Consumable stock item', inventoryUse: 'Stock movement capable', issueUse: 'Issue-capable', receiptUse: 'Receipt-capable' },
+    'item-004': { chargeUse: 'Chargeable combo', consumptionUse: 'Backend expands components', inventoryUse: 'Backend expands components', issueUse: 'Component issue preview by backend', receiptUse: 'Not directly received' },
 };
 
 export const itemAuditEntries: ItemAuditEntry[] = [

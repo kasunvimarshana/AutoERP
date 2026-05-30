@@ -30,6 +30,10 @@ interface VehicleServiceManagementServiceInterface
 
     public function getStockAvailability(int $tenantId, int $itemId, ?int $warehouseId, ?int $locationId): Result;
 
+    public function getVehicleOwnerSummary(int $tenantId, int $vehicleId): Result;
+
+    public function validatePartyContext(array $payload): Result;
+
     public function getInvoiceableJobCards(int $tenantId, ?int $customerId): Result;
 
     public function getReceivableJobCards(int $tenantId, ?int $customerId): Result;

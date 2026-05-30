@@ -176,7 +176,7 @@ export function SupplierForm({ mode, supplier }: { mode: 'create' | 'edit'; supp
                     </div>
                 </FormSection>
 
-                <FormSection description="These values are collected for backend validation. Authoritative payable balances, taxes, finance accounts, and purchase totals stay in backend." title="Finance, Tax, and Optional Setup">
+                <FormSection description="These values are collected for backend validation. Authoritative payable balances, taxes, finance accounts, and source totals stay in backend." title="Finance, Tax, and Optional Setup">
                     <div className="grid gap-4 md:grid-cols-2">
                         {['Finance Defaults', 'Primary Contact', 'Primary Address', 'Primary Bank Account', 'Tax Profile', 'Optional User Access'].map((label) => (
                             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4" key={label}>

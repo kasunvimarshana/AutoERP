@@ -31,7 +31,7 @@ final class UpsertSupplierItemRequest extends FormRequest
             'lead_time_days' => ['nullable', 'integer', 'min:0'],
             'min_order_qty' => ['nullable', 'numeric', 'min:0.0001'],
             'is_preferred' => ['nullable', 'boolean'],
-            'last_purchase_price' => ['nullable', 'numeric', 'min:0'],
+            'last_observed_unit_cost' => ['nullable', 'numeric', 'min:0'],
         ];
     }
 }

@@ -598,18 +598,28 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
         return (array) DB::table('document_types')->where('id', $id)->first();
     }
 
-    public function listDocumentTypes(): array
+    public function listDocumentTypes(int $tenantId): array
     {
         return DB::table('document_types')
+            ->where(function ($query) use ($tenantId): void {
+                $query->where('tenant_id', $tenantId)
+                    ->orWhereNull('tenant_id');
+            })
             ->orderBy('name')
             ->get()
             ->map(static fn ($row): array => (array) $row)
             ->all();
     }
 
-    public function getDocumentType(int $typeId): ?array
+    public function getDocumentType(int $tenantId, int $typeId): ?array
     {
-        $row = DB::table('document_types')->where('id', $typeId)->first();
+        $row = DB::table('document_types')
+            ->where('id', $typeId)
+            ->where(function ($query) use ($tenantId): void {
+                $query->where('tenant_id', $tenantId)
+                    ->orWhereNull('tenant_id');
+            })
+            ->first();
 
         return $row === null ? null : (array) $row;
     }

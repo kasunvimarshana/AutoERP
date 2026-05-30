@@ -86,6 +86,18 @@ final class VehicleServiceManagementController extends Controller
         return $this->respond($this->service->getStockAvailability($tenantId, $itemId, $warehouseId, $locationId));
     }
 
+    public function vehicleOwnerSummary(Request $request, int $vehicleId): JsonResponse
+    {
+        $tenantId = (int) ($request->input('tenant_id', 0));
+
+        return $this->respond($this->service->getVehicleOwnerSummary($tenantId, $vehicleId));
+    }
+
+    public function validatePartyContext(Request $request): JsonResponse
+    {
+        return $this->respond($this->service->validatePartyContext($request->all()));
+    }
+
     public function invoiceableJobCards(Request $request): JsonResponse
     {
         $tenantId = (int) ($request->input('tenant_id', 0));

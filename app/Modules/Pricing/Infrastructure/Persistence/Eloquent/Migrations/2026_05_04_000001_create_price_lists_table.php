@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('code')->nullable();
             $table->string('name');
             $table->text('description')->nullable();
-            $table->string('type')->default('generic')->comment('generic, sales, purchase, rental, service, finance');
+            $table->string('type')->default('generic')->comment('Generic resolver context such as standard, customer, supplier, source, charge, or internal.');
             $table->string('scope_type')->default('generic')->comment('generic, customer, supplier, module, source');
             $table->string('source_type')->nullable()->comment('Upstream module or pricing source type');
             $table->unsignedBigInteger('source_id')->nullable()->comment('Upstream module or source reference');

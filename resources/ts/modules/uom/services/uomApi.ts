@@ -75,6 +75,7 @@ function categoryForType(type: UomUnitType) {
 function normalizeUnit(raw: BackendRecord): UomUnit {
     const type = normalizeType(raw.type);
     const symbol = asString(raw.symbol ?? raw.code, 'UOM');
+    const metadata = raw.metadata && typeof raw.metadata === 'object' ? raw.metadata as BackendRecord : {};
 
     return {
         allowFractional: Number(raw.precision ?? raw.decimal_precision ?? 0) > 0,
@@ -89,11 +90,11 @@ function normalizeUnit(raw: BackendRecord): UomUnit {
         symbol,
         type,
         updatedAt: asString(raw.updated_at, 'Backend timestamp pending'),
+        usableForCharge: asBool(metadata.usable_for_charge ?? raw.usable_for_charge, ['duration', 'distance', 'service'].includes(type)),
+        usableForConsumption: asBool(metadata.usable_for_consumption ?? raw.usable_for_consumption, ['count', 'duration', 'volume'].includes(type)),
         usableForInventory: asBool(raw.usable_for_inventory, ['count', 'mass', 'volume'].includes(type)),
-        usableForPurchase: asBool(raw.usable_for_purchase, ['count', 'mass', 'volume'].includes(type)),
-        usableForRental: asBool(raw.usable_for_rental, ['duration', 'distance'].includes(type)),
-        usableForSales: asBool(raw.usable_for_sales, true),
-        usableForService: asBool(raw.usable_for_service, ['count', 'duration', 'volume'].includes(type)),
+        usableForIssue: asBool(metadata.usable_for_issue ?? raw.usable_for_issue, ['count', 'mass', 'volume'].includes(type)),
+        usableForReceipt: asBool(metadata.usable_for_receipt ?? raw.usable_for_receipt, ['count', 'mass', 'volume'].includes(type)),
     };
 }
 
@@ -142,11 +143,11 @@ function toBackendUnitPayload(input: UomUnitFormInput) {
             code: input.code,
             description: input.description,
             precision: input.precision,
+            usable_for_charge: input.usableForCharge,
+            usable_for_consumption: input.usableForConsumption,
             usable_for_inventory: input.usableForInventory,
-            usable_for_purchase: input.usableForPurchase,
-            usable_for_rental: input.usableForRental,
-            usable_for_sales: input.usableForSales,
-            usable_for_service: input.usableForService,
+            usable_for_issue: input.usableForIssue,
+            usable_for_receipt: input.usableForReceipt,
         },
         name: input.name,
         symbol: input.symbol || input.code,
@@ -222,10 +223,10 @@ export const uomApi = {
             inventory: 'Backend usage pending',
             items: 'Backend usage pending',
             pricing: 'Backend usage pending',
-            purchase: 'Backend usage pending',
-            rental: 'Backend usage pending',
-            sales: 'Backend usage pending',
-            service: 'Backend usage pending',
+            charge: 'Backend usage pending',
+            consumption: 'Backend usage pending',
+            issue: 'Backend usage pending',
+            receipt: 'Backend usage pending',
         }),
     listCategories: (): Promise<ApiCollectionResponse<UomCategory>> => mockCollectionResponse(uomCategories),
     listConversions: () =>

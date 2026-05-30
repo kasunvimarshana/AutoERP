@@ -17,6 +17,9 @@ final class VehicleServiceJobExternalServiceModel extends CoreModel
 
     protected function casts(): array
     {
-        return array_merge(parent::casts(), []);
+        return array_merge(parent::casts(), [
+            'provider_id' => 'integer',
+            'supplier_id' => 'integer',
+        ]);
     }
 }

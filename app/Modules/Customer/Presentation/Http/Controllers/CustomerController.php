@@ -133,37 +133,9 @@ final class CustomerController extends Controller
         return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())]);
     }
 
-    public function validateForSales(int|string $id): JsonResponse
+    public function validateForContext(int|string $id, string $context): JsonResponse
     {
-        $result = $this->service->validateCustomerForSales($id);
-
-        if ($result->isFailure()) {
-            $error = $result->errorOrFail();
-            $status = $error->code === 'CUSTOMER_NOT_FOUND' ? 404 : 422;
-
-            return response()->json(['message' => $error->message], $status);
-        }
-
-        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())]);
-    }
-
-    public function validateForVehicleService(int|string $id): JsonResponse
-    {
-        $result = $this->service->validateCustomerForVehicleService($id);
-
-        if ($result->isFailure()) {
-            $error = $result->errorOrFail();
-            $status = $error->code === 'CUSTOMER_NOT_FOUND' ? 404 : 422;
-
-            return response()->json(['message' => $error->message], $status);
-        }
-
-        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())]);
-    }
-
-    public function validateForVehicleRental(int|string $id): JsonResponse
-    {
-        $result = $this->service->validateCustomerForVehicleRental($id);
+        $result = $this->service->validateCustomerForContext($id, $context);
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();

@@ -39,6 +39,10 @@ return new class extends Migration
             $table->foreignId('department_id')->nullable()->constrained('departments')->nullOnDelete();
             $table->foreignId('designation_id')->nullable()->constrained('designations')->nullOnDelete();
             $table->foreignId('employment_type_id')->nullable()->constrained('employment_types')->nullOnDelete();
+            $table->foreignId('reporting_manager_id')
+                ->nullable()
+                ->constrained('employees', 'id', 'employees_reporting_manager_fk')
+                ->nullOnDelete();
             $table->date('joining_date')->nullable();
             $table->date('leaving_date')->nullable();
             $table->string('employment_status', 60)->default('draft');
@@ -65,12 +69,24 @@ return new class extends Migration
             $table->index(['tenant_id', 'employment_status', 'is_active'], 'employees_status_active_idx');
             $table->index(['tenant_id', 'department_id'], 'employees_department_idx');
             $table->index(['tenant_id', 'designation_id'], 'employees_designation_idx');
+            $table->index(['tenant_id', 'reporting_manager_id'], 'employees_reporting_manager_idx');
             $table->index(['tenant_id', 'email'], 'employees_email_idx');
+        });
+
+        Schema::table('departments', function (Blueprint $table): void {
+            $table->foreign('manager_employee_id', 'departments_manager_employee_fk')
+                ->references('id')
+                ->on('employees')
+                ->nullOnDelete();
         });
     }
 
     public function down(): void
     {
+        Schema::table('departments', function (Blueprint $table): void {
+            $table->dropForeign('departments_manager_employee_fk');
+        });
+
         Schema::dropIfExists('employees');
     }
 };

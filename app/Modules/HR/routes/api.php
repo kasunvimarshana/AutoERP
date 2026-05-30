@@ -63,10 +63,10 @@ Route::prefix('api/hr')
         Route::apiResource('employees', EmployeeController::class);
         Route::patch('employees/{employee}/status', [EmployeeController::class, 'status'])->name('employees.status');
         Route::get(
-            'employees/{employee}/validate-for-vehicle-service',
-            [EmployeeController::class, 'validateForVehicleService'],
+            'employees/{employee}/validate/assignment-context/{context}',
+            [EmployeeController::class, 'validateForAssignmentContext'],
         )
-            ->name('employees.validate-for-vehicle-service');
+            ->name('employees.validate.assignment-context');
         Route::get('employees/{employee}/employment-details', [EmployeeController::class, 'employmentDetails'])
             ->name('employees.employment-details.show');
         Route::put('employees/{employee}/employment-details', [EmployeeController::class, 'updateEmploymentDetails'])

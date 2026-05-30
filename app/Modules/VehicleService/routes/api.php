@@ -116,6 +116,14 @@ Route::prefix('api/vehicle-service')
             [VehicleServiceManagementController::class, 'stockAvailability'],
         )->name('stock-availability.show');
         Route::get(
+            'vehicles/{vehicleId}/owner-summary',
+            [VehicleServiceManagementController::class, 'vehicleOwnerSummary'],
+        )->name('vehicles.owner-summary');
+        Route::post(
+            'party-context/validate',
+            [VehicleServiceManagementController::class, 'validatePartyContext'],
+        )->name('party-context.validate');
+        Route::get(
             'invoiceable-job-cards',
             [VehicleServiceManagementController::class, 'invoiceableJobCards'],
         )->name('job-cards.invoiceable');

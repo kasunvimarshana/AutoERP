@@ -33,6 +33,8 @@ return new class extends Migration
             $table->decimal('period_11_amount', 20, 4)->default(0)->comment('November');
             $table->decimal('period_12_amount', 20, 4)->default(0)->comment('December');
             $table->decimal('total_amount', 20, 4)->default(0);
+            $table->decimal('used_amount', 20, 4)->default(0)->comment('Backend-calculated/read-model budget usage');
+            $table->decimal('variance_amount', 20, 4)->default(0)->comment('Backend-calculated/read-model variance');
             $table->text('notes')->nullable();
 
             $table->timestamps();

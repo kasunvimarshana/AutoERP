@@ -20,8 +20,22 @@ return new class extends Migration
             $table->string('job_card_number');
             $table->string('reference')->nullable();
             $table->foreignId('service_type_id')->nullable()->constrained('vehicle_service_types')->nullOnDelete();
-            $table->foreignId('customer_id')->nullable()->constrained('customers')->restrictOnDelete();
             $table->foreignId('vehicle_id')->nullable()->constrained('vehicles')->restrictOnDelete();
+            $table->unsignedBigInteger('vehicle_ownership_id')->nullable()->comment('Current ownership snapshot/reference from Vehicle at intake');
+            $table->string('vehicle_owner_type')->nullable()->comment('company, customer, supplier, employee, partner, external_party, party, other');
+            $table->unsignedBigInteger('vehicle_owner_id')->nullable();
+            $table->string('vehicle_owner_name')->nullable();
+            $table->string('service_customer_type')->nullable()->comment('customer, supplier_as_customer, party, external_party, internal_company');
+            $table->unsignedBigInteger('service_customer_id')->nullable();
+            $table->string('service_customer_name')->nullable();
+            $table->foreignId('linked_customer_id')->nullable()->constrained('customers')->restrictOnDelete()->comment('Customer role used for invoicing when available');
+            $table->string('billing_customer_type')->nullable()->comment('customer, supplier_as_customer, party, external_party, internal_company, insurance_company');
+            $table->unsignedBigInteger('billing_customer_id')->nullable();
+            $table->string('billing_customer_name')->nullable();
+            $table->string('payer_type')->nullable()->comment('customer, supplier, party, external_party, internal_company, insurance_company');
+            $table->unsignedBigInteger('payer_id')->nullable();
+            $table->string('payer_name')->nullable();
+            $table->json('party_context')->nullable()->comment('Readonly source/role context and backend validation warnings');
             $table->foreignId('warehouse_id')->nullable()->constrained('warehouses')->restrictOnDelete();
             $table->string('priority')->default('medium')->comment('low, medium, high, critical');
             $table->string('status')->default('open')->comment('open, in_progress, waiting_parts, completed, invoiced, cancelled');
@@ -101,6 +115,10 @@ return new class extends Migration
             $table->index(['tenant_id', 'status'], 'vehicle_service_job_cards_status_idx');
             $table->index(['tenant_id', 'invoice_status'], 'vehicle_service_job_cards_invoice_status_idx');
             $table->index(['tenant_id', 'payment_status'], 'vehicle_service_job_cards_payment_status_idx');
+            $table->index(['tenant_id', 'vehicle_id'], 'vehicle_service_job_cards_vehicle_idx');
+            $table->index(['tenant_id', 'linked_customer_id'], 'vehicle_service_job_cards_customer_role_idx');
+            $table->index(['tenant_id', 'service_customer_type', 'service_customer_id'], 'vehicle_service_job_cards_service_party_idx');
+            $table->index(['tenant_id', 'billing_customer_type', 'billing_customer_id'], 'vehicle_service_job_cards_billing_party_idx');
         });
     }
 

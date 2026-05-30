@@ -25,7 +25,7 @@ return new class extends Migration
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
             $table->foreignId('parent_id')->nullable()->constrained('departments')->nullOnDelete();
-            $table->foreignId('manager_employee_id')->nullable()->constrained('employees', 'id')->nullOnDelete();
+            $table->unsignedBigInteger('manager_employee_id')->nullable();
             $table->string('department_code', 50);
             $table->string('department_name', 160);
             $table->unsignedInteger('depth')->default(0);

@@ -41,7 +41,7 @@ export type Item = {
 export type ItemUnit = {
     id: string;
     isBase: boolean;
-    purpose: 'base' | 'purchase' | 'rental' | 'sales' | 'service';
+    purpose: 'base' | 'charge' | 'consumption' | 'issue' | 'receipt';
     unit: string;
 };
 
@@ -101,11 +101,11 @@ export type ItemInventorySummary = {
 };
 
 export type ItemUsageSummary = {
+    chargeUse: string;
+    consumptionUse: string;
     inventoryUse: string;
-    purchaseUse: string;
-    rentalUse: string;
-    salesUse: string;
-    serviceUse: string;
+    issueUse: string;
+    receiptUse: string;
 };
 
 export type ItemAuditEntry = {
@@ -116,10 +116,10 @@ export type ItemAuditEntry = {
 };
 
 export type ItemFormInput = {
-    allowPurchase: boolean;
-    allowRentalUsage: boolean;
-    allowSales: boolean;
-    allowServiceUsage: boolean;
+    allowChargeUsage: boolean;
+    allowConsumptionUsage: boolean;
+    allowIssueUsage: boolean;
+    allowReceiptUsage: boolean;
     baseUomId: string;
     brand: string;
     category: string;

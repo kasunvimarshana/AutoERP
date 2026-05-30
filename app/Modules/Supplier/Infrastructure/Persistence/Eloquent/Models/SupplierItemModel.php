@@ -23,7 +23,7 @@ final class SupplierItemModel extends CoreModel
             'lead_time_days' => 'integer',
             'min_order_qty' => 'decimal:4',
             'is_preferred' => 'boolean',
-            'last_purchase_price' => 'decimal:4',
+            'last_observed_unit_cost' => 'decimal:4',
             'metadata' => 'array',
             'row_version' => 'integer',
         ]);

@@ -33,8 +33,8 @@ Route::prefix('api/supplier')
         Route::apiResource('suppliers', SupplierController::class);
         Route::get('suppliers-lookup', [SupplierController::class, 'lookup'])->name('suppliers.lookup');
         Route::patch('suppliers/{supplier}/status', [SupplierController::class, 'status'])->name('suppliers.status');
-        Route::get('suppliers/{supplier}/validate-for-purchase', [SupplierController::class, 'validateForPurchase'])
-            ->name('suppliers.validate-for-purchase');
+        Route::get('suppliers/{supplier}/validate/context/{context}', [SupplierController::class, 'validateForContext'])
+            ->name('suppliers.validate.context');
         Route::get('suppliers/{supplier}/finance-defaults', [SupplierController::class, 'financeDefaults'])
             ->name('suppliers.finance-defaults');
         Route::put('suppliers/{supplier}/finance-defaults', [SupplierController::class, 'updateFinanceDefaults'])

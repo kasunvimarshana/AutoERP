@@ -124,10 +124,10 @@ function toBackendItemPayload(input: ItemFormInput) {
         description: input.description || null,
         display_name: input.displayName || input.name,
         is_batch_tracked: input.trackBatch,
-        is_chargeable: input.allowSales || input.allowServiceUsage || input.allowRentalUsage,
-        is_purchasable: input.allowPurchase,
-        is_rentable: input.allowRentalUsage,
-        is_sellable: input.allowSales,
+        is_chargeable: input.allowChargeUsage,
+        is_purchasable: input.allowReceiptUsage,
+        is_rentable: input.allowChargeUsage,
+        is_sellable: input.allowIssueUsage,
         is_serial_tracked: input.trackSerial,
         is_service: ['external_service', 'labour', 'service'].includes(input.itemType),
         is_stockable: input.stockable,
@@ -194,7 +194,7 @@ export const itemApi = {
     getItemActivity: (_itemId: string): Promise<ApiCollectionResponse<ItemAuditEntry>> => mockCollectionResponse(itemAuditEntries),
     getItemUnits: (itemId: string): Promise<ApiCollectionResponse<ItemUnit>> => mockCollectionResponse(itemUnits[itemId] ?? [{ id: 'unit-default', isBase: true, purpose: 'base', unit: getItemById(itemId).baseUom }]),
     getItemUsage: (itemId: string): Promise<ApiResponse<ItemUsageSummary>> =>
-        mockResponse(itemUsageSummaries[itemId] ?? { inventoryUse: 'Backend usage pending', purchaseUse: 'Backend usage pending', rentalUse: 'Backend usage pending', salesUse: 'Backend usage pending', serviceUse: 'Backend usage pending' }),
+        mockResponse(itemUsageSummaries[itemId] ?? { chargeUse: 'Backend usage pending', consumptionUse: 'Backend usage pending', inventoryUse: 'Backend usage pending', issueUse: 'Backend usage pending', receiptUse: 'Backend usage pending' }),
     getPricingReferences: (itemId: string): Promise<ApiCollectionResponse<ItemPricingReference>> => mockCollectionResponse(itemPricingReferences[itemId] ?? []),
     listAttributeValues: (attributeId?: string): Promise<ApiCollectionResponse<ItemAttributeValue>> => mockCollectionResponse(attributeId ? itemAttributeValues.filter((value) => value.attributeId === attributeId) : itemAttributeValues),
     listAttributes: () =>

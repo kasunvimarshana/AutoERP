@@ -19,7 +19,7 @@ return new class extends Migration
 
             $table->foreignId('tax_group_id')->constrained('tax_groups')->cascadeOnDelete();
             $table->foreignId('item_category_id')->nullable()->constrained('item_categories')->nullOnDelete();
-            $table->string('party_type')->nullable()->comment('customer, supplier');
+            $table->string('party_type')->nullable()->comment('Generic party role/type such as customer, supplier, employee, party, or external_party');
             $table->string('region')->nullable()->comment('country, state');
             $table->unsignedInteger('priority')->default(0)->comment('higher priority wins');
             $table->boolean('is_active')->default(true);

@@ -22,7 +22,7 @@ interface SupplierManagementServiceInterface
 
     public function lookupSuppliers(string $search, int $limit = 20): Result;
 
-    public function validateSupplierForPurchase(int|string $id): Result;
+    public function validateSupplierForContext(int|string $id, string $context): Result;
 
     public function getFinanceDefaults(int|string $id): Result;
 

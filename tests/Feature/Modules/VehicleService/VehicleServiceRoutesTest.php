@@ -72,6 +72,8 @@ final class VehicleServiceRoutesTest extends TestCase
         self::assertTrue(Route::has('vehicleservice.settings.initialize'));
         self::assertTrue(Route::has('vehicleservice.status-history.show'));
         self::assertTrue(Route::has('vehicleservice.stock-availability.show'));
+        self::assertTrue(Route::has('vehicleservice.vehicles.owner-summary'));
+        self::assertTrue(Route::has('vehicleservice.party-context.validate'));
         self::assertTrue(Route::has('vehicleservice.job-cards.invoiceable'));
         self::assertTrue(Route::has('vehicleservice.job-cards.receivable'));
         self::assertTrue(Route::has('vehicleservice.workflow.transition'));

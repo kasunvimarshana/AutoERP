@@ -39,7 +39,7 @@ return new class extends Migration
             $table->string('status')
                 ->default('ACTIVE')
                 ->comment('ACTIVE, PARTIALLY_CONSUMED, CONSUMED, RELEASED, EXPIRED, CANCELLED');
-            $table->nullableMorphs('reserved_for'); // e.g., sales order line
+            $table->nullableMorphs('reserved_for'); // Generic source document or line reserving stock.
             $table->timestamp('expires_at')->nullable();
             $table->decimal('unit_cost', 20, 4)->nullable();
             $table->foreignId('reserved_by')->nullable()->constrained('users')->nullOnDelete();

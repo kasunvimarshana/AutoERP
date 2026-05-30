@@ -21,11 +21,11 @@ export type UomUnit = {
     symbol: string;
     type: UomUnitType;
     updatedAt: string;
+    usableForCharge: boolean;
+    usableForConsumption: boolean;
     usableForInventory: boolean;
-    usableForPurchase: boolean;
-    usableForRental: boolean;
-    usableForSales: boolean;
-    usableForService: boolean;
+    usableForIssue: boolean;
+    usableForReceipt: boolean;
 };
 
 export type UomConversionDirection = 'bidirectional' | 'one_way';
@@ -66,10 +66,10 @@ export type UomItemUsage = {
     inventory: string;
     items: string;
     pricing: string;
-    purchase: string;
-    rental: string;
-    sales: string;
-    service: string;
+    charge: string;
+    consumption: string;
+    issue: string;
+    receipt: string;
 };
 
 export type UomAuditEntry = {
@@ -89,11 +89,11 @@ export type UomUnitFormInput = {
     status: UomUnitStatus;
     symbol: string;
     type: UomUnitType;
+    usableForCharge: boolean;
+    usableForConsumption: boolean;
     usableForInventory: boolean;
-    usableForPurchase: boolean;
-    usableForRental: boolean;
-    usableForSales: boolean;
-    usableForService: boolean;
+    usableForIssue: boolean;
+    usableForReceipt: boolean;
 };
 
 export type UomConversionFormInput = {

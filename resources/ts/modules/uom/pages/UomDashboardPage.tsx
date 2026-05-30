@@ -9,7 +9,7 @@ export function UomDashboardPage() {
             <PageHeader
                 actions={<><Link to="/uom/units/new"><Button>New Unit</Button></Link><Link to="/uom/conversions/new"><Button variant="secondary">New Conversion</Button></Link></>}
                 eyebrow="Core Master Data"
-                subtitle="UOM controls quantity consistency across item, inventory, purchase, sales, service, rental, and pricing workflows."
+                subtitle="UOM controls quantity consistency across item, inventory, receipt, issue, consumption, charge, and pricing contexts."
                 title="UOM"
             />
             <div className="grid gap-4 md:grid-cols-3">

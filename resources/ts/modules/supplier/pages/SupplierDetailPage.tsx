@@ -11,7 +11,7 @@ import { SupplierAddressesTable } from '../components/SupplierAddressesTable';
 import { SupplierBankAccountsTable } from '../components/SupplierBankAccountsTable';
 import { SupplierContactsTable } from '../components/SupplierContactsTable';
 import { SupplierFinanceDefaultsForm } from '../components/SupplierFinanceDefaultsForm';
-import { SupplierPurchaseUsagePanel } from '../components/SupplierPurchaseUsagePanel';
+import { SupplierBusinessContextPanel } from '../components/SupplierBusinessContextPanel';
 import { SupplierSummaryCard } from '../components/SupplierSummaryCard';
 import { SupplierTaxProfileForm } from '../components/SupplierTaxProfileForm';
 import { SupplierUserAccessPanel } from '../components/SupplierUserAccessPanel';
@@ -23,7 +23,7 @@ import type {
     SupplierBankAccount,
     SupplierContact,
     SupplierFinanceDefaults,
-    SupplierPurchaseUsageSummary,
+    SupplierBusinessContextSummary,
     SupplierTaxProfile,
     SupplierUserAccess,
 } from '../types/supplier.types';
@@ -36,7 +36,7 @@ const tabs = [
     { label: 'Tax Profile', value: 'tax' },
     { label: 'Finance Defaults', value: 'finance' },
     { label: 'User Access', value: 'user-access' },
-    { label: 'Purchase Usage / Activity', value: 'purchase-usage' },
+    { label: 'Source Context / Activity', value: 'source-context' },
     { label: 'Audit / History', value: 'audit' },
 ];
 
@@ -46,7 +46,7 @@ type SupplierDetailState = {
     bankAccounts: SupplierBankAccount[];
     contacts: SupplierContact[];
     financeDefaults: SupplierFinanceDefaults;
-    purchaseUsage: SupplierPurchaseUsageSummary;
+    businessContext: SupplierBusinessContextSummary;
     supplier: Supplier;
     taxProfile: SupplierTaxProfile;
     userAccess: SupplierUserAccess[];
@@ -71,10 +71,10 @@ export function SupplierDetailPage() {
             supplierApi.getTaxProfile(supplierId),
             supplierApi.getFinanceDefaults(supplierId),
             supplierApi.listUserAccess(supplierId),
-            supplierApi.getPurchaseUsageSummary(supplierId),
+            supplierApi.getBusinessContextSummary(supplierId),
             supplierApi.getSupplierActivity(supplierId),
         ])
-            .then(([supplier, contacts, addresses, bankAccounts, taxProfile, financeDefaults, userAccess, purchaseUsage, activity]) => {
+            .then(([supplier, contacts, addresses, bankAccounts, taxProfile, financeDefaults, userAccess, businessContext, activity]) => {
                 if (mounted) {
                     setDetail({
                         activity: activity.data,
@@ -82,7 +82,7 @@ export function SupplierDetailPage() {
                         bankAccounts: bankAccounts.data,
                         contacts: contacts.data,
                         financeDefaults: financeDefaults.data,
-                        purchaseUsage: purchaseUsage.data,
+                        businessContext: businessContext.data,
                         supplier: supplier.data,
                         taxProfile: taxProfile.data,
                         userAccess: userAccess.data,
@@ -113,7 +113,7 @@ export function SupplierDetailPage() {
         return <EmptyState description={error || 'Supplier was not found.'} title="Unable to load supplier" />;
     }
 
-    const { activity, addresses, bankAccounts, contacts, financeDefaults, purchaseUsage, supplier, taxProfile, userAccess } = detail;
+    const { activity, addresses, bankAccounts, businessContext, contacts, financeDefaults, supplier, taxProfile, userAccess } = detail;
 
     return (
         <div className="space-y-6">
@@ -129,7 +129,7 @@ export function SupplierDetailPage() {
                     </>
                 }
                 eyebrow="Supplier"
-                subtitle="Supplier detail aggregates vendor profile, contacts, addresses, bank accounts, backend-owned tax/finance previews, optional user access, purchase usage, and audit."
+                subtitle="Supplier detail aggregates vendor profile, contacts, addresses, bank accounts, backend-owned tax/finance previews, optional user access, source context, and audit."
                 title={supplier.name}
             />
             <SupplierSummaryCard supplier={supplier} />
@@ -161,7 +161,7 @@ export function SupplierDetailPage() {
                     <PreviewPanel
                         rows={[
                             { label: 'Payables', value: 'Backend-owned value' },
-                            { label: 'Purchase totals', value: 'Backend-owned value' },
+                            { label: 'Source totals', value: 'Backend-owned value' },
                             { label: 'Status changes', value: 'Backend workflow controlled' },
                         ]}
                         title="Supplier backend summary"
@@ -174,7 +174,7 @@ export function SupplierDetailPage() {
             {activeTab === 'tax' ? <SupplierTaxProfileForm profile={taxProfile} /> : null}
             {activeTab === 'finance' ? <SupplierFinanceDefaultsForm defaults={financeDefaults} /> : null}
             {activeTab === 'user-access' ? <SupplierUserAccessPanel access={userAccess} /> : null}
-            {activeTab === 'purchase-usage' ? <SupplierPurchaseUsagePanel summary={purchaseUsage} /> : null}
+            {activeTab === 'source-context' ? <SupplierBusinessContextPanel summary={businessContext} /> : null}
             {activeTab === 'audit' ? <SupplierActivityTimeline entries={activity} /> : null}
         </div>
     );

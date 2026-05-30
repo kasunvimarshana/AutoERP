@@ -31,7 +31,8 @@ return new class extends Migration
             $table->unsignedInteger('lead_time_days')->nullable();
             $table->decimal('min_order_qty', 20, 4)->default(1);
             $table->boolean('is_preferred')->default(false);
-            $table->decimal('last_purchase_price', 20, 4)->nullable();
+            $table->decimal('last_observed_unit_cost', 20, 4)->nullable()
+                ->comment('Readonly reference from backend costing/pricing observations; not workflow authority.');
             $table->timestamps();
 
             $table->unique(

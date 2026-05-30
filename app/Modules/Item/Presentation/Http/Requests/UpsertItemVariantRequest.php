@@ -30,8 +30,6 @@ final class UpsertItemVariantRequest extends FormRequest
             'name' => array_merge($required, ['string', 'max:255']),
             'is_default' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
-            'cost_price' => ['nullable', 'numeric'],
-            'sales_price' => ['nullable', 'numeric'],
         ];
     }
 }

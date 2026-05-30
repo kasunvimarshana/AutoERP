@@ -35,10 +35,10 @@ final class ListItemRequest extends FormRequest
             'image_path' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'string', 'max:255'],
             'base_uom_id' => ['nullable', 'integer', 'min:1'],
-            'purchase_uom_id' => ['nullable', 'integer', 'min:1'],
-            'sales_uom_id' => ['nullable', 'integer', 'min:1'],
-            'service_uom_id' => ['nullable', 'integer', 'min:1'],
-            'rental_uom_id' => ['nullable', 'integer', 'min:1'],
+            'default_receipt_uom_id' => ['nullable', 'integer', 'min:1'],
+            'default_issue_uom_id' => ['nullable', 'integer', 'min:1'],
+            'default_consumption_uom_id' => ['nullable', 'integer', 'min:1'],
+            'default_charge_uom_id' => ['nullable', 'integer', 'min:1'],
             'tax_group_id' => ['nullable', 'integer', 'min:1'],
             'default_currency_id' => ['nullable', 'integer', 'min:1'],
             'is_batch_tracked' => ['nullable', 'boolean'],
@@ -56,8 +56,8 @@ final class ListItemRequest extends FormRequest
             'cogs_account_id' => ['nullable', 'integer', 'min:1'],
             'inventory_account_id' => ['nullable', 'integer', 'min:1'],
             'expense_account_id' => ['nullable', 'integer', 'min:1'],
-            'sales_return_account_id' => ['nullable', 'integer', 'min:1'],
-            'purchase_return_account_id' => ['nullable', 'integer', 'min:1'],
+            'return_in_account_id' => ['nullable', 'integer', 'min:1'],
+            'return_out_account_id' => ['nullable', 'integer', 'min:1'],
             'inventory_gain_account_id' => ['nullable', 'integer', 'min:1'],
             'inventory_loss_account_id' => ['nullable', 'integer', 'min:1'],
             'stock_transfer_account_id' => ['nullable', 'integer', 'min:1'],
@@ -65,7 +65,6 @@ final class ListItemRequest extends FormRequest
             'price_variance_account_id' => ['nullable', 'integer', 'min:1'],
             'is_active' => ['nullable', 'boolean'],
             'auto_replenishment_enabled' => ['nullable', 'boolean'],
-            'allow_auto_purchase_order' => ['nullable', 'boolean'],
         ];
     }
 }

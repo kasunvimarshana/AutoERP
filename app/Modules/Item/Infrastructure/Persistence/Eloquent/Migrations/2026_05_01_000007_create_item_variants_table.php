@@ -22,8 +22,6 @@ return new class extends Migration
             $table->string('name');
             $table->boolean('is_default')->default(false);
             $table->boolean('is_active')->default(true);
-            $table->decimal('cost_price', 20, 4)->nullable();
-            $table->decimal('sales_price', 20, 4)->nullable();
 
             $table->timestamps();
             $table->softDeletes();

@@ -19,8 +19,11 @@ return new class extends Migration
 
             $table->foreignId('job_card_id')->constrained('vehicle_service_job_cards', 'id')->cascadeOnDelete();
             $table->string('reference')->nullable();
-            $table->string('vendor_name');
-            $table->foreignId('supplier_id')->nullable()->constrained('suppliers', 'id')->nullOnDelete();
+            $table->string('vendor_name')->nullable();
+            $table->string('provider_type')->nullable()->comment('supplier, customer_as_provider, party, external_party, internal_company');
+            $table->unsignedBigInteger('provider_id')->nullable();
+            $table->string('provider_name')->nullable();
+            $table->foreignId('supplier_id')->nullable()->constrained('suppliers', 'id')->nullOnDelete()->comment('Linked supplier role when provider has one');
             $table->string('service_name');
             $table->text('description')->nullable();
             $table->foreignId('uom_id')->nullable()->constrained('unit_of_measures', 'id')->nullOnDelete();
@@ -41,6 +44,7 @@ return new class extends Migration
 
             $table->index(['tenant_id', 'job_card_id'], 'vehicle_service_ext_services_job_card_idx');
             $table->index(['tenant_id', 'status'], 'vehicle_service_ext_services_status_idx');
+            $table->index(['tenant_id', 'provider_type', 'provider_id'], 'vehicle_service_ext_services_provider_idx');
         });
     }
 

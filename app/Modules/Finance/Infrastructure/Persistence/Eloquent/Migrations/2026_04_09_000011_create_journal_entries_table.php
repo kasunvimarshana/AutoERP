@@ -22,15 +22,23 @@ return new class extends Migration
             $table->string('entry_type')->default('MANUAL')->comment('MANUAL, AUTO, SYSTEM, OPENING, CLOSING, ADJUSTMENT');
             $table->string('reference_type')->nullable()->comment('Polymorphic reference (Document, Payment, etc.)');
             $table->unsignedBigInteger('reference_id')->nullable();
+            $table->string('source_module')->nullable()->comment('Generic source module key');
+            $table->string('source_type')->nullable()->comment('Generic source document/event type');
+            $table->unsignedBigInteger('source_id')->nullable()->comment('Generic source identifier');
+            $table->string('source_reference')->nullable()->comment('Human-readable source number/reference');
             $table->text('description')->nullable();
             $table->date('entry_date');
             $table->date('posting_date')->nullable();
             $table->string('status')->default('DRAFT')->comment('DRAFT, POSTED, REVERSED');
+            $table->unsignedBigInteger('currency_id')->nullable()->comment('Currency reference for journal header when applicable');
+            $table->decimal('total_debit', 20, 4)->default(0)->comment('Backend-calculated journal debit total');
+            $table->decimal('total_credit', 20, 4)->default(0)->comment('Backend-calculated journal credit total');
             $table->boolean('is_reversed')->default(false);
             $table->foreignId('reversal_entry_id')->nullable()->constrained('journal_entries')->nullOnDelete();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('posted_by')->nullable();
             $table->timestamp('posted_at')->nullable();
+            $table->timestamp('reversed_at')->nullable();
 
             $table->timestamps();
             // No softDeletes - journal entries are immutable; reversals only
@@ -39,6 +47,7 @@ return new class extends Migration
             $table->index(['tenant_id', 'entry_date'], 'journal_entries_date_idx');
             $table->index(['tenant_id', 'fiscal_period_id', 'status'], 'journal_entries_period_status_idx');
             $table->index(['tenant_id', 'reference_type', 'reference_id'], 'journal_entries_reference_idx');
+            $table->index(['tenant_id', 'source_module', 'source_type', 'source_id'], 'journal_entries_source_idx');
         });
     }
 

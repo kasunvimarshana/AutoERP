@@ -25,8 +25,6 @@ final class ItemVariantModel extends CoreModel
             'item_id' => 'integer',
             'is_default' => 'boolean',
             'is_active' => 'boolean',
-            'cost_price' => 'decimal:4',
-            'sales_price' => 'decimal:4',
         ]);
     }
 }

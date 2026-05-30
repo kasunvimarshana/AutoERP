@@ -148,9 +148,9 @@ final class EmployeeController extends Controller
         return response()->json(['data' => $result->valueOrFail()]);
     }
 
-    public function validateForVehicleService(int|string $id): JsonResponse
+    public function validateForAssignmentContext(int|string $id, string $context): JsonResponse
     {
-        $result = $this->service->validateEmployeeForVehicleService($id);
+        $result = $this->service->validateEmployeeForAssignmentContext($id, $context);
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();

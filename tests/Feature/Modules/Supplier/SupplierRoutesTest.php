@@ -18,7 +18,7 @@ final class SupplierRoutesTest extends TestCase
         self::assertTrue(Route::has('supplier.suppliers.destroy'));
         self::assertTrue(Route::has('supplier.suppliers.lookup'));
         self::assertTrue(Route::has('supplier.suppliers.status'));
-        self::assertTrue(Route::has('supplier.suppliers.validate-for-purchase'));
+        self::assertTrue(Route::has('supplier.suppliers.validate.context'));
         self::assertTrue(Route::has('supplier.suppliers.finance-defaults'));
         self::assertTrue(Route::has('supplier.suppliers.finance-defaults.update'));
         self::assertTrue(Route::has('supplier.suppliers.user-accesses.index'));

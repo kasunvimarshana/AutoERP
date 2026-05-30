@@ -486,7 +486,7 @@ final class SupplierManagementService implements SupplierManagementServiceInterf
         }
     }
 
-    public function validateSupplierForPurchase(int|string $id): Result
+    public function validateSupplierForContext(int|string $id, string $context): Result
     {
         try {
             $supplier = $this->findSupplierInScope($id);
@@ -521,6 +521,7 @@ final class SupplierManagementService implements SupplierManagementServiceInterf
 
             return Result::success([
                 'supplier_id' => (int) $supplier->id,
+                'context' => $this->normalizeContext($context),
                 'is_valid' => $errors === [],
                 'errors' => $errors,
             ]);
@@ -1109,6 +1110,13 @@ final class SupplierManagementService implements SupplierManagementServiceInterf
         }
 
         return $normalized;
+    }
+
+    private function normalizeContext(string $value): string
+    {
+        $normalized = Str::of($value)->trim()->lower()->replace([' ', '-'], '_')->toString();
+
+        return $normalized === '' ? 'generic' : $normalized;
     }
 
     private function normalizeNullable(mixed $value): ?string

@@ -19,8 +19,10 @@ final class CustomerVehicleModel extends CoreModel
             'row_version' => 'integer',
             'organization_unit_id' => 'integer',
             'metadata' => 'array',
+            'source_context' => 'array',
             'customer_id' => 'integer',
             'vehicle_id' => 'integer',
+            'vehicle_ownership_id' => 'integer',
             'is_current' => 'boolean',
             'is_active' => 'boolean',
         ]);

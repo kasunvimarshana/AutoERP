@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\VehicleService\Application\Services;
 
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
@@ -42,7 +44,12 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
     {
         try {
             return $this->jobCardRepository->transaction(function () use ($id, $payload): Result {
-                $headerPayload = $this->extractHeaderPayload($payload);
+                $headerPayload = $this->applyPartyContextDefaults($this->extractHeaderPayload($payload));
+                $partyValidation = $this->validatePartyContext($headerPayload);
+                if ($partyValidation->isFailure()) {
+                    return $partyValidation;
+                }
+
                 $jobCard = $id === null
                     ? $this->jobCardRepository->create($this->withDefaultRowVersion($headerPayload))
                     : $this->jobCardRepository->update($id, $headerPayload);
@@ -485,6 +492,80 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
         }
     }
 
+    public function getVehicleOwnerSummary(int $tenantId, int $vehicleId): Result
+    {
+        try {
+            if ($tenantId < 1 || $vehicleId < 1) {
+                return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, 'tenant_id and vehicle_id are required.'));
+            }
+
+            $ownership = $this->currentVehicleOwnership($tenantId, $vehicleId);
+
+            return Result::success([
+                'tenant_id' => $tenantId,
+                'vehicle_id' => $vehicleId,
+                'ownership' => $ownership,
+                'warnings' => $ownership === null
+                    ? ['No current vehicle ownership record found. Service customer and billing party must be selected explicitly.']
+                    : [],
+            ]);
+        } catch (Throwable $exception) {
+            return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, $exception->getMessage()));
+        }
+    }
+
+    public function validatePartyContext(array $payload): Result
+    {
+        try {
+            $tenantId = (int) ($payload['tenant_id'] ?? 0);
+            if ($tenantId < 1) {
+                return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, 'tenant_id is required.'));
+            }
+
+            $errors = [];
+            $warnings = [];
+
+            foreach ([
+                'service_customer' => ['type' => 'service_customer_type', 'id' => 'service_customer_id', 'name' => 'service_customer_name'],
+                'billing_customer' => ['type' => 'billing_customer_type', 'id' => 'billing_customer_id', 'name' => 'billing_customer_name'],
+                'payer' => ['type' => 'payer_type', 'id' => 'payer_id', 'name' => 'payer_name'],
+            ] as $label => $keys) {
+                $type = isset($payload[$keys['type']]) ? (string) $payload[$keys['type']] : null;
+                $id = isset($payload[$keys['id']]) ? (int) $payload[$keys['id']] : null;
+                $name = isset($payload[$keys['name']]) ? trim((string) $payload[$keys['name']]) : '';
+
+                $validation = $this->validatePartyReference($tenantId, $label, $type, $id, $name);
+                $errors = [...$errors, ...$validation['errors']];
+                $warnings = [...$warnings, ...$validation['warnings']];
+            }
+
+            if (isset($payload['linked_customer_id']) && (int) $payload['linked_customer_id'] > 0) {
+                if (! $this->tenantRecordExists('customers', (int) $payload['linked_customer_id'], $tenantId)) {
+                    $errors[] = 'linked_customer_id must reference an active customer in the same tenant.';
+                }
+            }
+
+            if (
+                ($payload['vehicle_owner_type'] ?? null) !== null
+                && ($payload['billing_customer_type'] ?? null) !== null
+                && (string) $payload['vehicle_owner_type'] !== (string) $payload['billing_customer_type']
+            ) {
+                $warnings[] = 'Vehicle owner differs from billing customer. Backend will keep them separate for document/payment context.';
+            }
+
+            if ($errors !== []) {
+                return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, implode(' ', $errors)));
+            }
+
+            return Result::success([
+                'valid' => true,
+                'warnings' => array_values(array_unique($warnings)),
+            ]);
+        } catch (Throwable $exception) {
+            return Result::failure(new Error(VehicleServiceErrorCode::INVALID_VALUE, $exception->getMessage()));
+        }
+    }
+
     public function getInvoiceableJobCards(int $tenantId, ?int $customerId): Result
     {
         try {
@@ -493,7 +574,7 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
                 'status' => 'completed',
             ];
             if ($customerId !== null) {
-                $filters['customer_id'] = $customerId;
+                $filters['linked_customer_id'] = $customerId;
             }
 
             return Result::success($this->jobCardRepository->list($filters));
@@ -509,7 +590,7 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
                 'tenant_id' => $tenantId,
             ];
             if ($customerId !== null) {
-                $filters['customer_id'] = $customerId;
+                $filters['linked_customer_id'] = $customerId;
             }
 
             $jobCards = $this->jobCardRepository->list($filters);
@@ -715,6 +796,175 @@ final class VehicleServiceManagementService implements VehicleServiceManagementS
         );
 
         return $payload;
+    }
+
+    private function applyPartyContextDefaults(array $payload): array
+    {
+        $tenantId = (int) ($payload['tenant_id'] ?? 0);
+        $vehicleId = isset($payload['vehicle_id']) ? (int) $payload['vehicle_id'] : 0;
+
+        if ($tenantId > 0 && $vehicleId > 0 && ! isset($payload['vehicle_ownership_id'])) {
+            $ownership = $this->currentVehicleOwnership($tenantId, $vehicleId);
+            if ($ownership !== null) {
+                $payload['vehicle_ownership_id'] = $ownership['id'];
+                $payload['vehicle_owner_type'] = $ownership['owner_type'];
+                $payload['vehicle_owner_id'] = $ownership['owner_id'];
+                $payload['vehicle_owner_name'] = $ownership['owner_display'];
+                $payload['party_context'] = [
+                    'vehicle_owner' => $ownership,
+                    'warnings' => [],
+                ];
+            }
+        }
+
+        if (isset($payload['customer_id']) && ! isset($payload['linked_customer_id'])) {
+            $payload['linked_customer_id'] = (int) $payload['customer_id'];
+            unset($payload['customer_id']);
+        }
+
+        if (! isset($payload['service_customer_type']) && isset($payload['linked_customer_id'])) {
+            $payload['service_customer_type'] = 'customer';
+            $payload['service_customer_id'] = (int) $payload['linked_customer_id'];
+        }
+
+        if (! isset($payload['billing_customer_type']) && isset($payload['linked_customer_id'])) {
+            $payload['billing_customer_type'] = 'customer';
+            $payload['billing_customer_id'] = (int) $payload['linked_customer_id'];
+        }
+
+        if (! isset($payload['payer_type']) && isset($payload['billing_customer_type'])) {
+            $payload['payer_type'] = $payload['billing_customer_type'];
+            $payload['payer_id'] = $payload['billing_customer_id'] ?? null;
+            $payload['payer_name'] = $payload['billing_customer_name'] ?? null;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function currentVehicleOwnership(int $tenantId, int $vehicleId): ?array
+    {
+        $record = DB::table('vehicle_ownerships')
+            ->where('tenant_id', $tenantId)
+            ->where('vehicle_id', $vehicleId)
+            ->where('is_current', true)
+            ->whereNull('deleted_at')
+            ->orderByRaw("case when ownership_role = 'legal_owner' then 0 when ownership_role = 'provider' then 1 else 2 end")
+            ->orderByDesc('start_date')
+            ->first();
+
+        if ($record === null) {
+            return null;
+        }
+
+        $ownerType = (string) $record->owner_type;
+        $ownerId = $record->owner_id !== null ? (int) $record->owner_id : null;
+
+        return [
+            'id' => (int) $record->id,
+            'ownership_type' => (string) $record->ownership_type,
+            'owner_type' => $ownerType,
+            'owner_id' => $ownerId,
+            'owner_name' => $record->owner_name,
+            'owner_display' => $this->resolvePartyDisplayName($tenantId, $ownerType, $ownerId, $record->owner_name),
+            'ownership_role' => (string) $record->ownership_role,
+            'start_date' => $record->start_date,
+            'end_date' => $record->end_date,
+            'is_current' => (bool) $record->is_current,
+        ];
+    }
+
+    /**
+     * @return array{errors: array<int, string>, warnings: array<int, string>}
+     */
+    private function validatePartyReference(int $tenantId, string $label, ?string $type, ?int $id, string $name): array
+    {
+        if ($type === null || trim($type) === '') {
+            return ['errors' => [], 'warnings' => ["{$label} not selected. Backend will require it before invoice/payment posting."]];
+        }
+
+        $type = trim($type);
+        if (in_array($type, ['external_party', 'internal_company', 'company'], true)) {
+            if ($type === 'external_party' && $id === null && $name === '') {
+                return ['errors' => ["{$label}_name is required for external_party."], 'warnings' => []];
+            }
+
+            return ['errors' => [], 'warnings' => []];
+        }
+
+        $table = match ($type) {
+            'customer', 'billing_customer' => 'customers',
+            'supplier', 'supplier_as_customer', 'provider' => 'suppliers',
+            'employee' => 'employees',
+            default => null,
+        };
+
+        if ($table === null) {
+            return ['errors' => [], 'warnings' => ["{$label} uses {$type}; generic party mapping will be validated by the owning module when available."]];
+        }
+
+        if ($id === null || $id < 1) {
+            return ['errors' => ["{$label}_id is required for {$type}."], 'warnings' => []];
+        }
+
+        if (! $this->tenantRecordExists($table, $id, $tenantId)) {
+            return ['errors' => ["{$label}_id must reference an active {$type} in the same tenant."], 'warnings' => []];
+        }
+
+        if ($type === 'supplier_as_customer') {
+            return ['errors' => [], 'warnings' => ['Supplier-as-customer requires a linked customer role before final invoicing if no Party module is active.']];
+        }
+
+        return ['errors' => [], 'warnings' => []];
+    }
+
+    private function tenantRecordExists(string $table, int $id, int $tenantId): bool
+    {
+        $query = DB::table($table)
+            ->where('id', $id)
+            ->where('tenant_id', $tenantId);
+
+        if (Schema::hasColumn($table, 'is_active')) {
+            $query->where(function ($query): void {
+                $query->where('is_active', true)->orWhereNull('is_active');
+            });
+        }
+
+        if (Schema::hasColumn($table, 'deleted_at')) {
+            $query->whereNull('deleted_at');
+        }
+
+        return $query->exists();
+    }
+
+    private function resolvePartyDisplayName(int $tenantId, string $ownerType, ?int $ownerId, ?string $fallback): ?string
+    {
+        if ($ownerId === null) {
+            return $fallback;
+        }
+
+        $table = match ($ownerType) {
+            'customer' => 'customers',
+            'supplier', 'provider' => 'suppliers',
+            'employee' => 'employees',
+            default => null,
+        };
+
+        if ($table === null) {
+            return $fallback;
+        }
+
+        $record = DB::table($table)->where('tenant_id', $tenantId)->where('id', $ownerId)->first();
+        $data = $record !== null ? (array) $record : [];
+
+        return match ($table) {
+            'customers' => $data['display_name'] ?? $data['customer_name'] ?? $fallback,
+            'suppliers' => $data['display_name'] ?? $data['supplier_name'] ?? $fallback,
+            'employees' => $data['display_name'] ?? $data['full_name'] ?? $fallback,
+            default => $fallback,
+        };
     }
 
     private function hydrateLineTotals(array $line, bool $includeIncentive = false): array

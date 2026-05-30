@@ -22,11 +22,19 @@ return new class extends Migration
             $table->foreignId('account_id')->constrained('accounts', 'id', 'ap_transactions_account_id_fk')->cascadeOnDelete();
             $table->string('transaction_type')->comment('BILL, PAYMENT, ADJUSTMENT, etc.');
             $table->nullableMorphs('reference');
+            $table->string('source_module')->nullable();
+            $table->string('source_type')->nullable();
+            $table->unsignedBigInteger('source_id')->nullable();
+            $table->string('source_reference')->nullable();
             $table->decimal('debit_amount', 20, 4)->default(0);
             $table->decimal('credit_amount', 20, 4)->default(0);
+            $table->decimal('original_amount', 20, 4)->default(0)->comment('Backend-maintained original transaction amount');
+            $table->decimal('paid_amount', 20, 4)->default(0)->comment('Backend-maintained paid/settled amount');
+            $table->decimal('outstanding_amount', 20, 4)->default(0)->comment('Backend-maintained open balance');
             $table->decimal('balance_after', 20, 4)->default(0);
             $table->date('transaction_date');
             $table->date('due_date')->nullable();
+            $table->string('status')->default('OPEN');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', 'ap_transactions_currency_id_fk')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 4)->default(1);
             $table->boolean('is_reconciled')->default(false);
@@ -38,6 +46,7 @@ return new class extends Migration
             $table->index(['tenant_id', 'transaction_date', 'due_date'], 'ap_transactions_tenant_dates_idx');
             $table->index(['tenant_id', 'party_type', 'party_id'], 'ap_transactions_party_idx');
             $table->index(['tenant_id', 'is_reconciled'], 'ap_transactions_reconciled_idx');
+            $table->index(['tenant_id', 'source_module', 'source_type', 'source_id'], 'ap_transactions_source_idx');
         });
     }
 

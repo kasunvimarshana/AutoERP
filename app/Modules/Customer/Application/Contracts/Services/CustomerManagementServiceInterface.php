@@ -22,11 +22,7 @@ interface CustomerManagementServiceInterface
 
     public function lookupCustomers(string $search, int $limit = 20): Result;
 
-    public function validateCustomerForSales(int|string $id): Result;
-
-    public function validateCustomerForVehicleService(int|string $id): Result;
-
-    public function validateCustomerForVehicleRental(int|string $id): Result;
+    public function validateCustomerForContext(int|string $id, string $context): Result;
 
     public function getFinanceDefaults(int|string $id): Result;
 

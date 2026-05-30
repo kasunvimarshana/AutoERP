@@ -9,7 +9,7 @@ import {
     supplierBankAccounts,
     supplierContacts,
     supplierFinanceDefaults,
-    supplierPurchaseUsage,
+    supplierBusinessContext,
     suppliers,
     supplierTaxProfiles,
     supplierUserAccess,
@@ -22,7 +22,7 @@ import type {
     SupplierContact,
     SupplierFinanceDefaults,
     SupplierFormInput,
-    SupplierPurchaseUsageSummary,
+    SupplierBusinessContextSummary,
     SupplierStatus,
     SupplierTaxProfile,
     SupplierUserAccess,
@@ -278,14 +278,14 @@ export const supplierApi = {
             },
             () => mockResponse(supplierFinanceDefaults.find((defaults) => defaults.supplierId === supplierId) ?? supplierFinanceDefaults[0]),
         ),
-    getPurchaseUsageSummary: (supplierId: string): Promise<ApiResponse<SupplierPurchaseUsageSummary>> =>
-        mockResponse(supplierPurchaseUsage.find((usage) => usage.supplierId === supplierId) ?? {
-            backendPreviewStatus: 'Mock backend purchase usage',
-            lastPurchaseDate: 'No purchase usage returned yet',
-            openPurchaseOrders: 'Backend-owned open PO count',
+    getBusinessContextSummary: (supplierId: string): Promise<ApiResponse<SupplierBusinessContextSummary>> =>
+        mockResponse(supplierBusinessContext.find((usage) => usage.supplierId === supplierId) ?? {
+            backendPreviewStatus: 'Mock backend supplier context',
+            lastActivityDate: 'No source usage returned yet',
+            openSourceDocuments: 'Backend-owned open source count',
             payableBalance: 'Backend-owned AP balance',
             supplierId,
-            totalPurchases: 'Backend-owned purchase total',
+            totalActivityValue: 'Backend-owned source total',
         }),
     getSupplier: (supplierId: string) =>
         withMockFallback(

@@ -35,9 +35,6 @@ final class UpsertComboItemRequest extends FormRequest
             'quantity' => array_merge($required, ['numeric', 'gt:0']),
             'uom_id' => array_merge($required, ['integer', 'min:1', 'exists:unit_of_measures,id']),
             'standard_cost' => ['nullable', 'numeric', 'min:0'],
-            'cost_price' => ['nullable', 'numeric', 'min:0'],
-            'sales_price' => ['nullable', 'numeric', 'min:0'],
-            'incentive_value' => ['nullable', 'numeric', 'min:0'],
         ];
     }
 }

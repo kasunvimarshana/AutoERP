@@ -79,6 +79,10 @@ final class VehicleServiceModuleIntegrityTest extends TestCase
         self::assertStringContainsString('payment_status', $jobCards);
         self::assertStringContainsString('finance_status', $jobCards);
         self::assertStringContainsString('advance_amount', $jobCards);
+        self::assertStringContainsString('vehicle_ownership_id', $jobCards);
+        self::assertStringContainsString('service_customer_type', $jobCards);
+        self::assertStringContainsString('billing_customer_type', $jobCards);
+        self::assertStringContainsString('payer_type', $jobCards);
 
         self::assertStringContainsString('line_type', $jobCardLines);
         self::assertStringContainsString('is_customer_supplied', $jobCardLines);
@@ -92,6 +96,7 @@ final class VehicleServiceModuleIntegrityTest extends TestCase
         self::assertStringContainsString('auto_invoice_trigger_status', $settings);
         self::assertStringContainsString('service_invoice_document_type_code', $settings);
 
+        self::assertStringContainsString('provider_type', $externalServices);
         self::assertStringContainsString('supplier_id', $externalServices);
         self::assertStringContainsString('line_total', $externalServices);
 

@@ -109,8 +109,10 @@ final class HrEmployeeManagementService implements HrEmployeeManagementServiceIn
                 $departmentId = $this->toNullableInt($payload['department_id'] ?? null);
                 $designationId = $this->toNullableInt($payload['designation_id'] ?? null);
                 $employmentTypeId = $this->toNullableInt($payload['employment_type_id'] ?? null);
+                $reportingManagerId = $this->toNullableInt($payload['reporting_manager_id'] ?? null);
                 $this->validateDepartmentDesignation($departmentId, $designationId);
                 $this->validateEmploymentType($employmentTypeId);
+                $this->validateReportingManager($reportingManagerId);
 
                 $employee = $this->employees->newQuery()->create([
                     'tenant_id' => $tenantId,
@@ -131,6 +133,7 @@ final class HrEmployeeManagementService implements HrEmployeeManagementServiceIn
                     'department_id' => $departmentId,
                     'designation_id' => $designationId,
                     'employment_type_id' => $employmentTypeId,
+                    'reporting_manager_id' => $reportingManagerId,
                     'joining_date' => $payload['joining_date'] ?? null,
                     'leaving_date' => $payload['leaving_date'] ?? null,
                     'employment_status' => $status,
@@ -205,8 +208,12 @@ final class HrEmployeeManagementService implements HrEmployeeManagementServiceIn
                 $employmentTypeId = array_key_exists('employment_type_id', $payload)
                     ? $this->toNullableInt($payload['employment_type_id'])
                     : $this->toNullableInt($employee->employment_type_id);
+                $reportingManagerId = array_key_exists('reporting_manager_id', $payload)
+                    ? $this->toNullableInt($payload['reporting_manager_id'])
+                    : $this->toNullableInt($employee->reporting_manager_id);
                 $this->validateDepartmentDesignation($departmentId, $designationId);
                 $this->validateEmploymentType($employmentTypeId);
+                $this->validateReportingManager($reportingManagerId, (int) $employee->id);
 
                 $changes = [
                     'updated_by' => $this->userId(),
@@ -240,7 +247,7 @@ final class HrEmployeeManagementService implements HrEmployeeManagementServiceIn
                     }
                 }
 
-                foreach (['department_id', 'designation_id', 'employment_type_id'] as $fkKey) {
+                foreach (['department_id', 'designation_id', 'employment_type_id', 'reporting_manager_id'] as $fkKey) {
                     if (array_key_exists($fkKey, $payload)) {
                         $changes[$fkKey] = $this->toNullableInt($payload[$fkKey]);
                     }
@@ -842,9 +849,7 @@ final class HrEmployeeManagementService implements HrEmployeeManagementServiceIn
             }
 
             $managerId = $this->toNullableInt($payload['reporting_manager_id'] ?? null);
-            if ($managerId !== null && $managerId === (int) $employee->id) {
-                return $this->failure('Reporting manager cannot be the same employee.');
-            }
+            $this->validateReportingManager($managerId, (int) $employee->id);
 
             $attributes = [
                 'department_id' => $this->toNullableInt($payload['department_id'] ?? $employee->department_id),
@@ -1110,26 +1115,10 @@ final class HrEmployeeManagementService implements HrEmployeeManagementServiceIn
         }
     }
 
-    public function validateEmployeeForVehicleService(int|string $employeeId): Result
+    public function validateEmployeeForAssignmentContext(int|string $employeeId, string $assignmentContext): Result
     {
         try {
-            $employee = $this->findEmployeeInScope($employeeId);
-            if ($employee === null) {
-                return $this->notFound('Employee not found.');
-            }
-
-            $errors = [];
-            if ((string) $employee->employment_status !== EmployeeStatus::ACTIVE || ! (bool) $employee->is_active) {
-                $errors[] = 'Employee is not active for assignment.';
-            }
-
-            return Result::success([
-                'employee_id' => (int) $employee->id,
-                'employee_code' => $employee->employee_code,
-                'employee_name' => $employee->full_name,
-                'is_assignable' => $errors === [],
-                'errors' => $errors,
-            ]);
+            return $this->validateEmployeeForAssignment($employeeId, $assignmentContext);
         } catch (Throwable $exception) {
             return $this->failure($exception->getMessage());
         }
@@ -1398,6 +1387,56 @@ final class HrEmployeeManagementService implements HrEmployeeManagementServiceIn
         if (! $exists) {
             throw new RuntimeException('Invalid employment type selected.');
         }
+    }
+
+    private function validateReportingManager(?int $reportingManagerId, ?int $employeeId = null): void
+    {
+        if ($reportingManagerId === null) {
+            return;
+        }
+
+        if ($employeeId !== null && $reportingManagerId === $employeeId) {
+            throw new RuntimeException('Reporting manager cannot be the same employee.');
+        }
+
+        $exists = $this->employees->newQuery()
+            ->where('tenant_id', $this->tenantId())
+            ->where('id', $reportingManagerId)
+            ->exists();
+
+        if (! $exists) {
+            throw new RuntimeException('Invalid reporting manager selected.');
+        }
+    }
+
+    private function validateEmployeeForAssignment(int|string $employeeId, string $assignmentType): Result
+    {
+        $employee = $this->findEmployeeInScope($employeeId);
+        if ($employee === null) {
+            return $this->notFound('Employee not found.');
+        }
+
+        $errors = [];
+        if ((string) $employee->employment_status !== EmployeeStatus::ACTIVE || ! (bool) $employee->is_active) {
+            $errors[] = 'Employee is not active for assignment.';
+        }
+
+        return Result::success([
+            'assignment_context' => $this->normalizeContext($assignmentType),
+            'assignment_type' => $this->normalizeContext($assignmentType),
+            'employee_id' => (int) $employee->id,
+            'employee_code' => $employee->employee_code,
+            'employee_name' => $employee->full_name,
+            'is_assignable' => $errors === [],
+            'errors' => $errors,
+        ]);
+    }
+
+    private function normalizeContext(string $value): string
+    {
+        $normalized = \Illuminate\Support\Str::of($value)->trim()->lower()->replace([' ', '-'], '_')->toString();
+
+        return $normalized === '' ? 'generic' : $normalized;
     }
 
     private function findEmployeeInScope(int|string $id): ?EmployeeModel

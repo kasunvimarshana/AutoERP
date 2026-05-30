@@ -1,4 +1,4 @@
-export type StockMovementType = 'purchase_receipt' | 'sales_issue' | 'service_consumption' | 'transfer_in' | 'transfer_out' | 'adjustment_in' | 'adjustment_out' | 'return_in' | 'return_out';
+export type StockMovementType = 'receipt' | 'issue' | 'consumption' | 'transfer_in' | 'transfer_out' | 'adjustment_in' | 'adjustment_out' | 'return_in' | 'return_out';
 
 export type StockLevel = {
     available: string;

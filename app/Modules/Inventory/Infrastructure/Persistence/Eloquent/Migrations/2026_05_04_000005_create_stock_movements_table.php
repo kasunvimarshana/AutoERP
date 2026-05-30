@@ -26,7 +26,7 @@ return new class extends Migration
 
             $table->string('direction')->comment('IN, OUT');
             $table->string('movement_type')->comment(
-                'OPENING_BALANCE, PURCHASE_RECEIPT, SALES_ISSUE, TRANSFER_OUT, TRANSFER_IN, '
+                'OPENING_BALANCE, RECEIPT, ISSUE, CONSUMPTION, TRANSFER_OUT, TRANSFER_IN, '
                 . 'ADJUSTMENT_IN, ADJUSTMENT_OUT, RESERVATION, RESERVATION_RELEASE, RETURN_IN, '
                 . 'RETURN_OUT, STOCK_COUNT_GAIN, STOCK_COUNT_LOSS'
             );

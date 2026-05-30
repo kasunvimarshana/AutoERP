@@ -133,9 +133,9 @@ final class SupplierController extends Controller
         return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())]);
     }
 
-    public function validateForPurchase(int|string $id): JsonResponse
+    public function validateForContext(int|string $id, string $context): JsonResponse
     {
-        $result = $this->service->validateSupplierForPurchase($id);
+        $result = $this->service->validateSupplierForContext($id, $context);
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();

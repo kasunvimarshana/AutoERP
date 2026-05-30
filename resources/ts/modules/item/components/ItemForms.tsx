@@ -34,10 +34,10 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
 
         const formData = new FormData(event.currentTarget);
         const input: ItemFormInput = {
-            allowPurchase: checkbox(formData, 'allow_purchase'),
-            allowRentalUsage: checkbox(formData, 'allow_rental_usage'),
-            allowSales: checkbox(formData, 'allow_sales'),
-            allowServiceUsage: checkbox(formData, 'allow_service_usage'),
+            allowChargeUsage: checkbox(formData, 'allow_charge_usage'),
+            allowConsumptionUsage: checkbox(formData, 'allow_consumption_usage'),
+            allowIssueUsage: checkbox(formData, 'allow_issue_usage'),
+            allowReceiptUsage: checkbox(formData, 'allow_receipt_usage'),
             baseUomId: String(formData.get('base_uom_id') ?? '1'),
             brand: String(formData.get('brand') ?? ''),
             category: String(formData.get('category') ?? ''),
@@ -134,10 +134,10 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
                     <div className="grid gap-4 md:grid-cols-2">
                         {[
                             ['is_stockable', 'Stockable / affects inventory', isStockable],
-                            ['allow_purchase', 'Allow purchase', true],
-                            ['allow_sales', 'Allow sales', true],
-                            ['allow_service_usage', 'Allow service usage', item?.itemType !== 'rental_charge'],
-                            ['allow_rental_usage', 'Allow rental usage', item?.itemType === 'rental_charge'],
+                            ['allow_receipt_usage', 'Receipt usage', true],
+                            ['allow_issue_usage', 'Issue usage', true],
+                            ['allow_consumption_usage', 'Consumption usage', item?.itemType !== 'rental_charge'],
+                            ['allow_charge_usage', 'Charge usage', item?.itemType === 'rental_charge'],
                             ['is_batch_tracked', 'Track batch', false],
                             ['is_serial_tracked', 'Track serial', false],
                         ].map(([name, label, defaultChecked]) => (

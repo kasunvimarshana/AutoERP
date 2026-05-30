@@ -1,30 +1,22 @@
-import { PageHeader } from '../../../shared/components/business/PageHeader';
-import { AuditTimeline } from '../../../shared/components/business/AuditTimeline';
-import { DataTable } from '../../../shared/components/data/DataTable';
-import { SearchFilterBar } from '../../../shared/components/data/SearchFilterBar';
-import { jobCards } from '../mock/vehicleServiceMock';
+import { useEffect, useState } from 'react';
+import { VehicleServiceActivityTimeline, VehicleServicePageHeader } from '../components/VehicleServiceComponents';
+import { vehicleServiceApi } from '../services/vehicleServiceApi';
+import type { VehicleServiceAuditEntry } from '../types/vehicleService.types';
 
 export function ServiceHistoryPage() {
+    const [rows, setRows] = useState<VehicleServiceAuditEntry[]>([]);
+
+    useEffect(() => {
+        vehicleServiceApi.history.list().then((response) => setRows(response.data));
+    }, []);
+
     return (
         <div className="space-y-6">
-            <PageHeader
-                eyebrow="Vehicle Service"
-                subtitle="Customer and vehicle service history timeline. Backend audit/history endpoints remain authoritative."
+            <VehicleServicePageHeader
+                subtitle="Service history shows backend/mock job-card activity, previews, workflow events, documents, payments, inventory, and finance actions."
                 title="Service History"
             />
-            <SearchFilterBar placeholder="Search vehicle plate, customer, job card, or service item..." />
-            <DataTable
-                columns={[
-                    { header: 'Job Card', key: 'jobNumber' },
-                    { header: 'Customer', key: 'customer' },
-                    { header: 'Vehicle', key: 'vehicle' },
-                    { header: 'Opened', key: 'openedAt' },
-                    { header: 'Advisor', key: 'serviceAdvisor' },
-                ]}
-                getRowKey={(row) => row.id}
-                rows={jobCards}
-            />
-            <AuditTimeline />
+            <VehicleServiceActivityTimeline rows={rows} />
         </div>
     );
 }

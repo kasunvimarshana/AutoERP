@@ -16,15 +16,21 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->cascadeOnDelete()->comment('Multi-tenant owner reference');
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
+            $table->json('source_context')->nullable()->comment('Generic source/context data for cross-role links');
 
             $table->foreignId('customer_id')->constrained('customers')->cascadeOnDelete();
             $table->foreignId('vehicle_id')->constrained('vehicles')->cascadeOnDelete();
+            $table->string('relationship_type', 80)
+                ->default('associated_vehicle')
+                ->comment('Contextual customer relationship; ownership truth lives in vehicle_ownerships.');
+            $table->unsignedBigInteger('vehicle_ownership_id')->nullable();
             $table->boolean('is_current')->default(false);
             $table->boolean('is_active')->default(true);
 
             $table->timestamps();
 
             $table->unique(['tenant_id', 'customer_id', 'vehicle_id'], 'customer_vehicles_customer_vehicle_uk');
+            $table->index('vehicle_ownership_id', 'customer_vehicles_ownership_idx');
         });
     }
 

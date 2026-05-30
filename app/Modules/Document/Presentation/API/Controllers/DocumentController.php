@@ -322,10 +322,12 @@ class DocumentController extends Controller
         return response()->json(['data' => ['deleted' => $deleted]]);
     }
 
-    public function listDocumentTypes(): JsonResponse
+    public function listDocumentTypes(Request $request): JsonResponse
     {
+        $tenantId = $this->resolveTenantId($request);
+
         return response()->json([
-            'data' => $this->orchestrator->listDocumentTypes(),
+            'data' => $this->orchestrator->listDocumentTypes($tenantId),
         ]);
     }
 
@@ -340,9 +342,9 @@ class DocumentController extends Controller
         ], Response::HTTP_CREATED);
     }
 
-    public function showDocumentType(int $type): JsonResponse
+    public function showDocumentType(Request $request, int $type): JsonResponse
     {
-        $payload = $this->orchestrator->getDocumentType($type);
+        $payload = $this->orchestrator->getDocumentType($this->resolveTenantId($request), $type);
 
         if ($payload === null) {
             return response()->json(['message' => 'Document type not found.'], Response::HTTP_NOT_FOUND);

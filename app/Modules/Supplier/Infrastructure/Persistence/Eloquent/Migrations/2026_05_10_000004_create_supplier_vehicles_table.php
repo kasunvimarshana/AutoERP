@@ -23,15 +23,21 @@ return new class extends Migration
                 ->nullOnDelete()
                 ->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
+            $table->json('source_context')->nullable()->comment('Generic source/context data for cross-role links');
 
             $table->foreignId('supplier_id')->constrained('suppliers')->cascadeOnDelete();
             $table->foreignId('vehicle_id')->constrained('vehicles')->cascadeOnDelete();
+            $table->string('relationship_type', 80)
+                ->default('associated_vehicle')
+                ->comment('Contextual supplier/provider relationship; ownership truth lives in vehicle_ownerships.');
+            $table->unsignedBigInteger('vehicle_ownership_id')->nullable();
             $table->boolean('is_current')->default(false);
             $table->boolean('is_active')->default(true);
 
             $table->timestamps();
 
             $table->unique(['tenant_id', 'supplier_id', 'vehicle_id'], 'supplier_vehicles_supplier_vehicle_uk');
+            $table->index('vehicle_ownership_id', 'supplier_vehicles_ownership_idx');
         });
     }
 

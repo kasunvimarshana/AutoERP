@@ -72,7 +72,7 @@ final class ItemNestedRelationsService
             return;
         }
 
-        foreach (['purchase_uom_id', 'sales_uom_id', 'service_uom_id', 'rental_uom_id'] as $field) {
+        foreach (['default_receipt_uom_id', 'default_issue_uom_id', 'default_consumption_uom_id', 'default_charge_uom_id'] as $field) {
             if (! array_key_exists($field, $payload) || $payload[$field] === null || $payload[$field] === '') {
                 continue;
             }
@@ -252,8 +252,6 @@ final class ItemNestedRelationsService
                 'is_active' => array_key_exists('is_active', $variantInput)
                     ? (bool) $variantInput['is_active']
                     : true,
-                'cost_price' => $variantInput['cost_price'] ?? null,
-                'sales_price' => $variantInput['sales_price'] ?? null,
                 'metadata' => is_array($variantInput['metadata'] ?? null)
                     ? $variantInput['metadata']
                     : null,

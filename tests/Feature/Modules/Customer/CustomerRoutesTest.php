@@ -18,9 +18,7 @@ final class CustomerRoutesTest extends TestCase
         self::assertTrue(Route::has('customer.customers.destroy'));
         self::assertTrue(Route::has('customer.customers.lookup'));
         self::assertTrue(Route::has('customer.customers.status'));
-        self::assertTrue(Route::has('customer.customers.validate.sales'));
-        self::assertTrue(Route::has('customer.customers.validate.vehicle-service'));
-        self::assertTrue(Route::has('customer.customers.validate.vehicle-rental'));
+        self::assertTrue(Route::has('customer.customers.validate.context'));
         self::assertTrue(Route::has('customer.customers.finance-defaults.show'));
         self::assertTrue(Route::has('customer.customers.finance-defaults.update'));
         self::assertTrue(Route::has('customer.customers.credit-check'));

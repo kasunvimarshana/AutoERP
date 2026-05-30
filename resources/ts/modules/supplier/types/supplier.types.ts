@@ -103,13 +103,13 @@ export type SupplierUserAccessCreateInput = {
     name?: string;
 };
 
-export type SupplierPurchaseUsageSummary = {
+export type SupplierBusinessContextSummary = {
     backendPreviewStatus: string;
-    lastPurchaseDate: string;
-    openPurchaseOrders: string;
+    lastActivityDate: string;
+    openSourceDocuments: string;
     payableBalance: string;
     supplierId: string;
-    totalPurchases: string;
+    totalActivityValue: string;
 };
 
 export type SupplierAuditEntry = {

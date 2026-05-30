@@ -474,19 +474,9 @@ final class CustomerManagementService implements CustomerManagementServiceInterf
         }
     }
 
-    public function validateCustomerForSales(int|string $id): Result
+    public function validateCustomerForContext(int|string $id, string $context): Result
     {
-        return $this->validateCustomerForTransaction($id, 'sales');
-    }
-
-    public function validateCustomerForVehicleService(int|string $id): Result
-    {
-        return $this->validateCustomerForTransaction($id, 'vehicle_service');
-    }
-
-    public function validateCustomerForVehicleRental(int|string $id): Result
-    {
-        return $this->validateCustomerForTransaction($id, 'vehicle_rental');
+        return $this->validateCustomerForTransaction($id, $context);
     }
 
     public function getFinanceDefaults(int|string $id): Result
@@ -806,9 +796,12 @@ final class CustomerManagementService implements CustomerManagementServiceInterf
                 $errors[] = 'Customer is currently on credit hold.';
             }
 
+            $resolvedContext = $this->normalizeContext($channel);
+
             return Result::success([
                 'customer_id' => (int) $customer->id,
-                'channel' => $channel,
+                'context' => $resolvedContext,
+                'channel' => $resolvedContext,
                 'is_valid' => $errors === [],
                 'errors' => $errors,
                 'finance_defaults' => [
@@ -1125,6 +1118,13 @@ final class CustomerManagementService implements CustomerManagementServiceInterf
         }
 
         return $normalized;
+    }
+
+    private function normalizeContext(string $value): string
+    {
+        $normalized = Str::of($value)->trim()->lower()->replace([' ', '-'], '_')->toString();
+
+        return $normalized === '' ? 'generic' : $normalized;
     }
 
     private function normalizeNullable(mixed $value): ?string

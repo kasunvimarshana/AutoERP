@@ -19,9 +19,11 @@ final class SupplierVehicleModel extends CoreModel
             'organization_unit_id' => 'integer',
             'supplier_id' => 'integer',
             'vehicle_id' => 'integer',
+            'vehicle_ownership_id' => 'integer',
             'is_current' => 'boolean',
             'is_active' => 'boolean',
             'metadata' => 'array',
+            'source_context' => 'array',
             'row_version' => 'integer',
         ]);
     }

@@ -41,6 +41,7 @@ final class UpsertEmployeeRequest extends FormRequest
             'department_id' => ['nullable', 'integer', 'min:1', 'exists:departments,id'],
             'designation_id' => ['nullable', 'integer', 'min:1', 'exists:designations,id'],
             'employment_type_id' => ['nullable', 'integer', 'min:1', 'exists:employment_types,id'],
+            'reporting_manager_id' => ['nullable', 'integer', 'min:1', 'exists:employees,id'],
             'joining_date' => ['nullable', 'date'],
             'leaving_date' => ['nullable', 'date'],
             'employment_status' => ['nullable', 'string', 'in:' . implode(',', EmployeeStatus::values())],

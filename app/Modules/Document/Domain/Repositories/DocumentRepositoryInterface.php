@@ -126,12 +126,12 @@ interface DocumentRepositoryInterface
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function listDocumentTypes(): array;
+    public function listDocumentTypes(int $tenantId): array;
 
     /**
      * @return array<string, mixed>|null
      */
-    public function getDocumentType(int $typeId): ?array;
+    public function getDocumentType(int $tenantId, int $typeId): ?array;
 
     /**
      * @param  array<string, mixed>  $payload

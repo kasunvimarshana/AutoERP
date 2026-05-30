@@ -18,7 +18,13 @@ final class VehicleServiceJobCardModel extends CoreModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-
+            'vehicle_ownership_id' => 'integer',
+            'vehicle_owner_id' => 'integer',
+            'service_customer_id' => 'integer',
+            'linked_customer_id' => 'integer',
+            'billing_customer_id' => 'integer',
+            'payer_id' => 'integer',
+            'party_context' => 'array',
         ]);
     }
 }

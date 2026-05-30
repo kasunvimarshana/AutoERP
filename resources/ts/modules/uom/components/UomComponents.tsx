@@ -100,10 +100,10 @@ export function UomItemUsagePanel({ usage }: { usage: UomItemUsage }) {
             rows={[
                 { label: 'Items', value: usage.items },
                 { label: 'Inventory', value: usage.inventory },
-                { label: 'Purchase', value: usage.purchase },
-                { label: 'Sales', value: usage.sales },
-                { label: 'Service', value: usage.service },
-                { label: 'Rental', value: usage.rental },
+                { label: 'Receipt contexts', value: usage.receipt },
+                { label: 'Issue contexts', value: usage.issue },
+                { label: 'Consumption contexts', value: usage.consumption },
+                { label: 'Charge contexts', value: usage.charge },
                 { label: 'Pricing', value: usage.pricing },
             ]}
             subtitle="Usage summary is backend/mock readonly. Frontend does not infer stock or billing quantities."
@@ -169,11 +169,11 @@ export function UomUnitForm({ mode, unit }: { mode: 'create' | 'edit'; unit?: Uo
             status: String(formData.get('status') ?? 'active') as UomUnitStatus,
             symbol: String(formData.get('symbol') ?? ''),
             type: String(formData.get('type') ?? 'count') as UomUnitType,
+            usableForCharge: checked(formData, 'usable_charge'),
+            usableForConsumption: checked(formData, 'usable_consumption'),
             usableForInventory: checked(formData, 'usable_inventory'),
-            usableForPurchase: checked(formData, 'usable_purchase'),
-            usableForRental: checked(formData, 'usable_rental'),
-            usableForSales: checked(formData, 'usable_sales'),
-            usableForService: checked(formData, 'usable_service'),
+            usableForIssue: checked(formData, 'usable_issue'),
+            usableForReceipt: checked(formData, 'usable_receipt'),
         };
 
         try {
@@ -215,11 +215,11 @@ export function UomUnitForm({ mode, unit }: { mode: 'create' | 'edit'; unit?: Uo
                 <FormSection description="These usage flags describe where the unit appears. They do not calculate operational effects." title="Usage Settings">
                     <div className="grid gap-3 md:grid-cols-3">
                         {[
-                            ['usable_purchase', 'Purchase', unit?.usableForPurchase],
-                            ['usable_sales', 'Sales', unit?.usableForSales],
+                            ['usable_receipt', 'Receipt contexts', unit?.usableForReceipt],
+                            ['usable_issue', 'Issue contexts', unit?.usableForIssue],
                             ['usable_inventory', 'Inventory', unit?.usableForInventory],
-                            ['usable_service', 'Service', unit?.usableForService],
-                            ['usable_rental', 'Rental', unit?.usableForRental],
+                            ['usable_consumption', 'Consumption contexts', unit?.usableForConsumption],
+                            ['usable_charge', 'Charge contexts', unit?.usableForCharge],
                         ].map(([name, label, defaultChecked]) => (
                             <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700" key={String(name)}>
                                 <Checkbox defaultChecked={Boolean(defaultChecked)} name={String(name)} />{label}

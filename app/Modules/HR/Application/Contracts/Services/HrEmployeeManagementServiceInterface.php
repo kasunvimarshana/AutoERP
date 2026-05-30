@@ -70,7 +70,7 @@ interface HrEmployeeManagementServiceInterface
 
     public function listActiveEmployees(int $limit = 50): Result;
 
-    public function validateEmployeeForVehicleService(int|string $employeeId): Result;
+    public function validateEmployeeForAssignmentContext(int|string $employeeId, string $assignmentContext): Result;
 
     public function getEmployeesByDepartment(int|string $departmentId): Result;
 

@@ -12,13 +12,16 @@ return new class extends Migration
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->foreignId('document_definition_id')->constrained('document_definitions')->cascadeOnDelete();
+            $table->string('section_key', 120)->nullable();
             $table->string('field_key', 120);
             $table->string('label', 180);
             $table->string('data_type', 40);
             $table->boolean('is_required')->default(false);
+            $table->boolean('is_readonly')->default(false);
             $table->unsignedInteger('display_order')->default(1);
             $table->string('default_value')->nullable();
             $table->text('validation_rule')->nullable();
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
 
             $table->unique(

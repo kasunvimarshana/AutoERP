@@ -21,6 +21,7 @@ return new class extends Migration
             $table->string('code');
             $table->string('name');
             $table->string('type')->comment('ASSET, LIABILITY, EQUITY, INCOME, EXPENSE');
+            $table->string('account_group')->nullable()->comment('Generic account grouping for reporting and UI trees');
             $table->string('normal_balance')->comment('DEBIT, CREDIT');
             $table->boolean('is_control_account')->default(false)->comment('Indicates if this is a control (parent) account');
             $table->boolean('is_bank_account')->default(false)->comment('Indicates if this account represents a bank account');

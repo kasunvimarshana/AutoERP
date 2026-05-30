@@ -29,9 +29,6 @@ final class ComboItemModel extends CoreModel
             'quantity' => 'decimal:4',
             'uom_id' => 'integer',
             'standard_cost' => 'decimal:4',
-            'cost_price' => 'decimal:4',
-            'sales_price' => 'decimal:4',
-            'incentive_value' => 'decimal:4',
         ]);
     }
 }

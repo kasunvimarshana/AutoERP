@@ -29,12 +29,12 @@ return new class extends Migration
             $table->string('image_path')->nullable();
             $table->string('status')->default('DRAFT')->comment('DRAFT, ACTIVE, INACTIVE, DISCONTINUED');
 
-            // Units of measure
+            // Units of measure. Context-specific defaults stay generic; business modules decide how to use them.
             $table->foreignId('base_uom_id')->constrained('unit_of_measures');
-            $table->foreignId('purchase_uom_id')->nullable()->constrained('unit_of_measures');
-            $table->foreignId('sales_uom_id')->nullable()->constrained('unit_of_measures');
-            $table->foreignId('service_uom_id')->nullable()->constrained('unit_of_measures');
-            $table->foreignId('rental_uom_id')->nullable()->constrained('unit_of_measures');
+            $table->foreignId('default_receipt_uom_id')->nullable()->constrained('unit_of_measures');
+            $table->foreignId('default_issue_uom_id')->nullable()->constrained('unit_of_measures');
+            $table->foreignId('default_consumption_uom_id')->nullable()->constrained('unit_of_measures');
+            $table->foreignId('default_charge_uom_id')->nullable()->constrained('unit_of_measures');
 
             $table->foreignId('tax_group_id')->nullable()->constrained('tax_groups')->nullOnDelete();
 
@@ -59,9 +59,8 @@ return new class extends Migration
             $table->foreignId('cogs_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('General ledger channel for inventory direct cost');
             $table->foreignId('inventory_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('General ledger channel for asset valuation');
             $table->foreignId('expense_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('General ledger channel for non-revenue overhead expenses');
-            // RETURNS
-            $table->foreignId('sales_return_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Used when customer returns goods (sales return adjustment)');
-            $table->foreignId('purchase_return_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Used when returning goods to supplier');
+            $table->foreignId('return_in_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Generic return receipt account mapping');
+            $table->foreignId('return_out_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Generic return issue account mapping');
             // INVENTORY VARIANCE (VERY IMPORTANT FOR COUNT ADJUSTMENT)
             $table->foreignId('inventory_gain_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Used when stock increases due to adjustments');
             $table->foreignId('inventory_loss_account_id')->nullable()->constrained('accounts')->nullOnDelete()->comment('Used when stock decreases due to damage, scrap, or shrinkage');
@@ -74,16 +73,7 @@ return new class extends Migration
 
             $table->boolean('is_active')->default(true);
 
-            // Pricing
-            $table->decimal('cost_price', 20, 4)->nullable()->comment('Actual supplier acquisition rate per piece');
-            $table->decimal('sales_price', 20, 4)->nullable()->comment('Standard commercial customer checkout baseline rate');
             $table->foreignId('default_currency_id')->nullable()->constrained('currencies')->nullOnDelete();
-
-            // Service fields
-            $table->decimal('estimated_service_time_hours', 20, 4)->nullable();
-
-            $table->string('incentive_type')->default('fixed')->nullable();   // percentage, fixed
-            $table->decimal('incentive_value', 20, 4)->default(0);
 
             $table->decimal('minimum_stock', 20, 4)->default(0);
             $table->decimal('maximum_stock', 20, 4)->nullable();
@@ -93,7 +83,6 @@ return new class extends Migration
             $table->integer('lead_time_days')->default(0);
             $table->integer('review_period_days')->default(30);
             $table->boolean('auto_replenishment_enabled')->default(false);
-            $table->boolean('allow_auto_purchase_order')->default(false);
 
             $table->timestamps();
             $table->softDeletes();

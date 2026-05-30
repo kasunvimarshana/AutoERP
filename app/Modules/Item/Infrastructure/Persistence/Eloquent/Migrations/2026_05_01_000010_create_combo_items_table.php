@@ -24,10 +24,6 @@ return new class extends Migration
             $table->decimal('quantity', 20, 4);
             $table->foreignId('uom_id')->constrained('unit_of_measures');
             $table->decimal('standard_cost', 20, 4)->nullable();
-            $table->decimal('cost_price', 20, 4)->nullable();
-            $table->decimal('sales_price', 20, 4)->nullable();
-            $table->string('incentive_type')->default('fixed')->nullable();   // percentage, fixed
-            $table->decimal('incentive_value', 20, 4)->default(0);
 
             $table->timestamps();
             $table->softDeletes();

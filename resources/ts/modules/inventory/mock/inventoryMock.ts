@@ -32,9 +32,9 @@ export const stockLevels: StockLevel[] = [
 ];
 
 export const stockMovements: StockMovement[] = [
-    { batchOrSerial: 'B-OIL-0526', costEffect: 'Backend valuation', id: 'mov-001', itemName: 'Engine Oil 10W-40', location: 'A-01', movementDate: '2026-05-22', movementNumber: 'MOV-2026-00101', movementType: 'purchase_receipt', quantity: 'Backend quantity', quantityEffect: 'Backend effect', sourceModule: 'purchase', sourceReference: 'GRN-2026-00051', status: 'posted', uom: 'L', warehouse: 'Main Warehouse' },
-    { costEffect: 'Backend valuation', id: 'mov-002', itemName: 'Oil Filter', location: 'B-03', movementDate: '2026-05-23', movementNumber: 'MOV-2026-00102', movementType: 'sales_issue', quantity: 'Backend quantity', quantityEffect: 'Backend effect', sourceModule: 'sales', sourceReference: 'GDN-2026-00077', status: 'posted', uom: 'PCS', warehouse: 'Main Warehouse' },
-    { costEffect: 'Backend valuation', id: 'mov-003', itemName: 'Brake Cleaner', location: 'S-04', movementDate: '2026-05-24', movementNumber: 'MOV-2026-00103', movementType: 'service_consumption', quantity: 'Backend quantity', quantityEffect: 'Backend effect', sourceModule: 'vehicle_service', sourceReference: 'JOB-2026-00512', status: 'posted', uom: 'CAN', warehouse: 'Service Store' },
+    { batchOrSerial: 'B-OIL-0526', costEffect: 'Backend valuation', id: 'mov-001', itemName: 'Engine Oil 10W-40', location: 'A-01', movementDate: '2026-05-22', movementNumber: 'MOV-2026-00101', movementType: 'receipt', quantity: 'Backend quantity', quantityEffect: 'Backend effect', sourceModule: 'purchase', sourceReference: 'GRN-2026-00051', status: 'posted', uom: 'L', warehouse: 'Main Warehouse' },
+    { costEffect: 'Backend valuation', id: 'mov-002', itemName: 'Oil Filter', location: 'B-03', movementDate: '2026-05-23', movementNumber: 'MOV-2026-00102', movementType: 'issue', quantity: 'Backend quantity', quantityEffect: 'Backend effect', sourceModule: 'sales', sourceReference: 'GDN-2026-00077', status: 'posted', uom: 'PCS', warehouse: 'Main Warehouse' },
+    { costEffect: 'Backend valuation', id: 'mov-003', itemName: 'Brake Cleaner', location: 'S-04', movementDate: '2026-05-24', movementNumber: 'MOV-2026-00103', movementType: 'consumption', quantity: 'Backend quantity', quantityEffect: 'Backend effect', sourceModule: 'vehicle_service', sourceReference: 'JOB-2026-00512', status: 'posted', uom: 'CAN', warehouse: 'Service Store' },
     { costEffect: 'Backend valuation', id: 'mov-004', itemName: 'Air Filter', location: 'A-02 to S-01', movementDate: '2026-05-25', movementNumber: 'MOV-2026-00104', movementType: 'transfer_out', quantity: 'Backend quantity', quantityEffect: 'Backend effect', sourceModule: 'inventory', sourceReference: 'TRF-2026-00018', status: 'posted', uom: 'PCS', warehouse: 'Main Warehouse' },
 ];
 
@@ -111,9 +111,9 @@ export const availabilityPreview: StockAvailabilityPreviewResult = {
 };
 
 export const traceability: InventoryAuditEntry[] = [
-    { actor: 'Purchase', description: 'Received from supplier document GRN-2026-00051.', id: 'trace-001', time: '2026-05-22 09:00', type: 'purchase_receipt' },
+    { actor: 'Purchase', description: 'Received from supplier document GRN-2026-00051.', id: 'trace-001', time: '2026-05-22 09:00', type: 'receipt' },
     { actor: 'Inventory', description: 'Transferred from Main Warehouse to Service Store.', id: 'trace-002', time: '2026-05-25 11:30', type: 'transfer' },
-    { actor: 'Vehicle Service', description: 'Consumed against service job JOB-2026-00512.', id: 'trace-003', time: '2026-05-26 14:10', type: 'service_consumption' },
+    { actor: 'Vehicle Service', description: 'Consumed against service job JOB-2026-00512.', id: 'trace-003', time: '2026-05-26 14:10', type: 'consumption' },
     { actor: 'Inventory', description: 'Adjusted after cycle count variance approval.', id: 'trace-004', time: '2026-05-27 10:20', type: 'adjustment' },
 ];
 

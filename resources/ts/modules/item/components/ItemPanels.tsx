@@ -82,10 +82,10 @@ export function ItemInventorySummaryPanel({ summary }: { summary: ItemInventoryS
 
 export function ItemUsagePanel({ summary }: { summary: ItemUsageSummary }) {
     return <PreviewPanel rows={[
-        { label: 'Purchase', value: summary.purchaseUse },
-        { label: 'Sales', value: summary.salesUse },
-        { label: 'Vehicle Service', value: summary.serviceUse },
-        { label: 'Rental', value: summary.rentalUse },
+        { label: 'Receipt', value: summary.receiptUse },
+        { label: 'Issue', value: summary.issueUse },
+        { label: 'Consumption', value: summary.consumptionUse },
+        { label: 'Charge', value: summary.chargeUse },
         { label: 'Inventory', value: summary.inventoryUse },
     ]} status="Readonly" subtitle="Usage is shown from backend/mock summaries only." title="Usage Summary" />;
 }
