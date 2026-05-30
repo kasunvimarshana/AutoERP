@@ -82,6 +82,7 @@ function normalizeAccount(raw: BackendRecord): Account {
     return {
         accountCode: asString(raw.account_code ?? raw.code, `ACC-${asString(raw.id)}`),
         accountName: asString(raw.account_name ?? raw.name, 'Backend account'),
+        accountGroup: asString(raw.account_group) as Account['accountGroup'],
         accountType: asString(raw.account_type ?? raw.type, 'asset') as Account['accountType'],
         id: asString(raw.id),
         normalBalance: asString(raw.normal_balance, 'debit') as Account['normalBalance'],
@@ -112,6 +113,8 @@ function normalizeJournal(raw: BackendRecord): JournalEntry {
         })),
         reference: asString(raw.reference_number ?? raw.reference),
         sourceModule: asString(raw.source_module),
+        sourceType: asString(raw.source_type),
+        sourceId: asString(raw.source_id),
         sourceReference: asString(raw.source_reference),
         status: asString(raw.status, 'draft') as JournalEntry['status'],
     };
@@ -136,15 +139,15 @@ export const financeApi = {
     ),
     createAccount: (input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>('/api/finance/accounts', { body: input, method: 'POST' }), () => mockResponse(input)),
     updateAccount: (id: string, input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/finance/accounts/${id}`, { body: input, method: 'PUT' }), () => mockResponse(input)),
-    activateAccount: (id: string) => mockResponse({ action: 'activate-account', id }),
-    deactivateAccount: (id: string) => mockResponse({ action: 'deactivate-account', id }),
+    activateAccount: (id: string) => withMockFallback(() => httpClient<ApiResponse<Account>>(`/api/finance/accounts/${id}/activate`, { method: 'PATCH' }), () => mockResponse({ ...getAccountById(id), status: 'active' })),
+    deactivateAccount: (id: string) => withMockFallback(() => httpClient<ApiResponse<Account>>(`/api/finance/accounts/${id}/deactivate`, { method: 'PATCH' }), () => mockResponse({ ...getAccountById(id), status: 'inactive' })),
 
     listFiscalYears: (): Promise<ApiCollectionResponse<FiscalYear>> => withMockFallback(() => httpClient<ApiCollectionResponse<FiscalYear>>('/api/finance/fiscal-years'), () => mockCollectionResponse(fiscalYears)),
     createFiscalYear: (input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>('/api/finance/fiscal-years', { body: input, method: 'POST' }), () => mockResponse(input)),
     updateFiscalYear: (id: string, input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/finance/fiscal-years/${id}`, { body: input, method: 'PUT' }), () => mockResponse(input)),
     listFiscalPeriods: (): Promise<ApiCollectionResponse<FiscalPeriod>> => withMockFallback(() => httpClient<ApiCollectionResponse<FiscalPeriod>>('/api/finance/fiscal-periods'), () => mockCollectionResponse(fiscalPeriods)),
-    openFiscalPeriod: (id: string) => mockResponse({ action: 'open-fiscal-period', id }),
-    closeFiscalPeriod: (id: string) => mockResponse({ action: 'close-fiscal-period', id }),
+    openFiscalPeriod: (id: string) => withMockFallback(() => httpClient<ApiResponse<FiscalPeriod>>(`/api/finance/fiscal-periods/${id}/open`, { method: 'PATCH' }), () => mockResponse({ ...(fiscalPeriods.find((period) => period.id === id) ?? fiscalPeriods[0]), status: 'open' })),
+    closeFiscalPeriod: (id: string) => withMockFallback(() => httpClient<ApiResponse<FiscalPeriod>>(`/api/finance/fiscal-periods/${id}/close`, { method: 'PATCH' }), () => mockResponse({ ...(fiscalPeriods.find((period) => period.id === id) ?? fiscalPeriods[0]), status: 'closed' })),
 
     listJournalEntries: (): Promise<ApiCollectionResponse<JournalEntry>> => withMockFallback(
         async () => {
@@ -168,6 +171,10 @@ export const financeApi = {
     ),
     postJournalEntry: (id: string) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/finance/journal-entries/${id}/engines/post`, { method: 'POST' }), () => mockResponse({ action: 'post-journal-entry', id })),
     reverseJournalEntry: (id: string) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/finance/journal-entries/${id}/engines/reverse`, { method: 'POST' }), () => mockResponse({ action: 'reverse-journal-entry', id })),
+    previewSourcePosting: (input: unknown): Promise<ApiPreviewResponse<unknown, FinancePostingPreview['calculated']>> => withMockFallback(
+        () => httpClient<ApiPreviewResponse<unknown, FinancePostingPreview['calculated']>>('/api/finance/posting-preview', { body: input, method: 'POST' }),
+        () => mockPreviewResponse(input, postingPreview.calculated, postingPreview.breakdown, postingPreview.warnings),
+    ),
 
     listApTransactions: (): Promise<ApiCollectionResponse<ApTransaction>> => withMockFallback(() => httpClient<ApiCollectionResponse<ApTransaction>>('/api/finance/ap-transactions'), () => mockCollectionResponse(apTransactions)),
     listArTransactions: (): Promise<ApiCollectionResponse<ArTransaction>> => withMockFallback(() => httpClient<ApiCollectionResponse<ArTransaction>>('/api/finance/ar-transactions'), () => mockCollectionResponse(arTransactions)),

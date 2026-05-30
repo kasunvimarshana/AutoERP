@@ -18,6 +18,7 @@ import type {
     BankTransaction,
     Budget,
     BudgetLine,
+    BudgetUsage,
     CostCenter,
     FinanceAuditEntry,
     FinancePostingPreview,
@@ -58,6 +59,7 @@ export function AccountForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
                     <Field label="Account code"><Input placeholder="1000" /></Field>
                     <Field label="Account name"><Input placeholder="Cash and Bank" /></Field>
                     <Field label="Account type"><Select><option>Asset</option><option>Liability</option><option>Equity</option><option>Income</option><option>Expense</option></Select></Field>
+                    <Field label="Account group"><Input placeholder="cash_bank, receivables, payables..." /></Field>
                     <Field label="Normal balance"><Select><option>Debit</option><option>Credit</option></Select></Field>
                     <Field label="Parent account"><Input placeholder="Optional parent" /></Field>
                     <Field label="Status"><Select><option>Active</option><option>Inactive</option></Select></Field>
@@ -169,6 +171,26 @@ export function JournalPostingPreviewPanel({ preview }: { preview: FinancePostin
     );
 }
 
+export function JournalStatusActionPanel({ journalId, status }: { journalId: string; status: string }) {
+    return (
+        <PreviewPanel
+            rows={[
+                { label: 'Journal', value: journalId },
+                { label: 'Current status', value: status },
+                { label: 'Allowed actions', value: 'Backend permission/status result' },
+            ]}
+            status="Workflow"
+            title="Journal Status Actions"
+        >
+            <div className="flex flex-wrap gap-2">
+                <Button variant="blue">Preview Posting</Button>
+                <Button variant="secondary">Post</Button>
+                <Button variant="ghost">Reverse</Button>
+            </div>
+        </PreviewPanel>
+    );
+}
+
 export function ApTransactionTable({ rows }: { rows: ApTransaction[] }) {
     return <SimpleTable rows={rows} columns={[['party', 'Supplier / Party'], ['sourceDocument', 'Document'], ['originalAmount', 'Original'], ['paidAmount', 'Paid'], ['outstandingAmount', 'Outstanding'], ['dueDate', 'Due'], ['agingBucket', 'Aging'], ['status', 'Status']]} />;
 }
@@ -230,6 +252,14 @@ export function BudgetForm() {
 
 export function BudgetLineTable({ rows }: { rows: BudgetLine[] }) {
     return <SimpleTable rows={rows} columns={[['account', 'Account'], ['budgetAmount', 'Budget'], ['usage', 'Backend Usage'], ['variance', 'Backend Variance']]} />;
+}
+
+export function BudgetUsagePanel({ rows }: { rows: BudgetUsage[] }) {
+    return (
+        <PreviewPanel status="Backend Read Model" title="Budget Usage / Variance">
+            <SimpleTable rows={rows} columns={[['budgetAmount', 'Budget'], ['usedAmount', 'Backend Used'], ['varianceAmount', 'Backend Variance']]} />
+        </PreviewPanel>
+    );
 }
 
 export function FinanceSourceReferencePanel({ sourceModule, sourceReference }: { sourceModule?: string; sourceReference?: string }) {

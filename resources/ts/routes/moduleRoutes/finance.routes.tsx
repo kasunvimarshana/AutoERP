@@ -18,6 +18,7 @@ export const financeRoutes: RouteObject[] = [
     { element: lazyNamed(journals, 'JournalEntryListPage'), path: 'finance/journal-entries' },
     { element: lazyNamed(journals, 'JournalEntryCreatePage'), path: 'finance/journal-entries/new' },
     { element: lazyNamed(journals, 'JournalEntryDetailPage'), path: 'finance/journal-entries/:id' },
+    { element: lazyNamed(journals, 'JournalEntryEditPage'), path: 'finance/journal-entries/:id/edit' },
     { element: lazyNamed(references, 'ApTransactionListPage'), path: 'finance/ap-transactions' },
     { element: lazyNamed(references, 'ArTransactionListPage'), path: 'finance/ar-transactions' },
     { element: lazyNamed(references, 'TaxDashboardPage'), path: 'finance/tax' },
@@ -30,5 +31,6 @@ export const financeRoutes: RouteObject[] = [
     { element: lazyNamed(references, 'BankTransactionListPage'), path: 'finance/bank-transactions' },
     { element: lazyNamed(references, 'BankReconciliationListPage'), path: 'finance/reconciliations' },
     { element: lazyNamed(references, 'BudgetListPage'), path: 'finance/budgets' },
+    { element: lazyNamed(references, 'BudgetDetailPage'), path: 'finance/budgets/:id' },
     { element: posting(), path: 'finance/posting-preview' },
 ];

@@ -21,8 +21,7 @@ final class ReverseJournalEntryService implements ReverseJournalEntryServiceInte
         private readonly JournalEntryRepositoryInterface $entries,
         private readonly JournalEntryLineRepositoryInterface $lines,
         private readonly PostJournalEntryServiceInterface $postService,
-    ) {
-    }
+    ) {}
 
     public function execute(int|string $journalEntryId, array $payload): Result
     {
@@ -79,7 +78,7 @@ final class ReverseJournalEntryService implements ReverseJournalEntryServiceInte
                     'entry_type' => 'ADJUSTMENT',
                     'reference_type' => 'JOURNAL_REVERSAL',
                     'reference_id' => (int) $entry->id(),
-                    'description' => 'Reversal for entry #' . $entry->get('entry_number'),
+                    'description' => 'Reversal for entry #'.$entry->get('entry_number'),
                     'entry_date' => $payload['posting_date'] ?? now()->toDateString(),
                     'status' => JournalEntryStatus::DRAFT,
                     'created_by' => $payload['posted_by'] ?? $entry->get('created_by'),
@@ -101,9 +100,12 @@ final class ReverseJournalEntryService implements ReverseJournalEntryServiceInte
                         'base_debit_amount' => (float) $line->get('base_credit_amount', 0),
                         'base_credit_amount' => (float) $line->get('base_debit_amount', 0),
                         'cost_center_id' => $line->get('cost_center_id'),
+                        'party_type' => $line->get('party_type'),
+                        'party_id' => $line->get('party_id'),
                         'tax_rate_id' => $line->get('tax_rate_id'),
                         'tax_amount' => (float) $line->get('tax_amount', 0),
                         'line_number' => $lineNumber++,
+                        'source_line_reference' => $line->get('source_line_reference'),
                     ]);
                 }
 
@@ -119,6 +121,7 @@ final class ReverseJournalEntryService implements ReverseJournalEntryServiceInte
                     'status' => JournalEntryStatus::REVERSED,
                     'is_reversed' => true,
                     'reversal_entry_id' => (int) $reversalEntry->id(),
+                    'reversed_at' => now(),
                     'row_version' => $currentRowVersion + 1,
                 ]);
 
@@ -148,6 +151,6 @@ final class ReverseJournalEntryService implements ReverseJournalEntryServiceInte
 
     private function generateReversalNumber(string $entryNumber): string
     {
-        return $entryNumber . '-REV-' . now()->format('YmdHisv');
+        return $entryNumber.'-REV-'.now()->format('YmdHisv');
     }
 }

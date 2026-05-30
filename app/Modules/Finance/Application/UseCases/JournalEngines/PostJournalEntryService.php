@@ -8,8 +8,8 @@ use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Modules\Finance\Application\Contracts\Services\FiscalPeriodServiceInterface;
-use Modules\Finance\Application\Repositories\AccountRepositoryInterface;
 use Modules\Finance\Application\Contracts\UseCases\JournalEngines\PostJournalEntryServiceInterface;
+use Modules\Finance\Application\Repositories\AccountRepositoryInterface;
 use Modules\Finance\Application\Repositories\JournalEntryLineRepositoryInterface;
 use Modules\Finance\Application\Repositories\JournalEntryRepositoryInterface;
 use Modules\Finance\Domain\Constants\FinanceErrorCode;
@@ -23,8 +23,7 @@ final class PostJournalEntryService implements PostJournalEntryServiceInterface
         private readonly JournalEntryLineRepositoryInterface $lines,
         private readonly AccountRepositoryInterface $accounts,
         private readonly FiscalPeriodServiceInterface $fiscalPeriodService,
-    ) {
-    }
+    ) {}
 
     public function execute(int|string $journalEntryId, array $payload): Result
     {
@@ -115,6 +114,8 @@ final class PostJournalEntryService implements PostJournalEntryServiceInterface
                     'posted_by' => $postedBy,
                     'posted_at' => now(),
                     'fiscal_period_id' => $entry->get('fiscal_period_id') ?? $fiscalPeriod->id(),
+                    'total_debit' => $totals['base_debit_total'],
+                    'total_credit' => $totals['base_credit_total'],
                     'row_version' => ((int) $entry->get('row_version', 1)) + 1,
                 ]);
 
@@ -142,7 +143,7 @@ final class PostJournalEntryService implements PostJournalEntryServiceInterface
     }
 
     /**
-     * @param list<DataRecord> $lines
+     * @param  list<DataRecord>  $lines
      * @return array<string, float>
      */
     private function calculateTotals(array $lines): array

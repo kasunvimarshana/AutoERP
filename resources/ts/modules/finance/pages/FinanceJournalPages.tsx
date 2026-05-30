@@ -12,6 +12,7 @@ import {
     JournalEntryForm,
     JournalEntryLineTable,
     JournalPostingPreviewPanel,
+    JournalStatusActionPanel,
 } from '../components/FinanceComponents';
 import { financeActivity, postingPreview } from '../mock/financeMock';
 import { financeApi } from '../services/financeApi';
@@ -66,6 +67,15 @@ export function JournalEntryCreatePage() {
     );
 }
 
+export function JournalEntryEditPage() {
+    return (
+        <div className="space-y-6">
+            <PageHeader eyebrow="Finance" subtitle="Edit draft journal input only. Posted journals stay immutable and must be reversed by backend workflow." title="Edit Journal Entry" />
+            <JournalEntryForm />
+        </div>
+    );
+}
+
 export function JournalEntryDetailPage() {
     const { id = 'je-001' } = useParams();
     const [journal, setJournal] = useState<JournalEntry>();
@@ -113,7 +123,7 @@ export function JournalEntryDetailPage() {
             {activeTab === 'lines' ? <JournalEntryLineTable rows={journal.lines} /> : null}
             {activeTab === 'posting' ? <JournalPostingPreviewPanel preview={postingPreview} /> : null}
             {activeTab === 'source' ? <FinanceSourceReferencePanel sourceModule={journal.sourceModule} sourceReference={journal.sourceReference} /> : null}
-            {activeTab === 'reversal' ? <PreviewPanel rows={[{ label: 'Reversal eligibility', value: 'Backend decision' }, { label: 'Reversal journal', value: 'Backend generated after action' }]} title="Reversal" /> : null}
+            {activeTab === 'reversal' ? <JournalStatusActionPanel journalId={journal.id} status={journal.status} /> : null}
             {activeTab === 'audit' ? <FinanceActivityTimeline rows={financeActivity} /> : null}
         </div>
     );

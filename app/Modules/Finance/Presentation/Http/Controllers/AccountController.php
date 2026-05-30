@@ -24,8 +24,7 @@ final class AccountController extends Controller
         private readonly CreateAccountServiceInterface $createService,
         private readonly UpdateAccountServiceInterface $updateService,
         private readonly DeleteAccountServiceInterface $deleteService,
-    ) {
-    }
+    ) {}
 
     public function index(ListAccountRequest $request): JsonResponse
     {
@@ -94,6 +93,11 @@ final class AccountController extends Controller
         ]);
     }
 
+    public function tree(ListAccountRequest $request): JsonResponse
+    {
+        return $this->index($request);
+    }
+
     public function show(int|string $id): JsonResponse|AccountResource
     {
         $result = $this->getService->execute($id);
@@ -119,6 +123,34 @@ final class AccountController extends Controller
     public function update(UpsertAccountRequest $request, int|string $id): JsonResponse|AccountResource
     {
         $result = $this->updateService->execute($id, $request->validated());
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'FINANCE_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return new AccountResource($result->valueOrFail());
+    }
+
+    public function activate(int|string $account): JsonResponse|AccountResource
+    {
+        $result = $this->updateService->execute($account, ['is_active' => true]);
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'FINANCE_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return new AccountResource($result->valueOrFail());
+    }
+
+    public function deactivate(int|string $account): JsonResponse|AccountResource
+    {
+        $result = $this->updateService->execute($account, ['is_active' => false]);
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();

@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
 import { SearchFilterBar } from '../../../shared/components/data/SearchFilterBar';
+import { Tabs } from '../../../shared/components/ui/Tabs';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
+import { useParams } from 'react-router-dom';
 import {
     ApTransactionTable,
     ArTransactionTable,
@@ -12,6 +14,7 @@ import {
     BankTransactionTable,
     BudgetForm,
     BudgetLineTable,
+    BudgetUsagePanel,
     BudgetTable,
     CostCenterForm,
     CostCenterTable,
@@ -144,6 +147,36 @@ export function BudgetListPage() {
                 <BudgetLineTable rows={budgets[0]?.lines ?? []} />
             </div>
         </ListPage>
+    );
+}
+
+export function BudgetDetailPage() {
+    const { id = 'bud-001' } = useParams();
+    const [activeTab, setActiveTab] = useState('overview');
+    const budget = budgets.find((row) => row.id === id) ?? budgets[0];
+
+    return (
+        <div className="space-y-6">
+            <PageHeader
+                eyebrow="Finance"
+                subtitle="Budget detail. Usage and variance are backend read-model values, never calculated in the frontend."
+                title={budget.name}
+            />
+            <Tabs
+                active={activeTab}
+                items={[
+                    { label: 'Overview', value: 'overview' },
+                    { label: 'Budget Lines', value: 'lines' },
+                    { label: 'Usage / Variance', value: 'usage' },
+                    { label: 'Audit / History', value: 'audit' },
+                ]}
+                onChange={setActiveTab}
+            />
+            {activeTab === 'overview' ? <BudgetTable rows={[budget]} /> : null}
+            {activeTab === 'lines' ? <BudgetLineTable rows={budget.lines} /> : null}
+            {activeTab === 'usage' ? <BudgetUsagePanel rows={budget.lines.map((line) => ({ budgetAmount: line.budgetAmount, id: line.id, usedAmount: line.usage, varianceAmount: line.variance }))} /> : null}
+            {activeTab === 'audit' ? <EmptyState description="Finance audit/history endpoint will populate budget activity here." title="Audit / History" /> : null}
+        </div>
     );
 }
 

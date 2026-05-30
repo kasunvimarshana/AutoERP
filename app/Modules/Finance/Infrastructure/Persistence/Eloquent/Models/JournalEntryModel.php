@@ -13,6 +13,9 @@ final class JournalEntryModel extends FinanceModel
         'entry_date' => 'date',
         'posting_date' => 'date',
         'is_reversed' => 'boolean',
+        'total_debit' => 'decimal:4',
+        'total_credit' => 'decimal:4',
         'posted_at' => 'datetime',
+        'reversed_at' => 'datetime',
     ];
 }

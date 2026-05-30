@@ -24,8 +24,7 @@ final class FiscalPeriodController extends Controller
         private readonly CreateFiscalPeriodServiceInterface $createService,
         private readonly UpdateFiscalPeriodServiceInterface $updateService,
         private readonly DeleteFiscalPeriodServiceInterface $deleteService,
-    ) {
-    }
+    ) {}
 
     public function index(ListFiscalPeriodRequest $request): JsonResponse
     {
@@ -115,6 +114,34 @@ final class FiscalPeriodController extends Controller
     public function update(UpsertFiscalPeriodRequest $request, int|string $id): JsonResponse|FiscalPeriodResource
     {
         $result = $this->updateService->execute($id, $request->validated());
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'FINANCE_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return new FiscalPeriodResource($result->valueOrFail());
+    }
+
+    public function open(int|string $fiscalPeriod): JsonResponse|FiscalPeriodResource
+    {
+        $result = $this->updateService->execute($fiscalPeriod, ['status' => 'OPEN']);
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'FINANCE_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return new FiscalPeriodResource($result->valueOrFail());
+    }
+
+    public function close(int|string $fiscalPeriod): JsonResponse|FiscalPeriodResource
+    {
+        $result = $this->updateService->execute($fiscalPeriod, ['status' => 'CLOSED']);
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();

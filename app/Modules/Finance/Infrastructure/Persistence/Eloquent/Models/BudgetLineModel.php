@@ -23,5 +23,7 @@ final class BudgetLineModel extends FinanceModel
         'period_11_amount' => 'decimal:4',
         'period_12_amount' => 'decimal:4',
         'total_amount' => 'decimal:4',
+        'used_amount' => 'decimal:4',
+        'variance_amount' => 'decimal:4',
     ];
 }

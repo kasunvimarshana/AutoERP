@@ -1,1 +1,1 @@
-export { PurchasePage } from './pages/PurchasePage';
+export { PurchaseDashboardPage, PurchasePage } from './pages/PurchaseDashboardPage';

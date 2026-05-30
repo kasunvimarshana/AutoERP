@@ -1,4 +1,5 @@
 export type AccountType = 'asset' | 'liability' | 'equity' | 'income' | 'expense';
+export type AccountGroup = 'cash_bank' | 'receivables' | 'payables' | 'inventory' | 'income' | 'expense' | 'equity' | 'tax' | 'other';
 export type AccountStatus = 'active' | 'inactive';
 export type JournalStatus = 'draft' | 'posted' | 'reversed' | 'voided';
 
@@ -6,6 +7,7 @@ export type Account = {
     accountCode: string;
     accountName: string;
     accountType: AccountType;
+    accountGroup?: AccountGroup;
     id: string;
     normalBalance: 'debit' | 'credit';
     parentAccount?: string;
@@ -36,6 +38,8 @@ export type JournalEntry = {
     lines: JournalEntryLine[];
     reference?: string;
     sourceModule?: string;
+    sourceType?: string;
+    sourceId?: string;
     sourceReference?: string;
     status: JournalStatus;
 };
@@ -56,6 +60,7 @@ export type BankReconciliation = { bankAccount: string; id: string; period: stri
 
 export type BudgetLine = { account: string; budgetAmount: string; id: string; usage: string; variance: string };
 export type Budget = { fiscalYear: string; id: string; lines: BudgetLine[]; name: string; status: string; variance: string };
+export type BudgetUsage = { budgetAmount: string; id: string; usedAmount: string; varianceAmount: string };
 
 export type FinancePostingPreview = {
     breakdown: Array<{ label: string; value: string }>;

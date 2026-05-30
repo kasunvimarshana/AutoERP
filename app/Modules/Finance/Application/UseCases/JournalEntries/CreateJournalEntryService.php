@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Modules\Finance\Application\UseCases\JournalEntries;
 
 use Modules\Core\Application\DTO\DataRecord;
+use Modules\Core\Application\Results\Error;
+use Modules\Core\Application\Results\Result;
 use Modules\Finance\Application\Contracts\UseCases\JournalEntries\CreateJournalEntryServiceInterface;
 use Modules\Finance\Application\Repositories\AccountRepositoryInterface;
 use Modules\Finance\Application\Repositories\JournalEntryLineRepositoryInterface;
 use Modules\Finance\Application\Repositories\JournalEntryRepositoryInterface;
 use Modules\Finance\Domain\Constants\FinanceErrorCode;
 use Modules\Finance\Domain\Constants\JournalEntryStatus;
-use Modules\Core\Application\Results\Error;
-use Modules\Core\Application\Results\Result;
 use Throwable;
 
 final class CreateJournalEntryService implements CreateJournalEntryServiceInterface
@@ -21,11 +21,10 @@ final class CreateJournalEntryService implements CreateJournalEntryServiceInterf
         private readonly JournalEntryRepositoryInterface $repository,
         private readonly JournalEntryLineRepositoryInterface $lineRepository,
         private readonly AccountRepositoryInterface $accountRepository,
-    ) {
-    }
+    ) {}
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     public function execute(array $payload): Result
     {
@@ -54,6 +53,10 @@ final class CreateJournalEntryService implements CreateJournalEntryServiceInterf
                 return Result::failure(new Error(FinanceErrorCode::INVALID_VALUE, 'Invalid journal status.'));
             }
 
+            $totals = $this->calculatePayloadTotals($lines);
+            $entryPayload['total_debit'] = $totals['debit_total'];
+            $entryPayload['total_credit'] = $totals['credit_total'];
+
             /** @var DataRecord $created */
             $created = $this->repository->transaction(function () use ($entryPayload, $tenantId, $lines): DataRecord {
                 $created = $this->repository->create($entryPayload);
@@ -80,7 +83,7 @@ final class CreateJournalEntryService implements CreateJournalEntryServiceInterf
     }
 
     /**
-     * @param array<string, mixed> $line
+     * @param  array<string, mixed>  $line
      * @return array<string, mixed>
      */
     private function prepareLinePayload(array $line, int $journalEntryId, int $tenantId, int $lineNumber): array
@@ -120,9 +123,41 @@ final class CreateJournalEntryService implements CreateJournalEntryServiceInterf
                 ? (float) $line['base_credit_amount']
                 : ($credit * $exchangeRate),
             'cost_center_id' => $line['cost_center_id'] ?? null,
+            'party_type' => $line['party_type'] ?? null,
+            'party_id' => $line['party_id'] ?? null,
             'tax_rate_id' => $line['tax_rate_id'] ?? null,
             'tax_amount' => (float) ($line['tax_amount'] ?? 0),
             'line_number' => $line['line_number'] ?? $lineNumber,
+            'source_line_reference' => $line['source_line_reference'] ?? null,
+        ];
+    }
+
+    /**
+     * @param  array<int, mixed>  $lines
+     * @return array<string, float>
+     */
+    private function calculatePayloadTotals(array $lines): array
+    {
+        $debit = 0.0;
+        $credit = 0.0;
+
+        foreach ($lines as $line) {
+            if (! is_array($line)) {
+                continue;
+            }
+
+            $exchangeRate = (float) ($line['exchange_rate'] ?? 1.0);
+            $debit += isset($line['base_debit_amount'])
+                ? (float) $line['base_debit_amount']
+                : ((float) ($line['debit_amount'] ?? 0) * $exchangeRate);
+            $credit += isset($line['base_credit_amount'])
+                ? (float) $line['base_credit_amount']
+                : ((float) ($line['credit_amount'] ?? 0) * $exchangeRate);
+        }
+
+        return [
+            'debit_total' => round($debit, 4),
+            'credit_total' => round($credit, 4),
         ];
     }
 }

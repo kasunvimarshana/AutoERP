@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Modules\Finance\Presentation\Http\Controllers\AccountController;
-use Modules\Finance\Presentation\Http\Controllers\JournalEngineController;
 use Modules\Finance\Presentation\Http\Controllers\ApTransactionController;
 use Modules\Finance\Presentation\Http\Controllers\ArTransactionController;
 use Modules\Finance\Presentation\Http\Controllers\BankAccountController;
@@ -16,6 +15,7 @@ use Modules\Finance\Presentation\Http\Controllers\BudgetLineController;
 use Modules\Finance\Presentation\Http\Controllers\CostCenterController;
 use Modules\Finance\Presentation\Http\Controllers\FiscalPeriodController;
 use Modules\Finance\Presentation\Http\Controllers\FiscalYearController;
+use Modules\Finance\Presentation\Http\Controllers\JournalEngineController;
 use Modules\Finance\Presentation\Http\Controllers\JournalEntryController;
 use Modules\Finance\Presentation\Http\Controllers\JournalEntryLineController;
 use Modules\Finance\Presentation\Http\Controllers\PaymentTermController;
@@ -34,7 +34,7 @@ $currentOrganizationUnitMiddleware = (string) config(
 Route::prefix('api/finance')
     ->middleware([
         'api',
-        'auth:' . $protectedGuard,
+        'auth:'.$protectedGuard,
         $currentUserMiddleware,
         $currentTenantMiddleware,
         $currentOrganizationUnitMiddleware,
@@ -50,8 +50,15 @@ Route::prefix('api/finance')
             ->name('journal-entries.engines.preview-posting');
         Route::post('journal-entries/{journalEntry}/engines/reverse', [JournalEngineController::class, 'reverse'])
             ->name('journal-entries.engines.reverse');
+        Route::post('posting-preview', [JournalEngineController::class, 'previewSourcePosting'])
+            ->name('posting-preview');
         Route::post('tax/preview-calculate', [TaxRateController::class, 'previewCalculation'])
             ->name('tax.preview-calculate');
+        Route::get('accounts/tree', [AccountController::class, 'tree'])->name('accounts.tree');
+        Route::patch('accounts/{account}/activate', [AccountController::class, 'activate'])->name('accounts.activate');
+        Route::patch('accounts/{account}/deactivate', [AccountController::class, 'deactivate'])->name('accounts.deactivate');
+        Route::patch('fiscal-periods/{fiscalPeriod}/open', [FiscalPeriodController::class, 'open'])->name('fiscal-periods.open');
+        Route::patch('fiscal-periods/{fiscalPeriod}/close', [FiscalPeriodController::class, 'close'])->name('fiscal-periods.close');
         Route::apiResource('accounts', AccountController::class);
         Route::apiResource('fiscal-years', FiscalYearController::class);
         Route::apiResource('fiscal-periods', FiscalPeriodController::class);
