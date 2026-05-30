@@ -1692,3 +1692,303 @@ Avoid:
 When a design decision has multiple possible approaches, choose the simplest robust design that supports real business cases and future expansion.
 
 If you discover a similar edge case while implementing any module, do not ignore it. Stop, analyze the domain impact, fix the design properly within the current scope, and mention it in the final report.
+
+---
+
+CORE MODULES ARE THE HEART OF THE APPLICATION
+
+Core/shared modules are the foundation of this ERP/SaaS platform.
+
+Treat these modules as the most critical modules in the system:
+
+- Document
+- Finance
+- Inventory
+- Payment
+- Item
+- UOM
+- Pricing
+- Sequence
+- Customer
+- Supplier
+- HR
+- Vehicle
+- Tenant
+- Configuration
+- Audit
+- User/Auth
+
+These core modules must be designed deeply, carefully, and generically.
+
+They must be:
+
+- reusable
+- plug-and-play
+- extensible
+- maintainable
+- tenant-safe
+- future-module-safe
+- business-module-agnostic
+- service-oriented
+- cleanly bounded
+
+CRITICAL RULE
+
+Core modules must NOT contain business-module-specific workflow logic.
+
+No Purchase-specific workflow logic inside core modules.
+No Sales-specific workflow logic inside core modules.
+No VehicleService-specific workflow logic inside core modules.
+No VehicleRental-specific workflow logic inside core modules.
+No Voucher-specific workflow logic inside unrelated core modules.
+
+Core modules provide generic reusable capabilities.
+
+Business modules orchestrate business workflows.
+
+Examples:
+
+Document module:
+- allowed:
+  - document definitions
+  - templates
+  - rendering
+  - versioning
+  - attachments
+  - comments
+  - workflow/status engine
+- not allowed:
+  - purchase invoice calculation
+  - sales tax calculation
+  - service invoice business rules
+  - rental billing logic
+
+Finance module:
+- allowed:
+  - chart of accounts
+  - journals
+  - AP/AR
+  - tax engine
+  - fiscal periods
+  - bank/reconciliation
+  - posting preview
+- not allowed:
+  - purchase workflow
+  - sales workflow
+  - vehicle service job logic
+  - vehicle rental agreement logic
+
+Inventory module:
+- allowed:
+  - stock levels
+  - stock movements
+  - reservations
+  - transfers
+  - adjustments
+  - valuation
+  - batches/serials
+  - traceability
+- not allowed:
+  - purchase GRN workflow
+  - sales delivery workflow
+  - vehicle service job workflow
+  - rental agreement workflow
+
+Payment module:
+- allowed:
+  - payments
+  - receipts
+  - allocations
+  - advances
+  - refunds
+  - write-offs
+  - payment methods
+  - payer/payee context
+- not allowed:
+  - purchase invoice workflow
+  - sales invoice workflow
+  - service job workflow
+  - rental billing workflow
+
+Pricing module:
+- allowed:
+  - price lists
+  - pricing rules
+  - discounts
+  - tiers
+  - resolve/preview price
+- not allowed:
+  - sales order workflow
+  - purchase order workflow
+  - rental agreement workflow
+  - service job workflow
+
+UOM module:
+- allowed:
+  - units
+  - conversions
+  - compatibility
+  - conversion preview
+- not allowed:
+  - purchase quantity workflow
+  - sales delivery workflow
+  - rental billing workflow
+
+Item module:
+- allowed:
+  - item definitions
+  - item types
+  - attributes
+  - variants
+  - combo definitions
+  - stock/service/labour/non-inventory classification
+- not allowed:
+  - purchase order workflow
+  - sales invoice workflow
+  - service job workflow
+
+Customer / Supplier / HR / Vehicle:
+- allowed:
+  - master data
+  - roles/context
+  - contacts
+  - addresses
+  - optional user access
+  - validation/lookup services
+- not allowed:
+  - Purchase/Sales/VehicleService/VehicleRental workflow logic
+
+BUSINESS MODULES SHOULD ORCHESTRATE
+
+Business modules such as:
+
+- Purchase
+- Sales
+- VehicleService
+- VehicleRental
+- Voucher
+
+should orchestrate workflows by calling core module services.
+
+Example:
+
+Purchase invoice posting should:
+- validate supplier through Supplier service
+- validate items through Item service
+- convert quantities through UOM service
+- resolve price through Pricing service
+- generate document through Document service
+- receive/return stock through Inventory service
+- post AP/journal through Finance service
+- settle payment through Payment service
+
+But Document, Inventory, Finance, Payment, Pricing, UOM should not know Purchase-specific workflow internally.
+
+STRICT DEPENDENCY DIRECTION
+
+Allowed dependency direction:
+
+Business Module → Core Module
+
+Allowed:
+- Purchase → Document
+- Purchase → Finance
+- Purchase → Inventory
+- Purchase → Payment
+- Sales → Document
+- Sales → Finance
+- Sales → Inventory
+- Sales → Payment
+- VehicleService → Document/Finance/Inventory/Payment
+- VehicleRental → Document/Finance/Payment
+- Voucher → Finance/Payment/Document
+
+Not allowed:
+- Document → Purchase
+- Finance → Sales
+- Inventory → VehicleService
+- Payment → VehicleRental
+- Pricing → Purchase workflow
+- UOM → Sales workflow
+
+Core modules may depend on lower-level shared infrastructure only when needed:
+
+- Tenant
+- Configuration
+- Sequence
+- Audit
+- User/Auth
+- shared contracts/interfaces
+
+CORE MODULE DESIGN CHECKLIST
+
+For every core module, deeply review:
+
+1. Is this module generic?
+2. Is this module reusable by future business modules?
+3. Does it contain business-specific workflow logic?
+4. Does it directly reference Purchase/Sales/VehicleService/VehicleRental tables unnecessarily?
+5. Does it use generic source references where needed?
+6. Does it expose clean services/contracts?
+7. Is it tenant-safe?
+8. Is it organization-unit-aware where required?
+9. Are calculations owned by backend, not frontend?
+10. Is the database schema future-safe?
+11. Are there hardcoded assumptions that block future modules?
+12. Are APIs generic enough without becoming vague?
+13. Are table/field names meaningful?
+14. Are status/workflow/history/audit handled cleanly?
+15. Are direct DB calls or cross-module table mutations creating coupling?
+16. Are seeders/settings clean and module-specific?
+17. Are frontend types/components not leaking business-specific assumptions into core UI?
+
+GENERIC SOURCE REFERENCE RULE
+
+Core modules that need to reference business records should use generic source reference fields:
+
+- source_module
+- source_type
+- source_id
+- source_reference
+- source_context
+
+Use this especially in:
+
+- Document
+- Finance
+- Payment
+- Inventory
+- Voucher
+- Audit
+- Workflow/status/history
+
+Avoid hardcoding only fields like:
+
+- purchase_invoice_id
+- sales_invoice_id
+- service_invoice_id
+- rental_invoice_id
+
+unless it is a business-module-specific wrapper table.
+
+CORE MODULE FINAL REQUIREMENT
+
+Before moving forward, review all core modules deeply and fix any contamination or coupling.
+
+If business logic is found inside a core module:
+
+1. Remove it from the core module.
+2. Move it to the correct business module.
+3. Keep only generic reusable service behavior inside the core module.
+4. Update APIs/resources/frontend types accordingly.
+5. Add generic source references where needed.
+6. Update tests/build.
+
+This is mandatory.
+
+The goal is:
+
+Core modules = reusable heart of the system.
+Business modules = workflow orchestration.
+
+Do not allow core modules to become hidden business modules.
