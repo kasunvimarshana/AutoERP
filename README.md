@@ -1642,3 +1642,53 @@ Scan app/Modules Core Configuration Tenant OrganizationUnit as immutable foundat
 ---
 
 Before creating any new migration, table, service, model, event, contract, helper, or business logic, ALWAYS first check the existing implementation to avoid duplicates, overlapping responsibilities, inconsistent structures, and architectural conflicts. Prefer extending and improving the existing foundation instead of creating parallel or duplicate implementations unless a full replacement is intentionally required.
+
+---
+
+IMPORTANT FUTURE DESIGN THINKING REQUIREMENT
+
+For all future module implementations, do not design only for the simplest happy-path case.
+
+Before finalizing any database schema, backend service, API contract, or frontend UI, think deeply about real-world business edge cases and cross-module role/context issues.
+
+Always consider:
+
+- Can the same person/company act in multiple roles?
+- Can a supplier also be a customer?
+- Can a customer also become a supplier/provider?
+- Can vehicle owner, service customer, billing customer, and payer be different?
+- Can rental customer and vehicle provider be different?
+- Can payer and invoice customer be different?
+- Can payee and supplier/provider be different?
+- Can an entity be internal, external, company-owned, customer-owned, supplier-owned, provider-owned, leased, or financed?
+- Should this be modeled as a role/context instead of a fixed hardcoded table reference?
+- Will this design support future modules without schema redesign?
+- Are we accidentally blocking a valid real business scenario?
+- Are we creating duplicate identities without traceability?
+- Are we mixing ownership, billing, payment, and operational responsibility incorrectly?
+
+Do not blindly hardcode one entity as one permanent role.
+
+Use flexible, traceable, future-safe designs where needed.
+
+Prefer:
+- generic party/business-partner concepts if available
+- role-based relationships
+- source references
+- ownership history
+- billing/payer/payee separation
+- service/provider/customer role separation
+- clean cross-role linking
+
+Avoid:
+- assuming Customer and Supplier are mutually exclusive forever
+- assuming vehicle owner is always service customer
+- assuming billing customer is always payer
+- assuming rental customer is always vehicle owner
+- assuming provider/payee is always supplier only
+- creating frontend workarounds for backend domain issues
+- over-engineering huge abstractions when a simple traceable role-link is enough
+
+When a design decision has multiple possible approaches, choose the simplest robust design that supports real business cases and future expansion.
+
+If you discover a similar edge case while implementing any module, do not ignore it. Stop, analyze the domain impact, fix the design properly within the current scope, and mention it in the final report.
