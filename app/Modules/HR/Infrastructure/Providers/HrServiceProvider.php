@@ -303,7 +303,6 @@ use Modules\HR\Application\UseCases\Shifts\DeleteShiftService;
 use Modules\HR\Application\UseCases\Shifts\GetShiftService;
 use Modules\HR\Application\UseCases\Shifts\ListShiftsService;
 use Modules\HR\Application\UseCases\Shifts\UpdateShiftService;
-use Modules\HR\Application\Services\HrEmployeeManagementService;
 use Modules\HR\Infrastructure\Persistence\Eloquent\Models\AttendanceLogModel;
 use Modules\HR\Infrastructure\Persistence\Eloquent\Models\AttendanceRecordModel;
 use Modules\HR\Infrastructure\Persistence\Eloquent\Models\BiometricDeviceModel;
@@ -358,12 +357,13 @@ use Modules\HR\Infrastructure\Persistence\Eloquent\Repositories\EloquentSalarySt
 use Modules\HR\Infrastructure\Persistence\Eloquent\Repositories\EloquentSalaryStructureRepository;
 use Modules\HR\Infrastructure\Persistence\Eloquent\Repositories\EloquentShiftAssignmentRepository;
 use Modules\HR\Infrastructure\Persistence\Eloquent\Repositories\EloquentShiftRepository;
+use Modules\HR\Infrastructure\Services\HrEmployeeManagementService;
 
 final class HrServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__ . '/../Config/hr.php', 'hr');
+        $this->mergeConfigFrom(__DIR__.'/../Config/hr.php', 'hr');
 
         $this->app->singleton(HrEmployeeManagementServiceInterface::class, HrEmployeeManagementService::class);
 
@@ -510,92 +510,91 @@ final class HrServiceProvider extends ServiceProvider
         }
 
         $this->app->singleton(DepartmentRepositoryInterface::class, function (): DepartmentRepositoryInterface {
-            return new EloquentDepartmentRepository(new DepartmentModel());
+            return new EloquentDepartmentRepository(new DepartmentModel);
         });
         $this->app->singleton(DesignationRepositoryInterface::class, function (): DesignationRepositoryInterface {
-            return new EloquentDesignationRepository(new DesignationModel());
+            return new EloquentDesignationRepository(new DesignationModel);
         });
         $this->app->singleton(EmploymentTypeRepositoryInterface::class, function (): EmploymentTypeRepositoryInterface {
-            return new EloquentEmploymentTypeRepository(new EmploymentTypeModel());
+            return new EloquentEmploymentTypeRepository(new EmploymentTypeModel);
         });
         $this->app->singleton(EmployeeRepositoryInterface::class, function (): EmployeeRepositoryInterface {
-            return new EloquentEmployeeRepository(new EmployeeModel());
+            return new EloquentEmployeeRepository(new EmployeeModel);
         });
         $this->app->singleton(EmployeeContactRepositoryInterface::class, function (): EmployeeContactRepositoryInterface {
-            return new EloquentEmployeeContactRepository(new EmployeeContactModel());
+            return new EloquentEmployeeContactRepository(new EmployeeContactModel);
         });
         $this->app->singleton(EmployeeDocumentRepositoryInterface::class, function (): EmployeeDocumentRepositoryInterface {
-            return new EloquentEmployeeDocumentRepository(new EmployeeDocumentModel());
+            return new EloquentEmployeeDocumentRepository(new EmployeeDocumentModel);
         });
         $this->app->singleton(EmployeeContractRepositoryInterface::class, function (): EmployeeContractRepositoryInterface {
-            return new EloquentEmployeeContractRepository(new EmployeeContractModel());
+            return new EloquentEmployeeContractRepository(new EmployeeContractModel);
         });
         $this->app->singleton(BiometricDeviceRepositoryInterface::class, function (): BiometricDeviceRepositoryInterface {
-            return new EloquentBiometricDeviceRepository(new BiometricDeviceModel());
+            return new EloquentBiometricDeviceRepository(new BiometricDeviceModel);
         });
         $this->app->singleton(HolidayRepositoryInterface::class, function (): HolidayRepositoryInterface {
-            return new EloquentHolidayRepository(new HolidayModel());
+            return new EloquentHolidayRepository(new HolidayModel);
         });
         $this->app->singleton(AttendanceLogRepositoryInterface::class, function (): AttendanceLogRepositoryInterface {
-            return new EloquentAttendanceLogRepository(new AttendanceLogModel());
+            return new EloquentAttendanceLogRepository(new AttendanceLogModel);
         });
         $this->app->singleton(ShiftRepositoryInterface::class, function (): ShiftRepositoryInterface {
-            return new EloquentShiftRepository(new ShiftModel());
+            return new EloquentShiftRepository(new ShiftModel);
         });
         $this->app->singleton(ShiftAssignmentRepositoryInterface::class, function (): ShiftAssignmentRepositoryInterface {
-            return new EloquentShiftAssignmentRepository(new ShiftAssignmentModel());
+            return new EloquentShiftAssignmentRepository(new ShiftAssignmentModel);
         });
         $this->app->singleton(AttendanceRecordRepositoryInterface::class, function (): AttendanceRecordRepositoryInterface {
-            return new EloquentAttendanceRecordRepository(new AttendanceRecordModel());
+            return new EloquentAttendanceRecordRepository(new AttendanceRecordModel);
         });
         $this->app->singleton(LeaveTypeRepositoryInterface::class, function (): LeaveTypeRepositoryInterface {
-            return new EloquentLeaveTypeRepository(new LeaveTypeModel());
+            return new EloquentLeaveTypeRepository(new LeaveTypeModel);
         });
         $this->app->singleton(LeavePolicyRepositoryInterface::class, function (): LeavePolicyRepositoryInterface {
-            return new EloquentLeavePolicyRepository(new LeavePolicyModel());
+            return new EloquentLeavePolicyRepository(new LeavePolicyModel);
         });
         $this->app->singleton(LeavePolicyLineRepositoryInterface::class, function (): LeavePolicyLineRepositoryInterface {
-            return new EloquentLeavePolicyLineRepository(new LeavePolicyLineModel());
+            return new EloquentLeavePolicyLineRepository(new LeavePolicyLineModel);
         });
         $this->app->singleton(LeaveAllocationRepositoryInterface::class, function (): LeaveAllocationRepositoryInterface {
-            return new EloquentLeaveAllocationRepository(new LeaveAllocationModel());
+            return new EloquentLeaveAllocationRepository(new LeaveAllocationModel);
         });
         $this->app->singleton(LeaveApplicationRepositoryInterface::class, function (): LeaveApplicationRepositoryInterface {
-            return new EloquentLeaveApplicationRepository(new LeaveApplicationModel());
+            return new EloquentLeaveApplicationRepository(new LeaveApplicationModel);
         });
         $this->app->singleton(SalaryComponentRepositoryInterface::class, function (): SalaryComponentRepositoryInterface {
-            return new EloquentSalaryComponentRepository(new SalaryComponentModel());
+            return new EloquentSalaryComponentRepository(new SalaryComponentModel);
         });
         $this->app->singleton(SalaryStructureRepositoryInterface::class, function (): SalaryStructureRepositoryInterface {
-            return new EloquentSalaryStructureRepository(new SalaryStructureModel());
+            return new EloquentSalaryStructureRepository(new SalaryStructureModel);
         });
         $this->app->singleton(SalaryStructureLineRepositoryInterface::class, function (): SalaryStructureLineRepositoryInterface {
-            return new EloquentSalaryStructureLineRepository(new SalaryStructureLineModel());
+            return new EloquentSalaryStructureLineRepository(new SalaryStructureLineModel);
         });
         $this->app->singleton(EmployeeSalaryAssignmentRepositoryInterface::class, function (): EmployeeSalaryAssignmentRepositoryInterface {
-            return new EloquentEmployeeSalaryAssignmentRepository(new EmployeeSalaryAssignmentModel());
+            return new EloquentEmployeeSalaryAssignmentRepository(new EmployeeSalaryAssignmentModel);
         });
         $this->app->singleton(PayrollRunRepositoryInterface::class, function (): PayrollRunRepositoryInterface {
-            return new EloquentPayrollRunRepository(new PayrollRunModel());
+            return new EloquentPayrollRunRepository(new PayrollRunModel);
         });
         $this->app->singleton(PayslipRepositoryInterface::class, function (): PayslipRepositoryInterface {
-            return new EloquentPayslipRepository(new PayslipModel());
+            return new EloquentPayslipRepository(new PayslipModel);
         });
         $this->app->singleton(PayslipLineRepositoryInterface::class, function (): PayslipLineRepositoryInterface {
-            return new EloquentPayslipLineRepository(new PayslipLineModel());
+            return new EloquentPayslipLineRepository(new PayslipLineModel);
         });
         $this->app->singleton(PerformanceCycleRepositoryInterface::class, function (): PerformanceCycleRepositoryInterface {
-            return new EloquentPerformanceCycleRepository(new PerformanceCycleModel());
+            return new EloquentPerformanceCycleRepository(new PerformanceCycleModel);
         });
         $this->app->singleton(PerformanceReviewRepositoryInterface::class, function (): PerformanceReviewRepositoryInterface {
-            return new EloquentPerformanceReviewRepository(new PerformanceReviewModel());
+            return new EloquentPerformanceReviewRepository(new PerformanceReviewModel);
         });
     }
 
     public function boot(): void
     {
-        $this->loadRoutesFrom(__DIR__ . '/../../routes/api.php');
-        $this->loadMigrationsFrom(__DIR__ . '/../../Infrastructure/Persistence/Eloquent/Migrations');
+        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
+        $this->loadMigrationsFrom(__DIR__.'/../../Infrastructure/Persistence/Eloquent/Migrations');
     }
 }
-

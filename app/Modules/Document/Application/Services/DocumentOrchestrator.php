@@ -9,6 +9,7 @@ use Modules\Document\Application\Actions\ChangeDocumentStatusAction;
 use Modules\Document\Application\Actions\CreateDocumentAction;
 use Modules\Document\Application\Actions\UploadDocumentAttachmentAction;
 use Modules\Document\Application\Contracts\SequenceServiceInterface;
+use Modules\Document\Application\Contracts\Services\DocumentOrchestratorInterface;
 use Modules\Document\Application\DTOs\CreateDocumentDTO;
 use Modules\Document\Application\Queries\GetDocumentQuery;
 use Modules\Document\Application\Queries\ListDocumentsQuery;
@@ -17,7 +18,7 @@ use Modules\Document\Domain\Exceptions\DocumentValidationException;
 use Modules\Document\Domain\Repositories\DocumentRepositoryInterface;
 use Modules\Document\Domain\Repositories\DocumentTypeRepositoryInterface;
 
-class DocumentOrchestrator
+class DocumentOrchestrator implements DocumentOrchestratorInterface
 {
     public function __construct(
         private readonly CreateDocumentAction $createDocumentAction,
@@ -28,8 +29,7 @@ class DocumentOrchestrator
         private readonly DocumentRepositoryInterface $documentRepository,
         private readonly DocumentTypeRepositoryInterface $documentTypeRepository,
         private readonly SequenceServiceInterface $sequenceService,
-    ) {
-    }
+    ) {}
 
     public function create(CreateDocumentDTO $dto): DocumentAggregate
     {
@@ -369,7 +369,7 @@ class DocumentOrchestrator
             : null;
 
         $rendered = strtr(
-            (string) (($template['body_content'] ?? null) ?: '{{document_title}}' . PHP_EOL . '{{document_body}}'),
+            (string) (($template['body_content'] ?? null) ?: '{{document_title}}'.PHP_EOL.'{{document_body}}'),
             [
                 '{{document_title}}' => (string) ($input['title'] ?? 'Document Preview'),
                 '{{document_body}}' => (string) ($input['body'] ?? 'Backend-rendered preview body'),

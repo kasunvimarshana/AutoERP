@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Customer\Application\Services;
+namespace Modules\Customer\Infrastructure\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -41,8 +41,7 @@ final class CustomerManagementService implements CustomerManagementServiceInterf
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
         private readonly CurrentUserContextAccessorInterface $currentUser,
-    ) {
-    }
+    ) {}
 
     public function listCustomers(array $filters, int $perPage, int $page): Result
     {
@@ -68,11 +67,11 @@ final class CustomerManagementService implements CustomerManagementServiceInterf
             if (isset($filters['search']) && is_string($filters['search']) && trim($filters['search']) !== '') {
                 $search = trim($filters['search']);
                 $query->where(function ($inner) use ($search): void {
-                    $inner->where('customer_code', 'like', '%' . $search . '%')
-                        ->orWhere('customer_name', 'like', '%' . $search . '%')
-                        ->orWhere('display_name', 'like', '%' . $search . '%')
-                        ->orWhere('registration_number', 'like', '%' . $search . '%')
-                        ->orWhere('email', 'like', '%' . $search . '%');
+                    $inner->where('customer_code', 'like', '%'.$search.'%')
+                        ->orWhere('customer_name', 'like', '%'.$search.'%')
+                        ->orWhere('display_name', 'like', '%'.$search.'%')
+                        ->orWhere('registration_number', 'like', '%'.$search.'%')
+                        ->orWhere('email', 'like', '%'.$search.'%');
                 });
             }
 
@@ -459,9 +458,9 @@ final class CustomerManagementService implements CustomerManagementServiceInterf
             $term = trim($search);
             if ($term !== '') {
                 $query->where(function ($inner) use ($term): void {
-                    $inner->where('customer_name', 'like', '%' . $term . '%')
-                        ->orWhere('customer_code', 'like', '%' . $term . '%')
-                        ->orWhere('registration_number', 'like', '%' . $term . '%');
+                    $inner->where('customer_name', 'like', '%'.$term.'%')
+                        ->orWhere('customer_code', 'like', '%'.$term.'%')
+                        ->orWhere('registration_number', 'like', '%'.$term.'%');
                 });
             }
 
@@ -1104,7 +1103,7 @@ final class CustomerManagementService implements CustomerManagementServiceInterf
     {
         $normalized = trim($value);
         if ($normalized === '') {
-            throw new RuntimeException($label . ' is required.');
+            throw new RuntimeException($label.' is required.');
         }
 
         return $normalized;

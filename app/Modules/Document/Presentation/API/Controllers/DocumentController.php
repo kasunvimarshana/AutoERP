@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
+use Modules\Document\Application\Contracts\Services\DocumentOrchestratorInterface;
 use Modules\Document\Application\DTOs\CreateDocumentDTO;
-use Modules\Document\Application\Services\DocumentOrchestrator;
 use Modules\Document\Presentation\API\Requests\ChangeStatusRequest;
 use Modules\Document\Presentation\API\Requests\CreateDocumentRequest;
 use Modules\Document\Presentation\API\Requests\ListDocumentsRequest;
@@ -18,10 +18,9 @@ use Symfony\Component\HttpFoundation\Response;
 class DocumentController extends Controller
 {
     public function __construct(
-        private readonly DocumentOrchestrator $orchestrator,
+        private readonly DocumentOrchestratorInterface $orchestrator,
         private readonly CurrentTenantContextAccessorInterface $currentTenantContext
-    ) {
-    }
+    ) {}
 
     public function index(ListDocumentsRequest $request): JsonResponse
     {
@@ -106,7 +105,7 @@ class DocumentController extends Controller
                 'document_id' => $document,
             ],
             'rendered' => [
-                'html' => '<article><h1>' . e($aggregate->document->documentNumber) . '</h1><p>Status: ' . e($aggregate->document->status) . '</p></article>',
+                'html' => '<article><h1>'.e($aggregate->document->documentNumber).'</h1><p>Status: '.e($aggregate->document->status).'</p></article>',
                 'document_number' => $aggregate->document->documentNumber,
                 'status' => $aggregate->document->status,
             ],

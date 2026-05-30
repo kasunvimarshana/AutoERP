@@ -4,6 +4,8 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Modules\Document\Infrastructure\Persistence\Eloquent\Seeders\DocumentModuleSeeder;
+use Modules\Item\Infrastructure\Persistence\Eloquent\Seeders\ItemModuleSeeder;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Seeders\PurchaseModuleSeeder;
 use Modules\VehicleRental\Infrastructure\Persistence\Eloquent\Seeders\VehicleRentalModuleSeeder;
 use Modules\Voucher\Infrastructure\Persistence\Eloquent\Seeders\VoucherModuleSeeder;
@@ -17,6 +19,11 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call(array_filter([
+            class_exists(ItemModuleSeeder::class) ? ItemModuleSeeder::class : null,
+            class_exists(DocumentModuleSeeder::class) ? DocumentModuleSeeder::class : null,
+        ]));
+
         if ((bool) env('SEED_PURCHASE_MODULE', false) && class_exists(PurchaseModuleSeeder::class)) {
             $this->call([
                 PurchaseModuleSeeder::class,

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\Supplier\Application\Services;
+namespace Modules\Supplier\Infrastructure\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -40,8 +40,7 @@ final class SupplierManagementService implements SupplierManagementServiceInterf
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
         private readonly CurrentUserContextAccessorInterface $currentUser,
-    ) {
-    }
+    ) {}
 
     public function listSuppliers(array $filters, int $perPage, int $page): Result
     {
@@ -67,11 +66,11 @@ final class SupplierManagementService implements SupplierManagementServiceInterf
             if (isset($filters['search']) && is_string($filters['search']) && trim($filters['search']) !== '') {
                 $search = trim($filters['search']);
                 $query->where(function ($inner) use ($search): void {
-                    $inner->where('supplier_code', 'like', '%' . $search . '%')
-                        ->orWhere('supplier_name', 'like', '%' . $search . '%')
-                        ->orWhere('display_name', 'like', '%' . $search . '%')
-                        ->orWhere('registration_number', 'like', '%' . $search . '%')
-                        ->orWhere('email', 'like', '%' . $search . '%');
+                    $inner->where('supplier_code', 'like', '%'.$search.'%')
+                        ->orWhere('supplier_name', 'like', '%'.$search.'%')
+                        ->orWhere('display_name', 'like', '%'.$search.'%')
+                        ->orWhere('registration_number', 'like', '%'.$search.'%')
+                        ->orWhere('email', 'like', '%'.$search.'%');
                 });
             }
 
@@ -472,9 +471,9 @@ final class SupplierManagementService implements SupplierManagementServiceInterf
             $term = trim($search);
             if ($term !== '') {
                 $query->where(function ($inner) use ($term): void {
-                    $inner->where('supplier_name', 'like', '%' . $term . '%')
-                        ->orWhere('supplier_code', 'like', '%' . $term . '%')
-                        ->orWhere('registration_number', 'like', '%' . $term . '%');
+                    $inner->where('supplier_name', 'like', '%'.$term.'%')
+                        ->orWhere('supplier_code', 'like', '%'.$term.'%')
+                        ->orWhere('registration_number', 'like', '%'.$term.'%');
                 });
             }
 
@@ -1096,7 +1095,7 @@ final class SupplierManagementService implements SupplierManagementServiceInterf
     {
         $normalized = trim($value);
         if ($normalized === '') {
-            throw new \InvalidArgumentException($label . ' is required.');
+            throw new \InvalidArgumentException($label.' is required.');
         }
 
         return $normalized;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Modules\HR\Application\Services;
+namespace Modules\HR\Infrastructure\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -47,8 +47,7 @@ final class HrEmployeeManagementService implements HrEmployeeManagementServiceIn
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
         private readonly CurrentUserContextAccessorInterface $currentUser,
-    ) {
-    }
+    ) {}
 
     public function listEmployees(array $filters, int $perPage, int $page): Result
     {
@@ -393,8 +392,8 @@ final class HrEmployeeManagementService implements HrEmployeeManagementServiceIn
             if (isset($filters['search']) && is_string($filters['search']) && trim($filters['search']) !== '') {
                 $term = trim($filters['search']);
                 $query->where(function ($inner) use ($term): void {
-                    $inner->where('department_code', 'like', '%' . $term . '%')
-                        ->orWhere('department_name', 'like', '%' . $term . '%');
+                    $inner->where('department_code', 'like', '%'.$term.'%')
+                        ->orWhere('department_name', 'like', '%'.$term.'%');
                 });
             }
 
@@ -526,8 +525,8 @@ final class HrEmployeeManagementService implements HrEmployeeManagementServiceIn
             if (isset($filters['search']) && is_string($filters['search']) && trim($filters['search']) !== '') {
                 $term = trim($filters['search']);
                 $query->where(function ($inner) use ($term): void {
-                    $inner->where('designation_code', 'like', '%' . $term . '%')
-                        ->orWhere('designation_name', 'like', '%' . $term . '%');
+                    $inner->where('designation_code', 'like', '%'.$term.'%')
+                        ->orWhere('designation_name', 'like', '%'.$term.'%');
                 });
             }
 
@@ -1083,9 +1082,9 @@ final class HrEmployeeManagementService implements HrEmployeeManagementServiceIn
             $term = trim($search);
             if ($term !== '') {
                 $query->where(function ($inner) use ($term): void {
-                    $inner->where('employee_code', 'like', '%' . $term . '%')
-                        ->orWhere('full_name', 'like', '%' . $term . '%')
-                        ->orWhere('email', 'like', '%' . $term . '%');
+                    $inner->where('employee_code', 'like', '%'.$term.'%')
+                        ->orWhere('full_name', 'like', '%'.$term.'%')
+                        ->orWhere('email', 'like', '%'.$term.'%');
                 });
             }
 
@@ -1175,7 +1174,7 @@ final class HrEmployeeManagementService implements HrEmployeeManagementServiceIn
     }
 
     /**
-     * @param array<int, array<string, mixed>> $contacts
+     * @param  array<int, array<string, mixed>>  $contacts
      */
     private function replaceContacts(int $employeeId, array $contacts): void
     {
@@ -1193,7 +1192,7 @@ final class HrEmployeeManagementService implements HrEmployeeManagementServiceIn
     }
 
     /**
-     * @param array<int, array<string, mixed>> $addresses
+     * @param  array<int, array<string, mixed>>  $addresses
      */
     private function replaceAddresses(int $employeeId, array $addresses): void
     {
@@ -1211,7 +1210,7 @@ final class HrEmployeeManagementService implements HrEmployeeManagementServiceIn
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
     private function contactAttributes(int $employeeId, array $payload): array
@@ -1238,7 +1237,7 @@ final class HrEmployeeManagementService implements HrEmployeeManagementServiceIn
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
     private function addressAttributes(int $employeeId, array $payload): array
@@ -1265,7 +1264,7 @@ final class HrEmployeeManagementService implements HrEmployeeManagementServiceIn
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function upsertSalaryProfile(int $employeeId, array $payload): void
     {
@@ -1338,10 +1337,10 @@ final class HrEmployeeManagementService implements HrEmployeeManagementServiceIn
         if (isset($filters['search']) && is_string($filters['search']) && trim($filters['search']) !== '') {
             $term = trim($filters['search']);
             $query->where(function ($inner) use ($term): void {
-                $inner->where('employee_code', 'like', '%' . $term . '%')
-                    ->orWhere('full_name', 'like', '%' . $term . '%')
-                    ->orWhere('email', 'like', '%' . $term . '%')
-                    ->orWhere('mobile', 'like', '%' . $term . '%');
+                $inner->where('employee_code', 'like', '%'.$term.'%')
+                    ->orWhere('full_name', 'like', '%'.$term.'%')
+                    ->orWhere('email', 'like', '%'.$term.'%')
+                    ->orWhere('mobile', 'like', '%'.$term.'%');
             });
         }
     }
@@ -1434,7 +1433,7 @@ final class HrEmployeeManagementService implements HrEmployeeManagementServiceIn
 
     private function normalizeContext(string $value): string
     {
-        $normalized = \Illuminate\Support\Str::of($value)->trim()->lower()->replace([' ', '-'], '_')->toString();
+        $normalized = Str::of($value)->trim()->lower()->replace([' ', '-'], '_')->toString();
 
         return $normalized === '' ? 'generic' : $normalized;
     }
@@ -1547,7 +1546,7 @@ final class HrEmployeeManagementService implements HrEmployeeManagementServiceIn
     {
         $normalized = trim($value);
         if ($normalized === '') {
-            throw new RuntimeException($label . ' is required.');
+            throw new RuntimeException($label.' is required.');
         }
 
         return $normalized;
@@ -1588,7 +1587,7 @@ final class HrEmployeeManagementService implements HrEmployeeManagementServiceIn
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function buildFullName(array $payload): string
     {
@@ -1599,7 +1598,7 @@ final class HrEmployeeManagementService implements HrEmployeeManagementServiceIn
             return $displayName;
         }
 
-        return trim($firstName . ' ' . ($lastName ?? ''));
+        return trim($firstName.' '.($lastName ?? ''));
     }
 
     private function notFound(string $message): Result

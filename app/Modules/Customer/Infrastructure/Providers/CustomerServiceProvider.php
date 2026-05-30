@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Customer\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Customer\Application\Contracts\Services\CustomerManagementServiceInterface;
 use Modules\Customer\Application\Contracts\UseCases\CustomerAddresses\CreateCustomerAddressServiceInterface;
 use Modules\Customer\Application\Contracts\UseCases\CustomerAddresses\DeleteCustomerAddressServiceInterface;
 use Modules\Customer\Application\Contracts\UseCases\CustomerAddresses\GetCustomerAddressServiceInterface;
@@ -25,7 +26,6 @@ use Modules\Customer\Application\Contracts\UseCases\CustomerVehicles\DeleteCusto
 use Modules\Customer\Application\Contracts\UseCases\CustomerVehicles\GetCustomerVehicleServiceInterface;
 use Modules\Customer\Application\Contracts\UseCases\CustomerVehicles\ListCustomerVehiclesServiceInterface;
 use Modules\Customer\Application\Contracts\UseCases\CustomerVehicles\UpdateCustomerVehicleServiceInterface;
-use Modules\Customer\Application\Contracts\Services\CustomerManagementServiceInterface;
 use Modules\Customer\Application\Repositories\CustomerAddressRepositoryInterface;
 use Modules\Customer\Application\Repositories\CustomerCategoryRepositoryInterface;
 use Modules\Customer\Application\Repositories\CustomerContactRepositoryInterface;
@@ -35,7 +35,6 @@ use Modules\Customer\Application\Repositories\CustomerStatusHistoryRepositoryInt
 use Modules\Customer\Application\Repositories\CustomerTaxProfileRepositoryInterface;
 use Modules\Customer\Application\Repositories\CustomerUserAccountRepositoryInterface;
 use Modules\Customer\Application\Repositories\CustomerVehicleRepositoryInterface;
-use Modules\Customer\Application\Services\CustomerManagementService;
 use Modules\Customer\Application\UseCases\CustomerAddresses\CreateCustomerAddressService;
 use Modules\Customer\Application\UseCases\CustomerAddresses\DeleteCustomerAddressService;
 use Modules\Customer\Application\UseCases\CustomerAddresses\GetCustomerAddressService;
@@ -74,12 +73,13 @@ use Modules\Customer\Infrastructure\Persistence\Eloquent\Repositories\EloquentCu
 use Modules\Customer\Infrastructure\Persistence\Eloquent\Repositories\EloquentCustomerTaxProfileRepository;
 use Modules\Customer\Infrastructure\Persistence\Eloquent\Repositories\EloquentCustomerUserAccountRepository;
 use Modules\Customer\Infrastructure\Persistence\Eloquent\Repositories\EloquentCustomerVehicleRepository;
+use Modules\Customer\Infrastructure\Services\CustomerManagementService;
 
 final class CustomerServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__ . '/../Config/customer.php', 'customer');
+        $this->mergeConfigFrom(__DIR__.'/../Config/customer.php', 'customer');
 
         foreach (
             [
@@ -110,61 +110,61 @@ final class CustomerServiceProvider extends ServiceProvider
         }
 
         $this->app->singleton(CustomerRepositoryInterface::class, function (): CustomerRepositoryInterface {
-            return new EloquentCustomerRepository(new CustomerModel());
+            return new EloquentCustomerRepository(new CustomerModel);
         });
         $this->app->singleton(
             CustomerContactRepositoryInterface::class,
             static function (): CustomerContactRepositoryInterface {
-                return new EloquentCustomerContactRepository(new CustomerContactModel());
+                return new EloquentCustomerContactRepository(new CustomerContactModel);
             },
         );
         $this->app->singleton(
             CustomerAddressRepositoryInterface::class,
             static function (): CustomerAddressRepositoryInterface {
-                return new EloquentCustomerAddressRepository(new CustomerAddressModel());
+                return new EloquentCustomerAddressRepository(new CustomerAddressModel);
             },
         );
         $this->app->singleton(
             CustomerVehicleRepositoryInterface::class,
             static function (): CustomerVehicleRepositoryInterface {
-                return new EloquentCustomerVehicleRepository(new CustomerVehicleModel());
+                return new EloquentCustomerVehicleRepository(new CustomerVehicleModel);
             },
         );
         $this->app->singleton(
             CustomerCategoryRepositoryInterface::class,
             static function (): CustomerCategoryRepositoryInterface {
-                return new EloquentCustomerCategoryRepository(new CustomerCategoryModel());
+                return new EloquentCustomerCategoryRepository(new CustomerCategoryModel);
             },
         );
         $this->app->singleton(
             CustomerTaxProfileRepositoryInterface::class,
             static function (): CustomerTaxProfileRepositoryInterface {
-                return new EloquentCustomerTaxProfileRepository(new CustomerTaxProfileModel());
+                return new EloquentCustomerTaxProfileRepository(new CustomerTaxProfileModel);
             },
         );
         $this->app->singleton(
             CustomerCreditProfileRepositoryInterface::class,
             static function (): CustomerCreditProfileRepositoryInterface {
-                return new EloquentCustomerCreditProfileRepository(new CustomerCreditProfileModel());
+                return new EloquentCustomerCreditProfileRepository(new CustomerCreditProfileModel);
             },
         );
         $this->app->singleton(
             CustomerUserAccountRepositoryInterface::class,
             static function (): CustomerUserAccountRepositoryInterface {
-                return new EloquentCustomerUserAccountRepository(new CustomerUserAccountModel());
+                return new EloquentCustomerUserAccountRepository(new CustomerUserAccountModel);
             },
         );
         $this->app->singleton(
             CustomerStatusHistoryRepositoryInterface::class,
             static function (): CustomerStatusHistoryRepositoryInterface {
-                return new EloquentCustomerStatusHistoryRepository(new CustomerStatusHistoryModel());
+                return new EloquentCustomerStatusHistoryRepository(new CustomerStatusHistoryModel);
             },
         );
     }
 
     public function boot(): void
     {
-        $this->loadRoutesFrom(__DIR__ . '/../../routes/api.php');
-        $this->loadMigrationsFrom(__DIR__ . '/../Persistence/Eloquent/Migrations');
+        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
+        $this->loadMigrationsFrom(__DIR__.'/../Persistence/Eloquent/Migrations');
     }
 }

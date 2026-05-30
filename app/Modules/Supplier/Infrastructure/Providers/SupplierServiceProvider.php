@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Supplier\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Supplier\Application\Contracts\Services\SupplierManagementServiceInterface;
 use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\CreateSupplierAddressServiceInterface;
 use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\DeleteSupplierAddressServiceInterface;
 use Modules\Supplier\Application\Contracts\UseCases\SupplierAddresses\GetSupplierAddressServiceInterface;
@@ -40,8 +41,6 @@ use Modules\Supplier\Application\Repositories\SupplierStatusHistoryRepositoryInt
 use Modules\Supplier\Application\Repositories\SupplierTaxProfileRepositoryInterface;
 use Modules\Supplier\Application\Repositories\SupplierUserAccountRepositoryInterface;
 use Modules\Supplier\Application\Repositories\SupplierVehicleRepositoryInterface;
-use Modules\Supplier\Application\Contracts\Services\SupplierManagementServiceInterface;
-use Modules\Supplier\Application\Services\SupplierManagementService;
 use Modules\Supplier\Application\UseCases\SupplierAddresses\CreateSupplierAddressService;
 use Modules\Supplier\Application\UseCases\SupplierAddresses\DeleteSupplierAddressService;
 use Modules\Supplier\Application\UseCases\SupplierAddresses\GetSupplierAddressService;
@@ -87,12 +86,13 @@ use Modules\Supplier\Infrastructure\Persistence\Eloquent\Repositories\EloquentSu
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Repositories\EloquentSupplierTaxProfileRepository;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Repositories\EloquentSupplierUserAccountRepository;
 use Modules\Supplier\Infrastructure\Persistence\Eloquent\Repositories\EloquentSupplierVehicleRepository;
+use Modules\Supplier\Infrastructure\Services\SupplierManagementService;
 
 final class SupplierServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__ . '/../Config/supplier.php', 'supplier');
+        $this->mergeConfigFrom(__DIR__.'/../Config/supplier.php', 'supplier');
 
         foreach (
             [
@@ -128,64 +128,64 @@ final class SupplierServiceProvider extends ServiceProvider
         }
 
         $this->app->singleton(SupplierRepositoryInterface::class, function (): SupplierRepositoryInterface {
-            return new EloquentSupplierRepository(new SupplierModel());
+            return new EloquentSupplierRepository(new SupplierModel);
         });
         $this->app->singleton(
             SupplierContactRepositoryInterface::class,
             function (): SupplierContactRepositoryInterface {
-                return new EloquentSupplierContactRepository(new SupplierContactModel());
+                return new EloquentSupplierContactRepository(new SupplierContactModel);
             },
         );
         $this->app->singleton(
             SupplierAddressRepositoryInterface::class,
             function (): SupplierAddressRepositoryInterface {
-                return new EloquentSupplierAddressRepository(new SupplierAddressModel());
+                return new EloquentSupplierAddressRepository(new SupplierAddressModel);
             },
         );
         $this->app->singleton(
             SupplierVehicleRepositoryInterface::class,
             function (): SupplierVehicleRepositoryInterface {
-                return new EloquentSupplierVehicleRepository(new SupplierVehicleModel());
+                return new EloquentSupplierVehicleRepository(new SupplierVehicleModel);
             },
         );
         $this->app->singleton(SupplierItemRepositoryInterface::class, function (): SupplierItemRepositoryInterface {
-            return new EloquentSupplierItemRepository(new SupplierItemModel());
+            return new EloquentSupplierItemRepository(new SupplierItemModel);
         });
         $this->app->singleton(
             SupplierCategoryRepositoryInterface::class,
             function (): SupplierCategoryRepositoryInterface {
-                return new EloquentSupplierCategoryRepository(new SupplierCategoryModel());
+                return new EloquentSupplierCategoryRepository(new SupplierCategoryModel);
             },
         );
         $this->app->singleton(
             SupplierBankAccountRepositoryInterface::class,
             function (): SupplierBankAccountRepositoryInterface {
-                return new EloquentSupplierBankAccountRepository(new SupplierBankAccountModel());
+                return new EloquentSupplierBankAccountRepository(new SupplierBankAccountModel);
             },
         );
         $this->app->singleton(
             SupplierTaxProfileRepositoryInterface::class,
             function (): SupplierTaxProfileRepositoryInterface {
-                return new EloquentSupplierTaxProfileRepository(new SupplierTaxProfileModel());
+                return new EloquentSupplierTaxProfileRepository(new SupplierTaxProfileModel);
             },
         );
         $this->app->singleton(
             SupplierUserAccountRepositoryInterface::class,
             function (): SupplierUserAccountRepositoryInterface {
-                return new EloquentSupplierUserAccountRepository(new SupplierUserAccountModel());
+                return new EloquentSupplierUserAccountRepository(new SupplierUserAccountModel);
             },
         );
         $this->app->singleton(
             SupplierStatusHistoryRepositoryInterface::class,
             function (): SupplierStatusHistoryRepositoryInterface {
-                return new EloquentSupplierStatusHistoryRepository(new SupplierStatusHistoryModel());
+                return new EloquentSupplierStatusHistoryRepository(new SupplierStatusHistoryModel);
             },
         );
     }
 
     public function boot(): void
     {
-        $this->loadRoutesFrom(__DIR__ . '/../../routes/api.php');
-        $this->loadMigrationsFrom(__DIR__ . '/../Persistence/Eloquent/Migrations');
+        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
+        $this->loadMigrationsFrom(__DIR__.'/../Persistence/Eloquent/Migrations');
     }
 }

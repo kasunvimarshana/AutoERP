@@ -10,14 +10,22 @@ class DocumentTypesSeeder extends Seeder
 {
     public function run(): void
     {
+        $tenantId = (int) DB::table('tenants')
+            ->where('code', DocumentSeedCatalog::DEFAULT_TENANT_CODE)
+            ->value('id');
+
         $records = array_map(
-            static fn (array $type): array => $type + ['created_at' => now(), 'updated_at' => now()],
+            static fn (array $type): array => $type + [
+                'tenant_id' => $tenantId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
             DocumentSeedCatalog::documentTypes()
         );
 
         DB::table('document_types')->upsert(
             $records,
-            ['code'],
+            ['tenant_id', 'code'],
             ['name', 'default_status', 'is_active', 'requires_source', 'updated_at']
         );
     }
