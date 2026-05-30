@@ -20,7 +20,9 @@ final class AttachmentModel extends CoreModel
             'organization_unit_id' => 'integer',
             'metadata' => 'array',
             'attachable_id' => 'integer',
-            'size' => 'integer'
+            'source_id' => 'integer',
+            'source_context' => 'array',
+            'size' => 'integer',
         ]);
     }
 }

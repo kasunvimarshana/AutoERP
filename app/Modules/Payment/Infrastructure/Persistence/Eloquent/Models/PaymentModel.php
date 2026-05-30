@@ -23,14 +23,23 @@ final class PaymentModel extends CoreModel
             'organization_unit_id' => 'integer',
             'metadata' => 'array',
             'party_id' => 'integer',
+            'payer_id' => 'integer',
+            'payee_id' => 'integer',
+            'source_id' => 'integer',
+            'source_context' => 'array',
             'payment_date' => 'date',
             'amount' => 'decimal:4',
+            'allocated_amount' => 'decimal:4',
             'payment_method_id' => 'integer',
             'account_id' => 'integer',
             'currency_id' => 'integer',
             'exchange_rate' => 'decimal:4',
             'base_amount' => 'decimal:4',
-            'journal_entry_id' => 'integer'
+            'journal_entry_id' => 'integer',
+            'reversal_of_payment_id' => 'integer',
+            'posted_at' => 'datetime',
+            'voided_at' => 'datetime',
+            'reversed_at' => 'datetime',
         ]);
     }
 }

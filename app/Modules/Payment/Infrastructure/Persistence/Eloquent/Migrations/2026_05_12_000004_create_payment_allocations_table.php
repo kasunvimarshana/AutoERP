@@ -21,6 +21,11 @@ return new class extends Migration
             $table->string('document_type')->comment('the invoice/credit note being settled');
             $table->unsignedBigInteger('document_id');
             $table->unsignedBigInteger('document_line_id')->nullable();
+            $table->string('source_module')->nullable()->comment('Generic source module key for allocated target');
+            $table->string('source_type')->nullable()->comment('Generic source document/event type for allocated target');
+            $table->unsignedBigInteger('source_id')->nullable()->comment('Generic source identifier for allocated target');
+            $table->string('source_reference')->nullable()->comment('Human-readable source number/reference');
+            $table->json('source_context')->nullable()->comment('Additional source context supplied by owning module');
             $table->string('reference')->nullable();
             $table->decimal('allocated_amount', 20, 4);
             $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete();
@@ -32,6 +37,7 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'payment_id', 'document_type', 'document_id'], 'payment_allocations_payment_document_uk');
             $table->index(['tenant_id', 'document_type', 'document_id'], 'payment_allocations_document_idx');
+            $table->index(['tenant_id', 'source_module', 'source_type', 'source_id'], 'payment_allocations_source_idx');
             $table->index(['tenant_id', 'payment_id', 'status'], 'payment_allocations_status_idx');
         });
     }

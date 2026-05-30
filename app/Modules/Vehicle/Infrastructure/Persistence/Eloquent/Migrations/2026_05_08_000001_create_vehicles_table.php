@@ -26,11 +26,13 @@ return new class extends Migration
             $table->string('color')->nullable();
             $table->string('category')->nullable();
             $table->string('usage_profile')->default('dual')->comment('rent_only, service_only, dual, internal');
+            $table->boolean('service_enabled')->default(true)->comment('Vehicle can be validated for service workflows');
+            $table->boolean('rental_enabled')->default(false)->comment('Vehicle can be validated for rental workflows');
             $table->string('fuel_type')->nullable();
             $table->string('transmission')->nullable();
             $table->unsignedTinyInteger('seating_capacity')->nullable();
             $table->unsignedBigInteger('current_odometer')->default(0);
-            $table->string('status')->default('active')->comment('active, inactive');
+            $table->string('status')->default('active')->comment('draft, active, inactive, in_service, in_rental, under_maintenance, unavailable, sold, archived');
             $table->date('registration_expiry')->nullable();
             $table->date('insurance_expiry')->nullable();
             $table->date('last_service_date')->nullable();

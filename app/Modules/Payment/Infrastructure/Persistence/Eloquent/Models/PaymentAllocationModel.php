@@ -4,13 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Payment\Infrastructure\Persistence\Eloquent\Models;
 
-
 use Modules\Core\Infrastructure\Persistence\Eloquent\Models\CoreModel;
 
 final class PaymentAllocationModel extends CoreModel
 {
-
-
     protected $table = 'payment_allocations';
 
     protected $guarded = ['id'];
@@ -24,7 +21,12 @@ final class PaymentAllocationModel extends CoreModel
             'metadata' => 'array',
             'payment_id' => 'integer',
             'document_id' => 'integer',
-            'allocated_amount' => 'decimal:4'
+            'document_line_id' => 'integer',
+            'source_id' => 'integer',
+            'source_context' => 'array',
+            'allocated_amount' => 'decimal:4',
+            'base_allocated_amount' => 'decimal:4',
+            'allocation_date' => 'date',
         ]);
     }
 }

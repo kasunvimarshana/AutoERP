@@ -9,18 +9,19 @@ return [
     ],
 
     'fail_safe' => [
-        'swallow_exceptions' => true,
+        'swallow_exceptions' => false,
     ],
 
     'events' => [
         'capture_wildcard' => false,
         'listen' => [
             'auth.lifecycle',
-            'SalesOrderCreated',
-            'InvoiceGenerated',
-            'StockUpdated',
-            'UserLoggedIn',
-            'ConfigurationChanged',
+            'document.lifecycle',
+            'finance.posting',
+            'inventory.movement',
+            'payment.lifecycle',
+            'configuration.changed',
+            'user.lifecycle',
         ],
         'ignore_prefixes' => [
             'Modules\\Audit\\',

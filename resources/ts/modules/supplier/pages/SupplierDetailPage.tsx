@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { BusinessPartyLinksPanel } from '../../../shared/components/business/BusinessPartyLinksPanel';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
 import { PreviewPanel } from '../../../shared/components/business/PreviewPanel';
 import { Button } from '../../../shared/components/ui/Button';
 import { Card } from '../../../shared/components/ui/Card';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Tabs } from '../../../shared/components/ui/Tabs';
+import { businessPartyLinkApi } from '../../../services/api/businessPartyLinkApi';
+import type { BusinessPartyLink } from '../../../shared/types/businessParty.types';
 import { SupplierActivityTimeline } from '../components/SupplierActivityTimeline';
 import { SupplierAddressesTable } from '../components/SupplierAddressesTable';
 import { SupplierBankAccountsTable } from '../components/SupplierBankAccountsTable';
@@ -36,6 +39,7 @@ const tabs = [
     { label: 'Tax Profile', value: 'tax' },
     { label: 'Finance Defaults', value: 'finance' },
     { label: 'User Access', value: 'user-access' },
+    { label: 'Cross-Role Links', value: 'cross-role' },
     { label: 'Source Context / Activity', value: 'source-context' },
     { label: 'Audit / History', value: 'audit' },
 ];
@@ -47,6 +51,7 @@ type SupplierDetailState = {
     contacts: SupplierContact[];
     financeDefaults: SupplierFinanceDefaults;
     businessContext: SupplierBusinessContextSummary;
+    partyLinks: BusinessPartyLink[];
     supplier: Supplier;
     taxProfile: SupplierTaxProfile;
     userAccess: SupplierUserAccess[];
@@ -73,8 +78,9 @@ export function SupplierDetailPage() {
             supplierApi.listUserAccess(supplierId),
             supplierApi.getBusinessContextSummary(supplierId),
             supplierApi.getSupplierActivity(supplierId),
+            businessPartyLinkApi.listForSource('supplier', supplierId),
         ])
-            .then(([supplier, contacts, addresses, bankAccounts, taxProfile, financeDefaults, userAccess, businessContext, activity]) => {
+            .then(([supplier, contacts, addresses, bankAccounts, taxProfile, financeDefaults, userAccess, businessContext, activity, partyLinks]) => {
                 if (mounted) {
                     setDetail({
                         activity: activity.data,
@@ -83,6 +89,7 @@ export function SupplierDetailPage() {
                         contacts: contacts.data,
                         financeDefaults: financeDefaults.data,
                         businessContext: businessContext.data,
+                        partyLinks: partyLinks.data,
                         supplier: supplier.data,
                         taxProfile: taxProfile.data,
                         userAccess: userAccess.data,
@@ -113,7 +120,7 @@ export function SupplierDetailPage() {
         return <EmptyState description={error || 'Supplier was not found.'} title="Unable to load supplier" />;
     }
 
-    const { activity, addresses, bankAccounts, businessContext, contacts, financeDefaults, supplier, taxProfile, userAccess } = detail;
+    const { activity, addresses, bankAccounts, businessContext, contacts, financeDefaults, partyLinks, supplier, taxProfile, userAccess } = detail;
 
     return (
         <div className="space-y-6">
@@ -174,6 +181,12 @@ export function SupplierDetailPage() {
             {activeTab === 'tax' ? <SupplierTaxProfileForm profile={taxProfile} /> : null}
             {activeTab === 'finance' ? <SupplierFinanceDefaultsForm defaults={financeDefaults} /> : null}
             {activeTab === 'user-access' ? <SupplierUserAccessPanel access={userAccess} /> : null}
+            {activeTab === 'cross-role' ? (
+                <BusinessPartyLinksPanel
+                    emptyDescription="No linked customer, provider, payer, or payee role was returned for this supplier."
+                    links={partyLinks}
+                />
+            ) : null}
             {activeTab === 'source-context' ? <SupplierBusinessContextPanel summary={businessContext} /> : null}
             {activeTab === 'audit' ? <SupplierActivityTimeline entries={activity} /> : null}
         </div>

@@ -26,6 +26,7 @@ return new class extends Migration
             $table->string('source_type')->nullable()->comment('Generic source document/event type');
             $table->unsignedBigInteger('source_id')->nullable()->comment('Generic source identifier');
             $table->string('source_reference')->nullable()->comment('Human-readable source number/reference');
+            $table->json('source_context')->nullable()->comment('Additional source context supplied by owning module');
             $table->text('description')->nullable();
             $table->date('entry_date');
             $table->date('posting_date')->nullable();

@@ -19,6 +19,11 @@ return new class extends Migration
 
             $table->string('attachable_type')->comment('polymorphic target type (e.g., Document, Product, Party)');
             $table->unsignedBigInteger('attachable_id')->comment('polymorphic target ID');
+            $table->string('source_module')->nullable()->comment('Generic source module key');
+            $table->string('source_type')->nullable()->comment('Generic source record type');
+            $table->unsignedBigInteger('source_id')->nullable()->comment('Generic source identifier');
+            $table->string('source_reference')->nullable()->comment('Human-readable source number/reference');
+            $table->json('source_context')->nullable()->comment('Additional source context supplied by owning module');
             $table->string('file_name');
             $table->string('file_path');
             $table->string('mime_type')->nullable();
@@ -27,6 +32,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['tenant_id', 'attachable_type', 'attachable_id'], 'attachments_type_id_idx');
+            $table->index(['tenant_id', 'source_module', 'source_type', 'source_id'], 'attachments_source_idx');
         });
     }
 

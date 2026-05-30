@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Tests\Unit\Modules\Tenant;
 
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
+use Modules\Core\Application\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Application\Contracts\SlugGeneratorInterface;
+use Modules\Core\Application\Contracts\TransactionManagerInterface;
 use Modules\Core\Application\Contracts\UuidGeneratorInterface;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Tenant\Application\Contracts\TenantRecordMapperInterface;
@@ -25,6 +27,10 @@ final class CreateTenantServiceTest extends TestCase
         $slugger = $this->createMock(SlugGeneratorInterface::class);
         $uuidGenerator = $this->createMock(UuidGeneratorInterface::class);
         $files = $this->createMock(FileStorageServiceInterface::class);
+        $transactions = $this->createMock(TransactionManagerInterface::class);
+        $errorNormalizer = $this->createMock(ErrorNormalizerInterface::class);
+
+        $transactions->method('runInTransaction')->willReturnCallback(static fn (callable $callback): mixed => $callback());
 
         $repository->method('findByCode')->willReturn(null);
         $repository->method('findByIsolationKey')->willReturn(null);
@@ -91,7 +97,16 @@ final class CreateTenantServiceTest extends TestCase
                 [],
             ));
 
-        $service = new CreateTenantService($repository, $domain, $mapper, $slugger, $uuidGenerator, $files);
+        $service = new CreateTenantService(
+            $repository,
+            $domain,
+            $mapper,
+            $slugger,
+            $uuidGenerator,
+            $files,
+            $transactions,
+            $errorNormalizer,
+        );
 
         $result = $service->execute([
             'code' => 'acme',

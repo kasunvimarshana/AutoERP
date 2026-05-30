@@ -24,6 +24,8 @@ final class VehicleModel extends CoreModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'year' => 'integer',
+            'service_enabled' => 'boolean',
+            'rental_enabled' => 'boolean',
             'seating_capacity' => 'integer',
             'current_odometer' => 'integer',
             'last_service_odometer' => 'integer',

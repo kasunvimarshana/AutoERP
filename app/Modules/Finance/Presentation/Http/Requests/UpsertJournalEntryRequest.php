@@ -35,6 +35,7 @@ final class UpsertJournalEntryRequest extends FormRequest
             'source_type' => ['nullable', 'string', 'max:100'],
             'source_id' => ['nullable', 'integer', 'min:1'],
             'source_reference' => ['nullable', 'string', 'max:255'],
+            'source_context' => ['nullable', 'array'],
             'description' => ['nullable', 'string'],
             'entry_date' => array_merge($required, ['date']),
             'posting_date' => ['nullable', 'date'],

@@ -24,13 +24,13 @@ final class ListVehicleRequest extends FormRequest
             'vehicle_code' => ['nullable', 'string', 'max:255'],
             'vin' => ['nullable', 'string', 'max:255'],
             'license_plate' => ['nullable', 'string', 'max:255'],
-            'status' => ['nullable', 'string', 'in:active,inactive'],
+            'status' => ['nullable', 'string', 'in:draft,active,inactive,in_service,in_rental,under_maintenance,unavailable,sold,archived'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => [
                 'nullable',
                 'integer',
                 'min:1',
-                'max:' . (int) config('vehicle.pagination.max_per_page', 200),
+                'max:'.(int) config('vehicle.pagination.max_per_page', 200),
             ],
         ];
     }

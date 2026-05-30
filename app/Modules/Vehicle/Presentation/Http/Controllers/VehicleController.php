@@ -7,6 +7,7 @@ namespace Modules\Vehicle\Presentation\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\Application\DTO\PagedResult;
+use Modules\Core\Application\Results\Error;
 use Modules\Vehicle\Application\Contracts\UseCases\Vehicles\CreateVehicleServiceInterface;
 use Modules\Vehicle\Application\Contracts\UseCases\Vehicles\DeleteVehicleServiceInterface;
 use Modules\Vehicle\Application\Contracts\UseCases\Vehicles\GetVehicleServiceInterface;
@@ -24,15 +25,14 @@ final class VehicleController extends Controller
         private readonly CreateVehicleServiceInterface $createVehicle,
         private readonly UpdateVehicleServiceInterface $updateVehicle,
         private readonly DeleteVehicleServiceInterface $deleteVehicle,
-    ) {
-    }
+    ) {}
 
     public function index(ListVehicleRequest $request): JsonResponse
     {
         $result = $this->listVehicles->execute($request->validated());
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 422);
+            return $this->errorResponse($result->errorOrFail());
         }
 
         $page = $result->valueOrFail();
@@ -57,7 +57,7 @@ final class VehicleController extends Controller
         $result = $this->getVehicle->execute($vehicle);
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 404);
+            return $this->errorResponse($result->errorOrFail());
         }
 
         return new VehicleResource($result->valueOrFail());
@@ -68,7 +68,7 @@ final class VehicleController extends Controller
         $result = $this->createVehicle->execute($request->validated());
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 422);
+            return $this->errorResponse($result->errorOrFail());
         }
 
         return (new VehicleResource($result->valueOrFail()))->response()->setStatusCode(201);
@@ -79,10 +79,7 @@ final class VehicleController extends Controller
         $result = $this->updateVehicle->execute($vehicle, $request->validated());
 
         if ($result->isFailure()) {
-            $error = $result->errorOrFail();
-            $status = $error->code === 'VEHICLE_NOT_FOUND' ? 404 : 422;
-
-            return response()->json(['message' => $error->message], $status);
+            return $this->errorResponse($result->errorOrFail());
         }
 
         return new VehicleResource($result->valueOrFail());
@@ -93,9 +90,16 @@ final class VehicleController extends Controller
         $result = $this->deleteVehicle->execute($vehicle);
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 404);
+            return $this->errorResponse($result->errorOrFail());
         }
 
         return response()->json(null, 204);
+    }
+
+    private function errorResponse(Error $error): JsonResponse
+    {
+        $status = $error->code === 'VEHICLE_NOT_FOUND' ? 404 : 422;
+
+        return \api_error_response($error->code, $error->message, $status, 'domain', $error->context);
     }
 }

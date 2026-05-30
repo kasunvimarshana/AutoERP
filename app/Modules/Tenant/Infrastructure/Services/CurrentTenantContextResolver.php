@@ -545,6 +545,10 @@ final class CurrentTenantContextResolver implements CurrentTenantContextResolver
 
     private function enforceAuthenticatedTenantMatch(): bool
     {
-        return (bool) config('tenant.resolution.enforce_authenticated_tenant_match', true);
+        try {
+            return (bool) config('tenant.resolution.enforce_authenticated_tenant_match', true);
+        } catch (Throwable) {
+            return true;
+        }
     }
 }

@@ -29,7 +29,7 @@ final class CaptureConfiguredSystemEventListener
             if ($result->isFailure()) {
                 $error = $result->errorOrFail();
 
-                Log::warning('Audit event capture failed in fail-safe mode.', [
+                Log::warning('Audit event capture failed.', [
                     'event' => $eventName,
                     'error_code' => $error->code,
                     'error_message' => $error->message,
@@ -41,7 +41,7 @@ final class CaptureConfiguredSystemEventListener
                 }
             }
         } catch (\Throwable $exception) {
-            Log::warning('Audit listener swallowed event capture exception.', [
+            Log::warning('Audit listener caught event capture exception.', [
                 'event' => $eventName,
                 'exception' => $exception::class,
                 'message' => $exception->getMessage(),

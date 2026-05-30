@@ -17,12 +17,12 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete();
             $table->foreignId('vehicle_id')->constrained('vehicles', 'id')->cascadeOnDelete();
             $table->string('ownership_type')->comment('own, customer, supplier, provider, leased, financed, partner, internal, external, other');
-            $table->string('owner_type')->comment('company, customer, supplier, employee, partner, external_party, party, other');
+            $table->string('owner_type')->comment('company, customer, supplier, provider, employee, partner, external_party, party, other');
             $table->unsignedBigInteger('owner_id')->nullable()->comment('System record id when owner_type references a module record');
             $table->unsignedBigInteger('party_id')->nullable()->comment('Future BusinessParty/Party id when available');
             $table->string('owner_name')->nullable()->comment('External or non-system owner display name');
             $table->string('ownership_role')->default('legal_owner')->comment('legal_owner, registered_owner, operational_owner, provider, current_holder');
-            $table->date('start_date')->nullable();
+            $table->date('start_date');
             $table->date('end_date')->nullable();
             $table->boolean('is_current')->default(true);
             $table->text('notes')->nullable();

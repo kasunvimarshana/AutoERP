@@ -15,9 +15,14 @@ use Modules\Core\Application\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Application\Contracts\ExceptionParserInterface;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use Modules\Core\Application\Contracts\PasswordHasherInterface;
+use Modules\Core\Application\Contracts\Services\BusinessPartyLinkServiceInterface;
 use Modules\Core\Application\Contracts\SlugGeneratorInterface;
 use Modules\Core\Application\Contracts\TransactionManagerInterface;
 use Modules\Core\Application\Contracts\UuidGeneratorInterface;
+use Modules\Core\Application\Repositories\BusinessPartyLinkRepositoryInterface;
+use Modules\Core\Application\Services\BusinessPartyLinkService;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Models\BusinessPartyLinkModel;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentBusinessPartyLinkRepository;
 use Modules\Core\Infrastructure\Services\FileStorageService;
 use Modules\Core\Infrastructure\Services\PasswordHasher;
 use Modules\Core\Infrastructure\Services\SlugGenerator;
@@ -50,6 +55,13 @@ final class CoreServiceProvider extends ServiceProvider
         $this->app->singleton(TransactionManagerInterface::class, LaravelTransactionManager::class);
         $this->app->singleton(ExceptionParserInterface::class, ExceptionParser::class);
         $this->app->singleton(ErrorNormalizerInterface::class, ErrorNormalizer::class);
+        $this->app->singleton(BusinessPartyLinkServiceInterface::class, BusinessPartyLinkService::class);
+        $this->app->singleton(
+            BusinessPartyLinkRepositoryInterface::class,
+            static fn (): BusinessPartyLinkRepositoryInterface => new EloquentBusinessPartyLinkRepository(
+                new BusinessPartyLinkModel(),
+            ),
+        );
 
         $this->app->when(FileStorageService::class)
             ->needs('$defaultDisk')
@@ -245,6 +257,9 @@ final class CoreServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->loadRoutesFrom(__DIR__ . '/../../routes/api.php');
+        $this->loadMigrationsFrom(__DIR__ . '/../Persistence/Eloquent/Migrations');
+
         $this->publishes([
             __DIR__ . '/../../Infrastructure/Config/core.php' => config_path('core.php'),
         ], 'core-config');

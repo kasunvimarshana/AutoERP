@@ -20,7 +20,9 @@ final class CommentModel extends CoreModel
             'organization_unit_id' => 'integer',
             'metadata' => 'array',
             'commentable_id' => 'integer',
-            'author_id' => 'integer'
+            'source_id' => 'integer',
+            'source_context' => 'array',
+            'author_id' => 'integer',
         ]);
     }
 }

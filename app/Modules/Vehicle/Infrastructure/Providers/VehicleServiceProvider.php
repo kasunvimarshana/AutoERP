@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Vehicle\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Vehicle\Application\Contracts\Services\VehicleOwnershipServiceInterface;
 use Modules\Vehicle\Application\Contracts\UseCases\VehicleDocuments\CreateVehicleDocumentServiceInterface;
 use Modules\Vehicle\Application\Contracts\UseCases\VehicleDocuments\DeleteVehicleDocumentServiceInterface;
 use Modules\Vehicle\Application\Contracts\UseCases\VehicleDocuments\GetVehicleDocumentServiceInterface;
@@ -16,7 +17,9 @@ use Modules\Vehicle\Application\Contracts\UseCases\Vehicles\GetVehicleServiceInt
 use Modules\Vehicle\Application\Contracts\UseCases\Vehicles\ListVehiclesServiceInterface;
 use Modules\Vehicle\Application\Contracts\UseCases\Vehicles\UpdateVehicleServiceInterface;
 use Modules\Vehicle\Application\Repositories\VehicleDocumentRepositoryInterface;
+use Modules\Vehicle\Application\Repositories\VehicleOwnershipRepositoryInterface;
 use Modules\Vehicle\Application\Repositories\VehicleRepositoryInterface;
+use Modules\Vehicle\Application\Services\VehicleOwnershipService;
 use Modules\Vehicle\Application\UseCases\VehicleDocuments\CreateVehicleDocumentService;
 use Modules\Vehicle\Application\UseCases\VehicleDocuments\DeleteVehicleDocumentService;
 use Modules\Vehicle\Application\UseCases\VehicleDocuments\GetVehicleDocumentService;
@@ -29,7 +32,9 @@ use Modules\Vehicle\Application\UseCases\Vehicles\ListVehiclesService;
 use Modules\Vehicle\Application\UseCases\Vehicles\UpdateVehicleService;
 use Modules\Vehicle\Infrastructure\Persistence\Eloquent\Models\VehicleDocumentModel;
 use Modules\Vehicle\Infrastructure\Persistence\Eloquent\Models\VehicleModel;
+use Modules\Vehicle\Infrastructure\Persistence\Eloquent\Models\VehicleOwnershipModel;
 use Modules\Vehicle\Infrastructure\Persistence\Eloquent\Repositories\EloquentVehicleDocumentRepository;
+use Modules\Vehicle\Infrastructure\Persistence\Eloquent\Repositories\EloquentVehicleOwnershipRepository;
 use Modules\Vehicle\Infrastructure\Persistence\Eloquent\Repositories\EloquentVehicleRepository;
 
 final class VehicleServiceProvider extends ServiceProvider
@@ -50,6 +55,7 @@ final class VehicleServiceProvider extends ServiceProvider
                 CreateVehicleDocumentServiceInterface::class => CreateVehicleDocumentService::class,
                 UpdateVehicleDocumentServiceInterface::class => UpdateVehicleDocumentService::class,
                 DeleteVehicleDocumentServiceInterface::class => DeleteVehicleDocumentService::class,
+                VehicleOwnershipServiceInterface::class => VehicleOwnershipService::class,
             ] as $contract => $implementation
         ) {
             $this->app->singleton($contract, $implementation);
@@ -63,6 +69,13 @@ final class VehicleServiceProvider extends ServiceProvider
             VehicleDocumentRepositoryInterface::class,
             function (): VehicleDocumentRepositoryInterface {
                 return new EloquentVehicleDocumentRepository(new VehicleDocumentModel());
+            },
+        );
+
+        $this->app->singleton(
+            VehicleOwnershipRepositoryInterface::class,
+            function (): VehicleOwnershipRepositoryInterface {
+                return new EloquentVehicleOwnershipRepository(new VehicleOwnershipModel());
             },
         );
     }

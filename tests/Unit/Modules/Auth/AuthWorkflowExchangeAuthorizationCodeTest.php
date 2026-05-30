@@ -12,6 +12,8 @@ use Modules\Auth\Application\Repositories\AuthLoginAttemptRepositoryInterface;
 use Modules\Auth\Application\Repositories\AuthProviderRepositoryInterface;
 use Modules\Auth\Application\UseCases\AuthWorkflowService;
 use Modules\Auth\Domain\Contracts\AuthDomainServiceInterface;
+use Modules\Core\Application\Contracts\ErrorNormalizerInterface;
+use Modules\Core\Application\Contracts\TransactionManagerInterface;
 use Modules\User\Application\Contracts\UseCases\UserServiceInterface;
 use PHPUnit\Framework\TestCase;
 
@@ -25,8 +27,11 @@ final class AuthWorkflowExchangeAuthorizationCodeTest extends TestCase
         $loginAttempts = $this->createMock(AuthLoginAttemptRepositoryInterface::class);
         $domain = $this->createMock(AuthDomainServiceInterface::class);
         $userService = $this->createMock(UserServiceInterface::class);
+        $transactions = $this->createMock(TransactionManagerInterface::class);
+        $errorNormalizer = $this->createMock(ErrorNormalizerInterface::class);
         $ssoProvider = $this->createMock(SsoProviderInterface::class);
 
+        $transactions->method('runInTransaction')->willReturnCallback(static fn (callable $callback): mixed => $callback());
         $registry->method('ssoProvider')->willReturn($ssoProvider);
         $ssoProvider->method('exchangeAuthorizationCode')->willReturn(null);
 
@@ -37,6 +42,8 @@ final class AuthWorkflowExchangeAuthorizationCodeTest extends TestCase
             $loginAttempts,
             $domain,
             $userService,
+            $transactions,
+            $errorNormalizer,
         );
 
         $result = $service->exchangeAuthorizationCode(ExchangeAuthorizationCodeData::fromArray([

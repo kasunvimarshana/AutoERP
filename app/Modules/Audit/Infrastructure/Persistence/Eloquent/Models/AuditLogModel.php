@@ -23,6 +23,7 @@ final class AuditLogModel extends CoreModel
             'organization_unit_id' => 'integer',
             'metadata' => 'array',
             'user_id' => 'integer',
+            'source_context' => 'array',
             'old_values' => 'array',
             'new_values' => 'array',
             'tags' => 'array',

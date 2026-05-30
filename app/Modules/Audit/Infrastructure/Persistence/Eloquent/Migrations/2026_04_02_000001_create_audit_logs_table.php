@@ -25,6 +25,11 @@ return new class extends Migration
             // $table->morphs('auditable');
             $table->string('auditable_type')->index('audit_logs_auditable_type_idx');
             $table->string('auditable_id')->index('audit_logs_auditable_id_idx');
+            $table->string('source_module')->nullable()->comment('Generic source module key');
+            $table->string('source_type')->nullable()->comment('Generic source record/event type');
+            $table->string('source_id')->nullable()->comment('Generic source identifier');
+            $table->string('source_reference')->nullable()->comment('Human-readable source number/reference');
+            $table->json('source_context')->nullable()->comment('Additional source context supplied by owning module');
 
             // Captured attribute snapshots
             $table->json('old_values')->nullable();
@@ -44,6 +49,7 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->index(['tenant_id', 'organization_unit_id', 'auditable_type', 'auditable_id'], 'audit_logs_auditable_idx');
+            $table->index(['tenant_id', 'source_module', 'source_type', 'source_id'], 'audit_logs_source_idx');
             $table->index(['tenant_id', 'organization_unit_id', 'occurred_at'], 'audit_logs_occurred_at_idx');
         });
     }

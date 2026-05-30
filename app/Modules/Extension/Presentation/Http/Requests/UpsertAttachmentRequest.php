@@ -27,10 +27,15 @@ final class UpsertAttachmentRequest extends FormRequest
             'metadata' => ['nullable', 'array'],
             'attachable_type' => array_merge($required, ['string', 'max:255']),
             'attachable_id' => array_merge($required, ['integer', 'min:1']),
+            'source_module' => ['nullable', 'string', 'max:100'],
+            'source_type' => ['nullable', 'string', 'max:100'],
+            'source_id' => ['nullable', 'integer', 'min:1'],
+            'source_reference' => ['nullable', 'string', 'max:255'],
+            'source_context' => ['nullable', 'array'],
             'file_name' => array_merge($required, ['string', 'max:255']),
             'file_path' => array_merge($required, ['string', 'max:255']),
             'mime_type' => ['nullable', 'string', 'max:255'],
-            'size' => ['nullable', 'integer', 'min:0']
+            'size' => ['nullable', 'integer', 'min:0'],
         ];
     }
 }

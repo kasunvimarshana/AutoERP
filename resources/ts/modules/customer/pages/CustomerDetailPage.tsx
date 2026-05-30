@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { BusinessPartyLinksPanel } from '../../../shared/components/business/BusinessPartyLinksPanel';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
 import { PreviewPanel } from '../../../shared/components/business/PreviewPanel';
 import { Button } from '../../../shared/components/ui/Button';
 import { Card } from '../../../shared/components/ui/Card';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Tabs } from '../../../shared/components/ui/Tabs';
+import { businessPartyLinkApi } from '../../../services/api/businessPartyLinkApi';
+import type { BusinessPartyLink } from '../../../shared/types/businessParty.types';
 import { CustomerActivityTimeline } from '../components/CustomerActivityTimeline';
 import { CustomerAddressesTable } from '../components/CustomerAddressesTable';
 import { CustomerContactsTable } from '../components/CustomerContactsTable';
@@ -36,6 +39,7 @@ const tabs = [
     { label: 'Credit Profile', value: 'credit' },
     { label: 'Finance Defaults', value: 'finance' },
     { label: 'User Access', value: 'user-access' },
+    { label: 'Cross-Role Links', value: 'cross-role' },
     { label: 'Activity / Audit', value: 'audit' },
 ];
 
@@ -45,6 +49,7 @@ type CustomerDetailState = {
     creditProfile: CustomerCreditProfile;
     customer: Customer;
     financeDefaults: CustomerFinanceDefaults;
+    partyLinks: BusinessPartyLink[];
     taxProfile: CustomerTaxProfile;
     userAccess: CustomerUserAccess[];
     vehicles: CustomerVehicle[];
@@ -70,8 +75,9 @@ export function CustomerDetailPage() {
             customerApi.getCreditProfile(customerId),
             customerApi.getFinanceDefaults(customerId),
             customerApi.listUserAccess(customerId),
+            businessPartyLinkApi.listForSource('customer', customerId),
         ])
-            .then(([customer, contacts, addresses, vehicles, taxProfile, creditProfile, financeDefaults, userAccess]) => {
+            .then(([customer, contacts, addresses, vehicles, taxProfile, creditProfile, financeDefaults, userAccess, partyLinks]) => {
                 if (mounted) {
                     setDetail({
                         addresses: addresses.data,
@@ -79,6 +85,7 @@ export function CustomerDetailPage() {
                         creditProfile: creditProfile.data,
                         customer: customer.data,
                         financeDefaults: financeDefaults.data,
+                        partyLinks: partyLinks.data,
                         taxProfile: taxProfile.data,
                         userAccess: userAccess.data,
                         vehicles: vehicles.data,
@@ -109,7 +116,7 @@ export function CustomerDetailPage() {
         return <EmptyState description={error || 'Customer was not found.'} title="Unable to load customer" />;
     }
 
-    const { addresses, contacts, creditProfile, customer, financeDefaults, taxProfile, userAccess, vehicles } = detail;
+    const { addresses, contacts, creditProfile, customer, financeDefaults, partyLinks, taxProfile, userAccess, vehicles } = detail;
 
     return (
         <div className="space-y-6">
@@ -170,6 +177,12 @@ export function CustomerDetailPage() {
             {activeTab === 'credit' ? <CustomerCreditProfilePanel profile={creditProfile} /> : null}
             {activeTab === 'finance' ? <CustomerFinanceDefaultsForm defaults={financeDefaults} /> : null}
             {activeTab === 'user-access' ? <CustomerUserAccessPanel access={userAccess} /> : null}
+            {activeTab === 'cross-role' ? (
+                <BusinessPartyLinksPanel
+                    emptyDescription="No linked supplier, provider, payer, or payee role was returned for this customer."
+                    links={partyLinks}
+                />
+            ) : null}
             {activeTab === 'audit' ? <CustomerActivityTimeline /> : null}
         </div>
     );

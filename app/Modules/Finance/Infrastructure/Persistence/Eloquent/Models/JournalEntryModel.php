@@ -10,6 +10,7 @@ final class JournalEntryModel extends FinanceModel
 
     protected $casts = [
         'metadata' => 'array',
+        'source_context' => 'array',
         'entry_date' => 'date',
         'posting_date' => 'date',
         'is_reversed' => 'boolean',

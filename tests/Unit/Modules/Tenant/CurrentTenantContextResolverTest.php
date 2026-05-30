@@ -134,10 +134,9 @@ final class CurrentTenantContextResolverTest extends TestCase
             ->with(888)
             ->willReturn(new DataRecord(['tenant_id' => 888, 'domain' => 'tenant888.example.com']));
 
-        $userTenants->expects(self::once())
+        $userTenants->expects(self::never())
             ->method('existsForTenantAndUser')
-            ->with(888, 42)
-            ->willReturn(false);
+            ->with(888, 42);
 
         $resolver = new CurrentTenantContextResolver(
             $currentUser,

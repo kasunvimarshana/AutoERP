@@ -37,6 +37,9 @@ return new class extends Migration
             $table->foreignId('location_id')->nullable()->constrained('warehouse_locations')->nullOnDelete();
             $table->foreignId('warehouse_id')->nullable()->constrained('warehouses')->nullOnDelete();
             $table->nullableMorphs('source');
+            $table->string('source_module')->nullable()->comment('Generic source module key');
+            $table->string('source_reference')->nullable()->comment('Human-readable source number/reference');
+            $table->json('source_context')->nullable()->comment('Additional source context supplied by owning module');
             $table->unsignedBigInteger('source_line_id')->nullable();
             $table->foreignId('transaction_uom_id')->constrained('unit_of_measures');
             $table->foreignId('base_uom_id')->constrained('unit_of_measures');
@@ -61,6 +64,7 @@ return new class extends Migration
 
             $table->index(['tenant_id', 'item_id', 'performed_at'], 'stock_movements_item_performed_at_idx');
             $table->index(['tenant_id', 'source_type', 'source_id'], 'stock_movements_reference_idx');
+            $table->index(['tenant_id', 'source_module', 'source_type', 'source_id'], 'stock_movements_source_idx');
             $table->index(['tenant_id', 'location_id', 'performed_at'], 'stock_movements_location_performed_at_idx');
             $table->index(['tenant_id', 'status', 'movement_type'], 'stock_movements_status_type_idx');
         });
