@@ -41,7 +41,10 @@ final class ListVehiclesService implements ListVehiclesServiceInterface
                 isset($filters['vehicle_code']) ? trim((string) $filters['vehicle_code']) : null,
                 isset($filters['vin']) ? trim((string) $filters['vin']) : null,
                 isset($filters['license_plate']) ? trim((string) $filters['license_plate']) : null,
+                isset($filters['search']) ? trim((string) $filters['search']) : null,
                 isset($filters['status']) ? trim((string) $filters['status']) : null,
+                array_key_exists('service_enabled', $filters) ? (bool) $filters['service_enabled'] : null,
+                array_key_exists('rental_enabled', $filters) ? (bool) $filters['rental_enabled'] : null,
                 max(
                     1,
                     (int) (

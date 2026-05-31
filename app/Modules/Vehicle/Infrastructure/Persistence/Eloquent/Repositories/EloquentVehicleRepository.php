@@ -24,7 +24,10 @@ final class EloquentVehicleRepository extends EloquentRepository implements Vehi
         ?string $vehicleCode,
         ?string $vin,
         ?string $licensePlate,
+        ?string $search,
         ?string $status,
+        ?bool $serviceEnabled,
+        ?bool $rentalEnabled,
         int $perPage,
         int $page,
     ): PagedResult {
@@ -50,8 +53,29 @@ final class EloquentVehicleRepository extends EloquentRepository implements Vehi
             $query->where('license_plate', trim($licensePlate));
         }
 
+        if ($search !== null && trim($search) !== '') {
+            $term = '%' . trim($search) . '%';
+            $query->where(function ($query) use ($term): void {
+                $query
+                    ->where('vehicle_code', 'like', $term)
+                    ->orWhere('license_plate', 'like', $term)
+                    ->orWhere('vin', 'like', $term)
+                    ->orWhere('make', 'like', $term)
+                    ->orWhere('model', 'like', $term)
+                    ->orWhere('category', 'like', $term);
+            });
+        }
+
         if ($status !== null && trim($status) !== '') {
             $query->where('status', trim($status));
+        }
+
+        if ($serviceEnabled !== null) {
+            $query->where('service_enabled', $serviceEnabled);
+        }
+
+        if ($rentalEnabled !== null) {
+            $query->where('rental_enabled', $rentalEnabled);
         }
 
         $paginator = $query->paginate($perPage, ['*'], 'page', $page);

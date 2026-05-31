@@ -16,6 +16,8 @@ final class VehicleRoutesTest extends TestCase
         self::assertTrue(Route::has('vehicle.vehicles.show'));
         self::assertTrue(Route::has('vehicle.vehicles.update'));
         self::assertTrue(Route::has('vehicle.vehicles.destroy'));
+        self::assertTrue(Route::has('vehicle.vehicles.lookup'));
+        self::assertTrue(Route::has('vehicle.vehicles.validate.usage'));
         self::assertTrue(Route::has('vehicle.vehicles.ownerships.index'));
         self::assertTrue(Route::has('vehicle.vehicles.ownerships.store'));
         self::assertTrue(Route::has('vehicle.vehicles.ownerships.update'));

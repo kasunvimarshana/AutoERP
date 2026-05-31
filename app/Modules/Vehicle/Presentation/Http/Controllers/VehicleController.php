@@ -6,6 +6,7 @@ namespace Modules\Vehicle\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
+use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\DTO\PagedResult;
 use Modules\Core\Application\Results\Error;
 use Modules\Vehicle\Application\Contracts\UseCases\Vehicles\CreateVehicleServiceInterface;
@@ -52,6 +53,11 @@ final class VehicleController extends Controller
         ]);
     }
 
+    public function lookup(ListVehicleRequest $request): JsonResponse
+    {
+        return $this->index($request);
+    }
+
     public function show(int|string $vehicle): JsonResponse|VehicleResource
     {
         $result = $this->getVehicle->execute($vehicle);
@@ -61,6 +67,37 @@ final class VehicleController extends Controller
         }
 
         return new VehicleResource($result->valueOrFail());
+    }
+
+    public function validateUsage(int|string $vehicle, string $usage): JsonResponse
+    {
+        $result = $this->getVehicle->execute($vehicle);
+
+        if ($result->isFailure()) {
+            return $this->errorResponse($result->errorOrFail());
+        }
+
+        $record = $result->valueOrFail();
+        if (! $record instanceof DataRecord) {
+            return response()->json(['message' => 'Unexpected vehicle response.'], 500);
+        }
+
+        $data = $record->toArray();
+        $status = (string) ($data['status'] ?? 'draft');
+        $isActive = in_array($status, ['active', 'in_service', 'in_rental'], true);
+        $flag = $usage === 'rental' ? (bool) ($data['rental_enabled'] ?? false) : (bool) ($data['service_enabled'] ?? false);
+        $valid = $isActive && $flag;
+
+        return response()->json([
+            'data' => [
+                'is_valid' => $valid,
+                'reason' => $valid
+                    ? 'Vehicle is valid for the requested usage.'
+                    : 'Vehicle is not active or not enabled for the requested usage.',
+                'usage' => $usage,
+                'vehicle' => VehicleResource::make($record)->resolve(),
+            ],
+        ]);
     }
 
     public function store(UpsertVehicleRequest $request): JsonResponse|VehicleResource

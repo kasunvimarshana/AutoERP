@@ -16,7 +16,10 @@ interface VehicleRepositoryInterface extends RepositoryPortInterface
         ?string $vehicleCode,
         ?string $vin,
         ?string $licensePlate,
+        ?string $search,
         ?string $status,
+        ?bool $serviceEnabled,
+        ?bool $rentalEnabled,
         int $perPage,
         int $page,
     ): PagedResult;

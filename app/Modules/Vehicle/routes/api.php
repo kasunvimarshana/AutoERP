@@ -25,6 +25,11 @@ Route::prefix('api/vehicle')
     ])
     ->name('vehicle.')
     ->group(function (): void {
+        Route::get('vehicles/lookup', [VehicleController::class, 'lookup'])
+            ->name('vehicles.lookup');
+        Route::get('vehicles/{vehicle}/validate/{usage}', [VehicleController::class, 'validateUsage'])
+            ->whereIn('usage', ['service', 'rental'])
+            ->name('vehicles.validate.usage');
         Route::apiResource('vehicles', VehicleController::class);
         Route::get('vehicles/{vehicle}/ownerships/current', [VehicleOwnershipController::class, 'current'])
             ->name('vehicles.ownerships.current');
