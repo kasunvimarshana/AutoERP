@@ -6,7 +6,6 @@ namespace Modules\Auth\Infrastructure\Persistence\Eloquent\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 final class AuthModuleSeeder extends Seeder
@@ -19,51 +18,7 @@ final class AuthModuleSeeder extends Seeder
 
             $this->seedInternalProvider(null, null);
             $this->seedInternalProvider($tenantId, $organizationUnitId);
-
-            if (! $this->shouldSeedLocalAdmin()) {
-                return;
-            }
-
-            $email = strtolower((string) env('AUTH_LOCAL_ADMIN_EMAIL', 'admin@example.com'));
-            $password = (string) env('AUTH_LOCAL_ADMIN_PASSWORD', 'password');
-
-            DB::table('users')->updateOrInsert(
-                [
-                    'email' => $email,
-                    'tenant_id' => $tenantId,
-                ],
-                [
-                    'date_of_birth' => null,
-                    'email_verified_at' => now(),
-                    'first_name' => 'System',
-                    'gender' => null,
-                    'last_name' => 'Administrator',
-                    'marital_status' => null,
-                    'metadata' => json_encode([
-                        'role' => 'System Administrator',
-                        'seed_source' => 'auth_module_local_admin',
-                    ]),
-                    'organization_unit_id' => $organizationUnitId,
-                    'password' => Hash::make($password),
-                    'phone' => null,
-                    'preferences' => null,
-                    'remember_token' => null,
-                    'row_version' => 1,
-                    'status' => 'active',
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ],
-            );
         });
-    }
-
-    private function shouldSeedLocalAdmin(): bool
-    {
-        if ((bool) env('SEED_AUTH_LOCAL_ADMIN', false)) {
-            return true;
-        }
-
-        return app()->environment(['local', 'testing']);
     }
 
     private function seedLocalTenant(): int

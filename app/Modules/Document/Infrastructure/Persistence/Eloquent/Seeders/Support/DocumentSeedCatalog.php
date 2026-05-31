@@ -4,7 +4,21 @@ namespace Modules\Document\Infrastructure\Persistence\Eloquent\Seeders\Support;
 
 final class DocumentSeedCatalog
 {
-    public const DEFAULT_TENANT_CODE = 'default';
+    public const DEFAULT_TENANT_CODE = 'AUTOERP';
+
+    public static function defaultTenantCode(): string
+    {
+        $code = strtoupper(trim((string) env('AUTH_LOCAL_TENANT_CODE', self::DEFAULT_TENANT_CODE)));
+
+        return $code !== '' ? $code : self::DEFAULT_TENANT_CODE;
+    }
+
+    public static function defaultTenantName(): string
+    {
+        $name = trim((string) env('AUTH_LOCAL_TENANT_NAME', 'Default Tenant'));
+
+        return $name !== '' ? $name : 'Default Tenant';
+    }
 
     /**
      * @return array<int, array<string, mixed>>

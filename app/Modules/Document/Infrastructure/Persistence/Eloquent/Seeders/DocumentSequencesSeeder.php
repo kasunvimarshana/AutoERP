@@ -10,7 +10,7 @@ class DocumentSequencesSeeder extends Seeder
 {
     public function run(): void
     {
-        $tenantId = (int) DB::table('tenants')->where('code', DocumentSeedCatalog::DEFAULT_TENANT_CODE)->value('id');
+        $tenantId = (int) DB::table('tenants')->where('code', DocumentSeedCatalog::defaultTenantCode())->value('id');
         $periodValue = date('Y');
 
         foreach (DocumentSeedCatalog::sequences() as $sequence) {

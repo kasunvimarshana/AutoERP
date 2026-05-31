@@ -11,7 +11,7 @@ class DocumentTypesSeeder extends Seeder
     public function run(): void
     {
         $tenantId = (int) DB::table('tenants')
-            ->where('code', DocumentSeedCatalog::DEFAULT_TENANT_CODE)
+            ->where('code', DocumentSeedCatalog::defaultTenantCode())
             ->value('id');
 
         $records = array_map(

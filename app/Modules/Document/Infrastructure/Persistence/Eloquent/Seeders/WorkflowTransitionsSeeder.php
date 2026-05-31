@@ -10,7 +10,7 @@ class WorkflowTransitionsSeeder extends Seeder
 {
     public function run(): void
     {
-        $tenantId = (int) DB::table('tenants')->where('code', DocumentSeedCatalog::DEFAULT_TENANT_CODE)->value('id');
+        $tenantId = (int) DB::table('tenants')->where('code', DocumentSeedCatalog::defaultTenantCode())->value('id');
         $documentTypeIds = DB::table('document_types')->pluck('id', 'code');
         $workflowIds = DB::table('document_workflows')
             ->where('tenant_id', $tenantId)

@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Modules\Auth\Infrastructure\Persistence\Eloquent\Seeders\AuthModuleSeeder;
+use Modules\Core\Infrastructure\Persistence\Eloquent\Seeders\CoreBootstrapSeeder;
 use Modules\Document\Infrastructure\Persistence\Eloquent\Seeders\DocumentModuleSeeder;
 use Modules\Item\Infrastructure\Persistence\Eloquent\Seeders\ItemModuleSeeder;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Seeders\PurchaseModuleSeeder;
@@ -21,6 +22,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(array_filter([
+            class_exists(CoreBootstrapSeeder::class) ? CoreBootstrapSeeder::class : null,
             class_exists(AuthModuleSeeder::class) ? AuthModuleSeeder::class : null,
             class_exists(ItemModuleSeeder::class) ? ItemModuleSeeder::class : null,
             class_exists(DocumentModuleSeeder::class) ? DocumentModuleSeeder::class : null,
