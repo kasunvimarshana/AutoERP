@@ -21,14 +21,11 @@ final class UpsertEmploymentTypeRequest extends FormRequest
         $required = $this->isMethod('post') ? ['required'] : ['sometimes'];
 
         return [
-            'tenant_id' => array_merge($required, ['integer', 'min:1', 'exists:tenants,id']),
-            'row_version' => ['nullable', 'integer', 'min:0'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
             'metadata' => ['nullable', 'array'],
-            'name' => array_merge($required, ['string', 'max:255']),
-            'code' => ['nullable', 'string', 'max:255'],
+            'employment_type_code' => array_merge($required, ['string', 'max:50']),
+            'employment_type_name' => array_merge($required, ['string', 'max:120']),
+            'description' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
-            'created_by' => ['nullable', 'integer', 'min:0'],
         ];
     }
 }

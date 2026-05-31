@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PreviewPanel } from '../../../shared/components/business/PreviewPanel';
 import { Button } from '../../../shared/components/ui/Button';
-import { EmployeeTable, HrDashboardCards, HrPageHeader } from '../components/HrComponents';
+import { EmployeeTable } from '../components/EmployeeComponents';
+import { HrDashboardCards, HrPageHeader } from '../components/HrComponents';
 import { hrApi } from '../services/hrApi';
 import type { Employee, HrDashboardMetric } from '../types/hr.types';
 

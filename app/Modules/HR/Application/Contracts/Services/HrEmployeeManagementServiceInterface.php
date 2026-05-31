@@ -36,6 +36,14 @@ interface HrEmployeeManagementServiceInterface
 
     public function updateDesignation(int|string $id, array $payload): Result;
 
+    public function listEmploymentTypes(array $filters, int $perPage, int $page): Result;
+
+    public function getEmploymentType(int|string $id): Result;
+
+    public function createEmploymentType(array $payload): Result;
+
+    public function updateEmploymentType(int|string $id, array $payload): Result;
+
     public function listEmployeeContacts(int|string $employeeId): Result;
 
     public function createEmployeeContact(int|string $employeeId, array $payload): Result;

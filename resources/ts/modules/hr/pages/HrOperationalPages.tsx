@@ -4,7 +4,8 @@ import { Card } from '../../../shared/components/ui/Card';
 import { Input } from '../../../shared/components/ui/Input';
 import { Select } from '../../../shared/components/ui/Select';
 import { Button } from '../../../shared/components/ui/Button';
-import { AttendancePanel, EmployeeTable, HrPageHeader, LeavePanel, SalaryProfileTable } from '../components/HrComponents';
+import { EmployeeTable } from '../components/EmployeeComponents';
+import { AttendancePanel, HrPageHeader, LeavePanel, SalaryProfileTable } from '../components/HrComponents';
 import { hrApi } from '../services/hrApi';
 import type { Employee, EmployeeAttendanceRecord, EmployeeLeaveRecord, EmployeeSalaryProfile } from '../types/hr.types';
 
@@ -41,7 +42,7 @@ export function AttendanceListPage() {
 
     return (
         <div className="space-y-6">
-            <HrPageHeader subtitle="Attendance basics are displayed from backend/mock. Frontend does not total attendance or overtime." title="Attendance" />
+            <HrPageHeader subtitle="Attendance basics are displayed from backend. Frontend does not total attendance or overtime." title="Attendance" />
             <AttendancePanel rows={rows} />
         </div>
     );
@@ -56,7 +57,7 @@ export function LeaveListPage() {
 
     return (
         <div className="space-y-6">
-            <HrPageHeader subtitle="Leave basics are displayed from backend/mock. Frontend does not calculate leave balances." title="Leave" />
+            <HrPageHeader subtitle="Leave basics are displayed from backend. Frontend does not calculate leave balances." title="Leave" />
             <LeavePanel rows={rows} />
         </div>
     );
@@ -71,7 +72,7 @@ export function SalaryProfileListPage() {
 
     return (
         <div className="space-y-6">
-            <HrPageHeader subtitle="Salary profile values are backend/mock readonly. Frontend does not calculate salary payable or payroll." title="Salary Profiles" />
+            <HrPageHeader subtitle="Salary profile values are backend readonly. Frontend does not calculate salary payable or payroll." title="Salary Profiles" />
             <SalaryProfileTable rows={rows} />
         </div>
     );

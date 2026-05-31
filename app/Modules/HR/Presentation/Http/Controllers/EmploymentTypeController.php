@@ -7,11 +7,7 @@ namespace Modules\HR\Presentation\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\Application\DTO\PagedResult;
-use Modules\HR\Application\Contracts\UseCases\EmploymentTypes\CreateEmploymentTypeServiceInterface;
-use Modules\HR\Application\Contracts\UseCases\EmploymentTypes\DeleteEmploymentTypeServiceInterface;
-use Modules\HR\Application\Contracts\UseCases\EmploymentTypes\GetEmploymentTypeServiceInterface;
-use Modules\HR\Application\Contracts\UseCases\EmploymentTypes\ListEmploymentTypesServiceInterface;
-use Modules\HR\Application\Contracts\UseCases\EmploymentTypes\UpdateEmploymentTypeServiceInterface;
+use Modules\HR\Application\Contracts\Services\HrEmployeeManagementServiceInterface;
 use Modules\HR\Presentation\Http\Requests\ListEmploymentTypeRequest;
 use Modules\HR\Presentation\Http\Requests\UpsertEmploymentTypeRequest;
 use Modules\HR\Presentation\Http\Resources\EmploymentTypeResource;
@@ -19,11 +15,7 @@ use Modules\HR\Presentation\Http\Resources\EmploymentTypeResource;
 final class EmploymentTypeController extends Controller
 {
     public function __construct(
-        private readonly ListEmploymentTypesServiceInterface $listService,
-        private readonly GetEmploymentTypeServiceInterface $getService,
-        private readonly CreateEmploymentTypeServiceInterface $createService,
-        private readonly UpdateEmploymentTypeServiceInterface $updateService,
-        private readonly DeleteEmploymentTypeServiceInterface $deleteService,
+        private readonly HrEmployeeManagementServiceInterface $service,
     ) {
     }
 
@@ -34,7 +26,7 @@ final class EmploymentTypeController extends Controller
         $page = (int) ($validated['page'] ?? 0);
         unset($validated['per_page'], $validated['page']);
 
-        $result = $this->listService->execute($validated, $perPage, $page);
+        $result = $this->service->listEmploymentTypes($validated, $perPage, $page);
 
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 422);
@@ -59,7 +51,7 @@ final class EmploymentTypeController extends Controller
 
     public function show(int|string $id): JsonResponse|EmploymentTypeResource
     {
-        $result = $this->getService->execute($id);
+        $result = $this->service->getEmploymentType($id);
 
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 404);
@@ -70,7 +62,7 @@ final class EmploymentTypeController extends Controller
 
     public function store(UpsertEmploymentTypeRequest $request): JsonResponse|EmploymentTypeResource
     {
-        $result = $this->createService->execute($request->validated());
+        $result = $this->service->createEmploymentType($request->validated());
 
         if ($result->isFailure()) {
             return response()->json(['message' => $result->errorOrFail()->message], 422);
@@ -81,7 +73,7 @@ final class EmploymentTypeController extends Controller
 
     public function update(UpsertEmploymentTypeRequest $request, int|string $id): JsonResponse|EmploymentTypeResource
     {
-        $result = $this->updateService->execute($id, $request->validated());
+        $result = $this->service->updateEmploymentType($id, $request->validated());
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
@@ -95,12 +87,6 @@ final class EmploymentTypeController extends Controller
 
     public function destroy(int|string $id): JsonResponse
     {
-        $result = $this->deleteService->execute($id);
-
-        if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 404);
-        }
-
-        return response()->json(null, 204);
+        return response()->json(['message' => 'Hard delete is disabled for employment types.'], 422);
     }
 }

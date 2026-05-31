@@ -27,7 +27,7 @@ function buildUrl(path: string, query?: HttpClientOptions['query']) {
 
     Object.entries(query ?? {}).forEach(([key, value]) => {
         if (value !== null && value !== undefined && value !== '') {
-            url.searchParams.set(key, String(value));
+            url.searchParams.set(key, typeof value === 'boolean' ? (value ? '1' : '0') : String(value));
         }
     });
 

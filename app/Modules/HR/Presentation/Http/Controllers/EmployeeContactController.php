@@ -6,6 +6,7 @@ namespace Modules\HR\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
+use Modules\Core\Application\DTO\DataRecord;
 use Modules\HR\Application\Contracts\Services\HrEmployeeManagementServiceInterface;
 use Modules\HR\Presentation\Http\Requests\ListEmployeeContactRequest;
 use Modules\HR\Presentation\Http\Requests\UpsertEmployeeContactRequest;
@@ -62,7 +63,7 @@ final class EmployeeContactController extends Controller
             return response()->json(['message' => $error->message], $status);
         }
 
-        return response()->json(['data' => $result->valueOrFail()], 201);
+        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())], 201);
     }
 
     public function update(
@@ -79,7 +80,7 @@ final class EmployeeContactController extends Controller
             return response()->json(['message' => $error->message], $status);
         }
 
-        return response()->json(['data' => $result->valueOrFail()]);
+        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())]);
     }
 
     public function destroy(int|string $employeeId, int|string $contactId): JsonResponse
@@ -93,6 +94,15 @@ final class EmployeeContactController extends Controller
             return response()->json(['message' => $error->message], $status);
         }
 
-        return response()->json(['data' => $result->valueOrFail()]);
+        return response()->json(['data' => $this->normalizeResponseValue($result->valueOrFail())]);
+    }
+
+    private function normalizeResponseValue(mixed $value): mixed
+    {
+        if ($value instanceof DataRecord) {
+            return $value->toArray();
+        }
+
+        return $value;
     }
 }

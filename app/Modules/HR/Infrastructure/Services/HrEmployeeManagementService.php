@@ -638,6 +638,126 @@ final class HrEmployeeManagementService implements HrEmployeeManagementServiceIn
         }
     }
 
+    public function listEmploymentTypes(array $filters, int $perPage, int $page): Result
+    {
+        try {
+            $query = $this->employmentTypes->newQuery()->where('tenant_id', $this->tenantId());
+            if (isset($filters['is_active'])) {
+                $query->where('is_active', (bool) $filters['is_active']);
+            }
+            if (isset($filters['search']) && is_string($filters['search']) && trim($filters['search']) !== '') {
+                $term = trim($filters['search']);
+                $query->where(function ($inner) use ($term): void {
+                    $inner->where('employment_type_code', 'like', '%'.$term.'%')
+                        ->orWhere('employment_type_name', 'like', '%'.$term.'%');
+                });
+            }
+
+            $paginator = $query->orderBy('employment_type_name')
+                ->paginate($this->resolvePerPage($perPage), ['*'], 'page', max(1, $page));
+
+            $items = [];
+            foreach ($paginator->items() as $item) {
+                $items[] = new DataRecord($item->toArray());
+            }
+
+            return Result::success(new PagedResult($items, $paginator->total(), $paginator->currentPage(), $paginator->perPage()));
+        } catch (Throwable $exception) {
+            return $this->failure($exception->getMessage());
+        }
+    }
+
+    public function getEmploymentType(int|string $id): Result
+    {
+        try {
+            $record = $this->employmentTypes->newQuery()
+                ->where('tenant_id', $this->tenantId())
+                ->where('id', (int) $id)
+                ->first();
+
+            if ($record === null) {
+                return $this->notFound('Employment type not found.');
+            }
+
+            return Result::success(new DataRecord($record->toArray()));
+        } catch (Throwable $exception) {
+            return $this->failure($exception->getMessage());
+        }
+    }
+
+    public function createEmploymentType(array $payload): Result
+    {
+        try {
+            $tenantId = $this->tenantId();
+            $code = $this->normalizeCode((string) ($payload['employment_type_code'] ?? ''));
+            $exists = $this->employmentTypes->newQuery()
+                ->where('tenant_id', $tenantId)
+                ->where('employment_type_code', $code)
+                ->exists();
+            if ($exists) {
+                return $this->failure('Employment type code already exists.');
+            }
+
+            $record = $this->employmentTypes->newQuery()->create([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $this->organizationUnitId(),
+                'metadata' => $this->normalizeArray($payload['metadata'] ?? null),
+                'employment_type_code' => $code,
+                'employment_type_name' => $this->required((string) ($payload['employment_type_name'] ?? ''), 'Employment type name'),
+                'description' => $this->nullableString($payload['description'] ?? null),
+                'is_active' => (bool) ($payload['is_active'] ?? true),
+                'created_by' => $this->userId(),
+                'updated_by' => $this->userId(),
+                'row_version' => 1,
+            ]);
+
+            return Result::success(new DataRecord($record->toArray()));
+        } catch (Throwable $exception) {
+            return $this->failure($exception->getMessage());
+        }
+    }
+
+    public function updateEmploymentType(int|string $id, array $payload): Result
+    {
+        try {
+            $record = $this->employmentTypes->newQuery()
+                ->where('tenant_id', $this->tenantId())
+                ->where('id', (int) $id)
+                ->first();
+
+            if ($record === null) {
+                return $this->notFound('Employment type not found.');
+            }
+
+            $changes = [
+                'updated_by' => $this->userId(),
+                'row_version' => ((int) $record->row_version) + 1,
+            ];
+            if (array_key_exists('employment_type_code', $payload)) {
+                $changes['employment_type_code'] = $this->normalizeCode((string) $payload['employment_type_code']);
+            }
+            if (array_key_exists('employment_type_name', $payload)) {
+                $changes['employment_type_name'] = $this->required((string) $payload['employment_type_name'], 'Employment type name');
+            }
+            if (array_key_exists('description', $payload)) {
+                $changes['description'] = $this->nullableString($payload['description']);
+            }
+            if (array_key_exists('is_active', $payload)) {
+                $changes['is_active'] = (bool) $payload['is_active'];
+            }
+            if (array_key_exists('metadata', $payload)) {
+                $changes['metadata'] = $this->normalizeArray($payload['metadata']);
+            }
+
+            $record->fill($changes);
+            $record->save();
+
+            return Result::success(new DataRecord($record->toArray()));
+        } catch (Throwable $exception) {
+            return $this->failure($exception->getMessage());
+        }
+    }
+
     public function listEmployeeContacts(int|string $employeeId): Result
     {
         try {
