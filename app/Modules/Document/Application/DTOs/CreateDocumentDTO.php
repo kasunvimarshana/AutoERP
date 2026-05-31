@@ -17,6 +17,12 @@ class CreateDocumentDTO
         public ?int $partyId = null,
         public ?string $dueDate = null,
         public ?string $notes = null,
+        public ?int $documentDefinitionId = null,
+        public ?string $sourceModule = null,
+        public ?string $sourceType = null,
+        public ?int $sourceId = null,
+        public ?string $sourceReference = null,
+        public ?string $title = null,
         public array $data = [],
         public array $items = [],
     ) {

@@ -48,6 +48,12 @@ class CreateDocumentAction
             notes: $dto->notes,
             createdBy: null,
             updatedBy: null,
+            documentDefinitionId: $dto->documentDefinitionId ?? $definition?->id,
+            sourceModule: $dto->sourceModule,
+            sourceType: $dto->sourceType,
+            sourceId: $dto->sourceId,
+            sourceReference: $dto->sourceReference,
+            title: $dto->title,
         );
 
         $items = [];

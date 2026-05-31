@@ -59,19 +59,6 @@ function apiError(error: unknown, fallback: string) {
     return { errors: {}, message: error instanceof Error ? error.message : fallback };
 }
 
-const sourceModuleOptions: LookupOption[] = [
-    { label: 'Shared/Core', value: 'shared' },
-    { label: 'Purchase', value: 'purchase' },
-    { label: 'Sales', value: 'sales' },
-    { label: 'Vehicle Service', value: 'vehicle_service' },
-    { label: 'Vehicle Rental', value: 'vehicle_rental' },
-    { label: 'Voucher', value: 'voucher' },
-    { label: 'Finance', value: 'finance' },
-    { label: 'Supplier', value: 'supplier' },
-    { label: 'Customer', value: 'customer' },
-    { label: 'HR', value: 'hr' },
-];
-
 const statusOptions: LookupOption[] = ['draft', 'submitted', 'approved', 'posted', 'finalized', 'cancelled', 'archived'].map((status) => ({ label: status, value: status }));
 
 export function DocumentRecordSummaryCard({ document, onStatusChanged }: { document: DocumentRecord; onStatusChanged?: (document: DocumentRecord) => void }) {
@@ -393,7 +380,7 @@ export function DocumentTypeForm({ mode, type }: { mode: 'create' | 'edit'; type
                     <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2"><FieldLabel>Type code</FieldLabel><Input defaultValue={type?.code} name="code" /><FieldError message={errors.code?.[0]} /></div>
                         <div className="space-y-2"><FieldLabel>Type name</FieldLabel><Input defaultValue={type?.name} name="name" /><FieldError message={errors.name?.[0]} /></div>
-                        <div className="space-y-2"><FieldLabel>Module / scope</FieldLabel><Select defaultValue={type?.moduleScope ?? 'shared'} name="module_scope" options={sourceModuleOptions} /></div>
+                        <div className="space-y-2"><FieldLabel>Module / scope</FieldLabel><Input defaultValue={type?.moduleScope ?? 'shared'} name="module_scope" /></div>
                         <div className="space-y-2 md:col-span-2"><FieldLabel>Description</FieldLabel><Textarea defaultValue={type?.description} name="description" /></div>
                     </div>
                 </FormSection>
@@ -487,7 +474,7 @@ export function DocumentDefinitionForm({ definition, mode }: { definition?: Docu
                         <div className="space-y-2"><FieldLabel>Definition code</FieldLabel><Input defaultValue={definition?.code} name="code" /></div>
                         <div className="space-y-2"><FieldLabel>Definition name</FieldLabel><Input defaultValue={definition?.name} name="name" /><FieldError message={errors.name?.[0]} /></div>
                         <div className="space-y-2"><FieldLabel>Document type</FieldLabel><Select defaultValue={definition?.documentTypeId} name="document_type_id" options={typeOptions} /></div>
-                        <div className="space-y-2"><FieldLabel>Source module</FieldLabel><Select defaultValue={definition?.sourceModule ?? 'shared'} name="source_module" options={sourceModuleOptions} /></div>
+                        <div className="space-y-2"><FieldLabel>Source module</FieldLabel><Input defaultValue={definition?.sourceModule ?? 'shared'} name="source_module" /></div>
                         <div className="space-y-2"><FieldLabel>Default status</FieldLabel><Select defaultValue={definition?.defaultStatus ?? 'draft'} name="default_status" options={statusOptions} /></div>
                         <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700"><Checkbox defaultChecked={definition?.isActive ?? true} name="is_active" />Active</label>
                         <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700"><Checkbox defaultChecked={definition?.supportsVersions ?? true} name="supports_versions" />Supports versions</label>

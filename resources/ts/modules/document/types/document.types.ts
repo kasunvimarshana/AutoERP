@@ -1,17 +1,6 @@
 export type DocumentStatus = 'draft' | 'submitted' | 'approved' | 'posted' | 'finalized' | 'cancelled' | 'archived' | 'active';
 
-export type DocumentSourceModule =
-    | 'shared'
-    | 'purchase'
-    | 'sales'
-    | 'vehicle_service'
-    | 'vehicle_rental'
-    | 'voucher'
-    | 'finance'
-    | 'supplier'
-    | 'customer'
-    | 'hr'
-    | 'core';
+export type DocumentSourceModule = string;
 
 export type LookupOption = {
     label: string;

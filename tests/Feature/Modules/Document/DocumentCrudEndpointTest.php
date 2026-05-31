@@ -134,6 +134,41 @@ final class DocumentCrudEndpointTest extends TestCase
             ->assertJsonPath('rendered.document_number', 'DOC-TEST-0001')
             ->assertJsonPath('metadata.business_logic_free', true);
 
+        $documentResponse = $this->withHeaders($headers)->postJson('/api/document/documents', [
+            'document_type_id' => $typeId,
+            'document_definition_id' => $definitionId,
+            'organization_unit_id' => $organizationUnitId,
+            'document_date' => now()->toDateString(),
+            'title' => 'Generic Source Document',
+            'source_module' => 'shared',
+            'source_type' => 'reference',
+            'source_id' => 1001,
+            'source_reference' => 'SRC-1001',
+            'notes' => 'Created from generic source data.',
+            'items' => [
+                [
+                    'item_type' => 'generic',
+                    'description' => 'Document-ready line supplied by source module.',
+                    'line_total' => '25.0000',
+                ],
+            ],
+        ]);
+
+        $documentResponse
+            ->assertCreated()
+            ->assertJsonPath('data.source_module', 'shared')
+            ->assertJsonPath('data.source_type', 'reference')
+            ->assertJsonPath('data.source_id', 1001)
+            ->assertJsonPath('data.source_reference', 'SRC-1001')
+            ->assertJsonPath('data.title', 'Generic Source Document');
+
+        $documentId = (int) $documentResponse->json('data.id');
+
+        $this->withHeaders($headers)->postJson('/api/document/documents/'.$documentId.'/preview')
+            ->assertOk()
+            ->assertJsonPath('rendered.document_number', $documentResponse->json('data.document_number'))
+            ->assertJsonPath('metadata.business_logic_free', true);
+
         $this->withHeaders($headers)->getJson('/api/document/workflows')
             ->assertOk()
             ->assertJsonStructure(['data']);

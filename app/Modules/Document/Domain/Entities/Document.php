@@ -24,6 +24,15 @@ class Document
         public ?int $createdBy,
         public ?int $updatedBy,
         public array $attachments = [],
+        public ?int $documentDefinitionId = null,
+        public ?string $sourceModule = null,
+        public ?string $sourceType = null,
+        public ?int $sourceId = null,
+        public ?string $sourceReference = null,
+        public ?string $title = null,
+        public int $version = 1,
+        public ?string $documentTypeCode = null,
+        public ?string $documentTypeName = null,
     ) {
     }
 }

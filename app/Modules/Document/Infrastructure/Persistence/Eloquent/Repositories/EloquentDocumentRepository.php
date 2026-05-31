@@ -23,10 +23,17 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
             'tenant_id' => $aggregate->document->tenantId,
             'organization_unit_id' => $aggregate->document->organizationUnitId,
             'document_type_id' => $aggregate->document->documentTypeId,
+            'document_definition_id' => $aggregate->document->documentDefinitionId,
             'document_number' => $aggregate->document->documentNumber,
             'status' => $aggregate->document->status,
+            'version' => $aggregate->document->version,
             'owner_id' => $aggregate->document->ownerId,
             'party_id' => $aggregate->document->partyId,
+            'source_module' => $aggregate->document->sourceModule,
+            'source_type' => $aggregate->document->sourceType,
+            'source_id' => $aggregate->document->sourceId,
+            'source_reference' => $aggregate->document->sourceReference,
+            'title' => $aggregate->document->title,
             'document_date' => $aggregate->document->documentDate,
             'due_date' => $aggregate->document->dueDate,
             'subtotal' => $aggregate->document->subtotal,
@@ -78,7 +85,7 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
     public function findById(int $tenantId, int $id): ?DocumentAggregate
     {
         $model = DocumentModel::query()
-            ->with(['items', 'attachments'])
+            ->with(['items', 'attachments', 'type'])
             ->where('tenant_id', $tenantId)
             ->find($id);
 
@@ -141,6 +148,15 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
                 'mime_type' => $attachment->mime_type,
                 'file_size' => $attachment->file_size,
             ])->all(),
+            documentDefinitionId: $model->document_definition_id,
+            sourceModule: $model->source_module,
+            sourceType: $model->source_type,
+            sourceId: $model->source_id,
+            sourceReference: $model->source_reference,
+            title: $model->title,
+            version: (int) $model->version,
+            documentTypeCode: $model->type?->code,
+            documentTypeName: $model->type?->name,
         );
 
         $items = $model->items->map(fn (DocumentItemModel $item): DocumentItem => new DocumentItem(

@@ -89,7 +89,7 @@ export function DocumentPreviewPage() {
                 title: String(formData.get('sample_reference') ?? ''),
             },
             sourceId: String(formData.get('source_id') ?? ''),
-            sourceModule: String(formData.get('source_module') ?? 'sales'),
+            sourceModule: String(formData.get('source_module') ?? 'shared') || 'shared',
             sourceReference: String(formData.get('sample_reference') ?? ''),
         };
 
@@ -113,7 +113,7 @@ export function DocumentPreviewPage() {
                     <FormSection description="No official rendering happens in the frontend. This form only sends preview input." title="Preview Inputs">
                         <div className="grid gap-4 md:grid-cols-2">
                             <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wide text-slate-500">Definition</label><Select name="definition_id" options={definitions.map((definition) => ({ label: definition.name, value: definition.id }))} /></div>
-                            <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wide text-slate-500">Source module</label><Select name="source_module" options={[{ label: 'Sales', value: 'sales' }, { label: 'Purchase', value: 'purchase' }, { label: 'Vehicle Service', value: 'vehicle_service' }, { label: 'Vehicle Rental', value: 'vehicle_rental' }, { label: 'Voucher', value: 'voucher' }]} /></div>
+                            <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wide text-slate-500">Source module</label><Input defaultValue="shared" name="source_module" /></div>
                             <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wide text-slate-500">Source id</label><Input name="source_id" /></div>
                             <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wide text-slate-500">Sample reference</label><Input name="sample_reference" /></div>
                             <div className="space-y-2 md:col-span-2"><label className="text-xs font-bold uppercase tracking-wide text-slate-500">Sample metadata</label><Textarea name="notes" /></div>

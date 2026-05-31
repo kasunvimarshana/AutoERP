@@ -32,12 +32,17 @@ export function DocumentRecordListPage() {
         });
     }, [query, records, sourceModule, status]);
 
+    const sourceModuleOptions = useMemo(() => {
+        const modules = Array.from(new Set(records.map((record) => record.sourceModule).filter(Boolean))).sort();
+        return [{ label: 'All source modules', value: '' }, ...modules.map((module) => ({ label: module, value: module }))];
+    }, [records]);
+
     return (
         <div className="space-y-6">
             <PageHeader eyebrow="Documents" subtitle="Document records from all source modules. Document UI does not calculate source totals or workflow effects." title="Document Records" />
             <SearchFilterBar onSearch={setQuery} />
             <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-4">
-                <Select onChange={(event) => setSourceModule(event.target.value)} options={[{ label: 'All source modules', value: '' }, { label: 'Purchase', value: 'purchase' }, { label: 'Sales', value: 'sales' }, { label: 'Vehicle Service', value: 'vehicle_service' }, { label: 'Vehicle Rental', value: 'vehicle_rental' }, { label: 'Voucher', value: 'voucher' }, { label: 'Finance', value: 'finance' }]} value={sourceModule} />
+                <Select onChange={(event) => setSourceModule(event.target.value)} options={sourceModuleOptions} value={sourceModule} />
                 <Select onChange={(event) => setStatus(event.target.value)} options={[{ label: 'All statuses', value: '' }, { label: 'Draft', value: 'draft' }, { label: 'Submitted', value: 'submitted' }, { label: 'Approved', value: 'approved' }, { label: 'Posted', value: 'posted' }, { label: 'Finalized', value: 'finalized' }, { label: 'Cancelled', value: 'cancelled' }]} value={status} />
             </div>
             {isLoading ? <EmptyState description="Loading document records..." title="Loading records" /> : null}

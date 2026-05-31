@@ -52,22 +52,30 @@ class DocumentController extends Controller
             partyId: $validated['party_id'] ?? null,
             dueDate: $validated['due_date'] ?? null,
             notes: $validated['notes'] ?? null,
+            documentDefinitionId: $validated['document_definition_id'] ?? null,
+            sourceModule: $validated['source_module'] ?? null,
+            sourceType: $validated['source_type'] ?? null,
+            sourceId: $validated['source_id'] ?? null,
+            sourceReference: $validated['source_reference'] ?? null,
+            title: $validated['title'] ?? null,
             data: $validated['data'] ?? [],
             items: $validated['items'],
         );
 
         $aggregate = $this->orchestrator->create($dto);
 
-        return (new DocumentResource($aggregate))
-            ->response()
-            ->setStatusCode(Response::HTTP_CREATED);
+        return response()->json([
+            'data' => (new DocumentResource($aggregate))->resolve($request),
+        ], Response::HTTP_CREATED);
     }
 
     public function show(int $document): JsonResponse
     {
         $tenantId = $this->resolveTenantId(request());
 
-        return (new DocumentResource($this->orchestrator->show($tenantId, $document)))->response();
+        return response()->json([
+            'data' => (new DocumentResource($this->orchestrator->show($tenantId, $document)))->resolve(request()),
+        ]);
     }
 
     public function updateMetadata(Request $request, int $document): JsonResponse
@@ -100,22 +108,18 @@ class DocumentController extends Controller
         $tenantId = $this->resolveTenantId($request);
         $aggregate = $this->orchestrator->show($tenantId, $document);
 
-        return response()->json([
-            'input' => [
-                'document_id' => $document,
-            ],
-            'rendered' => [
-                'html' => '<article><h1>'.e($aggregate->document->documentNumber).'</h1><p>Status: '.e($aggregate->document->status).'</p></article>',
-                'document_number' => $aggregate->document->documentNumber,
-                'status' => $aggregate->document->status,
-            ],
+        return response()->json($this->orchestrator->previewDocumentDefinition($tenantId, [
+            'definition_id' => $aggregate->document->documentDefinitionId,
+            'document_number' => $aggregate->document->documentNumber,
+            'source_module' => $aggregate->document->sourceModule,
+            'source_type' => $aggregate->document->sourceType,
+            'source_id' => $aggregate->document->sourceId,
+            'source_reference' => $aggregate->document->sourceReference,
             'metadata' => [
-                'official' => false,
-                'business_logic_free' => true,
+                'title' => $aggregate->document->title ?? $aggregate->document->documentNumber,
+                'body' => $aggregate->document->notes,
             ],
-            'warnings' => [],
-            'errors' => [],
-        ]);
+        ]));
     }
 
     public function changeStatus(ChangeStatusRequest $request, int $document): JsonResponse
@@ -129,7 +133,9 @@ class DocumentController extends Controller
             $request->validated('action_name'),
         );
 
-        return (new DocumentResource($aggregate))->response();
+        return response()->json([
+            'data' => (new DocumentResource($aggregate))->resolve($request),
+        ]);
     }
 
     public function uploadAttachment(UploadDocumentAttachmentRequest $request, int $document): JsonResponse
