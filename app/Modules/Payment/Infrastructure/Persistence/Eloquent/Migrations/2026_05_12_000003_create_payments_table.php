@@ -39,7 +39,7 @@ return new class extends Migration
             $table->string('direction')->default('inbound')->comment('inbound, outbound');
             $table->foreignId('payment_group_id')->nullable()->constrained('payment_groups')->nullOnDelete();
             $table->foreignId('payment_method_id')->constrained('payment_methods')->restrictOnDelete();
-            $table->foreignId('account_id')->constrained('accounts');
+            $table->foreignId('account_id')->nullable()->constrained('accounts')->nullOnDelete();
             $table->foreignId('currency_id')->nullable()->constrained('currencies')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 4)->default(1);
             $table->decimal('base_amount', 20, 4);

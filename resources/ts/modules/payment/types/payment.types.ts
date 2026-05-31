@@ -18,12 +18,14 @@ export type Payment = {
     reference?: string;
     sourceModule?: string;
     sourceReference?: string;
+    sourceType?: string;
     status: PaymentStatus;
     unallocatedAmount: string;
     updatedAt: string;
 };
 
 export type PaymentMethod = {
+    accountId?: string;
     accountName?: string;
     code: string;
     id: string;
@@ -161,12 +163,22 @@ export type PaymentFormInput = {
     direction: PaymentDirection;
     notes?: string;
     partyId?: string;
+    partyName?: string;
     partyType: string;
     paymentDate: string;
     paymentMethodId: string;
+    paymentMethodName?: string;
     reference?: string;
     sourceId?: string;
     sourceModule?: string;
     sourceReference?: string;
     sourceType?: string;
+};
+
+export type PaymentMethodFormInput = {
+    accountId?: string;
+    code: string;
+    isActive: boolean;
+    name: string;
+    type: PaymentMethodType;
 };

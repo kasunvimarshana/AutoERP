@@ -43,13 +43,10 @@ final class PaymentReversalService implements PaymentReversalServiceInterface
                 ]);
             }
 
-            $reverseNumber = trim((string) ($payload['payment_number'] ?? ''));
-            if ($reverseNumber === '') {
-                return Result::failure(new Error(
-                    PaymentErrorCode::INVALID_VALUE,
-                    'payment_number is required for reversal.',
-                ));
-            }
+            $reverseNumber = $this->resolveReversalNumber(
+                (int) $payment->get('tenant_id'),
+                (string) ($payload['payment_number'] ?? ''),
+            );
 
             return $this->paymentRepository->transaction(function () use ($payment, $payload, $reverseNumber): Result {
                 $reversal = $this->paymentRepository->create([
@@ -67,7 +64,7 @@ final class PaymentReversalService implements PaymentReversalServiceInterface
                     'direction' => $this->reverseDirection((string) $payment->get('direction', 'inbound')),
                     'payment_group_id' => $payment->get('payment_group_id'),
                     'payment_method_id' => (int) $payment->get('payment_method_id'),
-                    'account_id' => (int) $payment->get('account_id'),
+                    'account_id' => $this->optionalInteger($payment->get('account_id')),
                     'currency_id' => $payment->get('currency_id'),
                     'exchange_rate' => (float) $payment->get('exchange_rate', 1),
                     'base_amount' => (float) $payment->get('base_amount', 0),
@@ -113,5 +110,29 @@ final class PaymentReversalService implements PaymentReversalServiceInterface
     private function reverseDirection(string $direction): string
     {
         return strtolower(trim($direction)) === 'inbound' ? 'outbound' : 'inbound';
+    }
+
+    private function optionalInteger(mixed $value): ?int
+    {
+        $integer = (int) ($value ?? 0);
+
+        return $integer > 0 ? $integer : null;
+    }
+
+    private function resolveReversalNumber(int $tenantId, string $requested): string
+    {
+        $requested = trim($requested);
+        if ($requested !== '') {
+            return $requested;
+        }
+
+        $next = count($this->paymentRepository->list(['tenant_id' => $tenantId])) + 1;
+
+        do {
+            $number = 'REV-' . now()->format('Ymd') . '-' . str_pad((string) $next, 5, '0', STR_PAD_LEFT);
+            $next++;
+        } while ($this->paymentRepository->exists(['tenant_id' => $tenantId, 'payment_number' => $number]));
+
+        return $number;
     }
 }

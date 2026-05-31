@@ -1,24 +1,6 @@
 import type { ApiCollectionResponse, ApiPreviewResponse, ApiResponse } from '../../../services/api/apiResponse';
-import { ApiError } from '../../../services/api/apiErrors';
 import { httpClient } from '../../../services/api/httpClient';
-import { mockCollectionResponse, mockPreviewResponse, mockResponse } from '../../../services/mock/mockResponse';
-import {
-    advancePayments,
-    allocationPreview,
-    cashRegisters,
-    checks,
-    getPaymentById,
-    paymentActivity,
-    paymentAllocations,
-    paymentDashboardMetrics,
-    paymentGroups,
-    paymentMethods,
-    payments,
-    postingPreview,
-    refunds,
-    sourceReferences,
-    writeOffs,
-} from '../mock/paymentMock';
+import { getStoredOrganizationUnitId, getStoredTenantId } from '../../../services/api/authTokenStorage';
 import type {
     AdvancePayment,
     CashRegister,
@@ -30,6 +12,7 @@ import type {
     PaymentFormInput,
     PaymentGroup,
     PaymentMethod,
+    PaymentMethodFormInput,
     PaymentPostingPreview,
     PaymentSourceReference,
     Refund,
@@ -38,276 +21,352 @@ import type {
 
 type BackendRecord = Record<string, unknown>;
 
-const PAYMENT_API_MODE = import.meta.env.VITE_PAYMENT_API_MODE ?? 'auto';
-
-function shouldUseMockOnly() {
-    return PAYMENT_API_MODE === 'mock';
-}
-
-async function withMockFallback<T>(realCall: () => Promise<T>, mockCall: () => Promise<T>, fallbackStatuses = [401, 403, 404, 419, 422]): Promise<T> {
-    if (shouldUseMockOnly()) {
-        return mockCall();
-    }
-
-    try {
-        return await realCall();
-    } catch (error) {
-        if (PAYMENT_API_MODE === 'real') {
-            throw error;
-        }
-
-        if (error instanceof ApiError && !fallbackStatuses.includes(error.status)) {
-            throw error;
-        }
-
-        return mockCall();
-    }
-}
-
 function asString(value: unknown, fallback = '') {
     return value === null || value === undefined ? fallback : String(value);
 }
 
-function normalizePayment(raw: BackendRecord): Payment {
-    const metadata = raw.metadata && typeof raw.metadata === 'object' ? raw.metadata as BackendRecord : {};
-    const paymentId = asString(raw.id);
+function asNumberString(value: unknown, fallback = '0.0000') {
+    if (value === null || value === undefined || value === '') return fallback;
+    return Number(value).toFixed(4);
+}
 
+function asBool(value: unknown, fallback = false) {
+    return value === null || value === undefined ? fallback : Boolean(value);
+}
+
+function record(value: unknown): BackendRecord {
+    return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as BackendRecord : {};
+}
+
+function collectionPayload<T>(response: ApiCollectionResponse<BackendRecord>, mapper: (row: BackendRecord) => T): ApiCollectionResponse<T> {
+    return { ...response, data: response.data.map(mapper) };
+}
+
+function contextQuery() {
+    const params = new URLSearchParams();
+    const tenantId = getStoredTenantId();
+    const organizationUnitId = getStoredOrganizationUnitId();
+    if (tenantId) params.set('tenant_id', tenantId);
+    if (organizationUnitId) params.set('organization_unit_id', organizationUnitId);
+    params.set('per_page', '100');
+
+    return `?${params.toString()}`;
+}
+
+function contextPayload(input: BackendRecord = {}): BackendRecord {
     return {
-        allocatedAmount: asString(raw.allocated_amount ?? metadata.allocated_amount, 'Backend calculated'),
-        amount: asString(raw.amount, 'Backend amount'),
-        currency: asString(metadata.currency_code ?? raw.currency_code, 'Backend currency'),
-        direction: normalizeDirection(raw.direction ?? metadata.direction),
-        id: paymentId,
-        methodName: asString(metadata.payment_method_name ?? raw.payment_method_name, 'Backend method'),
-        party: asString(metadata.party_name ?? raw.party_name ?? raw.party_id, 'Backend party'),
-        partyType: asString(raw.party_type ?? metadata.party_type, 'generic'),
-        paymentDate: asString(raw.payment_date, 'Backend date'),
-        paymentNumber: asString(raw.payment_number, `PAY-${paymentId}`),
-        reference: asString(raw.reference),
-        sourceModule: asString(metadata.source_module),
-        sourceReference: asString(metadata.source_reference ?? raw.reference),
-        status: normalizeStatus(raw.status),
-        unallocatedAmount: asString(metadata.unallocated_amount, 'Backend calculated'),
-        updatedAt: asString(raw.updated_at, 'Backend timestamp'),
+        ...input,
+        organization_unit_id: input.organization_unit_id ?? numberOrUndefined(getStoredOrganizationUnitId()),
+        tenant_id: input.tenant_id ?? numberOrUndefined(getStoredTenantId()),
     };
+}
+
+function numberOrUndefined(value: string | null) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 function normalizeDirection(value: unknown): Payment['direction'] {
     const direction = asString(value, 'generic_receipt');
-    if (direction === 'inbound') {
-        return 'generic_receipt';
-    }
-    if (direction === 'outbound') {
-        return 'generic_payment';
-    }
+    if (direction === 'inbound') return 'generic_receipt';
+    if (direction === 'outbound') return 'generic_payment';
     return ['customer_receipt', 'supplier_payment', 'generic_receipt', 'generic_payment'].includes(direction)
         ? direction as Payment['direction']
         : 'generic_receipt';
 }
 
+function backendDirection(direction: Payment['direction']) {
+    return direction === 'supplier_payment' || direction === 'generic_payment' ? 'outbound' : 'inbound';
+}
+
 function normalizeStatus(value: unknown): Payment['status'] {
     const status = asString(value, 'draft').toLowerCase();
     const allowed: Payment['status'][] = ['draft', 'pending', 'posted', 'partially_allocated', 'fully_allocated', 'reconciled', 'voided', 'reversed', 'failed'];
-
     return allowed.includes(status as Payment['status']) ? status as Payment['status'] : 'draft';
 }
 
-function toPaymentPayload(input: PaymentFormInput) {
+function normalizePayment(raw: BackendRecord): Payment {
+    const metadata = record(raw.metadata);
+    const amount = Number(raw.amount ?? 0);
+    const allocated = Number(raw.allocated_amount ?? 0);
+
     return {
-        account_id: input.accountId ? Number(input.accountId) : 1,
-        amount: input.amount,
-        currency_id: input.currency === 'LKR' ? 1 : undefined,
-        direction: input.direction === 'supplier_payment' || input.direction === 'generic_payment' ? 'outbound' : 'inbound',
-        metadata: {
-            direction: input.direction,
-            source_id: input.sourceId,
-            source_module: input.sourceModule,
-            source_reference: input.sourceReference,
-            source_type: input.sourceType,
-        },
-        notes: input.notes,
-        party_id: input.partyId ? Number(input.partyId) : undefined,
-        party_type: input.partyType || undefined,
-        payment_date: input.paymentDate,
-        payment_method_id: Number(input.paymentMethodId || 1),
-        payment_number: `FRONTEND-DRAFT-${Date.now()}`,
-        reference: input.reference,
+        allocatedAmount: asNumberString(raw.allocated_amount),
+        amount: asNumberString(raw.amount),
+        currency: asString(raw.currency_code ?? metadata.currency_code, 'LKR'),
+        direction: normalizeDirection(metadata.direction ?? raw.direction),
+        id: asString(raw.id),
+        methodName: asString(metadata.payment_method_name ?? raw.payment_method_name ?? raw.payment_method_id, 'Payment method'),
+        party: asString(metadata.party_name ?? raw.payer_name ?? raw.payee_name ?? raw.party_id ?? raw.party_type, 'Generic party'),
+        partyType: asString(raw.party_type ?? metadata.party_type, 'generic'),
+        paymentDate: asString(raw.payment_date).slice(0, 10),
+        paymentNumber: asString(raw.payment_number),
+        reference: asString(raw.reference),
+        sourceModule: asString(raw.source_module ?? metadata.source_module),
+        sourceReference: asString(raw.source_reference ?? metadata.source_reference),
+        sourceType: asString(raw.source_type ?? metadata.source_type),
+        status: normalizeStatus(raw.status),
+        unallocatedAmount: asNumberString(Math.max(0, amount - allocated)),
+        updatedAt: asString(raw.updated_at),
     };
 }
 
-function mockPaymentFromInput(input: PaymentFormInput): Payment {
+function normalizeMethod(raw: BackendRecord): PaymentMethod {
     return {
-        allocatedAmount: 'Backend calculated',
-        amount: input.amount,
-        currency: input.currency,
-        direction: input.direction,
-        id: 'mock-payment-draft',
-        methodName: 'Selected method',
-        party: input.partyType || 'Selected party',
-        partyType: input.partyType,
-        paymentDate: input.paymentDate,
-        paymentNumber: 'Backend sequence pending',
-        reference: input.reference,
-        sourceModule: input.sourceModule,
-        sourceReference: input.sourceReference,
-        status: 'draft',
-        unallocatedAmount: 'Backend calculated',
-        updatedAt: 'Mock timestamp',
+        accountId: asString(raw.account_id),
+        accountName: asString(record(raw.metadata).account_name ?? raw.account_name),
+        code: asString(raw.code),
+        id: asString(raw.id),
+        isActive: asBool(raw.is_active, true),
+        name: asString(raw.name),
+        type: asString(raw.type, 'other') as PaymentMethod['type'],
     };
+}
+
+function normalizeGroup(raw: BackendRecord): PaymentGroup {
+    return {
+        direction: asString(raw.direction),
+        groupType: asString(raw.group_type ?? raw.type),
+        id: asString(raw.id),
+        reference: asString(raw.reference),
+        status: asString(raw.status, 'draft'),
+        totalAmount: asNumberString(raw.total_amount),
+        transactionNumber: asString(raw.transaction_number ?? raw.group_number ?? raw.id),
+    };
+}
+
+function normalizeAllocation(raw: BackendRecord): PaymentAllocation {
+    return {
+        allocatedAmount: asNumberString(raw.allocated_amount),
+        allocationDate: asString(raw.allocation_date ?? raw.created_at).slice(0, 10),
+        documentNumber: asString(raw.source_reference ?? raw.reference ?? raw.document_id),
+        documentType: asString(raw.document_type ?? raw.source_type),
+        id: asString(raw.id),
+        paymentId: asString(raw.payment_id),
+        reference: asString(raw.reference),
+        status: asString(raw.status, 'active'),
+    };
+}
+
+function normalizeAdvance(raw: BackendRecord): AdvancePayment {
+    const metadata = record(raw.metadata);
+    return {
+        advanceDate: asString(raw.advance_date).slice(0, 10),
+        advanceNumber: asString(raw.advance_number),
+        amount: asNumberString(raw.amount),
+        currency: asString(raw.currency_code ?? metadata.currency_code, 'LKR'),
+        id: asString(raw.id),
+        party: asString(metadata.party_name ?? raw.party_id ?? raw.party_type, 'Generic party'),
+        partyType: asString(raw.party_type),
+        remainingAmount: asNumberString(raw.remaining_amount),
+        status: asString(raw.status, 'open'),
+        type: asString(raw.type, 'generic'),
+    };
+}
+
+function normalizeWriteOff(raw: BackendRecord): WriteOff {
+    return {
+        amount: asNumberString(raw.amount),
+        documentNumber: asString(raw.source_reference ?? raw.reference ?? raw.document_id),
+        documentType: asString(raw.document_type),
+        id: asString(raw.id),
+        reason: asString(raw.reason),
+        reference: asString(raw.reference),
+        status: asString(raw.status, 'draft'),
+    };
+}
+
+function normalizeCashRegister(raw: BackendRecord): CashRegister {
+    return {
+        assignedUser: asString(raw.assigned_user_id, 'Unassigned'),
+        code: asString(raw.code),
+        currentBalance: asNumberString(raw.current_balance),
+        id: asString(raw.id),
+        name: asString(raw.name),
+        openingBalance: asNumberString(raw.opening_balance),
+        status: asString(raw.status, 'closed'),
+    };
+}
+
+function normalizeCheck(raw: BackendRecord): CheckPayment {
+    const metadata = record(raw.metadata);
+    return {
+        amount: asNumberString(raw.amount),
+        bank: asString(metadata.bank_name ?? raw.bank_account_id),
+        checkNumber: asString(raw.check_number),
+        dueDate: asString(raw.due_date ?? raw.check_date).slice(0, 10),
+        id: asString(raw.id),
+        linkedPayment: asString(raw.payment_id),
+        party: asString(raw.party_id ?? raw.party_type, 'Generic party'),
+        status: asString(raw.status, 'pending'),
+        type: asString(raw.type),
+    };
+}
+
+function paymentPayload(input: PaymentFormInput): BackendRecord {
+    return contextPayload({
+        amount: input.amount,
+        direction: backendDirection(input.direction),
+        exchange_rate: 1,
+        metadata: {
+            currency_code: input.currency,
+            direction: input.direction,
+            party_name: input.partyName,
+            payment_method_name: input.paymentMethodName,
+        },
+        notes: input.notes,
+        party_id: numberOrUndefined(input.partyId ?? null),
+        party_role: input.direction.includes('receipt') ? 'payer' : 'payee',
+        party_type: input.partyType || 'external_party',
+        payee_name: input.direction.includes('payment') ? input.partyName : undefined,
+        payer_name: input.direction.includes('receipt') ? input.partyName : undefined,
+        payment_date: input.paymentDate,
+        payment_method_id: Number(input.paymentMethodId),
+        reference: input.reference,
+        source_id: numberOrUndefined(input.sourceId ?? null),
+        source_module: input.sourceModule || undefined,
+        source_reference: input.sourceReference || undefined,
+        source_type: input.sourceType || undefined,
+    });
 }
 
 export const paymentApi = {
-    listDashboardMetrics: () => mockCollectionResponse(paymentDashboardMetrics),
-
-    listPayments: (): Promise<ApiCollectionResponse<Payment>> => withMockFallback(
-        async () => {
-            const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/payment/payments');
-
-            return { ...response, data: response.data.map(normalizePayment) };
-        },
-        () => mockCollectionResponse(payments),
-    ),
-
-    getPayment: (paymentId: string): Promise<ApiResponse<Payment>> => withMockFallback(
-        async () => {
-            const response = await httpClient<ApiResponse<BackendRecord>>(`/api/payment/payments/${paymentId}`);
-
-            return { ...response, data: normalizePayment(response.data) };
-        },
-        () => mockResponse(getPaymentById(paymentId)),
-    ),
-
-    createPayment: (input: PaymentFormInput): Promise<ApiResponse<Payment | PaymentFormInput>> => withMockFallback(
-        async () => {
-            const response = await httpClient<ApiResponse<BackendRecord>>('/api/payment/payments', { body: toPaymentPayload(input), method: 'POST' });
-
-            return { ...response, data: normalizePayment(response.data) };
-        },
-        () => mockResponse(mockPaymentFromInput(input)),
-    ),
-
-    updatePayment: (paymentId: string, input: PaymentFormInput): Promise<ApiResponse<Payment | PaymentFormInput>> => withMockFallback(
-        async () => {
-            const response = await httpClient<ApiResponse<BackendRecord>>(`/api/payment/payments/${paymentId}`, { body: toPaymentPayload(input), method: 'PUT' });
-
-            return { ...response, data: normalizePayment(response.data) };
-        },
-        () => mockResponse({ ...mockPaymentFromInput(input), id: paymentId }),
-    ),
-
-    postPayment: (paymentId: string) => withMockFallback(
-        () => httpClient<ApiResponse<unknown>>(`/api/payment/payments/${paymentId}/engines/post`, { method: 'POST' }),
-        () => mockResponse({ action: 'post-requested', paymentId }),
-    ),
-
-    reversePayment: (paymentId: string, input?: unknown) => withMockFallback(
-        () => httpClient<ApiResponse<unknown>>(`/api/payment/payments/${paymentId}/engines/reverse`, { body: input ?? {}, method: 'POST' }),
-        () => mockResponse({ action: 'reverse-requested', input, paymentId }),
-    ),
-
-    voidPayment: (paymentId: string) => withMockFallback(
-        () => httpClient<ApiResponse<unknown>>(`/api/payment/payments/${paymentId}`, { method: 'DELETE' }),
-        () => mockResponse({ action: 'void-requested', paymentId }),
-    ),
-
-    refundPayment: (paymentId: string, input?: unknown) => withMockFallback(
-        () => httpClient<ApiResponse<unknown>>(`/api/payment/payments/${paymentId}/engines/refund`, { body: input ?? {}, method: 'POST' }),
-        () => mockResponse({ action: 'refund-requested', input, paymentId }),
-    ),
-
-    listPaymentMethods: (): Promise<ApiCollectionResponse<PaymentMethod>> => withMockFallback(
-        () => httpClient<ApiCollectionResponse<PaymentMethod>>('/api/payment/payment-methods'),
-        () => mockCollectionResponse(paymentMethods),
-    ),
-
-    createPaymentMethod: (input: unknown) => withMockFallback(
-        () => httpClient<ApiResponse<PaymentMethod>>('/api/payment/payment-methods', { body: input, method: 'POST' }),
-        () => mockResponse(input),
-    ),
-
-    updatePaymentMethod: (methodId: string, input: unknown) => withMockFallback(
-        () => httpClient<ApiResponse<PaymentMethod>>(`/api/payment/payment-methods/${methodId}`, { body: input, method: 'PUT' }),
-        () => mockResponse(input),
-    ),
-
-    listPaymentGroups: (): Promise<ApiCollectionResponse<PaymentGroup>> => withMockFallback(
-        () => httpClient<ApiCollectionResponse<PaymentGroup>>('/api/payment/payment-groups'),
-        () => mockCollectionResponse(paymentGroups),
-    ),
-
-    listAllocations: (): Promise<ApiCollectionResponse<PaymentAllocation>> => withMockFallback(
-        () => httpClient<ApiCollectionResponse<PaymentAllocation>>('/api/payment/payment-allocations'),
-        () => mockCollectionResponse(paymentAllocations),
-    ),
-
-    previewAllocation: (paymentId: string, input: unknown): Promise<ApiPreviewResponse<unknown, PaymentAllocationPreview['calculated']>> => withMockFallback(
-        async () => {
-            const response = await httpClient<ApiResponse<PaymentAllocationPreview>>(`/api/payment/payments/${paymentId}/engines/preview-allocation`, { body: input, method: 'POST' });
-            const preview = response.data;
-
-            return {
-                breakdown: preview.breakdown,
-                calculated: preview.calculated,
-                errors: preview.errors,
-                input,
-                warnings: preview.warnings,
-            };
-        },
-        () => mockPreviewResponse(input, allocationPreview.calculated, allocationPreview.breakdown, allocationPreview.warnings),
-    ),
-
-    allocatePayment: (paymentId: string, input: unknown) => withMockFallback(
-        () => httpClient<ApiResponse<unknown>>(`/api/payment/payments/${paymentId}/engines/allocate`, { body: input, method: 'POST' }),
-        () => mockResponse({ action: 'allocate-requested', input, paymentId }),
-    ),
-
-    unallocatePayment: (paymentId: string, input: unknown) => withMockFallback(
-        () => httpClient<ApiResponse<unknown>>(`/api/payment/payments/${paymentId}/engines/unallocate`, { body: input, method: 'POST' }),
-        () => mockResponse({ action: 'unallocate-requested', input, paymentId }),
-    ),
-
-    listAdvancePayments: (): Promise<ApiCollectionResponse<AdvancePayment>> => withMockFallback(
-        () => httpClient<ApiCollectionResponse<AdvancePayment>>('/api/payment/advance-payments'),
-        () => mockCollectionResponse(advancePayments),
-    ),
-
-    createAdvancePayment: (input: unknown) => withMockFallback(
-        () => httpClient<ApiResponse<AdvancePayment>>('/api/payment/advance-payments', { body: input, method: 'POST' }),
-        () => mockResponse(input),
-    ),
-
-    allocateAdvancePayment: (input: unknown) => withMockFallback(
-        () => httpClient<ApiResponse<unknown>>('/api/payment/advance-payment-allocations', { body: input, method: 'POST' }),
-        () => mockResponse(input),
-    ),
-
-    listRefunds: () => mockCollectionResponse(refunds),
-
+    allocatePayment: (paymentId: string, input: { allocatedAmount: string; documentId: string; documentType: string; reference?: string }) => httpClient<ApiResponse<unknown>>(`/api/payment/payments/${paymentId}/engines/allocate`, {
+        body: contextPayload({
+            allocated_amount: input.allocatedAmount,
+            document_id: Number(input.documentId),
+            document_type: input.documentType,
+            reference: input.reference,
+        }),
+        method: 'POST',
+    }),
+    createPayment: async (input: PaymentFormInput): Promise<ApiResponse<Payment>> => {
+        const response = await httpClient<ApiResponse<BackendRecord>>('/api/payment/payments', { body: paymentPayload(input), method: 'POST' });
+        return { ...response, data: normalizePayment(response.data ?? record(response)) };
+    },
+    createPaymentMethod: async (input: PaymentMethodFormInput): Promise<ApiResponse<PaymentMethod>> => {
+        const response = await httpClient<ApiResponse<BackendRecord>>('/api/payment/payment-methods', {
+            body: contextPayload({
+                account_id: numberOrUndefined(input.accountId ?? null),
+                code: input.code,
+                is_active: input.isActive,
+                name: input.name,
+                type: input.type,
+            }),
+            method: 'POST',
+        });
+        return { ...response, data: normalizeMethod(response.data ?? record(response)) };
+    },
     createRefund: (paymentId: string, input: unknown) => paymentApi.refundPayment(paymentId, input),
-
-    listWriteOffs: (): Promise<ApiCollectionResponse<WriteOff>> => withMockFallback(
-        () => httpClient<ApiCollectionResponse<WriteOff>>('/api/payment/write-offs'),
-        () => mockCollectionResponse(writeOffs),
-    ),
-
-    createWriteOff: (input: unknown) => withMockFallback(
-        () => httpClient<ApiResponse<WriteOff>>('/api/payment/write-offs', { body: input, method: 'POST' }),
-        () => mockResponse(input),
-    ),
-
-    listCashRegisters: (): Promise<ApiCollectionResponse<CashRegister>> => withMockFallback(
-        () => httpClient<ApiCollectionResponse<CashRegister>>('/api/payment/cash-registers'),
-        () => mockCollectionResponse(cashRegisters),
-    ),
-
-    listChecks: (): Promise<ApiCollectionResponse<CheckPayment>> => withMockFallback(
-        () => httpClient<ApiCollectionResponse<CheckPayment>>('/api/payment/checks'),
-        () => mockCollectionResponse(checks),
-    ),
-
-    getPaymentActivity: (_paymentId: string): Promise<ApiCollectionResponse<PaymentAuditEntry>> => mockCollectionResponse(paymentActivity),
-
-    listSourceReferences: (_paymentId: string): Promise<ApiCollectionResponse<PaymentSourceReference>> => mockCollectionResponse(sourceReferences),
-
-    getPaymentPostingPreview: (_paymentId: string): Promise<ApiResponse<PaymentPostingPreview>> => mockResponse(postingPreview),
+    createWriteOff: async (input: unknown) => httpClient<ApiResponse<WriteOff>>('/api/payment/write-offs', { body: contextPayload(record(input)), method: 'POST' }),
+    getPayment: async (paymentId: string): Promise<ApiResponse<Payment>> => {
+        const response = await httpClient<ApiResponse<BackendRecord> | BackendRecord>(`/api/payment/payments/${paymentId}`);
+        const raw = 'data' in response && response.data ? response.data as BackendRecord : response as BackendRecord;
+        return { data: normalizePayment(raw) };
+    },
+    getPaymentActivity: async (paymentId: string): Promise<ApiCollectionResponse<PaymentAuditEntry>> => {
+        const response = await paymentApi.getPayment(paymentId);
+        return {
+            data: [
+                {
+                    actor: 'Backend',
+                    description: `Payment status is ${response.data.status}.`,
+                    id: `${paymentId}-status`,
+                    time: response.data.updatedAt,
+                },
+            ],
+        };
+    },
+    getPaymentPostingPreview: async (_paymentId: string): Promise<ApiResponse<PaymentPostingPreview>> => ({
+        data: {
+            breakdown: [{ label: 'Posting preview', value: 'Finance posting preview endpoint is not configured for Payment yet.' }],
+            errors: [],
+            journalImpact: [],
+            warnings: ['Posting preview is unavailable until Finance exposes a generic preview endpoint for Payment.'],
+        },
+    }),
+    listAdvancePayments: async () => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/payment/advance-payments${contextQuery()}`), normalizeAdvance),
+    listAllocations: async () => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/payment/payment-allocations${contextQuery()}`), normalizeAllocation),
+    listCashRegisters: async () => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/payment/cash-registers${contextQuery()}`), normalizeCashRegister),
+    listChecks: async () => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/payment/checks${contextQuery()}`), normalizeCheck),
+    listDashboardMetrics: async (): Promise<ApiCollectionResponse<{ label: string; tone: string; value: string }>> => {
+        const [payments, methods, allocations] = await Promise.all([paymentApi.listPayments(), paymentApi.listPaymentMethods(), paymentApi.listAllocations()]);
+        return {
+            data: [
+                { label: 'Payments', tone: 'active', value: String(payments.data.length) },
+                { label: 'Draft', tone: 'draft', value: String(payments.data.filter((payment) => payment.status === 'draft').length) },
+                { label: 'Posted', tone: 'posted', value: String(payments.data.filter((payment) => payment.status === 'posted').length) },
+                { label: 'Methods', tone: 'active', value: String(methods.data.length) },
+                { label: 'Allocations', tone: 'active', value: String(allocations.data.length) },
+                { label: 'Backend-owned', tone: 'pending', value: 'Balances' },
+            ],
+        };
+    },
+    listPaymentGroups: async () => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/payment/payment-groups${contextQuery()}`), normalizeGroup),
+    listPaymentMethods: async () => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/payment/payment-methods${contextQuery()}`), normalizeMethod),
+    listPayments: async () => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/payment/payments${contextQuery()}`), normalizePayment),
+    listRefunds: async (): Promise<ApiCollectionResponse<Refund>> => ({ data: [] }),
+    listSourceReferences: async (paymentId: string): Promise<ApiCollectionResponse<PaymentSourceReference>> => {
+        const response = await paymentApi.getPayment(paymentId);
+        return {
+            data: response.data.sourceReference
+                ? [{
+                    id: `${paymentId}-source`,
+                    label: response.data.sourceReference,
+                    sourceModule: response.data.sourceModule ?? '',
+                    sourceReference: response.data.sourceReference,
+                    sourceType: response.data.sourceType ?? '',
+                }]
+                : [],
+        };
+    },
+    listWriteOffs: async () => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/payment/write-offs${contextQuery()}`), normalizeWriteOff),
+    postPayment: (paymentId: string) => httpClient<ApiResponse<unknown>>(`/api/payment/payments/${paymentId}/engines/post`, { method: 'POST' }),
+    previewAllocation: async (paymentId: string, input: { allocatedAmount: string; documentId: string; documentType: string }): Promise<ApiPreviewResponse<unknown, PaymentAllocationPreview['calculated']>> => {
+        const response = await httpClient<ApiResponse<BackendRecord>>(`/api/payment/payments/${paymentId}/engines/preview-allocation`, {
+            body: contextPayload({
+                allocated_amount: input.allocatedAmount,
+                document_id: Number(input.documentId),
+                document_type: input.documentType,
+            }),
+            method: 'POST',
+        });
+        const preview = response.data;
+        return {
+            breakdown: [
+                { label: 'Payment amount', value: asNumberString(preview.payment_amount) },
+                { label: 'Currently allocated', value: asNumberString(preview.allocated_amount_total) },
+                { label: 'Requested allocation', value: asNumberString(preview.requested_allocation_amount) },
+            ],
+            calculated: {
+                allocatedAmount: asNumberString(preview.allocated_amount_total),
+                remainingUnallocatedAmount: asNumberString(preview.remaining_after_allocation),
+                targetRemainingBalance: asString(preview.can_allocate) === 'true' ? 'Backend allowed' : 'Backend rejected',
+            },
+            errors: asBool(preview.can_allocate) ? [] : ['Backend rejected this allocation request.'],
+            input,
+            warnings: asBool(preview.duplicate_allocation_exists) ? ['Duplicate allocation exists for this target.'] : [],
+        };
+    },
+    refundPayment: (paymentId: string, input?: unknown) => httpClient<ApiResponse<unknown>>(`/api/payment/payments/${paymentId}/engines/refund`, { body: input ?? {}, method: 'POST' }),
+    reversePayment: (paymentId: string, input?: unknown) => httpClient<ApiResponse<unknown>>(`/api/payment/payments/${paymentId}/engines/reverse`, { body: input ?? {}, method: 'POST' }),
+    unallocatePayment: (paymentId: string, input: unknown) => httpClient<ApiResponse<unknown>>(`/api/payment/payments/${paymentId}/engines/unallocate`, { body: input, method: 'POST' }),
+    updatePayment: async (paymentId: string, input: PaymentFormInput): Promise<ApiResponse<Payment>> => {
+        const response = await httpClient<ApiResponse<BackendRecord>>(`/api/payment/payments/${paymentId}`, { body: paymentPayload(input), method: 'PUT' });
+        return { ...response, data: normalizePayment(response.data ?? record(response)) };
+    },
+    updatePaymentMethod: async (methodId: string, input: PaymentMethodFormInput): Promise<ApiResponse<PaymentMethod>> => {
+        const response = await httpClient<ApiResponse<BackendRecord>>(`/api/payment/payment-methods/${methodId}`, {
+            body: contextPayload({
+                account_id: numberOrUndefined(input.accountId ?? null),
+                code: input.code,
+                is_active: input.isActive,
+                name: input.name,
+                type: input.type,
+            }),
+            method: 'PUT',
+        });
+        return { ...response, data: normalizeMethod(response.data ?? record(response)) };
+    },
+    voidPayment: (paymentId: string) => httpClient<void>(`/api/payment/payments/${paymentId}`, { method: 'DELETE' }),
 };

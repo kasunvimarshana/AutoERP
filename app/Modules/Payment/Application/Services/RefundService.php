@@ -35,13 +35,10 @@ final class RefundService implements RefundServiceInterface
                 ));
             }
 
-            $refundNumber = trim((string) ($payload['payment_number'] ?? ''));
-            if ($refundNumber === '') {
-                return Result::failure(new Error(
-                    PaymentErrorCode::INVALID_VALUE,
-                    'payment_number is required for refund.',
-                ));
-            }
+            $refundNumber = $this->resolveRefundNumber(
+                (int) $source->get('tenant_id'),
+                (string) ($payload['payment_number'] ?? ''),
+            );
 
             $refundAmount = isset($payload['amount'])
                 ? round((float) $payload['amount'], 4)
@@ -68,7 +65,7 @@ final class RefundService implements RefundServiceInterface
                 'direction' => $this->reverseDirection((string) $source->get('direction', 'inbound')),
                 'payment_group_id' => $source->get('payment_group_id'),
                 'payment_method_id' => (int) ($payload['payment_method_id'] ?? $source->get('payment_method_id')),
-                'account_id' => (int) ($payload['account_id'] ?? $source->get('account_id')),
+                'account_id' => $this->optionalInteger($payload['account_id'] ?? $source->get('account_id')),
                 'currency_id' => $source->get('currency_id'),
                 'exchange_rate' => (float) $source->get('exchange_rate', 1),
                 'base_amount' => round($refundAmount * (float) $source->get('exchange_rate', 1), 4),
@@ -91,5 +88,29 @@ final class RefundService implements RefundServiceInterface
     private function reverseDirection(string $direction): string
     {
         return strtolower(trim($direction)) === 'inbound' ? 'outbound' : 'inbound';
+    }
+
+    private function optionalInteger(mixed $value): ?int
+    {
+        $integer = (int) ($value ?? 0);
+
+        return $integer > 0 ? $integer : null;
+    }
+
+    private function resolveRefundNumber(int $tenantId, string $requested): string
+    {
+        $requested = trim($requested);
+        if ($requested !== '') {
+            return $requested;
+        }
+
+        $next = count($this->paymentRepository->list(['tenant_id' => $tenantId])) + 1;
+
+        do {
+            $number = 'REF-' . now()->format('Ymd') . '-' . str_pad((string) $next, 5, '0', STR_PAD_LEFT);
+            $next++;
+        } while ($this->paymentRepository->exists(['tenant_id' => $tenantId, 'payment_number' => $number]));
+
+        return $number;
     }
 }

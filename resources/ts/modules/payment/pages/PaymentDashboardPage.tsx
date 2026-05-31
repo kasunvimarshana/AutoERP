@@ -1,11 +1,18 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
 import { Button } from '../../../shared/components/ui/Button';
 import { Card } from '../../../shared/components/ui/Card';
 import { StatusBadge } from '../../../shared/components/business/StatusBadge';
-import { paymentDashboardMetrics } from '../mock/paymentMock';
+import { paymentApi } from '../services/paymentApi';
 
 export function PaymentDashboardPage() {
+    const [metrics, setMetrics] = useState<Array<{ label: string; tone: string; value: string }>>([]);
+
+    useEffect(() => {
+        paymentApi.listDashboardMetrics().then((response) => setMetrics(response.data));
+    }, []);
+
     return (
         <div className="space-y-6">
             <PageHeader
@@ -15,7 +22,7 @@ export function PaymentDashboardPage() {
                 title="Payments"
             />
             <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
-                {paymentDashboardMetrics.map((metric) => (
+                {metrics.map((metric) => (
                     <Card className="p-4" key={metric.label}>
                         <div className="flex items-start justify-between gap-3">
                             <div>

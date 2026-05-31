@@ -14,14 +14,14 @@ import {
     RefundPanel,
     WriteOffPanel,
 } from '../components/PaymentComponents';
-import { paymentAllocations, refunds } from '../mock/paymentMock';
 import { paymentApi } from '../services/paymentApi';
-import type { AdvancePayment, CashRegister, CheckPayment, PaymentGroup, PaymentMethod, WriteOff } from '../types/payment.types';
+import type { AdvancePayment, CashRegister, CheckPayment, PaymentAllocation, PaymentGroup, PaymentMethod, Refund, WriteOff } from '../types/payment.types';
 
 export function PaymentMethodListPage() {
     const [rows, setRows] = useState<PaymentMethod[]>([]);
-    useEffect(() => { paymentApi.listPaymentMethods().then((response) => setRows(response.data)); }, []);
-    return <ReferencePage subtitle="Reusable payment methods for cash, bank, card, check, online, and other channels." title="Payment Methods"><PaymentMethodForm />{rows.length ? <PaymentMethodsTable methods={rows} /> : <EmptyState description="No methods returned yet." title="No payment methods" />}</ReferencePage>;
+    const load = () => { paymentApi.listPaymentMethods().then((response) => setRows(response.data)); };
+    useEffect(load, []);
+    return <ReferencePage subtitle="Reusable payment methods for cash, bank, card, check, online, and other channels." title="Payment Methods"><PaymentMethodForm onSaved={load} /><PaymentMethodsTable methods={rows} /></ReferencePage>;
 }
 
 export function PaymentGroupListPage() {
@@ -31,7 +31,9 @@ export function PaymentGroupListPage() {
 }
 
 export function PaymentAllocationListPage() {
-    return <ReferencePage subtitle="Allocation workspace. Frontend requests preview and confirmation only; backend calculates allocated and remaining amounts." title="Payment Allocations"><PaymentAllocationPanel allocations={paymentAllocations} /></ReferencePage>;
+    const [rows, setRows] = useState<PaymentAllocation[]>([]);
+    useEffect(() => { paymentApi.listAllocations().then((response) => setRows(response.data)); }, []);
+    return <ReferencePage subtitle="Allocation workspace. Frontend requests preview and confirmation only; backend calculates allocated and remaining amounts." title="Payment Allocations"><PaymentAllocationPanel allocations={rows} /></ReferencePage>;
 }
 
 export function AdvancePaymentListPage() {
@@ -41,7 +43,9 @@ export function AdvancePaymentListPage() {
 }
 
 export function RefundListPage() {
-    return <ReferencePage subtitle="Refund requests and outcomes. Backend validates refundable amount and posting effects." title="Refunds"><RefundPanel refunds={refunds} /></ReferencePage>;
+    const [rows, setRows] = useState<Refund[]>([]);
+    useEffect(() => { paymentApi.listRefunds().then((response) => setRows(response.data)); }, []);
+    return <ReferencePage subtitle="Refund requests and outcomes. Backend validates refundable amount and posting effects." title="Refunds"><RefundPanel refunds={rows} /></ReferencePage>;
 }
 
 export function WriteOffListPage() {
@@ -66,7 +70,7 @@ function ReferencePage({ children, subtitle, title }: { children: ReactNode; sub
     return (
         <div className="space-y-6">
             <PageHeader eyebrow="Payments" subtitle={subtitle} title={title} />
-            <SearchFilterBar placeholder={`Search ${title.toLowerCase()}...`} />
+            <SearchFilterBar />
             {children}
         </div>
     );

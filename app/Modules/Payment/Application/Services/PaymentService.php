@@ -40,10 +40,13 @@ final class PaymentService implements PaymentServiceInterface
             }
 
             $amount = round((float) $payload['amount'], 4);
+            $paymentMethodId = (int) $payload['payment_method_id'];
             $exchangeRate = round((float) ($payload['exchange_rate'] ?? 1), 4);
             $payload['base_amount'] = round((float) ($payload['base_amount'] ?? ($amount * $exchangeRate)), 4);
             $payload['amount'] = $amount;
             $payload['exchange_rate'] = $exchangeRate;
+            $payload['payment_number'] = $this->resolvePaymentNumber($tenantId, (string) ($payload['payment_number'] ?? ''));
+            $payload['account_id'] = $this->resolveAccountId($tenantId, $paymentMethodId, $payload['account_id'] ?? null);
             $payload['status'] = $payload['status'] ?? PaymentStatus::DRAFT;
             $payload['direction'] = strtolower(trim((string) ($payload['direction'] ?? 'inbound')));
             $payload['row_version'] = (int) ($payload['row_version'] ?? 1);
@@ -95,24 +98,20 @@ final class PaymentService implements PaymentServiceInterface
     {
         $tenantId = isset($payload['tenant_id']) ? (int) $payload['tenant_id'] : 0;
         $paymentMethodId = isset($payload['payment_method_id']) ? (int) $payload['payment_method_id'] : 0;
-        $paymentNumber = trim((string) ($payload['payment_number'] ?? ''));
         $paymentDate = trim((string) ($payload['payment_date'] ?? ''));
         $amount = (float) ($payload['amount'] ?? 0);
-        $accountId = isset($payload['account_id']) ? (int) $payload['account_id'] : 0;
         $direction = strtolower(trim((string) ($payload['direction'] ?? 'inbound')));
         $exchangeRate = (float) ($payload['exchange_rate'] ?? 1);
 
         if (
             $tenantId < 1
             || $paymentMethodId < 1
-            || $paymentNumber === ''
             || $paymentDate === ''
             || $amount <= 0
-            || $accountId < 1
         ) {
             return Result::failure(new Error(
                 PaymentErrorCode::INVALID_VALUE,
-                'tenant_id, payment_method_id, payment_number, payment_date, amount and account_id are required.',
+                'tenant_id, payment_method_id, payment_date and amount are required.',
             ));
         }
 
@@ -140,6 +139,39 @@ final class PaymentService implements PaymentServiceInterface
         }
 
         return Result::success(true);
+    }
+
+    private function resolvePaymentNumber(int $tenantId, string $requested): string
+    {
+        $requested = trim($requested);
+        if ($requested !== '') {
+            return $requested;
+        }
+
+        $next = count($this->paymentRepository->list(['tenant_id' => $tenantId])) + 1;
+
+        do {
+            $number = 'PAY-' . now()->format('Ymd') . '-' . str_pad((string) $next, 5, '0', STR_PAD_LEFT);
+            $next++;
+        } while ($this->paymentRepository->exists(['tenant_id' => $tenantId, 'payment_number' => $number]));
+
+        return $number;
+    }
+
+    private function resolveAccountId(int $tenantId, int $paymentMethodId, mixed $requestedAccountId): ?int
+    {
+        $accountId = (int) ($requestedAccountId ?? 0);
+        if ($accountId > 0) {
+            return $accountId;
+        }
+
+        $method = $this->paymentMethodRepository->findById($paymentMethodId);
+        $methodAccountId = (int) ($method?->get('account_id', 0) ?? 0);
+        if ($methodAccountId > 0 && (int) ($method?->get('tenant_id', 0) ?? 0) === $tenantId) {
+            return $methodAccountId;
+        }
+
+        return null;
     }
 
     /**

@@ -15,9 +15,8 @@ import {
     RefundPanel,
     WriteOffPanel,
 } from '../components/PaymentComponents';
-import { paymentAllocations, refunds, writeOffs } from '../mock/paymentMock';
 import { paymentApi } from '../services/paymentApi';
-import type { Payment, PaymentAuditEntry, PaymentPostingPreview, PaymentSourceReference } from '../types/payment.types';
+import type { Payment, PaymentAllocation, PaymentAuditEntry, PaymentPostingPreview, PaymentSourceReference, Refund, WriteOff } from '../types/payment.types';
 
 const tabs = [
     { label: 'Overview', value: 'overview' },
@@ -36,15 +35,25 @@ export function PaymentDetailPage() {
     const [active, setActive] = useState('overview');
     const [payment, setPayment] = useState<Payment | null>(null);
     const [activity, setActivity] = useState<PaymentAuditEntry[]>([]);
+    const [allocations, setAllocations] = useState<PaymentAllocation[]>([]);
     const [references, setReferences] = useState<PaymentSourceReference[]>([]);
     const [postingPreview, setPostingPreview] = useState<PaymentPostingPreview | null>(null);
+    const [refunds, setRefunds] = useState<Refund[]>([]);
+    const [writeOffs, setWriteOffs] = useState<WriteOff[]>([]);
 
-    useEffect(() => {
+    function load() {
         const paymentId = id ?? 'pay-001';
         paymentApi.getPayment(paymentId).then((response) => setPayment(response.data));
         paymentApi.getPaymentActivity(paymentId).then((response) => setActivity(response.data));
+        paymentApi.listAllocations().then((response) => setAllocations(response.data.filter((allocation) => allocation.paymentId === paymentId)));
         paymentApi.listSourceReferences(paymentId).then((response) => setReferences(response.data));
         paymentApi.getPaymentPostingPreview(paymentId).then((response) => setPostingPreview(response.data));
+        paymentApi.listRefunds().then((response) => setRefunds(response.data));
+        paymentApi.listWriteOffs().then((response) => setWriteOffs(response.data));
+    }
+
+    useEffect(() => {
+        load();
     }, [id]);
 
     if (!payment) {
@@ -54,10 +63,10 @@ export function PaymentDetailPage() {
     return (
         <div className="space-y-6">
             <PageHeader actions={<><Link to="/payments/payments"><Button variant="secondary">Back</Button></Link><Link to={`/payments/payments/${payment.id}/edit`}><Button>Edit Payment</Button></Link></>} eyebrow="Payment" subtitle="Payment detail shows generic settlement context without calculating balances in the frontend." title={payment.paymentNumber} />
-            <PaymentSummaryCard payment={payment} />
+            <PaymentSummaryCard onChanged={load} payment={payment} />
             <Tabs active={active} items={tabs} onChange={setActive} />
             {active === 'overview' ? <Overview payment={payment} /> : null}
-            {active === 'allocations' ? <PaymentAllocationPanel allocations={paymentAllocations} /> : null}
+            {active === 'allocations' ? <PaymentAllocationPanel allocations={allocations} payment={payment} /> : null}
             {active === 'source' ? <PaymentSourceReferencePanel references={references} /> : null}
             {active === 'posting' && postingPreview ? <PaymentPostingPreviewPanel preview={postingPreview} /> : null}
             {active === 'refunds' ? <RefundPanel refunds={refunds} /> : null}
@@ -80,7 +89,7 @@ function Overview({ payment }: { payment: Payment }) {
                 { label: 'Source', value: payment.sourceReference ?? 'No source reference' },
             ]}
             status={payment.status}
-            subtitle="Values are displayed from backend/mock response. No settlement math is performed here."
+            subtitle="Values are displayed from backend response. No settlement math is performed here."
             title="Payment Overview"
         />
     );
