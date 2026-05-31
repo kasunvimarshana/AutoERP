@@ -22,7 +22,13 @@ final class ListSupplierContactRequest extends FormRequest
             'tenant_id' => ['nullable', 'integer', 'min:1', 'exists:tenants,id'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
             'page' => ['nullable', 'integer', 'min:1'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:' . (int) config('supplier.pagination.max_per_page', 200)],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:'.(int) config('supplier.pagination.max_per_page', 200)],
+            'supplier_id' => ['nullable', 'integer', 'min:1', 'exists:suppliers,id'],
+            'name' => ['nullable', 'string', 'max:180'],
+            'contact_name' => ['nullable', 'string', 'max:180'],
+            'designation' => ['nullable', 'string', 'max:180'],
+            'email' => ['nullable', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:100'],
         ];
     }
 }

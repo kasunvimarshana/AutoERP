@@ -22,7 +22,11 @@ final class ListSupplierAddressRequest extends FormRequest
             'tenant_id' => ['nullable', 'integer', 'min:1', 'exists:tenants,id'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
             'page' => ['nullable', 'integer', 'min:1'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:' . (int) config('supplier.pagination.max_per_page', 200)],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:'.(int) config('supplier.pagination.max_per_page', 200)],
+            'supplier_id' => ['nullable', 'integer', 'min:1', 'exists:suppliers,id'],
+            'type' => ['nullable', 'string', 'max:50'],
+            'city' => ['nullable', 'string', 'max:120'],
+            'is_active' => ['nullable', 'boolean'],
         ];
     }
 }

@@ -13,6 +13,31 @@ final class UpsertSupplierAddressRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $aliases = [];
+
+        if ($this->has('address_type') && ! $this->has('type')) {
+            $aliases['type'] = $this->input('address_type');
+        }
+
+        if ($this->has('address_line_1') && ! $this->has('address_line1')) {
+            $aliases['address_line1'] = $this->input('address_line_1');
+        }
+
+        if ($this->has('address_line_2') && ! $this->has('address_line2')) {
+            $aliases['address_line2'] = $this->input('address_line_2');
+        }
+
+        if ($this->has('is_primary') && ! $this->has('is_default')) {
+            $aliases['is_default'] = $this->input('is_primary');
+        }
+
+        if ($aliases !== []) {
+            $this->merge($aliases);
+        }
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -22,6 +47,7 @@ final class UpsertSupplierAddressRequest extends FormRequest
 
         return [
             'tenant_id' => ['nullable', 'integer', 'min:1'],
+            'row_version' => ['nullable', 'integer', 'min:0'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'metadata' => ['nullable', 'array'],
             'supplier_id' => array_merge($required, ['integer', 'min:1', 'exists:suppliers,id']),

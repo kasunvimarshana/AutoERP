@@ -6,7 +6,6 @@ import type {
     SupplierCategory,
     SupplierContact,
     SupplierFinanceDefaults,
-    SupplierBusinessContextSummary,
     SupplierTaxProfile,
     SupplierUserAccess,
 } from '../types/supplier.types';
@@ -120,11 +119,6 @@ export const supplierFinanceDefaults: SupplierFinanceDefaults[] = [
 export const supplierUserAccess: SupplierUserAccess[] = [
     { email: 'portal@wheelalignpro.example', id: 'sup-user-001', invitedAt: '2026-05-01', isPrimary: true, lastLogin: '2026-05-24', status: 'active', supplierId: 'sup-002', userName: 'Wheel Align Portal' },
     { email: 'blocked@blockeddiesel.example', id: 'sup-user-002', invitedAt: '2026-04-11', isPrimary: true, lastLogin: '', status: 'deactivated', supplierId: 'sup-004', userName: 'Blocked Diesel Portal' },
-];
-
-export const supplierBusinessContext: SupplierBusinessContextSummary[] = [
-    { backendPreviewStatus: 'Mock backend supplier context', lastActivityDate: '2026-05-24', openSourceDocuments: 'Readonly backend value', payableBalance: 'Backend-owned AP balance', supplierId: 'sup-001', totalActivityValue: 'Backend-owned source total' },
-    { backendPreviewStatus: 'Mock backend supplier context', lastActivityDate: '2026-05-18', openSourceDocuments: 'Readonly backend value', payableBalance: 'Backend-owned AP balance', supplierId: 'sup-002', totalActivityValue: 'Backend-owned source total' },
 ];
 
 export const supplierAuditEntries: SupplierAuditEntry[] = [

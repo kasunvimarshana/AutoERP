@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Supplier\Application\UseCases\SupplierContacts;
 
+use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Modules\Supplier\Application\Contracts\UseCases\SupplierContacts\ListSupplierContactsServiceInterface;
@@ -14,9 +15,10 @@ use Throwable;
 
 final class ListSupplierContactsService implements ListSupplierContactsServiceInterface
 {
-    public function __construct(private readonly SupplierContactRepositoryInterface $repository)
-    {
-    }
+    public function __construct(
+        private readonly SupplierContactRepositoryInterface $repository,
+        private readonly CurrentTenantContextAccessorInterface $currentTenant,
+    ) {}
 
     public function execute(array $criteria, int $perPage, int $page): Result
     {
@@ -26,11 +28,27 @@ final class ListSupplierContactsService implements ListSupplierContactsServiceIn
                 ? min($perPage, (int) config('supplier.pagination.max_per_page', SupplierDefaults::MAX_PER_PAGE))
                 : (int) config('supplier.pagination.default_per_page', SupplierDefaults::DEFAULT_PER_PAGE);
 
-            unset($criteria['search']);
+            $criteria['tenant_id'] = $this->tenantId();
+
+            if (isset($criteria['contact_name']) && ! isset($criteria['name'])) {
+                $criteria['name'] = $criteria['contact_name'];
+            }
+
+            unset($criteria['search'], $criteria['contact_name']);
 
             return Result::success($this->repository->page($criteria, $resolvedPerPage, $resolvedPage));
         } catch (Throwable $exception) {
             return Result::failure(new Error(SupplierErrorCode::INVALID_VALUE, $exception->getMessage()));
         }
+    }
+
+    private function tenantId(): int
+    {
+        $tenantId = $this->currentTenant->currentTenantId();
+        if ($tenantId === null || $tenantId < 1) {
+            throw new \RuntimeException('Current tenant context is required.');
+        }
+
+        return $tenantId;
     }
 }

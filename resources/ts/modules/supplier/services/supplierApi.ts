@@ -1,19 +1,5 @@
 import type { ApiCollectionResponse, ApiResponse } from '../../../services/api/apiResponse';
-import { ApiError } from '../../../services/api/apiErrors';
 import { httpClient } from '../../../services/api/httpClient';
-import { mockCollectionResponse, mockResponse } from '../../../services/mock/mockResponse';
-import {
-    getSupplierById,
-    supplierAddresses,
-    supplierAuditEntries,
-    supplierBankAccounts,
-    supplierContacts,
-    supplierFinanceDefaults,
-    supplierBusinessContext,
-    suppliers,
-    supplierTaxProfiles,
-    supplierUserAccess,
-} from '../mock/supplierMock';
 import type {
     Supplier,
     SupplierAddress,
@@ -22,7 +8,6 @@ import type {
     SupplierContact,
     SupplierFinanceDefaults,
     SupplierFormInput,
-    SupplierBusinessContextSummary,
     SupplierStatus,
     SupplierTaxProfile,
     SupplierUserAccess,
@@ -32,34 +17,45 @@ import type {
 
 type BackendRecord = Record<string, unknown>;
 
-const SUPPLIER_API_MODE = import.meta.env.VITE_SUPPLIER_API_MODE ?? 'auto';
+type SupplierListQuery = {
+    page?: number;
+    perPage?: number;
+    search?: string;
+    status?: SupplierStatus;
+};
 
-function shouldUseMockOnly() {
-    return SUPPLIER_API_MODE === 'mock';
+function asRecord(value: unknown): BackendRecord {
+    return value && typeof value === 'object' && !Array.isArray(value) ? (value as BackendRecord) : {};
 }
 
-async function withMockFallback<T>(realCall: () => Promise<T>, mockCall: () => Promise<T>, fallbackStatuses = [401, 403, 404, 419]): Promise<T> {
-    if (shouldUseMockOnly()) {
-        return mockCall();
+function asString(value: unknown, fallback = ''): string {
+    if (value === null || value === undefined) {
+        return fallback;
     }
 
-    try {
-        return await realCall();
-    } catch (error) {
-        if (SUPPLIER_API_MODE === 'real') {
-            throw error;
-        }
-
-        if (error instanceof ApiError && !fallbackStatuses.includes(error.status)) {
-            throw error;
-        }
-
-        return mockCall();
-    }
+    return String(value);
 }
 
-function asString(value: unknown, fallback = '') {
-    return value === null || value === undefined ? fallback : String(value);
+function asOptionalString(value: unknown): string | undefined {
+    const normalized = asString(value).trim();
+
+    return normalized === '' ? undefined : normalized;
+}
+
+function asBoolean(value: unknown, fallback = false): boolean {
+    if (typeof value === 'boolean') {
+        return value;
+    }
+
+    if (typeof value === 'number') {
+        return value === 1;
+    }
+
+    if (typeof value === 'string') {
+        return ['1', 'true', 'yes'].includes(value.toLowerCase());
+    }
+
+    return fallback;
 }
 
 function normalizeStatus(value: unknown): SupplierStatus {
@@ -70,111 +66,139 @@ function normalizeStatus(value: unknown): SupplierStatus {
 }
 
 function normalizeSupplier(raw: BackendRecord): Supplier {
+    const userAccounts = Array.isArray(raw.user_accounts) ? raw.user_accounts : [];
+
     return {
         category: asString(raw.category_name ?? raw.category ?? raw.supplier_category, 'Uncategorized'),
-        code: asString(raw.supplier_code ?? raw.code, 'SUP-MOCK'),
-        defaultCurrency: asString(raw.default_currency_code ?? raw.defaultCurrency, ''),
-        displayName: asString(raw.display_name ?? raw.supplier_name ?? raw.name, 'Unnamed supplier'),
-        email: asString(raw.email, 'Not provided'),
+        code: asString(raw.supplier_code ?? raw.code),
+        defaultCurrency: asString(raw.default_currency_code ?? raw.defaultCurrency),
+        displayName: asString(raw.display_name ?? raw.supplier_name ?? raw.name),
+        email: asString(raw.email),
         id: asString(raw.id),
-        legalName: asString(raw.legal_name, ''),
-        mobile: asString(raw.mobile, ''),
-        name: asString(raw.supplier_name ?? raw.name ?? raw.display_name, 'Unnamed supplier'),
-        phone: asString(raw.phone, 'Not provided'),
-        registrationNumber: asString(raw.registration_number, ''),
+        legalName: asOptionalString(raw.legal_name),
+        mobile: asOptionalString(raw.mobile),
+        name: asString(raw.supplier_name ?? raw.name ?? raw.display_name),
+        notes: asOptionalString(raw.notes),
+        phone: asString(raw.phone),
+        registrationNumber: asOptionalString(raw.registration_number),
         status: normalizeStatus(raw.status),
-        supplierType: asString(raw.supplier_type ?? raw.supplierType, 'general'),
-        taxNumber: asString(raw.tax_number ?? raw.taxNumber, ''),
-        updatedAt: asString(raw.updated_at ?? raw.updatedAt, 'Backend timestamp pending'),
-        userAccessStatus: raw.user_access_status === 'linked' || raw.has_user_access === true ? 'linked' : 'none',
-        vatNumber: asString(raw.vat_number ?? raw.vatNumber, ''),
-        website: asString(raw.website, ''),
+        supplierType: asString(raw.supplier_type ?? raw.supplierType, 'business'),
+        taxNumber: asOptionalString(raw.tax_number ?? raw.taxNumber),
+        updatedAt: asString(raw.updated_at ?? raw.updatedAt),
+        userAccessStatus: raw.user_access_status === 'linked' || raw.has_user_access === true || userAccounts.length > 0 ? 'linked' : 'none',
+        vatNumber: asOptionalString(raw.vat_number ?? raw.vatNumber),
+        website: asOptionalString(raw.website),
     };
 }
 
 function normalizeContact(raw: BackendRecord): SupplierContact {
     return {
-        department: asString(raw.department, ''),
-        designation: asString(raw.designation ?? raw.role, ''),
-        email: asString(raw.email, 'Not provided'),
+        department: asOptionalString(raw.department),
+        designation: asOptionalString(raw.designation ?? raw.role),
+        email: asString(raw.email),
         id: asString(raw.id),
-        isPrimary: Boolean(raw.is_primary),
-        name: asString(raw.name ?? raw.contact_name, 'Unnamed contact'),
-        phone: asString(raw.phone ?? raw.mobile, 'Not provided'),
+        isPrimary: asBoolean(raw.is_primary),
+        name: asString(raw.name ?? raw.contact_name),
+        phone: asString(raw.phone ?? raw.mobile),
         supplierId: asString(raw.supplier_id),
     };
 }
 
 function normalizeAddress(raw: BackendRecord): SupplierAddress {
     return {
-        city: asString(raw.city, 'Not provided'),
-        country: asString(raw.country_name ?? raw.country, 'Not provided'),
+        city: asString(raw.city),
+        country: asString(raw.country_name ?? raw.country),
         id: asString(raw.id),
-        isDefault: Boolean(raw.is_default ?? raw.is_default_billing ?? raw.is_default_shipping),
-        line1: asString(raw.address_line1 ?? raw.address_line_1 ?? raw.line1, 'Not provided'),
-        line2: asString(raw.address_line2 ?? raw.address_line_2 ?? raw.line2, ''),
-        postalCode: asString(raw.postal_code, ''),
+        isDefault: asBoolean(raw.is_default ?? raw.is_default_billing ?? raw.is_default_shipping),
+        line1: asString(raw.address_line1 ?? raw.address_line_1 ?? raw.line1),
+        line2: asOptionalString(raw.address_line2 ?? raw.address_line_2 ?? raw.line2),
+        postalCode: asOptionalString(raw.postal_code),
         supplierId: asString(raw.supplier_id),
-        type: asString(raw.type ?? raw.address_type, 'registered') as SupplierAddress['type'],
+        type: normalizeAddressType(raw.type ?? raw.address_type),
     };
+}
+
+function normalizeAddressType(value: unknown): SupplierAddress['type'] {
+    const type = asString(value, 'billing').toLowerCase();
+
+    if (type === 'registered' || type === 'shipping') {
+        return type;
+    }
+
+    return 'billing';
 }
 
 function normalizeBankAccount(raw: BackendRecord, supplierId: string): SupplierBankAccount {
     return {
-        accountName: asString(raw.account_name, 'Not provided'),
-        accountNumber: asString(raw.account_number, 'Not provided'),
-        bankName: asString(raw.bank_name, 'Not provided'),
-        branchName: asString(raw.branch_name, ''),
-        currency: asString(raw.currency_code ?? raw.currency, 'Backend currency'),
+        accountName: asString(raw.account_name),
+        accountNumber: asString(raw.account_number),
+        bankName: asString(raw.bank_name),
+        branchName: asOptionalString(raw.branch_name),
+        currency: asString(raw.currency_code ?? raw.currency ?? raw.currency_id),
         id: asString(raw.id),
-        isActive: Boolean(raw.is_active ?? true),
-        isPrimary: Boolean(raw.is_primary),
+        isActive: asBoolean(raw.is_active, true),
+        isPrimary: asBoolean(raw.is_primary),
         supplierId,
     };
 }
 
 function normalizeTaxProfile(raw: BackendRecord | null | undefined, supplierId: string): SupplierTaxProfile {
+    const record = asRecord(raw);
+
     return {
-        isTaxExempt: Boolean(raw?.is_tax_exempt),
+        isTaxExempt: asBoolean(record.is_tax_exempt),
         supplierId,
-        taxIdentifier: asString(raw?.tax_identifier, ''),
-        taxType: asString(raw?.tax_type, 'Backend tax type pending'),
-        vatIdentifier: asString(raw?.vat_identifier, ''),
-        withholdingRate: asString(raw?.withholding_rate, 'Backend-owned withholding preview'),
+        taxIdentifier: asOptionalString(record.tax_identifier),
+        taxType: asString(record.tax_type),
+        vatIdentifier: asOptionalString(record.vat_identifier),
+        withholdingRate: asString(record.withholding_rate),
     };
 }
 
 function normalizeFinanceDefaults(raw: BackendRecord, supplierId: string): SupplierFinanceDefaults {
     return {
-        creditLimit: asString(raw.credit_limit, 'Backend-owned credit/payable limit'),
-        defaultCurrency: asString(raw.default_currency_code ?? raw.default_currency_id, 'Backend currency'),
-        expenseAccount: asString(raw.default_expense_account_name ?? raw.default_expense_account_id, 'Backend expense account'),
-        payableAccount: asString(raw.default_payable_account_name ?? raw.default_payable_account_id, 'Backend payable account'),
-        paymentTerm: asString(raw.default_payment_term_name ?? raw.default_payment_term_id, 'Backend payment term'),
+        creditLimit: asString(raw.credit_limit),
+        defaultCurrency: asString(raw.default_currency_code ?? raw.default_currency_id),
+        expenseAccount: asString(raw.default_expense_account_name ?? raw.default_expense_account_id),
+        payableAccount: asString(raw.default_payable_account_name ?? raw.default_payable_account_id),
+        paymentTerm: asString(raw.default_payment_term_name ?? raw.default_payment_term_id),
         supplierId,
     };
 }
 
 function normalizeUserAccess(raw: BackendRecord, supplierId: string): SupplierUserAccess {
     return {
-        email: asString(raw.email ?? raw.user_email, 'Not provided'),
+        email: asString(raw.email ?? raw.user_email),
         id: asString(raw.id),
-        invitedAt: asString(raw.invited_at, ''),
-        isPrimary: Boolean(raw.is_primary),
-        lastLogin: asString(raw.last_login_at ?? raw.lastLogin, ''),
-        status: asString(raw.status, 'active') as SupplierUserAccess['status'],
+        invitedAt: asOptionalString(raw.invited_at ?? raw.linked_at),
+        isPrimary: asBoolean(raw.is_primary),
+        lastLogin: asOptionalString(raw.last_login_at ?? raw.lastLogin),
+        status: normalizeUserAccessStatus(raw.status),
         supplierId,
         userName: asString(raw.user_name ?? raw.name ?? raw.user_id, 'Linked user'),
     };
 }
 
-function toBackendSupplierPayload(input: SupplierFormInput) {
+function normalizeUserAccessStatus(value: unknown): SupplierUserAccess['status'] {
+    const status = asString(value, 'active').toLowerCase();
+
+    if (status === 'inactive' || status === 'revoked' || status === 'deactivated') {
+        return 'deactivated';
+    }
+
+    if (status === 'invited') {
+        return 'invited';
+    }
+
+    return 'active';
+}
+
+function toBackendSupplierPayload(input: SupplierFormInput): BackendRecord {
     return {
         create_user_access: false,
         display_name: input.displayName || input.name,
         email: input.email || null,
         legal_name: input.legalName || null,
-        metadata: {},
         mobile: input.mobile || null,
         notes: input.notes || null,
         phone: input.phone || null,
@@ -189,289 +213,218 @@ function toBackendSupplierPayload(input: SupplierFormInput) {
     };
 }
 
+function toBackendContactPayload(supplierId: string, input: SupplierContact): BackendRecord {
+    return {
+        department: input.department || null,
+        designation: input.designation || null,
+        email: input.email || null,
+        is_primary: input.isPrimary,
+        name: input.name,
+        phone: input.phone || null,
+        supplier_id: Number(supplierId),
+    };
+}
+
+function toBackendAddressPayload(supplierId: string, input: SupplierAddress): BackendRecord {
+    return {
+        address_line1: input.line1,
+        address_line2: input.line2 || null,
+        city: input.city,
+        is_default: input.isDefault,
+        postal_code: input.postalCode || '00000',
+        supplier_id: Number(supplierId),
+        type: input.type,
+    };
+}
+
+function toBackendBankAccountPayload(input: SupplierBankAccount): BackendRecord {
+    return {
+        account_name: input.accountName,
+        account_number: input.accountNumber,
+        bank_name: input.bankName,
+        branch_name: input.branchName || null,
+        is_active: input.isActive,
+        is_primary: input.isPrimary,
+    };
+}
+
 export const supplierApi = {
     activateSupplier: (supplierId: string) => supplierApi.changeStatus(supplierId, 'active'),
     blockSupplier: (supplierId: string) => supplierApi.changeStatus(supplierId, 'blocked'),
-    changeStatus: (supplierId: string, status: SupplierStatus) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendRecord>>(`/api/supplier/suppliers/${supplierId}/status`, {
-                    body: { status },
-                    method: 'PATCH',
-                });
+    changeStatus: async (supplierId: string, status: SupplierStatus): Promise<ApiResponse<Supplier>> => {
+        const response = await httpClient<ApiResponse<BackendRecord>>(`/api/supplier/suppliers/${supplierId}/status`, {
+            body: { status },
+            method: 'PATCH',
+        });
 
-                return { ...response, data: normalizeSupplier(response.data) };
-            },
-            () => mockResponse({ ...getSupplierById(supplierId), status }),
-        ),
-    createSupplier: (input: SupplierFormInput) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendRecord>>('/api/supplier/suppliers', {
-                    body: toBackendSupplierPayload(input),
-                    method: 'POST',
-                });
+        return { ...response, data: normalizeSupplier(response.data) };
+    },
+    createSupplier: async (input: SupplierFormInput): Promise<ApiResponse<Supplier>> => {
+        const response = await httpClient<ApiResponse<BackendRecord>>('/api/supplier/suppliers', {
+            body: toBackendSupplierPayload(input),
+            method: 'POST',
+        });
 
-                return { ...response, data: normalizeSupplier(response.data) };
-            },
-            () => mockResponse({ ...suppliers[0], ...input, id: 'mock-supplier', userAccessStatus: 'none' as const }),
-        ),
+        return { ...response, data: normalizeSupplier(response.data) };
+    },
     createUserAccess: (supplierId: string, input: SupplierUserAccessCreateInput) =>
-        withMockFallback(
-            () =>
-                httpClient<ApiResponse<unknown>>(`/api/supplier/suppliers/${supplierId}/user-accesses`, {
-                    body: {
-                        access_type: input.accessType || null,
-                        is_primary: input.isPrimary ?? false,
-                        user: {
-                            email: input.email,
-                            name: input.name || null,
-                        },
-                    },
-                    method: 'POST',
-                }),
-            () => mockResponse({ action: 'create-user-access', input, supplierId }),
-        ),
+        httpClient<ApiResponse<unknown>>(`/api/supplier/suppliers/${supplierId}/user-accesses`, {
+            body: {
+                access_type: input.accessType || null,
+                is_primary: input.isPrimary ?? false,
+                user: {
+                    email: input.email,
+                    name: input.name || null,
+                },
+            },
+            method: 'POST',
+        }),
     deactivateAddress: (addressId: string) =>
-        withMockFallback(
-            () =>
-                httpClient<ApiResponse<BackendRecord>>(`/api/supplier/supplier-addresses/${addressId}`, {
-                    body: { is_active: false },
-                    method: 'PATCH',
-                }),
-            () => mockResponse({ action: 'deactivate-address', addressId }),
-        ),
+        httpClient<ApiResponse<BackendRecord>>(`/api/supplier/supplier-addresses/${addressId}`, {
+            body: { is_active: false },
+            method: 'PATCH',
+        }),
     deactivateBankAccount: (supplierId: string, bankAccountId: string) =>
-        withMockFallback(
-            () =>
-                httpClient<ApiResponse<unknown>>(`/api/supplier/suppliers/${supplierId}/bank-accounts/${bankAccountId}`, {
-                    body: { is_active: false },
-                    method: 'PUT',
-                }),
-            () => mockResponse({ action: 'deactivate-bank-account', bankAccountId, supplierId }),
-        ),
+        httpClient<ApiResponse<unknown>>(`/api/supplier/suppliers/${supplierId}/bank-accounts/${bankAccountId}`, {
+            body: { is_active: false },
+            method: 'PUT',
+        }),
     deactivateContact: (contactId: string) =>
-        withMockFallback(
-            () =>
-                httpClient<ApiResponse<BackendRecord>>(`/api/supplier/supplier-contacts/${contactId}`, {
-                    body: { is_active: false },
-                    method: 'PATCH',
-                }),
-            () => mockResponse({ action: 'deactivate-contact', contactId }),
-        ),
+        httpClient<ApiResponse<BackendRecord>>(`/api/supplier/supplier-contacts/${contactId}`, {
+            body: { is_active: false },
+            method: 'PATCH',
+        }),
     deactivateSupplier: (supplierId: string) => supplierApi.changeStatus(supplierId, 'inactive'),
     deactivateUserAccess: (supplierId: string, accessId: string, reason?: string) =>
-        withMockFallback(
-            () =>
-                httpClient<ApiResponse<unknown>>(`/api/supplier/suppliers/${supplierId}/user-accesses/${accessId}/deactivate`, {
-                    body: { reason: reason || null },
-                    method: 'PATCH',
-                }),
-            () => mockResponse({ accessId, action: 'deactivate-user-access', reason, supplierId }),
-        ),
-    getFinanceDefaults: (supplierId: string) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendRecord>>(`/api/supplier/suppliers/${supplierId}/finance-defaults`);
-
-                return { ...response, data: normalizeFinanceDefaults(response.data, supplierId) };
-            },
-            () => mockResponse(supplierFinanceDefaults.find((defaults) => defaults.supplierId === supplierId) ?? supplierFinanceDefaults[0]),
-        ),
-    getBusinessContextSummary: (supplierId: string): Promise<ApiResponse<SupplierBusinessContextSummary>> =>
-        mockResponse(supplierBusinessContext.find((usage) => usage.supplierId === supplierId) ?? {
-            backendPreviewStatus: 'Mock backend supplier context',
-            lastActivityDate: 'No source usage returned yet',
-            openSourceDocuments: 'Backend-owned open source count',
-            payableBalance: 'Backend-owned AP balance',
-            supplierId,
-            totalActivityValue: 'Backend-owned source total',
+        httpClient<ApiResponse<unknown>>(`/api/supplier/suppliers/${supplierId}/user-accesses/${accessId}/deactivate`, {
+            body: { reason: reason || null },
+            method: 'PATCH',
         }),
-    getSupplier: (supplierId: string) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendRecord>>(`/api/supplier/suppliers/${supplierId}`);
+    getFinanceDefaults: async (supplierId: string): Promise<ApiResponse<SupplierFinanceDefaults>> => {
+        const response = await httpClient<ApiResponse<BackendRecord>>(`/api/supplier/suppliers/${supplierId}/finance-defaults`);
 
-                return { ...response, data: normalizeSupplier(response.data) };
-            },
-            () => mockResponse(getSupplierById(supplierId)),
-        ),
-    getSupplierActivity: (_supplierId: string): Promise<ApiCollectionResponse<SupplierAuditEntry>> => mockCollectionResponse(supplierAuditEntries),
-    getTaxProfile: (supplierId: string) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendRecord | null>>(`/api/supplier/suppliers/${supplierId}/tax-profile`);
+        return { ...response, data: normalizeFinanceDefaults(response.data, supplierId) };
+    },
+    getSupplier: async (supplierId: string): Promise<ApiResponse<Supplier>> => {
+        const response = await httpClient<ApiResponse<BackendRecord>>(`/api/supplier/suppliers/${supplierId}`);
 
-                return { ...response, data: normalizeTaxProfile(response.data, supplierId) };
-            },
-            () => mockResponse(supplierTaxProfiles.find((profile) => profile.supplierId === supplierId) ?? supplierTaxProfiles[0]),
-        ),
+        return { ...response, data: normalizeSupplier(response.data) };
+    },
+    getSupplierActivity: (_supplierId: string): Promise<ApiCollectionResponse<SupplierAuditEntry>> => Promise.resolve({ data: [] }),
+    getTaxProfile: async (supplierId: string): Promise<ApiResponse<SupplierTaxProfile>> => {
+        const response = await httpClient<ApiResponse<BackendRecord | null>>(`/api/supplier/suppliers/${supplierId}/tax-profile`);
+
+        return { ...response, data: normalizeTaxProfile(response.data, supplierId) };
+    },
     linkUserAccess: (supplierId: string, input: SupplierUserAccessLinkInput) =>
-        withMockFallback(
-            () =>
-                httpClient<ApiResponse<unknown>>(`/api/supplier/suppliers/${supplierId}/link-user`, {
-                    body: {
-                        access_type: input.accessType || null,
-                        is_primary: input.isPrimary ?? false,
-                        user_id: Number(input.userId),
-                    },
-                    method: 'POST',
-                }),
-            () => mockResponse({ action: 'link-user-access', input, supplierId }),
-        ),
-    listAddresses: (supplierId: string) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/supplier/supplier-addresses', { query: { supplier_id: supplierId } });
-
-                return { ...response, data: response.data.map(normalizeAddress) };
+        httpClient<ApiResponse<unknown>>(`/api/supplier/suppliers/${supplierId}/link-user`, {
+            body: {
+                access_type: input.accessType || null,
+                is_primary: input.isPrimary ?? false,
+                user_id: Number(input.userId),
             },
-            () => mockCollectionResponse(supplierAddresses.filter((address) => address.supplierId === supplierId)),
-            [401, 403, 404, 419, 422],
-        ),
-    listBankAccounts: (supplierId: string) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/supplier/suppliers/${supplierId}/bank-accounts`);
+            method: 'POST',
+        }),
+    listAddresses: async (supplierId: string): Promise<ApiCollectionResponse<SupplierAddress>> => {
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/supplier/supplier-addresses', { query: { supplier_id: supplierId } });
 
-                return { ...response, data: response.data.map((item) => normalizeBankAccount(item, supplierId)) };
-            },
-            () => mockCollectionResponse(supplierBankAccounts.filter((account) => account.supplierId === supplierId)),
-        ),
-    listContacts: (supplierId: string) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/supplier/supplier-contacts', { query: { supplier_id: supplierId } });
+        return { ...response, data: response.data.map(normalizeAddress) };
+    },
+    listBankAccounts: async (supplierId: string): Promise<ApiCollectionResponse<SupplierBankAccount>> => {
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/supplier/suppliers/${supplierId}/bank-accounts`);
 
-                return { ...response, data: response.data.map(normalizeContact) };
-            },
-            () => mockCollectionResponse(supplierContacts.filter((contact) => contact.supplierId === supplierId)),
-            [401, 403, 404, 419, 422],
-        ),
-    listSuppliers: () =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/supplier/suppliers');
+        return { ...response, data: response.data.map((item) => normalizeBankAccount(item, supplierId)) };
+    },
+    listContacts: async (supplierId: string): Promise<ApiCollectionResponse<SupplierContact>> => {
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/supplier/supplier-contacts', { query: { supplier_id: supplierId } });
 
-                return { ...response, data: response.data.map(normalizeSupplier) };
+        return { ...response, data: response.data.map(normalizeContact) };
+    },
+    listSuppliers: async (query: SupplierListQuery = {}): Promise<ApiCollectionResponse<Supplier>> => {
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/supplier/suppliers', {
+            query: {
+                page: query.page,
+                per_page: query.perPage ?? 50,
+                search: query.search,
+                status: query.status,
             },
-            () => mockCollectionResponse(suppliers),
-        ),
-    listUserAccess: (supplierId: string) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/supplier/suppliers/${supplierId}/user-accesses`);
+        });
 
-                return { ...response, data: response.data.map((item) => normalizeUserAccess(item, supplierId)) };
-            },
-            () => mockCollectionResponse(supplierUserAccess.filter((access) => access.supplierId === supplierId)),
-        ),
+        return { ...response, data: response.data.map(normalizeSupplier) };
+    },
+    listUserAccess: async (supplierId: string): Promise<ApiCollectionResponse<SupplierUserAccess>> => {
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/supplier/suppliers/${supplierId}/user-accesses`);
+
+        return { ...response, data: response.data.map((item) => normalizeUserAccess(item, supplierId)) };
+    },
     setPrimaryBankAccount: (supplierId: string, bankAccountId: string) =>
-        withMockFallback(
-            () =>
-                httpClient<ApiResponse<unknown>>(`/api/supplier/suppliers/${supplierId}/bank-accounts/${bankAccountId}`, {
-                    body: { is_primary: true },
-                    method: 'PUT',
-                }),
-            () => mockResponse({ action: 'set-primary-bank-account', bankAccountId, supplierId }),
-        ),
+        httpClient<ApiResponse<unknown>>(`/api/supplier/suppliers/${supplierId}/bank-accounts/${bankAccountId}`, {
+            body: { is_primary: true },
+            method: 'PUT',
+        }),
     unblockSupplier: (supplierId: string) => supplierApi.changeStatus(supplierId, 'active'),
     unlinkUserAccess: (supplierId: string, accessId: string) =>
-        withMockFallback(
-            () => httpClient<ApiResponse<unknown>>(`/api/supplier/suppliers/${supplierId}/user-accesses/${accessId}`, { method: 'DELETE' }),
-            () => mockResponse({ accessId, action: 'unlink-user-access', supplierId }),
-        ),
+        httpClient<ApiResponse<unknown>>(`/api/supplier/suppliers/${supplierId}/user-accesses/${accessId}`, { method: 'DELETE' }),
     updateFinanceDefaults: (supplierId: string, input: unknown) =>
-        withMockFallback(
-            () => httpClient<ApiResponse<unknown>>(`/api/supplier/suppliers/${supplierId}/finance-defaults`, { body: input, method: 'PUT' }),
-            () => mockResponse({ input, supplierId }),
-        ),
-    updateSupplier: (supplierId: string, input: SupplierFormInput) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendRecord>>(`/api/supplier/suppliers/${supplierId}`, {
-                    body: toBackendSupplierPayload(input),
-                    method: 'PUT',
-                });
+        httpClient<ApiResponse<unknown>>(`/api/supplier/suppliers/${supplierId}/finance-defaults`, { body: input, method: 'PUT' }),
+    updateSupplier: async (supplierId: string, input: SupplierFormInput): Promise<ApiResponse<Supplier>> => {
+        const response = await httpClient<ApiResponse<BackendRecord>>(`/api/supplier/suppliers/${supplierId}`, {
+            body: toBackendSupplierPayload(input),
+            method: 'PUT',
+        });
 
-                return { ...response, data: normalizeSupplier(response.data) };
+        return { ...response, data: normalizeSupplier(response.data) };
+    },
+    updateTaxProfile: async (supplierId: string, input: SupplierTaxProfile): Promise<ApiResponse<SupplierTaxProfile>> => {
+        const response = await httpClient<ApiResponse<BackendRecord>>(`/api/supplier/suppliers/${supplierId}/tax-profile`, {
+            body: {
+                is_tax_exempt: input.isTaxExempt,
+                tax_identifier: input.taxIdentifier || null,
+                tax_type: input.taxType || null,
+                vat_identifier: input.vatIdentifier || null,
+                withholding_rate: input.withholdingRate || null,
             },
-            () => mockResponse({ ...getSupplierById(supplierId), ...input }),
-        ),
-    updateTaxProfile: (supplierId: string, input: SupplierTaxProfile) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendRecord>>(`/api/supplier/suppliers/${supplierId}/tax-profile`, {
-                    body: {
-                        is_tax_exempt: input.isTaxExempt,
-                        tax_identifier: input.taxIdentifier || null,
-                        tax_type: input.taxType || null,
-                        vat_identifier: input.vatIdentifier || null,
-                    },
-                    method: 'PUT',
-                });
+            method: 'PUT',
+        });
 
-                return { ...response, data: normalizeTaxProfile(response.data, supplierId) };
+        return { ...response, data: normalizeTaxProfile(response.data, supplierId) };
+    },
+    upsertAddress: async (supplierId: string, input: SupplierAddress): Promise<ApiResponse<SupplierAddress>> => {
+        const hasExistingId = input.id.trim() !== '';
+        const response = await httpClient<ApiResponse<BackendRecord>>(
+            hasExistingId ? `/api/supplier/supplier-addresses/${input.id}` : '/api/supplier/supplier-addresses',
+            {
+                body: toBackendAddressPayload(supplierId, input),
+                method: hasExistingId ? 'PATCH' : 'POST',
             },
-            () => mockResponse({ ...input, supplierId }),
-        ),
-    upsertAddress: (supplierId: string, input: SupplierAddress) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendRecord>>('/api/supplier/supplier-addresses', {
-                    body: {
-                        address_line1: input.line1,
-                        address_line2: input.line2 || null,
-                        city: input.city,
-                        country_id: null,
-                        is_default: input.isDefault,
-                        postal_code: input.postalCode || '00000',
-                        supplier_id: supplierId,
-                        type: input.type,
-                    },
-                    method: 'POST',
-                });
+        );
 
-                return { ...response, data: normalizeAddress(response.data) };
+        return { ...response, data: normalizeAddress(response.data) };
+    },
+    upsertBankAccount: async (supplierId: string, input: SupplierBankAccount): Promise<ApiResponse<SupplierBankAccount>> => {
+        const hasExistingId = input.id.trim() !== '';
+        const response = await httpClient<ApiResponse<BackendRecord>>(
+            hasExistingId
+                ? `/api/supplier/suppliers/${supplierId}/bank-accounts/${input.id}`
+                : `/api/supplier/suppliers/${supplierId}/bank-accounts`,
+            {
+                body: toBackendBankAccountPayload(input),
+                method: hasExistingId ? 'PUT' : 'POST',
             },
-            () => mockResponse({ ...input, supplierId }),
-        ),
-    upsertBankAccount: (supplierId: string, input: SupplierBankAccount) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendRecord>>(`/api/supplier/suppliers/${supplierId}/bank-accounts`, {
-                    body: {
-                        account_name: input.accountName,
-                        account_number: input.accountNumber,
-                        bank_name: input.bankName,
-                        branch_name: input.branchName || null,
-                        is_active: input.isActive,
-                        is_primary: input.isPrimary,
-                    },
-                    method: 'POST',
-                });
+        );
 
-                return { ...response, data: normalizeBankAccount(response.data, supplierId) };
+        return { ...response, data: normalizeBankAccount(response.data, supplierId) };
+    },
+    upsertContact: async (supplierId: string, input: SupplierContact): Promise<ApiResponse<SupplierContact>> => {
+        const hasExistingId = input.id.trim() !== '';
+        const response = await httpClient<ApiResponse<BackendRecord>>(
+            hasExistingId ? `/api/supplier/supplier-contacts/${input.id}` : '/api/supplier/supplier-contacts',
+            {
+                body: toBackendContactPayload(supplierId, input),
+                method: hasExistingId ? 'PATCH' : 'POST',
             },
-            () => mockResponse({ ...input, supplierId }),
-        ),
-    upsertContact: (supplierId: string, input: SupplierContact) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendRecord>>('/api/supplier/supplier-contacts', {
-                    body: {
-                        designation: input.designation || null,
-                        email: input.email || null,
-                        is_primary: input.isPrimary,
-                        name: input.name,
-                        phone: input.phone || null,
-                        supplier_id: supplierId,
-                    },
-                    method: 'POST',
-                });
+        );
 
-                return { ...response, data: normalizeContact(response.data) };
-            },
-            () => mockResponse({ ...input, supplierId }),
-        ),
+        return { ...response, data: normalizeContact(response.data) };
+    },
 };

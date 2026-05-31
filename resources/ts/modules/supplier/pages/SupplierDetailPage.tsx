@@ -14,7 +14,6 @@ import { SupplierAddressesTable } from '../components/SupplierAddressesTable';
 import { SupplierBankAccountsTable } from '../components/SupplierBankAccountsTable';
 import { SupplierContactsTable } from '../components/SupplierContactsTable';
 import { SupplierFinanceDefaultsForm } from '../components/SupplierFinanceDefaultsForm';
-import { SupplierBusinessContextPanel } from '../components/SupplierBusinessContextPanel';
 import { SupplierSummaryCard } from '../components/SupplierSummaryCard';
 import { SupplierTaxProfileForm } from '../components/SupplierTaxProfileForm';
 import { SupplierUserAccessPanel } from '../components/SupplierUserAccessPanel';
@@ -26,7 +25,7 @@ import type {
     SupplierBankAccount,
     SupplierContact,
     SupplierFinanceDefaults,
-    SupplierBusinessContextSummary,
+    SupplierStatus,
     SupplierTaxProfile,
     SupplierUserAccess,
 } from '../types/supplier.types';
@@ -40,7 +39,6 @@ const tabs = [
     { label: 'Finance Defaults', value: 'finance' },
     { label: 'User Access', value: 'user-access' },
     { label: 'Cross-Role Links', value: 'cross-role' },
-    { label: 'Source Context / Activity', value: 'source-context' },
     { label: 'Audit / History', value: 'audit' },
 ];
 
@@ -50,7 +48,6 @@ type SupplierDetailState = {
     bankAccounts: SupplierBankAccount[];
     contacts: SupplierContact[];
     financeDefaults: SupplierFinanceDefaults;
-    businessContext: SupplierBusinessContextSummary;
     partyLinks: BusinessPartyLink[];
     supplier: Supplier;
     taxProfile: SupplierTaxProfile;
@@ -60,8 +57,10 @@ type SupplierDetailState = {
 export function SupplierDetailPage() {
     const { id } = useParams();
     const [activeTab, setActiveTab] = useState('overview');
+    const [actionError, setActionError] = useState('');
     const [detail, setDetail] = useState<SupplierDetailState | null>(null);
     const [error, setError] = useState('');
+    const [isChangingStatus, setIsChangingStatus] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -76,11 +75,10 @@ export function SupplierDetailPage() {
             supplierApi.getTaxProfile(supplierId),
             supplierApi.getFinanceDefaults(supplierId),
             supplierApi.listUserAccess(supplierId),
-            supplierApi.getBusinessContextSummary(supplierId),
             supplierApi.getSupplierActivity(supplierId),
             businessPartyLinkApi.listForSource('supplier', supplierId),
         ])
-            .then(([supplier, contacts, addresses, bankAccounts, taxProfile, financeDefaults, userAccess, businessContext, activity, partyLinks]) => {
+            .then(([supplier, contacts, addresses, bankAccounts, taxProfile, financeDefaults, userAccess, activity, partyLinks]) => {
                 if (mounted) {
                     setDetail({
                         activity: activity.data,
@@ -88,7 +86,6 @@ export function SupplierDetailPage() {
                         bankAccounts: bankAccounts.data,
                         contacts: contacts.data,
                         financeDefaults: financeDefaults.data,
-                        businessContext: businessContext.data,
                         partyLinks: partyLinks.data,
                         supplier: supplier.data,
                         taxProfile: taxProfile.data,
@@ -120,7 +117,21 @@ export function SupplierDetailPage() {
         return <EmptyState description={error || 'Supplier was not found.'} title="Unable to load supplier" />;
     }
 
-    const { activity, addresses, bankAccounts, businessContext, contacts, financeDefaults, partyLinks, supplier, taxProfile, userAccess } = detail;
+    const { activity, addresses, bankAccounts, contacts, financeDefaults, partyLinks, supplier, taxProfile, userAccess } = detail;
+
+    async function changeSupplierStatus(status: SupplierStatus) {
+        setIsChangingStatus(true);
+        setActionError('');
+
+        try {
+            const response = await supplierApi.changeStatus(supplier.id, status);
+            setDetail((current) => current ? { ...current, supplier: response.data } : current);
+        } catch (caught) {
+            setActionError(caught instanceof Error ? caught.message : 'Unable to change supplier status.');
+        } finally {
+            setIsChangingStatus(false);
+        }
+    }
 
     return (
         <div className="space-y-6">
@@ -130,15 +141,27 @@ export function SupplierDetailPage() {
                         <Link to="/suppliers">
                             <Button variant="secondary">Back</Button>
                         </Link>
+                        {supplier.status !== 'active' ? (
+                            <Button disabled={isChangingStatus} onClick={() => void changeSupplierStatus('active')} variant="secondary">Activate</Button>
+                        ) : null}
+                        {supplier.status === 'active' ? (
+                            <Button disabled={isChangingStatus} onClick={() => void changeSupplierStatus('inactive')} variant="secondary">Deactivate</Button>
+                        ) : null}
+                        {supplier.status !== 'blocked' ? (
+                            <Button disabled={isChangingStatus} onClick={() => void changeSupplierStatus('blocked')} variant="danger">Block</Button>
+                        ) : (
+                            <Button disabled={isChangingStatus} onClick={() => void changeSupplierStatus('active')} variant="secondary">Unblock</Button>
+                        )}
                         <Link to={`/suppliers/${supplier.id}/edit`}>
                             <Button>Edit Supplier</Button>
                         </Link>
                     </>
                 }
                 eyebrow="Supplier"
-                subtitle="Supplier detail aggregates vendor profile, contacts, addresses, bank accounts, backend-owned tax/finance previews, optional user access, source context, and audit."
+                subtitle="Supplier detail aggregates vendor profile, contacts, addresses, bank accounts, backend-owned tax/finance previews, optional user access, cross-role links, and audit."
                 title={supplier.name}
             />
+            {actionError ? <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{actionError}</div> : null}
             <SupplierSummaryCard supplier={supplier} />
             <Card className="p-5">
                 <Tabs active={activeTab} items={tabs} onChange={setActiveTab} />
@@ -175,9 +198,27 @@ export function SupplierDetailPage() {
                     />
                 </div>
             ) : null}
-            {activeTab === 'contacts' ? <SupplierContactsTable contacts={contacts} /> : null}
-            {activeTab === 'addresses' ? <SupplierAddressesTable addresses={addresses} /> : null}
-            {activeTab === 'bank-accounts' ? <SupplierBankAccountsTable accounts={bankAccounts} /> : null}
+            {activeTab === 'contacts' ? (
+                <SupplierContactsTable
+                    contacts={contacts}
+                    supplierId={supplier.id}
+                    onSaved={(contact) => setDetail((current) => current ? { ...current, contacts: [...current.contacts, contact] } : current)}
+                />
+            ) : null}
+            {activeTab === 'addresses' ? (
+                <SupplierAddressesTable
+                    addresses={addresses}
+                    supplierId={supplier.id}
+                    onSaved={(address) => setDetail((current) => current ? { ...current, addresses: [...current.addresses, address] } : current)}
+                />
+            ) : null}
+            {activeTab === 'bank-accounts' ? (
+                <SupplierBankAccountsTable
+                    accounts={bankAccounts}
+                    supplierId={supplier.id}
+                    onSaved={(account) => setDetail((current) => current ? { ...current, bankAccounts: [...current.bankAccounts, account] } : current)}
+                />
+            ) : null}
             {activeTab === 'tax' ? <SupplierTaxProfileForm profile={taxProfile} /> : null}
             {activeTab === 'finance' ? <SupplierFinanceDefaultsForm defaults={financeDefaults} /> : null}
             {activeTab === 'user-access' ? <SupplierUserAccessPanel access={userAccess} /> : null}
@@ -187,7 +228,6 @@ export function SupplierDetailPage() {
                     links={partyLinks}
                 />
             ) : null}
-            {activeTab === 'source-context' ? <SupplierBusinessContextPanel summary={businessContext} /> : null}
             {activeTab === 'audit' ? <SupplierActivityTimeline entries={activity} /> : null}
         </div>
     );

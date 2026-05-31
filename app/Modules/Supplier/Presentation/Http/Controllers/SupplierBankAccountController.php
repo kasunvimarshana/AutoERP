@@ -6,6 +6,7 @@ namespace Modules\Supplier\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\DB;
 use Modules\Core\Application\Contracts\CurrentOrganizationUnitContextAccessorInterface;
 use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Application\Contracts\CurrentUserContextAccessorInterface;
@@ -21,8 +22,7 @@ final class SupplierBankAccountController extends Controller
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
         private readonly CurrentUserContextAccessorInterface $currentUser,
-    ) {
-    }
+    ) {}
 
     public function index(int|string $supplierId): JsonResponse
     {
@@ -45,30 +45,32 @@ final class SupplierBankAccountController extends Controller
         }
 
         $payload = $request->validated();
-        if ((bool) ($payload['is_primary'] ?? false)) {
-            $this->clearPrimary((int) $supplierId);
-        }
+        $record = DB::transaction(function () use ($payload, $supplierId) {
+            if ((bool) ($payload['is_primary'] ?? false)) {
+                $this->clearPrimary((int) $supplierId);
+            }
 
-        $record = $this->repository->create([
-            'tenant_id' => $this->tenantId(),
-            'organization_unit_id' => $this->currentOrganizationUnit->currentOrganizationUnitId(),
-            'metadata' => $payload['metadata'] ?? null,
-            'supplier_id' => (int) $supplierId,
-            'account_name' => $payload['account_name'],
-            'account_number' => $payload['account_number'],
-            'iban' => $payload['iban'] ?? null,
-            'swift_code' => $payload['swift_code'] ?? null,
-            'bank_name' => $payload['bank_name'],
-            'branch_name' => $payload['branch_name'] ?? null,
-            'bank_code' => $payload['bank_code'] ?? null,
-            'branch_code' => $payload['branch_code'] ?? null,
-            'currency_id' => $payload['currency_id'] ?? null,
-            'is_primary' => (bool) ($payload['is_primary'] ?? false),
-            'is_active' => (bool) ($payload['is_active'] ?? true),
-            'created_by' => $this->currentUser->currentUserId(),
-            'updated_by' => $this->currentUser->currentUserId(),
-            'row_version' => 1,
-        ]);
+            return $this->repository->create([
+                'tenant_id' => $this->tenantId(),
+                'organization_unit_id' => $this->currentOrganizationUnit->currentOrganizationUnitId(),
+                'metadata' => $payload['metadata'] ?? null,
+                'supplier_id' => (int) $supplierId,
+                'account_name' => $payload['account_name'],
+                'account_number' => $payload['account_number'],
+                'iban' => $payload['iban'] ?? null,
+                'swift_code' => $payload['swift_code'] ?? null,
+                'bank_name' => $payload['bank_name'],
+                'branch_name' => $payload['branch_name'] ?? null,
+                'bank_code' => $payload['bank_code'] ?? null,
+                'branch_code' => $payload['branch_code'] ?? null,
+                'currency_id' => $payload['currency_id'] ?? null,
+                'is_primary' => (bool) ($payload['is_primary'] ?? false),
+                'is_active' => (bool) ($payload['is_active'] ?? true),
+                'created_by' => $this->currentUser->currentUserId(),
+                'updated_by' => $this->currentUser->currentUserId(),
+                'row_version' => 1,
+            ]);
+        });
 
         return response()->json(['data' => $record->toArray()], 201);
     }
@@ -92,30 +94,32 @@ final class SupplierBankAccountController extends Controller
         }
 
         $payload = $request->validated();
-        if ((bool) ($payload['is_primary'] ?? false)) {
-            $this->clearPrimary((int) $supplierId, (int) $id);
-        }
+        $record = DB::transaction(function () use ($existing, $id, $payload, $supplierId) {
+            if ((bool) ($payload['is_primary'] ?? false)) {
+                $this->clearPrimary((int) $supplierId, (int) $id);
+            }
 
-        $record = $this->repository->update($id, [
-            'metadata' => $payload['metadata'] ?? $existing->get('metadata'),
-            'account_name' => $payload['account_name'] ?? $existing->get('account_name'),
-            'account_number' => $payload['account_number'] ?? $existing->get('account_number'),
-            'iban' => $payload['iban'] ?? $existing->get('iban'),
-            'swift_code' => $payload['swift_code'] ?? $existing->get('swift_code'),
-            'bank_name' => $payload['bank_name'] ?? $existing->get('bank_name'),
-            'branch_name' => $payload['branch_name'] ?? $existing->get('branch_name'),
-            'bank_code' => $payload['bank_code'] ?? $existing->get('bank_code'),
-            'branch_code' => $payload['branch_code'] ?? $existing->get('branch_code'),
-            'currency_id' => $payload['currency_id'] ?? $existing->get('currency_id'),
-            'is_primary' => array_key_exists('is_primary', $payload)
-                ? (bool) $payload['is_primary']
-                : (bool) $existing->get('is_primary'),
-            'is_active' => array_key_exists('is_active', $payload)
-                ? (bool) $payload['is_active']
-                : (bool) $existing->get('is_active'),
-            'updated_by' => $this->currentUser->currentUserId(),
-            'row_version' => ((int) $existing->get('row_version', 1)) + 1,
-        ]);
+            return $this->repository->update($id, [
+                'metadata' => $payload['metadata'] ?? $existing->get('metadata'),
+                'account_name' => $payload['account_name'] ?? $existing->get('account_name'),
+                'account_number' => $payload['account_number'] ?? $existing->get('account_number'),
+                'iban' => $payload['iban'] ?? $existing->get('iban'),
+                'swift_code' => $payload['swift_code'] ?? $existing->get('swift_code'),
+                'bank_name' => $payload['bank_name'] ?? $existing->get('bank_name'),
+                'branch_name' => $payload['branch_name'] ?? $existing->get('branch_name'),
+                'bank_code' => $payload['bank_code'] ?? $existing->get('bank_code'),
+                'branch_code' => $payload['branch_code'] ?? $existing->get('branch_code'),
+                'currency_id' => $payload['currency_id'] ?? $existing->get('currency_id'),
+                'is_primary' => array_key_exists('is_primary', $payload)
+                    ? (bool) $payload['is_primary']
+                    : (bool) $existing->get('is_primary'),
+                'is_active' => array_key_exists('is_active', $payload)
+                    ? (bool) $payload['is_active']
+                    : (bool) $existing->get('is_active'),
+                'updated_by' => $this->currentUser->currentUserId(),
+                'row_version' => ((int) $existing->get('row_version', 1)) + 1,
+            ]);
+        });
 
         return response()->json(['data' => $record->toArray()]);
     }

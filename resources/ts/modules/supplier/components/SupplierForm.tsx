@@ -170,7 +170,7 @@ export function SupplierForm({ mode, supplier }: { mode: 'create' | 'edit'; supp
                         </div>
                         <div className="space-y-2 md:col-span-2">
                             <FieldLabel>Notes</FieldLabel>
-                            <Textarea name="notes" placeholder="Procurement notes, compliance notes, preferred delivery windows." />
+                            <Textarea defaultValue={supplier?.notes} name="notes" placeholder="Procurement notes, compliance notes, preferred delivery windows." />
                             <FieldError message={errors.notes?.[0]} />
                         </div>
                     </div>
@@ -191,7 +191,6 @@ export function SupplierForm({ mode, supplier }: { mode: 'create' | 'edit'; supp
                     <Link to="/suppliers">
                         <Button variant="secondary">Cancel</Button>
                     </Link>
-                    <Button disabled={isSubmitting}>Save Draft</Button>
                     <Button disabled={isSubmitting} type="submit" variant="blue">{mode === 'edit' ? 'Update Supplier' : 'Create Supplier'}</Button>
                 </div>
             </div>

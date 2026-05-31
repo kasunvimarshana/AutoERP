@@ -74,7 +74,7 @@ export function SupplierListPage() {
             />
             <div className="grid gap-4 md:grid-cols-3">
                 {[
-                    ['Suppliers loaded', String(suppliers.length), 'Mock or backend-normalized records'],
+                    ['Suppliers loaded', String(suppliers.length), 'Backend records'],
                     ['Optional user links', String(suppliers.filter((supplier) => supplier.userAccessStatus === 'linked').length), 'Supplier login is not automatic'],
                     ['Backend finance previews', 'Readonly', 'No frontend payable calculations'],
                 ].map(([label, value, helper]) => (

@@ -15,6 +15,7 @@ export type Supplier = {
     legalName?: string;
     mobile?: string;
     name: string;
+    notes?: string;
     phone: string;
     registrationNumber?: string;
     status: SupplierStatus;
@@ -101,15 +102,6 @@ export type SupplierUserAccessCreateInput = {
     email: string;
     isPrimary?: boolean;
     name?: string;
-};
-
-export type SupplierBusinessContextSummary = {
-    backendPreviewStatus: string;
-    lastActivityDate: string;
-    openSourceDocuments: string;
-    payableBalance: string;
-    supplierId: string;
-    totalActivityValue: string;
 };
 
 export type SupplierAuditEntry = {

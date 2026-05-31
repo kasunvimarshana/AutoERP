@@ -13,6 +13,23 @@ final class UpsertSupplierContactRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $aliases = [];
+
+        if ($this->has('contact_name') && ! $this->has('name')) {
+            $aliases['name'] = $this->input('contact_name');
+        }
+
+        if ($this->has('role') && ! $this->has('designation')) {
+            $aliases['designation'] = $this->input('role');
+        }
+
+        if ($aliases !== []) {
+            $this->merge($aliases);
+        }
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -22,6 +39,7 @@ final class UpsertSupplierContactRequest extends FormRequest
 
         return [
             'tenant_id' => ['nullable', 'integer', 'min:1'],
+            'row_version' => ['nullable', 'integer', 'min:0'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'metadata' => ['nullable', 'array'],
             'supplier_id' => array_merge($required, ['integer', 'min:1', 'exists:suppliers,id']),
