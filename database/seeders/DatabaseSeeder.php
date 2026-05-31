@@ -8,6 +8,7 @@ use Modules\Auth\Infrastructure\Persistence\Eloquent\Seeders\AuthModuleSeeder;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Seeders\CoreBootstrapSeeder;
 use Modules\Document\Infrastructure\Persistence\Eloquent\Seeders\DocumentModuleSeeder;
 use Modules\Item\Infrastructure\Persistence\Eloquent\Seeders\ItemModuleSeeder;
+use Modules\Pricing\Infrastructure\Persistence\Eloquent\Seeders\PricingModuleSeeder;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Seeders\PurchaseModuleSeeder;
 use Modules\UOM\Infrastructure\Persistence\Eloquent\Seeders\UomModuleSeeder;
 use Modules\Vehicle\Infrastructure\Persistence\Eloquent\Seeders\VehicleModuleSeeder;
@@ -28,6 +29,7 @@ class DatabaseSeeder extends Seeder
             class_exists(AuthModuleSeeder::class) ? AuthModuleSeeder::class : null,
             class_exists(UomModuleSeeder::class) ? UomModuleSeeder::class : null,
             class_exists(ItemModuleSeeder::class) ? ItemModuleSeeder::class : null,
+            class_exists(PricingModuleSeeder::class) ? PricingModuleSeeder::class : null,
             class_exists(DocumentModuleSeeder::class) ? DocumentModuleSeeder::class : null,
             class_exists(VehicleModuleSeeder::class) ? VehicleModuleSeeder::class : null,
         ]));

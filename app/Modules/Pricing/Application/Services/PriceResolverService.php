@@ -181,7 +181,18 @@ final class PriceResolverService implements PriceResolverServiceInterface
         $ids = [];
 
         if ($explicitPriceListId !== null) {
-            $ids[] = $explicitPriceListId;
+            $priceList = $this->priceListRepository->findById($explicitPriceListId);
+
+            if (
+                $priceList instanceof DataRecord
+                && (int) $priceList->get('tenant_id') === $tenantId
+                && (bool) $priceList->get('is_active', true)
+                && $this->isDateApplicable($resolveDate, $priceList->get('valid_from'), $priceList->get('valid_to'))
+            ) {
+                return [$explicitPriceListId];
+            }
+
+            return [];
         }
 
         $genericLists = $this->priceListRepository->list(['tenant_id' => $tenantId, 'is_active' => true]);

@@ -36,6 +36,12 @@ Route::prefix('api/pricing')
         Route::post('resolve-price', [PriceResolverController::class, 'resolve'])->name('resolve-price');
         Route::post('discounts/preview-calculate', [PriceResolverController::class, 'previewDiscountCalculation'])
             ->name('discounts.preview-calculate');
+        Route::get('price-lists/{price_list}/usage', [PriceListController::class, 'usage'])->name('price-lists.usage');
+        Route::patch('price-lists/{price_list}/activate', [PriceListController::class, 'activate'])->name('price-lists.activate');
+        Route::patch('price-lists/{price_list}/deactivate', [PriceListController::class, 'deactivate'])->name('price-lists.deactivate');
+        Route::get('pricing-rules/{pricing_rule}/usage', [PricingRuleController::class, 'usage'])->name('pricing-rules.usage');
+        Route::patch('pricing-rules/{pricing_rule}/activate', [PricingRuleController::class, 'activate'])->name('pricing-rules.activate');
+        Route::patch('pricing-rules/{pricing_rule}/deactivate', [PricingRuleController::class, 'deactivate'])->name('pricing-rules.deactivate');
         Route::apiResource('price-lists', PriceListController::class);
         Route::apiResource('price-list-items', PriceListItemController::class);
         Route::apiResource('pricing-rules', PricingRuleController::class);

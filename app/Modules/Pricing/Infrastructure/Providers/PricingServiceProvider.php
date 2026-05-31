@@ -10,6 +10,7 @@ use Modules\Pricing\Application\Contracts\Services\PriceListServiceInterface;
 use Modules\Pricing\Application\Contracts\Services\PriceResolverServiceInterface;
 use Modules\Pricing\Application\Contracts\Services\PriceValidationServiceInterface;
 use Modules\Pricing\Application\Contracts\Services\PricingRuleServiceInterface;
+use Modules\Pricing\Application\Contracts\Services\PricingUsageSummaryServiceInterface;
 use Modules\Pricing\Application\Contracts\Services\TierPricingServiceInterface;
 use Modules\Pricing\Application\Contracts\UseCases\CustomerPriceLists\CreateCustomerPriceListServiceInterface;
 use Modules\Pricing\Application\Contracts\UseCases\CustomerPriceLists\DeleteCustomerPriceListServiceInterface;
@@ -87,6 +88,7 @@ use Modules\Pricing\Infrastructure\Persistence\Eloquent\Repositories\EloquentPri
 use Modules\Pricing\Infrastructure\Persistence\Eloquent\Repositories\EloquentPricingRuleRepository;
 use Modules\Pricing\Infrastructure\Persistence\Eloquent\Repositories\EloquentPricingTierRepository;
 use Modules\Pricing\Infrastructure\Persistence\Eloquent\Repositories\EloquentSupplierPriceListRepository;
+use Modules\Pricing\Infrastructure\Services\DatabasePricingUsageSummaryService;
 
 final class PricingServiceProvider extends ServiceProvider
 {
@@ -127,6 +129,7 @@ final class PricingServiceProvider extends ServiceProvider
         $this->app->singleton(PricingRuleServiceInterface::class, PricingRuleService::class);
         $this->app->singleton(PriceListServiceInterface::class, PriceListService::class);
         $this->app->singleton(PriceResolverServiceInterface::class, PriceResolverService::class);
+        $this->app->singleton(PricingUsageSummaryServiceInterface::class, DatabasePricingUsageSummaryService::class);
 
         $this->app->singleton(PriceListRepositoryInterface::class, function (): PriceListRepositoryInterface {
             return new EloquentPriceListRepository(new PriceListModel());

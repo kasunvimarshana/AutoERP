@@ -8,7 +8,7 @@ import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Tabs } from '../../../shared/components/ui/Tabs';
 import {
     DiscountRulesTable,
-    PriceListItemsTable,
+    PriceListItemsManager,
     PriceListSummaryCard,
     PricingActivityTimeline,
     PricingRuleConditionsTable,
@@ -44,7 +44,7 @@ export function PriceListDetailPage() {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(true);
 
-    useEffect(() => {
+    function loadDetail() {
         let mounted = true;
         const priceListId = id ?? '';
         Promise.all([
@@ -54,7 +54,7 @@ export function PriceListDetailPage() {
             pricingApi.listPricingRuleConditions(),
             pricingApi.listDiscountRules(),
             pricingApi.listPricingTiers(),
-            pricingApi.getPricingUsage(priceListId),
+            pricingApi.getPricingUsage(priceListId, 'price-list'),
             pricingApi.getPricingActivity(priceListId),
         ]).then(([priceListResponse, itemResponse, ruleResponse, conditionResponse, discountRuleResponse, tierResponse, usageResponse, activityResponse]) => {
             if (mounted) {
@@ -63,13 +63,18 @@ export function PriceListDetailPage() {
                 setRules(ruleResponse.data);
                 setConditions(conditionResponse.data);
                 setDiscountRules(discountRuleResponse.data);
-                setTiers(tierResponse.data.filter((tier) => tier.priceListId === priceListId || !priceListId));
+                const itemIds = new Set(itemResponse.data.map((item) => item.id));
+                setTiers(tierResponse.data.filter((tier) => itemIds.has(tier.priceListItemId)));
                 setUsage(usageResponse.data);
                 setActivity(activityResponse.data);
             }
         }).catch((caught: unknown) => { if (mounted) setError(caught instanceof Error ? caught.message : 'Unable to load price list detail.'); })
             .finally(() => { if (mounted) setIsLoading(false); });
         return () => { mounted = false; };
+    }
+
+    useEffect(() => {
+        return loadDetail();
     }, [id]);
 
     if (isLoading) return <EmptyState description="Loading price list detail..." title="Loading price list" />;
@@ -78,10 +83,10 @@ export function PriceListDetailPage() {
     return (
         <div className="space-y-6">
             <PageHeader actions={<><Link to="/pricing/price-lists"><Button variant="secondary">Back</Button></Link><Link to={`/pricing/price-lists/${priceList.id}/edit`}><Button>Edit Price List</Button></Link></>} eyebrow="Price List" subtitle="Detail workspace shows setup, links, rules, discounts, tiers, usage, and audit without resolving prices in frontend." title={priceList.name} />
-            <PriceListSummaryCard priceList={priceList} />
+            <PriceListSummaryCard onStatusChange={setPriceList} priceList={priceList} />
             <Card className="p-5"><Tabs active={activeTab} items={tabs} onChange={setActiveTab} /></Card>
             {activeTab === 'overview' ? <div className="grid gap-5 xl:grid-cols-[1fr_340px]"><PreviewPanel rows={[{ label: 'Type', value: priceList.type }, { label: 'Module usage', value: priceList.moduleUsage.join(', ') }, { label: 'Party scope', value: priceList.isCustomerSpecific ? 'Customer-specific' : priceList.isSupplierSpecific ? 'Supplier-specific' : 'General' }]} title="Overview" /><PricingUsagePanel usage={usage} /></div> : null}
-            {activeTab === 'items' ? <PriceListItemsTable items={items} /> : null}
+            {activeTab === 'items' ? <PriceListItemsManager items={items} onChanged={loadDetail} priceListId={priceList.id} /> : null}
             {activeTab === 'customers' ? <PreviewPanel rows={[{ label: 'Customer lists', value: 'Managed by backend/customer-price-list endpoints' }]} title="Customer Price Lists" /> : null}
             {activeTab === 'suppliers' ? <PreviewPanel rows={[{ label: 'Supplier lists', value: 'Managed by backend/supplier-price-list endpoints' }]} title="Supplier Price Lists" /> : null}
             {activeTab === 'rules' ? <PricingRuleConditionsTable conditions={conditions.filter((condition) => rules.some((rule) => rule.id === condition.ruleId))} /> : null}

@@ -33,7 +33,7 @@ export function PricingRuleDetailPage() {
     useEffect(() => {
         let mounted = true;
         const ruleId = id ?? '';
-        Promise.all([pricingApi.getPricingRule(ruleId), pricingApi.listPricingRuleConditions(ruleId), pricingApi.listDiscountRules(), pricingApi.getPricingUsage(ruleId), pricingApi.getPricingActivity(ruleId)])
+        Promise.all([pricingApi.getPricingRule(ruleId), pricingApi.listPricingRuleConditions(ruleId), pricingApi.listDiscountRules(), pricingApi.getPricingUsage(ruleId, 'rule'), pricingApi.getPricingActivity(ruleId)])
             .then(([ruleResponse, conditionResponse, discountRuleResponse, usageResponse, activityResponse]) => {
                 if (mounted) {
                     setRule(ruleResponse.data);

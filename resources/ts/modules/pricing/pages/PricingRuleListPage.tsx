@@ -16,6 +16,7 @@ export function PricingRuleListPage() {
     const [query, setQuery] = useState('');
     const [status, setStatus] = useState('');
     const [source, setSource] = useState('');
+    const [ruleType, setRuleType] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(true);
 
@@ -32,18 +33,18 @@ export function PricingRuleListPage() {
         const q = query.trim().toLowerCase();
         return rows.filter((row) => {
             const matchesQuery = q ? [row.code, row.name, row.ruleType, row.sourceType].some((value) => value.toLowerCase().includes(q)) : true;
-            return matchesQuery && (!status || row.status === status) && (!source || row.sourceType === source);
+            return matchesQuery && (!status || row.status === status) && (!source || row.sourceType === source) && (!ruleType || row.ruleType === ruleType);
         });
-    }, [query, rows, source, status]);
+    }, [query, rows, ruleType, source, status]);
 
     return (
         <div className="space-y-6">
             <PageHeader actions={<Link to="/pricing/rules/new"><Button>New Rule</Button></Link>} eyebrow="Pricing" subtitle="Rules describe resolver priority, conditions, discounts, and tiers. Backend evaluates every rule." title="Pricing Rules" />
-            <SearchFilterBar onSearch={setQuery} placeholder="Search rule code, name, type, source..." />
+            <SearchFilterBar onSearch={setQuery} />
             <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-3">
-                <Select onChange={(event) => setSource(event.target.value)} options={[{ label: 'Sales', value: 'sales' }, { label: 'Purchase', value: 'purchase' }, { label: 'Vehicle Service', value: 'vehicle_service' }, { label: 'Vehicle Rental', value: 'vehicle_rental' }]} placeholder="All sources" value={source} />
-                <Select onChange={(event) => setStatus(event.target.value)} options={[{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }, { label: 'Draft', value: 'draft' }]} placeholder="All statuses" value={status} />
-                <Select options={[{ label: 'Discount', value: 'discount' }, { label: 'Tier', value: 'tier' }]} placeholder="All rule types" />
+                <Select onChange={(event) => setSource(event.target.value)} options={[{ label: 'All sources', value: '' }, { label: 'Sales', value: 'sales' }, { label: 'Purchase', value: 'purchase' }, { label: 'Vehicle Service', value: 'vehicle_service' }, { label: 'Vehicle Rental', value: 'vehicle_rental' }]} value={source} />
+                <Select onChange={(event) => setStatus(event.target.value)} options={[{ label: 'All statuses', value: '' }, { label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }]} value={status} />
+                <Select onChange={(event) => setRuleType(event.target.value)} options={[{ label: 'All rule types', value: '' }, { label: 'Discount', value: 'discount' }, { label: 'Tier', value: 'tier' }, { label: 'Price resolve', value: 'price_resolve' }, { label: 'Generic', value: 'generic' }]} value={ruleType} />
             </div>
             {isLoading ? <EmptyState description="Loading pricing rules..." title="Loading rules" /> : null}
             {error ? <EmptyState description={error} title="Pricing rule service unavailable" /> : null}
@@ -57,7 +58,7 @@ export function PricingRuleListPage() {
                         { header: 'Priority', key: 'priority' },
                         { header: 'Action', key: 'actionType' },
                         { header: 'Status', key: 'status', render: (row) => <StatusBadge status={row.status} /> },
-                        { header: 'Actions', key: 'actions', render: (row) => <PricingRuleRowActions rule={row} /> },
+                        { header: 'Actions', key: 'actions', render: (row) => <PricingRuleRowActions onChanged={() => pricingApi.listPricingRules().then((response) => setRows(response.data))} rule={row} /> },
                     ]}
                     getRowKey={(row) => row.id}
                     rows={visibleRows}

@@ -16,6 +16,9 @@ final class PricingRoutesTest extends TestCase
         self::assertTrue(Route::has('pricing.price-lists.show'));
         self::assertTrue(Route::has('pricing.price-lists.update'));
         self::assertTrue(Route::has('pricing.price-lists.destroy'));
+        self::assertTrue(Route::has('pricing.price-lists.activate'));
+        self::assertTrue(Route::has('pricing.price-lists.deactivate'));
+        self::assertTrue(Route::has('pricing.price-lists.usage'));
         self::assertTrue(Route::has('pricing.price-list-items.index'));
         self::assertTrue(Route::has('pricing.price-list-items.store'));
         self::assertTrue(Route::has('pricing.price-list-items.show'));
@@ -31,6 +34,9 @@ final class PricingRoutesTest extends TestCase
         self::assertTrue(Route::has('pricing.customer-price-lists.show'));
         self::assertTrue(Route::has('pricing.customer-price-lists.update'));
         self::assertTrue(Route::has('pricing.customer-price-lists.destroy'));
+        self::assertTrue(Route::has('pricing.pricing-rules.activate'));
+        self::assertTrue(Route::has('pricing.pricing-rules.deactivate'));
+        self::assertTrue(Route::has('pricing.pricing-rules.usage'));
         self::assertTrue(Route::has('pricing.discounts.preview-calculate'));
     }
 

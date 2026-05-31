@@ -22,16 +22,21 @@ final class PriceListItemModel extends CoreModel
             'price_list_id' => 'integer',
             'item_id' => 'integer',
             'variant_id' => 'integer',
-            'warehouse_id' => 'integer',
-            'warehouse_location_id' => 'integer',
-            'batch_id' => 'integer',
-            'serial_id' => 'integer',
             'uom_id' => 'integer',
+            'currency_id' => 'integer',
+            'party_id' => 'integer',
+            'source_id' => 'integer',
             'min_quantity' => 'decimal:4',
+            'max_quantity' => 'decimal:4',
             'price' => 'decimal:4',
             'discount_value' => 'decimal:4',
+            'markup_value' => 'decimal:4',
+            'is_tax_inclusive' => 'boolean',
+            'priority' => 'integer',
             'valid_from' => 'date',
-            'valid_to' => 'date'
+            'valid_to' => 'date',
+            'is_promotional' => 'boolean',
+            'is_active' => 'boolean',
         ]);
     }
 }

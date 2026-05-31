@@ -26,7 +26,7 @@ export function PricingDashboardPage() {
     }, []);
 
     const metrics = [
-        ['Active price lists', String(priceLists.filter((row) => row.status === 'active').length), 'Backend/mock normalized'],
+        ['Active price lists', String(priceLists.filter((row) => row.status === 'active').length), 'Loaded from Pricing API'],
         ['Active rules', String(rules.filter((row) => row.status === 'active').length), 'Priority evaluated by backend'],
         ['Active discounts', String(discounts.filter((row) => row.status === 'active').length), 'Amounts calculated by backend'],
         ['Recent changes', String(history.length), 'Readonly price history'],

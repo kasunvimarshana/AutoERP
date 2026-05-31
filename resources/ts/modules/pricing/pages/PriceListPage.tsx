@@ -18,6 +18,7 @@ export function PriceListPage() {
     const [type, setType] = useState('');
     const [status, setStatus] = useState('');
     const [currency, setCurrency] = useState('');
+    const [validity, setValidity] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(true);
 
@@ -34,9 +35,16 @@ export function PriceListPage() {
         const q = query.trim().toLowerCase();
         return rows.filter((row) => {
             const matchesQuery = q ? [row.code, row.name, row.currency, row.type].some((value) => value.toLowerCase().includes(q)) : true;
-            return matchesQuery && (!type || row.type === type) && (!status || row.status === status) && (!currency || row.currency === currency);
+            const today = new Date().toISOString().slice(0, 10);
+            const isCurrent = (!row.validFrom || row.validFrom <= today) && (!row.validTo || row.validTo >= today);
+            const isExpiring = row.validTo ? row.validTo >= today && row.validTo <= new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString().slice(0, 10) : false;
+            return matchesQuery
+                && (!type || row.type === type)
+                && (!status || row.status === status)
+                && (!currency || row.currency === currency)
+                && (!validity || (validity === 'current' ? isCurrent : isExpiring));
         });
-    }, [currency, query, rows, status, type]);
+    }, [currency, query, rows, status, type, validity]);
 
     return (
         <div className="space-y-6">
@@ -44,14 +52,14 @@ export function PriceListPage() {
             <div className="grid gap-4 md:grid-cols-3">
                 <Card className="p-5"><p className="text-sm text-slate-500">Loaded lists</p><p className="mt-2 text-2xl font-bold text-slate-950">{rows.length}</p></Card>
                 <Card className="p-5"><p className="text-sm text-slate-500">Active lists</p><p className="mt-2 text-2xl font-bold text-slate-950">{rows.filter((row) => row.status === 'active').length}</p></Card>
-                <Card className="p-5"><p className="text-sm text-slate-500">Price resolving</p><p className="mt-2 text-2xl font-bold text-slate-950">Backend-owned</p></Card>
+                <Card className="p-5"><p className="text-sm text-slate-500">Resolver source</p><p className="mt-2 text-2xl font-bold text-slate-950">API</p></Card>
             </div>
-            <SearchFilterBar onSearch={setQuery} placeholder="Search code, name, currency, type..." />
+            <SearchFilterBar onSearch={setQuery} />
             <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-4">
-                <Select onChange={(event) => setType(event.target.value)} options={[{ label: 'Sales', value: 'sales' }, { label: 'Purchase', value: 'purchase' }, { label: 'Customer', value: 'customer' }, { label: 'Supplier', value: 'supplier' }, { label: 'Service', value: 'service' }, { label: 'Rental', value: 'rental' }]} placeholder="All types" value={type} />
-                <Select onChange={(event) => setCurrency(event.target.value)} options={[{ label: 'LKR', value: 'LKR' }, { label: 'USD', value: 'USD' }]} placeholder="All currencies" value={currency} />
-                <Select onChange={(event) => setStatus(event.target.value)} options={[{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }, { label: 'Draft', value: 'draft' }]} placeholder="All statuses" value={status} />
-                <Select options={[{ label: 'Current validity', value: 'current' }, { label: 'Expiring soon', value: 'expiring' }]} placeholder="All valid dates" />
+                <Select onChange={(event) => setType(event.target.value)} options={[{ label: 'All types', value: '' }, { label: 'Sales', value: 'sales' }, { label: 'Purchase', value: 'purchase' }, { label: 'Customer', value: 'customer' }, { label: 'Supplier', value: 'supplier' }, { label: 'Service', value: 'service' }, { label: 'Rental', value: 'rental' }]} value={type} />
+                <Select onChange={(event) => setCurrency(event.target.value)} options={[{ label: 'All currencies', value: '' }, { label: 'LKR', value: 'LKR' }, { label: 'USD', value: 'USD' }]} value={currency} />
+                <Select onChange={(event) => setStatus(event.target.value)} options={[{ label: 'All statuses', value: '' }, { label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }]} value={status} />
+                <Select onChange={(event) => setValidity(event.target.value)} options={[{ label: 'All valid dates', value: '' }, { label: 'Current validity', value: 'current' }, { label: 'Expiring soon', value: 'expiring' }]} value={validity} />
             </div>
             {isLoading ? <EmptyState description="Loading price lists..." title="Loading pricing" /> : null}
             {error ? <EmptyState description={error} title="Pricing service unavailable" /> : null}
@@ -67,7 +75,7 @@ export function PriceListPage() {
                         { header: 'Valid To', key: 'validTo' },
                         { header: 'Status', key: 'status', render: (row) => <StatusBadge status={row.status} /> },
                         { header: 'Updated', key: 'updatedAt' },
-                        { header: 'Actions', key: 'actions', render: (row) => <PriceListRowActions priceList={row} /> },
+                        { header: 'Actions', key: 'actions', render: (row) => <PriceListRowActions onChanged={() => pricingApi.listPriceLists().then((response) => setRows(response.data))} priceList={row} /> },
                     ]}
                     getRowKey={(row) => row.id}
                     rows={visibleRows}

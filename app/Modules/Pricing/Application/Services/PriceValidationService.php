@@ -69,11 +69,11 @@ final class PriceValidationService implements PriceValidationServiceInterface
     {
         $tenantId = (int) ($payload['tenant_id'] ?? 0);
         $name = trim((string) ($payload['name'] ?? ''));
-        if ($tenantId < 1 || $name === '') {
+        if ($tenantId < 1 || (! $isUpdate && $name === '')) {
             return $this->invalid('tenant_id and name are required.');
         }
 
-        if (! $isUpdate && $this->priceLists->exists(['tenant_id' => $tenantId, 'name' => $name])) {
+        if (! $isUpdate && $name !== '' && $this->priceLists->exists(['tenant_id' => $tenantId, 'name' => $name])) {
             return $this->conflict('Price list name already exists in tenant.');
         }
 
@@ -161,7 +161,7 @@ final class PriceValidationService implements PriceValidationServiceInterface
     {
         $tenantId = (int) ($payload['tenant_id'] ?? 0);
         $name = trim((string) ($payload['name'] ?? ''));
-        if ($tenantId < 1 || $name === '') {
+        if ($tenantId < 1 || (! $isUpdate && $name === '')) {
             return $this->invalid('tenant_id and name are required.');
         }
 
@@ -197,7 +197,7 @@ final class PriceValidationService implements PriceValidationServiceInterface
         $tenantId = (int) ($payload['tenant_id'] ?? 0);
         $name = trim((string) ($payload['name'] ?? ''));
         $discountValue = (float) ($payload['discount_value'] ?? -1);
-        if ($tenantId < 1 || $name === '') {
+        if ($tenantId < 1 || (! $isUpdate && $name === '')) {
             return $this->invalid('tenant_id and name are required.');
         }
 
@@ -205,7 +205,7 @@ final class PriceValidationService implements PriceValidationServiceInterface
             return $this->conflict('Discount code already exists in tenant.');
         }
 
-        if ($discountValue < 0) {
+        if (array_key_exists('discount_value', $payload) && $discountValue < 0) {
             return $this->invalid('discount_value must be >= 0.');
         }
 

@@ -4,7 +4,7 @@ import { PriceListForm } from '../components/PricingComponents';
 export function PriceListCreatePage() {
     return (
         <div className="space-y-6">
-            <PageHeader eyebrow="Pricing" subtitle="Create a price list and optional price item setup. Backend will later validate currency, dates, party scope, and price resolving." title="Create Price List" />
+            <PageHeader eyebrow="Pricing" subtitle="Create a price list. Currency, dates, party scope, and resolver priority are validated by the backend." title="Create Price List" />
             <PriceListForm mode="create" />
         </div>
     );

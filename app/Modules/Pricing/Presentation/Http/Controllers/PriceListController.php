@@ -7,6 +7,8 @@ namespace Modules\Pricing\Presentation\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Modules\Core\Application\DTO\PagedResult;
+use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
+use Modules\Pricing\Application\Contracts\Services\PricingUsageSummaryServiceInterface;
 use Modules\Pricing\Application\Contracts\UseCases\PriceLists\CreatePriceListServiceInterface;
 use Modules\Pricing\Application\Contracts\UseCases\PriceLists\DeletePriceListServiceInterface;
 use Modules\Pricing\Application\Contracts\UseCases\PriceLists\GetPriceListServiceInterface;
@@ -24,6 +26,8 @@ final class PriceListController extends Controller
         private readonly CreatePriceListServiceInterface $createService,
         private readonly UpdatePriceListServiceInterface $updateService,
         private readonly DeletePriceListServiceInterface $deleteService,
+        private readonly PricingUsageSummaryServiceInterface $usageSummaryService,
+        private readonly CurrentTenantContextAccessorInterface $currentTenant,
     ) {}
 
     public function index(ListPriceListRequest $request): JsonResponse
@@ -101,5 +105,46 @@ final class PriceListController extends Controller
         }
 
         return response()->json(null, 204);
+    }
+
+    public function activate(int|string $priceList): JsonResponse|PriceListResource
+    {
+        return $this->changeActiveState($priceList, true);
+    }
+
+    public function deactivate(int|string $priceList): JsonResponse|PriceListResource
+    {
+        return $this->changeActiveState($priceList, false);
+    }
+
+    public function usage(int|string $priceList): JsonResponse
+    {
+        $tenantId = $this->currentTenant->currentTenantId();
+        if ($tenantId === null) {
+            return response()->json(['message' => 'Current tenant context is required.'], 422);
+        }
+
+        $result = $this->getService->execute($priceList);
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 404);
+        }
+
+        return response()->json([
+            'data' => $this->usageSummaryService->summarizePriceList((int) $priceList, (int) $tenantId),
+        ]);
+    }
+
+    private function changeActiveState(int|string $priceList, bool $isActive): JsonResponse|PriceListResource
+    {
+        $result = $this->updateService->execute($priceList, ['is_active' => $isActive]);
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'PRICING_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return new PriceListResource($result->valueOrFail());
     }
 }
