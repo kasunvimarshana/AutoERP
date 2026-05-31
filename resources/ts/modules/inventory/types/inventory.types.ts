@@ -55,6 +55,22 @@ export type StockTransferLine = {
     uom: string;
 };
 
+export type StockTransferFormInput = {
+    fromLocationId?: string;
+    fromWarehouseId: string;
+    lines: Array<{
+        itemId: string;
+        quantity: string;
+        toLocationId?: string;
+        uomId: string;
+    }>;
+    notes?: string;
+    referenceNumber?: string;
+    status?: string;
+    toLocationId?: string;
+    toWarehouseId: string;
+};
+
 export type StockTransfer = {
     destinationLocation: string;
     destinationWarehouse: string;
@@ -87,6 +103,21 @@ export type StockAdjustment = {
     reason: string;
     status: string;
     warehouse: string;
+};
+
+export type StockAdjustmentFormInput = {
+    lines: Array<{
+        adjustmentQuantity: string;
+        direction: 'DECREASE' | 'INCREASE';
+        itemId: string;
+        uomId: string;
+    }>;
+    locationId?: string;
+    reason?: string;
+    referenceNumber?: string;
+    status?: string;
+    type?: string;
+    warehouseId: string;
 };
 
 export type CycleCount = {
@@ -215,4 +246,10 @@ export type InventoryAuditEntry = {
     id: string;
     time: string;
     type: string;
+};
+
+export type InventoryLookupOption = {
+    id: string;
+    label: string;
+    secondary?: string;
 };

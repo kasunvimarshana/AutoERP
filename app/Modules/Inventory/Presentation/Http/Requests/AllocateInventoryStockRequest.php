@@ -27,6 +27,7 @@ final class AllocateInventoryStockRequest extends FormRequest
             'variant_id' => ['sometimes', 'nullable', 'integer'],
             'batch_id' => ['sometimes', 'nullable', 'integer'],
             'serial_id' => ['sometimes', 'nullable', 'integer'],
+            'uom_id' => ['sometimes', 'nullable', 'integer'],
             'lot_number' => ['sometimes', 'nullable', 'string', 'max:100'],
             'allocation_method' => ['sometimes', 'nullable', 'string', 'max:50'],
             'quantity' => ['required', 'numeric', 'gt:0'],

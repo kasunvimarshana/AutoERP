@@ -1,44 +1,47 @@
 import { useEffect, useState } from 'react';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
-import { Button } from '../../../shared/components/ui/Button';
-import { Input } from '../../../shared/components/ui/Input';
 import { FormSection } from '../../../shared/components/forms/FormSection';
+import { EmptyState } from '../../../shared/components/ui/EmptyState';
+import { Input } from '../../../shared/components/ui/Input';
 import { InventoryTraceabilityTimeline, StockAvailabilityPreviewForm, StockAvailabilityResultPanel } from '../components/InventoryComponents';
-import { availabilityPreview } from '../mock/inventoryMock';
 import { inventoryApi } from '../services/inventoryApi';
 import type { InventoryAuditEntry, StockAvailabilityPreviewResult } from '../types/inventory.types';
 
 export function TraceabilityPage() {
     const [rows, setRows] = useState<InventoryAuditEntry[]>([]);
-    useEffect(() => { inventoryApi.getTraceability().then((response) => setRows(response.data)); }, []);
+    const [query, setQuery] = useState('');
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        inventoryApi.getTraceability()
+            .then((response) => setRows(response.data))
+            .catch((caught: unknown) => setError(caught instanceof Error ? caught.message : 'Unable to load traceability.'));
+    }, []);
+
+    const filteredRows = query
+        ? rows.filter((row) => JSON.stringify(row).toLowerCase().includes(query.toLowerCase()))
+        : rows;
 
     return (
         <div className="space-y-6">
-            <PageHeader eyebrow="Inventory" subtitle="Trace stock by item, batch, serial, or source reference. Backend/mock returns the timeline." title="Traceability" />
+            <PageHeader eyebrow="Inventory" subtitle="Trace stock by item, batch, serial, or source reference. Backend returns the timeline." title="Traceability" />
             <FormSection title="Trace Context">
                 <div className="grid gap-4 md:grid-cols-4">
-                    <Input placeholder="Item selector" />
-                    <Input placeholder="Batch / serial optional" />
-                    <Input placeholder="Source reference optional" />
-                    <Button variant="blue">Trace</Button>
+                    <Input onChange={(event) => setQuery(event.target.value)} value={query} />
                 </div>
             </FormSection>
-            <InventoryTraceabilityTimeline entries={rows} />
+            {error ? <EmptyState description={error} title="Unable to load traceability" /> : <InventoryTraceabilityTimeline entries={filteredRows} />}
         </div>
     );
 }
 
 export function StockAvailabilityPreviewPage() {
-    const [result, setResult] = useState<StockAvailabilityPreviewResult>(availabilityPreview);
-    useEffect(() => {
-        inventoryApi.previewStockAvailability({ itemId: 'mock-item', quantity: '1', uom: 'PCS', warehouse: 'Main Warehouse' })
-            .then((response) => setResult({ breakdown: response.breakdown.map((row) => ({ label: String(row.label), value: String(row.value) })), calculated: response.calculated, errors: response.errors, input: response.input, warnings: response.warnings }));
-    }, []);
+    const [result, setResult] = useState<StockAvailabilityPreviewResult | null>(null);
 
     return (
         <div className="space-y-6">
-            <PageHeader eyebrow="Inventory Preview" subtitle="Ask backend/mock if stock is available. The frontend does not calculate on hand, reserved, available, UOM conversion, or batch/serial availability." title="Stock Availability Preview" />
-            <StockAvailabilityPreviewForm />
+            <PageHeader eyebrow="Inventory Preview" subtitle="Ask backend if stock is available. The frontend does not calculate on hand, reserved, available, UOM conversion, or batch/serial availability." title="Stock Availability Preview" />
+            <StockAvailabilityPreviewForm onResult={setResult} />
             <StockAvailabilityResultPanel result={result} />
         </div>
     );
