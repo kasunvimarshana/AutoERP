@@ -21,7 +21,7 @@ final class UpsertItemCategoryRequest extends FormRequest
         $required = $this->isMethod('post') ? ['required'] : ['sometimes'];
 
         return [
-            'tenant_id' => array_merge($required, ['integer', 'min:1', 'exists:tenants,id']),
+            'tenant_id' => ['nullable', 'integer', 'min:1', 'exists:tenants,id'],
             'row_version' => ['nullable', 'integer', 'min:0'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1', 'exists:organization_units,id'],
             'metadata' => ['nullable', 'array'],

@@ -54,6 +54,8 @@ final class UpsertItemRequest extends FormRequest
             'is_chargeable' => ['nullable', 'boolean'],
             'is_taxable' => ['nullable', 'boolean'],
             'is_variable' => ['nullable', 'boolean'],
+            'valuation_method' => ['nullable', 'string', 'max:255'],
+            'allocation_method' => ['nullable', 'string', 'max:255'],
             'standard_cost' => ['nullable', 'numeric', 'min:0'],
             'income_account_id' => ['nullable', 'integer', 'min:1', 'exists:accounts,id'],
             'cogs_account_id' => ['nullable', 'integer', 'min:1', 'exists:accounts,id'],

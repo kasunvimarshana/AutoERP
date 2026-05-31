@@ -3,12 +3,18 @@ import { httpClient } from '../../../services/api/httpClient';
 import type {
     Item,
     ItemAttribute,
+    ItemAttributeInput,
+    ItemAttributeValue,
     ItemAuditEntry,
     ItemBrand,
+    ItemCapabilitySummary,
     ItemCategory,
+    ItemCategoryInput,
     ItemComboComponent,
+    ItemComboComponentInput,
     ItemFormInput,
     ItemIdentifier,
+    ItemIdentifierInput,
     ItemInventorySummary,
     ItemListQuery,
     ItemLookupOption,
@@ -16,9 +22,11 @@ import type {
     ItemStatus,
     ItemType,
     ItemTypeOption,
+    ItemTypeSetupPreview,
     ItemUnit,
     ItemUsageSummary,
     ItemVariant,
+    ItemVariantInput,
     StockBehavior,
     UomOption,
 } from '../types/item.types';
@@ -28,6 +36,7 @@ type BackendRecord = Record<string, unknown>;
 type LookupContext = {
     brands?: Map<string, ItemBrand>;
     categories?: Map<string, ItemCategory>;
+    items?: Map<string, Item>;
     itemTypes?: Map<string, ItemTypeOption>;
     uoms?: Map<string, UomOption>;
 };
@@ -72,6 +81,15 @@ function asBool(value: unknown, fallback = false) {
 function asNumberOrUndefined(value: string) {
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function asDecimalString(value: unknown, fallback = '0') {
+    if (value === null || value === undefined || value === '') {
+        return fallback;
+    }
+
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed.toLocaleString(undefined, { maximumFractionDigits: 4 }) : String(value);
 }
 
 function collectionMeta<T>(response: ApiCollectionResponse<T>) {
@@ -211,6 +229,15 @@ function normalizeLookupOption(raw: BackendRecord): ItemLookupOption {
     };
 }
 
+function normalizePriceList(raw: BackendRecord): ItemLookupOption {
+    return {
+        code: asOptionalString(raw.code),
+        id: asString(raw.id),
+        label: asOptionalString(raw.code) ? `${asString(raw.code)} - ${asString(raw.name)}` : asString(raw.name, `Price List #${asString(raw.id)}`),
+        name: asString(raw.name, `Price List #${asString(raw.id)}`),
+    };
+}
+
 function normalizeItem(raw: BackendRecord, lookups: LookupContext = {}): Item {
     const categoryId = asOptionalString(raw.category_id);
     const brandId = asOptionalString(raw.brand_id);
@@ -253,11 +280,40 @@ function normalizeItem(raw: BackendRecord, lookups: LookupContext = {}): Item {
         isStockable: asBool(raw.is_stockable, itemType === 'inventory_product'),
         itemType,
         itemTypeId,
+        leadTimeDays: asOptionalString(raw.lead_time_days),
+        maximumStock: asOptionalString(raw.maximum_stock),
+        minimumStock: asOptionalString(raw.minimum_stock),
         name: asString(raw.name, 'Unnamed item'),
+        reorderPoint: asOptionalString(raw.reorder_point),
+        reorderQuantity: asOptionalString(raw.reorder_quantity),
+        safetyStock: asOptionalString(raw.safety_stock),
+        standardCost: asOptionalString(raw.standard_cost),
         status: normalizeStatus(raw),
         stockBehavior: normalizeStockBehavior(raw, itemType),
         taxGroupId: asOptionalString(raw.tax_group_id),
         updatedAt: asString(raw.updated_at ?? raw.updatedAt, 'Not updated yet'),
+        valuationMethod: asOptionalString(raw.valuation_method),
+    };
+}
+
+function normalizeCapabilities(raw: BackendRecord): ItemCapabilitySummary {
+    return {
+        affectsInventory: asBool(raw.affects_inventory),
+        batchTracking: asBool(raw.batch_tracking),
+        chargeable: asBool(raw.chargeable),
+        hasComboComponents: asBool(raw.has_combo_components),
+        hasIdentifiers: asBool(raw.has_identifiers),
+        hasVariants: asBool(raw.has_variants),
+        inventoryReferencesCount: Number(raw.inventory_references_count ?? 0),
+        itemType: normalizeItemType(raw.item_type),
+        pricingReferencesCount: Number(raw.pricing_references_count ?? 0),
+        purchasable: asBool(raw.purchasable),
+        rentalUsable: asBool(raw.rental_usable),
+        sellable: asBool(raw.sellable),
+        serialTracking: asBool(raw.serial_tracking),
+        serviceUsable: asBool(raw.service_usable),
+        stockable: asBool(raw.stockable),
+        uomConfigured: asBool(raw.uom_configured),
     };
 }
 
@@ -290,11 +346,19 @@ function toBackendItemPayload(input: ItemFormInput) {
         is_service: isService,
         is_stockable: input.stockable,
         item_type_id: asNumberOrUndefined(input.itemTypeId) ?? null,
+        lead_time_days: input.leadTimeDays ? Number(input.leadTimeDays) : null,
+        maximum_stock: input.maximumStock ? Number(input.maximumStock) : null,
+        minimum_stock: input.minimumStock ? Number(input.minimumStock) : 0,
         name: input.name,
+        reorder_point: input.reorderPoint ? Number(input.reorderPoint) : 0,
+        reorder_quantity: input.reorderQuantity ? Number(input.reorderQuantity) : null,
+        safety_stock: input.safetyStock ? Number(input.safetyStock) : 0,
         sku: input.code,
+        standard_cost: input.standardCost ? Number(input.standardCost) : null,
         status: statusToBackend(input.status),
         tax_group_id: asNumberOrUndefined(input.taxGroupId) ?? null,
         type: input.itemType,
+        valuation_method: input.valuationMethod || null,
     };
 
     const comboItems = input.comboItems
@@ -348,6 +412,34 @@ async function fetchTaxGroups() {
     return { ...response, data, meta: collectionMeta({ ...response, data }) };
 }
 
+async function fetchAttributeValues() {
+    const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/item-attribute-values', { query: { per_page: 200 } });
+    const data: ItemAttributeValue[] = response.data.map((record) => ({
+        attributeId: asString(record.attribute_id),
+        id: asString(record.id),
+        value: asString(record.value),
+    }));
+
+    return { ...response, data, meta: collectionMeta({ ...response, data }) };
+}
+
+async function fetchVariantAttributeValues() {
+    const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/item-variant-attribute-values', { query: { per_page: 200 } });
+    const data = response.data.map((record) => ({
+        attributeValueId: asString(record.attribute_value_id),
+        id: asString(record.id),
+        variantId: asString(record.variant_id),
+    }));
+
+    return { ...response, data, meta: collectionMeta({ ...response, data }) };
+}
+
+async function fetchPriceLists() {
+    const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/price-lists', { query: { is_active: true, per_page: 200 } });
+    const data = response.data.map(normalizePriceList);
+    return { ...response, data, meta: collectionMeta({ ...response, data }) };
+}
+
 async function lookupContext(): Promise<LookupContext> {
     const [categories, brands, itemTypes, uoms] = await Promise.all([
         fetchCategories(),
@@ -390,19 +482,110 @@ export const itemApi = {
         const context = await lookupContext();
         return { ...response, data: normalizeItem(response.data, context) };
     },
+    createAttribute: async (input: ItemAttributeInput) => {
+        const response = await httpClient<ApiResponse<BackendRecord>>('/api/item/item-attributes', {
+            body: {
+                group_id: asNumberOrUndefined(input.groupId ?? '') ?? null,
+                is_required: input.isRequired ?? false,
+                name: input.name,
+                type: input.type,
+            },
+            method: 'POST',
+        });
+        return {
+            ...response,
+            data: {
+                group: asString(response.data.group_name ?? response.data.group_id),
+                id: asString(response.data.id),
+                name: asString(response.data.name),
+                type: asString(response.data.type, 'text'),
+            },
+        };
+    },
+    createCategory: async (input: ItemCategoryInput) => {
+        const response = await httpClient<ApiResponse<BackendRecord>>('/api/item/item-categories', {
+            body: {
+                code: input.code || null,
+                description: input.description || null,
+                is_active: input.isActive ?? true,
+                name: input.name,
+            },
+            method: 'POST',
+        });
+        return { ...response, data: normalizeCategory(response.data) };
+    },
+    createComboComponent: async (input: ItemComboComponentInput) => {
+        const response = await httpClient<ApiResponse<BackendRecord>>('/api/item/combo-items', {
+            body: {
+                combo_item_id: asNumberOrUndefined(input.comboItemId),
+                component_item_id: asNumberOrUndefined(input.componentItemId),
+                quantity: Number(input.quantity) > 0 ? Number(input.quantity) : 1,
+                uom_id: asNumberOrUndefined(input.uomId),
+            },
+            method: 'POST',
+        });
+        return response;
+    },
+    createIdentifier: async (input: ItemIdentifierInput) => {
+        const response = await httpClient<ApiResponse<BackendRecord>>('/api/item/item-identifiers', {
+            body: {
+                format: input.format || null,
+                is_active: input.isActive ?? true,
+                is_primary: input.isPrimary ?? false,
+                item_id: asNumberOrUndefined(input.itemId),
+                technology: input.technology || 'barcode_1d',
+                value: input.value,
+                variant_id: asNumberOrUndefined(input.variantId ?? '') ?? null,
+            },
+            method: 'POST',
+        });
+        return response;
+    },
+    createVariant: async (input: ItemVariantInput) => {
+        const response = await httpClient<ApiResponse<BackendRecord>>('/api/item/item-variants', {
+            body: {
+                is_active: input.isActive ?? true,
+                is_default: input.isDefault ?? false,
+                item_id: asNumberOrUndefined(input.itemId),
+                name: input.name,
+                sku: input.sku || null,
+            },
+            method: 'POST',
+        });
+        return response;
+    },
     deactivateItem: async (itemId: string) => {
         const context = await lookupContext();
         const response = await httpClient<ApiResponse<BackendRecord>>(`/api/item/items/${itemId}/deactivate`, { method: 'PATCH' });
         return { ...response, data: normalizeItem(response.data, context) };
     },
-    getInventorySummary: async (_itemId: string): Promise<ApiResponse<ItemInventorySummary>> => ({
-        data: {
-            availability: 'No inventory summary endpoint returned for this item yet.',
-            costPreview: 'Backend-owned cost preview unavailable',
-            stockOnHand: 'Backend-owned stock quantity unavailable',
-            valuation: 'Backend-owned valuation unavailable',
-        },
-    }),
+    deleteAttribute: (id: string) => httpClient<void>(`/api/item/item-attributes/${id}`, { method: 'DELETE' }),
+    deleteCategory: (id: string) => httpClient<void>(`/api/item/item-categories/${id}`, { method: 'DELETE' }),
+    deleteComboComponent: (id: string) => httpClient<void>(`/api/item/combo-items/${id}`, { method: 'DELETE' }),
+    deleteIdentifier: (id: string) => httpClient<void>(`/api/item/item-identifiers/${id}`, { method: 'DELETE' }),
+    deleteVariant: (id: string) => httpClient<void>(`/api/item/item-variants/${id}`, { method: 'DELETE' }),
+    getInventorySummary: async (itemId: string): Promise<ApiResponse<ItemInventorySummary>> => {
+        const response = await httpClient<ApiResponse<BackendRecord>>(`/api/item/items/${itemId}/inventory-summary`);
+
+        return {
+            ...response,
+            data: {
+                availableQuantity: asDecimalString(response.data.quantity_available),
+                cogsAccountId: asOptionalString(response.data.cogs_account_id),
+                inventoryAccountId: asOptionalString(response.data.inventory_account_id),
+                isStockable: asBool(response.data.is_stockable),
+                minimumStock: asDecimalString(response.data.minimum_stock),
+                quantityOnHand: asDecimalString(response.data.quantity_on_hand),
+                quantityReserved: asDecimalString(response.data.quantity_reserved),
+                reorderPoint: asDecimalString(response.data.reorder_point),
+                reorderQuantity: asOptionalString(response.data.reorder_quantity),
+                safetyStock: asDecimalString(response.data.safety_stock),
+                standardCost: asOptionalString(response.data.standard_cost),
+                stockLevelCount: Number(response.data.stock_level_count ?? 0),
+                valuationMethod: asOptionalString(response.data.valuation_method),
+            },
+        };
+    },
     getItem: async (itemId: string) => {
         const [response, context] = await Promise.all([
             httpClient<ApiResponse<BackendRecord>>(`/api/item/items/${itemId}`),
@@ -410,33 +593,107 @@ export const itemApi = {
         ]);
         return { ...response, data: normalizeItem(response.data, context) };
     },
-    getItemActivity: async (_itemId: string): Promise<ApiCollectionResponse<ItemAuditEntry>> => ({ data: [] }),
+    getItemActivity: async (itemId: string): Promise<ApiCollectionResponse<ItemAuditEntry>> => {
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/audit/audit-logs', {
+            query: { auditable_id: itemId, auditable_type: 'items', per_page: 50 },
+        });
+        const data = response.data.map((entry) => ({
+            actor: asString(entry.user_name ?? entry.user_id ?? 'System'),
+            description: asString(entry.description ?? entry.event ?? 'Item activity'),
+            id: asString(entry.id),
+            time: asString(entry.occurred_at ?? entry.created_at ?? entry.updated_at),
+        }));
+
+        return { ...response, data, meta: collectionMeta({ ...response, data }) };
+    },
     getItemUnits: async (itemId: string): Promise<ApiCollectionResponse<ItemUnit>> => {
-        const item = await itemApi.getItem(itemId);
+        const [setup, item, uoms] = await Promise.all([
+            httpClient<ApiResponse<BackendRecord>>(`/api/item/items/${itemId}/uom-setup`),
+            itemApi.getItem(itemId),
+            itemApi.listUoms(),
+        ]);
+        const uomMap = new Map(uoms.data.map((uom) => [uom.id, uom]));
+        const baseUomId = asOptionalString(setup.data.base_uom_id) ?? item.data.baseUomId;
+        const units: ItemUnit[] = [
+            { id: baseUomId ?? 'base-uom', isBase: true, purpose: 'base', unit: baseUomId ? uomMap.get(baseUomId)?.label ?? `UOM #${baseUomId}` : item.data.baseUom },
+            { id: asString(setup.data.default_receipt_uom_id), isBase: false, purpose: 'receipt', unit: setup.data.default_receipt_uom_id ? uomMap.get(asString(setup.data.default_receipt_uom_id))?.label ?? `UOM #${asString(setup.data.default_receipt_uom_id)}` : 'Not configured' },
+            { id: asString(setup.data.default_issue_uom_id), isBase: false, purpose: 'issue', unit: setup.data.default_issue_uom_id ? uomMap.get(asString(setup.data.default_issue_uom_id))?.label ?? `UOM #${asString(setup.data.default_issue_uom_id)}` : 'Not configured' },
+            { id: asString(setup.data.default_consumption_uom_id), isBase: false, purpose: 'consumption', unit: setup.data.default_consumption_uom_id ? uomMap.get(asString(setup.data.default_consumption_uom_id))?.label ?? `UOM #${asString(setup.data.default_consumption_uom_id)}` : 'Not configured' },
+            { id: asString(setup.data.default_charge_uom_id), isBase: false, purpose: 'charge', unit: setup.data.default_charge_uom_id ? uomMap.get(asString(setup.data.default_charge_uom_id))?.label ?? `UOM #${asString(setup.data.default_charge_uom_id)}` : 'Not configured' },
+        ];
+
         return {
-            data: [
-                {
-                    id: item.data.baseUomId ?? 'base-uom',
-                    isBase: true,
-                    purpose: 'base',
-                    unit: item.data.baseUom,
-                },
-            ],
+            data: units.map((unit, index) => ({ ...unit, id: unit.id || `${itemId}-uom-${index}` })),
         };
     },
     getItemUsage: async (itemId: string): Promise<ApiResponse<ItemUsageSummary>> => {
-        const item = await itemApi.getItem(itemId);
+        const response = await httpClient<ApiResponse<BackendRecord>>(`/api/item/items/${itemId}/usage-summary`);
+        return { ...response, data: { capabilities: normalizeCapabilities(response.data) } };
+    },
+    getPricingReferences: async (itemId: string): Promise<ApiCollectionResponse<ItemPricingReference>> => {
+        const response = await httpClient<ApiResponse<{ references?: BackendRecord[] }>>(`/api/item/items/${itemId}/pricing-references`);
+        const data = (response.data.references ?? []).map((record) => ({
+            currency: asString(record.currency_id, 'Default currency'),
+            discount: `${asDecimalString(record.discount_value)} ${asString(record.discount_type, 'percentage')}`,
+            id: asString(record.id),
+            price: asDecimalString(record.price),
+            priceList: asOptionalString(record.price_list_code) ? `${asString(record.price_list_code)} - ${asString(record.price_list_name)}` : asString(record.price_list_name, `Price List #${asString(record.price_list_id)}`),
+            status: asBool(record.is_active, true) ? 'Active' : 'Inactive',
+            uom: asOptionalString(record.uom_id),
+        }));
+
+        return { data, meta: collectionMeta({ data } as ApiCollectionResponse<ItemPricingReference>) };
+    },
+    getTypeSetupPreview: async (input: Partial<ItemFormInput>): Promise<ApiResponse<ItemTypeSetupPreview>> => {
+        const response = await httpClient<ApiResponse<BackendRecord>>('/api/item/items/preview-type-setup', {
+            body: toBackendItemPayload({
+                allowChargeUsage: input.allowChargeUsage ?? false,
+                allowConsumptionUsage: input.allowConsumptionUsage ?? false,
+                allowIssueUsage: input.allowIssueUsage ?? false,
+                allowReceiptUsage: input.allowReceiptUsage ?? false,
+                barcode: input.barcode ?? '',
+                baseUomId: input.baseUomId ?? '',
+                brandId: input.brandId ?? '',
+                categoryId: input.categoryId ?? '',
+                cogsAccountId: input.cogsAccountId ?? '',
+                code: input.code ?? 'PREVIEW',
+                comboItems: input.comboItems ?? [],
+                defaultChargeUomId: input.defaultChargeUomId ?? '',
+                defaultConsumptionUomId: input.defaultConsumptionUomId ?? '',
+                defaultIssueUomId: input.defaultIssueUomId ?? '',
+                defaultReceiptUomId: input.defaultReceiptUomId ?? '',
+                description: input.description ?? '',
+                displayName: input.displayName ?? '',
+                expenseAccountId: input.expenseAccountId ?? '',
+                incomeAccountId: input.incomeAccountId ?? '',
+                inventoryAccountId: input.inventoryAccountId ?? '',
+                itemType: input.itemType ?? 'inventory_product',
+                itemTypeId: input.itemTypeId ?? '',
+                leadTimeDays: input.leadTimeDays ?? '',
+                maximumStock: input.maximumStock ?? '',
+                minimumStock: input.minimumStock ?? '',
+                name: input.name ?? 'Preview',
+                reorderPoint: input.reorderPoint ?? '',
+                reorderQuantity: input.reorderQuantity ?? '',
+                safetyStock: input.safetyStock ?? '',
+                standardCost: input.standardCost ?? '',
+                status: input.status ?? 'draft',
+                stockable: input.stockable ?? false,
+                taxGroupId: input.taxGroupId ?? '',
+                trackBatch: input.trackBatch ?? false,
+                trackSerial: input.trackSerial ?? false,
+                valuationMethod: input.valuationMethod ?? '',
+            }),
+            method: 'POST',
+        });
         return {
+            ...response,
             data: {
-                chargeUse: item.data.allowChargeUsage ? 'Enabled by backend item setup' : 'Disabled by backend item setup',
-                consumptionUse: item.data.allowConsumptionUsage ? 'Enabled by backend item setup' : 'Disabled by backend item setup',
-                inventoryUse: item.data.isStockable ? 'Stockable item setup' : 'No stock impact in item setup',
-                issueUse: item.data.allowIssueUsage ? 'Enabled by backend item setup' : 'Disabled by backend item setup',
-                receiptUse: item.data.allowReceiptUsage ? 'Enabled by backend item setup' : 'Disabled by backend item setup',
+                capabilities: normalizeCapabilities((response.data.capabilities ?? {}) as BackendRecord),
+                warnings: Array.isArray(response.data.warnings) ? response.data.warnings.map(String) : [],
             },
         };
     },
-    getPricingReferences: async (_itemId: string): Promise<ApiCollectionResponse<ItemPricingReference>> => ({ data: [] }),
     listAttributes: async () => {
         const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/item-attributes', { query: { per_page: 200 } });
         const data = response.data.map((item) => ({
@@ -450,18 +707,25 @@ export const itemApi = {
     listBrands: fetchBrands,
     listCategories: fetchCategories,
     listComboComponents: async (itemId?: string) => {
-        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/combo-items', {
-            query: { combo_item_id: itemId, per_page: 200 },
-        });
+        const [response, itemsResponse, uomResponse] = await Promise.all([
+            httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/combo-items', {
+                query: { combo_item_id: itemId, per_page: 200 },
+            }),
+            itemApi.listItems({ perPage: 200 }),
+            itemApi.listUoms(),
+        ]);
+        const itemMap = new Map(itemsResponse.data.map((item) => [item.id, item]));
+        const uomMap = new Map(uomResponse.data.map((uom) => [uom.id, uom]));
         const data = response.data.map((component) => ({
             comboItemId: asOptionalString(component.combo_item_id),
             componentItemId: asOptionalString(component.component_item_id),
-            componentItemName: `Item #${asString(component.component_item_id)}`,
-            componentType: 'inventory_product' as ItemType,
+            componentItemName: itemMap.get(asString(component.component_item_id))?.name ?? `Item #${asString(component.component_item_id)}`,
+            componentType: itemMap.get(asString(component.component_item_id))?.itemType ?? 'inventory_product' as ItemType,
             id: asString(component.id),
             quantity: asString(component.quantity, '1'),
-            stockImpact: 'Backend-owned',
-            uom: asString(component.uom_id, 'UOM'),
+            stockImpact: itemMap.get(asString(component.component_item_id))?.isStockable ? 'Component can affect stock through backend expansion' : 'No stock impact in item setup',
+            uom: uomMap.get(asString(component.uom_id))?.label ?? asString(component.uom_id, 'UOM'),
+            uomId: asOptionalString(component.uom_id),
         }));
         return { ...response, data, meta: collectionMeta({ ...response, data }) };
     },
@@ -503,11 +767,28 @@ export const itemApi = {
     listTaxGroups: fetchTaxGroups,
     listUoms: fetchUoms,
     listVariants: async (itemId?: string) => {
-        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/item-variants', {
-            query: { item_id: itemId, per_page: 200 },
-        });
+        const [response, attributes, attributeValues, variantAttributeValues] = await Promise.all([
+            httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/item-variants', {
+                query: { item_id: itemId, per_page: 200 },
+            }),
+            itemApi.listAttributes(),
+            fetchAttributeValues(),
+            fetchVariantAttributeValues(),
+        ]);
+        const attributeMap = new Map(attributes.data.map((attribute) => [attribute.id, attribute]));
+        const attributeValueMap = new Map(attributeValues.data.map((value) => [value.id, value]));
         const data = response.data.map((item) => ({
-            attributes: [],
+            attributes: variantAttributeValues.data
+                .filter((link) => link.variantId === asString(item.id))
+                .map((link) => {
+                    const value = attributeValueMap.get(link.attributeValueId);
+                    const attribute = value ? attributeMap.get(value.attributeId) : undefined;
+
+                    return {
+                        attribute: attribute?.name ?? `Attribute #${value?.attributeId ?? ''}`,
+                        value: value?.value ?? `Value #${link.attributeValueId}`,
+                    };
+                }),
             id: asString(item.id),
             isActive: asBool(item.is_active, true),
             itemId: asOptionalString(item.item_id),

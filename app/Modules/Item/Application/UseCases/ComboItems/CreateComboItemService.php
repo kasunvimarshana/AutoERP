@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Item\Application\UseCases\ComboItems;
 
 use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
+use Modules\Core\Application\Contracts\CurrentOrganizationUnitContextAccessorInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Modules\Item\Application\Contracts\UseCases\ComboItems\CreateComboItemServiceInterface;
@@ -19,6 +20,7 @@ final class CreateComboItemService implements CreateComboItemServiceInterface
         private readonly ComboItemRepositoryInterface $repository,
         private readonly ItemRepositoryInterface $itemRepository,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
+        private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
     ) {
     }
 
@@ -58,6 +60,7 @@ final class CreateComboItemService implements CreateComboItemServiceInterface
             }
 
             $payload['tenant_id'] = $tenantId;
+            $payload['organization_unit_id'] ??= $this->currentOrganizationUnit->currentOrganizationUnitId();
 
             if (! array_key_exists('row_version', $payload)) {
                 $payload['row_version'] = 1;

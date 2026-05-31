@@ -74,7 +74,7 @@ final class ItemSampleSeeder extends Seeder
                     'brand_id' => null,
                     'item_type_id' => $this->itemTypeId('SERVICE'),
                     'base_uom_id' => $hourUomId,
-                    'description' => 'Sample service item. Pricing and billing are backend-owned.',
+                    'description' => 'Sample service item with reusable service setup.',
                     'is_service' => true,
                     'is_chargeable' => true,
                     'is_purchasable' => false,
@@ -114,7 +114,7 @@ final class ItemSampleSeeder extends Seeder
                     'brand_id' => null,
                     'item_type_id' => $this->itemTypeId('COMBO'),
                     'base_uom_id' => $eachUomId,
-                    'description' => 'Sample combo item. Component expansion is backend-owned.',
+                    'description' => 'Sample combo item with persisted component setup.',
                     'is_chargeable' => true,
                 ],
                 [
@@ -125,7 +125,7 @@ final class ItemSampleSeeder extends Seeder
                     'brand_id' => null,
                     'item_type_id' => $this->itemTypeId('RENTAL_CHARGE'),
                     'base_uom_id' => $dayUomId,
-                    'description' => 'Sample rental charge item. Rental billing remains backend-owned.',
+                    'description' => 'Sample rental charge item with reusable charge setup.',
                     'is_rentable' => true,
                     'is_chargeable' => true,
                     'is_stockable' => false,
@@ -233,6 +233,60 @@ final class ItemSampleSeeder extends Seeder
                     ],
                 );
             }
+
+            if ($filterItemId !== null && Schema::hasTable('item_attributes') && Schema::hasTable('item_variants')) {
+                $groupId = $this->ensureAttributeGroup($tenantId, $organizationUnitId, 'Fitment');
+                $attributeId = $this->ensureAttribute($tenantId, $organizationUnitId, $groupId, 'Size', 'SELECT');
+                $valueId = $this->ensureAttributeValue($tenantId, $organizationUnitId, $attributeId, 'Standard');
+
+                DB::table('item_variant_attributes')->updateOrInsert(
+                    ['tenant_id' => $tenantId, 'item_id' => $filterItemId, 'attribute_id' => $attributeId],
+                    [
+                        'row_version' => 1,
+                        'organization_unit_id' => $organizationUnitId,
+                        'metadata' => json_encode(['seed_source' => 'item_sample']),
+                        'is_required' => false,
+                        'is_variation_axis' => true,
+                        'display_order' => 1,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ],
+                );
+
+                DB::table('item_variants')->updateOrInsert(
+                    ['tenant_id' => $tenantId, 'item_id' => $filterItemId, 'name' => 'Standard'],
+                    [
+                        'row_version' => 1,
+                        'organization_unit_id' => $organizationUnitId,
+                        'metadata' => json_encode(['seed_source' => 'item_sample']),
+                        'sku' => 'ITM-FILTER-001-STD',
+                        'is_default' => true,
+                        'is_active' => true,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ],
+                );
+
+                $variantId = (int) DB::table('item_variants')
+                    ->where('tenant_id', $tenantId)
+                    ->where('item_id', $filterItemId)
+                    ->where('name', 'Standard')
+                    ->value('id');
+
+                DB::table('item_variant_attribute_values')->updateOrInsert(
+                    ['tenant_id' => $tenantId, 'variant_id' => $variantId, 'attribute_value_id' => $valueId],
+                    [
+                        'row_version' => 1,
+                        'organization_unit_id' => $organizationUnitId,
+                        'metadata' => json_encode(['seed_source' => 'item_sample']),
+                        'created_by' => null,
+                        'updated_by' => null,
+                        'deleted_by' => null,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ],
+                );
+            }
         });
     }
 
@@ -318,5 +372,67 @@ final class ItemSampleSeeder extends Seeder
             ->value('id');
 
         return $id === null ? null : (int) $id;
+    }
+
+    private function ensureAttributeGroup(int $tenantId, ?int $organizationUnitId, string $name): int
+    {
+        DB::table('item_attribute_groups')->updateOrInsert(
+            ['tenant_id' => $tenantId, 'name' => $name],
+            [
+                'row_version' => 1,
+                'organization_unit_id' => $organizationUnitId,
+                'metadata' => json_encode(['seed_source' => 'item_sample']),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+
+        return (int) DB::table('item_attribute_groups')
+            ->where('tenant_id', $tenantId)
+            ->where('name', $name)
+            ->value('id');
+    }
+
+    private function ensureAttribute(int $tenantId, ?int $organizationUnitId, int $groupId, string $name, string $type): int
+    {
+        DB::table('item_attributes')->updateOrInsert(
+            ['tenant_id' => $tenantId, 'name' => $name],
+            [
+                'row_version' => 1,
+                'organization_unit_id' => $organizationUnitId,
+                'metadata' => json_encode(['seed_source' => 'item_sample']),
+                'group_id' => $groupId,
+                'type' => $type,
+                'is_required' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+
+        return (int) DB::table('item_attributes')
+            ->where('tenant_id', $tenantId)
+            ->where('name', $name)
+            ->value('id');
+    }
+
+    private function ensureAttributeValue(int $tenantId, ?int $organizationUnitId, int $attributeId, string $value): int
+    {
+        DB::table('item_attribute_values')->updateOrInsert(
+            ['tenant_id' => $tenantId, 'attribute_id' => $attributeId, 'value' => $value],
+            [
+                'row_version' => 1,
+                'organization_unit_id' => $organizationUnitId,
+                'metadata' => json_encode(['seed_source' => 'item_sample']),
+                'sort_order' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+
+        return (int) DB::table('item_attribute_values')
+            ->where('tenant_id', $tenantId)
+            ->where('attribute_id', $attributeId)
+            ->where('value', $value)
+            ->value('id');
     }
 }

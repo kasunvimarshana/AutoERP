@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace Modules\Item\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Modules\Core\Application\DTO\PagedResult;
+use Modules\Core\Application\Results\Result;
 use Modules\Item\Application\Contracts\UseCases\Items\CreateItemServiceInterface;
 use Modules\Item\Application\Contracts\UseCases\Items\DeleteItemServiceInterface;
 use Modules\Item\Application\Contracts\UseCases\Items\GetItemServiceInterface;
+use Modules\Item\Application\Contracts\UseCases\Items\GetItemSetupSummaryServiceInterface;
 use Modules\Item\Application\Contracts\UseCases\Items\ListItemsServiceInterface;
 use Modules\Item\Application\Contracts\UseCases\Items\UpdateItemServiceInterface;
 use Modules\Item\Presentation\Http\Requests\ListItemRequest;
@@ -24,6 +27,7 @@ final class ItemController extends Controller
         private readonly CreateItemServiceInterface $createService,
         private readonly UpdateItemServiceInterface $updateService,
         private readonly DeleteItemServiceInterface $deleteService,
+        private readonly GetItemSetupSummaryServiceInterface $setupSummaryService,
     ) {
     }
 
@@ -114,6 +118,50 @@ final class ItemController extends Controller
         return $this->setActiveState($id, false);
     }
 
+    public function capabilities(int|string $id): JsonResponse
+    {
+        return $this->summaryResponse($this->setupSummaryService->capabilities($id));
+    }
+
+    public function inventorySummary(int|string $id): JsonResponse
+    {
+        return $this->summaryResponse($this->setupSummaryService->inventorySummary($id));
+    }
+
+    public function pricingReferences(int|string $id): JsonResponse
+    {
+        return $this->summaryResponse($this->setupSummaryService->pricingReferences($id));
+    }
+
+    public function usageSummary(int|string $id): JsonResponse
+    {
+        return $this->summaryResponse($this->setupSummaryService->capabilities($id));
+    }
+
+    public function uomSetup(int|string $id): JsonResponse
+    {
+        return $this->summaryResponse($this->setupSummaryService->uomSetup($id));
+    }
+
+    public function previewTypeSetup(Request $request): JsonResponse
+    {
+        $payload = $request->validate([
+            'type' => ['nullable', 'string', 'max:255'],
+            'base_uom_id' => ['nullable', 'integer', 'min:1', 'exists:unit_of_measures,id'],
+            'is_stockable' => ['nullable', 'boolean'],
+            'is_purchasable' => ['nullable', 'boolean'],
+            'is_sellable' => ['nullable', 'boolean'],
+            'is_service' => ['nullable', 'boolean'],
+            'is_rentable' => ['nullable', 'boolean'],
+            'is_chargeable' => ['nullable', 'boolean'],
+            'is_batch_tracked' => ['nullable', 'boolean'],
+            'is_serial_tracked' => ['nullable', 'boolean'],
+            'combo_items' => ['nullable', 'array'],
+        ]);
+
+        return $this->summaryResponse($this->setupSummaryService->previewTypeSetup($payload));
+    }
+
     private function setActiveState(int|string $id, bool $active): JsonResponse|ItemResource
     {
         $result = $this->updateService->execute($id, ['is_active' => $active]);
@@ -126,5 +174,17 @@ final class ItemController extends Controller
         }
 
         return new ItemResource($result->valueOrFail());
+    }
+
+    private function summaryResponse(Result $result): JsonResponse
+    {
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === 'ITEM_NOT_FOUND' ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return response()->json(['data' => $result->valueOrFail()]);
     }
 }

@@ -1,7 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ApiError } from '../../../services/api/apiErrors';
-import { PreviewPanel } from '../../../shared/components/business/PreviewPanel';
 import { FieldError } from '../../../shared/components/forms/FieldError';
 import { FormSection } from '../../../shared/components/forms/FormSection';
 import { Button } from '../../../shared/components/ui/Button';
@@ -11,7 +10,8 @@ import { Input } from '../../../shared/components/ui/Input';
 import { Select } from '../../../shared/components/ui/Select';
 import { Textarea } from '../../../shared/components/ui/Textarea';
 import { itemApi } from '../services/itemApi';
-import type { ComboComponentInput, Item, ItemBrand, ItemCategory, ItemFormInput, ItemLookupOption, ItemStatus, ItemType, ItemTypeOption, UomOption } from '../types/item.types';
+import type { ComboComponentInput, Item, ItemBrand, ItemCategory, ItemFormInput, ItemLookupOption, ItemStatus, ItemType, ItemTypeOption, ItemTypeSetupPreview, UomOption } from '../types/item.types';
+import { ItemCapabilityPanel } from './ItemPanels';
 
 type FormLookupState = {
     accounts: ItemLookupOption[];
@@ -53,6 +53,18 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
     const [lookupsLoading, setLookupsLoading] = useState(true);
     const [selectedType, setSelectedType] = useState<ItemType>(item?.itemType ?? 'inventory_product');
     const [comboItems, setComboItems] = useState<ComboComponentInput[]>([]);
+    const [baseUomId, setBaseUomId] = useState(item?.baseUomId ?? '');
+    const [behavior, setBehavior] = useState({
+        chargeable: item?.allowChargeUsage ?? false,
+        consumable: item?.allowConsumptionUsage ?? false,
+        issuable: item?.allowIssueUsage ?? true,
+        purchasable: item?.allowReceiptUsage ?? true,
+        stockable: item?.isStockable ?? false,
+        trackBatch: item?.isBatchTracked ?? false,
+        trackSerial: item?.isSerialTracked ?? false,
+    });
+    const [setupPreview, setSetupPreview] = useState<ItemTypeSetupPreview | null>(null);
+    const [setupPreviewError, setSetupPreviewError] = useState('');
 
     useEffect(() => {
         let mounted = true;
@@ -94,10 +106,93 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
         };
     }, []);
 
+    useEffect(() => {
+        if (!item || item.itemType !== 'combo') {
+            return;
+        }
+
+        let mounted = true;
+        itemApi.listComboComponents(item.id)
+            .then((response) => {
+                if (mounted) {
+                    setComboItems(response.data.map((component) => ({
+                        componentItemId: component.componentItemId ?? '',
+                        quantity: component.quantity,
+                        uomId: component.uomId ?? item.baseUomId ?? '',
+                    })));
+                }
+            })
+            .catch((error: unknown) => {
+                if (mounted) {
+                    setFormError(error instanceof Error ? error.message : 'Unable to load combo components.');
+                    setComboItems([]);
+                }
+            });
+
+        return () => {
+            mounted = false;
+        };
+    }, [item]);
+
     const selectedTypeDefaults = useMemo(() => typeDefaults(selectedType, lookups.itemTypes), [lookups.itemTypes, selectedType]);
-    const stockableDefault = item?.isStockable ?? Boolean(selectedTypeDefaults?.isStockable);
     const serviceDefault = ['external_service', 'labour', 'service'].includes(selectedType);
-    const chargeDefault = item?.allowChargeUsage ?? Boolean(selectedTypeDefaults?.isChargeable || serviceDefault || selectedType === 'rental_charge');
+    const chargeDefault = Boolean(selectedTypeDefaults?.isChargeable || serviceDefault || selectedType === 'rental_charge');
+
+    useEffect(() => {
+        if (item) {
+            return;
+        }
+
+        setBehavior((current) => ({
+            ...current,
+            chargeable: chargeDefault,
+            consumable: Boolean(selectedTypeDefaults?.isStockable),
+            stockable: Boolean(selectedTypeDefaults?.isStockable),
+        }));
+    }, [chargeDefault, item, selectedTypeDefaults]);
+
+    useEffect(() => {
+        if (!baseUomId && lookups.uoms[0]?.id) {
+            setBaseUomId(lookups.uoms[0].id);
+        }
+    }, [baseUomId, lookups.uoms]);
+
+    useEffect(() => {
+        if (!lookups.itemTypes.length) {
+            return;
+        }
+
+        let mounted = true;
+        setSetupPreviewError('');
+
+        itemApi.getTypeSetupPreview({
+            allowChargeUsage: behavior.chargeable,
+            allowConsumptionUsage: behavior.consumable,
+            allowIssueUsage: behavior.issuable,
+            allowReceiptUsage: behavior.purchasable,
+            baseUomId,
+            comboItems,
+            itemType: selectedType,
+            itemTypeId: lookups.itemTypes.find((option) => option.value === selectedType)?.id ?? item?.itemTypeId ?? '',
+            stockable: behavior.stockable,
+            trackBatch: behavior.trackBatch,
+            trackSerial: behavior.trackSerial,
+        })
+            .then((response) => {
+                if (mounted) {
+                    setSetupPreview(response.data);
+                }
+            })
+            .catch((error: unknown) => {
+                if (mounted) {
+                    setSetupPreviewError(error instanceof Error ? error.message : 'Unable to preview item setup.');
+                }
+            });
+
+        return () => {
+            mounted = false;
+        };
+    }, [baseUomId, behavior, comboItems, item?.itemTypeId, lookups.itemTypes, selectedType]);
 
     function addComboItem() {
         setComboItems((rows) => [...rows, { componentItemId: '', quantity: '1', uomId: item?.baseUomId ?? lookups.uoms[0]?.id ?? '' }]);
@@ -109,6 +204,10 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
 
     function removeComboItem(index: number) {
         setComboItems((rows) => rows.filter((_, rowIndex) => rowIndex !== index));
+    }
+
+    function updateBehavior(field: keyof typeof behavior, value: boolean) {
+        setBehavior((current) => ({ ...current, [field]: value }));
     }
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -142,11 +241,19 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
             itemType: stringValue(formData, 'type') as ItemType,
             itemTypeId: stringValue(formData, 'item_type_id'),
             name: stringValue(formData, 'name'),
+            leadTimeDays: stringValue(formData, 'lead_time_days'),
+            maximumStock: stringValue(formData, 'maximum_stock'),
+            minimumStock: stringValue(formData, 'minimum_stock'),
+            reorderPoint: stringValue(formData, 'reorder_point'),
+            reorderQuantity: stringValue(formData, 'reorder_quantity'),
+            safetyStock: stringValue(formData, 'safety_stock'),
+            standardCost: stringValue(formData, 'standard_cost'),
             status: stringValue(formData, 'status') as ItemStatus,
             stockable: checkbox(formData, 'is_stockable'),
             taxGroupId: stringValue(formData, 'tax_group_id'),
             trackBatch: checkbox(formData, 'is_batch_tracked'),
             trackSerial: checkbox(formData, 'is_serial_tracked'),
+            valuationMethod: stringValue(formData, 'valuation_method'),
         };
 
         try {
@@ -253,16 +360,20 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
                 <FormSection description="These are item setup flags only. Backend services remain authoritative for stock effects, UOM conversion, pricing, tax, and accounting." title="Usage / Behavior">
                     <div className="grid gap-4 md:grid-cols-2">
                         {[
-                            ['is_stockable', 'Stockable / affects inventory setup', stockableDefault],
-                            ['allow_receipt_usage', 'Receipt usage allowed', item?.allowReceiptUsage ?? true],
-                            ['allow_issue_usage', 'Issue / sale usage allowed', item?.allowIssueUsage ?? true],
-                            ['allow_consumption_usage', 'Consumption usage allowed', item?.allowConsumptionUsage ?? stockableDefault],
-                            ['allow_charge_usage', 'Charge / billing usage allowed', chargeDefault],
-                            ['is_batch_tracked', 'Track batch', item?.isBatchTracked ?? false],
-                            ['is_serial_tracked', 'Track serial', item?.isSerialTracked ?? false],
-                        ].map(([name, label, defaultChecked]) => (
+                            ['is_stockable', 'Stockable / affects inventory setup', 'stockable'],
+                            ['allow_receipt_usage', 'Receipt usage allowed', 'purchasable'],
+                            ['allow_issue_usage', 'Issue / sale usage allowed', 'issuable'],
+                            ['allow_consumption_usage', 'Consumption usage allowed', 'consumable'],
+                            ['allow_charge_usage', 'Charge / billing usage allowed', 'chargeable'],
+                            ['is_batch_tracked', 'Track batch', 'trackBatch'],
+                            ['is_serial_tracked', 'Track serial', 'trackSerial'],
+                        ].map(([name, label, behaviorField]) => (
                             <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700" key={String(name)}>
-                                <Checkbox defaultChecked={Boolean(defaultChecked)} name={String(name)} />
+                                <Checkbox
+                                    checked={behavior[behaviorField as keyof typeof behavior]}
+                                    name={String(name)}
+                                    onChange={(event) => updateBehavior(behaviorField as keyof typeof behavior, event.target.checked)}
+                                />
                                 {label}
                             </label>
                         ))}
@@ -271,7 +382,7 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
                 <FormSection description="Select default units. Conversion validity is checked by the backend; the frontend does not convert quantities." title="UOM Defaults">
                     <div className="grid gap-4 md:grid-cols-2">
                         {[
-                            ['base_uom_id', 'Base UOM', item?.baseUomId ?? lookups.uoms[0]?.id ?? '', true],
+                            ['base_uom_id', 'Base UOM', baseUomId || lookups.uoms[0]?.id || '', true],
                             ['default_receipt_uom_id', 'Purchase / receipt UOM', item?.defaultReceiptUomId ?? '', false],
                             ['default_issue_uom_id', 'Sales / issue UOM', item?.defaultIssueUomId ?? '', false],
                             ['default_consumption_uom_id', 'Service / consumption UOM', item?.defaultConsumptionUomId ?? '', false],
@@ -282,8 +393,9 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
                                 <Select
                                     defaultValue={String(defaultValue)}
                                     name={String(name)}
+                                    onChange={name === 'base_uom_id' ? (event) => setBaseUomId(event.target.value) : undefined}
                                     options={lookups.uoms.map((uom) => ({ label: uom.label, value: uom.id }))}
-                                    placeholder={required ? undefined : 'Backend default / not set'}
+                                    placeholder={required ? undefined : 'Not configured'}
                                 />
                                 <FieldError message={fieldMessage(errors, String(name))} />
                             </div>
@@ -311,21 +423,93 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
                         ))}
                     </div>
                 </FormSection>
-                <FormSection description="Type-specific setup is captured here; backend modules decide actual workflow effects." title="Type-Specific Setup">
+                <FormSection description="Type-specific setup is validated by the Item API and saved on the Item record." title="Type-Specific Setup">
                     {selectedType === 'inventory_product' ? (
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">Product item: stock flags, batch/serial tracking, UOM defaults, and inventory accounts are saved as setup. Stock quantity and valuation are backend-owned.</div>
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                                <FieldLabel>Valuation method</FieldLabel>
+                                <Select defaultValue={item?.valuationMethod ?? 'weighted_average'} name="valuation_method" options={[
+                                    { label: 'Weighted Average', value: 'weighted_average' },
+                                    { label: 'FIFO', value: 'fifo' },
+                                    { label: 'Standard Cost', value: 'standard_cost' },
+                                    { label: 'Specific Identification', value: 'specific_identification' },
+                                ]} />
+                            </div>
+                            <div className="space-y-2">
+                                <FieldLabel>Standard cost</FieldLabel>
+                                <Input defaultValue={item?.standardCost ?? ''} min="0" name="standard_cost" step="0.0001" type="number" />
+                            </div>
+                            {[
+                                ['minimum_stock', 'Minimum stock', item?.minimumStock ?? '0'],
+                                ['maximum_stock', 'Maximum stock', item?.maximumStock ?? ''],
+                                ['reorder_point', 'Reorder point', item?.reorderPoint ?? '0'],
+                                ['reorder_quantity', 'Reorder quantity', item?.reorderQuantity ?? ''],
+                                ['safety_stock', 'Safety stock', item?.safetyStock ?? '0'],
+                                ['lead_time_days', 'Lead time days', item?.leadTimeDays ?? '0'],
+                            ].map(([name, label, defaultValue]) => (
+                                <div className="space-y-2" key={String(name)}>
+                                    <FieldLabel>{String(label)}</FieldLabel>
+                                    <Input defaultValue={String(defaultValue)} min="0" name={String(name)} step={name === 'lead_time_days' ? '1' : '0.0001'} type="number" />
+                                    <FieldError message={fieldMessage(errors, String(name))} />
+                                </div>
+                            ))}
+                        </div>
                     ) : null}
                     {['service', 'external_service'].includes(selectedType) ? (
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">Service item: saved as non-stock service setup. Scheduling, pricing, and billing are handled by source modules and backend services.</div>
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700">
+                                <Checkbox checked={behavior.chargeable} name="service_chargeable_display" onChange={(event) => updateBehavior('chargeable', event.target.checked)} />
+                                Chargeable service setup
+                            </label>
+                            <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700">
+                                <Checkbox checked={behavior.issuable} name="service_sellable_display" onChange={(event) => updateBehavior('issuable', event.target.checked)} />
+                                Available for sales/service documents
+                            </label>
+                        </div>
                     ) : null}
                     {selectedType === 'labour' ? (
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">Labour item: use this for reusable labour definitions. Technician assignment and incentive rules are not calculated here.</div>
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700">
+                                <Checkbox checked={behavior.chargeable} name="labour_chargeable_display" onChange={(event) => updateBehavior('chargeable', event.target.checked)} />
+                                Chargeable labour setup
+                            </label>
+                            <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700">
+                                <Checkbox checked={behavior.consumable} name="labour_consumption_display" onChange={(event) => updateBehavior('consumable', event.target.checked)} />
+                                Usable on service consumption lines
+                            </label>
+                        </div>
                     ) : null}
                     {selectedType === 'non_inventory' || selectedType === 'customer_supplied' ? (
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">Reference/non-inventory item: no stock impact is calculated by the frontend.</div>
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700">
+                                <Checkbox checked={behavior.purchasable} name="non_inventory_purchasable_display" onChange={(event) => updateBehavior('purchasable', event.target.checked)} />
+                                Purchasable non-stock setup
+                            </label>
+                            <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700">
+                                <Checkbox checked={behavior.issuable} name="non_inventory_sellable_display" onChange={(event) => updateBehavior('issuable', event.target.checked)} />
+                                Sellable non-stock setup
+                            </label>
+                        </div>
                     ) : null}
                     {selectedType === 'rental_charge' ? (
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">Rental charge item: stored as chargeable/rentable setup. Rental billing and provider payable previews are backend-owned.</div>
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700">
+                                <Checkbox checked={behavior.chargeable} name="rental_chargeable_display" onChange={(event) => updateBehavior('chargeable', event.target.checked)} />
+                                Rental charge enabled
+                            </label>
+                            <div className="space-y-2">
+                                <FieldLabel>Rental billing unit</FieldLabel>
+                                <Select
+                                    defaultValue={item?.defaultChargeUomId ?? baseUomId}
+                                    name="rental_charge_uom_display"
+                                    onChange={(event) => {
+                                        const hidden = document.querySelector<HTMLSelectElement>('select[name="default_charge_uom_id"]');
+                                        if (hidden) hidden.value = event.target.value;
+                                    }}
+                                    options={lookups.uoms.map((uom) => ({ label: uom.label, value: uom.id }))}
+                                />
+                            </div>
+                        </div>
                     ) : null}
                     {selectedType === 'combo' ? (
                         <div className="space-y-4">
@@ -351,17 +535,18 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
                     <Button disabled={isSubmitting} type="submit" variant="blue">{isSubmitting ? 'Saving...' : mode === 'edit' ? 'Update Item' : 'Create Item'}</Button>
                 </div>
             </div>
-            <PreviewPanel rows={[
-                { label: 'Stock availability', value: 'Backend-owned' },
-                { label: 'UOM conversion', value: 'Backend-owned' },
-                { label: 'Pricing / tax / cost', value: 'Backend-owned' },
-                { label: 'Combo expansion', value: 'Backend-owned' },
-            ]} title="Item responsibility boundary" />
+            <div className="space-y-4">
+                {setupPreview ? <ItemCapabilityPanel capabilities={setupPreview.capabilities} /> : null}
+                {setupPreviewError ? <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{setupPreviewError}</div> : null}
+                {setupPreview?.warnings.length ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                        <h3 className="text-sm font-bold text-amber-900">Setup warnings</h3>
+                        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-800">
+                            {setupPreview.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+                        </ul>
+                    </div>
+                ) : null}
+            </div>
         </form>
     );
 }
-
-export function ItemCategoryForm() { return null; }
-export function ItemAttributeForm() { return null; }
-export function ItemVariantForm() { return null; }
-export function ItemComboComponentForm() { return null; }

@@ -43,6 +43,8 @@ final class ItemModel extends CoreModel
             'is_chargeable' => 'boolean',
             'is_taxable' => 'boolean',
             'is_variable' => 'boolean',
+            'valuation_method' => 'string',
+            'allocation_method' => 'string',
             'standard_cost' => 'decimal:4',
             'income_account_id' => 'integer',
             'cogs_account_id' => 'integer',

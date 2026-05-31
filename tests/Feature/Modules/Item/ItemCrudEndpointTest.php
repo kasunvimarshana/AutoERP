@@ -74,6 +74,114 @@ final class ItemCrudEndpointTest extends TestCase
             ->assertJsonPath('data.id', $itemId);
 
         $this->withHeaders($headers)
+            ->getJson('/api/item/items/'.$itemId.'/capabilities')
+            ->assertOk()
+            ->assertJsonPath('data.stockable', true)
+            ->assertJsonPath('data.uom_configured', true);
+
+        $this->withHeaders($headers)
+            ->getJson('/api/item/items/'.$itemId.'/inventory-summary')
+            ->assertOk()
+            ->assertJsonPath('data.is_stockable', true)
+            ->assertJsonPath('data.quantity_on_hand', 0);
+
+        $this->withHeaders($headers)
+            ->getJson('/api/item/items/'.$itemId.'/uom-setup')
+            ->assertOk()
+            ->assertJsonPath('data.base_uom_id', $uomId);
+
+        $this->withHeaders($headers)
+            ->getJson('/api/item/items/'.$itemId.'/usage-summary')
+            ->assertOk()
+            ->assertJsonPath('data.purchasable', true)
+            ->assertJsonPath('data.sellable', true);
+
+        $this->withHeaders($headers)
+            ->getJson('/api/item/items/'.$itemId.'/pricing-references')
+            ->assertOk()
+            ->assertJsonPath('data.count', 0);
+
+        $this->withHeaders($headers)
+            ->postJson('/api/item/items/preview-type-setup', [
+                'base_uom_id' => $uomId,
+                'is_stockable' => true,
+                'is_purchasable' => true,
+                'is_sellable' => true,
+                'type' => 'inventory_product',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.capabilities.stockable', true);
+
+        $createdCategory = $this->withHeaders($headers)
+            ->postJson('/api/item/item-categories', [
+                'code' => 'TEST-CAT',
+                'name' => 'Test Category',
+                'is_active' => true,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.code', 'TEST-CAT')
+            ->json('data.id');
+
+        $createdAttribute = $this->withHeaders($headers)
+            ->postJson('/api/item/item-attributes', [
+                'name' => 'Test Attribute',
+                'type' => 'TEXT',
+                'is_required' => false,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.name', 'Test Attribute')
+            ->json('data.id');
+
+        $createdVariant = $this->withHeaders($headers)
+            ->postJson('/api/item/item-variants', [
+                'item_id' => $itemId,
+                'sku' => 'ITM-TST-001-V1',
+                'name' => 'Variant One',
+                'is_active' => true,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.sku', 'ITM-TST-001-V1')
+            ->json('data.id');
+
+        $componentItemId = (int) DB::table('items')
+            ->where('tenant_id', $tenantId)
+            ->where('sku', 'ITM-FILTER-001')
+            ->value('id');
+
+        $createdCombo = $this->withHeaders($headers)
+            ->postJson('/api/item/combo-items', [
+                'combo_item_id' => $itemId,
+                'component_item_id' => $componentItemId,
+                'quantity' => 1,
+                'uom_id' => $uomId,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.combo_item_id', $itemId)
+            ->json('data.id');
+
+        $createdIdentifier = $this->withHeaders($headers)
+            ->postJson('/api/item/item-identifiers', [
+                'item_id' => $itemId,
+                'technology' => 'barcode_1d',
+                'format' => 'code128',
+                'value' => 'ITM-TST-001-BARCODE',
+                'is_active' => true,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.value', 'ITM-TST-001-BARCODE')
+            ->json('data.id');
+
+        foreach ([
+            '/api/item/item-categories/'.$createdCategory,
+            '/api/item/item-attributes/'.$createdAttribute,
+            '/api/item/item-variants/'.$createdVariant,
+            '/api/item/combo-items/'.$createdCombo,
+            '/api/item/item-identifiers/'.$createdIdentifier,
+        ] as $deleteUrl) {
+            $this->withHeaders($headers)->deleteJson($deleteUrl)->assertNoContent();
+        }
+
+        $this->withHeaders($headers)
             ->putJson('/api/item/items/'.$itemId, [
                 'base_uom_id' => $uomId,
                 'category_id' => $categoryId,
@@ -98,6 +206,41 @@ final class ItemCrudEndpointTest extends TestCase
             ->patchJson('/api/item/items/'.$itemId.'/activate')
             ->assertOk()
             ->assertJsonPath('data.is_active', true);
+
+        $this->withHeaders($headers)
+            ->getJson('/api/item/item-categories')
+            ->assertOk()
+            ->assertJsonFragment(['code' => 'GENERAL']);
+
+        $this->withHeaders($headers)
+            ->getJson('/api/item/item-brands')
+            ->assertOk()
+            ->assertJsonFragment(['code' => 'GENERIC']);
+
+        $this->withHeaders($headers)
+            ->getJson('/api/item/item-attributes')
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'Size']);
+
+        $this->withHeaders($headers)
+            ->getJson('/api/item/item-variants')
+            ->assertOk()
+            ->assertJsonFragment(['sku' => 'ITM-FILTER-001-STD']);
+
+        $comboItemId = (int) DB::table('items')
+            ->where('tenant_id', $tenantId)
+            ->where('sku', 'ITM-BUNDLE-001')
+            ->value('id');
+
+        $this->withHeaders($headers)
+            ->getJson('/api/item/combo-items?combo_item_id='.$comboItemId)
+            ->assertOk()
+            ->assertJsonPath('data.0.combo_item_id', $comboItemId);
+
+        $this->withHeaders($headers)
+            ->getJson('/api/item/item-identifiers')
+            ->assertOk()
+            ->assertJsonFragment(['value' => '890000000001']);
     }
 
     public function test_item_create_returns_validation_errors(): void

@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
-import { PreviewPanel } from '../../../shared/components/business/PreviewPanel';
 import { Button } from '../../../shared/components/ui/Button';
 import { Card } from '../../../shared/components/ui/Card';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Tabs } from '../../../shared/components/ui/Tabs';
 import { ItemSummaryCard } from '../components/ItemSummaryCard';
-import { ItemActivityTimeline, ItemAttributesTable, ItemComboComponentsTable, ItemIdentifiersTable, ItemInventorySummaryPanel, ItemPricingReferencesPanel, ItemUnitsPanel, ItemUsagePanel, ItemVariantsTable } from '../components/ItemPanels';
+import { ItemActivityTimeline, ItemAttributesTable, ItemCapabilityPanel, ItemComboComponentsTable, ItemIdentifiersTable, ItemInventorySummaryPanel, ItemPricingReferencesPanel, ItemUnitsPanel, ItemUsagePanel, ItemVariantsTable } from '../components/ItemPanels';
+import { ItemComboComponentCreateForm, ItemIdentifierCreateForm, ItemVariantCreateForm } from '../components/ItemSubResourceForms';
 import { itemApi } from '../services/itemApi';
 import type { Item, ItemAttribute, ItemAuditEntry, ItemComboComponent, ItemIdentifier, ItemInventorySummary, ItemPricingReference, ItemUnit, ItemUsageSummary, ItemVariant } from '../types/item.types';
 
@@ -44,6 +44,7 @@ export function ItemDetailPage() {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isChangingStatus, setIsChangingStatus] = useState(false);
+    const [reloadKey, setReloadKey] = useState(0);
 
     useEffect(() => {
         let mounted = true;
@@ -66,9 +67,9 @@ export function ItemDetailPage() {
             .catch((caught: unknown) => { if (mounted) setError(caught instanceof Error ? caught.message : 'Unable to load item detail.'); })
             .finally(() => { if (mounted) setIsLoading(false); });
         return () => { mounted = false; };
-    }, [id]);
+    }, [id, reloadKey]);
 
-    if (isLoading) return <EmptyState description="Loading item setup, backend preview panels, and audit..." title="Loading item detail" />;
+    if (isLoading) return <EmptyState description="Loading item setup, capability summaries, and audit..." title="Loading item detail" />;
     if (!detail) return <EmptyState description={error || 'Item was not found.'} title="Unable to load item" />;
 
     const { activity, attributes, comboComponents, identifiers, inventorySummary, item, pricingReferences, units, usage, variants } = detail;
@@ -95,7 +96,7 @@ export function ItemDetailPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader actions={<><Link to="/items"><Button variant="secondary">Back</Button></Link>{item.status === 'inactive' ? <Button disabled={isChangingStatus} onClick={() => void changeStatus('activate')} variant="secondary">Activate</Button> : <Button disabled={isChangingStatus} onClick={() => void changeStatus('deactivate')} variant="secondary">Deactivate</Button>}<Link to={`/items/${item.id}/edit`}><Button>Edit Item</Button></Link></>} eyebrow="Item" subtitle="Item detail separates UOM, variants, combo components, pricing references, inventory previews, usage, and audit." title={item.name} />
+            <PageHeader actions={<><Link to="/items"><Button variant="secondary">Back</Button></Link>{item.status === 'inactive' ? <Button disabled={isChangingStatus} onClick={() => void changeStatus('activate')} variant="secondary">Activate</Button> : <Button disabled={isChangingStatus} onClick={() => void changeStatus('deactivate')} variant="secondary">Deactivate</Button>}<Link to={`/items/${item.id}/edit`}><Button>Edit Item</Button></Link></>} eyebrow="Item" subtitle="Item detail separates UOM, variants, combo components, pricing references, inventory summary, usage, and audit." title={item.name} />
             {error ? <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</div> : null}
             <ItemSummaryCard item={item} />
             <Card className="p-5"><Tabs active={activeTab} items={tabs} onChange={setActiveTab} /></Card>
@@ -114,19 +115,29 @@ export function ItemDetailPage() {
                             ].map(([label, value]) => <div className="rounded-lg border border-slate-200 bg-slate-50 p-3" key={label}><p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p><p className="mt-1 text-sm font-semibold text-slate-800">{value}</p></div>)}
                         </div>
                     </Card>
-                    <PreviewPanel rows={[
-                        { label: 'Stock availability', value: 'Backend-owned' },
-                        { label: 'Pricing', value: 'Backend price resolver' },
-                        { label: 'UOM conversion', value: 'Backend conversion rules' },
-                        { label: 'Combo expansion', value: 'Backend validation' },
-                    ]} title="Backend ownership" />
+                    <ItemCapabilityPanel capabilities={usage.capabilities} />
                 </div>
             ) : null}
             {activeTab === 'units' ? <ItemUnitsPanel units={units} /> : null}
             {activeTab === 'attributes' ? <ItemAttributesTable attributes={attributes} /> : null}
-            {activeTab === 'variants' ? <ItemVariantsTable variants={variants} /> : null}
-            {activeTab === 'combo' ? <ItemComboComponentsTable components={comboComponents} /> : null}
-            {activeTab === 'identifiers' ? <ItemIdentifiersTable identifiers={identifiers} /> : null}
+            {activeTab === 'variants' ? (
+                <div className="space-y-5">
+                    <ItemVariantCreateForm item={item} onSaved={() => setReloadKey((value) => value + 1)} />
+                    <ItemVariantsTable onDelete={async (row) => { await itemApi.deleteVariant(row.id); setReloadKey((value) => value + 1); }} variants={variants} />
+                </div>
+            ) : null}
+            {activeTab === 'combo' ? (
+                <div className="space-y-5">
+                    <ItemComboComponentCreateForm item={item} onSaved={() => setReloadKey((value) => value + 1)} />
+                    <ItemComboComponentsTable components={comboComponents} onDelete={async (row) => { await itemApi.deleteComboComponent(row.id); setReloadKey((value) => value + 1); }} />
+                </div>
+            ) : null}
+            {activeTab === 'identifiers' ? (
+                <div className="space-y-5">
+                    <ItemIdentifierCreateForm item={item} onSaved={() => setReloadKey((value) => value + 1)} />
+                    <ItemIdentifiersTable identifiers={identifiers} onDelete={async (row) => { await itemApi.deleteIdentifier(row.id); setReloadKey((value) => value + 1); }} />
+                </div>
+            ) : null}
             {activeTab === 'pricing' ? <ItemPricingReferencesPanel references={pricingReferences} /> : null}
             {activeTab === 'inventory' ? <ItemInventorySummaryPanel summary={inventorySummary} /> : null}
             {activeTab === 'usage' ? <ItemUsagePanel summary={usage} /> : null}

@@ -93,11 +93,19 @@ export type Item = {
     isStockable: boolean;
     itemType: ItemType;
     itemTypeId?: string;
+    leadTimeDays?: string;
+    maximumStock?: string;
+    minimumStock?: string;
     name: string;
+    reorderPoint?: string;
+    reorderQuantity?: string;
+    safetyStock?: string;
+    standardCost?: string;
     status: ItemStatus;
     stockBehavior: StockBehavior;
     taxGroupId?: string;
     updatedAt: string;
+    valuationMethod?: string;
 };
 
 export type ItemUnit = {
@@ -143,6 +151,7 @@ export type ItemComboComponent = {
     quantity: string;
     stockImpact: string;
     uom: string;
+    uomId?: string;
 };
 
 export type ItemIdentifier = {
@@ -152,26 +161,97 @@ export type ItemIdentifier = {
     value: string;
 };
 
+export type ItemCategoryInput = {
+    code: string;
+    description?: string;
+    isActive?: boolean;
+    name: string;
+};
+
+export type ItemAttributeInput = {
+    groupId?: string;
+    isRequired?: boolean;
+    name: string;
+    type: string;
+};
+
+export type ItemVariantInput = {
+    isActive?: boolean;
+    isDefault?: boolean;
+    itemId: string;
+    name: string;
+    sku?: string;
+};
+
+export type ItemComboComponentInput = {
+    comboItemId: string;
+    componentItemId: string;
+    quantity: string;
+    uomId: string;
+};
+
+export type ItemIdentifierInput = {
+    format?: string;
+    isActive?: boolean;
+    isPrimary?: boolean;
+    itemId: string;
+    technology: string;
+    value: string;
+    variantId?: string;
+};
+
 export type ItemPricingReference = {
     currency: string;
+    discount: string;
     id: string;
+    price: string;
     priceList: string;
-    resolvedByBackend: string;
+    status: string;
+    uom?: string;
 };
 
 export type ItemInventorySummary = {
-    availability: string;
-    costPreview: string;
-    stockOnHand: string;
-    valuation: string;
+    availableQuantity: string;
+    cogsAccountId?: string;
+    inventoryAccountId?: string;
+    isStockable: boolean;
+    minimumStock: string;
+    quantityOnHand: string;
+    quantityReserved: string;
+    reorderPoint: string;
+    reorderQuantity?: string;
+    safetyStock: string;
+    standardCost?: string;
+    stockLevelCount: number;
+    valuationMethod?: string;
 };
 
 export type ItemUsageSummary = {
-    chargeUse: string;
-    consumptionUse: string;
-    inventoryUse: string;
-    issueUse: string;
-    receiptUse: string;
+    capabilities: ItemCapabilitySummary;
+};
+
+export type ItemCapabilitySummary = {
+    affectsInventory: boolean;
+    batchTracking: boolean;
+    chargeable: boolean;
+    hasComboComponents: boolean;
+    hasIdentifiers: boolean;
+    hasVariants: boolean;
+    inventoryReferencesCount: number;
+    itemType: ItemType;
+    pricingReferencesCount: number;
+    purchasable: boolean;
+    rentalUsable: boolean;
+    sellable: boolean;
+    serialTracking: boolean;
+    serviceUsable: boolean;
+    stockable: boolean;
+    uomConfigured: boolean;
+};
+
+export type ItemTypeSetupPreview = {
+    capabilities: ItemCapabilitySummary;
+    warnings: string[];
 };
 
 export type ItemAuditEntry = {
@@ -219,4 +299,12 @@ export type ItemFormInput = {
     taxGroupId: string;
     trackBatch: boolean;
     trackSerial: boolean;
+    leadTimeDays: string;
+    maximumStock: string;
+    minimumStock: string;
+    reorderPoint: string;
+    reorderQuantity: string;
+    safetyStock: string;
+    standardCost: string;
+    valuationMethod: string;
 };

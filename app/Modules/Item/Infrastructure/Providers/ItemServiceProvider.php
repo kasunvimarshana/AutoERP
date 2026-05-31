@@ -44,6 +44,7 @@ use Modules\Item\Application\Contracts\UseCases\ItemTypes\ListItemTypesServiceIn
 use Modules\Item\Application\Contracts\UseCases\Items\CreateItemServiceInterface;
 use Modules\Item\Application\Contracts\UseCases\Items\DeleteItemServiceInterface;
 use Modules\Item\Application\Contracts\UseCases\Items\GetItemServiceInterface;
+use Modules\Item\Application\Contracts\UseCases\Items\GetItemSetupSummaryServiceInterface;
 use Modules\Item\Application\Contracts\UseCases\Items\ListItemsServiceInterface;
 use Modules\Item\Application\Contracts\UseCases\Items\UpdateItemServiceInterface;
 use Modules\Item\Application\Contracts\UseCases\ItemVariantAttributes\CreateItemVariantAttributeServiceInterface;
@@ -112,6 +113,7 @@ use Modules\Item\Application\UseCases\ItemTypes\ListItemTypesService;
 use Modules\Item\Application\UseCases\Items\CreateItemService;
 use Modules\Item\Application\UseCases\Items\DeleteItemService;
 use Modules\Item\Application\UseCases\Items\GetItemService;
+use Modules\Item\Application\UseCases\Items\GetItemSetupSummaryService;
 use Modules\Item\Application\UseCases\Items\ListItemsService;
 use Modules\Item\Application\UseCases\Items\UpdateItemService;
 use Modules\Item\Application\UseCases\ItemVariantAttributes\CreateItemVariantAttributeService;
@@ -174,6 +176,7 @@ final class ItemServiceProvider extends ServiceProvider
                 DeleteItemBrandServiceInterface::class => DeleteItemBrandService::class,
                 ListItemsServiceInterface::class => ListItemsService::class,
                 GetItemServiceInterface::class => GetItemService::class,
+                GetItemSetupSummaryServiceInterface::class => GetItemSetupSummaryService::class,
                 CreateItemServiceInterface::class => CreateItemService::class,
                 UpdateItemServiceInterface::class => UpdateItemService::class,
                 DeleteItemServiceInterface::class => DeleteItemService::class,
