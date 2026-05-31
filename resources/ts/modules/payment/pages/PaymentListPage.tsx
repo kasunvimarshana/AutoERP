@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
 import { Button } from '../../../shared/components/ui/Button';
-import { SearchFilterBar } from '../../../shared/components/data/SearchFilterBar';
+import { DataToolbar } from '../../../shared/components/data/DataToolbar';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { PaymentTable } from '../components/PaymentComponents';
 import { paymentApi } from '../services/paymentApi';
@@ -31,7 +31,13 @@ export function PaymentListPage() {
     return (
         <div className="space-y-6">
             <PageHeader actions={<Link to="/payments/payments/new"><Button>New Payment</Button></Link>} eyebrow="Payments" subtitle="Generic payments across customers, suppliers, other parties, advances, refunds, and module sources." title="Payment Records" />
-            <SearchFilterBar onSearch={setQuery} />
+            <DataToolbar
+                isLoading={loading}
+                onSearchChange={setQuery}
+                savedViewsDisabledReason="Saved views need a user-preferences backend before they can be enabled for payment lists."
+                searchPlaceholder="Search payment number, party, source, reference, or method..."
+                searchValue={query}
+            />
             {loading ? <EmptyState description="Loading payment records from service layer." title="Loading payments" /> : null}
             {error ? <EmptyState description={error} title="Payment API unavailable" /> : null}
             {!loading && !error && visibleRows.length ? <PaymentTable payments={visibleRows} /> : null}

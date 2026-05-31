@@ -2,11 +2,10 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ApiError } from '../../../services/api/apiErrors';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
-import { SearchFilterBar } from '../../../shared/components/data/SearchFilterBar';
+import { DataToolbar, type DataToolbarFilterValue } from '../../../shared/components/data/DataToolbar';
 import { Button } from '../../../shared/components/ui/Button';
 import { Card } from '../../../shared/components/ui/Card';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
-import { Select } from '../../../shared/components/ui/Select';
 import { VehicleTable } from '../components/VehiclePanels';
 import { vehicleApi } from '../services/vehicleApi';
 import type { Vehicle, VehicleStatus } from '../types/vehicle.types';
@@ -66,6 +65,12 @@ export function VehicleListPage() {
         };
     }, [search, status]);
 
+    function updateFilter(filterId: string, value: DataToolbarFilterValue): void {
+        if (filterId === 'status') {
+            setStatus(typeof value === 'string' ? value : '');
+        }
+    }
+
     return (
         <div className="space-y-6">
             <PageHeader
@@ -89,12 +94,18 @@ export function VehicleListPage() {
                 ))}
             </div>
 
-            <Card className="p-4">
-                <div className="grid gap-3 md:grid-cols-[1fr_220px]">
-                    <SearchFilterBar onSearch={setSearch} placeholder="Search code, plate, VIN, make, model, category..." />
-                    <Select onChange={(event) => setStatus(event.target.value)} options={statusOptions} placeholder="All statuses" value={status} />
-                </div>
-            </Card>
+            <DataToolbar
+                filterValues={{ status }}
+                filters={[{ id: 'status', label: 'Status', options: statusOptions, placeholder: 'All statuses', type: 'status' }]}
+                isLoading={isLoading}
+                onFilterChange={updateFilter}
+                onRemoveFilter={(filterId) => updateFilter(filterId, undefined)}
+                onResetFilters={() => setStatus('')}
+                onSearchChange={setSearch}
+                savedViewsDisabledReason="Saved views need a user-preferences backend before they can be enabled for vehicle lists."
+                searchPlaceholder="Search code, plate, VIN, make, model, category..."
+                searchValue={search}
+            />
 
             {isLoading ? <EmptyState description="Loading vehicle profiles from the backend..." title="Loading vehicles" /> : null}
             {error ? <EmptyState description={error} title="Unable to load vehicles" /> : null}

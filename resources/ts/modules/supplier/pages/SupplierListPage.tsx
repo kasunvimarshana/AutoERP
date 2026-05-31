@@ -3,11 +3,10 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
 import { StatusBadge } from '../../../shared/components/business/StatusBadge';
 import { DataTable } from '../../../shared/components/data/DataTable';
-import { SearchFilterBar } from '../../../shared/components/data/SearchFilterBar';
+import { DataToolbar, type DataToolbarFilterValue } from '../../../shared/components/data/DataToolbar';
 import { Button } from '../../../shared/components/ui/Button';
 import { Card } from '../../../shared/components/ui/Card';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
-import { Select } from '../../../shared/components/ui/Select';
 import { supplierApi } from '../services/supplierApi';
 import type { Supplier, SupplierStatus } from '../types/supplier.types';
 import { SupplierStatusBadge } from '../components/SupplierStatusBadge';
@@ -60,6 +59,12 @@ export function SupplierListPage() {
         });
     }, [category, query, status, suppliers]);
 
+    function updateFilter(filterId: string, value: DataToolbarFilterValue): void {
+        const next = typeof value === 'string' ? value : '';
+        if (filterId === 'status') setStatus(next);
+        if (filterId === 'category') setCategory(next);
+    }
+
     return (
         <div className="space-y-6">
             <PageHeader
@@ -85,43 +90,31 @@ export function SupplierListPage() {
                     </Card>
                 ))}
             </div>
-            <div className="space-y-3">
-                <SearchFilterBar onSearch={setQuery} placeholder="Search supplier code, name, email, phone, tax/VAT number..." />
-                <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-3">
-                    <Select
-                        onChange={(event) => setStatus(event.target.value)}
-                        options={[
-                            { label: 'Active', value: 'active' },
-                            { label: 'Inactive', value: 'inactive' },
-                            { label: 'Blocked', value: 'blocked' },
-                            { label: 'Draft', value: 'draft' },
-                            { label: 'Pending Approval', value: 'pending_approval' },
-                        ]}
-                        placeholder="All statuses"
-                        value={status}
-                    />
-                    <Select
-                        onChange={(event) => setCategory(event.target.value)}
-                        options={[
-                            { label: 'Parts Supplier', value: 'Parts Supplier' },
-                            { label: 'External Service Provider', value: 'External Service Provider' },
-                            { label: 'Fleet Provider', value: 'Fleet Provider' },
-                        ]}
-                        placeholder="All categories"
-                        value={category}
-                    />
-                    <Select
-                        onChange={(event) => setStatus(event.target.value)}
-                        options={[
-                            { label: 'Active only', value: 'active' },
-                            { label: 'Inactive only', value: 'inactive' },
-                            { label: 'Blocked only', value: 'blocked' },
-                        ]}
-                        placeholder="Active / inactive / blocked"
-                        value={['active', 'inactive', 'blocked'].includes(status) ? status : ''}
-                    />
-                </div>
-            </div>
+            <DataToolbar
+                filterValues={{ category, status }}
+                filters={[
+                    { id: 'status', label: 'Status', options: [
+                        { label: 'Active', value: 'active' },
+                        { label: 'Inactive', value: 'inactive' },
+                        { label: 'Blocked', value: 'blocked' },
+                        { label: 'Draft', value: 'draft' },
+                        { label: 'Pending Approval', value: 'pending_approval' },
+                    ], placeholder: 'All statuses', type: 'status' },
+                    { id: 'category', label: 'Category', options: [
+                        { label: 'Parts Supplier', value: 'Parts Supplier' },
+                        { label: 'External Service Provider', value: 'External Service Provider' },
+                        { label: 'Fleet Provider', value: 'Fleet Provider' },
+                    ], placeholder: 'All categories', type: 'select' },
+                ]}
+                isLoading={isLoading}
+                onFilterChange={updateFilter}
+                onRemoveFilter={(filterId) => updateFilter(filterId, undefined)}
+                onResetFilters={() => { setStatus(''); setCategory(''); }}
+                onSearchChange={setQuery}
+                savedViewsDisabledReason="Saved views need a user-preferences backend before they can be enabled for supplier lists."
+                searchPlaceholder="Search supplier code, name, email, phone, tax/VAT number..."
+                searchValue={query}
+            />
             {isLoading ? <EmptyState description="Loading suppliers from the Supplier service..." title="Loading suppliers" /> : null}
             {error ? <EmptyState description={error} title="Supplier service unavailable" /> : null}
             {!isLoading && !error && visibleSuppliers.length === 0 ? <EmptyState description="Create a supplier profile without linking a user account." title="No suppliers found" /> : null}

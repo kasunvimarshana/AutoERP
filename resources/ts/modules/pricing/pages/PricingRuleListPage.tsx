@@ -3,10 +3,9 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
 import { StatusBadge } from '../../../shared/components/business/StatusBadge';
 import { DataTable } from '../../../shared/components/data/DataTable';
-import { SearchFilterBar } from '../../../shared/components/data/SearchFilterBar';
+import { DataToolbar, type DataToolbarFilterValue } from '../../../shared/components/data/DataToolbar';
 import { Button } from '../../../shared/components/ui/Button';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
-import { Select } from '../../../shared/components/ui/Select';
 import { PricingRuleRowActions } from '../components/PricingComponents';
 import { pricingApi } from '../services/pricingApi';
 import type { PricingRule } from '../types/pricing.types';
@@ -37,15 +36,32 @@ export function PricingRuleListPage() {
         });
     }, [query, rows, ruleType, source, status]);
 
+    function updateFilter(filterId: string, value: DataToolbarFilterValue): void {
+        const next = typeof value === 'string' ? value : '';
+        if (filterId === 'source') setSource(next);
+        if (filterId === 'status') setStatus(next);
+        if (filterId === 'ruleType') setRuleType(next);
+    }
+
     return (
         <div className="space-y-6">
             <PageHeader actions={<Link to="/pricing/rules/new"><Button>New Rule</Button></Link>} eyebrow="Pricing" subtitle="Rules describe resolver priority, conditions, discounts, and tiers. Backend evaluates every rule." title="Pricing Rules" />
-            <SearchFilterBar onSearch={setQuery} />
-            <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-3">
-                <Select onChange={(event) => setSource(event.target.value)} options={[{ label: 'All sources', value: '' }, { label: 'Sales', value: 'sales' }, { label: 'Purchase', value: 'purchase' }, { label: 'Vehicle Service', value: 'vehicle_service' }, { label: 'Vehicle Rental', value: 'vehicle_rental' }]} value={source} />
-                <Select onChange={(event) => setStatus(event.target.value)} options={[{ label: 'All statuses', value: '' }, { label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }]} value={status} />
-                <Select onChange={(event) => setRuleType(event.target.value)} options={[{ label: 'All rule types', value: '' }, { label: 'Discount', value: 'discount' }, { label: 'Tier', value: 'tier' }, { label: 'Price resolve', value: 'price_resolve' }, { label: 'Generic', value: 'generic' }]} value={ruleType} />
-            </div>
+            <DataToolbar
+                filterValues={{ ruleType, source, status }}
+                filters={[
+                    { id: 'source', label: 'Source', options: [{ label: 'Sales', value: 'sales' }, { label: 'Purchase', value: 'purchase' }, { label: 'Vehicle Service', value: 'vehicle_service' }, { label: 'Vehicle Rental', value: 'vehicle_rental' }], placeholder: 'All sources', type: 'select' },
+                    { id: 'status', label: 'Status', options: [{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }], placeholder: 'All statuses', type: 'status' },
+                    { id: 'ruleType', label: 'Rule type', options: [{ label: 'Discount', value: 'discount' }, { label: 'Tier', value: 'tier' }, { label: 'Price resolve', value: 'price_resolve' }, { label: 'Generic', value: 'generic' }], placeholder: 'All rule types', type: 'select' },
+                ]}
+                isLoading={isLoading}
+                onFilterChange={updateFilter}
+                onRemoveFilter={(filterId) => updateFilter(filterId, undefined)}
+                onResetFilters={() => { setSource(''); setStatus(''); setRuleType(''); }}
+                onSearchChange={setQuery}
+                savedViewsDisabledReason="Saved views need a user-preferences backend before they can be enabled for pricing rules."
+                searchPlaceholder="Search code, name, rule type, or source..."
+                searchValue={query}
+            />
             {isLoading ? <EmptyState description="Loading pricing rules..." title="Loading rules" /> : null}
             {error ? <EmptyState description={error} title="Pricing rule service unavailable" /> : null}
             {!isLoading && !error && visibleRows.length ? (

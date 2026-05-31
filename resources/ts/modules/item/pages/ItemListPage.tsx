@@ -3,11 +3,10 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
 import { StatusBadge } from '../../../shared/components/business/StatusBadge';
 import { DataTable } from '../../../shared/components/data/DataTable';
-import { SearchFilterBar } from '../../../shared/components/data/SearchFilterBar';
+import { DataToolbar, type DataToolbarFilterValue } from '../../../shared/components/data/DataToolbar';
 import { Button } from '../../../shared/components/ui/Button';
 import { Card } from '../../../shared/components/ui/Card';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
-import { Select } from '../../../shared/components/ui/Select';
 import { ItemStockBehaviorBadge, ItemTypeBadge } from '../components/ItemBadges';
 import { itemApi } from '../services/itemApi';
 import type { Item, ItemStatus, ItemType, StockBehavior } from '../types/item.types';
@@ -68,6 +67,35 @@ export function ItemListPage() {
     }, [query, status, stockBehavior, type]);
 
     const selectedStockBehavior = useMemo(() => (stockBehavior || 'all') as StockBehavior | 'all', [stockBehavior]);
+    const filters = [
+        { id: 'type', label: 'Item type', options: [
+            { label: 'Inventory Product', value: 'inventory_product' },
+            { label: 'Service', value: 'service' },
+            { label: 'Labour', value: 'labour' },
+            { label: 'Combo / Bundle', value: 'combo' },
+            { label: 'Non-Inventory', value: 'non_inventory' },
+            { label: 'Rental Charge', value: 'rental_charge' },
+            { label: 'External Service', value: 'external_service' },
+            { label: 'Customer-Supplied Reference', value: 'customer_supplied' },
+        ], placeholder: 'All item types', type: 'select' as const },
+        { id: 'stockBehavior', label: 'Stock behavior', options: [
+            { label: 'Stock tracked', value: 'stock_tracked' },
+            { label: 'No stock impact', value: 'no_stock_impact' },
+        ], placeholder: 'All stock behavior', type: 'select' as const },
+        { id: 'status', label: 'Status', options: [
+            { label: 'Active', value: 'active' },
+            { label: 'Draft', value: 'draft' },
+            { label: 'Inactive', value: 'inactive' },
+            { label: 'Discontinued', value: 'discontinued' },
+        ], placeholder: 'All statuses', type: 'status' as const },
+    ];
+
+    function updateFilter(filterId: string, value: DataToolbarFilterValue): void {
+        const next = typeof value === 'string' ? value : '';
+        if (filterId === 'type') setType(next);
+        if (filterId === 'stockBehavior') setStockBehavior(next);
+        if (filterId === 'status') setStatus(next);
+    }
 
     return (
         <div className="space-y-6">
@@ -89,29 +117,18 @@ export function ItemListPage() {
                     <p className="mt-1 text-xs text-slate-400">Stock, pricing, tax, and costing are loaded from API-backed module data</p>
                 </Card>
             </div>
-            <SearchFilterBar onSearch={setQuery} placeholder="Search SKU, item name, barcode, category, or brand..." />
-            <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-3">
-                <Select onChange={(event) => setType(event.target.value)} options={[
-                    { label: 'Inventory Product', value: 'inventory_product' },
-                    { label: 'Service', value: 'service' },
-                    { label: 'Labour', value: 'labour' },
-                    { label: 'Combo / Bundle', value: 'combo' },
-                    { label: 'Non-Inventory', value: 'non_inventory' },
-                    { label: 'Rental Charge', value: 'rental_charge' },
-                    { label: 'External Service', value: 'external_service' },
-                    { label: 'Customer-Supplied Reference', value: 'customer_supplied' },
-                ]} placeholder="All item types" value={type} />
-                <Select onChange={(event) => setStockBehavior(event.target.value)} options={[
-                    { label: 'Stock tracked', value: 'stock_tracked' },
-                    { label: 'No stock impact', value: 'no_stock_impact' },
-                ]} placeholder="All stock behavior" value={stockBehavior} />
-                <Select onChange={(event) => setStatus(event.target.value)} options={[
-                    { label: 'Active', value: 'active' },
-                    { label: 'Draft', value: 'draft' },
-                    { label: 'Inactive', value: 'inactive' },
-                    { label: 'Discontinued', value: 'discontinued' },
-                ]} placeholder="All statuses" value={status} />
-            </div>
+            <DataToolbar
+                filterValues={{ status, stockBehavior, type }}
+                filters={filters}
+                isLoading={isLoading}
+                onFilterChange={updateFilter}
+                onRemoveFilter={(filterId) => updateFilter(filterId, undefined)}
+                onResetFilters={() => { setType(''); setStockBehavior(''); setStatus(''); }}
+                onSearchChange={setQuery}
+                savedViewsDisabledReason="Saved views need a user-preferences backend before they can be enabled for item lists."
+                searchPlaceholder="Search SKU, item name, barcode, category, or brand..."
+                searchValue={query}
+            />
             {isLoading ? <EmptyState description="Loading items from the Item API..." title="Loading items" /> : null}
             {error ? <EmptyState description={error} title="Item service unavailable" /> : null}
             {!isLoading && !error && !items.length ? <EmptyState description="Create an item and choose the correct type, UOM, and stock setup." title="No items found" /> : null}

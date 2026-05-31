@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
-import { SearchFilterBar } from '../../../shared/components/data/SearchFilterBar';
+import { DataToolbar, type DataToolbarFilterValue } from '../../../shared/components/data/DataToolbar';
 import { Button } from '../../../shared/components/ui/Button';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
-import { Select } from '../../../shared/components/ui/Select';
 import { UomConversionTable } from '../components/UomComponents';
 import { uomApi } from '../services/uomApi';
 import type { UomCategory, UomConversion } from '../types/uom.types';
@@ -48,6 +47,13 @@ export function UomConversionListPage() {
         });
     }, [category, conversions, query, scope, status]);
 
+    function updateFilter(filterId: string, value: DataToolbarFilterValue): void {
+        const next = typeof value === 'string' ? value : '';
+        if (filterId === 'category') setCategory(next);
+        if (filterId === 'status') setStatus(next);
+        if (filterId === 'scope') setScope(next);
+    }
+
     async function changeStatus(conversion: UomConversion) {
         conversion.isActive
             ? await uomApi.deactivateConversion(conversion.id)
@@ -59,12 +65,22 @@ export function UomConversionListPage() {
     return (
         <div className="space-y-6">
             <PageHeader actions={<Link to="/uom/conversions/new"><Button>New Conversion</Button></Link>} eyebrow="UOM" subtitle="Conversions describe compatible unit relationships. Backend applies factors and rounding." title="Conversions" />
-            <SearchFilterBar onSearch={setQuery} />
-            <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-3">
-                <Select onChange={(event) => setCategory(event.target.value)} options={[{ label: 'All categories', value: '' }, ...categories.map((row) => ({ label: row.name, value: row.type }))]} value={category} />
-                <Select onChange={(event) => setStatus(event.target.value)} options={[{ label: 'All statuses', value: '' }, { label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }]} value={status} />
-                <Select onChange={(event) => setScope(event.target.value)} options={[{ label: 'General / item-specific', value: '' }, { label: 'General', value: 'general' }, { label: 'Item-specific', value: 'item' }]} value={scope} />
-            </div>
+            <DataToolbar
+                filterValues={{ category, scope, status }}
+                filters={[
+                    { id: 'category', label: 'Category', options: categories.map((row) => ({ label: row.name, value: row.type })), placeholder: 'All categories', type: 'select' },
+                    { id: 'status', label: 'Status', options: [{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }], placeholder: 'All statuses', type: 'status' },
+                    { id: 'scope', label: 'Scope', options: [{ label: 'General', value: 'general' }, { label: 'Item-specific', value: 'item' }], placeholder: 'General / item-specific', type: 'select' },
+                ]}
+                isLoading={isLoading}
+                onFilterChange={updateFilter}
+                onRemoveFilter={(filterId) => updateFilter(filterId, undefined)}
+                onResetFilters={() => { setCategory(''); setStatus(''); setScope(''); }}
+                onSearchChange={setQuery}
+                savedViewsDisabledReason="Saved views need a user-preferences backend before they can be enabled for UOM conversion lists."
+                searchPlaceholder="Search units, factor, or category..."
+                searchValue={query}
+            />
             {isLoading ? <EmptyState description="Loading conversions..." title="Loading conversions" /> : null}
             {error ? <EmptyState description={error} title="Conversion service unavailable" /> : null}
             {!isLoading && !error && !visibleConversions.length ? <EmptyState description="Create the first conversion. Preview results come from backend." title="No conversions found" /> : null}

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
 import { StatusBadge } from '../../../shared/components/business/StatusBadge';
 import { DataTable } from '../../../shared/components/data/DataTable';
-import { SearchFilterBar } from '../../../shared/components/data/SearchFilterBar';
+import { DataToolbar } from '../../../shared/components/data/DataToolbar';
 import { Button } from '../../../shared/components/ui/Button';
 import { Card } from '../../../shared/components/ui/Card';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
@@ -76,7 +76,13 @@ export function CustomerListPage() {
                     </Card>
                 ))}
             </div>
-            <SearchFilterBar onSearch={setSearch} placeholder="Search customer code, name, phone, email, tax number..." />
+            <DataToolbar
+                isLoading={isLoading}
+                onSearchChange={setSearch}
+                savedViewsDisabledReason="Saved views need a user-preferences backend before they can be enabled for customer lists."
+                searchPlaceholder="Search customer code, name, phone, email, tax number..."
+                searchValue={search}
+            />
             {isLoading ? <EmptyState description="Loading customers from the Customer service..." title="Loading customers" /> : null}
             {error ? <EmptyState description={error} title="Customer service unavailable" /> : null}
             {!isLoading && !error && customers.length === 0 ? <EmptyState description="Create your first customer without linking a user account." title="No customers found" /> : null}

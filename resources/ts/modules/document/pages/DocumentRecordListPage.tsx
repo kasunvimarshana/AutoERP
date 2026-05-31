@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
-import { SearchFilterBar } from '../../../shared/components/data/SearchFilterBar';
+import { DataToolbar, type DataToolbarFilterValue } from '../../../shared/components/data/DataToolbar';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
-import { Select } from '../../../shared/components/ui/Select';
 import { DocumentRecordTable } from '../components/DocumentComponents';
 import { documentApi } from '../services/documentApi';
 import type { DocumentRecord } from '../types/document.types';
@@ -34,17 +33,33 @@ export function DocumentRecordListPage() {
 
     const sourceModuleOptions = useMemo(() => {
         const modules = Array.from(new Set(records.map((record) => record.sourceModule).filter(Boolean))).sort();
-        return [{ label: 'All source modules', value: '' }, ...modules.map((module) => ({ label: module, value: module }))];
+        return modules.map((module) => ({ label: module, value: module }));
     }, [records]);
+
+    function updateFilter(filterId: string, value: DataToolbarFilterValue): void {
+        const next = typeof value === 'string' ? value : '';
+        if (filterId === 'sourceModule') setSourceModule(next);
+        if (filterId === 'status') setStatus(next);
+    }
 
     return (
         <div className="space-y-6">
             <PageHeader eyebrow="Documents" subtitle="Document records from all source modules. Document UI does not calculate source totals or workflow effects." title="Document Records" />
-            <SearchFilterBar onSearch={setQuery} />
-            <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-4">
-                <Select onChange={(event) => setSourceModule(event.target.value)} options={sourceModuleOptions} value={sourceModule} />
-                <Select onChange={(event) => setStatus(event.target.value)} options={[{ label: 'All statuses', value: '' }, { label: 'Draft', value: 'draft' }, { label: 'Submitted', value: 'submitted' }, { label: 'Approved', value: 'approved' }, { label: 'Posted', value: 'posted' }, { label: 'Finalized', value: 'finalized' }, { label: 'Cancelled', value: 'cancelled' }]} value={status} />
-            </div>
+            <DataToolbar
+                filterValues={{ sourceModule, status }}
+                filters={[
+                    { id: 'sourceModule', label: 'Source module', options: sourceModuleOptions, placeholder: 'All source modules', type: 'select' },
+                    { id: 'status', label: 'Status', options: [{ label: 'Draft', value: 'draft' }, { label: 'Submitted', value: 'submitted' }, { label: 'Approved', value: 'approved' }, { label: 'Posted', value: 'posted' }, { label: 'Finalized', value: 'finalized' }, { label: 'Cancelled', value: 'cancelled' }], placeholder: 'All statuses', type: 'status' },
+                ]}
+                isLoading={isLoading}
+                onFilterChange={updateFilter}
+                onRemoveFilter={(filterId) => updateFilter(filterId, undefined)}
+                onResetFilters={() => { setSourceModule(''); setStatus(''); }}
+                onSearchChange={setQuery}
+                savedViewsDisabledReason="Saved views need a user-preferences backend before they can be enabled for document records."
+                searchPlaceholder="Search document number, title, type, or source reference..."
+                searchValue={query}
+            />
             {isLoading ? <EmptyState description="Loading document records..." title="Loading records" /> : null}
             {error ? <EmptyState description={error} title="Document service unavailable" /> : null}
             {!isLoading && !error && visibleRecords.length ? <DocumentRecordTable records={visibleRecords} /> : null}
