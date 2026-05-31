@@ -32,7 +32,7 @@ export function InventoryDashboardPage() {
             <PageHeader
                 actions={<Link to="/inventory/availability-preview"><Button>Availability Preview</Button></Link>}
                 eyebrow="Core Inventory"
-                subtitle="Generic stock, movement, reservation, transfer, adjustment, valuation, and traceability workspace. Backend owns all stock math."
+                subtitle="Generic stock, movement, reservation, transfer, adjustment, valuation, and traceability workspace."
                 title="Inventory"
             />
             {error ? <EmptyState description={error} title="Unable to load inventory" /> : null}

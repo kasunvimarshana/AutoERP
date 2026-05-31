@@ -24,7 +24,7 @@ export function TraceabilityPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader eyebrow="Inventory" subtitle="Trace stock by item, batch, serial, or source reference. Backend returns the timeline." title="Traceability" />
+            <PageHeader eyebrow="Inventory" subtitle="Trace stock by item, batch, serial, or source reference." title="Traceability" />
             <FormSection title="Trace Context">
                 <div className="grid gap-4 md:grid-cols-4">
                     <Input onChange={(event) => setQuery(event.target.value)} value={query} />
@@ -40,7 +40,7 @@ export function StockAvailabilityPreviewPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader eyebrow="Inventory Preview" subtitle="Ask backend if stock is available. The frontend does not calculate on hand, reserved, available, UOM conversion, or batch/serial availability." title="Stock Availability Preview" />
+            <PageHeader eyebrow="Inventory Preview" subtitle="Check stock availability for an item, warehouse, UOM, and tracking context." title="Stock Availability Preview" />
             <StockAvailabilityPreviewForm onResult={setResult} />
             <StockAvailabilityResultPanel result={result} />
         </div>

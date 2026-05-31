@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\Pricing\Presentation\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
+use Modules\Item\Application\Support\ItemUomOptions;
 use Modules\Pricing\Presentation\Http\Requests\Concerns\ResolvesPricingTenant;
 
 final class UpsertPriceListItemRequest extends FormRequest
@@ -52,5 +54,22 @@ final class UpsertPriceListItemRequest extends FormRequest
             'is_active' => ['nullable', 'boolean'],
             'reference' => ['nullable', 'string', 'max:255'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $tenantId = (int) $this->input('tenant_id');
+            $itemId = $this->input('item_id');
+            $uomId = $this->input('uom_id');
+
+            if ($tenantId < 1 || ! is_numeric($itemId) || ! is_numeric($uomId)) {
+                return;
+            }
+
+            if (! ItemUomOptions::isAllowed($tenantId, (int) $itemId, (int) $uomId, 'pricing')) {
+                $validator->errors()->add('uom_id', 'The selected UOM is not configured for this item in pricing context.');
+            }
+        });
     }
 }

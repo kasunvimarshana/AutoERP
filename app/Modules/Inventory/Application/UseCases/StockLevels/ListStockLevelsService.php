@@ -26,8 +26,6 @@ final class ListStockLevelsService implements ListStockLevelsServiceInterface
                 ? min($perPage, (int) config('inventory.pagination.max_per_page', InventoryDefaults::MAX_PER_PAGE))
                 : (int) config('inventory.pagination.default_per_page', InventoryDefaults::DEFAULT_PER_PAGE);
 
-            unset($criteria['search']);
-
             return Result::success($this->repository->page($criteria, $resolvedPerPage, $resolvedPage));
         } catch (Throwable $exception) {
             return Result::failure(new Error(InventoryErrorCode::INVALID_VALUE, $exception->getMessage()));

@@ -15,6 +15,8 @@ export type StockLevel = {
     warehouse: string;
 };
 
+export type InventoryListQuery = Record<string, boolean | number | string | undefined>;
+
 export type StockMovement = {
     batchOrSerial?: string;
     costEffect: string;
@@ -59,14 +61,17 @@ export type StockTransferFormInput = {
     fromLocationId?: string;
     fromWarehouseId: string;
     lines: Array<{
+        batchId?: string;
         itemId: string;
         quantity: string;
+        serialId?: string;
         toLocationId?: string;
         uomId: string;
     }>;
     notes?: string;
     referenceNumber?: string;
     status?: string;
+    transferDate?: string;
     toLocationId?: string;
     toWarehouseId: string;
 };
@@ -108,10 +113,13 @@ export type StockAdjustment = {
 export type StockAdjustmentFormInput = {
     lines: Array<{
         adjustmentQuantity: string;
+        batchId?: string;
         direction: 'DECREASE' | 'INCREASE';
         itemId: string;
+        serialId?: string;
         uomId: string;
     }>;
+    adjustmentDate?: string;
     locationId?: string;
     reason?: string;
     referenceNumber?: string;
@@ -211,11 +219,15 @@ export type CostLayer = {
 };
 
 export type StockAvailabilityPreviewRequest = {
-    batchOrSerial?: string;
+    batchId?: string;
     itemId: string;
     location?: string;
     quantity: string;
+    serialId?: string;
+    sourceId?: string;
     sourceModule?: string;
+    sourceReference?: string;
+    sourceType?: string;
     uom: string;
     warehouse: string;
 };
@@ -224,9 +236,15 @@ export type StockAvailabilityPreviewResult = {
     breakdown: Array<{ label: string; value: string }>;
     calculated: {
         availableQuantity: string;
+        available_quantity?: string;
+        baseRequestedQuantity?: string;
+        base_requested_quantity?: string;
         decision: 'available' | 'insufficient' | 'requires_batch_or_serial';
         requestedQuantity: string;
+        requested_quantity?: string;
         reservedQuantity: string;
+        reserved_quantity?: string;
+        status?: string;
     };
     errors: string[];
     input: StockAvailabilityPreviewRequest | Record<string, unknown>;

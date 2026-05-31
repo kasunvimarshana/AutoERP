@@ -27,11 +27,34 @@ final class InventoryCrudEndpointTest extends TestCase
         $fromLocationId = (int) DB::table('warehouse_locations')->where('tenant_id', $tenantId)->where('code', 'MAIN-BIN')->value('id');
         $toLocationId = (int) DB::table('warehouse_locations')->where('tenant_id', $tenantId)->where('code', 'SERVICE-BIN')->value('id');
         $userId = (int) DB::table('users')->where('email', 'admin@example.com')->value('id');
+        $kilometerUomId = (int) DB::table('unit_of_measures')->where('tenant_id', $tenantId)->where('code', 'KM')->value('id');
 
         $this->withHeaders($headers)
             ->getJson('/api/inventory/stock-levels')
             ->assertOk()
-            ->assertJsonStructure(['data']);
+            ->assertJsonStructure(['data'])
+            ->assertJsonPath('data.0.item.sku', 'ITM-FILTER-001')
+            ->assertJsonPath('data.0.item_label', 'ITM-FILTER-001 - Oil Filter')
+            ->assertJsonPath('data.0.warehouse_label', 'MAIN - Main Warehouse')
+            ->assertJsonPath('data.0.location_label', 'MAIN-BIN - Main Bin')
+            ->assertJsonPath('data.0.base_uom_label', 'PCS');
+
+        $this->withHeaders($headers)
+            ->getJson('/api/inventory/stock-levels?search=Oil&warehouse_id='.$fromWarehouseId.'&uom_id='.$uomId.'&status=good')
+            ->assertOk()
+            ->assertJsonPath('data.0.item_label', 'ITM-FILTER-001 - Oil Filter')
+            ->assertJsonPath('data.0.warehouse_label', 'MAIN - Main Warehouse')
+            ->assertJsonPath('data.0.base_uom_label', 'PCS');
+
+        $uomSetup = $this->withHeaders($headers)
+            ->getJson('/api/item/items/'.$item->id.'/uom-setup?context=inventory')
+            ->assertOk()
+            ->json('data.allowed_uoms');
+
+        self::assertSame(['PCS', 'BOX', 'PACK'], array_values(array_map(
+            static fn (array $uom): string => (string) $uom['code'],
+            $uomSetup,
+        )));
 
         $this->withHeaders($headers)
             ->getJson('/api/inventory/stock-movements')
@@ -40,8 +63,6 @@ final class InventoryCrudEndpointTest extends TestCase
 
         $this->withHeaders($headers)
             ->postJson('/api/inventory/engines/stock-availability/preview', [
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => $organizationUnitId,
                 'warehouse_id' => $fromWarehouseId,
                 'location_id' => $fromLocationId,
                 'item_id' => (int) $item->id,
@@ -50,7 +71,19 @@ final class InventoryCrudEndpointTest extends TestCase
             ])
             ->assertOk()
             ->assertJsonPath('calculated.decision', 'available')
+            ->assertJsonPath('calculated.requested_quantity', '1.0000')
             ->assertJsonPath('calculated.baseRequestedQuantity', '1.0000');
+
+        $this->withHeaders($headers)
+            ->postJson('/api/inventory/engines/stock-availability/preview', [
+                'warehouse_id' => $fromWarehouseId,
+                'location_id' => $fromLocationId,
+                'item_id' => (int) $item->id,
+                'uom_id' => $kilometerUomId,
+                'quantity' => 1,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['uom_id']);
 
         $transferResponse = $this->withHeaders($headers)
             ->postJson('/api/inventory/stock-transfers', [
@@ -137,6 +170,13 @@ final class InventoryCrudEndpointTest extends TestCase
             ->postJson('/api/inventory/stock-transfers', ['reference_number' => ''])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['tenant_id', 'reference_number', 'from_warehouse_id', 'to_warehouse_id', 'requested_by']);
+
+        $this->withHeaders($headers)
+            ->postJson('/api/inventory/engines/stock-availability/preview', [
+                'quantity' => 1,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['item_id', 'uom_id']);
     }
 
     /**

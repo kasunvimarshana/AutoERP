@@ -138,9 +138,11 @@ final class ItemController extends Controller
         return $this->summaryResponse($this->setupSummaryService->capabilities($id));
     }
 
-    public function uomSetup(int|string $id): JsonResponse
+    public function uomSetup(Request $request, int|string $id): JsonResponse
     {
-        return $this->summaryResponse($this->setupSummaryService->uomSetup($id));
+        $context = $request->query('context');
+
+        return $this->summaryResponse($this->setupSummaryService->uomSetup($id, is_string($context) ? $context : null));
     }
 
     public function previewTypeSetup(Request $request): JsonResponse

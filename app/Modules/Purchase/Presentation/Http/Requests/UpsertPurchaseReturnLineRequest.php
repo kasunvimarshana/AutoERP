@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\Purchase\Presentation\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
+use Modules\Item\Application\Support\ItemUomOptions;
 
 final class UpsertPurchaseReturnLineRequest extends FormRequest
 {
@@ -54,5 +56,18 @@ final class UpsertPurchaseReturnLineRequest extends FormRequest
             'line_total_with_tax' => ['nullable', 'numeric'],
             'account_id' => ['nullable', 'integer', 'min:1', 'exists:accounts,id']
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $tenantId = (int) $this->input('tenant_id');
+            $itemId = $this->input('item_id');
+            $uomId = $this->input('uom_id');
+
+            if ($tenantId > 0 && is_numeric($itemId) && is_numeric($uomId) && ! ItemUomOptions::isAllowed($tenantId, (int) $itemId, (int) $uomId, 'purchase')) {
+                $validator->errors()->add('uom_id', 'The selected UOM is not configured for this item in purchase context.');
+            }
+        });
     }
 }

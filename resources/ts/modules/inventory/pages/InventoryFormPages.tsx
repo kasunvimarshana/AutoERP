@@ -4,7 +4,7 @@ import { StockAdjustmentForm, StockTransferForm } from '../components/InventoryC
 export function StockTransferCreatePage() {
     return (
         <div className="space-y-6">
-            <PageHeader eyebrow="Inventory" subtitle="Create transfer request inputs. Backend validates availability and posts movement effects." title="Create Stock Transfer" />
+            <PageHeader eyebrow="Inventory" subtitle="Create a warehouse transfer with item, UOM, quantity, and tracking context." title="Create Stock Transfer" />
             <StockTransferForm />
         </div>
     );
@@ -13,7 +13,7 @@ export function StockTransferCreatePage() {
 export function StockAdjustmentCreatePage() {
     return (
         <div className="space-y-6">
-            <PageHeader eyebrow="Inventory" subtitle="Create adjustment request inputs. Backend validates quantity impact and valuation." title="Create Stock Adjustment" />
+            <PageHeader eyebrow="Inventory" subtitle="Create a stock adjustment with item, UOM, quantity, and tracking context." title="Create Stock Adjustment" />
             <StockAdjustmentForm />
         </div>
     );

@@ -44,6 +44,9 @@ final class ItemSampleSeeder extends Seeder
             $now = now();
             $hourUomId = $this->uomId($tenantId, 'Hour') ?? $eachUomId;
             $dayUomId = $this->uomId($tenantId, 'Day') ?? $eachUomId;
+            $boxUomId = $this->uomId($tenantId, 'Box');
+            $packUomId = $this->uomId($tenantId, 'Pack');
+            $monthUomId = $this->uomId($tenantId, 'Month');
 
             $generalCategoryId = $this->ensureCategory($tenantId, $organizationUnitId, 'GENERAL', 'General');
             $partsCategoryId = $this->ensureCategory($tenantId, $organizationUnitId, 'SPARE_PARTS', 'Spare Parts');
@@ -61,6 +64,9 @@ final class ItemSampleSeeder extends Seeder
                     'brand_id' => $brandId,
                     'item_type_id' => $this->itemTypeId('INVENTORY_PRODUCT'),
                     'base_uom_id' => $eachUomId,
+                    'default_receipt_uom_id' => $eachUomId,
+                    'default_issue_uom_id' => $eachUomId,
+                    'default_consumption_uom_id' => $eachUomId,
                     'description' => 'Sample stock-tracked inventory product.',
                     'is_stockable' => true,
                     'is_purchasable' => true,
@@ -74,6 +80,8 @@ final class ItemSampleSeeder extends Seeder
                     'brand_id' => null,
                     'item_type_id' => $this->itemTypeId('SERVICE'),
                     'base_uom_id' => $hourUomId,
+                    'default_charge_uom_id' => $hourUomId,
+                    'default_consumption_uom_id' => $hourUomId,
                     'description' => 'Sample service item with reusable service setup.',
                     'is_service' => true,
                     'is_chargeable' => true,
@@ -88,6 +96,8 @@ final class ItemSampleSeeder extends Seeder
                     'brand_id' => null,
                     'item_type_id' => $this->itemTypeId('LABOUR'),
                     'base_uom_id' => $hourUomId,
+                    'default_charge_uom_id' => $hourUomId,
+                    'default_consumption_uom_id' => $hourUomId,
                     'description' => 'Sample labour item.',
                     'is_service' => true,
                     'is_chargeable' => true,
@@ -102,6 +112,8 @@ final class ItemSampleSeeder extends Seeder
                     'brand_id' => null,
                     'item_type_id' => $this->itemTypeId('NON_INVENTORY'),
                     'base_uom_id' => $eachUomId,
+                    'default_receipt_uom_id' => $eachUomId,
+                    'default_issue_uom_id' => $eachUomId,
                     'description' => 'Sample non-inventory item.',
                     'is_stockable' => false,
                     'is_chargeable' => true,
@@ -114,6 +126,7 @@ final class ItemSampleSeeder extends Seeder
                     'brand_id' => null,
                     'item_type_id' => $this->itemTypeId('COMBO'),
                     'base_uom_id' => $eachUomId,
+                    'default_charge_uom_id' => $eachUomId,
                     'description' => 'Sample combo item with persisted component setup.',
                     'is_chargeable' => true,
                 ],
@@ -125,6 +138,7 @@ final class ItemSampleSeeder extends Seeder
                     'brand_id' => null,
                     'item_type_id' => $this->itemTypeId('RENTAL_CHARGE'),
                     'base_uom_id' => $dayUomId,
+                    'default_charge_uom_id' => $dayUomId,
                     'description' => 'Sample rental charge item with reusable charge setup.',
                     'is_rentable' => true,
                     'is_chargeable' => true,
@@ -189,6 +203,22 @@ final class ItemSampleSeeder extends Seeder
 
             $comboItemId = $this->itemId($tenantId, 'ITM-BUNDLE-001');
             $filterItemId = $this->itemId($tenantId, 'ITM-FILTER-001');
+            $rentalChargeItemId = $this->itemId($tenantId, 'ITM-RENTAL-DAY-001');
+
+            if ($filterItemId !== null) {
+                if ($boxUomId !== null) {
+                    $this->ensureItemConversion($tenantId, $organizationUnitId, $filterItemId, $boxUomId, $eachUomId, '12', 'UNIT');
+                }
+
+                if ($packUomId !== null) {
+                    $this->ensureItemConversion($tenantId, $organizationUnitId, $filterItemId, $packUomId, $eachUomId, '6', 'UNIT');
+                }
+            }
+
+            if ($rentalChargeItemId !== null && $monthUomId !== null) {
+                $this->ensureItemConversion($tenantId, $organizationUnitId, $rentalChargeItemId, $monthUomId, $dayUomId, '30', 'TIME');
+            }
+
             if ($comboItemId !== null && $filterItemId !== null && Schema::hasTable('combo_items')) {
                 DB::table('combo_items')->updateOrInsert(
                     [
@@ -342,6 +372,43 @@ final class ItemSampleSeeder extends Seeder
             ->where('tenant_id', $tenantId)
             ->where('name', $name)
             ->value('id');
+    }
+
+    private function ensureItemConversion(
+        int $tenantId,
+        ?int $organizationUnitId,
+        int $itemId,
+        int $fromUomId,
+        int $toUomId,
+        string $factor,
+        string $category,
+    ): void {
+        if (! Schema::hasTable('uom_conversions')) {
+            return;
+        }
+
+        DB::table('uom_conversions')->updateOrInsert(
+            [
+                'tenant_id' => $tenantId,
+                'item_id' => $itemId,
+                'from_uom_id' => $fromUomId,
+                'to_uom_id' => $toUomId,
+            ],
+            [
+                'category' => $category,
+                'effective_from' => null,
+                'effective_to' => null,
+                'factor' => $factor,
+                'is_active' => true,
+                'is_bidirectional' => true,
+                'metadata' => json_encode(['seed_source' => 'item_sample']),
+                'notes' => 'Default item-specific UOM setup for real UI testing.',
+                'organization_unit_id' => $organizationUnitId,
+                'row_version' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
     }
 
     private function uomId(int $tenantId, string $name): ?int

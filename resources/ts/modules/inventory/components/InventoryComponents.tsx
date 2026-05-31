@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ApiError } from '../../../services/api/apiErrors';
+import { itemUomApi } from '../../../services/api/itemUomApi';
 import { StatusBadge } from '../../../shared/components/business/StatusBadge';
 import { PreviewPanel } from '../../../shared/components/business/PreviewPanel';
 import { DataTable, type DataTableColumn } from '../../../shared/components/data/DataTable';
@@ -116,10 +117,11 @@ export function StockReservationTable({ rows }: { rows: StockReservation[] }) {
 
 export function StockTransferForm() {
     const navigate = useNavigate();
-    const [lookups, setLookups] = useState<LookupState>({ items: [], locations: [], uoms: [], warehouses: [] });
+    const [lookups, setLookups] = useState<LookupState>({ batches: [], items: [], locations: [], serials: [], uoms: [], warehouses: [] });
     const [error, setError] = useState<string | null>(null);
     const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
     const [isSaving, setIsSaving] = useState(false);
+    const itemUoms = useItemUomOptions('inventory');
 
     useEffect(() => {
         void loadLookups().then(setLookups).catch((caught: unknown) => setError(errorMessage(caught, 'Unable to load inventory lookups.')));
@@ -137,13 +139,16 @@ export function StockTransferForm() {
             fromLocationId: stringValue(form, 'fromLocationId'),
             fromWarehouseId: stringValue(form, 'fromWarehouseId'),
             lines: [{
+                batchId: stringValue(form, 'batchId'),
                 itemId: stringValue(form, 'itemId'),
                 quantity: stringValue(form, 'quantity'),
+                serialId: stringValue(form, 'serialId'),
                 toLocationId: stringValue(form, 'toLocationId'),
                 uomId: stringValue(form, 'uomId'),
             }],
             notes: stringValue(form, 'notes'),
             status: submitter?.value === 'complete' ? 'COMPLETED' : 'DRAFT',
+            transferDate: stringValue(form, 'transferDate'),
             toLocationId: stringValue(form, 'toLocationId'),
             toWarehouseId: stringValue(form, 'toWarehouseId'),
         };
@@ -161,19 +166,22 @@ export function StockTransferForm() {
     return (
         <form className="space-y-5" onSubmit={submit}>
             <GlobalError message={error} />
-            <FormSection description="Transfer inputs are persisted by the backend; completing a transfer posts source and destination stock effects." title="Transfer Header">
+            <FormSection description="Create the transfer header and source/destination context." title="Transfer Header">
                 <div className="grid gap-4 md:grid-cols-4">
+                    <TextField label="Transfer date" name="transferDate" type="date" />
                     <OptionField error={fieldErrors.from_warehouse_id?.[0]} label="Source warehouse" name="fromWarehouseId" options={lookups.warehouses} />
                     <OptionField label="Source location" name="fromLocationId" options={lookups.locations} />
                     <OptionField error={fieldErrors.to_warehouse_id?.[0]} label="Destination warehouse" name="toWarehouseId" options={lookups.warehouses} />
                     <OptionField label="Destination location" name="toLocationId" options={lookups.locations} />
                 </div>
             </FormSection>
-            <FormSection description="Backend validates stockable item, UOM compatibility, and quantity before saving." title="Transfer Line">
+            <FormSection description="Add item, unit, quantity, and tracking dimensions for this transfer." title="Transfer Line">
                 <div className="grid gap-4 md:grid-cols-4">
-                    <OptionField error={fieldErrors['lines.0.item_id']?.[0]} label="Item" name="itemId" options={lookups.items} />
-                    <OptionField error={fieldErrors['lines.0.uom_id']?.[0]} label="UOM" name="uomId" options={lookups.uoms} />
+                    <OptionField error={fieldErrors['lines.0.item_id']?.[0]} label="Item" name="itemId" onChange={(event) => itemUoms.selectItem(event.currentTarget.value)} options={lookups.items} value={itemUoms.itemId} />
+                    <OptionField disabled={!itemUoms.itemId || itemUoms.isLoading || itemUoms.uoms.length === 0} error={fieldErrors['lines.0.uom_id']?.[0]} hint={itemUoms.hint} label="UOM" name="uomId" onChange={(event) => itemUoms.setUomId(event.currentTarget.value)} options={itemUoms.uoms} value={itemUoms.uomId} />
                     <TextField error={fieldErrors['lines.0.quantity']?.[0]} inputMode="decimal" label="Quantity" name="quantity" type="number" />
+                    <OptionField label="Batch" name="batchId" options={lookups.batches} />
+                    <OptionField label="Serial" name="serialId" options={lookups.serials} />
                     <TextAreaField label="Notes" name="notes" />
                 </div>
                 <div className="mt-4 flex justify-end gap-3">
@@ -186,15 +194,16 @@ export function StockTransferForm() {
 }
 
 export function StockTransferLineTable({ rows }: { rows: StockTransferLine[] }) {
-    return rows.length ? <SimpleTable rows={rows} columns={[['itemName', 'Item'], ['requestedQuantity', 'Requested Qty'], ['uom', 'UOM'], ['batchOrSerial', 'Batch / Serial']]} /> : <EmptyState description="No transfer lines returned by backend." title="No lines" />;
+    return rows.length ? <SimpleTable rows={rows} columns={[['itemName', 'Item'], ['requestedQuantity', 'Requested Qty'], ['uom', 'UOM'], ['batchOrSerial', 'Batch / Serial']]} /> : <EmptyState description="No transfer lines available." title="No lines" />;
 }
 
 export function StockAdjustmentForm() {
     const navigate = useNavigate();
-    const [lookups, setLookups] = useState<LookupState>({ items: [], locations: [], uoms: [], warehouses: [] });
+    const [lookups, setLookups] = useState<LookupState>({ batches: [], items: [], locations: [], serials: [], uoms: [], warehouses: [] });
     const [error, setError] = useState<string | null>(null);
     const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
     const [isSaving, setIsSaving] = useState(false);
+    const itemUoms = useItemUomOptions('inventory');
 
     useEffect(() => {
         void loadLookups().then(setLookups).catch((caught: unknown) => setError(errorMessage(caught, 'Unable to load inventory lookups.')));
@@ -211,10 +220,13 @@ export function StockAdjustmentForm() {
         const input: StockAdjustmentFormInput = {
             lines: [{
                 adjustmentQuantity: stringValue(form, 'quantity'),
+                batchId: stringValue(form, 'batchId'),
                 direction: stringValue(form, 'direction') === 'DECREASE' ? 'DECREASE' : 'INCREASE',
                 itemId: stringValue(form, 'itemId'),
+                serialId: stringValue(form, 'serialId'),
                 uomId: stringValue(form, 'uomId'),
             }],
+            adjustmentDate: stringValue(form, 'adjustmentDate'),
             locationId: stringValue(form, 'locationId'),
             reason: stringValue(form, 'reason'),
             status: submitter?.value === 'post' ? 'COMPLETED' : 'DRAFT',
@@ -234,19 +246,22 @@ export function StockAdjustmentForm() {
     return (
         <form className="space-y-5" onSubmit={submit}>
             <GlobalError message={error} />
-            <FormSection description="Adjustment quantities are captured here; backend owns quantity and valuation effects." title="Adjustment Header">
+            <FormSection description="Create an adjustment header for the selected warehouse and reason." title="Adjustment Header">
                 <div className="grid gap-4 md:grid-cols-4">
+                    <TextField label="Adjustment date" name="adjustmentDate" type="date" />
                     <OptionField error={fieldErrors.warehouse_id?.[0]} label="Warehouse" name="warehouseId" options={lookups.warehouses} />
                     <OptionField label="Location" name="locationId" options={lookups.locations} />
                     <Field label="Direction"><Select name="direction"><option value="INCREASE">Increase</option><option value="DECREASE">Decrease</option></Select></Field>
                     <TextAreaField error={fieldErrors.reason?.[0]} label="Reason" name="reason" />
                 </div>
             </FormSection>
-            <FormSection description="Backend validates stockable item, UOM compatibility, and signed quantity." title="Adjustment Line">
+            <FormSection description="Add item, unit, quantity, and tracking dimensions for this adjustment." title="Adjustment Line">
                 <div className="grid gap-4 md:grid-cols-3">
-                    <OptionField error={fieldErrors['lines.0.item_id']?.[0]} label="Item" name="itemId" options={lookups.items} />
-                    <OptionField error={fieldErrors['lines.0.uom_id']?.[0]} label="UOM" name="uomId" options={lookups.uoms} />
+                    <OptionField error={fieldErrors['lines.0.item_id']?.[0]} label="Item" name="itemId" onChange={(event) => itemUoms.selectItem(event.currentTarget.value)} options={lookups.items} value={itemUoms.itemId} />
+                    <OptionField disabled={!itemUoms.itemId || itemUoms.isLoading || itemUoms.uoms.length === 0} error={fieldErrors['lines.0.uom_id']?.[0]} hint={itemUoms.hint} label="UOM" name="uomId" onChange={(event) => itemUoms.setUomId(event.currentTarget.value)} options={itemUoms.uoms} value={itemUoms.uomId} />
                     <TextField error={fieldErrors['lines.0.adjustment_quantity']?.[0]} inputMode="decimal" label="Quantity" name="quantity" type="number" />
+                    <OptionField label="Batch" name="batchId" options={lookups.batches} />
+                    <OptionField label="Serial" name="serialId" options={lookups.serials} />
                 </div>
                 <div className="mt-4 flex justify-end gap-3">
                     <Button disabled={isSaving} name="action" type="submit" value="draft" variant="secondary">Save draft</Button>
@@ -258,7 +273,7 @@ export function StockAdjustmentForm() {
 }
 
 export function StockAdjustmentLineTable({ rows }: { rows: StockAdjustmentLine[] }) {
-    return rows.length ? <SimpleTable rows={rows} columns={[['itemName', 'Item'], ['adjustmentType', 'Type'], ['quantity', 'Qty'], ['uom', 'UOM'], ['quantityImpact', 'Backend Impact']]} /> : <EmptyState description="No adjustment lines returned by backend." title="No lines" />;
+    return rows.length ? <SimpleTable rows={rows} columns={[['itemName', 'Item'], ['adjustmentType', 'Type'], ['quantity', 'Qty'], ['uom', 'UOM'], ['quantityImpact', 'Quantity Impact']]} /> : <EmptyState description="No adjustment lines available." title="No lines" />;
 }
 
 export function CycleCountTable({ rows }: { rows: CycleCount[] }) {
@@ -290,13 +305,15 @@ export function ValuationTable({ rows }: { rows: InventoryValuation[] }) {
 }
 
 export function CostLayerPanel({ rows }: { rows: CostLayer[] }) {
-    return rows.length ? <SimpleTable rows={rows} columns={[['itemName', 'Item'], ['sourceReference', 'Source'], ['layerDate', 'Date'], ['quantity', 'Qty'], ['remainingQuantity', 'Remaining'], ['unitCost', 'Unit Cost']]} /> : <EmptyState description="No cost layers returned by backend." title="No cost layers" />;
+    return rows.length ? <SimpleTable rows={rows} columns={[['itemName', 'Item'], ['sourceReference', 'Source'], ['layerDate', 'Date'], ['quantity', 'Qty'], ['remainingQuantity', 'Remaining'], ['unitCost', 'Unit Cost']]} /> : <EmptyState description="No cost layers available." title="No cost layers" />;
 }
 
 export function StockAvailabilityPreviewForm({ onResult }: { onResult: (result: StockAvailabilityPreviewResult) => void }) {
-    const [lookups, setLookups] = useState<LookupState>({ items: [], locations: [], uoms: [], warehouses: [] });
+    const [lookups, setLookups] = useState<LookupState>({ batches: [], items: [], locations: [], serials: [], uoms: [], warehouses: [] });
     const [error, setError] = useState<string | null>(null);
+    const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
     const [isLoading, setIsLoading] = useState(false);
+    const itemUoms = useItemUomOptions('inventory');
 
     useEffect(() => {
         void loadLookups().then(setLookups).catch((caught: unknown) => setError(errorMessage(caught, 'Unable to load inventory lookups.')));
@@ -305,14 +322,20 @@ export function StockAvailabilityPreviewForm({ onResult }: { onResult: (result: 
     async function submit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         setError(null);
+        setFieldErrors({});
         setIsLoading(true);
 
         const form = new FormData(event.currentTarget);
         const input: StockAvailabilityPreviewRequest = {
+            batchId: stringValue(form, 'batchId'),
             itemId: stringValue(form, 'itemId'),
             location: stringValue(form, 'locationId'),
             quantity: stringValue(form, 'quantity'),
+            serialId: stringValue(form, 'serialId'),
+            sourceId: stringValue(form, 'sourceId'),
             sourceModule: stringValue(form, 'sourceModule'),
+            sourceReference: stringValue(form, 'sourceReference'),
+            sourceType: stringValue(form, 'sourceType'),
             uom: stringValue(form, 'uomId'),
             warehouse: stringValue(form, 'warehouseId'),
         };
@@ -327,7 +350,12 @@ export function StockAvailabilityPreviewForm({ onResult }: { onResult: (result: 
                 warnings: response.warnings,
             });
         } catch (caught) {
-            setError(errorMessage(caught, 'Unable to preview stock availability.'));
+            if (caught instanceof ApiError) {
+                setFieldErrors(caught.errors);
+                setError(Object.keys(caught.errors).length > 0 ? null : caught.message);
+            } else {
+                setError(errorMessage(caught, 'Unable to preview stock availability.'));
+            }
         } finally {
             setIsLoading(false);
         }
@@ -335,15 +363,20 @@ export function StockAvailabilityPreviewForm({ onResult }: { onResult: (result: 
 
     return (
         <form onSubmit={submit}>
-            <FormSection description="Submit item, warehouse, UOM, and quantity context. Backend returns the stock decision." title="Availability Context">
+            <FormSection description="Submit item, warehouse, UOM, quantity, and tracking context for an availability decision." title="Availability Context">
                 <GlobalError message={error} />
                 <div className="grid gap-4 md:grid-cols-3">
-                    <OptionField label="Item" name="itemId" options={lookups.items} />
-                    <OptionField label="Warehouse" name="warehouseId" options={lookups.warehouses} />
-                    <OptionField label="Location" name="locationId" options={lookups.locations} />
-                    <OptionField label="UOM" name="uomId" options={lookups.uoms} />
-                    <TextField inputMode="decimal" label="Requested quantity" name="quantity" type="number" />
-                    <Field label="Source module"><Select name="sourceModule"><option value="">None</option><option value="sales">Sales</option><option value="purchase">Purchase</option><option value="vehicle_service">Vehicle Service</option><option value="vehicle_rental">Vehicle Rental</option></Select></Field>
+                    <OptionField error={fieldErrors.item_id?.[0]} label="Item" name="itemId" onChange={(event) => itemUoms.selectItem(event.currentTarget.value)} options={lookups.items} value={itemUoms.itemId} />
+                    <OptionField error={fieldErrors.warehouse_id?.[0]} label="Warehouse" name="warehouseId" options={lookups.warehouses} />
+                    <OptionField error={fieldErrors.location_id?.[0]} label="Location" name="locationId" options={lookups.locations} />
+                    <OptionField disabled={!itemUoms.itemId || itemUoms.isLoading || itemUoms.uoms.length === 0} error={fieldErrors.uom_id?.[0]} hint={itemUoms.hint} label="UOM" name="uomId" onChange={(event) => itemUoms.setUomId(event.currentTarget.value)} options={itemUoms.uoms} value={itemUoms.uomId} />
+                    <OptionField error={fieldErrors.batch_id?.[0]} label="Batch" name="batchId" options={lookups.batches} />
+                    <OptionField error={fieldErrors.serial_id?.[0]} label="Serial" name="serialId" options={lookups.serials} />
+                    <TextField error={fieldErrors.quantity?.[0]} inputMode="decimal" label="Requested quantity" name="quantity" type="number" />
+                    <TextField error={fieldErrors.source_module?.[0]} label="Source module" name="sourceModule" />
+                    <TextField error={fieldErrors.source_type?.[0]} label="Source type" name="sourceType" />
+                    <TextField error={fieldErrors.source_id?.[0]} label="Source ID" name="sourceId" type="number" />
+                    <TextField error={fieldErrors.source_reference?.[0]} label="Source reference" name="sourceReference" />
                 </div>
                 <div className="mt-4 flex justify-end"><Button disabled={isLoading} type="submit" variant="blue">Preview availability</Button></div>
             </FormSection>
@@ -356,16 +389,23 @@ export function StockAvailabilityResultPanel({ result }: { result: StockAvailabi
         return <EmptyState description="Submit item and warehouse context to request a backend availability preview." title="No preview yet" />;
     }
 
+    const requestedQuantity = result.calculated.requestedQuantity ?? result.calculated.requested_quantity ?? '';
+    const baseRequestedQuantity = result.calculated.baseRequestedQuantity ?? result.calculated.base_requested_quantity ?? requestedQuantity;
+    const availableQuantity = result.calculated.availableQuantity ?? result.calculated.available_quantity ?? '';
+    const reservedQuantity = result.calculated.reservedQuantity ?? result.calculated.reserved_quantity ?? '';
+    const decision = result.calculated.decision ?? result.calculated.status ?? '';
+
     return (
         <PreviewPanel
             rows={[
-                { label: 'Requested quantity', value: result.calculated.requestedQuantity },
-                { label: 'Available quantity', value: result.calculated.availableQuantity },
-                { label: 'Reserved quantity', value: result.calculated.reservedQuantity },
-                { label: 'Decision', value: result.calculated.decision.replaceAll('_', ' ') },
+                { label: 'Requested quantity', value: requestedQuantity },
+                { label: 'Base requested quantity', value: baseRequestedQuantity },
+                { label: 'Available quantity', value: availableQuantity },
+                { label: 'Reserved quantity', value: reservedQuantity },
+                { label: 'Decision', value: decision.replaceAll('_', ' ') },
             ]}
-            status="Backend Preview"
-            subtitle="Readonly preview. Frontend does not calculate availability, reservations, UOM conversion, or stock effects."
+            status="Live Preview"
+            subtitle="Availability decision for the selected item, warehouse, UOM, and tracking context."
             title="Availability Result"
         />
     );
@@ -386,7 +426,7 @@ export function InventoryTraceabilityTimeline({ entries }: { entries: InventoryA
                 </div>
             ))}
         </div>
-    ) : <EmptyState description="No traceability entries returned by backend." title="No trace entries" />;
+    ) : <EmptyState description="No traceability entries available." title="No trace entries" />;
 }
 
 export function SourceReferencePanel({ sourceModule, sourceReference }: { sourceModule: string; sourceReference: string }) {
@@ -394,24 +434,29 @@ export function SourceReferencePanel({ sourceModule, sourceReference }: { source
 }
 
 type LookupState = {
+    batches: InventoryLookupOption[];
     items: InventoryLookupOption[];
     locations: InventoryLookupOption[];
+    serials: InventoryLookupOption[];
     uoms: InventoryLookupOption[];
     warehouses: InventoryLookupOption[];
 };
 
 async function loadLookups(): Promise<LookupState> {
-    const [items, locations, uoms, warehouses] = await Promise.all([
+    const [batches, items, locations, serials, warehouses] = await Promise.all([
+        inventoryApi.listBatches(),
         inventoryApi.listItems(),
         inventoryApi.listLocations(),
-        inventoryApi.listUoms(),
+        inventoryApi.listSerials(),
         inventoryApi.listWarehouses(),
     ]);
 
     return {
+        batches: batches.data.map((batch) => ({ id: batch.id, label: batch.batchNumber, secondary: batch.itemName })),
         items: items.data,
         locations: locations.data,
-        uoms: uoms.data,
+        serials: serials.data.map((serial) => ({ id: serial.id, label: serial.serialNumber, secondary: serial.itemName })),
+        uoms: [],
         warehouses: warehouses.data,
     };
 }
@@ -422,16 +467,98 @@ function SimpleTable<T extends { id: string }>({ columns, rows }: { columns: Arr
         key,
         render: (row) => key.toLowerCase().includes('status') ? <StatusBadge status={String(row[key] ?? '')} /> : String(row[key] ?? ''),
     }));
-    return rows.length ? <DataTable columns={tableColumns} getRowKey={(row) => row.id} rows={rows} /> : <EmptyState description="No records returned by backend." title="No records" />;
+    return rows.length ? <DataTable columns={tableColumns} getRowKey={(row) => row.id} rows={rows} /> : <EmptyState description="No records available." title="No records" />;
 }
 
-function OptionField({ error, label, name, options }: { error?: string; label: string; name: string; options: InventoryLookupOption[] }) {
+function useItemUomOptions(context: 'inventory') {
+    const [itemId, setItemId] = useState('');
+    const [uomId, setUomId] = useState('');
+    const [uoms, setUoms] = useState<InventoryLookupOption[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    function selectItem(nextItemId: string): void {
+        setItemId(nextItemId);
+        setUomId('');
+        setUoms([]);
+        setError('');
+    }
+
+    useEffect(() => {
+        let mounted = true;
+
+        if (!itemId) {
+            setUoms([]);
+            setUomId('');
+            return () => { mounted = false; };
+        }
+
+        setIsLoading(true);
+        itemUomApi.listForItem(itemId, context)
+            .then((options) => {
+                if (!mounted) return;
+
+                const mapped = options.map((option) => ({
+                    id: option.id,
+                    label: option.label,
+                    secondary: option.name && option.name !== option.label ? option.name : option.category,
+                }));
+                const defaultOption = options.find((option) => option.isDefaultForContext) ?? options[0];
+
+                setUoms(mapped);
+                setUomId(defaultOption?.id ?? '');
+                setError(mapped.length === 0 ? 'No UOM configured for this item.' : '');
+            })
+            .catch((caught: unknown) => {
+                if (!mounted) return;
+                setUoms([]);
+                setUomId('');
+                setError(errorMessage(caught, 'Unable to load UOMs for the selected item.'));
+            })
+            .finally(() => {
+                if (mounted) setIsLoading(false);
+            });
+
+        return () => { mounted = false; };
+    }, [context, itemId]);
+
+    return {
+        hint: !itemId ? 'Select an item first.' : isLoading ? 'Loading UOMs for selected item...' : error,
+        isLoading,
+        itemId,
+        selectItem,
+        setUomId,
+        uomId,
+        uoms,
+    };
+}
+
+function OptionField({
+    disabled = false,
+    error,
+    hint,
+    label,
+    name,
+    onChange,
+    options,
+    value,
+}: {
+    disabled?: boolean;
+    error?: string;
+    hint?: string;
+    label: string;
+    name: string;
+    onChange?: (event: ChangeEvent<HTMLSelectElement>) => void;
+    options: InventoryLookupOption[];
+    value?: string;
+}) {
     return (
         <Field label={label}>
-            <Select name={name}>
+            <Select disabled={disabled} name={name} onChange={onChange} value={value}>
                 <option value="">Select {label.toLowerCase()}</option>
                 {options.map((option) => <option key={option.id} value={option.id}>{option.label}{option.secondary ? ` (${option.secondary})` : ''}</option>)}
             </Select>
+            {hint && !error ? <p className="text-xs text-slate-500">{hint}</p> : null}
             <FieldError message={error} />
         </Field>
     );

@@ -12,6 +12,7 @@ use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Modules\Item\Application\Contracts\UseCases\Items\GetItemSetupSummaryServiceInterface;
 use Modules\Item\Application\Repositories\ItemRepositoryInterface;
+use Modules\Item\Application\Support\ItemUomOptions;
 use Modules\Item\Domain\Constants\ItemErrorCode;
 use Throwable;
 
@@ -98,9 +99,18 @@ final class GetItemSetupSummaryService implements GetItemSetupSummaryServiceInte
         });
     }
 
-    public function uomSetup(int|string $id): Result
+    public function uomSetup(int|string $id, ?string $context = null): Result
     {
-        return $this->forItem($id, function (DataRecord $item): array {
+        return $this->forItem($id, function (DataRecord $item, int $tenantId) use ($context): array {
+            $allowedUoms = ItemUomOptions::allowedUoms($tenantId, (int) $item->id(), $context);
+            $defaultUom = null;
+            foreach ($allowedUoms as $uom) {
+                if ((bool) ($uom['is_default_for_context'] ?? false)) {
+                    $defaultUom = $uom;
+                    break;
+                }
+            }
+
             return [
                 'item_id' => (int) $item->id(),
                 'base_uom_id' => $item->get('base_uom_id'),
@@ -108,6 +118,9 @@ final class GetItemSetupSummaryService implements GetItemSetupSummaryServiceInte
                 'default_issue_uom_id' => $item->get('default_issue_uom_id'),
                 'default_consumption_uom_id' => $item->get('default_consumption_uom_id'),
                 'default_charge_uom_id' => $item->get('default_charge_uom_id'),
+                'allowed_uoms' => $allowedUoms,
+                'default_uom' => $defaultUom,
+                'context' => $context,
                 'is_configured' => $item->get('base_uom_id') !== null,
             ];
         });

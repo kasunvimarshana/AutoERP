@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace Modules\Inventory\Presentation\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
+use Modules\Inventory\Presentation\Http\Requests\Concerns\ValidatesInventoryItemUoms;
 
 final class UpsertStockReservationRequest extends FormRequest
 {
+    use ValidatesInventoryItemUoms;
+
     public function authorize(): bool
     {
         return $this->user() !== null;
@@ -39,5 +43,18 @@ final class UpsertStockReservationRequest extends FormRequest
             'condition' => ['nullable', 'string', 'max:50'],
             'notes' => ['nullable', 'string'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $this->addItemUomErrorWhenInvalid(
+                $validator,
+                (int) $this->input('tenant_id'),
+                $this->input('item_id'),
+                $this->input('uom_id'),
+                'uom_id',
+            );
+        });
     }
 }

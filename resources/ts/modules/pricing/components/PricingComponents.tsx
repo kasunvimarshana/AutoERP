@@ -1,6 +1,7 @@
-import { FormEvent, MouseEvent, useEffect, useState } from 'react';
+import { FormEvent, MouseEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ApiError } from '../../../services/api/apiErrors';
+import { itemUomApi } from '../../../services/api/itemUomApi';
 import { AuditTimeline } from '../../../shared/components/business/AuditTimeline';
 import { PreviewPanel } from '../../../shared/components/business/PreviewPanel';
 import { StatusBadge } from '../../../shared/components/business/StatusBadge';
@@ -85,6 +86,76 @@ function lookupOptions(rows: LookupOption[]) {
     return rows.map((row) => ({ label: row.label, value: row.id }));
 }
 
+function useItemUomLookup(context: string, initialItemId = '', initialUomId = '') {
+    const [itemId, setItemId] = useState(initialItemId);
+    const [uomId, setUomId] = useState(initialUomId);
+    const [uoms, setUoms] = useState<LookupOption[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [message, setMessage] = useState('');
+
+    useEffect(() => {
+        setItemId(initialItemId);
+        setUomId(initialUomId);
+    }, [initialItemId, initialUomId]);
+
+    function selectItem(nextItemId: string): void {
+        setItemId(nextItemId);
+        setUomId('');
+        setUoms([]);
+        setMessage('');
+    }
+
+    useEffect(() => {
+        let mounted = true;
+
+        if (!itemId) {
+            setUoms([]);
+            setMessage('');
+            return () => { mounted = false; };
+        }
+
+        setIsLoading(true);
+        itemUomApi.listForItem(itemId, context)
+            .then((options) => {
+                if (!mounted) return;
+
+                const rows = options.map((option) => ({
+                    id: option.id,
+                    label: option.label,
+                    name: option.name || option.label,
+                    secondary: option.name && option.name !== option.label ? option.name : option.category,
+                }));
+                const defaultOption = options.find((option) => option.isDefaultForContext) ?? options[0];
+                const existingStillValid = initialUomId && rows.some((row) => row.id === initialUomId);
+
+                setUoms(rows);
+                setUomId(existingStillValid ? initialUomId : (defaultOption?.id ?? ''));
+                setMessage(rows.length === 0 ? 'No UOM configured for this item.' : '');
+            })
+            .catch((error: unknown) => {
+                if (!mounted) return;
+                setUoms([]);
+                setUomId('');
+                setMessage(error instanceof Error ? error.message : 'Unable to load UOMs for this item.');
+            })
+            .finally(() => {
+                if (mounted) setIsLoading(false);
+            });
+
+        return () => { mounted = false; };
+    }, [context, initialUomId, itemId]);
+
+    return {
+        hint: !itemId ? 'Select an item first.' : isLoading ? 'Loading UOMs for selected item...' : message,
+        isLoading,
+        itemId,
+        selectItem,
+        setUomId,
+        uomId,
+        uoms,
+    };
+}
+
 export function PriceListSummaryCard({ onStatusChange, priceList }: { onStatusChange?: (priceList: PriceList) => void; priceList: PriceList }) {
     const [confirm, setConfirm] = useState<'activate' | 'deactivate' | null>(null);
     const [isSaving, setIsSaving] = useState(false);
@@ -139,16 +210,15 @@ export function PriceListSummaryCard({ onStatusChange, priceList }: { onStatusCh
 
 function PriceListItemEditor({ existing, onSaved, priceListId }: { existing?: PriceListItem; onSaved: (item: PriceListItem) => void; priceListId: string }) {
     const [items, setItems] = useState<LookupOption[]>([]);
-    const [uoms, setUoms] = useState<LookupOption[]>([]);
+    const itemUoms = useItemUomLookup('pricing', existing?.itemId, existing?.uomId);
     const [state, setState] = useState<FormErrorState>({ errors: {}, message: '' });
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         let mounted = true;
-        Promise.all([pricingApi.listItems(), pricingApi.listUoms()]).then(([itemResponse, uomResponse]) => {
+        pricingApi.listItems().then((itemResponse) => {
             if (mounted) {
                 setItems(itemResponse.data);
-                setUoms(uomResponse.data);
             }
         }).catch((error: unknown) => {
             if (mounted) setState(errorState(error, 'Unable to load item/UOM lookups.'));
@@ -192,8 +262,8 @@ function PriceListItemEditor({ existing, onSaved, priceListId }: { existing?: Pr
         <form className="space-y-4" onSubmit={handleSubmit}>
             {state.message ? <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{state.message}</div> : null}
             <div className="grid gap-4 md:grid-cols-4">
-                <div className="space-y-2"><FieldLabel>Item</FieldLabel><Select defaultValue={existing?.itemId} name="item_id" options={lookupOptions(items)} /><FieldError message={state.errors.item_id?.[0]} /></div>
-                <div className="space-y-2"><FieldLabel>UOM</FieldLabel><Select defaultValue={existing?.uomId} name="uom_id" options={lookupOptions(uoms)} /><FieldError message={state.errors.uom_id?.[0]} /></div>
+                <div className="space-y-2"><FieldLabel>Item</FieldLabel><Select name="item_id" onChange={(event) => itemUoms.selectItem(event.currentTarget.value)} options={lookupOptions(items)} placeholder="Select item" value={itemUoms.itemId} /><FieldError message={state.errors.item_id?.[0]} /></div>
+                <div className="space-y-2"><FieldLabel>UOM</FieldLabel><Select disabled={!itemUoms.itemId || itemUoms.isLoading || itemUoms.uoms.length === 0} name="uom_id" onChange={(event) => itemUoms.setUomId(event.currentTarget.value)} options={lookupOptions(itemUoms.uoms)} placeholder="Select UOM" value={itemUoms.uomId} />{itemUoms.hint ? <p className="text-xs text-slate-500">{itemUoms.hint}</p> : null}<FieldError message={state.errors.uom_id?.[0]} /></div>
                 <div className="space-y-2"><FieldLabel>Unit price</FieldLabel><Input defaultValue={existing?.unitPrice} name="price" type="number" /><FieldError message={state.errors.price?.[0]} /></div>
                 <div className="space-y-2"><FieldLabel>Min quantity</FieldLabel><Input defaultValue={existing?.minQuantity ?? '1'} name="min_quantity" type="number" /></div>
                 <div className="space-y-2"><FieldLabel>Max quantity</FieldLabel><Input defaultValue={existing?.maxQuantity} name="max_quantity" type="number" /></div>
@@ -557,15 +627,17 @@ export function PricingRuleForm({ mode, rule }: { mode: 'create' | 'edit'; rule?
 
 export function PriceResolverForm() {
     const [result, setResult] = useState<PriceResolveResult>();
-    const [lookups, setLookups] = useState<{ currencies: LookupOption[]; items: LookupOption[]; priceLists: PriceList[]; uoms: LookupOption[] }>({ currencies: [], items: [], priceLists: [], uoms: [] });
+    const [moduleSource, setModuleSource] = useState<PricingModuleScope>('sales');
+    const [lookups, setLookups] = useState<{ currencies: LookupOption[]; items: LookupOption[]; priceLists: PriceList[] }>({ currencies: [], items: [], priceLists: [] });
+    const itemUoms = useItemUomLookup(moduleSource);
     const [isLoading, setIsLoading] = useState(false);
     const [formError, setFormError] = useState('');
 
     useEffect(() => {
         let mounted = true;
-        Promise.all([pricingApi.listItems(), pricingApi.listUoms(), pricingApi.listCurrencies(), pricingApi.listPriceLists()])
-            .then(([items, uoms, currencies, priceLists]) => {
-                if (mounted) setLookups({ currencies: currencies.data, items: items.data, priceLists: priceLists.data, uoms: uoms.data });
+        Promise.all([pricingApi.listItems(), pricingApi.listCurrencies(), pricingApi.listPriceLists()])
+            .then(([items, currencies, priceLists]) => {
+                if (mounted) setLookups({ currencies: currencies.data, items: items.data, priceLists: priceLists.data });
             })
             .catch((error: unknown) => { if (mounted) setFormError(error instanceof Error ? error.message : 'Unable to load resolver lookups.'); });
         return () => { mounted = false; };
@@ -608,9 +680,9 @@ export function PriceResolverForm() {
                 {formError ? <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{formError}</div> : null}
                 <FormSection description="Submit transaction context to the backend resolver. The result panel is readonly." title="Price Resolver Inputs">
                     <div className="grid gap-4 md:grid-cols-3">
-                        <div className="space-y-2"><FieldLabel>Module/source</FieldLabel><Select name="module_source" options={[{ label: 'Sales', value: 'sales' }, { label: 'Purchase', value: 'purchase' }, { label: 'Vehicle Service', value: 'vehicle_service' }, { label: 'Vehicle Rental', value: 'vehicle_rental' }]} /></div>
-                        <div className="space-y-2"><FieldLabel>Item</FieldLabel><Select name="item_id" options={lookupOptions(lookups.items)} /></div>
-                        <div className="space-y-2"><FieldLabel>UOM</FieldLabel><Select name="uom_id" options={lookupOptions(lookups.uoms)} /></div>
+                        <div className="space-y-2"><FieldLabel>Module/source</FieldLabel><Select name="module_source" onChange={(event) => setModuleSource(event.currentTarget.value as PricingModuleScope)} options={[{ label: 'Sales', value: 'sales' }, { label: 'Purchase', value: 'purchase' }, { label: 'Vehicle Service', value: 'vehicle_service' }, { label: 'Vehicle Rental', value: 'vehicle_rental' }]} value={moduleSource} /></div>
+                        <div className="space-y-2"><FieldLabel>Item</FieldLabel><Select name="item_id" onChange={(event) => itemUoms.selectItem(event.currentTarget.value)} options={lookupOptions(lookups.items)} placeholder="Select item" value={itemUoms.itemId} /></div>
+                        <div className="space-y-2"><FieldLabel>UOM</FieldLabel><Select disabled={!itemUoms.itemId || itemUoms.isLoading || itemUoms.uoms.length === 0} name="uom_id" onChange={(event) => itemUoms.setUomId(event.currentTarget.value)} options={lookupOptions(itemUoms.uoms)} placeholder="Select UOM" value={itemUoms.uomId} />{itemUoms.hint ? <p className="text-xs text-slate-500">{itemUoms.hint}</p> : null}</div>
                         <div className="space-y-2"><FieldLabel>Customer optional</FieldLabel><Input name="customer_id" /></div>
                         <div className="space-y-2"><FieldLabel>Supplier optional</FieldLabel><Input name="supplier_id" /></div>
                         <div className="space-y-2"><FieldLabel>Quantity</FieldLabel><Input defaultValue="1" name="quantity" type="number" /></div>
@@ -756,16 +828,17 @@ export function DiscountManager({ onChanged, rows }: { onChanged: () => void; ro
 }
 
 export function PricingTierManager({ onChanged, priceListItems, rows }: { onChanged: () => void; priceListItems: PriceListItem[]; rows: PricingTier[] }) {
-    const [uoms, setUoms] = useState<LookupOption[]>([]);
     const [editing, setEditing] = useState<PricingTier | undefined>();
     const [deleteTarget, setDeleteTarget] = useState<PricingTier | null>(null);
     const [state, setState] = useState<FormErrorState>({ errors: {}, message: '' });
+    const editingPriceItem = priceListItems.find((item) => item.id === editing?.priceListItemId);
+    const itemUoms = useItemUomLookup('pricing', editingPriceItem?.itemId, editing?.uomId);
+    const priceItemOptions = useMemo(() => priceListItems.map((item) => ({ label: `${item.itemName} - ${item.unitPrice}`, value: item.id })), [priceListItems]);
 
-    useEffect(() => {
-        let mounted = true;
-        pricingApi.listUoms().then((response) => { if (mounted) setUoms(response.data); });
-        return () => { mounted = false; };
-    }, []);
+    function selectPriceItem(priceListItemId: string): void {
+        const priceItem = priceListItems.find((item) => item.id === priceListItemId);
+        itemUoms.selectItem(priceItem?.itemId ?? '');
+    }
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -807,11 +880,11 @@ export function PricingTierManager({ onChanged, priceListItems, rows }: { onChan
                 <form className="space-y-4" onSubmit={handleSubmit}>
                     {state.message ? <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{state.message}</div> : null}
                     <div className="grid gap-4 md:grid-cols-4">
-                        <div className="space-y-2"><FieldLabel>Price item</FieldLabel><Select defaultValue={editing?.priceListItemId} name="price_list_item_id" options={priceListItems.map((item) => ({ label: `${item.itemName} - ${item.unitPrice}`, value: item.id }))} /></div>
+                        <div className="space-y-2"><FieldLabel>Price item</FieldLabel><Select defaultValue={editing?.priceListItemId} name="price_list_item_id" onChange={(event) => selectPriceItem(event.currentTarget.value)} options={priceItemOptions} /></div>
                         <div className="space-y-2"><FieldLabel>Sequence</FieldLabel><Input defaultValue={editing?.sequence ?? '1'} name="sequence" type="number" /></div>
                         <div className="space-y-2"><FieldLabel>Min quantity</FieldLabel><Input defaultValue={editing?.minQuantity ?? '1'} name="min_quantity" type="number" /></div>
                         <div className="space-y-2"><FieldLabel>Max quantity</FieldLabel><Input defaultValue={editing?.maxQuantity} name="max_quantity" type="number" /></div>
-                        <div className="space-y-2"><FieldLabel>UOM</FieldLabel><Select defaultValue={editing?.uomId} name="uom_id" options={lookupOptions(uoms)} /></div>
+                        <div className="space-y-2"><FieldLabel>UOM</FieldLabel><Select disabled={!itemUoms.itemId || itemUoms.isLoading || itemUoms.uoms.length === 0} name="uom_id" onChange={(event) => itemUoms.setUomId(event.currentTarget.value)} options={lookupOptions(itemUoms.uoms)} placeholder="Select UOM" value={itemUoms.uomId} />{itemUoms.hint ? <p className="text-xs text-slate-500">{itemUoms.hint}</p> : null}</div>
                         <div className="space-y-2"><FieldLabel>Override price</FieldLabel><Input defaultValue={editing?.unitPrice} name="price" type="number" /></div>
                         <div className="space-y-2"><FieldLabel>Adjustment type</FieldLabel><Select defaultValue={editing?.adjustmentType} name="adjustment_type" options={[{ label: 'None', value: '' }, { label: 'Percentage', value: 'percentage' }, { label: 'Fixed', value: 'fixed' }, { label: 'Override', value: 'override' }]} /></div>
                         <div className="space-y-2"><FieldLabel>Adjustment value</FieldLabel><Input defaultValue={editing?.adjustmentValue} name="adjustment_value" type="number" /></div>

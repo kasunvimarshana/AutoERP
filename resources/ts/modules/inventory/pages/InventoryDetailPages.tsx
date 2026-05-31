@@ -27,13 +27,13 @@ export function StockMovementDetailPage() {
     }, [id]);
 
     if (error) return <EmptyState description={error} title="Unable to load movement" />;
-    if (!movement) return <EmptyState description="Loading movement from backend." title="Loading movement" />;
+    if (!movement) return <EmptyState description="Loading movement." title="Loading movement" />;
 
     const tabs = ['overview', 'source', 'item', 'warehouse', 'batch', 'quantity', 'cost', 'audit'].map((value) => ({ label: label(value), value }));
 
     return (
         <div className="space-y-6">
-            <PageHeader actions={<Link to="/inventory/movements"><Button variant="secondary">Back</Button></Link>} eyebrow="Inventory Movement" subtitle="Movement detail is readonly. Source module supplies context; Inventory owns stock ledger effects." title={movement.movementNumber} />
+            <PageHeader actions={<Link to="/inventory/movements"><Button variant="secondary">Back</Button></Link>} eyebrow="Inventory Movement" subtitle="Readonly stock movement ledger entry." title={movement.movementNumber} />
             <StockMovementSummaryCard movement={movement} />
             <Tabs active={active} items={tabs} onChange={setActive} />
             {active === 'overview' ? <PreviewPanel rows={[{ label: 'Movement type', value: movement.movementType.replaceAll('_', ' ') }, { label: 'Quantity', value: movement.quantity }, { label: 'Status', value: movement.status }]} title="Movement Overview" /> : null}
@@ -54,6 +54,8 @@ export function StockTransferDetailPage() {
     const [transfer, setTransfer] = useState<StockTransfer | null>(null);
     const [trace, setTrace] = useState<InventoryAuditEntry[]>([]);
     const [error, setError] = useState<string | null>(null);
+    const [actionError, setActionError] = useState<string | null>(null);
+    const [isActing, setIsActing] = useState(false);
 
     function load() {
         if (!id) return;
@@ -68,19 +70,40 @@ export function StockTransferDetailPage() {
     useEffect(load, [id]);
 
     if (error) return <EmptyState description={error} title="Unable to load transfer" />;
-    if (!transfer) return <EmptyState description="Loading transfer from backend." title="Loading transfer" />;
+    if (!transfer) return <EmptyState description="Loading transfer." title="Loading transfer" />;
 
     const tabs = ['overview', 'lines', 'source', 'destination', 'workflow', 'audit'].map((value) => ({ label: label(value), value }));
+    const canSubmit = transfer.status === 'draft';
+    const canComplete = ['draft', 'pending', 'approved'].includes(transfer.status);
+
+    async function runTransferAction(action: 'complete' | 'submit') {
+        if (!transfer) return;
+        setActionError(null);
+        setIsActing(true);
+        try {
+            if (action === 'submit') {
+                await inventoryApi.submitTransfer(transfer.id);
+            } else {
+                await inventoryApi.completeTransfer(transfer.id);
+            }
+            load();
+        } catch (caught) {
+            setActionError(caught instanceof Error ? caught.message : 'Unable to update transfer status.');
+        } finally {
+            setIsActing(false);
+        }
+    }
 
     return (
         <div className="space-y-6">
-            <PageHeader actions={<><Link to="/inventory/transfers"><Button variant="secondary">Back</Button></Link><Button onClick={() => void inventoryApi.submitTransfer(transfer.id).then(load)} variant="secondary">Submit</Button><Button onClick={() => void inventoryApi.completeTransfer(transfer.id).then(load)} variant="blue">Complete</Button></>} eyebrow="Stock Transfer" subtitle="Backend owns availability checks and source/destination stock effects." title={transfer.transferNumber} />
+            <PageHeader actions={<><Link to="/inventory/transfers"><Button variant="secondary">Back</Button></Link><Button disabled={!canSubmit || isActing} onClick={() => void runTransferAction('submit')} title={canSubmit ? 'Submit transfer' : 'Only draft transfers can be submitted'} variant="secondary">Submit</Button><Button disabled={!canComplete || isActing} onClick={() => void runTransferAction('complete')} title={canComplete ? 'Complete transfer' : 'This transfer cannot be completed from its current status'} variant="blue">Complete</Button></>} eyebrow="Stock Transfer" subtitle="Warehouse transfer detail and lines." title={transfer.transferNumber} />
+            {actionError ? <EmptyState description={actionError} title="Action failed" /> : null}
             <Tabs active={active} items={tabs} onChange={setActive} />
             {active === 'overview' ? <PreviewPanel rows={[{ label: 'Reason', value: transfer.reason }, { label: 'Date', value: transfer.transferDate }, { label: 'Status', value: transfer.status }]} title="Transfer Overview" /> : null}
             {active === 'lines' ? <StockTransferLineTable rows={transfer.lines} /> : null}
             {active === 'source' ? <PreviewPanel rows={[{ label: 'Warehouse', value: transfer.sourceWarehouse }, { label: 'Location', value: transfer.sourceLocation }]} title="Source Warehouse" /> : null}
             {active === 'destination' ? <PreviewPanel rows={[{ label: 'Warehouse', value: transfer.destinationWarehouse }, { label: 'Location', value: transfer.destinationLocation }]} title="Destination Warehouse" /> : null}
-            {active === 'workflow' ? <PreviewPanel rows={[{ label: 'Current status', value: transfer.status }, { label: 'Workflow source', value: 'Backend status update' }]} title="Status / Workflow" /> : null}
+            {active === 'workflow' ? <PreviewPanel rows={[{ label: 'Current status', value: transfer.status }, { label: 'Next actions', value: canComplete ? 'Submit or complete' : 'No transition available' }]} title="Status / Workflow" /> : null}
             {active === 'audit' ? <InventoryTraceabilityTimeline entries={trace} /> : null}
         </div>
     );
@@ -92,6 +115,8 @@ export function StockAdjustmentDetailPage() {
     const [adjustment, setAdjustment] = useState<StockAdjustment | null>(null);
     const [trace, setTrace] = useState<InventoryAuditEntry[]>([]);
     const [error, setError] = useState<string | null>(null);
+    const [actionError, setActionError] = useState<string | null>(null);
+    const [isActing, setIsActing] = useState(false);
 
     function load() {
         if (!id) return;
@@ -106,13 +131,29 @@ export function StockAdjustmentDetailPage() {
     useEffect(load, [id]);
 
     if (error) return <EmptyState description={error} title="Unable to load adjustment" />;
-    if (!adjustment) return <EmptyState description="Loading adjustment from backend." title="Loading adjustment" />;
+    if (!adjustment) return <EmptyState description="Loading adjustment." title="Loading adjustment" />;
 
     const tabs = ['overview', 'lines', 'reason', 'impact', 'audit'].map((value) => ({ label: label(value), value }));
+    const canPost = adjustment.status === 'draft';
+
+    async function postAdjustment() {
+        if (!adjustment) return;
+        setActionError(null);
+        setIsActing(true);
+        try {
+            await inventoryApi.postAdjustment(adjustment.id);
+            load();
+        } catch (caught) {
+            setActionError(caught instanceof Error ? caught.message : 'Unable to post adjustment.');
+        } finally {
+            setIsActing(false);
+        }
+    }
 
     return (
         <div className="space-y-6">
-            <PageHeader actions={<><Link to="/inventory/adjustments"><Button variant="secondary">Back</Button></Link><Button onClick={() => void inventoryApi.postAdjustment(adjustment.id).then(load)} variant="blue">Post</Button></>} eyebrow="Stock Adjustment" subtitle="Backend owns quantity and valuation effects." title={adjustment.adjustmentNumber} />
+            <PageHeader actions={<><Link to="/inventory/adjustments"><Button variant="secondary">Back</Button></Link><Button disabled={!canPost || isActing} onClick={() => void postAdjustment()} title={canPost ? 'Post adjustment' : 'Only draft adjustments can be posted'} variant="blue">Post</Button></>} eyebrow="Stock Adjustment" subtitle="Stock adjustment detail and quantity impact." title={adjustment.adjustmentNumber} />
+            {actionError ? <EmptyState description={actionError} title="Action failed" /> : null}
             <Tabs active={active} items={tabs} onChange={setActive} />
             {active === 'overview' ? <PreviewPanel rows={[{ label: 'Warehouse', value: adjustment.warehouse }, { label: 'Location', value: adjustment.location }, { label: 'Status', value: adjustment.status }]} title="Adjustment Overview" /> : null}
             {active === 'lines' ? <StockAdjustmentLineTable rows={adjustment.lines} /> : null}

@@ -112,7 +112,7 @@ function normalizePriceListType(value: unknown): PriceListType {
 
 function normalizeLookup(raw: BackendRecord): LookupOption {
     const code = asOptionalString(raw.code ?? raw.sku ?? raw.symbol);
-    const name = asString(raw.name ?? raw.display_name ?? raw.label, code ?? `#${asString(raw.id)}`);
+    const name = asString(raw.name ?? raw.display_name ?? raw.label, code ?? 'Unnamed option');
 
     return {
         code,
@@ -163,14 +163,14 @@ function normalizePriceListItem(raw: BackendRecord, items = new Map<string, Look
         effectiveFrom: asString(raw.valid_from, ''),
         effectiveTo: asString(raw.valid_to, ''),
         id: asString(raw.id),
-        itemCode: item?.code ?? asString(raw.item_code ?? raw.item_id, itemId),
+        itemCode: item?.code ?? asString(raw.item_code, ''),
         itemId,
-        itemName: item?.name ?? asString(raw.item_name ?? raw.item_id, `Item #${itemId}`),
+        itemName: item?.name ?? asString(raw.item_name ?? raw.item_label, 'Backend item'),
         maxQuantity: asString(raw.max_quantity, ''),
         minQuantity: asDecimal(raw.min_quantity, '1'),
         priceListId: asString(raw.price_list_id),
         priority: asString(raw.priority, '0'),
-        uom: uom?.code ?? uom?.name ?? asString(raw.uom_code ?? raw.uom_id, `UOM #${uomId}`),
+        uom: uom?.code ?? uom?.name ?? asString(raw.uom_label ?? raw.uom_code ?? raw.uom_symbol ?? raw.uom_name, 'Backend UOM'),
         uomId,
         unitPrice: asDecimal(raw.price),
     };

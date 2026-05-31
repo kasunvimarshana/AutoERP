@@ -6,6 +6,7 @@ import type {
     CycleCount,
     InventoryAuditEntry,
     InventoryBatch,
+    InventoryListQuery,
     InventoryLookupOption,
     InventorySerial,
     InventoryValuation,
@@ -45,6 +46,46 @@ function asStatus(value: unknown, fallback = 'active'): string {
     return asString(value, fallback).toLowerCase();
 }
 
+function nestedLabel(raw: BackendRecord, key: string, codeKeys: string[], nameKeys: string[], fallback = ''): string {
+    const direct = asString(raw[`${key}_label`]);
+    if (direct) {
+        return direct;
+    }
+
+    const nested = record(raw[key]);
+    const code = codeKeys.map((codeKey) => asString(nested[codeKey])).find(Boolean) ?? '';
+    const name = nameKeys.map((nameKey) => asString(nested[nameKey])).find(Boolean) ?? '';
+
+    if (code && name) {
+        return `${code} - ${name}`;
+    }
+
+    return name || code || fallback;
+}
+
+function uomLabel(raw: BackendRecord, key: 'base_uom' | 'transaction_uom' | 'uom', fallback = 'UOM'): string {
+    const direct = asString(raw[`${key}_label`]);
+    if (direct) {
+        return direct;
+    }
+
+    const nested = record(raw[key]);
+
+    return asString(nested.symbol ?? nested.code ?? nested.name, fallback);
+}
+
+function batchSerialLabel(raw: BackendRecord, fallback = 'None'): string {
+    const direct = asString(raw.batch_serial_label);
+    if (direct) {
+        return direct;
+    }
+
+    const batch = record(raw.batch);
+    const serial = record(raw.serial);
+
+    return asString(batch.batch_number ?? batch.lot_number ?? serial.serial_number, fallback);
+}
+
 function numberOrUndefined(value: string | null | undefined): number | undefined {
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
@@ -76,7 +117,6 @@ function collectionPayload<T>(response: ApiCollectionResponse<BackendRecord>, ma
 }
 
 function normalizeStockLevel(raw: BackendRecord): StockLevel {
-    const meta = record(raw.metadata);
     const onHand = Number(raw.quantity_on_hand ?? 0);
     const reserved = Number(raw.quantity_reserved ?? 0);
     const blocked = Number(raw.quantity_blocked ?? 0);
@@ -85,17 +125,17 @@ function normalizeStockLevel(raw: BackendRecord): StockLevel {
 
     return {
         available: asNumberString(available),
-        batchOrSerial: asString(meta.batch_or_serial ?? raw.batch_number ?? raw.serial_number, 'None'),
+        batchOrSerial: batchSerialLabel(raw),
         id: asString(raw.id),
-        itemCode: asString(meta.item_code ?? raw.item_code ?? raw.item_id),
-        itemName: asString(meta.item_name ?? raw.item_name ?? raw.item_id, 'Item'),
-        location: asString(meta.location_name ?? raw.location_id, 'Default'),
+        itemCode: asString(record(raw.item).sku ?? record(raw.item).code),
+        itemName: nestedLabel(raw, 'item', ['sku', 'code'], ['name'], 'Item'),
+        location: nestedLabel(raw, 'location', ['code'], ['name'], 'Default'),
         onHand: asNumberString(raw.quantity_on_hand),
         reserved: asNumberString(raw.quantity_reserved),
         status: asStatus(raw.condition, 'good'),
-        uom: asString(meta.uom_code ?? raw.base_uom_id, 'UOM'),
+        uom: uomLabel(raw, 'base_uom'),
         updatedAt: asString(raw.updated_at),
-        warehouse: asString(meta.warehouse_name ?? raw.warehouse_id, 'Warehouse'),
+        warehouse: nestedLabel(raw, 'warehouse', ['code'], ['name'], 'Warehouse'),
     };
 }
 
@@ -106,23 +146,22 @@ function normalizeMovementType(value: unknown): StockMovementType {
 }
 
 function normalizeMovement(raw: BackendRecord): StockMovement {
-    const meta = record(raw.metadata);
     return {
-        batchOrSerial: asString(meta.batch_or_serial ?? raw.batch_id ?? raw.serial_id, 'None'),
-        costEffect: asNumberString(raw.total_cost ?? meta.cost_effect),
+        batchOrSerial: batchSerialLabel(raw),
+        costEffect: asNumberString(raw.total_cost ?? record(raw.metadata).cost_effect),
         id: asString(raw.id),
-        itemName: asString(meta.item_name ?? raw.item_id, 'Item'),
-        location: asString(meta.location_name ?? raw.location_id, 'Default'),
+        itemName: nestedLabel(raw, 'item', ['sku', 'code'], ['name'], 'Item'),
+        location: nestedLabel(raw, 'location', ['code'], ['name'], 'Default'),
         movementDate: asString(raw.performed_at ?? raw.created_at).slice(0, 10),
-        movementNumber: asString(raw.movement_number ?? raw.reference ?? raw.source_reference, `MOV-${asString(raw.id)}`),
+        movementNumber: asString(raw.movement_number ?? raw.reference ?? raw.source_reference, 'Movement'),
         movementType: normalizeMovementType(raw.movement_type),
         quantity: asNumberString(raw.quantity),
         quantityEffect: asString(raw.direction, 'IN'),
         sourceModule: asString(raw.source_module, 'inventory'),
-        sourceReference: asString(raw.source_reference ?? raw.source_id, 'Source'),
+        sourceReference: asString(raw.source_reference, 'Not linked'),
         status: asStatus(raw.status, 'posted'),
-        uom: asString(meta.uom_code ?? raw.transaction_uom_id, 'UOM'),
-        warehouse: asString(meta.warehouse_name ?? raw.warehouse_id, 'Warehouse'),
+        uom: uomLabel(raw, 'transaction_uom'),
+        warehouse: nestedLabel(raw, 'warehouse', ['code'], ['name'], 'Warehouse'),
     };
 }
 
@@ -132,41 +171,39 @@ function normalizeReservation(raw: BackendRecord): StockReservation {
         availableDecision: asString(meta.available_decision, 'reserved'),
         expiresAt: asString(raw.expires_at),
         id: asString(raw.id),
-        itemName: asString(meta.item_name ?? raw.item_id, 'Item'),
+        itemName: nestedLabel(raw, 'item', ['sku', 'code'], ['name'], 'Item'),
         quantity: asNumberString(raw.quantity),
         reservedFor: asString(raw.reserved_for_type ?? meta.reserved_for, 'Generic source'),
         sourceModule: asString(meta.source_module ?? raw.reserved_for_type, 'inventory'),
-        sourceReference: asString(meta.source_reference ?? raw.reserved_for_id, 'Reservation'),
+        sourceReference: asString(meta.source_reference, 'Reservation'),
         status: asStatus(raw.status, 'active'),
-        uom: asString(meta.uom_code ?? raw.transaction_uom_id, 'UOM'),
-        warehouse: asString(meta.warehouse_name ?? raw.warehouse_id, 'Warehouse'),
+        uom: uomLabel(raw, 'transaction_uom'),
+        warehouse: nestedLabel(raw, 'warehouse', ['code'], ['name'], 'Warehouse'),
     };
 }
 
 function normalizeTransferLine(raw: BackendRecord): StockTransferLine {
-    const meta = record(raw.metadata);
     return {
-        batchOrSerial: asString(meta.batch_or_serial ?? raw.batch_id ?? raw.serial_id, 'None'),
+        batchOrSerial: batchSerialLabel(raw),
         id: asString(raw.id),
-        itemName: asString(meta.item_name ?? raw.item_id, 'Item'),
+        itemName: nestedLabel(raw, 'item', ['sku', 'code'], ['name'], 'Item'),
         requestedQuantity: asNumberString(raw.quantity),
-        uom: asString(meta.uom_code ?? raw.uom_id, 'UOM'),
+        uom: uomLabel(raw, 'uom'),
     };
 }
 
 function normalizeTransfer(raw: BackendRecord, lines: StockTransferLine[] = []): StockTransfer {
-    const meta = record(raw.metadata);
     return {
-        destinationLocation: asString(meta.to_location_name ?? raw.to_location_id, 'Destination'),
-        destinationWarehouse: asString(meta.to_warehouse_name ?? raw.to_warehouse_id, 'Warehouse'),
+        destinationLocation: nestedLabel(raw, 'to_location', ['code'], ['name'], 'Destination'),
+        destinationWarehouse: nestedLabel(raw, 'to_warehouse', ['code'], ['name'], 'Warehouse'),
         id: asString(raw.id),
         lines,
         reason: asString(raw.notes, 'Transfer'),
-        sourceLocation: asString(meta.from_location_name ?? raw.from_location_id, 'Source'),
-        sourceWarehouse: asString(meta.from_warehouse_name ?? raw.from_warehouse_id, 'Warehouse'),
+        sourceLocation: nestedLabel(raw, 'from_location', ['code'], ['name'], 'Source'),
+        sourceWarehouse: nestedLabel(raw, 'from_warehouse', ['code'], ['name'], 'Warehouse'),
         status: asStatus(raw.status, 'draft'),
         transferDate: asString(raw.transferred_at ?? raw.created_at).slice(0, 10),
-        transferNumber: asString(raw.reference_number, `TRF-${asString(raw.id)}`),
+        transferNumber: asString(raw.reference_number, 'Transfer'),
     };
 }
 
@@ -174,26 +211,25 @@ function normalizeAdjustmentLine(raw: BackendRecord): StockAdjustmentLine {
     const direction = asString(raw.direction, 'INCREASE').toUpperCase() === 'DECREASE' ? 'decrease' : 'increase';
     return {
         adjustmentType: direction,
-        batchOrSerial: asString(raw.batch_id ?? raw.serial_id, 'None'),
+        batchOrSerial: batchSerialLabel(raw),
         id: asString(raw.id),
-        itemName: asString(record(raw.metadata).item_name ?? raw.item_id, 'Item'),
+        itemName: nestedLabel(raw, 'item', ['sku', 'code'], ['name'], 'Item'),
         quantity: asNumberString(raw.adjustment_quantity),
         quantityImpact: asNumberString(raw.base_adjustment_quantity),
-        uom: asString(record(raw.metadata).uom_code ?? raw.transaction_uom_id, 'UOM'),
+        uom: uomLabel(raw, 'transaction_uom'),
     };
 }
 
 function normalizeAdjustment(raw: BackendRecord, lines: StockAdjustmentLine[] = []): StockAdjustment {
-    const meta = record(raw.metadata);
     return {
         adjustmentDate: asString(raw.approved_at ?? raw.counted_at ?? raw.created_at).slice(0, 10),
-        adjustmentNumber: asString(raw.reference_number, `ADJ-${asString(raw.id)}`),
+        adjustmentNumber: asString(raw.reference_number, 'Adjustment'),
         id: asString(raw.id),
         lines,
-        location: asString(meta.location_name ?? raw.location_id, 'Default'),
+        location: nestedLabel(raw, 'location', ['code'], ['name'], 'Default'),
         reason: asString(raw.reason, 'Adjustment'),
         status: asStatus(raw.status, 'draft'),
-        warehouse: asString(meta.warehouse_name ?? raw.warehouse_id, 'Warehouse'),
+        warehouse: nestedLabel(raw, 'warehouse', ['code'], ['name'], 'Warehouse'),
     };
 }
 
@@ -203,30 +239,40 @@ function normalizeBatch(raw: BackendRecord): InventoryBatch {
         batchNumber: asString(raw.batch_number),
         expiryDate: asString(raw.expiry_date),
         id: asString(raw.id),
-        itemName: asString(record(raw.metadata).item_name ?? raw.item_id, 'Item'),
-        location: asString(record(raw.metadata).location_name, 'Location'),
+        itemName: nestedLabel(raw, 'item', ['sku', 'code'], ['name'], 'Item'),
+        location: nestedLabel(raw, 'location', ['code'], ['name'], 'Location'),
         sourceReference: asString(record(raw.metadata).source_reference, 'Batch'),
         status: asStatus(raw.status, 'active'),
-        warehouse: asString(record(raw.metadata).warehouse_name, 'Warehouse'),
+        warehouse: nestedLabel(raw, 'warehouse', ['code'], ['name'], 'Warehouse'),
     };
 }
 
 function normalizeSerial(raw: BackendRecord): InventorySerial {
     return {
         id: asString(raw.id),
-        itemName: asString(record(raw.metadata).item_name ?? raw.item_id, 'Item'),
-        location: asString(record(raw.metadata).location_name ?? raw.current_location_id, 'Location'),
+        itemName: nestedLabel(raw, 'item', ['sku', 'code'], ['name'], 'Item'),
+        location: nestedLabel(raw, 'current_location', ['code'], ['name'], 'Location'),
         serialNumber: asString(raw.serial_number),
         sourceReference: asString(record(raw.metadata).source_reference, 'Serial'),
         status: asStatus(raw.status, 'available'),
-        warehouse: asString(record(raw.metadata).warehouse_name, 'Warehouse'),
+        warehouse: nestedLabel(raw, 'warehouse', ['code'], ['name'], 'Warehouse'),
     };
 }
 
 function normalizeSimple(raw: BackendRecord): InventoryAuditEntry {
     const meta = record(raw.metadata);
     return {
-        actor: asString(raw.performed_by ?? meta.actor, 'Backend'),
+        actor: asString(
+            raw.performed_by_user_label
+                ?? raw.approved_by_user_label
+                ?? raw.requested_by_user_label
+                ?? raw.reserved_by_user_label
+                ?? raw.released_by_user_label
+                ?? raw.counted_by_user_label
+                ?? raw.inspected_by_user_label
+                ?? meta.actor,
+            'System',
+        ),
         description: asString(meta.description ?? raw.action_type, 'Inventory activity'),
         id: asString(raw.id),
         time: asString(raw.performed_at ?? raw.created_at),
@@ -235,14 +281,13 @@ function normalizeSimple(raw: BackendRecord): InventoryAuditEntry {
 }
 
 function normalizeCostLayer(raw: BackendRecord): CostLayer {
-    const meta = record(raw.metadata);
     return {
         id: asString(raw.id),
-        itemName: asString(meta.item_name ?? raw.item_id, 'Item'),
+        itemName: nestedLabel(raw, 'item', ['sku', 'code'], ['name'], 'Item'),
         layerDate: asString(raw.layer_date),
         quantity: asNumberString(raw.quantity_in),
         remainingQuantity: asNumberString(raw.quantity_remaining),
-        sourceReference: asString(meta.source_reference ?? raw.reference_id, 'Cost layer'),
+        sourceReference: asString(record(raw.metadata).source_reference, 'Cost layer'),
         unitCost: asNumberString(raw.unit_cost),
     };
 }
@@ -252,21 +297,21 @@ function normalizeValuation(raw: BackendRecord): InventoryValuation {
     const unitCost = Number(raw.unit_cost ?? 0);
     return {
         id: asString(raw.id),
-        itemName: asString(record(raw.metadata).item_name ?? raw.item_id, 'Item'),
+        itemName: nestedLabel(raw, 'item', ['sku', 'code'], ['name'], 'Item'),
         latestCostLayer: asString(raw.layer_date),
         quantity: asNumberString(quantity),
         totalValue: asNumberString(quantity * unitCost),
         unitCost: asNumberString(unitCost),
         updatedAt: asString(raw.updated_at),
         valuationMethod: asString(raw.valuation_method, 'weighted_average'),
-        warehouse: asString(record(raw.metadata).warehouse_name ?? raw.warehouse_id, 'Warehouse'),
+        warehouse: nestedLabel(raw, 'warehouse', ['code'], ['name'], 'Warehouse'),
     };
 }
 
 function normalizeLookup(raw: BackendRecord): InventoryLookupOption {
     return {
         id: asString(raw.id),
-        label: asString(raw.name ?? raw.display_name ?? raw.sku ?? raw.code ?? raw.id),
+        label: asString(raw.name ?? raw.display_name ?? raw.sku ?? raw.code, 'Unnamed option'),
         secondary: asString(raw.code ?? raw.sku ?? raw.symbol),
     };
 }
@@ -276,8 +321,10 @@ function transferPayload(input: StockTransferFormInput): BackendRecord {
         from_location_id: numberOrUndefined(input.fromLocationId),
         from_warehouse_id: Number(input.fromWarehouseId),
         lines: input.lines.map((line) => ({
+            batch_id: numberOrUndefined(line.batchId),
             item_id: Number(line.itemId),
             quantity: line.quantity,
+            serial_id: numberOrUndefined(line.serialId),
             to_location_id: numberOrUndefined(line.toLocationId ?? input.toLocationId),
             uom_id: Number(line.uomId),
         })),
@@ -285,6 +332,7 @@ function transferPayload(input: StockTransferFormInput): BackendRecord {
         reference_number: input.referenceNumber || `TRF-${Date.now()}`,
         requested_by: userId(),
         status: input.status ?? 'DRAFT',
+        transferred_at: input.transferDate || undefined,
         to_location_id: numberOrUndefined(input.toLocationId),
         to_warehouse_id: Number(input.toWarehouseId),
     });
@@ -293,10 +341,13 @@ function transferPayload(input: StockTransferFormInput): BackendRecord {
 function adjustmentPayload(input: StockAdjustmentFormInput): BackendRecord {
     return contextPayload({
         counted_by: userId(),
+        counted_at: input.adjustmentDate || undefined,
         lines: input.lines.map((line) => ({
             adjustment_quantity: line.adjustmentQuantity,
+            batch_id: numberOrUndefined(line.batchId),
             direction: line.direction,
             item_id: Number(line.itemId),
+            serial_id: numberOrUndefined(line.serialId),
             uom_id: Number(line.uomId),
         })),
         location_id: numberOrUndefined(input.locationId),
@@ -357,14 +408,14 @@ export const inventoryApi = {
     listAdjustments: async (): Promise<ApiCollectionResponse<StockAdjustment>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/stock-adjustments', { query: contextQuery() }), (row) => normalizeAdjustment(row)),
     listBatches: async (): Promise<ApiCollectionResponse<InventoryBatch>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/batches', { query: contextQuery() }), normalizeBatch),
     listCycleCounts: async (): Promise<ApiCollectionResponse<CycleCount>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/cycle-count-headers', { query: contextQuery() }), (raw) => ({
-        countNumber: asString(raw.count_number ?? raw.reference_number, `COUNT-${asString(raw.id)}`),
+        countNumber: asString(raw.count_number ?? raw.reference_number, 'Cycle count'),
         countedDate: asString(raw.counted_at),
         id: asString(raw.id),
-        lineSummary: asString(raw.line_count, 'Backend lines'),
+        lineSummary: asString(raw.line_count, 'No line summary'),
         scheduledDate: asString(raw.scheduled_at ?? raw.created_at).slice(0, 10),
         status: asStatus(raw.status, 'draft'),
-        variance: asString(raw.variance_summary, 'Backend variance'),
-        warehouse: asString(record(raw.metadata).warehouse_name ?? raw.warehouse_id, 'Warehouse'),
+        variance: asString(raw.variance_summary, 'No variance recorded'),
+        warehouse: nestedLabel(raw, 'warehouse', ['code'], ['name'], 'Warehouse'),
     })),
     listDashboardMetrics: async (): Promise<ApiCollectionResponse<{ label: string; status: string; value: string }>> => {
         const [levels, movements, reservations, transfers, adjustments, layers] = await Promise.all([
@@ -390,31 +441,31 @@ export const inventoryApi = {
     listLocations: async (): Promise<ApiCollectionResponse<InventoryLookupOption>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/warehouse/warehouse-locations', { query: contextQuery() }), normalizeLookup),
     listPickingTasks: async (): Promise<ApiCollectionResponse<PickingTask>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/picking-tasks', { query: contextQuery() }), (raw) => ({
         id: asString(raw.id),
-        itemName: asString(record(raw.metadata).item_name ?? raw.item_id, 'Item'),
+        itemName: nestedLabel(raw, 'item', ['sku', 'code'], ['name'], 'Item'),
         quantity: asNumberString(raw.quantity),
-        sourceReference: asString(raw.source_reference ?? raw.reference_id, 'Source'),
+        sourceReference: asString(raw.source_reference, 'Source'),
         status: asStatus(raw.status, 'draft'),
-        warehouse: asString(record(raw.metadata).warehouse_name ?? raw.source_warehouse_id, 'Warehouse'),
+        warehouse: nestedLabel(raw, 'source_warehouse', ['code'], ['name'], 'Warehouse'),
     })),
     listPutAwayTasks: async (): Promise<ApiCollectionResponse<PutAwayTask>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/put-away-tasks', { query: contextQuery() }), (raw) => ({
-        destinationLocation: asString(raw.target_location_id, 'Location'),
+        destinationLocation: nestedLabel(raw, 'target_location', ['code'], ['name'], 'Location'),
         id: asString(raw.id),
-        itemName: asString(record(raw.metadata).item_name ?? raw.item_id, 'Item'),
+        itemName: nestedLabel(raw, 'item', ['sku', 'code'], ['name'], 'Item'),
         quantity: asNumberString(raw.quantity),
-        sourceReference: asString(raw.source_reference ?? raw.reference_id, 'Source'),
+        sourceReference: asString(raw.source_reference, 'Source'),
         status: asStatus(raw.status, 'draft'),
     })),
     listReceiptInspections: async (): Promise<ApiCollectionResponse<ReceiptInspection>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/receipt-inspections', { query: contextQuery() }), (raw) => ({
         id: asString(raw.id),
-        inspectionNumber: asString(raw.inspection_number ?? raw.reference_number, `INSP-${asString(raw.id)}`),
-        itemName: asString(record(raw.metadata).item_name ?? raw.item_id, 'Item'),
+        inspectionNumber: asString(raw.inspection_number ?? raw.reference_number, 'Inspection'),
+        itemName: nestedLabel(raw, 'item', ['sku', 'code'], ['name'], 'Item'),
         result: asString(raw.result, 'pending'),
-        sourceReference: asString(raw.source_reference ?? raw.reference_id, 'Source'),
+        sourceReference: asString(raw.source_reference, 'Source'),
         status: asStatus(raw.status, 'draft'),
     })),
     listReservations: async (): Promise<ApiCollectionResponse<StockReservation>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/stock-reservations', { query: contextQuery() }), normalizeReservation),
     listSerials: async (): Promise<ApiCollectionResponse<InventorySerial>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/serials', { query: contextQuery() }), normalizeSerial),
-    listStockLevels: async (): Promise<ApiCollectionResponse<StockLevel>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/stock-levels', { query: contextQuery() }), normalizeStockLevel),
+    listStockLevels: async (query: InventoryListQuery = {}): Promise<ApiCollectionResponse<StockLevel>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/stock-levels', { query: contextQuery(query) }), normalizeStockLevel),
     listStockMovements: async (): Promise<ApiCollectionResponse<StockMovement>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/stock-movements', { query: contextQuery() }), normalizeMovement),
     listTransferLines: async (): Promise<ApiCollectionResponse<StockTransferLine[] & StockTransferLine>> => {
         const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/stock-transfer-lines', { query: contextQuery() });
@@ -429,8 +480,14 @@ export const inventoryApi = {
         const response = await httpClient<ApiPreviewResponse<StockAvailabilityPreviewRequest, StockAvailabilityPreviewResult['calculated']>>('/api/inventory/engines/stock-availability/preview', {
             body: contextPayload({
                 item_id: Number(input.itemId),
+                batch_id: numberOrUndefined(input.batchId),
                 location_id: numberOrUndefined(input.location),
                 quantity: input.quantity,
+                serial_id: numberOrUndefined(input.serialId),
+                source_id: numberOrUndefined(input.sourceId),
+                source_module: input.sourceModule || undefined,
+                source_reference: input.sourceReference || undefined,
+                source_type: input.sourceType || undefined,
                 uom_id: numberOrUndefined(input.uom),
                 warehouse_id: numberOrUndefined(input.warehouse),
             }),

@@ -16,11 +16,11 @@ final class StockLevelResource extends JsonResource
     public function toArray(Request $request): array
     {
         if ($this->resource instanceof DataRecord) {
-            return $this->resource->toArray();
+            return InventoryResourceLabels::enrich($this->resource->toArray());
         }
 
         if (is_array($this->resource)) {
-            return $this->resource;
+            return InventoryResourceLabels::enrich($this->resource);
         }
 
         return [];
