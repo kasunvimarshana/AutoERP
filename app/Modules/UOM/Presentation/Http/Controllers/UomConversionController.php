@@ -94,6 +94,16 @@ final class UomConversionController extends Controller
         return new UomConversionResource($result->valueOrFail());
     }
 
+    public function activate(int|string $id): JsonResponse|UomConversionResource
+    {
+        return $this->changeActiveState($id, true);
+    }
+
+    public function deactivate(int|string $id): JsonResponse|UomConversionResource
+    {
+        return $this->changeActiveState($id, false);
+    }
+
     public function destroy(int|string $id): JsonResponse
     {
         $result = $this->deleteService->execute($id);
@@ -103,5 +113,19 @@ final class UomConversionController extends Controller
         }
 
         return response()->json(null, 204);
+    }
+
+    private function changeActiveState(int|string $id, bool $isActive): JsonResponse|UomConversionResource
+    {
+        $result = $this->updateService->execute($id, ['is_active' => $isActive]);
+
+        if ($result->isFailure()) {
+            $error = $result->errorOrFail();
+            $status = $error->code === UomErrorCode::NOT_FOUND ? 404 : 422;
+
+            return response()->json(['message' => $error->message], $status);
+        }
+
+        return new UomConversionResource($result->valueOrFail());
     }
 }

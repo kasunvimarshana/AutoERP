@@ -73,6 +73,22 @@ final class UomCrudEndpointTest extends TestCase
             ->assertJsonPath('data.name', 'Test Unit Updated')
             ->assertJsonPath('data.is_active', false);
 
+        $this->withHeaders($headers)
+            ->patchJson('/api/uom/units-of-measure/'.$unitId.'/activate')
+            ->assertOk()
+            ->assertJsonPath('data.is_active', true);
+
+        $this->withHeaders($headers)
+            ->getJson('/api/uom/units-of-measure/'.$unitId.'/usage')
+            ->assertOk()
+            ->assertJsonPath('data.unit_id', $unitId)
+            ->assertJsonStructure(['data' => ['counts' => ['items', 'inventory', 'pricing', 'purchase', 'sales', 'service', 'rental', 'conversions_from', 'conversions_to']]]);
+
+        $this->withHeaders($headers)
+            ->getJson('/api/uom/categories')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', 'UNIT');
+
         $createConversion = $this->withHeaders($headers)->postJson('/api/uom/uom-conversions', [
             'from_uom_id' => $unitId,
             'to_uom_id' => $pcsId,
@@ -109,6 +125,16 @@ final class UomCrudEndpointTest extends TestCase
             ])
             ->assertOk()
             ->assertJsonPath('data.factor', '4.00000000')
+            ->assertJsonPath('data.is_active', false);
+
+        $this->withHeaders($headers)
+            ->patchJson('/api/uom/uom-conversions/'.$conversionId.'/activate')
+            ->assertOk()
+            ->assertJsonPath('data.is_active', true);
+
+        $this->withHeaders($headers)
+            ->patchJson('/api/uom/uom-conversions/'.$conversionId.'/deactivate')
+            ->assertOk()
             ->assertJsonPath('data.is_active', false);
     }
 

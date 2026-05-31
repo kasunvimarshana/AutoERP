@@ -6,6 +6,7 @@ namespace Modules\UOM\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Modules\UOM\Application\Contracts\Services\UomConversionServiceInterface;
+use Modules\UOM\Application\Contracts\Services\UomUsageSummaryServiceInterface;
 use Modules\UOM\Application\Contracts\UseCases\UnitOfMeasures\CreateUnitOfMeasureServiceInterface;
 use Modules\UOM\Application\Contracts\UseCases\UnitOfMeasures\DeleteUnitOfMeasureServiceInterface;
 use Modules\UOM\Application\Contracts\UseCases\UnitOfMeasures\GetUnitOfMeasureServiceInterface;
@@ -33,6 +34,7 @@ use Modules\UOM\Infrastructure\Persistence\Eloquent\Models\UnitOfMeasureModel;
 use Modules\UOM\Infrastructure\Persistence\Eloquent\Models\UomConversionModel;
 use Modules\UOM\Infrastructure\Persistence\Eloquent\Repositories\EloquentUnitOfMeasureRepository;
 use Modules\UOM\Infrastructure\Persistence\Eloquent\Repositories\EloquentUomConversionRepository;
+use Modules\UOM\Infrastructure\Services\DatabaseUomUsageSummaryService;
 
 final class UomServiceProvider extends ServiceProvider
 {
@@ -51,6 +53,7 @@ final class UomServiceProvider extends ServiceProvider
 
         // Reusable conversion service
         $this->app->singleton(UomConversionServiceInterface::class, UomConversionService::class);
+        $this->app->singleton(UomUsageSummaryServiceInterface::class, DatabaseUomUsageSummaryService::class);
 
         // Use case bindings
         foreach (

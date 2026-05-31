@@ -9,11 +9,13 @@ import { Card } from '../../../shared/components/ui/Card';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Select } from '../../../shared/components/ui/Select';
 import { uomApi } from '../services/uomApi';
-import type { UomUnit } from '../types/uom.types';
+import type { UomCategory, UomUnit } from '../types/uom.types';
 
 export function UomUnitListPage() {
     const [units, setUnits] = useState<UomUnit[]>([]);
+    const [categories, setCategories] = useState<UomCategory[]>([]);
     const [query, setQuery] = useState('');
+    const [role, setRole] = useState('');
     const [type, setType] = useState('');
     const [status, setStatus] = useState('');
     const [error, setError] = useState('');
@@ -21,8 +23,13 @@ export function UomUnitListPage() {
 
     useEffect(() => {
         let mounted = true;
-        uomApi.listUnits()
-            .then((response) => { if (mounted) setUnits(response.data); })
+        Promise.all([uomApi.listUnits(), uomApi.listCategories()])
+            .then(([unitResponse, categoryResponse]) => {
+                if (mounted) {
+                    setUnits(unitResponse.data);
+                    setCategories(categoryResponse.data);
+                }
+            })
             .catch((caught: unknown) => { if (mounted) setError(caught instanceof Error ? caught.message : 'Unable to load UOM units.'); })
             .finally(() => { if (mounted) setIsLoading(false); });
         return () => { mounted = false; };
@@ -32,9 +39,10 @@ export function UomUnitListPage() {
         const q = query.trim().toLowerCase();
         return units.filter((unit) => {
             const matchesQuery = q ? [unit.code, unit.name, unit.symbol, unit.category].some((value) => value.toLowerCase().includes(q)) : true;
-            return matchesQuery && (!type || unit.type === type) && (!status || unit.status === status);
+            const matchesRole = role ? (role === 'base' ? unit.isBase : !unit.isBase) : true;
+            return matchesQuery && matchesRole && (!type || unit.type === type) && (!status || unit.status === status);
         });
-    }, [query, status, type, units]);
+    }, [query, role, status, type, units]);
 
     return (
         <div className="space-y-6">
@@ -43,14 +51,14 @@ export function UomUnitListPage() {
                 {[
                     ['Units loaded', String(units.length), 'Backend records'],
                     ['Base units', String(units.filter((unit) => unit.isBase).length), 'Category base units'],
-                    ['Conversion logic', 'Backend-owned', 'No frontend quantity conversion'],
+                    ['Conversion previews', 'API', 'No frontend quantity conversion'],
                 ].map(([label, value, helper]) => <Card className="p-5" key={label}><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-2xl font-bold text-slate-950">{value}</p><p className="mt-1 text-xs text-slate-400">{helper}</p></Card>)}
             </div>
-            <SearchFilterBar onSearch={setQuery} placeholder="Search unit code, name, symbol, category..." />
+            <SearchFilterBar onSearch={setQuery} />
             <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-3">
-                <Select onChange={(event) => setType(event.target.value)} options={[{ label: 'Unit / Count', value: 'UNIT' }, { label: 'Volume', value: 'VOLUME' }, { label: 'Mass', value: 'MASS' }, { label: 'Time', value: 'TIME' }, { label: 'Distance', value: 'DISTANCE' }]} placeholder="All categories" value={type} />
-                <Select onChange={(event) => setStatus(event.target.value)} options={[{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }]} placeholder="All statuses" value={status} />
-                <Select options={[{ label: 'Base units', value: 'base' }, { label: 'Conversion units', value: 'conversion' }]} placeholder="All unit roles" />
+                <Select onChange={(event) => setType(event.target.value)} options={[{ label: 'All categories', value: '' }, ...categories.map((category) => ({ label: `${category.name} (${category.unitCount})`, value: category.type }))]} value={type} />
+                <Select onChange={(event) => setStatus(event.target.value)} options={[{ label: 'All statuses', value: '' }, { label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }]} value={status} />
+                <Select onChange={(event) => setRole(event.target.value)} options={[{ label: 'All unit roles', value: '' }, { label: 'Base units', value: 'base' }, { label: 'Conversion units', value: 'conversion' }]} value={role} />
             </div>
             {isLoading ? <EmptyState description="Loading UOM units..." title="Loading units" /> : null}
             {error ? <EmptyState description={error} title="UOM service unavailable" /> : null}

@@ -6,6 +6,7 @@ export type UomCategory = {
     id: string;
     name: string;
     type: UomUnitType;
+    unitCount: number;
 };
 
 export type UomUnit = {
@@ -68,13 +69,15 @@ export type UomConversionPreview = {
 };
 
 export type UomItemUsage = {
-    inventory: string;
-    items: string;
-    pricing: string;
-    purchase: string;
-    rental: string;
-    sales: string;
-    service: string;
+    conversionsFrom: number;
+    conversionsTo: number;
+    inventory: number;
+    items: number;
+    pricing: number;
+    purchase: number;
+    rental: number;
+    sales: number;
+    service: number;
 };
 
 export type UomAuditEntry = {
@@ -91,6 +94,7 @@ export type UomLookupOption = {
 
 export type UomUnitFormInput = {
     allowFractional: boolean;
+    category: UomUnitType;
     code: string;
     description: string;
     isBase: boolean;
@@ -107,6 +111,7 @@ export type UomUnitFormInput = {
 };
 
 export type UomConversionFormInput = {
+    category?: UomUnitType;
     effectiveFrom?: string;
     effectiveTo?: string;
     factor: string;

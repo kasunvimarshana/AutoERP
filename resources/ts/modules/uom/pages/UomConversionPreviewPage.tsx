@@ -73,10 +73,10 @@ export function UomConversionPreviewPage() {
             <form className="grid gap-5 xl:grid-cols-[1fr_340px]" onSubmit={handleSubmit}>
                 <FormSection title="Preview Input">
                     <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2"><Select name="from_unit_id" options={units.map((unit) => ({ label: `${unit.code} - ${unit.name}`, value: unit.id }))} placeholder="From unit" /><FieldError message={errors.from_uom_id?.[0]} /></div>
-                        <div className="space-y-2"><Select name="to_unit_id" options={units.map((unit) => ({ label: `${unit.code} - ${unit.name}`, value: unit.id }))} placeholder="To unit" /><FieldError message={errors.to_uom_id?.[0]} /></div>
-                        <div className="space-y-2"><Input defaultValue="1" min="0" name="quantity" placeholder="Quantity" type="number" /><FieldError message={errors.quantity?.[0]} /></div>
-                        <Select name="item_id" options={items.map((item) => ({ label: item.label, value: item.id }))} placeholder="Optional item" />
+                        <div className="space-y-2"><Select name="from_unit_id" options={[{ label: 'From unit', value: '' }, ...units.map((unit) => ({ label: `${unit.code} - ${unit.name}`, value: unit.id }))]} /><FieldError message={errors.from_uom_id?.[0]} /></div>
+                        <div className="space-y-2"><Select name="to_unit_id" options={[{ label: 'To unit', value: '' }, ...units.map((unit) => ({ label: `${unit.code} - ${unit.name}`, value: unit.id }))]} /><FieldError message={errors.to_uom_id?.[0]} /></div>
+                        <div className="space-y-2"><Input defaultValue="1" min="0" name="quantity" type="number" /><FieldError message={errors.quantity?.[0]} /></div>
+                        <Select name="item_id" options={[{ label: 'Optional item', value: '' }, ...items.map((item) => ({ label: item.label, value: item.id }))]} />
                     </div>
                     <div className="mt-5 flex justify-end"><Button disabled={isSubmitting} type="submit" variant="blue">{isSubmitting ? 'Previewing...' : 'Preview Conversion'}</Button></div>
                 </FormSection>

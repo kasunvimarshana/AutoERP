@@ -16,11 +16,17 @@ final class UomRoutesTest extends TestCase
         self::assertTrue(Route::has('uom.units-of-measure.show'));
         self::assertTrue(Route::has('uom.units-of-measure.update'));
         self::assertTrue(Route::has('uom.units-of-measure.destroy'));
+        self::assertTrue(Route::has('uom.units-of-measure.activate'));
+        self::assertTrue(Route::has('uom.units-of-measure.deactivate'));
+        self::assertTrue(Route::has('uom.units-of-measure.usage'));
+        self::assertTrue(Route::has('uom.categories.index'));
         self::assertTrue(Route::has('uom.uom-conversions.index'));
         self::assertTrue(Route::has('uom.uom-conversions.store'));
         self::assertTrue(Route::has('uom.uom-conversions.show'));
         self::assertTrue(Route::has('uom.uom-conversions.update'));
         self::assertTrue(Route::has('uom.uom-conversions.destroy'));
+        self::assertTrue(Route::has('uom.uom-conversions.activate'));
+        self::assertTrue(Route::has('uom.uom-conversions.deactivate'));
     }
 
     public function testUomRoutesUseContextMiddlewares(): void

@@ -10,6 +10,7 @@ import { FormSection } from '../../../shared/components/forms/FormSection';
 import { Button } from '../../../shared/components/ui/Button';
 import { Card } from '../../../shared/components/ui/Card';
 import { Checkbox } from '../../../shared/components/ui/Checkbox';
+import { ConfirmDialog } from '../../../shared/components/ui/ConfirmDialog';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Input } from '../../../shared/components/ui/Input';
 import { Select } from '../../../shared/components/ui/Select';
@@ -17,6 +18,7 @@ import { Textarea } from '../../../shared/components/ui/Textarea';
 import { uomApi } from '../services/uomApi';
 import type {
     UomAuditEntry,
+    UomCategory,
     UomConversion,
     UomConversionFormInput,
     UomConversionPreview,
@@ -52,7 +54,7 @@ function optionForUnit(unit: UomUnit) {
 }
 
 export function UomCompatibilityBadge({ compatible }: { compatible: boolean }) {
-    return <StatusBadge status={compatible ? 'Compatible' : 'Needs Backend Check'} />;
+    return <StatusBadge status={compatible ? 'Compatible' : 'Not Compatible'} />;
 }
 
 export function UomUnitSummaryCard({ unit }: { unit: UomUnit }) {
@@ -78,23 +80,68 @@ export function UomUnitSummaryCard({ unit }: { unit: UomUnit }) {
     );
 }
 
-export function UomConversionTable({ conversions }: { conversions: UomConversion[] }) {
+export function UomConversionTable({
+    conversions,
+    onStatusChange,
+}: {
+    conversions: UomConversion[];
+    onStatusChange?: (conversion: UomConversion) => Promise<void>;
+}) {
+    const [selected, setSelected] = useState<UomConversion | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+
+    async function confirmStatusChange() {
+        if (!selected || !onStatusChange) {
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            await onStatusChange(selected);
+            setSelected(null);
+        } finally {
+            setIsSaving(false);
+        }
+    }
+
     return (
-        <DataTable
-            columns={[
-                { header: 'From', key: 'fromUnitCode' },
-                { header: 'To', key: 'toUnitCode' },
-                { header: 'Factor', key: 'factor' },
-                { header: 'Category', key: 'category' },
-                { header: 'Item', key: 'itemName', render: (row) => row.itemName || 'General' },
-                { header: 'Direction', key: 'direction', render: (row) => <StatusBadge status={row.direction === 'bidirectional' ? 'Bidirectional' : 'One way'} /> },
-                { header: 'Status', key: 'isActive', render: (row) => <StatusBadge status={row.isActive ? 'Active' : 'Inactive'} /> },
-                { header: 'Updated', key: 'updatedAt' },
-                { header: 'Actions', key: 'actions', render: (row) => <Link className="font-semibold text-slate-950" to={`/uom/conversions/${row.id}/edit`}>Edit</Link> },
-            ]}
-            getRowKey={(row) => row.id}
-            rows={conversions}
-        />
+        <>
+            <DataTable
+                columns={[
+                    { header: 'From', key: 'fromUnitCode' },
+                    { header: 'To', key: 'toUnitCode' },
+                    { header: 'Factor', key: 'factor' },
+                    { header: 'Category', key: 'category' },
+                    { header: 'Item', key: 'itemName', render: (row) => row.itemName || 'General' },
+                    { header: 'Direction', key: 'direction', render: (row) => <StatusBadge status={row.direction === 'bidirectional' ? 'Bidirectional' : 'One way'} /> },
+                    { header: 'Status', key: 'isActive', render: (row) => <StatusBadge status={row.isActive ? 'Active' : 'Inactive'} /> },
+                    { header: 'Updated', key: 'updatedAt' },
+                    {
+                        header: 'Actions',
+                        key: 'actions',
+                        render: (row) => (
+                            <div className="flex flex-wrap gap-2">
+                                <Link className="font-semibold text-slate-950" to={`/uom/conversions/${row.id}/edit`}>Edit</Link>
+                                {onStatusChange ? (
+                                    <button className="font-semibold text-slate-500" onClick={() => setSelected(row)} type="button">
+                                        {row.isActive ? 'Deactivate' : 'Activate'}
+                                    </button>
+                                ) : null}
+                            </div>
+                        ),
+                    },
+                ]}
+                getRowKey={(row) => row.id}
+                rows={conversions}
+            />
+            <ConfirmDialog
+                message={`This will ${selected?.isActive ? 'deactivate' : 'activate'} the ${selected?.fromUnitCode ?? ''} to ${selected?.toUnitCode ?? ''} conversion.`}
+                onCancel={() => setSelected(null)}
+                onConfirm={confirmStatusChange}
+                open={selected !== null}
+                title={isSaving ? 'Updating conversion...' : 'Confirm conversion status'}
+            />
+        </>
     );
 }
 
@@ -110,6 +157,8 @@ export function UomPrecisionPanel({ unit }: { unit: UomUnit }) {
                 { label: 'Service', value: unit.usableForService ? 'Enabled' : 'Disabled' },
                 { label: 'Rental', value: unit.usableForRental ? 'Enabled' : 'Disabled' },
             ]}
+            status="Backend API"
+            subtitle="Unit precision and usage flags are stored by the UOM API."
             title="Unit Setup"
         />
     );
@@ -119,14 +168,18 @@ export function UomItemUsagePanel({ usage }: { usage: UomItemUsage }) {
     return (
         <PreviewPanel
             rows={[
-                { label: 'Items', value: usage.items },
-                { label: 'Inventory', value: usage.inventory },
-                { label: 'Purchase', value: usage.purchase },
-                { label: 'Sales', value: usage.sales },
-                { label: 'Service', value: usage.service },
-                { label: 'Rental', value: usage.rental },
-                { label: 'Pricing', value: usage.pricing },
+                { label: 'Item references', value: usage.items },
+                { label: 'Conversions from this unit', value: usage.conversionsFrom },
+                { label: 'Conversions to this unit', value: usage.conversionsTo },
+                { label: 'Inventory references', value: usage.inventory },
+                { label: 'Purchase references', value: usage.purchase },
+                { label: 'Sales references', value: usage.sales },
+                { label: 'Service references', value: usage.service },
+                { label: 'Rental references', value: usage.rental },
+                { label: 'Pricing references', value: usage.pricing },
             ]}
+            status="Backend API"
+            subtitle="Reference counts are read from tenant-scoped backend tables."
             title="UOM Usage"
         />
     );
@@ -134,7 +187,7 @@ export function UomItemUsagePanel({ usage }: { usage: UomItemUsage }) {
 
 export function UomActivityTimeline({ entries }: { entries: UomAuditEntry[] }) {
     if (!entries.length) {
-        return <EmptyState description="No UOM audit endpoint is exposed for this unit yet." title="No activity" />;
+        return <EmptyState description="No audit entries have been recorded for this unit." title="No activity" />;
     }
 
     return <AuditTimeline events={entries.map((entry) => ({ actor: entry.actor, description: entry.description, time: entry.time }))} />;
@@ -142,7 +195,7 @@ export function UomActivityTimeline({ entries }: { entries: UomAuditEntry[] }) {
 
 export function UomConversionPreviewPanel({ preview }: { preview?: UomConversionPreview }) {
     if (!preview) {
-        return <PreviewPanel rows={[{ label: 'Result', value: 'Run preview' }]} title="Conversion Preview" />;
+        return <PreviewPanel rows={[{ label: 'Result', value: 'Submit a quantity to request a backend conversion.' }]} status="Ready" subtitle="The conversion result appears after the API responds." title="Conversion Preview" />;
     }
 
     return (
@@ -155,8 +208,46 @@ export function UomConversionPreviewPanel({ preview }: { preview?: UomConversion
                 { label: 'Warnings', value: preview.warnings.length ? preview.warnings.join(', ') : 'None' },
                 { label: 'Errors', value: preview.errors.length ? preview.errors.join(', ') : 'None' },
             ]}
+            status="Backend API"
+            subtitle="Converted quantity, factor, and precision are returned by the UOM conversion endpoint."
             title="Conversion Preview"
         />
+    );
+}
+
+export function UomUnitStatusActions({ onChanged, unit }: { onChanged: (unit: UomUnit) => void; unit: UomUnit }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [error, setError] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+
+    async function confirmChange() {
+        setError('');
+        setIsSaving(true);
+        try {
+            const response = unit.isActive ? await uomApi.deactivateUnit(unit.id) : await uomApi.activateUnit(unit.id);
+            onChanged(response.data);
+            setIsOpen(false);
+        } catch (caught) {
+            setError(caught instanceof Error ? caught.message : 'Unable to update unit status.');
+        } finally {
+            setIsSaving(false);
+        }
+    }
+
+    return (
+        <div className="flex flex-wrap items-center justify-end gap-3">
+            {error ? <span className="text-sm font-medium text-red-600">{error}</span> : null}
+            <Button onClick={() => setIsOpen(true)} variant={unit.isActive ? 'danger' : 'secondary'}>
+                {unit.isActive ? 'Deactivate Unit' : 'Activate Unit'}
+            </Button>
+            <ConfirmDialog
+                message={`This will ${unit.isActive ? 'deactivate' : 'activate'} ${unit.code}. Existing references remain intact.`}
+                onCancel={() => setIsOpen(false)}
+                onConfirm={confirmChange}
+                open={isOpen}
+                title={isSaving ? 'Updating unit...' : 'Confirm unit status'}
+            />
+        </div>
     );
 }
 
@@ -175,6 +266,7 @@ export function UomUnitForm({ mode, unit }: { mode: 'create' | 'edit'; unit?: Uo
         const formData = new FormData(event.currentTarget);
         const input: UomUnitFormInput = {
             allowFractional: checked(formData, 'allow_fractional'),
+            category: String(formData.get('category') ?? 'UNIT') as UomUnitType,
             code: String(formData.get('code') ?? ''),
             description: String(formData.get('description') ?? ''),
             isBase: checked(formData, 'is_base'),
@@ -211,10 +303,11 @@ export function UomUnitForm({ mode, unit }: { mode: 'create' | 'edit'; unit?: Uo
                 {formError ? <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{formError}</div> : null}
                 <FormSection title="Basic Information">
                     <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2"><FieldLabel>Code</FieldLabel><Input defaultValue={unit?.code} name="code" placeholder="PCS" /><FieldError message={errors.code?.[0]} /></div>
-                        <div className="space-y-2"><FieldLabel>Name</FieldLabel><Input defaultValue={unit?.name} name="name" placeholder="Pieces" /><FieldError message={errors.name?.[0]} /></div>
-                        <div className="space-y-2"><FieldLabel>Symbol</FieldLabel><Input defaultValue={unit?.symbol} name="symbol" placeholder="pcs" /><FieldError message={errors.symbol?.[0]} /></div>
-                        <div className="space-y-2"><FieldLabel>Category</FieldLabel><Select defaultValue={unit?.type ?? 'UNIT'} name="type" options={typeOptions} /><FieldError message={errors.type?.[0] ?? errors.category?.[0]} /></div>
+                        <div className="space-y-2"><FieldLabel>Code</FieldLabel><Input defaultValue={unit?.code} name="code" /><FieldError message={errors.code?.[0]} /></div>
+                        <div className="space-y-2"><FieldLabel>Name</FieldLabel><Input defaultValue={unit?.name} name="name" /><FieldError message={errors.name?.[0]} /></div>
+                        <div className="space-y-2"><FieldLabel>Symbol</FieldLabel><Input defaultValue={unit?.symbol} name="symbol" /><FieldError message={errors.symbol?.[0]} /></div>
+                        <div className="space-y-2"><FieldLabel>Category</FieldLabel><Select defaultValue={unit?.category ?? 'UNIT'} name="category" options={typeOptions} /><FieldError message={errors.category?.[0]} /></div>
+                        <div className="space-y-2"><FieldLabel>Unit type</FieldLabel><Select defaultValue={unit?.type ?? 'UNIT'} name="type" options={typeOptions} /><FieldError message={errors.type?.[0]} /></div>
                         <div className="space-y-2"><FieldLabel>Status</FieldLabel><Select defaultValue={unit?.status ?? 'active'} name="status" options={[{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }]} /></div>
                         <div className="space-y-2"><FieldLabel>Decimal precision</FieldLabel><Input defaultValue={unit?.precision ?? 0} min="0" name="precision" type="number" /><FieldError message={errors.decimal_precision?.[0]} /></div>
                         <div className="space-y-2 md:col-span-2"><FieldLabel>Description</FieldLabel><Textarea defaultValue={unit?.description} name="description" /></div>
@@ -233,13 +326,24 @@ export function UomUnitForm({ mode, unit }: { mode: 'create' | 'edit'; unit?: Uo
                 </FormSection>
                 <div className="flex justify-end gap-3"><Link to="/uom/units"><Button variant="secondary">Cancel</Button></Link><Button disabled={isSubmitting} type="submit" variant="blue">{mode === 'edit' ? 'Update Unit' : 'Create Unit'}</Button></div>
             </div>
-            <PreviewPanel rows={[{ label: 'Conversions', value: 'Resolved by backend preview' }, { label: 'Rounding', value: 'Backend-owned' }, { label: 'Stock quantity effects', value: 'Backend-owned' }]} title="Backend Ownership" />
+            <PreviewPanel
+                rows={[
+                    { label: 'Unit category', value: unit?.type ?? 'Selected on save' },
+                    { label: 'Precision', value: unit?.precision ?? 'Validated on save' },
+                    { label: 'Conversion result', value: 'Available from /uom/convert' },
+                    { label: 'Reference counts', value: mode === 'edit' ? 'Available on detail page' : 'Available after creation' },
+                ]}
+                status="Backend API"
+                subtitle="This form persists UOM setup; conversion math is requested from the API."
+                title="UOM Setup"
+            />
         </form>
     );
 }
 
 export function UomConversionForm({ conversion, mode }: { conversion?: UomConversion; mode: 'create' | 'edit' }) {
     const navigate = useNavigate();
+    const [categories, setCategories] = useState<UomCategory[]>([]);
     const [units, setUnits] = useState<UomUnit[]>([]);
     const [items, setItems] = useState<UomLookupOption[]>([]);
     const [errors, setErrors] = useState<Record<string, string[]>>({});
@@ -250,11 +354,12 @@ export function UomConversionForm({ conversion, mode }: { conversion?: UomConver
 
     useEffect(() => {
         let mounted = true;
-        Promise.all([uomApi.listUnits(), uomApi.listItemOptions()])
-            .then(([unitResponse, itemResponse]) => {
+        Promise.all([uomApi.listUnits(), uomApi.listItemOptions(), uomApi.listCategories()])
+            .then(([unitResponse, itemResponse, categoryResponse]) => {
                 if (mounted) {
                     setUnits(unitResponse.data);
                     setItems(itemResponse.data);
+                    setCategories(categoryResponse.data);
                 }
             })
             .catch((error: unknown) => setFormError(error instanceof Error ? error.message : 'Unable to load UOM lookups.'))
@@ -268,6 +373,7 @@ export function UomConversionForm({ conversion, mode }: { conversion?: UomConver
         const isItemSpecific = checked(formData, 'is_item_specific');
 
         return {
+            category: String(formData.get('category') ?? '') as UomUnitType,
             effectiveFrom: String(formData.get('effective_from') ?? ''),
             effectiveTo: String(formData.get('effective_to') ?? ''),
             factor: String(formData.get('factor') ?? ''),
@@ -336,11 +442,12 @@ export function UomConversionForm({ conversion, mode }: { conversion?: UomConver
                 {formError ? <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{formError}</div> : null}
                 <FormSection title="Conversion Details">
                     <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2"><FieldLabel>From unit</FieldLabel><Select defaultValue={conversion?.fromUnitId} name="from_unit_id" options={units.map(optionForUnit)} placeholder="Select unit" /><FieldError message={errors.from_uom_id?.[0]} /></div>
-                        <div className="space-y-2"><FieldLabel>To unit</FieldLabel><Select defaultValue={conversion?.toUnitId} name="to_unit_id" options={units.map(optionForUnit)} placeholder="Select unit" /><FieldError message={errors.to_uom_id?.[0]} /></div>
-                        <div className="space-y-2"><FieldLabel>Conversion factor</FieldLabel><Input defaultValue={conversion?.factor} name="factor" placeholder="12" /><FieldError message={errors.factor?.[0]} /></div>
+                        <div className="space-y-2"><FieldLabel>From unit</FieldLabel><Select defaultValue={conversion?.fromUnitId ?? ''} name="from_unit_id" options={[{ label: 'Select unit', value: '' }, ...units.map(optionForUnit)]} /><FieldError message={errors.from_uom_id?.[0]} /></div>
+                        <div className="space-y-2"><FieldLabel>To unit</FieldLabel><Select defaultValue={conversion?.toUnitId ?? ''} name="to_unit_id" options={[{ label: 'Select unit', value: '' }, ...units.map(optionForUnit)]} /><FieldError message={errors.to_uom_id?.[0]} /></div>
+                        <div className="space-y-2"><FieldLabel>Category</FieldLabel><Select defaultValue={conversion?.category ?? ''} name="category" options={[{ label: 'Use source unit category', value: '' }, ...categories.map((category) => ({ label: category.name, value: category.type }))]} /><FieldError message={errors.category?.[0]} /></div>
+                        <div className="space-y-2"><FieldLabel>Conversion factor</FieldLabel><Input defaultValue={conversion?.factor} name="factor" /><FieldError message={errors.factor?.[0]} /></div>
                         <div className="space-y-2"><FieldLabel>Preview quantity</FieldLabel><Input defaultValue="1" min="0" name="quantity" type="number" /></div>
-                        <div className="space-y-2"><FieldLabel>Optional item</FieldLabel><Select defaultValue={conversion?.itemId} name="item_id" options={items.map((item) => ({ label: item.label, value: item.id }))} placeholder="General conversion" /><FieldError message={errors.item_id?.[0]} /></div>
+                        <div className="space-y-2"><FieldLabel>Optional item</FieldLabel><Select defaultValue={conversion?.itemId ?? ''} name="item_id" options={[{ label: 'General conversion', value: '' }, ...items.map((item) => ({ label: item.label, value: item.id }))]} /><FieldError message={errors.item_id?.[0]} /></div>
                         <div className="space-y-2"><FieldLabel>Effective from</FieldLabel><Input defaultValue={conversion?.effectiveFrom} name="effective_from" type="date" /></div>
                         <div className="space-y-2"><FieldLabel>Effective to</FieldLabel><Input defaultValue={conversion?.effectiveTo} name="effective_to" type="date" /><FieldError message={errors.effective_to?.[0]} /></div>
                         <div className="space-y-2 md:col-span-2"><FieldLabel>Notes</FieldLabel><Textarea defaultValue={conversion?.notes} name="notes" /></div>

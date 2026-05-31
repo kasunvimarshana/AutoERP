@@ -26,6 +26,22 @@ Route::prefix('api/uom')
     ->name('uom.')
     ->group(function (): void {
         Route::post('convert', ConvertUomController::class)->name('convert');
+        Route::get('categories', [UnitOfMeasureController::class, 'categories'])->name('categories.index');
+        Route::get('units-of-measure/{units_of_measure}/usage', [UnitOfMeasureController::class, 'usage'])
+            ->whereNumber('units_of_measure')
+            ->name('units-of-measure.usage');
+        Route::patch('units-of-measure/{units_of_measure}/activate', [UnitOfMeasureController::class, 'activate'])
+            ->whereNumber('units_of_measure')
+            ->name('units-of-measure.activate');
+        Route::patch('units-of-measure/{units_of_measure}/deactivate', [UnitOfMeasureController::class, 'deactivate'])
+            ->whereNumber('units_of_measure')
+            ->name('units-of-measure.deactivate');
+        Route::patch('uom-conversions/{uom_conversion}/activate', [UomConversionController::class, 'activate'])
+            ->whereNumber('uom_conversion')
+            ->name('uom-conversions.activate');
+        Route::patch('uom-conversions/{uom_conversion}/deactivate', [UomConversionController::class, 'deactivate'])
+            ->whereNumber('uom_conversion')
+            ->name('uom-conversions.deactivate');
         Route::apiResource('units-of-measure', UnitOfMeasureController::class);
         Route::apiResource('uom-conversions', UomConversionController::class);
     });
