@@ -10,9 +10,8 @@ import { Input } from '../../../shared/components/ui/Input';
 import { Select } from '../../../shared/components/ui/Select';
 import { Textarea } from '../../../shared/components/ui/Textarea';
 import { DocumentPreviewPanel, DocumentSequencePanel, DocumentWorkflowPanel } from '../components/DocumentComponents';
-import { documentDefinitions } from '../mock/documentMock';
 import { documentApi } from '../services/documentApi';
-import type { DocumentPreviewResult, DocumentSequence, DocumentWorkflow } from '../types/document.types';
+import type { DocumentDefinition, DocumentPreviewInput, DocumentPreviewRendered, DocumentSequence, DocumentWorkflow } from '../types/document.types';
 
 export function DocumentWorkflowListPage() {
     const [rows, setRows] = useState<DocumentWorkflow[]>([]);
@@ -65,34 +64,39 @@ export function DocumentSequenceListPage() {
 }
 
 export function DocumentPreviewPage() {
-    const [preview, setPreview] = useState<DocumentPreviewResult | undefined>();
+    const [definitions, setDefinitions] = useState<DocumentDefinition[]>([]);
+    const [preview, setPreview] = useState<DocumentPreviewRendered | undefined>();
+    const [breakdown, setBreakdown] = useState<Array<{ label: string; value: string }>>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+
+    useEffect(() => {
+        let mounted = true;
+        documentApi.listDefinitions().then((response) => { if (mounted) setDefinitions(response.data); });
+        return () => { mounted = false; };
+    }, []);
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         setIsLoading(true);
         setError('');
         const formData = new FormData(event.currentTarget);
-        const input: DocumentPreviewResult['input'] = {
+        const input: DocumentPreviewInput = {
             definitionId: String(formData.get('definition_id') ?? ''),
             metadata: {
+                body: String(formData.get('notes') ?? ''),
                 sample_reference: String(formData.get('sample_reference') ?? ''),
-                notes: String(formData.get('notes') ?? ''),
+                title: String(formData.get('sample_reference') ?? ''),
             },
             sourceId: String(formData.get('source_id') ?? ''),
             sourceModule: String(formData.get('source_module') ?? 'sales'),
+            sourceReference: String(formData.get('sample_reference') ?? ''),
         };
 
         try {
-            const response = await documentApi.renderDocumentPreview(input);
-            setPreview({
-                breakdown: response.breakdown.map((row) => ({ label: String(row.label ?? 'Step'), value: String(row.value ?? '') })),
-                errors: response.errors,
-                input,
-                rendered: response.calculated,
-                warnings: response.warnings,
-            });
+            const response = await documentApi.previewDocument(input);
+            setPreview(response.calculated);
+            setBreakdown(response.breakdown.map((row) => ({ label: String(row.label ?? 'Step'), value: String(row.value ?? '') })));
         } catch (caught) {
             setError(caught instanceof Error ? caught.message : 'Unable to render document preview.');
         } finally {
@@ -102,24 +106,24 @@ export function DocumentPreviewPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader eyebrow="Document Preview" subtitle="Choose a definition and sample source. Backend/mock returns the rendered preview, number preview, template, warnings, and errors." title="Preview Document" />
+            <PageHeader eyebrow="Document Preview" subtitle="Choose a definition and source context. The Document API returns rendered preview output." title="Preview Document" />
             <form className="grid gap-5 xl:grid-cols-[1fr_420px]" onSubmit={handleSubmit}>
                 <div className="space-y-5">
                     {error ? <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</div> : null}
                     <FormSection description="No official rendering happens in the frontend. This form only sends preview input." title="Preview Inputs">
                         <div className="grid gap-4 md:grid-cols-2">
-                            <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wide text-slate-500">Definition</label><Select name="definition_id" options={documentDefinitions.map((definition) => ({ label: definition.name, value: definition.id }))} /></div>
+                            <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wide text-slate-500">Definition</label><Select name="definition_id" options={definitions.map((definition) => ({ label: definition.name, value: definition.id }))} /></div>
                             <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wide text-slate-500">Source module</label><Select name="source_module" options={[{ label: 'Sales', value: 'sales' }, { label: 'Purchase', value: 'purchase' }, { label: 'Vehicle Service', value: 'vehicle_service' }, { label: 'Vehicle Rental', value: 'vehicle_rental' }, { label: 'Voucher', value: 'voucher' }]} /></div>
-                            <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wide text-slate-500">Source id</label><Input name="source_id" placeholder="Source record id" /></div>
-                            <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wide text-slate-500">Sample reference</label><Input name="sample_reference" placeholder="SO-2026-000219" /></div>
-                            <div className="space-y-2 md:col-span-2"><label className="text-xs font-bold uppercase tracking-wide text-slate-500">Sample metadata</label><Textarea name="notes" placeholder="Sample note or metadata for preview" /></div>
+                            <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wide text-slate-500">Source id</label><Input name="source_id" /></div>
+                            <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-wide text-slate-500">Sample reference</label><Input name="sample_reference" /></div>
+                            <div className="space-y-2 md:col-span-2"><label className="text-xs font-bold uppercase tracking-wide text-slate-500">Sample metadata</label><Textarea name="notes" /></div>
                         </div>
                     </FormSection>
                     <div className="flex justify-end"><Button disabled={isLoading} type="submit" variant="blue">{isLoading ? 'Rendering...' : 'Preview Document'}</Button></div>
                 </div>
-                <DocumentPreviewPanel preview={preview} />
+                <DocumentPreviewPanel rendered={preview} />
             </form>
-            {preview ? <PreviewPanel rows={preview.breakdown.map((row) => ({ label: row.label, value: row.value }))} title="Preview Breakdown" /> : <Card className="p-5"><p className="text-sm text-slate-500">Preview output will appear after backend/mock rendering.</p></Card>}
+            {preview ? <PreviewPanel rows={breakdown} title="Preview Breakdown" /> : <Card className="p-5"><p className="text-sm text-slate-500">Preview output will appear after backend rendering.</p></Card>}
         </div>
     );
 }

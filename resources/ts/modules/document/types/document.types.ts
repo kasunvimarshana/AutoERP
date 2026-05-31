@@ -1,6 +1,7 @@
-export type DocumentStatus = 'draft' | 'submitted' | 'approved' | 'posted' | 'finalized' | 'cancelled' | 'archived';
+export type DocumentStatus = 'draft' | 'submitted' | 'approved' | 'posted' | 'finalized' | 'cancelled' | 'archived' | 'active';
 
 export type DocumentSourceModule =
+    | 'shared'
     | 'purchase'
     | 'sales'
     | 'vehicle_service'
@@ -12,14 +13,24 @@ export type DocumentSourceModule =
     | 'hr'
     | 'core';
 
+export type LookupOption = {
+    label: string;
+    value: string;
+};
+
 export type DocumentRecord = {
     createdAt: string;
-    createdBy: string;
+    data: Record<string, unknown>;
     definitionId: string;
+    documentDate: string;
     documentNumber: string;
+    dueDate: string;
+    grandTotal: string;
     id: string;
+    notes: string;
     sourceModule: DocumentSourceModule;
     sourceReference: string;
+    sourceType: string;
     status: DocumentStatus;
     title: string;
     typeCode: string;
@@ -31,32 +42,35 @@ export type DocumentType = {
     attachmentsEnabled: boolean;
     code: string;
     commentsEnabled: boolean;
+    defaultStatus: DocumentStatus;
     description: string;
     id: string;
     isActive: boolean;
-    moduleScope: DocumentSourceModule | 'shared';
+    moduleScope: DocumentSourceModule;
     name: string;
-    permissionsEnabled: boolean;
+    requiresSource: boolean;
     versioningEnabled: boolean;
     workflowEnabled: boolean;
 };
 
 export type DocumentFieldDefinition = {
     code: string;
-    defaultValue?: string;
+    dataType: 'text' | 'number' | 'date' | 'money' | 'boolean' | 'json';
+    defaultValue: string;
     displayOrder: number;
-    fieldType: 'text' | 'number' | 'date' | 'money' | 'boolean' | 'json';
     id: string;
     isReadonly: boolean;
     isRequired: boolean;
     label: string;
-    validationRule?: string;
+    sectionKey: string;
+    validationRule: string;
 };
 
 export type DocumentDefinition = {
-    allowedStatuses: DocumentStatus[];
     code: string;
+    defaultStatus: DocumentStatus;
     description: string;
+    documentTypeCode: string;
     documentTypeId: string;
     documentTypeName: string;
     fields: DocumentFieldDefinition[];
@@ -64,7 +78,8 @@ export type DocumentDefinition = {
     isActive: boolean;
     name: string;
     sequenceId: string;
-    sourceModule: DocumentSourceModule | 'shared';
+    sourceModule: DocumentSourceModule;
+    supportsVersions: boolean;
     templateId: string;
     updatedAt: string;
     version: string;
@@ -72,39 +87,21 @@ export type DocumentDefinition = {
 };
 
 export type DocumentTemplate = {
-    bodyPlaceholder: string;
+    bodyContent: string;
     code: string;
     documentTypeId: string;
-    footerPlaceholder: string;
-    headerPlaceholder: string;
+    footerContent: string;
+    headerContent: string;
     id: string;
     isActive: boolean;
     layoutType: 'html' | 'pdf' | 'thermal' | 'plain';
     name: string;
 };
 
-export type DocumentTemplateSection = {
-    content: string;
-    displayOrder: number;
-    id: string;
-    isActive: boolean;
-    label: string;
-    sectionKey: string;
-    sectionType: 'header' | 'body' | 'line_table' | 'totals' | 'signature' | 'terms' | 'custom';
-    templateId: string;
-};
-
-export type DocumentMetadataValue = {
-    code: string;
-    label: string;
-    value: string;
-};
-
 export type DocumentLine = {
     description: string;
-    discountAmount: string;
     displayOrder: number;
-    documentId?: string;
+    documentId: string;
     id: string;
     itemLabel: string;
     lineNo: number;
@@ -113,9 +110,15 @@ export type DocumentLine = {
     quantity: string;
     sourceLineId?: string;
     sourceLineType?: string;
-    taxAmount: string;
     unitPrice: string;
     uomLabel: string;
+};
+
+export type DocumentMetadataValue = {
+    code: string;
+    label: string;
+    value: string;
+    valueType: string;
 };
 
 export type DocumentSourceReference = {
@@ -187,6 +190,7 @@ export type DocumentWorkflowStep = {
 };
 
 export type DocumentWorkflow = {
+    documentTypeName: string;
     id: string;
     isActive: boolean;
     name: string;
@@ -204,29 +208,23 @@ export type DocumentSequence = {
     status: 'active' | 'inactive';
 };
 
-export type DocumentPreviewResult = {
-    breakdown: Array<{ label: string; value: string }>;
-    errors: string[];
-    input: {
-        definitionId: string;
-        metadata: Record<string, string>;
-        sourceId: string;
-        sourceModule: string;
-    };
-    rendered: {
-        documentNumber: string;
-        renderedPreview: string;
-        templateUsed: string;
-        versionInfo: string;
-    };
-    warnings: string[];
+export type DocumentPreviewInput = {
+    definitionId: string;
+    documentNumber?: string;
+    metadata: Record<string, string>;
+    sourceId: string;
+    sourceModule: string;
+    sourceReference: string;
 };
 
-export type DocumentAuditEntry = {
-    actor: string;
-    description: string;
-    id: string;
-    time: string;
+export type DocumentPreviewRendered = {
+    definitionId: string;
+    definitionName: string;
+    documentNumber: string;
+    html: string;
+    templateId: string;
+    templateName: string;
+    text: string;
 };
 
 export type DocumentTypeFormInput = {
@@ -237,14 +235,14 @@ export type DocumentTypeFormInput = {
     isActive: boolean;
     moduleScope: DocumentType['moduleScope'];
     name: string;
-    permissionsEnabled: boolean;
+    requiresSource: boolean;
     versioningEnabled: boolean;
     workflowEnabled: boolean;
 };
 
 export type DocumentDefinitionFormInput = {
-    allowedStatuses: DocumentStatus[];
     code: string;
+    defaultStatus: DocumentStatus;
     description: string;
     documentTypeId: string;
     fields: DocumentFieldDefinition[];
@@ -252,16 +250,17 @@ export type DocumentDefinitionFormInput = {
     name: string;
     sequenceId: string;
     sourceModule: DocumentDefinition['sourceModule'];
+    supportsVersions: boolean;
     templateId: string;
     workflowId: string;
 };
 
 export type DocumentTemplateFormInput = {
-    bodyPlaceholder: string;
+    bodyContent: string;
     code: string;
     documentTypeId: string;
-    footerPlaceholder: string;
-    headerPlaceholder: string;
+    footerContent: string;
+    headerContent: string;
     isActive: boolean;
     layoutType: DocumentTemplate['layoutType'];
     name: string;

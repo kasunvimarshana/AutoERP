@@ -402,6 +402,74 @@ class DocumentOrchestrator implements DocumentOrchestratorInterface
     }
 
     /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listWorkflows(int $tenantId): array
+    {
+        return $this->documentRepository->listWorkflows($tenantId);
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    public function previewDocumentDefinition(int $tenantId, array $input): array
+    {
+        $definitionId = isset($input['definition_id']) ? (int) $input['definition_id'] : 0;
+        $definition = $definitionId > 0 ? $this->documentRepository->getDocumentDefinition($tenantId, $definitionId) : null;
+        $template = null;
+
+        if ($definition !== null && isset($definition['template_id'])) {
+            $template = $this->documentRepository->getTemplate($tenantId, (int) $definition['template_id']);
+        }
+
+        $metadata = is_array($input['metadata'] ?? null) ? $input['metadata'] : [];
+        $documentNumber = (string) ($input['document_number'] ?? 'PREVIEW');
+        $title = (string) ($metadata['title'] ?? $input['source_reference'] ?? $documentNumber);
+        $body = (string) ($metadata['body'] ?? $metadata['notes'] ?? 'Document preview data supplied by source module.');
+
+        $rendered = strtr(
+            (string) (($template['body_content'] ?? null) ?: '{{document_title}}'.PHP_EOL.'{{document_body}}'),
+            [
+                '{{document_title}}' => $title,
+                '{{document_body}}' => $body,
+                '{{document_number}}' => $documentNumber,
+            ],
+        );
+
+        $this->documentRepository->createRenderLog($tenantId, [
+            'document_template_id' => $template['id'] ?? null,
+            'render_type' => 'document-preview',
+            'status' => 'rendered',
+            'message' => 'Document preview rendered.',
+        ]);
+
+        return [
+            'input' => $input,
+            'rendered' => [
+                'html' => nl2br(e($rendered)),
+                'text' => $rendered,
+                'document_number' => $documentNumber,
+                'template_id' => $template['id'] ?? null,
+                'template_name' => $template['template_name'] ?? null,
+                'definition_id' => $definition['id'] ?? null,
+                'definition_name' => $definition['name'] ?? null,
+            ],
+            'breakdown' => [
+                ['label' => 'Definition', 'value' => $definition['name'] ?? 'No definition selected'],
+                ['label' => 'Template', 'value' => $template['template_name'] ?? 'Default preview layout'],
+                ['label' => 'Source module', 'value' => $input['source_module'] ?? 'shared'],
+            ],
+            'metadata' => [
+                'official' => false,
+                'business_logic_free' => true,
+            ],
+            'warnings' => $definition === null ? ['Definition was not found; rendered with default preview layout.'] : [],
+            'errors' => [],
+        ];
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */

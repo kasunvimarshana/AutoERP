@@ -48,7 +48,7 @@ export function DocumentDashboardPage() {
                 {[
                     ['Records', 'Generated document records from source modules.', '/documents/records'],
                     ['Definitions', 'Fields, templates, sequences, workflows.', '/documents/definitions'],
-                    ['Templates', 'Renderer placeholders and layouts.', '/documents/templates'],
+                    ['Templates', 'Renderer content and layouts.', '/documents/templates'],
                     ['Workflows', 'Statuses and transitions managed by backend.', '/documents/workflows'],
                 ].map(([title, description, path]) => (
                     <Link key={title} to={path}><Card className="h-full p-5 transition hover:border-slate-300 hover:shadow-md"><p className="font-bold text-slate-950">{title}</p><p className="mt-2 text-sm text-slate-500">{description}</p></Card></Link>

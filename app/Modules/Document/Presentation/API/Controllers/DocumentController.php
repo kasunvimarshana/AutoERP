@@ -538,6 +538,32 @@ class DocumentController extends Controller
         return response()->json($this->orchestrator->previewTemplate($tenantId, $payload));
     }
 
+    public function preview(Request $request): JsonResponse
+    {
+        $payload = $request->validate([
+            'definition_id' => ['nullable', 'integer', 'min:1'],
+            'source_module' => ['nullable', 'string', 'max:120'],
+            'source_type' => ['nullable', 'string', 'max:120'],
+            'source_id' => ['nullable', 'integer', 'min:1'],
+            'source_reference' => ['nullable', 'string', 'max:180'],
+            'document_number' => ['nullable', 'string', 'max:180'],
+            'metadata' => ['nullable', 'array'],
+        ]);
+
+        $tenantId = $this->resolveTenantId($request);
+
+        return response()->json($this->orchestrator->previewDocumentDefinition($tenantId, $payload));
+    }
+
+    public function listWorkflows(Request $request): JsonResponse
+    {
+        $tenantId = $this->resolveTenantId($request);
+
+        return response()->json([
+            'data' => $this->orchestrator->listWorkflows($tenantId),
+        ]);
+    }
+
     public function listItemDefinitions(): JsonResponse
     {
         $tenantId = $this->resolveTenantId(request());

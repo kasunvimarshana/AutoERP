@@ -878,24 +878,56 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
 
     public function updateDocumentDefinition(int $tenantId, int $definitionId, array $payload): array
     {
-        DB::table('document_definitions')
-            ->where('tenant_id', $tenantId)
-            ->where('id', $definitionId)
-            ->update([
-                'document_type_id' => (int) ($payload['document_type_id'] ?? 0),
-                'definition_code' => $payload['definition_code'] ?? ($payload['settings']['code'] ?? null),
-                'version' => (int) ($payload['version'] ?? 1),
-                'name' => (string) ($payload['name'] ?? ''),
-                'description' => $payload['description'] ?? ($payload['settings']['description'] ?? null),
-                'source_module' => (string) ($payload['source_module'] ?? ($payload['settings']['source_module'] ?? 'shared')),
-                'template_id' => isset($payload['template_id']) ? (int) $payload['template_id'] : null,
-                'sequence_id' => isset($payload['sequence_id']) ? (int) $payload['sequence_id'] : null,
-                'workflow_id' => isset($payload['workflow_id']) ? (int) $payload['workflow_id'] : null,
-                'default_status' => (string) ($payload['default_status'] ?? 'draft'),
-                'supports_versions' => (bool) ($payload['supports_versions'] ?? true),
-                'is_active' => (bool) ($payload['is_active'] ?? true),
-                'updated_at' => now(),
-            ]);
+        DB::transaction(function () use ($tenantId, $definitionId, $payload): void {
+            DB::table('document_definitions')
+                ->where('tenant_id', $tenantId)
+                ->where('id', $definitionId)
+                ->update([
+                    'document_type_id' => (int) ($payload['document_type_id'] ?? 0),
+                    'definition_code' => $payload['definition_code'] ?? ($payload['settings']['code'] ?? null),
+                    'version' => (int) ($payload['version'] ?? 1),
+                    'name' => (string) ($payload['name'] ?? ''),
+                    'description' => $payload['description'] ?? ($payload['settings']['description'] ?? null),
+                    'source_module' => (string) ($payload['source_module'] ?? ($payload['settings']['source_module'] ?? 'shared')),
+                    'template_id' => isset($payload['template_id']) ? (int) $payload['template_id'] : null,
+                    'sequence_id' => isset($payload['sequence_id']) ? (int) $payload['sequence_id'] : null,
+                    'workflow_id' => isset($payload['workflow_id']) ? (int) $payload['workflow_id'] : null,
+                    'default_status' => (string) ($payload['default_status'] ?? 'draft'),
+                    'supports_versions' => (bool) ($payload['supports_versions'] ?? true),
+                    'is_active' => (bool) ($payload['is_active'] ?? true),
+                    'updated_at' => now(),
+                ]);
+
+            if (is_array($payload['fields'] ?? null)) {
+                DB::table('document_definition_fields')
+                    ->where('tenant_id', $tenantId)
+                    ->where('document_definition_id', $definitionId)
+                    ->delete();
+
+                foreach (array_values($payload['fields']) as $index => $field) {
+                    if (! is_array($field)) {
+                        continue;
+                    }
+
+                    DB::table('document_definition_fields')->insert([
+                        'tenant_id' => $tenantId,
+                        'document_definition_id' => $definitionId,
+                        'field_key' => (string) $field['field_key'],
+                        'label' => (string) ($field['label'] ?? $field['field_key']),
+                        'data_type' => (string) ($field['data_type'] ?? 'text'),
+                        'is_required' => (bool) ($field['is_required'] ?? false),
+                        'is_readonly' => (bool) ($field['is_readonly'] ?? false),
+                        'display_order' => (int) ($field['display_order'] ?? ($index + 1)),
+                        'default_value' => isset($field['default_value']) ? (string) $field['default_value'] : null,
+                        'validation_rule' => isset($field['validation_rule']) ? (string) $field['validation_rule'] : null,
+                        'section_key' => $field['section_key'] ?? null,
+                        'is_active' => (bool) ($field['is_active'] ?? true),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
+        });
 
         return $this->getDocumentDefinition($tenantId, $definitionId) ?? [];
     }
@@ -987,6 +1019,50 @@ class EloquentDocumentRepository implements DocumentRepositoryInterface
         ]);
 
         return (array) DB::table('document_render_logs')->where('id', $id)->first();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listWorkflows(int $tenantId): array
+    {
+        if (! Schema::hasTable('document_workflows')) {
+            return [];
+        }
+
+        $workflows = DB::table('document_workflows as workflows')
+            ->leftJoin('document_types as types', 'types.id', '=', 'workflows.document_type_id')
+            ->where('workflows.tenant_id', $tenantId)
+            ->orderBy('workflows.name')
+            ->get([
+                'workflows.id',
+                'workflows.tenant_id',
+                'workflows.document_type_id',
+                'workflows.name',
+                'workflows.is_default',
+                'workflows.is_active',
+                'types.name as document_type_name',
+                'types.code as document_type_code',
+            ])
+            ->map(static fn ($row): array => (array) $row);
+
+        $workflowIds = $workflows->pluck('id')->map(static fn ($id): int => (int) $id)->all();
+        $stepsByWorkflow = $workflowIds === []
+            ? collect()
+            : DB::table('document_workflow_steps')
+                ->whereIn('workflow_id', $workflowIds)
+                ->orderBy('sequence')
+                ->get()
+                ->groupBy('workflow_id');
+
+        return $workflows->map(function (array $workflow) use ($stepsByWorkflow): array {
+            $workflow['steps'] = ($stepsByWorkflow->get((int) $workflow['id']) ?? collect())
+                ->map(static fn ($step): array => (array) $step)
+                ->values()
+                ->all();
+
+            return $workflow;
+        })->all();
     }
 
     public function createItemDefinition(int $tenantId, array $payload): array

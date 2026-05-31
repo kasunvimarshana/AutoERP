@@ -35,12 +35,10 @@ export function DocumentRecordListPage() {
     return (
         <div className="space-y-6">
             <PageHeader eyebrow="Documents" subtitle="Document records from all source modules. Document UI does not calculate source totals or workflow effects." title="Document Records" />
-            <SearchFilterBar onSearch={setQuery} placeholder="Search document number, title, source reference..." />
+            <SearchFilterBar onSearch={setQuery} />
             <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-4">
-                <Select onChange={(event) => setSourceModule(event.target.value)} options={[{ label: 'Purchase', value: 'purchase' }, { label: 'Sales', value: 'sales' }, { label: 'Vehicle Service', value: 'vehicle_service' }, { label: 'Vehicle Rental', value: 'vehicle_rental' }, { label: 'Voucher', value: 'voucher' }, { label: 'Finance', value: 'finance' }]} placeholder="All source modules" value={sourceModule} />
-                <Select onChange={(event) => setStatus(event.target.value)} options={[{ label: 'Draft', value: 'draft' }, { label: 'Submitted', value: 'submitted' }, { label: 'Approved', value: 'approved' }, { label: 'Posted', value: 'posted' }, { label: 'Finalized', value: 'finalized' }, { label: 'Cancelled', value: 'cancelled' }]} placeholder="All statuses" value={status} />
-                <Select options={[{ label: 'Today', value: 'today' }, { label: 'This month', value: 'month' }]} placeholder="All date ranges" />
-                <Select options={[{ label: 'Current user', value: 'me' }]} placeholder="All owners" />
+                <Select onChange={(event) => setSourceModule(event.target.value)} options={[{ label: 'All source modules', value: '' }, { label: 'Purchase', value: 'purchase' }, { label: 'Sales', value: 'sales' }, { label: 'Vehicle Service', value: 'vehicle_service' }, { label: 'Vehicle Rental', value: 'vehicle_rental' }, { label: 'Voucher', value: 'voucher' }, { label: 'Finance', value: 'finance' }]} value={sourceModule} />
+                <Select onChange={(event) => setStatus(event.target.value)} options={[{ label: 'All statuses', value: '' }, { label: 'Draft', value: 'draft' }, { label: 'Submitted', value: 'submitted' }, { label: 'Approved', value: 'approved' }, { label: 'Posted', value: 'posted' }, { label: 'Finalized', value: 'finalized' }, { label: 'Cancelled', value: 'cancelled' }]} value={status} />
             </div>
             {isLoading ? <EmptyState description="Loading document records..." title="Loading records" /> : null}
             {error ? <EmptyState description={error} title="Document service unavailable" /> : null}

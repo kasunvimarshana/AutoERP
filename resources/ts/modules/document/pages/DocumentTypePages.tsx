@@ -29,7 +29,7 @@ export function DocumentTypeListPage() {
     return (
         <div className="space-y-6">
             <PageHeader actions={<Link to="/documents/types/new"><Button>New Type</Button></Link>} eyebrow="Documents" subtitle="Reusable module-agnostic document types." title="Document Types" />
-            <SearchFilterBar onSearch={setQuery} placeholder="Search type code, name, scope..." />
+            <SearchFilterBar onSearch={setQuery} />
             {isLoading ? <EmptyState description="Loading document types..." title="Loading types" /> : null}
             {!isLoading ? (
                 <DataTable

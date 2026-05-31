@@ -201,6 +201,11 @@ interface DocumentRepositoryInterface
     public function createRenderLog(int $tenantId, array $payload): array;
 
     /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listWorkflows(int $tenantId): array;
+
+    /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */

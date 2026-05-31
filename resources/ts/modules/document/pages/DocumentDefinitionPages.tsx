@@ -9,8 +9,7 @@ import { Button } from '../../../shared/components/ui/Button';
 import { Card } from '../../../shared/components/ui/Card';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Tabs } from '../../../shared/components/ui/Tabs';
-import { DocumentDefinitionFieldsTable, DocumentDefinitionForm, DocumentSequencePanel, DocumentTemplatePreviewPanel, DocumentWorkflowPanel } from '../components/DocumentComponents';
-import { documentSequences, documentTemplates, documentWorkflows } from '../mock/documentMock';
+import { DocumentDefinitionFieldsTable, DocumentDefinitionForm, DocumentDefinitionUsagePanel, DocumentSequencePanel, DocumentTemplatePreviewPanel, DocumentWorkflowPanel, useDocumentDefinitionSupport } from '../components/DocumentComponents';
 import { documentApi } from '../services/documentApi';
 import type { DocumentDefinition } from '../types/document.types';
 
@@ -44,7 +43,7 @@ export function DocumentDefinitionListPage() {
     return (
         <div className="space-y-6">
             <PageHeader actions={<Link to="/documents/definitions/new"><Button>New Definition</Button></Link>} eyebrow="Documents" subtitle="Definitions connect types, metadata fields, templates, sequences, and workflows." title="Document Definitions" />
-            <SearchFilterBar onSearch={setQuery} placeholder="Search definition code, name, type, source..." />
+            <SearchFilterBar onSearch={setQuery} />
             {isLoading ? <EmptyState description="Loading document definitions..." title="Loading definitions" /> : null}
             {!isLoading ? <DataTable columns={[
                 { header: 'Code', key: 'code', render: (row) => <Link className="font-semibold text-slate-950" to={`/documents/definitions/${row.id}`}>{row.code}</Link> },
@@ -103,25 +102,23 @@ export function DocumentDefinitionDetailPage() {
         return () => { mounted = false; };
     }, [id]);
 
+    const { sequence, template, workflow } = useDocumentDefinitionSupport(definition);
+
     if (isLoading) return <EmptyState description="Loading document definition..." title="Loading definition" />;
     if (!definition) return <EmptyState description="Document definition not found." title="Unable to load definition" />;
-
-    const template = documentTemplates.find((row) => row.id === definition.templateId);
-    const sequence = documentSequences.find((row) => row.id === definition.sequenceId);
-    const workflow = documentWorkflows.find((row) => row.id === definition.workflowId);
 
     return (
         <div className="space-y-6">
             <PageHeader actions={<><Link to="/documents/definitions"><Button variant="secondary">Back</Button></Link><Link to={`/documents/definitions/${definition.id}/edit`}><Button>Edit Definition</Button></Link></>} eyebrow="Document Definition" subtitle="Definition detail keeps document setup reusable and source-module agnostic." title={definition.name} />
             <Card className="p-5"><Tabs active={activeTab} items={tabs} onChange={setActiveTab} /></Card>
-            {activeTab === 'overview' ? <PreviewPanel rows={[{ label: 'Code', value: definition.code }, { label: 'Type', value: definition.documentTypeName }, { label: 'Source module', value: definition.sourceModule }, { label: 'Allowed statuses', value: definition.allowedStatuses.join(', ') }]} title="Overview" /> : null}
+            {activeTab === 'overview' ? <PreviewPanel rows={[{ label: 'Code', value: definition.code }, { label: 'Type', value: definition.documentTypeName }, { label: 'Source module', value: definition.sourceModule }, { label: 'Default status', value: definition.defaultStatus }]} title="Overview" /> : null}
             {activeTab === 'fields' ? <DocumentDefinitionFieldsTable fields={definition.fields} /> : null}
             {activeTab === 'template' ? <DocumentTemplatePreviewPanel template={template} /> : null}
             {activeTab === 'sequence' ? <DocumentSequencePanel sequence={sequence} /> : null}
             {activeTab === 'workflow' ? <DocumentWorkflowPanel workflow={workflow} /> : null}
-            {activeTab === 'permissions' ? <PreviewPanel rows={[{ label: 'Definition permissions', value: 'Backend-managed permission rules' }]} title="Permissions" /> : null}
-            {activeTab === 'usage' ? <PreviewPanel rows={[{ label: 'Usage', value: 'Used by source modules through Document API' }]} title="Usage" /> : null}
-            {activeTab === 'audit' ? <PreviewPanel rows={[{ label: 'Audit', value: 'Backend activity/history endpoint pending for definitions' }]} title="Audit / History" /> : null}
+            {activeTab === 'permissions' ? <PreviewPanel rows={[{ label: 'Definition permissions', value: 'Use document record permissions for runtime access.' }]} title="Permissions" /> : null}
+            {activeTab === 'usage' ? <DocumentDefinitionUsagePanel definition={definition} /> : null}
+            {activeTab === 'audit' ? <PreviewPanel rows={[{ label: 'Updated at', value: definition.updatedAt || 'Not recorded' }]} title="Audit / History" /> : null}
         </div>
     );
 }

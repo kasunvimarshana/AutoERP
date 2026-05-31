@@ -19,14 +19,14 @@ import {
     DocumentStatusActionPanel,
     DocumentVersionsTable,
 } from '../components/DocumentComponents';
-import { sourceReferences } from '../mock/documentMock';
 import { documentApi } from '../services/documentApi';
-import type { DocumentAttachment, DocumentComment, DocumentEvent, DocumentLine, DocumentPermission, DocumentRecord, DocumentRelation, DocumentVersion } from '../types/document.types';
+import type { DocumentAttachment, DocumentComment, DocumentEvent, DocumentLine, DocumentPermission, DocumentPreviewRendered, DocumentRecord, DocumentRelation, DocumentVersion } from '../types/document.types';
 
 const tabs = [
     { label: 'Overview', value: 'overview' },
     { label: 'Preview', value: 'preview' },
     { label: 'Lines / Items', value: 'lines' },
+    { label: 'Metadata', value: 'metadata' },
     { label: 'Source References', value: 'source' },
     { label: 'Attachments', value: 'attachments' },
     { label: 'Comments', value: 'comments' },
@@ -48,12 +48,13 @@ export function DocumentRecordDetailPage() {
     const [permissions, setPermissions] = useState<DocumentPermission[]>([]);
     const [events, setEvents] = useState<DocumentEvent[]>([]);
     const [versions, setVersions] = useState<DocumentVersion[]>([]);
+    const [preview, setPreview] = useState<DocumentPreviewRendered | undefined>();
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(true);
 
-    useEffect(() => {
-        let mounted = true;
+    function loadDetail() {
         const documentId = id ?? '';
+        setIsLoading(true);
         Promise.all([
             documentApi.getDocument(documentId),
             documentApi.listAttachments(documentId),
@@ -64,36 +65,54 @@ export function DocumentRecordDetailPage() {
             documentApi.listEvents(documentId),
             documentApi.listVersions(documentId),
         ]).then(([documentResponse, attachmentResponse, commentResponse, lineResponse, relationResponse, permissionResponse, eventResponse, versionResponse]) => {
-            if (mounted) {
-                setDocument(documentResponse.data);
-                setAttachments(attachmentResponse.data);
-                setComments(commentResponse.data);
-                setLines(lineResponse.data);
-                setRelations(relationResponse.data);
-                setPermissions(permissionResponse.data);
-                setEvents(eventResponse.data);
-                setVersions(versionResponse.data);
-            }
-        }).catch((caught: unknown) => { if (mounted) setError(caught instanceof Error ? caught.message : 'Unable to load document detail.'); })
-            .finally(() => { if (mounted) setIsLoading(false); });
-        return () => { mounted = false; };
+            setDocument(documentResponse.data);
+            setAttachments(attachmentResponse.data);
+            setComments(commentResponse.data);
+            setLines(lineResponse.data);
+            setRelations(relationResponse.data);
+            setPermissions(permissionResponse.data);
+            setEvents(eventResponse.data);
+            setVersions(versionResponse.data);
+        }).catch((caught: unknown) => { setError(caught instanceof Error ? caught.message : 'Unable to load document detail.'); })
+            .finally(() => { setIsLoading(false); });
+    }
+
+    useEffect(() => {
+        loadDetail();
     }, [id]);
+
+    async function loadPreview() {
+        if (!document) return;
+        const response = await documentApi.previewDocument({
+            definitionId: document.definitionId,
+            documentNumber: document.documentNumber,
+            metadata: {
+                body: document.notes,
+                title: document.title,
+            },
+            sourceId: '',
+            sourceModule: document.sourceModule,
+            sourceReference: document.sourceReference,
+        });
+        setPreview(response.calculated);
+    }
 
     if (isLoading) return <EmptyState description="Loading document detail..." title="Loading document" />;
     if (error || !document) return <EmptyState description={error || 'Document record was not found.'} title="Unable to load document" />;
 
     return (
         <div className="space-y-6">
-            <PageHeader actions={<><Link to="/documents/records"><Button variant="secondary">Back</Button></Link><Button>Preview</Button></>} eyebrow="Document Record" subtitle="Record detail shows document shell, source references, workflow, versions, attachments, comments, and audit. Source modules own business values." title={document.documentNumber} />
-            <DocumentRecordSummaryCard document={document} />
+            <PageHeader actions={<><Link to="/documents/records"><Button variant="secondary">Back</Button></Link><Button onClick={() => void loadPreview()}>Preview</Button></>} eyebrow="Document Record" subtitle="Record detail shows document shell, source references, workflow, versions, attachments, comments, and audit. Source modules own business values." title={document.documentNumber} />
+            <DocumentRecordSummaryCard document={document} onStatusChanged={setDocument} />
             <Card className="p-5"><Tabs active={activeTab} items={tabs} onChange={setActiveTab} /></Card>
-            {activeTab === 'overview' ? <div className="grid gap-5 xl:grid-cols-[1fr_340px]"><DocumentMetadataPanel /><DocumentStatusActionPanel document={document} /></div> : null}
-            {activeTab === 'preview' ? <DocumentPreviewPanel /> : null}
+            {activeTab === 'overview' ? <div className="grid gap-5 xl:grid-cols-[1fr_340px]"><DocumentMetadataPanel document={document} /><DocumentStatusActionPanel document={document} /></div> : null}
+            {activeTab === 'preview' ? <DocumentPreviewPanel rendered={preview} /> : null}
             {activeTab === 'lines' ? <DocumentLinesTable lines={lines} /> : null}
-            {activeTab === 'source' ? <DocumentSourceReferencePanel references={sourceReferences} /> : null}
-            {activeTab === 'attachments' ? <DocumentAttachmentPanel attachments={attachments} /> : null}
-            {activeTab === 'comments' ? <DocumentCommentPanel comments={comments} /> : null}
-            {activeTab === 'relations' ? <DocumentRelationsTable relations={relations} /> : null}
+            {activeTab === 'metadata' ? <DocumentMetadataPanel document={document} /> : null}
+            {activeTab === 'source' ? <DocumentSourceReferencePanel document={document} /> : null}
+            {activeTab === 'attachments' ? <DocumentAttachmentPanel attachments={attachments} documentId={document.id} onChanged={loadDetail} /> : null}
+            {activeTab === 'comments' ? <DocumentCommentPanel comments={comments} documentId={document.id} onChanged={loadDetail} /> : null}
+            {activeTab === 'relations' ? <DocumentRelationsTable onRemove={(relation) => void documentApi.removeRelation(document.id, relation.id).then(loadDetail)} relations={relations} /> : null}
             {activeTab === 'permissions' ? <DocumentPermissionsPanel permissions={permissions} /> : null}
             {activeTab === 'events' ? <DocumentEventsTimeline events={events} /> : null}
             {activeTab === 'versions' ? <DocumentVersionsTable versions={versions} /> : null}

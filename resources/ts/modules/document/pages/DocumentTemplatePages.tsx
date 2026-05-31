@@ -37,7 +37,7 @@ export function DocumentTemplateListPage() {
 export function DocumentTemplateCreatePage() {
     return (
         <div className="space-y-6">
-            <PageHeader eyebrow="Document Template" subtitle="Create a template placeholder for backend rendering." title="Create Template" />
+            <PageHeader eyebrow="Document Template" subtitle="Create backend-rendered template content." title="Create Template" />
             <DocumentTemplateForm mode="create" />
         </div>
     );
@@ -59,7 +59,7 @@ export function DocumentTemplateEditPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader eyebrow="Document Template" subtitle="Edit renderer placeholders only." title={`Edit ${template.name}`} />
+            <PageHeader eyebrow="Document Template" subtitle="Edit renderer content stored by the Document API." title={`Edit ${template.name}`} />
             <DocumentTemplateForm mode="edit" template={template} />
         </div>
     );

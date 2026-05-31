@@ -207,6 +207,17 @@ interface DocumentOrchestratorInterface
     public function previewTemplate(int $tenantId, array $input): array;
 
     /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listWorkflows(int $tenantId): array;
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    public function previewDocumentDefinition(int $tenantId, array $input): array;
+
+    /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */

@@ -23,6 +23,8 @@ Route::prefix('api/document')
     ])
     ->name('document.')
     ->group(function (): void {
+        Route::post('preview', [DocumentController::class, 'preview'])
+            ->name('preview');
         Route::get('documents', [DocumentController::class, 'index'])->name('documents.index');
         Route::post('documents', [DocumentController::class, 'store'])->name('documents.store');
         Route::get('documents/{document}', [DocumentController::class, 'show'])->name('documents.show');
@@ -100,6 +102,8 @@ Route::prefix('api/document')
         Route::put('templates/{template}', [DocumentController::class, 'updateTemplate'])->name('templates.update');
         Route::patch('templates/{template}', [DocumentController::class, 'updateTemplate'])->name('templates.patch');
         Route::post('templates/preview', [DocumentController::class, 'previewTemplate'])->name('templates.preview');
+
+        Route::get('workflows', [DocumentController::class, 'listWorkflows'])->name('workflows.index');
 
         Route::get('item-definitions', [DocumentController::class, 'listItemDefinitions'])
             ->name('item-definitions.index');

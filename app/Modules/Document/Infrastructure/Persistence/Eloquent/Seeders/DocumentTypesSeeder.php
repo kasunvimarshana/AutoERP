@@ -26,7 +26,18 @@ class DocumentTypesSeeder extends Seeder
         DB::table('document_types')->upsert(
             $records,
             ['tenant_id', 'code'],
-            ['name', 'default_status', 'is_active', 'requires_source', 'updated_at']
+            [
+                'name',
+                'default_status',
+                'is_active',
+                'requires_source',
+                'supports_items',
+                'supports_attachments',
+                'supports_comments',
+                'supports_versions',
+                'supports_workflow',
+                'updated_at',
+            ]
         );
     }
 }

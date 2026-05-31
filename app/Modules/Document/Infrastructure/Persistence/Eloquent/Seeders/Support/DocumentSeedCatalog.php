@@ -25,15 +25,30 @@ final class DocumentSeedCatalog
      */
     public static function documentTypes(): array
     {
-        return [
-            [
-                'name' => 'Generic Document',
-                'code' => 'GENERIC',
-                'default_status' => 'draft',
-                'is_active' => true,
-                'requires_source' => false,
-            ],
+        $types = [
+            ['Generic Document', 'GENERIC', false],
+            ['Purchase Invoice', 'purchase_invoice', true],
+            ['Sales Invoice', 'sales_invoice', true],
+            ['Service Invoice', 'service_invoice', true],
+            ['Rental Invoice', 'rental_invoice', true],
+            ['Job Card', 'job_card', true],
+            ['Rental Agreement', 'rental_agreement', true],
+            ['Voucher', 'voucher', true],
+            ['Receipt', 'receipt', true],
         ];
+
+        return array_map(static fn (array $type): array => [
+            'name' => $type[0],
+            'code' => $type[1],
+            'default_status' => 'draft',
+            'is_active' => true,
+            'requires_source' => $type[2],
+            'supports_items' => true,
+            'supports_attachments' => true,
+            'supports_comments' => true,
+            'supports_versions' => true,
+            'supports_workflow' => true,
+        ], $types);
     }
 
     /**
@@ -56,8 +71,7 @@ final class DocumentSeedCatalog
      */
     public static function documentDefinitions(): array
     {
-        return [
-            'GENERIC' => [
+        $definition = [
                 'name' => 'Generic Definition',
                 'header_schema' => [
                     'title' => ['required' => true],
@@ -70,8 +84,19 @@ final class DocumentSeedCatalog
                         ['title' => 'General', 'fields' => ['title', 'external_reference']],
                     ],
                 ],
-            ],
         ];
+
+        return array_fill_keys([
+            'GENERIC',
+            'purchase_invoice',
+            'sales_invoice',
+            'service_invoice',
+            'rental_invoice',
+            'job_card',
+            'rental_agreement',
+            'voucher',
+            'receipt',
+        ], $definition);
     }
 
     /**
@@ -140,6 +165,14 @@ final class DocumentSeedCatalog
     {
         return [
             ['document_type' => 'GENERIC', 'prefix' => 'DOC-', 'padding' => 5],
+            ['document_type' => 'purchase_invoice', 'prefix' => 'PINV-', 'padding' => 5],
+            ['document_type' => 'sales_invoice', 'prefix' => 'SINV-', 'padding' => 5],
+            ['document_type' => 'service_invoice', 'prefix' => 'SERVINV-', 'padding' => 5],
+            ['document_type' => 'rental_invoice', 'prefix' => 'RENTINV-', 'padding' => 5],
+            ['document_type' => 'job_card', 'prefix' => 'JOB-', 'padding' => 5],
+            ['document_type' => 'rental_agreement', 'prefix' => 'RAGR-', 'padding' => 5],
+            ['document_type' => 'voucher', 'prefix' => 'VCH-', 'padding' => 5],
+            ['document_type' => 'receipt', 'prefix' => 'RCT-', 'padding' => 5],
         ];
     }
 }
