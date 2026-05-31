@@ -1,38 +1,28 @@
-import { useEffect, useState } from 'react';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { useParams } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
-import { SearchFilterBar } from '../../../shared/components/data/SearchFilterBar';
+import { DataToolbar, type DataToolbarFilterValue } from '../../../shared/components/data/DataToolbar';
 import { Tabs } from '../../../shared/components/ui/Tabs';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
-import { useParams } from 'react-router-dom';
 import {
     ApTransactionTable,
+    ApiErrorBanner,
     ArTransactionTable,
-    BankAccountForm,
     BankAccountTable,
     BankReconciliationPanel,
     BankTransactionTable,
-    BudgetForm,
     BudgetLineTable,
-    BudgetUsagePanel,
     BudgetTable,
-    CostCenterForm,
+    BudgetUsagePanel,
     CostCenterTable,
-    FiscalPeriodForm,
     FiscalPeriodTable,
-    FiscalYearForm,
     FiscalYearTable,
-    PaymentTermForm,
     PaymentTermTable,
-    TaxGroupForm,
     TaxGroupTable,
     TaxPreviewPanel,
-    TaxRateForm,
     TaxRateTable,
-    TaxRuleForm,
     TaxRuleTable,
 } from '../components/FinanceComponents';
-import { budgets, taxPreview } from '../mock/financeMock';
 import { financeApi } from '../services/financeApi';
 import type {
     ApTransaction,
@@ -51,109 +41,86 @@ import type {
 } from '../types/finance.types';
 
 export function FiscalYearListPage() {
-    const [rows, setRows] = useState<FiscalYear[]>([]);
-    useEffect(() => { financeApi.listFiscalYears().then((response) => setRows(response.data)); }, []);
-    return <ListPage subtitle="Fiscal year opening and closing is backend-controlled." title="Fiscal Years"><FiscalYearForm /><FiscalYearTable rows={rows} /></ListPage>;
+    return <RemoteList loader={financeApi.listFiscalYears} render={(rows: FiscalYear[]) => <FiscalYearTable rows={rows} />} subtitle="Fiscal year opening and closing is backend-controlled." title="Fiscal Years" />;
 }
 
 export function FiscalPeriodListPage() {
-    const [rows, setRows] = useState<FiscalPeriod[]>([]);
-    useEffect(() => { financeApi.listFiscalPeriods().then((response) => setRows(response.data)); }, []);
-    return <ListPage subtitle="Period lock validation happens in backend posting engines." title="Fiscal Periods"><FiscalPeriodForm /><FiscalPeriodTable rows={rows} /></ListPage>;
+    return <RemoteList loader={financeApi.listFiscalPeriods} render={(rows: FiscalPeriod[]) => <FiscalPeriodTable rows={rows} />} subtitle="Period lock validation happens in backend posting engines." title="Fiscal Periods" />;
 }
 
 export function ApTransactionListPage() {
-    const [rows, setRows] = useState<ApTransaction[]>([]);
-    useEffect(() => { financeApi.listApTransactions().then((response) => setRows(response.data)); }, []);
-    return <ListPage subtitle="Readonly payable balances and aging from backend/mock." title="AP Transactions"><ApTransactionTable rows={rows} /></ListPage>;
+    return <RemoteList loader={financeApi.listApTransactions} render={(rows: ApTransaction[]) => <ApTransactionTable rows={rows} />} subtitle="Readonly payable balances and aging from backend." title="AP Transactions" />;
 }
 
 export function ArTransactionListPage() {
-    const [rows, setRows] = useState<ArTransaction[]>([]);
-    useEffect(() => { financeApi.listArTransactions().then((response) => setRows(response.data)); }, []);
-    return <ListPage subtitle="Readonly receivable balances and aging from backend/mock." title="AR Transactions"><ArTransactionTable rows={rows} /></ListPage>;
+    return <RemoteList loader={financeApi.listArTransactions} render={(rows: ArTransaction[]) => <ArTransactionTable rows={rows} />} subtitle="Readonly receivable balances and aging from backend." title="AR Transactions" />;
 }
 
 export function TaxDashboardPage() {
     return (
-        <ListPage subtitle="Tax configuration and previews. Backend owns tax rules, priority, and tax amount calculation." title="Tax">
+        <div className="space-y-6">
+            <PageHeader eyebrow="Finance" subtitle="Tax configuration and previews. Backend owns tax rules, priority, and tax amount calculation." title="Tax" />
             <div className="grid gap-4 md:grid-cols-3">
-                <TaxGroupForm />
-                <TaxRateForm />
-                <TaxRuleForm />
+                <TaxGroupListPage />
+                <TaxRateListPage />
+                <TaxRuleListPage />
             </div>
-            <TaxPreviewPanel preview={taxPreview} />
-        </ListPage>
+            <TaxPreviewPanel />
+        </div>
     );
 }
 
 export function TaxGroupListPage() {
-    const [rows, setRows] = useState<TaxGroup[]>([]);
-    useEffect(() => { financeApi.listTaxGroups().then((response) => setRows(response.data)); }, []);
-    return <ListPage subtitle="Tax groups for reusable finance tax setup." title="Tax Groups"><TaxGroupForm /><TaxGroupTable rows={rows} /></ListPage>;
+    return <RemoteList loader={financeApi.listTaxGroups} render={(rows: TaxGroup[]) => <TaxGroupTable rows={rows} />} subtitle="Tax groups for reusable finance tax setup." title="Tax Groups" />;
 }
 
 export function TaxRateListPage() {
-    const [rows, setRows] = useState<TaxRate[]>([]);
-    useEffect(() => { financeApi.listTaxRates().then((response) => setRows(response.data)); }, []);
-    return <ListPage subtitle="Tax rates are configured here; calculated tax stays backend-owned." title="Tax Rates"><TaxRateForm /><TaxRateTable rows={rows} /></ListPage>;
+    return <RemoteList loader={financeApi.listTaxRates} render={(rows: TaxRate[]) => <TaxRateTable rows={rows} />} subtitle="Tax rates are configured here; calculated tax stays backend-owned." title="Tax Rates" />;
 }
 
 export function TaxRuleListPage() {
-    const [rows, setRows] = useState<TaxRule[]>([]);
-    useEffect(() => { financeApi.listTaxRules().then((response) => setRows(response.data)); }, []);
-    return <ListPage subtitle="Tax rules are generic and source-reference friendly." title="Tax Rules"><TaxRuleForm /><TaxRuleTable rows={rows} /></ListPage>;
+    return <RemoteList loader={financeApi.listTaxRules} render={(rows: TaxRule[]) => <TaxRuleTable rows={rows} />} subtitle="Tax rules are generic and source-reference friendly." title="Tax Rules" />;
 }
 
 export function PaymentTermListPage() {
-    const [rows, setRows] = useState<PaymentTerm[]>([]);
-    useEffect(() => { financeApi.listPaymentTerms().then((response) => setRows(response.data)); }, []);
-    return <ListPage subtitle="Payment terms used by customers, suppliers, and documents. Due calculations stay backend-owned." title="Payment Terms"><PaymentTermForm /><PaymentTermTable rows={rows} /></ListPage>;
+    return <RemoteList loader={financeApi.listPaymentTerms} render={(rows: PaymentTerm[]) => <PaymentTermTable rows={rows} />} subtitle="Payment terms used by customers, suppliers, and documents. Due calculations stay backend-owned." title="Payment Terms" />;
 }
 
 export function CostCenterListPage() {
-    const [rows, setRows] = useState<CostCenter[]>([]);
-    useEffect(() => { financeApi.listCostCenters().then((response) => setRows(response.data)); }, []);
-    return <ListPage subtitle="Generic cost center setup for journal lines and module mappings." title="Cost Centers"><CostCenterForm /><CostCenterTable rows={rows} /></ListPage>;
+    return <RemoteList loader={financeApi.listCostCenters} render={(rows: CostCenter[]) => <CostCenterTable rows={rows} />} subtitle="Generic cost center setup for journal lines and module mappings." title="Cost Centers" />;
 }
 
 export function BankAccountListPage() {
-    const [rows, setRows] = useState<BankAccount[]>([]);
-    useEffect(() => { financeApi.listBankAccounts().then((response) => setRows(response.data)); }, []);
-    return <ListPage subtitle="Bank account setup. Reconciliation status and balances stay backend-owned." title="Bank Accounts"><BankAccountForm /><BankAccountTable rows={rows} /></ListPage>;
+    return <RemoteList loader={financeApi.listBankAccounts} render={(rows: BankAccount[]) => <BankAccountTable rows={rows} />} subtitle="Bank account setup. Reconciliation status and balances stay backend-owned." title="Bank Accounts" />;
 }
 
 export function BankTransactionListPage() {
-    const [rows, setRows] = useState<BankTransaction[]>([]);
-    useEffect(() => { financeApi.listBankTransactions().then((response) => setRows(response.data)); }, []);
-    return <ListPage subtitle="Bank transactions with backend-owned reconciliation status." title="Bank Transactions"><BankTransactionTable rows={rows} /></ListPage>;
+    return <RemoteList loader={financeApi.listBankTransactions} render={(rows: BankTransaction[]) => <BankTransactionTable rows={rows} />} subtitle="Bank transactions with backend-owned reconciliation status." title="Bank Transactions" />;
 }
 
 export function BankReconciliationListPage() {
-    const [rows, setRows] = useState<BankReconciliation[]>([]);
-    useEffect(() => { financeApi.listReconciliations().then((response) => setRows(response.data)); }, []);
-    return <ListPage subtitle="Reconciliation variance and matching decisions are backend-owned." title="Bank Reconciliations"><BankReconciliationPanel rows={rows} /></ListPage>;
+    return <RemoteList loader={financeApi.listReconciliations} render={(rows: BankReconciliation[]) => <BankReconciliationPanel rows={rows} />} subtitle="Reconciliation variance and matching decisions are backend-owned." title="Bank Reconciliations" />;
 }
 
 export function BudgetListPage() {
-    const [rows, setRows] = useState<Budget[]>([]);
-    useEffect(() => { financeApi.listBudgets().then((response) => setRows(response.data)); }, []);
-    return (
-        <ListPage subtitle="Budget usage and variance are readonly backend/mock values." title="Budgets">
-            <BudgetForm />
-            <BudgetTable rows={rows} />
-            <div className="space-y-3">
-                <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500">Budget Lines</h2>
-                <BudgetLineTable rows={budgets[0]?.lines ?? []} />
-            </div>
-        </ListPage>
-    );
+    return <RemoteList loader={financeApi.listBudgets} render={(rows: Budget[]) => <BudgetTable rows={rows} />} subtitle="Budget usage and variance are readonly backend values." title="Budgets" />;
 }
 
 export function BudgetDetailPage() {
-    const { id = 'bud-001' } = useParams();
+    const { id = '' } = useParams();
     const [activeTab, setActiveTab] = useState('overview');
-    const budget = budgets.find((row) => row.id === id) ?? budgets[0];
+    const [budget, setBudget] = useState<Budget>();
+    const [error, setError] = useState<Error | null>(null);
+
+    useEffect(() => {
+        financeApi.listBudgets({ search: id })
+            .then((response) => setBudget(response.data.find((row) => row.id === id) ?? response.data[0]))
+            .catch((caught: Error) => setError(caught));
+    }, [id]);
+
+    if (!budget) {
+        return <EmptyState description="Loading budget detail from backend..." title="Loading" />;
+    }
 
     return (
         <div className="space-y-6">
@@ -162,6 +129,7 @@ export function BudgetDetailPage() {
                 subtitle="Budget detail. Usage and variance are backend read-model values, never calculated in the frontend."
                 title={budget.name}
             />
+            <ApiErrorBanner error={error} />
             <Tabs
                 active={activeTab}
                 items={[
@@ -175,19 +143,56 @@ export function BudgetDetailPage() {
             {activeTab === 'overview' ? <BudgetTable rows={[budget]} /> : null}
             {activeTab === 'lines' ? <BudgetLineTable rows={budget.lines} /> : null}
             {activeTab === 'usage' ? <BudgetUsagePanel rows={budget.lines.map((line) => ({ budgetAmount: line.budgetAmount, id: line.id, usedAmount: line.usage, varianceAmount: line.variance }))} /> : null}
-            {activeTab === 'audit' ? <EmptyState description="Finance audit/history endpoint will populate budget activity here." title="Audit / History" /> : null}
+            {activeTab === 'audit' ? <EmptyState description="No Finance audit/history endpoint is currently exposed for budgets." title="No audit read model" /> : null}
         </div>
     );
 }
 
-function ListPage({ children, subtitle, title }: { children: ReactNode; subtitle: string; title: string }) {
+function RemoteList<T extends { id: string }>({
+    loader,
+    render,
+    subtitle,
+    title,
+}: {
+    loader: (query?: { search?: string; per_page?: number }) => Promise<{ data: T[] }>;
+    render: (rows: T[]) => ReactNode;
+    subtitle: string;
+    title: string;
+}) {
+    const [rows, setRows] = useState<T[]>([]);
+    const [search, setSearch] = useState('');
+    const [filters, setFilters] = useState<Record<string, DataToolbarFilterValue>>({});
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<Error | null>(null);
+
+    useEffect(() => {
+        setLoading(true);
+        loader({ search, status: String(filters.status ?? '') } as { search?: string; per_page?: number })
+            .then((response) => {
+                setRows(response.data);
+                setError(null);
+            })
+            .catch((caught: Error) => setError(caught))
+            .finally(() => setLoading(false));
+    }, [filters.status, loader, search]);
+
     return (
         <div className="space-y-6">
             <PageHeader eyebrow="Finance" subtitle={subtitle} title={title} />
-            <SearchFilterBar placeholder={`Search ${title.toLowerCase()}...`} />
-            <div className="space-y-5">
-                {children ?? <EmptyState description="No records returned yet." title="No records" />}
-            </div>
+            <ApiErrorBanner error={error} />
+            <DataToolbar
+                disabled={loading}
+                filterValues={filters}
+                filters={[{ id: 'status', label: 'Status', type: 'status', options: [{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }, { label: 'Open', value: 'open' }, { label: 'Closed', value: 'closed' }, { label: 'Draft', value: 'draft' }] }]}
+                isLoading={loading}
+                onFilterChange={(id, value) => setFilters((current) => ({ ...current, [id]: value }))}
+                onResetFilters={() => setFilters({})}
+                onSearchChange={setSearch}
+                savedViewsDisabledReason="Saved views are not backed by a Finance preferences endpoint yet."
+                searchPlaceholder={`Search ${title.toLowerCase()}...`}
+                searchValue={search}
+            />
+            {rows.length ? render(rows) : <EmptyState description="No records returned by the backend for the current filters." title="No records" />}
         </div>
     );
 }

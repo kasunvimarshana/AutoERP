@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { PreviewPanel } from '../../../shared/components/business/PreviewPanel';
 import { StatusBadge } from '../../../shared/components/business/StatusBadge';
@@ -6,11 +6,15 @@ import { DataTable, type DataTableColumn } from '../../../shared/components/data
 import { FormSection } from '../../../shared/components/forms/FormSection';
 import { Button } from '../../../shared/components/ui/Button';
 import { Card } from '../../../shared/components/ui/Card';
+import { Checkbox } from '../../../shared/components/ui/Checkbox';
+import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Input } from '../../../shared/components/ui/Input';
 import { Select } from '../../../shared/components/ui/Select';
 import { Textarea } from '../../../shared/components/ui/Textarea';
+import { ApiError } from '../../../services/api/apiErrors';
 import type {
     Account,
+    AccountFormValues,
     ApTransaction,
     ArTransaction,
     BankAccount,
@@ -20,11 +24,12 @@ import type {
     BudgetLine,
     BudgetUsage,
     CostCenter,
-    FinanceAuditEntry,
+    FinanceDashboardMetric,
     FinancePostingPreview,
     FiscalPeriod,
     FiscalYear,
     JournalEntry,
+    JournalEntryFormValues,
     JournalEntryLine,
     PaymentTerm,
     TaxGroup,
@@ -33,9 +38,9 @@ import type {
     TaxRule,
 } from '../types/finance.types';
 
-export function FinanceDashboardCards({ metrics }: { metrics: Array<{ label: string; status: string; value: string }> }) {
+export function FinanceDashboardCards({ metrics }: { metrics: FinanceDashboardMetric[] }) {
     return (
-        <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
+        <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
             {metrics.map((metric) => (
                 <Card className="p-4" key={metric.label}>
                     <div className="flex items-start justify-between gap-3">
@@ -51,27 +56,170 @@ export function FinanceDashboardCards({ metrics }: { metrics: Array<{ label: str
     );
 }
 
-export function AccountForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
+export function AccountForm({
+    errors,
+    initialValues,
+    isSaving,
+    mode = 'create',
+    onSubmit,
+}: {
+    errors?: Record<string, string[]>;
+    initialValues?: Partial<AccountFormValues>;
+    isSaving?: boolean;
+    mode?: 'create' | 'edit';
+    onSubmit: (values: AccountFormValues) => void;
+}) {
+    const defaults: AccountFormValues = {
+        accountCode: initialValues?.accountCode ?? '',
+        accountGroup: initialValues?.accountGroup ?? '',
+        accountName: initialValues?.accountName ?? '',
+        accountType: initialValues?.accountType ?? 'asset',
+        allowsManualPosting: initialValues?.allowsManualPosting ?? true,
+        description: initialValues?.description ?? '',
+        isBankAccount: initialValues?.isBankAccount ?? false,
+        isCashAccount: initialValues?.isCashAccount ?? false,
+        isControlAccount: initialValues?.isControlAccount ?? false,
+        normalBalance: initialValues?.normalBalance ?? 'debit',
+        parentId: initialValues?.parentId ?? '',
+        status: initialValues?.status ?? 'active',
+    };
+
+    function submit(event: FormEvent<HTMLFormElement>): void {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        onSubmit({
+            accountCode: String(form.get('accountCode') ?? ''),
+            accountGroup: String(form.get('accountGroup') ?? '') as AccountFormValues['accountGroup'],
+            accountName: String(form.get('accountName') ?? ''),
+            accountType: String(form.get('accountType') ?? 'asset') as AccountFormValues['accountType'],
+            allowsManualPosting: form.get('allowsManualPosting') === 'on',
+            description: String(form.get('description') ?? ''),
+            isBankAccount: form.get('isBankAccount') === 'on',
+            isCashAccount: form.get('isCashAccount') === 'on',
+            isControlAccount: form.get('isControlAccount') === 'on',
+            normalBalance: String(form.get('normalBalance') ?? 'debit') as AccountFormValues['normalBalance'],
+            parentId: String(form.get('parentId') ?? ''),
+            status: String(form.get('status') ?? 'active') as AccountFormValues['status'],
+        });
+    }
+
     return (
-        <form className="space-y-5">
-            <FormSection description="Chart of accounts setup only. Backend validates hierarchy and posting rules." title="Account Setup">
+        <form className="space-y-5" onSubmit={submit}>
+            <FormSection description="Chart of accounts setup only. Backend validates hierarchy, tenant scope, and posting rules." title="Account Setup">
                 <div className="grid gap-4 md:grid-cols-3">
-                    <Field label="Account code"><Input placeholder="1000" /></Field>
-                    <Field label="Account name"><Input placeholder="Cash and Bank" /></Field>
-                    <Field label="Account type"><Select><option>Asset</option><option>Liability</option><option>Equity</option><option>Income</option><option>Expense</option></Select></Field>
-                    <Field label="Account group"><Input placeholder="cash_bank, receivables, payables..." /></Field>
-                    <Field label="Normal balance"><Select><option>Debit</option><option>Credit</option></Select></Field>
-                    <Field label="Parent account"><Input placeholder="Optional parent" /></Field>
-                    <Field label="Status"><Select><option>Active</option><option>Inactive</option></Select></Field>
+                    <Field error={fieldError(errors, 'code')} label="Account code"><Input defaultValue={defaults.accountCode} name="accountCode" placeholder="1000" required /></Field>
+                    <Field error={fieldError(errors, 'name')} label="Account name"><Input defaultValue={defaults.accountName} name="accountName" placeholder="Cash and Bank" required /></Field>
+                    <Field error={fieldError(errors, 'type')} label="Account type">
+                        <Select defaultValue={defaults.accountType} name="accountType">
+                            <option value="asset">Asset</option>
+                            <option value="liability">Liability</option>
+                            <option value="equity">Equity</option>
+                            <option value="income">Income</option>
+                            <option value="expense">Expense</option>
+                        </Select>
+                    </Field>
+                    <Field error={fieldError(errors, 'account_group')} label="Account group"><Input defaultValue={defaults.accountGroup} name="accountGroup" placeholder="cash_bank" /></Field>
+                    <Field error={fieldError(errors, 'normal_balance')} label="Normal balance">
+                        <Select defaultValue={defaults.normalBalance} name="normalBalance"><option value="debit">Debit</option><option value="credit">Credit</option></Select>
+                    </Field>
+                    <Field error={fieldError(errors, 'parent_id')} label="Parent account id"><Input defaultValue={defaults.parentId} inputMode="numeric" name="parentId" placeholder="Optional parent id" /></Field>
+                    <Field label="Status"><Select defaultValue={defaults.status} name="status"><option value="active">Active</option><option value="inactive">Inactive</option></Select></Field>
+                    <BooleanField defaultChecked={defaults.isControlAccount} label="Control account" name="isControlAccount" />
+                    <BooleanField defaultChecked={defaults.allowsManualPosting} label="Allows manual posting" name="allowsManualPosting" />
+                    <BooleanField defaultChecked={defaults.isBankAccount} label="Bank account" name="isBankAccount" />
+                    <BooleanField defaultChecked={defaults.isCashAccount} label="Cash account" name="isCashAccount" />
+                    <Field className="md:col-span-3" error={fieldError(errors, 'description')} label="Description"><Textarea defaultValue={defaults.description} name="description" /></Field>
+                </div>
+                <FormActions isSaving={isSaving} label={mode === 'edit' ? 'Update Account' : 'Create Account'} />
+            </FormSection>
+        </form>
+    );
+}
+
+export function JournalEntryForm({
+    accounts,
+    errors,
+    initialValues,
+    isSaving,
+    mode = 'create',
+    onSubmit,
+}: {
+    accounts: Account[];
+    errors?: Record<string, string[]>;
+    initialValues?: Partial<JournalEntryFormValues>;
+    isSaving?: boolean;
+    mode?: 'create' | 'edit';
+    onSubmit: (values: JournalEntryFormValues) => void;
+}) {
+    const defaults: JournalEntryFormValues = {
+        description: initialValues?.description ?? '',
+        entryType: initialValues?.entryType ?? 'MANUAL',
+        journalDate: initialValues?.journalDate ?? new Date().toISOString().slice(0, 10),
+        journalNumber: initialValues?.journalNumber ?? '',
+        lines: initialValues?.lines?.length ? initialValues.lines : [
+            { accountId: '', credit: '', debit: '', description: '' },
+            { accountId: '', credit: '', debit: '', description: '' },
+        ],
+        sourceModule: initialValues?.sourceModule ?? '',
+        sourceReference: initialValues?.sourceReference ?? '',
+        sourceType: initialValues?.sourceType ?? '',
+        status: initialValues?.status ?? 'draft',
+    };
+
+    function submit(event: FormEvent<HTMLFormElement>): void {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        const lineIndexes = defaults.lines.map((_, index) => index);
+
+        onSubmit({
+            description: String(form.get('description') ?? ''),
+            entryType: String(form.get('entryType') ?? 'MANUAL'),
+            journalDate: String(form.get('journalDate') ?? ''),
+            journalNumber: String(form.get('journalNumber') ?? ''),
+            lines: lineIndexes.map((index) => ({
+                accountId: String(form.get(`lines.${index}.accountId`) ?? ''),
+                credit: String(form.get(`lines.${index}.credit`) ?? ''),
+                debit: String(form.get(`lines.${index}.debit`) ?? ''),
+                description: String(form.get(`lines.${index}.description`) ?? ''),
+            })),
+            sourceModule: String(form.get('sourceModule') ?? ''),
+            sourceReference: String(form.get('sourceReference') ?? ''),
+            sourceType: String(form.get('sourceType') ?? ''),
+            status: String(form.get('status') ?? 'draft') as JournalEntryFormValues['status'],
+        });
+    }
+
+    return (
+        <form className="space-y-5" onSubmit={submit}>
+            <FormSection description="Manual journal input. Backend validates period, line rules, totals, and posting eligibility." title="Journal Header">
+                <div className="grid gap-4 md:grid-cols-4">
+                    <Field error={fieldError(errors, 'entry_number')} label="Journal number"><Input defaultValue={defaults.journalNumber} name="journalNumber" required /></Field>
+                    <Field error={fieldError(errors, 'entry_date')} label="Journal date"><Input defaultValue={defaults.journalDate} name="journalDate" required type="date" /></Field>
+                    <Field label="Entry type"><Select defaultValue={defaults.entryType} name="entryType"><option value="MANUAL">Manual</option><option value="ADJUSTMENT">Adjustment</option><option value="OPENING">Opening</option></Select></Field>
+                    <Field label="Status"><Select defaultValue={defaults.status} name="status"><option value="draft">Draft</option></Select></Field>
+                    <Field className="md:col-span-2" label="Source module"><Input defaultValue={defaults.sourceModule} name="sourceModule" placeholder="Optional source module" /></Field>
+                    <Field label="Source type"><Input defaultValue={defaults.sourceType} name="sourceType" placeholder="Optional source type" /></Field>
+                    <Field label="Source reference"><Input defaultValue={defaults.sourceReference} name="sourceReference" placeholder="Optional source reference" /></Field>
+                    <Field className="md:col-span-4" error={fieldError(errors, 'description')} label="Description"><Textarea defaultValue={defaults.description} name="description" /></Field>
                 </div>
             </FormSection>
-            <FormSection description="Opening balances are submitted for backend validation and posting. Frontend does not calculate account balances." title="Opening Balance / Mapping">
-                <div className="grid gap-4 md:grid-cols-3">
-                    <Field label="Opening balance"><Input placeholder="Backend validated amount" /></Field>
-                    <Field label="Currency"><Input placeholder="LKR" /></Field>
-                    <Field label="Usage mapping"><Input placeholder="AR, AP, inventory, bank..." /></Field>
+            <FormSection description="Enter debit or credit per line. Backend returns the authoritative balance and posting preview." title="Journal Lines">
+                <div className="space-y-4">
+                    {defaults.lines.map((line, index) => (
+                        <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 md:grid-cols-5" key={index}>
+                            <Field error={fieldError(errors, `lines.${index}.account_id`)} label={`Line ${index + 1} account`}>
+                                <Select defaultValue={line.accountId} name={`lines.${index}.accountId`} required>
+                                    <option value="">Select account</option>
+                                    {accounts.map((account) => <option key={account.id} value={account.id}>{account.accountCode} - {account.accountName}</option>)}
+                                </Select>
+                            </Field>
+                            <Field error={fieldError(errors, `lines.${index}.debit_amount`)} label="Debit"><Input defaultValue={line.debit} min="0" name={`lines.${index}.debit`} step="0.0001" type="number" /></Field>
+                            <Field error={fieldError(errors, `lines.${index}.credit_amount`)} label="Credit"><Input defaultValue={line.credit} min="0" name={`lines.${index}.credit`} step="0.0001" type="number" /></Field>
+                            <Field className="md:col-span-2" label="Description"><Input defaultValue={line.description} name={`lines.${index}.description`} /></Field>
+                        </div>
+                    ))}
                 </div>
-                <div className="mt-4 flex justify-end gap-3"><Button variant="secondary">Cancel</Button><Button variant="blue">{mode === 'edit' ? 'Update Account' : 'Create Account'}</Button></div>
+                <FormActions isSaving={isSaving} label={mode === 'edit' ? 'Update Draft Journal' : 'Save Draft Journal'} />
             </FormSection>
         </form>
     );
@@ -84,7 +232,7 @@ export function AccountSummaryCard({ account }: { account: Account }) {
                 <div>
                     <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{account.accountType}</p>
                     <h2 className="mt-1 text-2xl font-bold text-slate-950">{account.accountCode} - {account.accountName}</h2>
-                    <p className="mt-2 text-sm text-slate-500">Normal balance: {account.normalBalance}. Current balance is backend-owned.</p>
+                    <p className="mt-2 text-sm text-slate-500">Normal balance: {account.normalBalance}. Current balances are returned by backend read models.</p>
                 </div>
                 <StatusBadge status={account.status} />
             </div>
@@ -99,10 +247,10 @@ export function AccountTreeView({ rows }: { rows: Account[] }) {
                 { header: 'Account', key: 'accountName', render: (row) => <Link className="font-semibold text-slate-950 hover:underline" to={`/finance/accounts/${row.id}`}>{row.accountCode} - {row.accountName}</Link> },
                 { header: 'Type', key: 'accountType' },
                 { header: 'Normal Balance', key: 'normalBalance' },
-                { header: 'Parent', key: 'parentAccount' },
+                { header: 'Parent', key: 'parentAccount', render: (row) => row.parentAccount || 'Root account' },
+                { header: 'Manual Posting', key: 'allowsManualPosting', render: (row) => row.allowsManualPosting ? 'Allowed' : 'Blocked' },
                 { header: 'Status', key: 'status', render: (row) => <StatusBadge status={row.status} /> },
-                { header: 'Updated', key: 'updatedAt' },
-                { header: 'Actions', key: 'actions', render: (row) => <div className="flex gap-2"><Link to={`/finance/accounts/${row.id}/edit`}><Button variant="secondary">Edit</Button></Link><Button variant="ghost">Ledger</Button></div> },
+                { header: 'Actions', key: 'actions', render: (row) => <Link to={`/finance/accounts/${row.id}/edit`}><Button variant="secondary">Edit</Button></Link> },
             ]}
             getRowKey={(row) => row.id}
             rows={rows}
@@ -111,51 +259,22 @@ export function AccountTreeView({ rows }: { rows: Account[] }) {
 }
 
 export function AccountLedgerTable({ rows }: { rows: JournalEntry[] }) {
+    if (!rows.length) {
+        return <EmptyState description="No journal entries reference this account in the current backend response." title="No ledger rows" />;
+    }
+
     return <SimpleTable rows={rows} columns={[['journalNumber', 'Journal #'], ['journalDate', 'Date'], ['description', 'Description'], ['sourceReference', 'Source'], ['status', 'Status']]} />;
-}
-
-export function FiscalYearForm() {
-    return <CompactForm title="Fiscal Year" fields={['Name', 'Start date', 'End date', 'Status']} />;
-}
-
-export function FiscalPeriodForm() {
-    return <CompactForm title="Fiscal Period" fields={['Fiscal year', 'Period name', 'Start date', 'End date', 'Status']} />;
-}
-
-export function JournalEntryForm() {
-    return (
-        <form className="space-y-5">
-            <FormSection description="Manual journal input. Backend validates fiscal period, balance, tax, and posting eligibility." title="Journal Header">
-                <div className="grid gap-4 md:grid-cols-4">
-                    <Field label="Journal date"><Input type="date" defaultValue="2026-05-30" /></Field>
-                    <Field label="Reference number"><Input placeholder="Reference" /></Field>
-                    <Field label="Currency"><Input placeholder="LKR" /></Field>
-                    <Field label="Source module optional"><Input placeholder="payment, inventory, voucher..." /></Field>
-                    <Field label="Description"><Textarea placeholder="Journal description" /></Field>
-                    <Field label="Source reference optional"><Input placeholder="Document or event reference" /></Field>
-                </div>
-            </FormSection>
-            <FormSection description="Debit/credit totals and balance decision come from backend preview." title="Journal Lines">
-                <JournalEntryLineTable rows={[{ account: 'Select account', credit: 'Input only', debit: 'Input only', description: 'Line description', id: 'draft-line' }]} />
-            </FormSection>
-            <JournalPostingPreviewPanel preview={{
-                breakdown: [],
-                calculated: { balanced: 'Backend decision', eligibility: 'Backend decision', totalCredit: 'Backend calculated', totalDebit: 'Backend calculated' },
-                errors: [],
-                input: {},
-                journalLines: [],
-                warnings: ['Click preview to request backend posting validation.'],
-            }} />
-            <div className="flex justify-end gap-3"><Button variant="secondary">Save Draft</Button><Button variant="blue">Preview Posting</Button></div>
-        </form>
-    );
 }
 
 export function JournalEntryLineTable({ rows }: { rows: JournalEntryLine[] }) {
     return <SimpleTable rows={rows} columns={[['account', 'Account'], ['debit', 'Debit'], ['credit', 'Credit'], ['costCenter', 'Cost Center'], ['taxRate', 'Tax'], ['party', 'Party'], ['description', 'Description']]} />;
 }
 
-export function JournalPostingPreviewPanel({ preview }: { preview: FinancePostingPreview }) {
+export function JournalPostingPreviewPanel({ preview }: { preview?: FinancePostingPreview }) {
+    if (!preview) {
+        return <EmptyState description="Run backend posting preview to see totals, balance status, warnings, and eligibility." title="No posting preview yet" />;
+    }
+
     return (
         <PreviewPanel
             rows={[
@@ -171,21 +290,34 @@ export function JournalPostingPreviewPanel({ preview }: { preview: FinancePostin
     );
 }
 
-export function JournalStatusActionPanel({ journalId, status }: { journalId: string; status: string }) {
+export function JournalStatusActionPanel({
+    journal,
+    onPost,
+    onPreview,
+    onReverse,
+}: {
+    journal: JournalEntry;
+    onPost: () => void;
+    onPreview: () => void;
+    onReverse: () => void;
+}) {
+    const isDraft = journal.status === 'draft';
+    const isPosted = journal.status === 'posted';
+
     return (
         <PreviewPanel
             rows={[
-                { label: 'Journal', value: journalId },
-                { label: 'Current status', value: status },
-                { label: 'Allowed actions', value: 'Backend permission/status result' },
+                { label: 'Journal', value: journal.journalNumber },
+                { label: 'Current status', value: journal.status },
+                { label: 'Allowed actions', value: isDraft ? 'Preview / Post' : isPosted ? 'Reverse' : 'No actions currently available' },
             ]}
             status="Workflow"
             title="Journal Status Actions"
         >
             <div className="flex flex-wrap gap-2">
-                <Button variant="blue">Preview Posting</Button>
-                <Button variant="secondary">Post</Button>
-                <Button variant="ghost">Reverse</Button>
+                <Button disabled={!isDraft} onClick={onPreview} title={isDraft ? undefined : 'Only draft journals can be previewed for posting.'} variant="blue">Preview Posting</Button>
+                <Button disabled={!isDraft} onClick={onPost} title={isDraft ? undefined : 'Only draft journals can be posted.'} variant="secondary">Post</Button>
+                <Button disabled={!isPosted} onClick={onReverse} title={isPosted ? undefined : 'Only posted journals can be reversed.'} variant="ghost">Reverse</Button>
             </div>
         </PreviewPanel>
     );
@@ -199,19 +331,11 @@ export function ArTransactionTable({ rows }: { rows: ArTransaction[] }) {
     return <SimpleTable rows={rows} columns={[['party', 'Customer / Party'], ['sourceDocument', 'Document'], ['originalAmount', 'Original'], ['paidAmount', 'Paid'], ['outstandingAmount', 'Outstanding'], ['dueDate', 'Due'], ['agingBucket', 'Aging'], ['status', 'Status']]} />;
 }
 
-export function TaxGroupForm() {
-    return <CompactForm title="Tax Group" fields={['Code', 'Name', 'Status']} />;
-}
+export function TaxPreviewPanel({ preview }: { preview?: TaxPreviewResult }) {
+    if (!preview) {
+        return <EmptyState description="Submit a tax preview request to receive the backend calculated tax result." title="No tax preview yet" />;
+    }
 
-export function TaxRateForm() {
-    return <CompactForm title="Tax Rate" fields={['Code', 'Name', 'Rate', 'Effective from', 'Status']} />;
-}
-
-export function TaxRuleForm() {
-    return <CompactForm title="Tax Rule" fields={['Name', 'Tax group', 'Tax rate', 'Applies to', 'Priority', 'Status']} />;
-}
-
-export function TaxPreviewPanel({ preview }: { preview: TaxPreviewResult }) {
     return (
         <PreviewPanel
             rows={[
@@ -226,28 +350,12 @@ export function TaxPreviewPanel({ preview }: { preview: TaxPreviewResult }) {
     );
 }
 
-export function PaymentTermForm() {
-    return <CompactForm title="Payment Term" fields={['Code', 'Name', 'Due days', 'Status']} />;
-}
-
-export function CostCenterForm() {
-    return <CompactForm title="Cost Center" fields={['Code', 'Name', 'Status']} />;
-}
-
-export function BankAccountForm() {
-    return <CompactForm title="Bank Account" fields={['Bank name', 'Account name', 'Account number', 'Currency', 'Status']} />;
-}
-
 export function BankTransactionTable({ rows }: { rows: BankTransaction[] }) {
     return <SimpleTable rows={rows} columns={[['date', 'Date'], ['bankAccount', 'Bank Account'], ['reference', 'Reference'], ['type', 'Type'], ['amount', 'Amount'], ['reconciliationStatus', 'Reconciliation']]} />;
 }
 
 export function BankReconciliationPanel({ rows }: { rows: BankReconciliation[] }) {
     return <SimpleTable rows={rows} columns={[['bankAccount', 'Bank Account'], ['period', 'Period'], ['variance', 'Backend Variance'], ['status', 'Status']]} />;
-}
-
-export function BudgetForm() {
-    return <CompactForm title="Budget" fields={['Budget name', 'Fiscal year', 'Status']} />;
 }
 
 export function BudgetLineTable({ rows }: { rows: BudgetLine[] }) {
@@ -262,26 +370,12 @@ export function BudgetUsagePanel({ rows }: { rows: BudgetUsage[] }) {
     );
 }
 
-export function FinanceSourceReferencePanel({ sourceModule, sourceReference }: { sourceModule?: string; sourceReference?: string }) {
-    return <PreviewPanel rows={[{ label: 'Source module', value: sourceModule ?? 'Manual / none' }, { label: 'Source reference', value: sourceReference ?? 'Not linked' }]} status="Readonly" title="Source Reference" />;
+export function FinanceSourceReferencePanel({ sourceModule, sourceReference, sourceType }: { sourceModule?: string; sourceReference?: string; sourceType?: string }) {
+    return <PreviewPanel rows={[{ label: 'Source module', value: sourceModule || 'Manual / none' }, { label: 'Source type', value: sourceType || 'Not linked' }, { label: 'Source reference', value: sourceReference || 'Not linked' }]} status="Readonly" title="Source Reference" />;
 }
 
-export function FinanceActivityTimeline({ rows }: { rows: FinanceAuditEntry[] }) {
-    return (
-        <div className="space-y-3">
-            {rows.map((entry) => (
-                <div className="rounded-lg border border-slate-200 bg-white p-4" key={entry.id}>
-                    <div className="flex items-start justify-between gap-4">
-                        <div>
-                            <p className="text-sm font-semibold text-slate-950">{entry.description}</p>
-                            <p className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-400">{entry.actor} - {entry.type}</p>
-                        </div>
-                        <span className="text-xs text-slate-400">{entry.time}</span>
-                    </div>
-                </div>
-            ))}
-        </div>
-    );
+export function ReferenceTable<T extends { id: string }>({ columns, rows }: { columns: Array<[keyof T & string, string]>; rows: T[] }) {
+    return <SimpleTable rows={rows} columns={columns} />;
 }
 
 export function TaxRuleTable({ rows }: { rows: TaxRule[] }) {
@@ -320,32 +414,70 @@ export function FiscalPeriodTable({ rows }: { rows: FiscalPeriod[] }) {
     return <SimpleTable rows={rows} columns={[['name', 'Period'], ['fiscalYear', 'Fiscal Year'], ['startDate', 'Start'], ['endDate', 'End'], ['status', 'Status']]} />;
 }
 
-function CompactForm({ fields, title }: { fields: string[]; title: string }) {
-    return (
-        <FormSection description="Captured values are submitted to backend validation. Calculated balances and effects stay backend-owned." title={title}>
-            <div className="grid gap-4 md:grid-cols-3">
-                {fields.map((field) => <Field key={field} label={field}><Input placeholder={field} /></Field>)}
-            </div>
-            <div className="mt-4 flex justify-end"><Button variant="blue">Save {title}</Button></div>
-        </FormSection>
-    );
+export function ApiErrorBanner({ error }: { error?: Error | string | null }) {
+    if (!error) {
+        return null;
+    }
+
+    const message = typeof error === 'string' ? error : error.message;
+
+    return <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{message}</div>;
+}
+
+export function apiFieldErrors(error: unknown): Record<string, string[]> {
+    return error instanceof ApiError ? error.errors : {};
 }
 
 function SimpleTable<T extends { id: string }>({ columns, rows }: { columns: Array<[keyof T & string, string]>; rows: T[] }) {
+    if (!rows.length) {
+        return <EmptyState description="No records returned by the backend for the current filters." title="No records" />;
+    }
+
     const tableColumns: Array<DataTableColumn<T>> = columns.map(([key, header]) => ({
         header,
         key,
-        render: (row) => key.toLowerCase().includes('status') ? <StatusBadge status={String(row[key] ?? '')} /> : String(row[key] ?? ''),
+        render: (row) => key.toLowerCase().includes('status') ? <StatusBadge status={String(row[key] ?? '')} /> : readableValue(row[key]),
     }));
 
     return <DataTable columns={tableColumns} getRowKey={(row) => row.id} rows={rows} />;
 }
 
-function Field({ children, label }: { children: ReactNode; label: string }) {
+function readableValue(value: unknown): string {
+    if (value === null || value === undefined || value === '') {
+        return 'Not set';
+    }
+
+    return String(value);
+}
+
+function Field({ children, className = '', error, label }: { children: ReactNode; className?: string; error?: string; label: string }) {
     return (
-        <label className="space-y-2 text-sm">
+        <label className={`space-y-2 text-sm ${className}`}>
             <span className="font-semibold text-slate-700">{label}</span>
             {children}
+            {error ? <span className="block text-xs font-semibold text-red-600">{error}</span> : null}
         </label>
     );
+}
+
+function BooleanField({ defaultChecked, label, name }: { defaultChecked: boolean; label: string; name: string }) {
+    return (
+        <label className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/60 px-3 text-sm font-semibold text-slate-700">
+            <Checkbox defaultChecked={defaultChecked} name={name} />
+            {label}
+        </label>
+    );
+}
+
+function FormActions({ isSaving, label }: { isSaving?: boolean; label: string }) {
+    return (
+        <div className="mt-4 flex justify-end gap-3">
+            <Link to=".."><Button variant="secondary">Cancel</Button></Link>
+            <Button disabled={isSaving} type="submit" variant="blue">{isSaving ? 'Saving...' : label}</Button>
+        </div>
+    );
+}
+
+function fieldError(errors: Record<string, string[]> | undefined, field: string): string | undefined {
+    return errors?.[field]?.[0];
 }
