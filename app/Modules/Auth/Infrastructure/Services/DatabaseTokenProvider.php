@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Infrastructure\Services;
 
+use DateInterval;
+use DateTimeImmutable;
 use Illuminate\Support\Str;
 use Modules\Auth\Application\Contracts\Providers\TokenProviderInterface;
 use Modules\Auth\Application\DTOs\TokenIssueData;
@@ -11,6 +13,7 @@ use Modules\Auth\Application\DTOs\TokenRefreshData;
 use Modules\Auth\Application\Repositories\AuthAccessTokenRepositoryInterface;
 use Modules\Auth\Application\Repositories\AuthRefreshTokenRepositoryInterface;
 use Modules\Auth\Application\Repositories\AuthSessionRepositoryInterface;
+use Modules\Core\Application\Contracts\ClockInterface;
 use Modules\Core\Application\Contracts\PasswordHasherInterface;
 
 final class DatabaseTokenProvider implements TokenProviderInterface
@@ -20,6 +23,7 @@ final class DatabaseTokenProvider implements TokenProviderInterface
         private readonly AuthRefreshTokenRepositoryInterface $refreshTokens,
         private readonly AuthSessionRepositoryInterface $sessions,
         private readonly PasswordHasherInterface $passwordHasher,
+        private readonly ClockInterface $clock,
     ) {
     }
 
@@ -33,9 +37,9 @@ final class DatabaseTokenProvider implements TokenProviderInterface
         $refreshKey = Str::random(48);
         $refreshSecret = Str::random(72);
 
-        $issuedAt = now();
-        $accessExpiresAt = now()->addSeconds($data->accessTokenTtlSeconds);
-        $refreshExpiresAt = now()->addSeconds($data->refreshTokenTtlSeconds);
+        $issuedAt = $this->clock->now();
+        $accessExpiresAt = $issuedAt->add(new DateInterval('PT' . $data->accessTokenTtlSeconds . 'S'));
+        $refreshExpiresAt = $issuedAt->add(new DateInterval('PT' . $data->refreshTokenTtlSeconds . 'S'));
 
         $access = $this->accessTokens->create([
             'tenant_id' => $data->tenantId,
@@ -109,7 +113,7 @@ final class DatabaseTokenProvider implements TokenProviderInterface
             if ($session === null || (string) $session->get('status', '') !== 'active') {
                 $this->refreshTokens->update($existing->id(), [
                     'status' => 'revoked',
-                    'revoked_at' => now(),
+                    'revoked_at' => $this->clock->now(),
                     'row_version' => ((int) $existing->get('row_version', 1)) + 1,
                 ]);
 
@@ -126,7 +130,7 @@ final class DatabaseTokenProvider implements TokenProviderInterface
         }
 
         $expiresAt = $existing->get('expires_at');
-        if ($expiresAt !== null && now()->greaterThan($expiresAt)) {
+        if ($expiresAt !== null && $this->clock->now() > new DateTimeImmutable((string) $expiresAt)) {
             $this->refreshTokens->update($existing->id(), [
                 'status' => 'expired',
                 'row_version' => ((int) $existing->get('row_version', 1)) + 1,
@@ -138,7 +142,7 @@ final class DatabaseTokenProvider implements TokenProviderInterface
         $this->refreshTokens->update($existing->id(), [
             'status' => 'revoked',
             'rotated' => true,
-            'rotated_at' => now(),
+            'rotated_at' => $this->clock->now(),
             'row_version' => ((int) $existing->get('row_version', 1)) + 1,
         ]);
 
@@ -177,7 +181,7 @@ final class DatabaseTokenProvider implements TokenProviderInterface
         }
 
         $expiresAt = $record->get('expires_at');
-        if ($expiresAt !== null && now()->greaterThan($expiresAt)) {
+        if ($expiresAt !== null && $this->clock->now() > new DateTimeImmutable((string) $expiresAt)) {
             $this->accessTokens->update($record->id(), [
                 'status' => 'expired',
                 'row_version' => ((int) $record->get('row_version', 1)) + 1,
@@ -207,7 +211,7 @@ final class DatabaseTokenProvider implements TokenProviderInterface
 
         $this->accessTokens->update($record->id(), [
             'status' => 'revoked',
-            'revoked_at' => now(),
+            'revoked_at' => $this->clock->now(),
             'row_version' => ((int) $record->get('row_version', 1)) + 1,
         ]);
 

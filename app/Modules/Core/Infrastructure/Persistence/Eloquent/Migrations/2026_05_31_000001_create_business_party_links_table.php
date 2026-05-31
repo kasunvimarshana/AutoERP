@@ -36,6 +36,15 @@ return new class extends Migration
             $table->index(['tenant_id', 'source_party_type', 'source_party_id'], 'business_party_links_source_idx');
             $table->index(['tenant_id', 'target_party_type', 'target_party_id'], 'business_party_links_target_idx');
             $table->index(['tenant_id', 'relation_type', 'is_active'], 'business_party_links_relation_idx');
+            $table->index([
+                'tenant_id',
+                'source_party_type',
+                'source_party_id',
+                'target_party_type',
+                'target_party_id',
+                'relation_type',
+                'is_active',
+            ], 'business_party_links_source_target_relation_idx');
         });
     }
 

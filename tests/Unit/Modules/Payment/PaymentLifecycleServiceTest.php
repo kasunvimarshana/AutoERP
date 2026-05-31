@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Modules\Payment;
 
+use DateTimeImmutable;
 use Modules\Core\Application\DTO\DataRecord;
+use Modules\Core\Application\Contracts\ClockInterface;
 use Modules\Payment\Application\Repositories\PaymentRepositoryInterface;
 use Modules\Payment\Application\Repositories\WriteOffRepositoryInterface;
 use Modules\Payment\Application\Services\PaymentPostingService;
@@ -39,7 +41,10 @@ final class PaymentLifecycleServiceTest extends TestCase
                 'status' => PaymentStatus::POSTED,
             ]));
 
-        $service = new PaymentPostingService($paymentRepository);
+        $clock = $this->createMock(ClockInterface::class);
+        $clock->method('now')->willReturn(new DateTimeImmutable('2026-01-01 00:00:00'));
+
+        $service = new PaymentPostingService($paymentRepository, $clock);
         $result = $service->postPayment(5, ['posted_by' => 9]);
 
         self::assertTrue($result->isSuccess());
@@ -87,7 +92,10 @@ final class PaymentLifecycleServiceTest extends TestCase
             ->method('update')
             ->willReturn(new DataRecord(['id' => 5, 'status' => 'reversed']));
 
-        $service = new PaymentReversalService($paymentRepository);
+        $clock = $this->createMock(ClockInterface::class);
+        $clock->method('now')->willReturn(new DateTimeImmutable('2026-01-01 00:00:00'));
+
+        $service = new PaymentReversalService($paymentRepository, $clock);
         $result = $service->reversePayment(5, ['payment_number' => 'PMT-5-R']);
 
         self::assertTrue($result->isSuccess());
@@ -123,7 +131,10 @@ final class PaymentLifecycleServiceTest extends TestCase
             ->method('create')
             ->willReturn(new DataRecord(['id' => 60, 'payment_number' => 'RFD-1']));
 
-        $service = new RefundService($paymentRepository);
+        $clock = $this->createMock(ClockInterface::class);
+        $clock->method('now')->willReturn(new DateTimeImmutable('2026-01-01 00:00:00'));
+
+        $service = new RefundService($paymentRepository, $clock);
         $result = $service->refundPayment(5, ['payment_number' => 'RFD-1', 'amount' => 25]);
 
         self::assertTrue($result->isSuccess());

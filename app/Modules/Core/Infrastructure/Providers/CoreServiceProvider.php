@@ -58,8 +58,8 @@ final class CoreServiceProvider extends ServiceProvider
         $this->app->singleton(BusinessPartyLinkServiceInterface::class, BusinessPartyLinkService::class);
         $this->app->singleton(
             BusinessPartyLinkRepositoryInterface::class,
-            static fn (): BusinessPartyLinkRepositoryInterface => new EloquentBusinessPartyLinkRepository(
-                new BusinessPartyLinkModel(),
+            static fn (BusinessPartyLinkModel $model): BusinessPartyLinkRepositoryInterface => new EloquentBusinessPartyLinkRepository(
+                $model,
             ),
         );
 

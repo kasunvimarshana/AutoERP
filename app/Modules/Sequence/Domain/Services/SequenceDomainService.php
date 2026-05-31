@@ -6,11 +6,15 @@ namespace Modules\Sequence\Domain\Services;
 
 use DateTimeImmutable;
 use InvalidArgumentException;
+use Modules\Core\Application\Contracts\ClockInterface;
 use Modules\Sequence\Domain\Constants\SequencePeriodType;
 use Modules\Sequence\Domain\Contracts\SequenceDomainServiceInterface;
 
 final class SequenceDomainService implements SequenceDomainServiceInterface
 {
+    public function __construct(private readonly ClockInterface $clock)
+    {
+    }
     public function normalizeDocumentType(string $value): string
     {
         $normalized = trim($value);
@@ -102,7 +106,7 @@ final class SequenceDomainService implements SequenceDomainServiceInterface
         }
 
         $date = $atDate === null || trim($atDate) === ''
-            ? new DateTimeImmutable('now')
+            ? $this->clock->now()
             : new DateTimeImmutable($atDate);
 
         if ($normalizedPeriodType === SequencePeriodType::MONTHLY) {

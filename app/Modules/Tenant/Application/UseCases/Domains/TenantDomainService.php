@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Tenant\Application\UseCases\Domains;
 
 use DateTimeImmutable;
+use Modules\Core\Application\Contracts\ClockInterface;
 use Modules\Core\Application\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Application\Contracts\TransactionManagerInterface;
 use Modules\Core\Application\DTO\DataRecord;
@@ -27,6 +28,7 @@ final class TenantDomainService implements TenantDomainServiceInterface
         private readonly TenantContext $tenantContext,
         private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errorNormalizer,
+        private readonly ClockInterface $clock,
     ) {
     }
 
@@ -199,7 +201,7 @@ final class TenantDomainService implements TenantDomainServiceInterface
     {
         $candidate = $this->domain->normalizeOptionalText($value);
         if ($candidate === null) {
-            return now()->format('Y-m-d H:i:s');
+            return $this->clock->now()->format('Y-m-d H:i:s');
         }
 
         return (new DateTimeImmutable($candidate))->format('Y-m-d H:i:s');

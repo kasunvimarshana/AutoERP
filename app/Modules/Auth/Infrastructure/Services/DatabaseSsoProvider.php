@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Infrastructure\Services;
 
+use DateInterval;
 use Illuminate\Support\Str;
 use Modules\Auth\Application\Contracts\Providers\SsoProviderInterface;
 use Modules\Auth\Application\DTOs\AuthorizeClientData;
@@ -11,6 +12,7 @@ use Modules\Auth\Application\DTOs\ExchangeAuthorizationCodeData;
 use Modules\Auth\Application\Repositories\AuthAuthorizationCodeRepositoryInterface;
 use Modules\Auth\Application\Repositories\AuthClientRepositoryInterface;
 use Modules\Core\Application\DTO\DataRecord;
+use Modules\Core\Application\Contracts\ClockInterface;
 use Modules\Core\Application\Contracts\PasswordHasherInterface;
 
 final class DatabaseSsoProvider implements SsoProviderInterface
@@ -19,6 +21,7 @@ final class DatabaseSsoProvider implements SsoProviderInterface
         private readonly AuthClientRepositoryInterface $clients,
         private readonly AuthAuthorizationCodeRepositoryInterface $authorizationCodes,
         private readonly PasswordHasherInterface $passwordHasher,
+        private readonly ClockInterface $clock,
     ) {
     }
 
@@ -83,8 +86,8 @@ final class DatabaseSsoProvider implements SsoProviderInterface
             'code_challenge_method' => $data->codeChallengeMethod,
             'redirect_uri' => $data->redirectUri,
             'status' => 'pending',
-            'issued_at' => now(),
-            'expires_at' => now()->addSeconds($data->ttlSeconds),
+            'issued_at' => $this->clock->now(),
+            'expires_at' => $this->clock->now()->add(new DateInterval('PT' . $data->ttlSeconds . 'S')),
             'row_version' => 1,
             'metadata' => null,
         ]);
@@ -117,7 +120,7 @@ final class DatabaseSsoProvider implements SsoProviderInterface
         }
 
         $expiresAt = $authorizationCode->get('expires_at');
-        if ($expiresAt !== null && now()->greaterThan($expiresAt)) {
+        if ($expiresAt !== null && $this->clock->now() > new \DateTimeImmutable((string) $expiresAt)) {
             $this->authorizationCodes->update($authorizationCode->id(), [
                 'status' => 'expired',
                 'row_version' => ((int) $authorizationCode->get('row_version', 1)) + 1,

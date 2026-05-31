@@ -7,6 +7,7 @@ namespace Modules\Payment\Application\Services;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
+use Modules\Core\Application\Contracts\ClockInterface;
 use Modules\Payment\Application\Contracts\Services\RefundServiceInterface;
 use Modules\Payment\Application\Repositories\PaymentRepositoryInterface;
 use Modules\Payment\Domain\Constants\PaymentErrorCode;
@@ -15,8 +16,10 @@ use Throwable;
 
 final class RefundService implements RefundServiceInterface
 {
-    public function __construct(private readonly PaymentRepositoryInterface $paymentRepository)
-    {
+    public function __construct(
+        private readonly PaymentRepositoryInterface $paymentRepository,
+        private readonly ClockInterface $clock,
+    ) {
     }
 
     public function refundPayment(int|string $sourcePaymentId, array $payload): Result
@@ -62,7 +65,7 @@ final class RefundService implements RefundServiceInterface
                 'party_id' => $source->get('party_id'),
                 'reference' => $payload['reference'] ?? ('Refund for ' . (string) $source->get('payment_number')),
                 'payment_number' => $refundNumber,
-                'payment_date' => $payload['payment_date'] ?? now()->toDateString(),
+                'payment_date' => $payload['payment_date'] ?? $this->clock->now()->format('Y-m-d'),
                 'amount' => $refundAmount,
                 'allocated_amount' => 0,
                 'direction' => $this->reverseDirection((string) $source->get('direction', 'inbound')),
@@ -79,7 +82,7 @@ final class RefundService implements RefundServiceInterface
                 'reversal_of_payment_id' => (int) $source->id(),
                 'created_by' => $payload['created_by'] ?? null,
                 'posted_by' => $payload['posted_by'] ?? null,
-                'posted_at' => $payload['posted_at'] ?? now(),
+                'posted_at' => $payload['posted_at'] ?? $this->clock->now()->format('Y-m-d H:i:s'),
             ]);
 
             return Result::success($refund);

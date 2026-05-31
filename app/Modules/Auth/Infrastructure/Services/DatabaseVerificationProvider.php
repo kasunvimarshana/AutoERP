@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Infrastructure\Services;
 
+use DateInterval;
+use DateTimeImmutable;
 use Illuminate\Support\Str;
 use Modules\Auth\Application\Contracts\Providers\VerificationProviderInterface;
 use Modules\Auth\Application\DTOs\VerificationChallengeRequestData;
 use Modules\Auth\Application\DTOs\VerificationChallengeVerifyData;
 use Modules\Auth\Application\Repositories\AuthVerificationChallengeRepositoryInterface;
+use Modules\Core\Application\Contracts\ClockInterface;
 use Modules\Core\Application\Contracts\PasswordHasherInterface;
 
 final class DatabaseVerificationProvider implements VerificationProviderInterface
@@ -16,6 +19,7 @@ final class DatabaseVerificationProvider implements VerificationProviderInterfac
     public function __construct(
         private readonly AuthVerificationChallengeRepositoryInterface $challenges,
         private readonly PasswordHasherInterface $passwordHasher,
+        private readonly ClockInterface $clock,
     ) {
     }
 
@@ -27,6 +31,7 @@ final class DatabaseVerificationProvider implements VerificationProviderInterfac
         $challengeKey = Str::random(40);
         $challengeSecret = (string) random_int(100000, 999999);
 
+        $issuedAt = $this->clock->now();
         $record = $this->challenges->create([
             'tenant_id' => $data->tenantId,
             'organization_unit_id' => $data->organizationUnitId,
@@ -41,8 +46,8 @@ final class DatabaseVerificationProvider implements VerificationProviderInterfac
             'attempts' => 0,
             'max_attempts' => 5,
             'status' => 'pending',
-            'issued_at' => now(),
-            'expires_at' => now()->addSeconds($data->ttlSeconds),
+            'issued_at' => $issuedAt,
+            'expires_at' => $issuedAt->add(new DateInterval('PT' . $data->ttlSeconds . 'S')),
             'row_version' => 1,
             'metadata' => $data->metadata,
         ]);
@@ -64,7 +69,7 @@ final class DatabaseVerificationProvider implements VerificationProviderInterfac
         }
 
         $expiresAt = $record->get('expires_at');
-        if ($expiresAt !== null && now()->greaterThan($expiresAt)) {
+        if ($expiresAt !== null && $this->clock->now() > new DateTimeImmutable((string) $expiresAt)) {
             $this->challenges->update($record->id(), [
                 'status' => 'expired',
                 'row_version' => ((int) $record->get('row_version', 1)) + 1,
@@ -78,8 +83,7 @@ final class DatabaseVerificationProvider implements VerificationProviderInterfac
         if ($attempts >= $maxAttempts) {
             $this->challenges->update($record->id(), [
                 'status' => 'failed',
-                'revoked_at' => now(),
-                'row_version' => ((int) $record->get('row_version', 1)) + 1,
+            'revoked_at' => $this->clock->now(),
             ]);
 
             return false;
@@ -97,7 +101,7 @@ final class DatabaseVerificationProvider implements VerificationProviderInterfac
 
         $this->challenges->update($record->id(), [
             'status' => 'verified',
-            'verified_at' => now(),
+            'verified_at' => $this->clock->now(),
             'row_version' => ((int) $record->get('row_version', 1)) + 1,
         ]);
 

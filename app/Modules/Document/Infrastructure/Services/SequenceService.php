@@ -4,19 +4,25 @@ declare(strict_types=1);
 
 namespace Modules\Document\Infrastructure\Services;
 
+use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Application\Contracts\ClockInterface;
 use Modules\Document\Application\Contracts\SequenceServiceInterface;
 
 final class SequenceService implements SequenceServiceInterface
 {
+    public function __construct(private readonly ClockInterface $clock)
+    {
+    }
+
     public function nextNumber(
         int $tenantId,
         ?int $organizationUnitId,
         string $documentType,
         ?string $date = null,
     ): string {
-        $date = $date ?? now()->toDateString();
-        $periodValue = date('Y', strtotime($date));
+        $date = $date ?? $this->clock->now()->format('Y-m-d');
+        $periodValue = (new DateTimeImmutable($date))->format('Y');
 
         return DB::transaction(function () use ($tenantId, $organizationUnitId, $documentType, $periodValue): string {
             $sequence = DB::table('sequences')
@@ -37,8 +43,8 @@ final class SequenceService implements SequenceServiceInterface
                     'padding' => 5,
                     'next_number' => 2,
                     'period_value' => $periodValue,
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                    'created_at' => $this->clock->now()->format('Y-m-d H:i:s'),
+                    'updated_at' => $this->clock->now()->format('Y-m-d H:i:s'),
                 ]);
 
                 $sequence = DB::table('sequences')->find($id);
@@ -50,7 +56,7 @@ final class SequenceService implements SequenceServiceInterface
                     ->where('id', $sequence->id)
                     ->update([
                         'next_number' => $currentNumber + 1,
-                        'updated_at' => now(),
+                        'updated_at' => $this->clock->now()->format('Y-m-d H:i:s'),
                     ]);
             }
 
