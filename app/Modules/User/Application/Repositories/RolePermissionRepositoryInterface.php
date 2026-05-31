@@ -10,4 +10,10 @@ use Modules\Core\Application\Repositories\Contracts\RepositoryPortInterface;
 interface RolePermissionRepositoryInterface extends RepositoryPortInterface
 {
     public function findByTenantRolePermission(?int $tenantId, int $roleId, int $permissionId, ?int $excludeId = null): ?DataRecord;
+
+    /**
+     * @param list<int> $roleIds
+     * @return list<string>
+     */
+    public function listPermissionNamesForTenantRoles(?int $tenantId, array $roleIds): array;
 }

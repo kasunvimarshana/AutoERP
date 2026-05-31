@@ -6,6 +6,7 @@ namespace Modules\User\Infrastructure\Persistence\Eloquent\Repositories;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Infrastructure\Persistence\Eloquent\Repositories\EloquentRepository;
 use Modules\User\Application\Repositories\UserPermissionRepositoryInterface;
@@ -33,6 +34,29 @@ final class EloquentUserPermissionRepository extends EloquentRepository implemen
         $model = $query->first();
 
         return $model instanceof Model ? $this->toRecord($model) : null;
+    }
+
+    public function listPermissionNamesForTenantUser(?int $tenantId, int $userId): array
+    {
+        $query = DB::table('user_permissions')
+            ->join('permissions', 'permissions.id', '=', 'user_permissions.permission_id')
+            ->where('user_permissions.user_id', $userId)
+            ->whereNull('permissions.deleted_at')
+            ->select('permissions.name');
+
+        if ($tenantId === null) {
+            $query->whereNull('user_permissions.tenant_id');
+        } else {
+            $query->where('user_permissions.tenant_id', $tenantId);
+        }
+
+        return $query
+            ->orderBy('permissions.name')
+            ->pluck('permissions.name')
+            ->map(static fn (mixed $name): string => (string) $name)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function applyTenantScope(Builder $query, ?int $tenantId): void

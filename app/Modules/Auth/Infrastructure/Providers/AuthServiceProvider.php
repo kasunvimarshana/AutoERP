@@ -18,6 +18,7 @@ use Modules\Auth\Application\Contracts\Providers\VerificationProviderInterface;
 use Modules\Auth\Application\Contracts\Providers\AuthProviderRegistryInterface;
 use Modules\Auth\Application\Contracts\UseCases\AuthorizeClientServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\ExchangeAuthorizationCodeServiceInterface;
+use Modules\Auth\Application\Contracts\UseCases\GetCurrentAuthProfileServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\IssueTokenServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\LinkExternalIdentityServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\ListSessionsServiceInterface;
@@ -42,6 +43,7 @@ use Modules\Auth\Application\Repositories\AuthSessionRepositoryInterface;
 use Modules\Auth\Application\Repositories\AuthVerificationChallengeRepositoryInterface;
 use Modules\Auth\Application\UseCases\AuthWorkflowService;
 use Modules\Auth\Application\UseCases\ExchangeAuthorizationCodeService;
+use Modules\Auth\Application\UseCases\GetCurrentAuthProfileService;
 use Modules\Auth\Application\UseCases\IssueTokenService;
 use Modules\Auth\Application\UseCases\LinkExternalIdentityService;
 use Modules\Auth\Application\UseCases\ListSessionsService;
@@ -179,6 +181,7 @@ final class AuthServiceProvider extends ServiceProvider
                 VerifyChallengeServiceInterface::class => VerifyChallengeService::class,
                 AuthorizeClientServiceInterface::class => AuthorizeClientService::class,
                 ExchangeAuthorizationCodeServiceInterface::class => ExchangeAuthorizationCodeService::class,
+                GetCurrentAuthProfileServiceInterface::class => GetCurrentAuthProfileService::class,
             ] as $contract => $implementation
         ) {
             $this->app->singleton($contract, $implementation);

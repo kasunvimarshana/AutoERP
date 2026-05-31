@@ -45,6 +45,10 @@ final class AuthLoginEndpointTest extends TestCase
         ])
             ->getJson('/api/auth/me')
             ->assertOk()
+            ->assertJsonPath('data.user.email', 'admin@example.com')
+            ->assertJsonPath('data.user.roles.0', 'Super Admin')
+            ->assertJsonPath('data.roles.0', 'Super Admin')
+            ->assertJsonPath('data.permissions.0', 'audit.activate')
             ->assertJsonPath('data.tenant_id', $tenantId)
             ->assertJsonPath('data.organization_unit_id', $organizationUnitId);
     }

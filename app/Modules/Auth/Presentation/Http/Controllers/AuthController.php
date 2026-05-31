@@ -11,6 +11,7 @@ use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Application\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Auth\Application\Contracts\UseCases\AuthorizeClientServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\ExchangeAuthorizationCodeServiceInterface;
+use Modules\Auth\Application\Contracts\UseCases\GetCurrentAuthProfileServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\IssueTokenServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\LinkExternalIdentityServiceInterface;
 use Modules\Auth\Application\Contracts\UseCases\ListSessionsServiceInterface;
@@ -68,6 +69,7 @@ final class AuthController extends Controller
         private readonly VerifyChallengeServiceInterface $verifyChallengeService,
         private readonly AuthorizeClientServiceInterface $authorizeClientService,
         private readonly ExchangeAuthorizationCodeServiceInterface $exchangeAuthorizationCodeService,
+        private readonly GetCurrentAuthProfileServiceInterface $currentAuthProfileService,
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
@@ -210,16 +212,17 @@ final class AuthController extends Controller
             ], 401);
         }
 
-        return (new AuthPayloadResource([
-            'user_id' => $context->userIdAsInt(),
-            'tenant_id' => $this->currentTenant->currentTenantId() ?? $context->tenantId(),
-            'organization_unit_id' => $this->currentOrganizationUnit->currentOrganizationUnitId()
-                ?? $context->organizationUnitId(),
-            'guard' => $context->guard(),
-            'provider' => $context->provider(),
-            'application_id' => $context->applicationId(),
-            'token_payload' => $context->tokenPayload(),
-        ]))->response()->setStatusCode(200);
+        $result = $this->currentAuthProfileService->getProfile(
+            $context->userIdAsInt(),
+            $this->currentTenant->currentTenantId() ?? $context->tenantId(),
+            $this->currentOrganizationUnit->currentOrganizationUnitId() ?? $context->organizationUnitId(),
+            $context->guard(),
+            $context->provider(),
+            $context->applicationId(),
+            $context->tokenPayload(),
+        );
+
+        return $this->respond($result);
     }
 
     public function ssoCallback(

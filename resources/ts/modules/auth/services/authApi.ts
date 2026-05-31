@@ -118,17 +118,33 @@ function normalizeSession(raw: BackendRecord): AuthSession {
 
 function userFromContext(context: BackendRecord): AuthUser {
     const stored = getStoredAuthSession().user;
+    const contextUser = asRecord(context.user);
     const userId = asString(context.user_id ?? stored?.id);
+    const contextRoles = asStringList(context.roles);
+    const contextPermissions = asStringList(context.permissions);
+
+    if (Object.keys(contextUser).length > 0) {
+        return normalizeUser(
+            {
+                ...contextUser,
+                permissions: contextUser.permissions ?? context.permissions,
+                roles: contextUser.roles ?? context.roles,
+            },
+            context,
+        );
+    }
 
     if (stored && stored.id === userId) {
         return {
             ...stored,
             organizationUnitId: asOptionalString(context.organization_unit_id) ?? stored.organizationUnitId,
+            permissions: contextPermissions.length > 0 ? contextPermissions : stored.permissions,
+            roles: contextRoles.length > 0 ? contextRoles : stored.roles,
             tenantId: asOptionalString(context.tenant_id) ?? stored.tenantId,
         };
     }
 
-    return normalizeUser({ id: userId }, context);
+    return normalizeUser({ id: userId, permissions: contextPermissions, roles: contextRoles }, context);
 }
 
 export const authApi = {
