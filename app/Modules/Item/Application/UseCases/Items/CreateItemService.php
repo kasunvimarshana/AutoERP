@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Item\Application\UseCases\Items;
 
+use Modules\Core\Application\Contracts\CurrentOrganizationUnitContextAccessorInterface;
 use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
@@ -25,6 +26,7 @@ final class CreateItemService implements CreateItemServiceInterface
     public function __construct(
         private readonly ItemRepositoryInterface $repository,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
+        private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
         private readonly ItemNestedRelationsService $nestedRelationsService,
     ) {
     }
@@ -38,6 +40,7 @@ final class CreateItemService implements CreateItemServiceInterface
             }
 
             $payload['tenant_id'] = $tenantId;
+            $payload['organization_unit_id'] ??= $this->currentOrganizationUnit->currentOrganizationUnitId();
             $nested = $this->extractNestedPayload($payload);
 
             if (! array_key_exists('row_version', $payload)) {

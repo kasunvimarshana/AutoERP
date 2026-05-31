@@ -14,6 +14,7 @@ use Modules\Item\Presentation\Http\Controllers\ItemVariantAttributeController;
 use Modules\Item\Presentation\Http\Controllers\ItemVariantAttributeValueController;
 use Modules\Item\Presentation\Http\Controllers\ComboItemController;
 use Modules\Item\Presentation\Http\Controllers\ItemIdentifierController;
+use Modules\Item\Presentation\Http\Controllers\ItemTypeController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $currentUserMiddleware = (string) config('core.current_user.middleware_alias', 'current.user');
@@ -35,6 +36,7 @@ Route::prefix('api/item')
     ->group(function (): void {
         Route::apiResource('item-categories', ItemCategoryController::class);
         Route::apiResource('item-brands', ItemBrandController::class);
+        Route::get('item-types', [ItemTypeController::class, 'index'])->name('item-types.index');
         Route::apiResource('items', ItemController::class);
         Route::patch('items/{item}/activate', [ItemController::class, 'activate'])->name('items.activate');
         Route::patch('items/{item}/deactivate', [ItemController::class, 'deactivate'])->name('items.deactivate');

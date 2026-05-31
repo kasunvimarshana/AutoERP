@@ -43,6 +43,7 @@ export function ItemDetailPage() {
     const [detail, setDetail] = useState<ItemDetailState | null>(null);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(true);
+    const [isChangingStatus, setIsChangingStatus] = useState(false);
 
     useEffect(() => {
         let mounted = true;
@@ -68,13 +69,34 @@ export function ItemDetailPage() {
     }, [id]);
 
     if (isLoading) return <EmptyState description="Loading item setup, backend preview panels, and audit..." title="Loading item detail" />;
-    if (error || !detail) return <EmptyState description={error || 'Item was not found.'} title="Unable to load item" />;
+    if (!detail) return <EmptyState description={error || 'Item was not found.'} title="Unable to load item" />;
 
     const { activity, attributes, comboComponents, identifiers, inventorySummary, item, pricingReferences, units, usage, variants } = detail;
 
+    async function changeStatus(action: 'activate' | 'deactivate') {
+        if (!detail) {
+            return;
+        }
+
+        setIsChangingStatus(true);
+        setError('');
+
+        try {
+            const response = action === 'activate'
+                ? await itemApi.activateItem(detail.item.id)
+                : await itemApi.deactivateItem(detail.item.id);
+            setDetail({ ...detail, item: response.data });
+        } catch (caught) {
+            setError(caught instanceof Error ? caught.message : 'Unable to change item status.');
+        } finally {
+            setIsChangingStatus(false);
+        }
+    }
+
     return (
         <div className="space-y-6">
-            <PageHeader actions={<><Link to="/items"><Button variant="secondary">Back</Button></Link><Link to={`/items/${item.id}/edit`}><Button>Edit Item</Button></Link></>} eyebrow="Item" subtitle="Item detail separates UOM, variants, combo components, pricing references, inventory previews, usage, and audit." title={item.name} />
+            <PageHeader actions={<><Link to="/items"><Button variant="secondary">Back</Button></Link>{item.status === 'inactive' ? <Button disabled={isChangingStatus} onClick={() => void changeStatus('activate')} variant="secondary">Activate</Button> : <Button disabled={isChangingStatus} onClick={() => void changeStatus('deactivate')} variant="secondary">Deactivate</Button>}<Link to={`/items/${item.id}/edit`}><Button>Edit Item</Button></Link></>} eyebrow="Item" subtitle="Item detail separates UOM, variants, combo components, pricing references, inventory previews, usage, and audit." title={item.name} />
+            {error ? <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</div> : null}
             <ItemSummaryCard item={item} />
             <Card className="p-5"><Tabs active={activeTab} items={tabs} onChange={setActiveTab} /></Card>
             {activeTab === 'overview' ? (

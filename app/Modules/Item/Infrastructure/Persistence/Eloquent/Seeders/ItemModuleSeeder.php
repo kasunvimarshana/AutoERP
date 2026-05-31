@@ -12,6 +12,7 @@ final class ItemModuleSeeder extends Seeder
     {
         $this->call([
             \Modules\Item\Infrastructure\Persistence\Eloquent\Seeders\ItemTypesSeeder::class,
+            \Modules\Item\Infrastructure\Persistence\Eloquent\Seeders\ItemSampleSeeder::class,
         ]);
     }
 }

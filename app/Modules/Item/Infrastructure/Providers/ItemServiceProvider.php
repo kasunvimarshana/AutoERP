@@ -40,6 +40,7 @@ use Modules\Item\Application\Contracts\UseCases\ItemIdentifiers\DeleteItemIdenti
 use Modules\Item\Application\Contracts\UseCases\ItemIdentifiers\GetItemIdentifierServiceInterface;
 use Modules\Item\Application\Contracts\UseCases\ItemIdentifiers\ListItemIdentifiersServiceInterface;
 use Modules\Item\Application\Contracts\UseCases\ItemIdentifiers\UpdateItemIdentifierServiceInterface;
+use Modules\Item\Application\Contracts\UseCases\ItemTypes\ListItemTypesServiceInterface;
 use Modules\Item\Application\Contracts\UseCases\Items\CreateItemServiceInterface;
 use Modules\Item\Application\Contracts\UseCases\Items\DeleteItemServiceInterface;
 use Modules\Item\Application\Contracts\UseCases\Items\GetItemServiceInterface;
@@ -68,6 +69,7 @@ use Modules\Item\Application\Repositories\ItemBrandRepositoryInterface;
 use Modules\Item\Application\Repositories\ItemCategoryRepositoryInterface;
 use Modules\Item\Application\Repositories\ItemIdentifierRepositoryInterface;
 use Modules\Item\Application\Repositories\ItemRepositoryInterface;
+use Modules\Item\Application\Repositories\ItemTypeRepositoryInterface;
 use Modules\Item\Application\Repositories\ItemVariantAttributeRepositoryInterface;
 use Modules\Item\Application\Repositories\ItemVariantAttributeValueRepositoryInterface;
 use Modules\Item\Application\Repositories\ItemVariantRepositoryInterface;
@@ -106,6 +108,7 @@ use Modules\Item\Application\UseCases\ItemIdentifiers\DeleteItemIdentifierServic
 use Modules\Item\Application\UseCases\ItemIdentifiers\GetItemIdentifierService;
 use Modules\Item\Application\UseCases\ItemIdentifiers\ListItemIdentifiersService;
 use Modules\Item\Application\UseCases\ItemIdentifiers\UpdateItemIdentifierService;
+use Modules\Item\Application\UseCases\ItemTypes\ListItemTypesService;
 use Modules\Item\Application\UseCases\Items\CreateItemService;
 use Modules\Item\Application\UseCases\Items\DeleteItemService;
 use Modules\Item\Application\UseCases\Items\GetItemService;
@@ -134,6 +137,7 @@ use Modules\Item\Infrastructure\Persistence\Eloquent\Models\ItemBrandModel;
 use Modules\Item\Infrastructure\Persistence\Eloquent\Models\ItemCategoryModel;
 use Modules\Item\Infrastructure\Persistence\Eloquent\Models\ItemIdentifierModel;
 use Modules\Item\Infrastructure\Persistence\Eloquent\Models\ItemModel;
+use Modules\Item\Infrastructure\Persistence\Eloquent\Models\ItemTypeModel;
 use Modules\Item\Infrastructure\Persistence\Eloquent\Models\ItemVariantAttributeModel;
 use Modules\Item\Infrastructure\Persistence\Eloquent\Models\ItemVariantAttributeValueModel;
 use Modules\Item\Infrastructure\Persistence\Eloquent\Models\ItemVariantModel;
@@ -145,6 +149,7 @@ use Modules\Item\Infrastructure\Persistence\Eloquent\Repositories\EloquentItemBr
 use Modules\Item\Infrastructure\Persistence\Eloquent\Repositories\EloquentItemCategoryRepository;
 use Modules\Item\Infrastructure\Persistence\Eloquent\Repositories\EloquentItemIdentifierRepository;
 use Modules\Item\Infrastructure\Persistence\Eloquent\Repositories\EloquentItemRepository;
+use Modules\Item\Infrastructure\Persistence\Eloquent\Repositories\EloquentItemTypeRepository;
 use Modules\Item\Infrastructure\Persistence\Eloquent\Repositories\EloquentItemVariantAttributeRepository;
 use Modules\Item\Infrastructure\Persistence\Eloquent\Repositories\EloquentItemVariantAttributeValueRepository;
 use Modules\Item\Infrastructure\Persistence\Eloquent\Repositories\EloquentItemVariantRepository;
@@ -212,6 +217,7 @@ final class ItemServiceProvider extends ServiceProvider
                 CreateItemIdentifierServiceInterface::class => CreateItemIdentifierService::class,
                 UpdateItemIdentifierServiceInterface::class => UpdateItemIdentifierService::class,
                 DeleteItemIdentifierServiceInterface::class => DeleteItemIdentifierService::class,
+                ListItemTypesServiceInterface::class => ListItemTypesService::class,
             ] as $contract => $implementation
         ) {
             $this->app->singleton($contract, $implementation);
@@ -249,6 +255,9 @@ final class ItemServiceProvider extends ServiceProvider
         });
         $this->app->singleton(ItemIdentifierRepositoryInterface::class, function (): ItemIdentifierRepositoryInterface {
             return new EloquentItemIdentifierRepository(new ItemIdentifierModel());
+        });
+        $this->app->singleton(ItemTypeRepositoryInterface::class, function (): ItemTypeRepositoryInterface {
+            return new EloquentItemTypeRepository(new ItemTypeModel());
         });
     }
 

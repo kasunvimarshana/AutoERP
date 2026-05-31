@@ -91,5 +91,7 @@ export function ItemUsagePanel({ summary }: { summary: ItemUsageSummary }) {
 }
 
 export function ItemActivityTimeline({ entries }: { entries: ItemAuditEntry[] }) {
+    if (!entries.length) return <EmptyState description="No audit/activity entries were returned for this item yet." title="No item activity" />;
+
     return <AuditTimeline events={entries.map((entry) => ({ actor: entry.actor, description: entry.description, time: entry.time }))} />;
 }
