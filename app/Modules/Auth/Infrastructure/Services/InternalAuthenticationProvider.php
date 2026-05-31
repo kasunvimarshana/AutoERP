@@ -9,7 +9,6 @@ use Modules\Auth\Application\Contracts\Providers\IdentityProviderInterface;
 use Modules\Auth\Application\DTOs\LoginData;
 use Modules\Auth\Application\DTOs\RegistrationData;
 use Modules\Auth\Application\Repositories\AuthProviderRepositoryInterface;
-use Modules\Core\Application\Contracts\ClockInterface;
 use Modules\Core\Application\Contracts\PasswordHasherInterface;
 use Modules\User\Application\Repositories\UserRepositoryInterface;
 
@@ -20,7 +19,6 @@ final class InternalAuthenticationProvider implements AuthenticationProviderInte
         private readonly AuthProviderRepositoryInterface $providers,
         private readonly IdentityProviderInterface $identities,
         private readonly PasswordHasherInterface $passwordHasher,
-        private readonly ClockInterface $clock,
     ) {
     }
 
@@ -68,13 +66,13 @@ final class InternalAuthenticationProvider implements AuthenticationProviderInte
                 'provider_user_key' => $email,
                 'status' => 'active',
                 'is_primary' => true,
-                'last_authenticated_at' => $this->clock->now(),
+                'last_authenticated_at' => now(),
                 'row_version' => 1,
                 'metadata' => $data->metadata,
             ]);
         } else {
             $identity = $this->identities->update($identity->id(), [
-                'last_authenticated_at' => $this->clock->now(),
+                'last_authenticated_at' => now(),
                 'row_version' => ((int) $identity->get('row_version', 1)) + 1,
             ]);
         }

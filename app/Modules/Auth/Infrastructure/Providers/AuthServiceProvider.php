@@ -214,10 +214,13 @@ final class AuthServiceProvider extends ServiceProvider
                 }
 
                 $tenantInputKey = (string) config('module-auth.token_guard_tenant_input_key', 'tenant_id');
-                $tenantId = $request->input($tenantInputKey);
+                $tenantId = $request->input($tenantInputKey)
+                    ?? $request->headers->get('X-Tenant-ID')
+                    ?? $request->headers->get('X-Tenant-Id')
+                    ?? $request->headers->get('X-Tenant');
                 $validation = $this->app->make(ValidateTokenServiceInterface::class)->validateToken(
                     $plainAccessToken,
-                    $tenantId !== null ? (int) $tenantId : null,
+                    is_numeric($tenantId) ? (int) $tenantId : null,
                 );
 
                 if ($validation->isFailure()) {

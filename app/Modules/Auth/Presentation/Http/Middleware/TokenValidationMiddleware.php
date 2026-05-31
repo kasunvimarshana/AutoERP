@@ -31,10 +31,10 @@ final class TokenValidationMiddleware
             ], 401);
         }
 
-        $tenantId = $request->attributes->get('current_tenant_id');
+        $tenantId = $this->resolveTenantId($request);
         $result = $this->tokens->validateToken(
             $bearerToken,
-            is_numeric($tenantId) ? (int) $tenantId : null,
+            $tenantId,
         );
 
         if ($result->isFailure()) {
@@ -47,5 +47,24 @@ final class TokenValidationMiddleware
         $request->attributes->set('auth_access_token', $result->valueOrFail());
 
         return $next($request);
+    }
+
+    private function resolveTenantId(Request $request): ?int
+    {
+        $candidates = [
+            $request->attributes->get('current_tenant_id'),
+            $request->input('tenant_id'),
+            $request->headers->get('X-Tenant-ID'),
+            $request->headers->get('X-Tenant-Id'),
+            $request->headers->get('X-Tenant'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_numeric($candidate) && (int) $candidate > 0) {
+                return (int) $candidate;
+            }
+        }
+
+        return null;
     }
 }

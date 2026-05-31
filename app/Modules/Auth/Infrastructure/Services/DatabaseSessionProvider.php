@@ -4,18 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Infrastructure\Services;
 
-use DateInterval;
 use Illuminate\Support\Str;
 use Modules\Auth\Application\Contracts\Providers\SessionProviderInterface;
 use Modules\Auth\Application\Repositories\AuthSessionRepositoryInterface;
-use Modules\Core\Application\Contracts\ClockInterface;
 
 final class DatabaseSessionProvider implements SessionProviderInterface
 {
-    public function __construct(
-        private readonly AuthSessionRepositoryInterface $sessions,
-        private readonly ClockInterface $clock,
-    ) {
+    public function __construct(private readonly AuthSessionRepositoryInterface $sessions)
+    {
     }
 
     /**
@@ -35,8 +31,8 @@ final class DatabaseSessionProvider implements SessionProviderInterface
             'ip_address' => $payload['ip_address'] ?? null,
             'user_agent' => $payload['user_agent'] ?? null,
             'device_name' => $payload['device_name'] ?? null,
-            'last_activity_at' => $this->clock->now(),
-            'expires_at' => $this->clock->now()->add(new DateInterval('P30D')),
+            'last_activity_at' => now(),
+            'expires_at' => now()->addDays(30),
             'row_version' => 1,
             'metadata' => $payload['metadata'] ?? null,
         ]);
@@ -58,7 +54,7 @@ final class DatabaseSessionProvider implements SessionProviderInterface
 
         $this->sessions->update($sessionId, [
             'status' => 'revoked',
-            'revoked_at' => $this->clock->now(),
+            'revoked_at' => now(),
             'row_version' => ((int) $session->get('row_version', 1)) + 1,
         ]);
 

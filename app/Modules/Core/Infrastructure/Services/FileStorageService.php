@@ -8,7 +8,6 @@ use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
-use Modules\Core\Application\Contracts\ClockInterface;
 use Modules\Core\Application\Contracts\FileStorageServiceInterface;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -19,7 +18,7 @@ final class FileStorageService implements FileStorageServiceInterface
 
     protected string $defaultDisk;
 
-    public function __construct(private readonly ClockInterface $clock, string $defaultDisk)
+    public function __construct(string $defaultDisk)
     {
         if (trim($defaultDisk) === '') {
             throw new InvalidArgumentException('Default storage disk cannot be empty.');
@@ -180,7 +179,7 @@ final class FileStorageService implements FileStorageServiceInterface
 
         $adapter = $this->getDisk($disk);
         if (method_exists($adapter, 'temporaryUrl')) {
-            return $adapter->temporaryUrl($path, $this->clock->now()->addMinutes($minutes));
+            return $adapter->temporaryUrl($path, now()->addMinutes($minutes));
         }
 
         return null;

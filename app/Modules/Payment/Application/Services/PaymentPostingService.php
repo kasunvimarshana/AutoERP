@@ -7,7 +7,6 @@ namespace Modules\Payment\Application\Services;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Core\Application\Contracts\ClockInterface;
 use Modules\Payment\Application\Contracts\Services\PaymentPostingServiceInterface;
 use Modules\Payment\Application\Repositories\PaymentRepositoryInterface;
 use Modules\Payment\Domain\Constants\PaymentErrorCode;
@@ -16,10 +15,8 @@ use Throwable;
 
 final class PaymentPostingService implements PaymentPostingServiceInterface
 {
-    public function __construct(
-        private readonly PaymentRepositoryInterface $paymentRepository,
-        private readonly ClockInterface $clock,
-    ) {
+    public function __construct(private readonly PaymentRepositoryInterface $paymentRepository)
+    {
     }
 
     public function postPayment(int|string $paymentId, array $payload = []): Result
@@ -59,7 +56,7 @@ final class PaymentPostingService implements PaymentPostingServiceInterface
             $updated = $this->paymentRepository->update($paymentId, [
                 'status' => PaymentStatus::POSTED,
                 'posted_by' => $payload['posted_by'] ?? null,
-                'posted_at' => $payload['posted_at'] ?? $this->clock->now()->format('Y-m-d H:i:s'),
+                'posted_at' => $payload['posted_at'] ?? now(),
                 'row_version' => $currentRowVersion + 1,
             ]);
 

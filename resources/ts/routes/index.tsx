@@ -1,6 +1,8 @@
 import { Navigate, RouterProvider as ReactRouterProvider, createBrowserRouter } from 'react-router-dom';
 import { AppLayout } from '../layouts/AppLayout';
-import { AuthGuard } from '../app/guards/AuthGuard';
+import { AuthLayout } from '../layouts/AuthLayout';
+import { AuthGuard, GuestGuard } from '../app/guards/AuthGuard';
+import { authGuestRoutes, logoutRoute } from './moduleRoutes/auth.routes';
 import { auditRoutes } from './moduleRoutes/audit.routes';
 import { configurationRoutes } from './moduleRoutes/configuration.routes';
 import { customerRoutes } from './moduleRoutes/customer.routes';
@@ -24,6 +26,15 @@ import { vehicleServiceRoutes } from './moduleRoutes/vehicleService.routes';
 import { voucherRoutes } from './moduleRoutes/voucher.routes';
 
 const router = createBrowserRouter([
+    {
+        element: (
+            <GuestGuard>
+                <AuthLayout />
+            </GuestGuard>
+        ),
+        children: authGuestRoutes,
+    },
+    logoutRoute,
     {
         element: (
             <AuthGuard>

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Unit\Modules\Tenant;
 
 use Modules\Core\Application\DTO\DataRecord;
-use Modules\Core\Application\Contracts\ClockInterface;
 use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Application\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Application\Contracts\TransactionManagerInterface;
@@ -26,7 +25,6 @@ final class TenantDomainCrudServiceTest extends TestCase
         $currentTenant = $this->createMock(CurrentTenantContextAccessorInterface::class);
         $transactions = $this->createMock(TransactionManagerInterface::class);
         $errorNormalizer = $this->createMock(ErrorNormalizerInterface::class);
-        $clock = $this->createMock(ClockInterface::class);
 
         $currentTenant->method('currentTenantId')->willReturn(7);
         $transactions->method('runInTransaction')->willReturnCallback(static fn (callable $callback): mixed => $callback());
@@ -52,7 +50,6 @@ final class TenantDomainCrudServiceTest extends TestCase
             new TenantContext($currentTenant),
             $transactions,
             $errorNormalizer,
-            $clock,
         );
 
         $result = $service->create([

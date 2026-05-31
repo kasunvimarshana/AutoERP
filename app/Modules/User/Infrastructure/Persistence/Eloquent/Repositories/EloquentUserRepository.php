@@ -31,7 +31,7 @@ final class EloquentUserRepository extends EloquentRepository implements UserRep
 
         $model = $query->first();
 
-        return $model instanceof Model ? $this->toRecord($model) : null;
+        return $model instanceof Model ? new DataRecord($model->getAttributes()) : null;
     }
 
     public function pageByFilters(?int $tenantId, ?string $search, int $perPage, int $page): PagedResult

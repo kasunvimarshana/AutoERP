@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Core\Application\Services;
 
 use DateTimeImmutable;
-use Modules\Core\Application\Contracts\ClockInterface;
 use Modules\Core\Application\Contracts\Services\BusinessPartyLinkServiceInterface;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Repositories\BusinessPartyLinkRepositoryInterface;
@@ -42,10 +41,8 @@ final class BusinessPartyLinkService implements BusinessPartyLinkServiceInterfac
         'payee_relation',
     ];
 
-    public function __construct(
-        private readonly BusinessPartyLinkRepositoryInterface $links,
-        private readonly ClockInterface $clock,
-    ) {
+    public function __construct(private readonly BusinessPartyLinkRepositoryInterface $links)
+    {
     }
 
     public function list(array $filters): Result
@@ -57,24 +54,6 @@ final class BusinessPartyLinkService implements BusinessPartyLinkServiceInterfac
 
         $sourceType = trim((string) ($filters['source_party_type'] ?? ''));
         $targetType = trim((string) ($filters['target_party_type'] ?? ''));
-
-        if ($sourceType !== '' && $targetType !== '') {
-            if (! in_array($sourceType, self::PARTY_TYPES, true)) {
-                return $this->invalid('Invalid source party type.');
-            }
-
-            if (! in_array($targetType, self::PARTY_TYPES, true)) {
-                return $this->invalid('Invalid target party type.');
-            }
-
-            return Result::success($this->links->listForSourceAndTarget(
-                $tenantId,
-                $sourceType,
-                $this->nullableInt($filters['source_party_id'] ?? null),
-                $targetType,
-                $this->nullableInt($filters['target_party_id'] ?? null),
-            ));
-        }
 
         if ($sourceType !== '') {
             if (! in_array($sourceType, self::PARTY_TYPES, true)) {
@@ -162,9 +141,7 @@ final class BusinessPartyLinkService implements BusinessPartyLinkServiceInterfac
             return $this->notFound('Business party link not found.');
         }
 
-        $endDate = $endDate === null || trim($endDate) === ''
-            ? $this->clock->now()->format('Y-m-d')
-            : $endDate;
+        $endDate = $endDate === null || trim($endDate) === '' ? now()->toDateString() : $endDate;
         if (! $this->isValidDate($endDate)) {
             return $this->invalid('End date must be a valid date.');
         }

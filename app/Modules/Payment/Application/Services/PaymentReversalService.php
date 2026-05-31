@@ -7,7 +7,6 @@ namespace Modules\Payment\Application\Services;
 use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
-use Modules\Core\Application\Contracts\ClockInterface;
 use Modules\Payment\Application\Contracts\Services\PaymentReversalServiceInterface;
 use Modules\Payment\Application\Repositories\PaymentRepositoryInterface;
 use Modules\Payment\Domain\Constants\PaymentErrorCode;
@@ -16,10 +15,8 @@ use Throwable;
 
 final class PaymentReversalService implements PaymentReversalServiceInterface
 {
-    public function __construct(
-        private readonly PaymentRepositoryInterface $paymentRepository,
-        private readonly ClockInterface $clock,
-    ) {
+    public function __construct(private readonly PaymentRepositoryInterface $paymentRepository)
+    {
     }
 
     public function reversePayment(int|string $paymentId, array $payload): Result
@@ -64,7 +61,7 @@ final class PaymentReversalService implements PaymentReversalServiceInterface
                     'party_id' => $payment->get('party_id'),
                     'reference' => $payload['reference'] ?? ('Reversal of ' . (string) $payment->get('payment_number')),
                     'payment_number' => $reverseNumber,
-                    'payment_date' => $payload['payment_date'] ?? $this->clock->now()->format('Y-m-d'),
+                    'payment_date' => $payload['payment_date'] ?? now()->toDateString(),
                     'amount' => (float) $payment->get('amount', 0),
                     'allocated_amount' => 0,
                     'direction' => $this->reverseDirection((string) $payment->get('direction', 'inbound')),
@@ -81,13 +78,13 @@ final class PaymentReversalService implements PaymentReversalServiceInterface
                     'reversal_of_payment_id' => (int) $payment->id(),
                     'created_by' => $payload['created_by'] ?? null,
                     'posted_by' => $payload['posted_by'] ?? null,
-                    'posted_at' => $payload['posted_at'] ?? $this->clock->now()->format('Y-m-d H:i:s'),
+                    'posted_at' => $payload['posted_at'] ?? now(),
                 ]);
 
                 $source = $this->paymentRepository->update((int) $payment->id(), [
                     'status' => PaymentStatus::REVERSED,
                     'reversed_by' => $payload['reversed_by'] ?? null,
-                    'reversed_at' => $payload['reversed_at'] ?? $this->clock->now()->format('Y-m-d H:i:s'),
+                    'reversed_at' => $payload['reversed_at'] ?? now(),
                     'row_version' => ((int) $payment->get('row_version', 1)) + 1,
                 ]);
 

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Application\UseCases;
 
-use DateInterval;
 use Modules\Auth\Application\Contracts\Providers\AuthProviderRegistryInterface;
 use Modules\Auth\Application\DTOs\LinkExternalIdentityData;
 use Modules\Auth\Application\Contracts\UseCases\LoginServiceInterface;
@@ -23,7 +22,6 @@ use Modules\Auth\Application\Repositories\AuthLoginAttemptRepositoryInterface;
 use Modules\Auth\Application\Repositories\AuthProviderRepositoryInterface;
 use Modules\Auth\Domain\Constants\AuthErrorCode;
 use Modules\Auth\Domain\Contracts\AuthDomainServiceInterface;
-use Modules\Core\Application\Contracts\ClockInterface;
 use Modules\Core\Application\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Application\Contracts\TransactionManagerInterface;
 use Modules\Core\Application\Results\Error;
@@ -56,7 +54,6 @@ final class AuthWorkflowService implements
         private readonly UserServiceInterface $userService,
         private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errorNormalizer,
-        private readonly ClockInterface $clock,
     ) {
     }
 
@@ -529,7 +526,7 @@ final class AuthWorkflowService implements
             event('auth.lifecycle', [
                 'name' => $name,
                 'context' => $context,
-                'occurred_at' => $this->clock->now()->format(DATE_ATOM),
+                'occurred_at' => now()->toIso8601String(),
             ]);
         } catch (Throwable) {
             // Allows isolated unit tests and non-framework adapters to exercise auth logic without an event bus.
@@ -570,7 +567,7 @@ final class AuthWorkflowService implements
             'ip_address' => $data->ipAddress,
             'user_agent' => $data->userAgent,
             'attempt_type' => 'password',
-            'attempted_at' => $this->clock->now(),
+            'attempted_at' => now(),
             'row_version' => 1,
             'metadata' => $this->domain->normalizeMetadata($data->metadata),
         ]);
@@ -597,7 +594,7 @@ final class AuthWorkflowService implements
             30,
             $this->readModuleAuthIntConfig('login_attempt_window_seconds', 900),
         );
-        $since = $this->clock->now()->sub(new DateInterval('PT' . $windowSeconds . 'S'));
+        $since = now()->subSeconds($windowSeconds);
 
         $recentFailures = $this->loginAttempts->countRecentFailures(
             $data->tenantId,
@@ -615,7 +612,7 @@ final class AuthWorkflowService implements
             30,
             $this->readModuleAuthIntConfig('login_attempt_window_seconds', 900),
         );
-        $since = $this->clock->now()->sub(new DateInterval('PT' . $windowSeconds . 'S'));
+        $since = now()->subSeconds($windowSeconds);
 
         $this->loginAttempts->clearRecentFailures(
             $data->tenantId,

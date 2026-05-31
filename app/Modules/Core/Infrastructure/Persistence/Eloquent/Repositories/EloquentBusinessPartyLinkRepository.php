@@ -48,31 +48,6 @@ final class EloquentBusinessPartyLinkRepository extends EloquentRepository imple
         return $this->recordsFromModels($query->get()->all());
     }
 
-    public function listForSourceAndTarget(
-        int $tenantId,
-        string $sourcePartyType,
-        ?int $sourcePartyId,
-        string $targetPartyType,
-        ?int $targetPartyId,
-    ): array {
-        $query = $this->query()
-            ->where('tenant_id', $tenantId)
-            ->where('source_party_type', $sourcePartyType)
-            ->where('target_party_type', $targetPartyType)
-            ->orderByDesc('is_active')
-            ->orderByDesc('id');
-
-        $sourcePartyId === null
-            ? $query->whereNull('source_party_id')
-            : $query->where('source_party_id', $sourcePartyId);
-
-        $targetPartyId === null
-            ? $query->whereNull('target_party_id')
-            : $query->where('target_party_id', $targetPartyId);
-
-        return $this->recordsFromModels($query->get()->all());
-    }
-
     public function findInTenant(int $tenantId, int $linkId): ?DataRecord
     {
         $model = $this->query()

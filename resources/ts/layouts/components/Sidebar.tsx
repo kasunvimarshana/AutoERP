@@ -107,7 +107,7 @@ function SidebarContent() {
                 </NavLink>
                 <div className="space-y-2 text-sm font-medium text-slate-400">
                     <p>Support</p>
-                    <p>Logout</p>
+                    <NavLink className="block transition hover:text-slate-900" to="/logout">Logout</NavLink>
                 </div>
             </div>
         </>

@@ -1,4 +1,5 @@
 import { ApiError } from './apiErrors';
+import { getStoredAccessToken, getStoredOrganizationUnitId, getStoredTenantId } from './authTokenStorage';
 
 type HttpMethod = 'DELETE' | 'GET' | 'PATCH' | 'POST' | 'PUT';
 
@@ -34,9 +35,9 @@ function buildUrl(path: string, query?: HttpClientOptions['query']) {
 }
 
 function authHeaders() {
-    const token = window.localStorage.getItem('auth_token');
-    const tenantId = window.localStorage.getItem('tenant_id');
-    const organizationUnitId = window.localStorage.getItem('organization_unit_id');
+    const token = getStoredAccessToken();
+    const tenantId = getStoredTenantId();
+    const organizationUnitId = getStoredOrganizationUnitId();
 
     return {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
