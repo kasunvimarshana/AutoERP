@@ -1,6 +1,6 @@
 export type UomUnitStatus = 'active' | 'inactive';
 
-export type UomUnitType = 'count' | 'distance' | 'duration' | 'mass' | 'service' | 'volume';
+export type UomUnitType = 'UNIT' | 'MASS' | 'VOLUME' | 'LENGTH' | 'AREA' | 'TIME' | 'DISTANCE' | 'OTHER';
 
 export type UomCategory = {
     id: string;
@@ -10,10 +10,11 @@ export type UomCategory = {
 
 export type UomUnit = {
     allowFractional: boolean;
-    category: string;
+    category: UomUnitType;
     code: string;
     description?: string;
     id: string;
+    isActive: boolean;
     isBase: boolean;
     name: string;
     precision: number;
@@ -21,25 +22,29 @@ export type UomUnit = {
     symbol: string;
     type: UomUnitType;
     updatedAt: string;
-    usableForCharge: boolean;
-    usableForConsumption: boolean;
     usableForInventory: boolean;
-    usableForIssue: boolean;
-    usableForReceipt: boolean;
+    usableForPurchase: boolean;
+    usableForRental: boolean;
+    usableForSales: boolean;
+    usableForService: boolean;
 };
 
 export type UomConversionDirection = 'bidirectional' | 'one_way';
 
 export type UomConversion = {
-    category: string;
+    category: UomUnitType | 'OTHER';
     direction: UomConversionDirection;
+    effectiveFrom?: string;
+    effectiveTo?: string;
     factor: string;
     fromUnitCode: string;
     fromUnitId: string;
     id: string;
     isActive: boolean;
     isItemSpecific: boolean;
+    itemId?: string;
     itemName?: string;
+    notes?: string;
     toUnitCode: string;
     toUnitId: string;
     updatedAt: string;
@@ -66,10 +71,10 @@ export type UomItemUsage = {
     inventory: string;
     items: string;
     pricing: string;
-    charge: string;
-    consumption: string;
-    issue: string;
-    receipt: string;
+    purchase: string;
+    rental: string;
+    sales: string;
+    service: string;
 };
 
 export type UomAuditEntry = {
@@ -77,6 +82,11 @@ export type UomAuditEntry = {
     description: string;
     id: string;
     time: string;
+};
+
+export type UomLookupOption = {
+    id: string;
+    label: string;
 };
 
 export type UomUnitFormInput = {
@@ -89,15 +99,14 @@ export type UomUnitFormInput = {
     status: UomUnitStatus;
     symbol: string;
     type: UomUnitType;
-    usableForCharge: boolean;
-    usableForConsumption: boolean;
     usableForInventory: boolean;
-    usableForIssue: boolean;
-    usableForReceipt: boolean;
+    usableForPurchase: boolean;
+    usableForRental: boolean;
+    usableForSales: boolean;
+    usableForService: boolean;
 };
 
 export type UomConversionFormInput = {
-    category: string;
     effectiveFrom?: string;
     effectiveTo?: string;
     factor: string;
@@ -106,6 +115,7 @@ export type UomConversionFormInput = {
     isBidirectional: boolean;
     isItemSpecific: boolean;
     itemId?: string;
+    notes?: string;
     quantity?: string;
     toUnitId: string;
 };

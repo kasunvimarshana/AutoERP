@@ -19,10 +19,14 @@ return new class extends Migration
 
             $table->foreignId('from_uom_id')->constrained('unit_of_measures');
             $table->foreignId('to_uom_id')->constrained('unit_of_measures');
-            $table->decimal('factor', 20, 4);
+            $table->decimal('factor', 20, 8);
+            $table->string('category')->nullable();
             $table->foreignId('item_id')->nullable()->constrained('items')->cascadeOnDelete();
             $table->boolean('is_bidirectional')->default(true);
             $table->boolean('is_active')->default(true);
+            $table->date('effective_from')->nullable();
+            $table->date('effective_to')->nullable();
+            $table->text('notes')->nullable();
 
             $table->timestamps();
             $table->softDeletes();

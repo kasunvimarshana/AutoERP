@@ -1,17 +1,5 @@
 import type { ApiCollectionResponse, ApiResponse } from '../../../services/api/apiResponse';
-import { ApiError } from '../../../services/api/apiErrors';
 import { httpClient } from '../../../services/api/httpClient';
-import { mockCollectionResponse, mockResponse } from '../../../services/mock/mockResponse';
-import {
-    getUomConversionById,
-    getUomUnitById,
-    mockUomPreview,
-    uomActivity,
-    uomCategories,
-    uomConversions,
-    uomUnits,
-    uomUsage,
-} from '../mock/uomMock';
 import type {
     UomAuditEntry,
     UomCategory,
@@ -19,6 +7,7 @@ import type {
     UomConversionFormInput,
     UomConversionPreview,
     UomItemUsage,
+    UomLookupOption,
     UomUnit,
     UomUnitFormInput,
     UomUnitStatus,
@@ -27,94 +16,109 @@ import type {
 
 type BackendRecord = Record<string, unknown>;
 
-const UOM_API_MODE = import.meta.env.VITE_UOM_API_MODE ?? 'auto';
-
-function shouldUseMockOnly() {
-    return UOM_API_MODE === 'mock';
-}
-
-async function withMockFallback<T>(realCall: () => Promise<T>, mockCall: () => Promise<T>, fallbackStatuses = [401, 403, 404, 419]): Promise<T> {
-    if (shouldUseMockOnly()) {
-        return mockCall();
-    }
-
-    try {
-        return await realCall();
-    } catch (error) {
-        if (UOM_API_MODE === 'real') {
-            throw error;
-        }
-
-        if (error instanceof ApiError && !fallbackStatuses.includes(error.status)) {
-            throw error;
-        }
-
-        return mockCall();
-    }
-}
+const UOM_CATEGORIES: UomCategory[] = [
+    { id: 'UNIT', name: 'Unit', type: 'UNIT' },
+    { id: 'MASS', name: 'Mass', type: 'MASS' },
+    { id: 'VOLUME', name: 'Volume', type: 'VOLUME' },
+    { id: 'LENGTH', name: 'Length', type: 'LENGTH' },
+    { id: 'AREA', name: 'Area', type: 'AREA' },
+    { id: 'TIME', name: 'Time', type: 'TIME' },
+    { id: 'DISTANCE', name: 'Distance', type: 'DISTANCE' },
+    { id: 'OTHER', name: 'Other', type: 'OTHER' },
+];
 
 function asString(value: unknown, fallback = '') {
     return value === null || value === undefined ? fallback : String(value);
 }
 
+function asOptionalString(value: unknown) {
+    const normalized = asString(value).trim();
+
+    return normalized === '' ? undefined : normalized;
+}
+
 function asBool(value: unknown, fallback = false) {
-    return value === null || value === undefined ? fallback : Boolean(value);
+    if (value === null || value === undefined) {
+        return fallback;
+    }
+
+    return Boolean(value);
+}
+
+function asNumberOrUndefined(value: unknown) {
+    if (value === null || value === undefined || value === '') {
+        return undefined;
+    }
+
+    const parsed = Number(value);
+
+    return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function normalizeType(value: unknown): UomUnitType {
-    const type = asString(value, 'count').toLowerCase();
-    const allowed: UomUnitType[] = ['count', 'distance', 'duration', 'mass', 'service', 'volume'];
+    const upper = asString(value, 'UNIT').toUpperCase();
+    const allowed: UomUnitType[] = ['UNIT', 'MASS', 'VOLUME', 'LENGTH', 'AREA', 'TIME', 'DISTANCE', 'OTHER'];
 
-    return allowed.includes(type as UomUnitType) ? (type as UomUnitType) : 'count';
-}
-
-function categoryForType(type: UomUnitType) {
-    return uomCategories.find((category) => category.type === type)?.name ?? 'Count';
+    return allowed.includes(upper as UomUnitType) ? (upper as UomUnitType) : 'OTHER';
 }
 
 function normalizeUnit(raw: BackendRecord): UomUnit {
-    const type = normalizeType(raw.type);
-    const symbol = asString(raw.symbol ?? raw.code, 'UOM');
-    const metadata = raw.metadata && typeof raw.metadata === 'object' ? raw.metadata as BackendRecord : {};
+    const type = normalizeType(raw.type ?? raw.category);
+    const isActive = asBool(raw.is_active, true);
 
     return {
-        allowFractional: Number(raw.precision ?? raw.decimal_precision ?? 0) > 0,
-        category: asString(raw.category_name, categoryForType(type)),
-        code: asString(raw.code ?? raw.symbol, symbol.toUpperCase()),
-        description: asString(raw.description, ''),
+        allowFractional: asBool(raw.allow_fractional_quantity, Number(raw.decimal_precision ?? 0) > 0),
+        category: normalizeType(raw.category ?? type),
+        code: asString(raw.code ?? raw.symbol, 'UOM').toUpperCase(),
+        description: asOptionalString(raw.description),
         id: asString(raw.id),
+        isActive,
         isBase: asBool(raw.is_base),
         name: asString(raw.name, 'Unnamed unit'),
-        precision: Number(raw.precision ?? raw.decimal_precision ?? 0),
-        status: raw.is_active === false ? 'inactive' : 'active',
-        symbol,
+        precision: Number(raw.decimal_precision ?? 0),
+        status: isActive ? 'active' : 'inactive',
+        symbol: asString(raw.symbol ?? raw.code, 'uom'),
         type,
         updatedAt: asString(raw.updated_at, 'Backend timestamp pending'),
-        usableForCharge: asBool(metadata.usable_for_charge ?? raw.usable_for_charge, ['duration', 'distance', 'service'].includes(type)),
-        usableForConsumption: asBool(metadata.usable_for_consumption ?? raw.usable_for_consumption, ['count', 'duration', 'volume'].includes(type)),
-        usableForInventory: asBool(raw.usable_for_inventory, ['count', 'mass', 'volume'].includes(type)),
-        usableForIssue: asBool(metadata.usable_for_issue ?? raw.usable_for_issue, ['count', 'mass', 'volume'].includes(type)),
-        usableForReceipt: asBool(metadata.usable_for_receipt ?? raw.usable_for_receipt, ['count', 'mass', 'volume'].includes(type)),
+        usableForInventory: asBool(raw.usable_for_inventory, true),
+        usableForPurchase: asBool(raw.usable_for_purchase, true),
+        usableForRental: asBool(raw.usable_for_rental, false),
+        usableForSales: asBool(raw.usable_for_sales, true),
+        usableForService: asBool(raw.usable_for_service, true),
     };
 }
 
-function normalizeConversion(raw: BackendRecord): UomConversion {
-    const fromUnitId = asString(raw.from_uom_id ?? raw.fromUnitId);
-    const toUnitId = asString(raw.to_uom_id ?? raw.toUnitId);
-    const fromUnit = uomUnits.find((unit) => unit.id === fromUnitId);
-    const toUnit = uomUnits.find((unit) => unit.id === toUnitId);
+function normalizeLookupOption(raw: BackendRecord): UomLookupOption {
+    const id = asString(raw.id);
+    const code = asOptionalString(raw.code);
+    const name = asOptionalString(raw.name ?? raw.display_name);
 
     return {
-        category: fromUnit && toUnit && fromUnit.category === toUnit.category ? fromUnit.category : asString(raw.category, 'Backend category'),
+        id,
+        label: [code, name].filter(Boolean).join(' - ') || id,
+    };
+}
+
+function normalizeConversion(raw: BackendRecord, units = new Map<string, UomUnit>(), items = new Map<string, UomLookupOption>()): UomConversion {
+    const fromUnitId = asString(raw.from_uom_id);
+    const toUnitId = asString(raw.to_uom_id);
+    const itemId = asOptionalString(raw.item_id);
+
+    return {
+        category: normalizeType(raw.category ?? units.get(fromUnitId)?.category ?? 'OTHER'),
         direction: asBool(raw.is_bidirectional, true) ? 'bidirectional' : 'one_way',
-        factor: asString(raw.factor, 'Backend factor'),
-        fromUnitCode: fromUnit?.code ?? asString(raw.from_uom_code ?? raw.from_uom_id, 'FROM'),
+        effectiveFrom: asOptionalString(raw.effective_from),
+        effectiveTo: asOptionalString(raw.effective_to),
+        factor: asString(raw.factor, '0'),
+        fromUnitCode: units.get(fromUnitId)?.code ?? asString(raw.from_uom_code ?? raw.from_uom_id, 'FROM'),
         fromUnitId,
         id: asString(raw.id),
         isActive: asBool(raw.is_active, true),
-        isItemSpecific: raw.item_id !== null && raw.item_id !== undefined,
-        itemName: asString(raw.item_name, ''),
-        toUnitCode: toUnit?.code ?? asString(raw.to_uom_code ?? raw.to_uom_id, 'TO'),
+        isItemSpecific: itemId !== undefined,
+        itemId,
+        itemName: itemId ? items.get(itemId)?.label ?? asOptionalString(raw.item_name) : undefined,
+        notes: asOptionalString(raw.notes),
+        toUnitCode: units.get(toUnitId)?.code ?? asString(raw.to_uom_code ?? raw.to_uom_id, 'TO'),
         toUnitId,
         updatedAt: asString(raw.updated_at, 'Backend timestamp pending'),
     };
@@ -124,11 +128,11 @@ function normalizePreview(raw: BackendRecord, input: UomConversionPreview['input
     const calculated = (raw.calculated && typeof raw.calculated === 'object' ? raw.calculated : {}) as BackendRecord;
 
     return {
-        breakdown: Array.isArray(raw.breakdown) ? raw.breakdown as UomConversionPreview['breakdown'] : [{ label: 'Backend response', value: 'Conversion service returned result' }],
+        breakdown: Array.isArray(raw.breakdown) ? raw.breakdown as UomConversionPreview['breakdown'] : [],
         calculated: {
-            convertedQuantity: asString(calculated.converted_quantity ?? raw.result ?? raw.calculated_quantity ?? raw.converted_quantity, 'Backend-owned conversion result'),
-            factor: asString(calculated.factor ?? raw.factor, 'Backend factor lookup'),
-            precision: asString(calculated.precision ?? raw.precision, 'Backend precision / rounding'),
+            convertedQuantity: asString(calculated.converted_quantity ?? raw.converted_quantity, 'Backend conversion unavailable'),
+            factor: asString(calculated.factor ?? raw.factor, 'Backend factor unavailable'),
+            precision: asString(calculated.precision ?? raw.precision, 'Backend precision unavailable'),
         },
         errors: Array.isArray(raw.errors) ? raw.errors.map(String) : [],
         input,
@@ -137,144 +141,168 @@ function normalizePreview(raw: BackendRecord, input: UomConversionPreview['input
 }
 
 function toBackendUnitPayload(input: UomUnitFormInput) {
+    const type = input.type || 'UNIT';
+
     return {
+        allow_fractional_quantity: input.allowFractional,
+        category: type,
+        code: input.code.trim().toUpperCase(),
+        decimal_precision: asNumberOrUndefined(input.precision) ?? 0,
+        description: input.description || null,
+        is_active: input.status === 'active',
         is_base: input.isBase,
-        metadata: {
-            code: input.code,
-            description: input.description,
-            precision: input.precision,
-            usable_for_charge: input.usableForCharge,
-            usable_for_consumption: input.usableForConsumption,
-            usable_for_inventory: input.usableForInventory,
-            usable_for_issue: input.usableForIssue,
-            usable_for_receipt: input.usableForReceipt,
-        },
+        metadata: {},
         name: input.name,
         symbol: input.symbol || input.code,
-        type: input.type,
+        type,
+        usable_for_inventory: input.usableForInventory,
+        usable_for_purchase: input.usableForPurchase,
+        usable_for_rental: input.usableForRental,
+        usable_for_sales: input.usableForSales,
+        usable_for_service: input.usableForService,
     };
 }
 
 function toBackendConversionPayload(input: UomConversionFormInput) {
     return {
+        effective_from: input.effectiveFrom || null,
+        effective_to: input.effectiveTo || null,
         factor: input.factor,
-        from_uom_id: Number(input.fromUnitId) || 1,
+        from_uom_id: asNumberOrUndefined(input.fromUnitId),
         is_active: input.isActive,
         is_bidirectional: input.isBidirectional,
-        item_id: input.isItemSpecific && input.itemId ? Number(input.itemId) : null,
-        metadata: {
-            category: input.category,
-            effective_from: input.effectiveFrom || null,
-            effective_to: input.effectiveTo || null,
-        },
-        to_uom_id: Number(input.toUnitId) || 1,
+        item_id: input.isItemSpecific ? asNumberOrUndefined(input.itemId) ?? null : null,
+        metadata: {},
+        notes: input.notes || null,
+        to_uom_id: asNumberOrUndefined(input.toUnitId),
     };
 }
 
+async function unitLookupMap() {
+    const units = await uomApi.listUnits();
+
+    return new Map(units.data.map((unit) => [unit.id, unit]));
+}
+
+async function itemLookupMap() {
+    const items = await uomApi.listItemOptions();
+
+    return new Map(items.data.map((item) => [item.id, item]));
+}
+
 export const uomApi = {
-    activateUnit: (unitId: string) => uomApi.updateUnit(unitId, { ...getUomUnitById(unitId), status: 'active' }),
+    activateUnit: (unitId: string, unit: UomUnit) => uomApi.updateUnit(unitId, { ...unit, status: 'active' }),
     convertQuantity: (input: UomConversionPreview['input']) => uomApi.previewConversion(input),
-    createConversion: (input: UomConversionFormInput) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendRecord>>('/api/uom/uom-conversions', { body: toBackendConversionPayload(input), method: 'POST' });
-                return { ...response, data: normalizeConversion(response.data) };
+    createConversion: async (input: UomConversionFormInput) => {
+        const [units, items] = await Promise.all([unitLookupMap(), itemLookupMap()]);
+        const response = await httpClient<ApiResponse<BackendRecord>>('/api/uom/uom-conversions', {
+            body: toBackendConversionPayload(input),
+            method: 'POST',
+        });
+
+        return { ...response, data: normalizeConversion(response.data, units, items) };
+    },
+    createUnit: async (input: UomUnitFormInput) => {
+        const response = await httpClient<ApiResponse<BackendRecord>>('/api/uom/units-of-measure', {
+            body: toBackendUnitPayload(input),
+            method: 'POST',
+        });
+
+        return { ...response, data: normalizeUnit(response.data) };
+    },
+    deactivateConversion: async (conversion: UomConversion) => {
+        const response = await uomApi.updateConversion(conversion.id, {
+            effectiveFrom: conversion.effectiveFrom,
+            effectiveTo: conversion.effectiveTo,
+            factor: conversion.factor,
+            fromUnitId: conversion.fromUnitId,
+            isActive: false,
+            isBidirectional: conversion.direction === 'bidirectional',
+            isItemSpecific: conversion.isItemSpecific,
+            itemId: conversion.itemId,
+            notes: conversion.notes,
+            toUnitId: conversion.toUnitId,
+        });
+
+        return response;
+    },
+    deactivateUnit: (unitId: string, unit: UomUnit) => uomApi.updateUnit(unitId, { ...unit, status: 'inactive' }),
+    deleteConversion: (conversionId: string) => httpClient<void>(`/api/uom/uom-conversions/${conversionId}`, { method: 'DELETE' }),
+    getConversion: async (conversionId: string) => {
+        const [units, items] = await Promise.all([unitLookupMap(), itemLookupMap()]);
+        const response = await httpClient<ApiResponse<BackendRecord>>(`/api/uom/uom-conversions/${conversionId}`);
+
+        return { ...response, data: normalizeConversion(response.data, units, items) };
+    },
+    getUnit: async (unitId: string) => {
+        const response = await httpClient<ApiResponse<BackendRecord>>(`/api/uom/units-of-measure/${unitId}`);
+
+        return { ...response, data: normalizeUnit(response.data) };
+    },
+    getUnitActivity: (_unitId: string): Promise<ApiCollectionResponse<UomAuditEntry>> => Promise.resolve({ data: [] }),
+    getUnitUsage: (_unitId: string): Promise<ApiResponse<UomItemUsage>> =>
+        Promise.resolve({
+            data: {
+                inventory: 'No backend usage endpoint exposed yet.',
+                items: 'No backend usage endpoint exposed yet.',
+                pricing: 'No backend usage endpoint exposed yet.',
+                purchase: 'No backend usage endpoint exposed yet.',
+                rental: 'No backend usage endpoint exposed yet.',
+                sales: 'No backend usage endpoint exposed yet.',
+                service: 'No backend usage endpoint exposed yet.',
             },
-            () => mockResponse({ ...uomConversions[0], id: 'mock-conversion', isActive: input.isActive }),
-        ),
-    createUnit: (input: UomUnitFormInput) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendRecord>>('/api/uom/units-of-measure', { body: toBackendUnitPayload(input), method: 'POST' });
-                return { ...response, data: normalizeUnit(response.data) };
-            },
-            () => mockResponse({ ...uomUnits[0], code: input.code, id: 'mock-uom-unit', name: input.name, status: input.status, symbol: input.symbol, type: input.type }),
-        ),
-    deactivateConversion: (conversionId: string) =>
-        withMockFallback(
-            () => httpClient<ApiResponse<BackendRecord>>(`/api/uom/uom-conversions/${conversionId}`, { body: { is_active: false }, method: 'PATCH' }),
-            () => mockResponse({ ...getUomConversionById(conversionId), isActive: false }),
-        ),
-    deactivateUnit: (unitId: string) => uomApi.updateUnit(unitId, { ...getUomUnitById(unitId), status: 'inactive' }),
-    deleteConversion: (conversionId: string) =>
-        withMockFallback(
-            () => httpClient<ApiResponse<unknown>>(`/api/uom/uom-conversions/${conversionId}`, { method: 'DELETE' }),
-            () => mockResponse({ action: 'delete-conversion', conversionId }),
-        ),
-    getConversion: (conversionId: string) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendRecord>>(`/api/uom/uom-conversions/${conversionId}`);
-                return { ...response, data: normalizeConversion(response.data) };
-            },
-            () => mockResponse(getUomConversionById(conversionId)),
-        ),
-    getUnit: (unitId: string) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendRecord>>(`/api/uom/units-of-measure/${unitId}`);
-                return { ...response, data: normalizeUnit(response.data) };
-            },
-            () => mockResponse(getUomUnitById(unitId)),
-        ),
-    getUnitActivity: (_unitId: string): Promise<ApiCollectionResponse<UomAuditEntry>> => mockCollectionResponse(uomActivity),
-    getUnitUsage: (unitId: string): Promise<ApiResponse<UomItemUsage>> =>
-        mockResponse(uomUsage[unitId] ?? {
-            inventory: 'Backend usage pending',
-            items: 'Backend usage pending',
-            pricing: 'Backend usage pending',
-            charge: 'Backend usage pending',
-            consumption: 'Backend usage pending',
-            issue: 'Backend usage pending',
-            receipt: 'Backend usage pending',
         }),
-    listCategories: (): Promise<ApiCollectionResponse<UomCategory>> => mockCollectionResponse(uomCategories),
-    listConversions: () =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/uom/uom-conversions');
-                return { ...response, data: response.data.map(normalizeConversion) };
+    listCategories: (): Promise<ApiCollectionResponse<UomCategory>> => Promise.resolve({ data: UOM_CATEGORIES }),
+    listConversions: async () => {
+        const [units, items] = await Promise.all([unitLookupMap(), itemLookupMap()]);
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/uom/uom-conversions', {
+            query: { per_page: 200 },
+        });
+
+        return { ...response, data: response.data.map((record) => normalizeConversion(record, units, items)) };
+    },
+    listItemOptions: async () => {
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/items', {
+            query: { per_page: 200 },
+        });
+
+        return { ...response, data: response.data.map(normalizeLookupOption) };
+    },
+    listUnits: async () => {
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/uom/units-of-measure', {
+            query: { per_page: 200 },
+        });
+
+        return { ...response, data: response.data.map(normalizeUnit) };
+    },
+    previewConversion: async (input: UomConversionPreview['input']) => {
+        const response = await httpClient<BackendRecord>('/api/uom/convert', {
+            body: {
+                from_uom_id: asNumberOrUndefined(input.fromUnitId),
+                item_id: asNumberOrUndefined(input.itemId) ?? null,
+                quantity: input.quantity,
+                to_uom_id: asNumberOrUndefined(input.toUnitId),
             },
-            () => mockCollectionResponse(uomConversions),
-        ),
-    listUnits: () =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/uom/units-of-measure');
-                return { ...response, data: response.data.map(normalizeUnit) };
-            },
-            () => mockCollectionResponse(uomUnits),
-        ),
-    previewConversion: (input: UomConversionPreview['input']) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<BackendRecord>('/api/uom/convert', {
-                    body: {
-                        from_uom_id: Number(input.fromUnitId) || 1,
-                        item_id: input.itemId ? Number(input.itemId) : null,
-                        quantity: input.quantity,
-                        to_uom_id: Number(input.toUnitId) || 1,
-                    },
-                    method: 'POST',
-                });
-                return normalizePreview(response, input);
-            },
-            () => mockResponse(mockUomPreview(input)).then((response) => response.data),
-        ),
-    updateConversion: (conversionId: string, input: UomConversionFormInput) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendRecord>>(`/api/uom/uom-conversions/${conversionId}`, { body: toBackendConversionPayload(input), method: 'PUT' });
-                return { ...response, data: normalizeConversion(response.data) };
-            },
-            () => mockResponse({ ...getUomConversionById(conversionId), isActive: input.isActive }),
-        ),
-    updateUnit: (unitId: string, input: UomUnitFormInput | UomUnit) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendRecord>>(`/api/uom/units-of-measure/${unitId}`, { body: toBackendUnitPayload(input as UomUnitFormInput), method: 'PUT' });
-                return { ...response, data: normalizeUnit(response.data) };
-            },
-            () => mockResponse({ ...getUomUnitById(unitId), ...input }),
-        ),
+            method: 'POST',
+        });
+
+        return normalizePreview(response, input);
+    },
+    updateConversion: async (conversionId: string, input: UomConversionFormInput) => {
+        const [units, items] = await Promise.all([unitLookupMap(), itemLookupMap()]);
+        const response = await httpClient<ApiResponse<BackendRecord>>(`/api/uom/uom-conversions/${conversionId}`, {
+            body: toBackendConversionPayload(input),
+            method: 'PUT',
+        });
+
+        return { ...response, data: normalizeConversion(response.data, units, items) };
+    },
+    updateUnit: async (unitId: string, input: UomUnitFormInput | UomUnit) => {
+        const response = await httpClient<ApiResponse<BackendRecord>>(`/api/uom/units-of-measure/${unitId}`, {
+            body: toBackendUnitPayload(input as UomUnitFormInput),
+            method: 'PUT',
+        });
+
+        return { ...response, data: normalizeUnit(response.data) };
+    },
 };

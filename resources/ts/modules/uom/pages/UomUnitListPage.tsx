@@ -41,16 +41,16 @@ export function UomUnitListPage() {
             <PageHeader actions={<Link to="/uom/units/new"><Button>New Unit</Button></Link>} eyebrow="UOM" subtitle="Units support receipt, issue, consumption, charge, inventory, and pricing contexts without frontend conversion calculations." title="Units" />
             <div className="grid gap-4 md:grid-cols-3">
                 {[
-                    ['Units loaded', String(units.length), 'Mock or backend-normalized records'],
+                    ['Units loaded', String(units.length), 'Backend records'],
                     ['Base units', String(units.filter((unit) => unit.isBase).length), 'Category base units'],
                     ['Conversion logic', 'Backend-owned', 'No frontend quantity conversion'],
                 ].map(([label, value, helper]) => <Card className="p-5" key={label}><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-2xl font-bold text-slate-950">{value}</p><p className="mt-1 text-xs text-slate-400">{helper}</p></Card>)}
             </div>
             <SearchFilterBar onSearch={setQuery} placeholder="Search unit code, name, symbol, category..." />
             <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-3">
-                <Select onChange={(event) => setType(event.target.value)} options={[{ label: 'Count', value: 'count' }, { label: 'Volume', value: 'volume' }, { label: 'Mass', value: 'mass' }, { label: 'Duration', value: 'duration' }, { label: 'Distance', value: 'distance' }]} placeholder="All categories" value={type} />
+                <Select onChange={(event) => setType(event.target.value)} options={[{ label: 'Unit / Count', value: 'UNIT' }, { label: 'Volume', value: 'VOLUME' }, { label: 'Mass', value: 'MASS' }, { label: 'Time', value: 'TIME' }, { label: 'Distance', value: 'DISTANCE' }]} placeholder="All categories" value={type} />
                 <Select onChange={(event) => setStatus(event.target.value)} options={[{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }]} placeholder="All statuses" value={status} />
-                <Select options={[{ label: 'Base units', value: 'base' }, { label: 'Conversion units', value: 'conversion' }]} placeholder="All unit types" />
+                <Select options={[{ label: 'Base units', value: 'base' }, { label: 'Conversion units', value: 'conversion' }]} placeholder="All unit roles" />
             </div>
             {isLoading ? <EmptyState description="Loading UOM units..." title="Loading units" /> : null}
             {error ? <EmptyState description={error} title="UOM service unavailable" /> : null}

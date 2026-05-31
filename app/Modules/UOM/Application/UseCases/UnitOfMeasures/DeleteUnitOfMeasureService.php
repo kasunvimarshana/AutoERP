@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\UOM\Application\UseCases\UnitOfMeasures;
 
+use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Modules\UOM\Application\Contracts\UseCases\UnitOfMeasures\DeleteUnitOfMeasureServiceInterface;
@@ -13,14 +14,21 @@ use Throwable;
 
 final class DeleteUnitOfMeasureService implements DeleteUnitOfMeasureServiceInterface
 {
-    public function __construct(private readonly UnitOfMeasureRepositoryInterface $repository)
-    {
+    public function __construct(
+        private readonly UnitOfMeasureRepositoryInterface $repository,
+        private readonly CurrentTenantContextAccessorInterface $currentTenant,
+    ) {
     }
 
     public function execute(int|string $id): Result
     {
         try {
-            if ($this->repository->findById($id) === null) {
+            $tenantId = $this->currentTenant->currentTenantId();
+            if ($tenantId === null) {
+                return Result::failure(new Error(UomErrorCode::INVALID_VALUE, 'Tenant context is required.'));
+            }
+
+            if ($this->repository->findByIdInTenant($id, $tenantId) === null) {
                 return Result::failure(new Error(UomErrorCode::NOT_FOUND, 'UnitOfMeasure not found.'));
             }
 

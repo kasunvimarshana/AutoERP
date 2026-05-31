@@ -33,9 +33,13 @@ final class UpsertUomConversionRequest extends FormRequest
                 'different:from_uom_id',
             ]),
             'factor' => array_merge($required, ['numeric', 'gt:0']),
+            'category' => ['nullable', 'string', 'max:50'],
             'item_id' => ['nullable', 'integer', 'min:1', 'exists:items,id'],
             'is_bidirectional' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
+            'effective_from' => ['nullable', 'date'],
+            'effective_to' => ['nullable', 'date', 'after_or_equal:effective_from'],
+            'notes' => ['nullable', 'string', 'max:1000'],
         ];
     }
 }

@@ -26,10 +26,25 @@ final class ConvertUomController extends Controller
     {
         $validated = $request->validated();
         $tenantId = (int) ($validated['tenant_id'] ?? $this->currentTenant->currentTenantId());
+        if ($tenantId <= 0) {
+            return response()->json([
+                'message' => 'Tenant context is required.',
+                'code' => UomErrorCode::INVALID_VALUE,
+            ], 422);
+        }
+
         $quantity = (float) $validated['quantity'];
         $fromUomId = (int) $validated['from_uom_id'];
         $toUomId = (int) $validated['to_uom_id'];
         $itemId = isset($validated['item_id']) ? (int) $validated['item_id'] : null;
+
+        $factorResult = $this->conversionService->getConversionFactor($fromUomId, $toUomId, $tenantId, $itemId);
+        if ($factorResult->isFailure()) {
+            $error = $factorResult->errorOrFail();
+            $status = $error->code === UomErrorCode::NOT_FOUND ? 404 : 422;
+
+            return response()->json(['message' => $error->message, 'code' => $error->code], $status);
+        }
 
         $result = $this->conversionService->convert($quantity, $fromUomId, $toUomId, $tenantId, $itemId);
 
@@ -49,6 +64,8 @@ final class ConvertUomController extends Controller
             ],
             'calculated' => [
                 'converted_quantity' => $result->valueOrFail(),
+                'factor' => $factorResult->valueOrFail(),
+                'precision' => 10,
             ],
             'breakdown' => [],
             'warnings' => [],

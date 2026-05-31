@@ -17,15 +17,28 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable()->constrained('organization_units', 'id')->nullOnDelete()->comment('Branch or department ownership');
             $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
 
+            $table->string('code', 50);
             $table->string('name');
             $table->string('symbol');
-            $table->string('type')->default('UNIT')->comment('UNIT, MASS, VOLUME, LENGTH, TIME, OTHER');
+            $table->string('category')->default('UNIT')->comment('Generic UOM category such as UNIT, MASS, VOLUME, LENGTH, TIME, DISTANCE, OTHER');
+            $table->string('type')->default('UNIT')->comment('UNIT, MASS, VOLUME, LENGTH, TIME, DISTANCE, OTHER');
+            $table->unsignedTinyInteger('decimal_precision')->default(0);
+            $table->boolean('allow_fractional_quantity')->default(false);
             $table->boolean('is_base')->default(false);
+            $table->boolean('usable_for_purchase')->default(true);
+            $table->boolean('usable_for_sales')->default(true);
+            $table->boolean('usable_for_inventory')->default(true);
+            $table->boolean('usable_for_service')->default(true);
+            $table->boolean('usable_for_rental')->default(false);
+            $table->boolean('is_active')->default(true);
+            $table->text('description')->nullable();
 
             $table->timestamps();
             $table->softDeletes();
 
+            $table->unique(['tenant_id', 'code'], 'unit_of_measures_code_uk');
             $table->unique(['tenant_id', 'name'], 'unit_of_measures_name_uk');
+            $table->index(['tenant_id', 'type', 'is_active'], 'unit_of_measures_type_active_idx');
         });
     }
 

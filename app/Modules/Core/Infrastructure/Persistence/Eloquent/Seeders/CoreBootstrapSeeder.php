@@ -644,26 +644,37 @@ final class CoreBootstrapSeeder extends Seeder
         }
 
         $uoms = [
-            ['name' => 'Each', 'symbol' => 'ea', 'type' => 'UNIT', 'is_base' => true],
-            ['name' => 'Hour', 'symbol' => 'hr', 'type' => 'TIME', 'is_base' => true],
-            ['name' => 'Day', 'symbol' => 'day', 'type' => 'TIME', 'is_base' => false],
-            ['name' => 'Kilometer', 'symbol' => 'km', 'type' => 'LENGTH', 'is_base' => true],
-            ['name' => 'Month', 'symbol' => 'mo', 'type' => 'TIME', 'is_base' => false],
+            ['code' => 'PCS', 'name' => 'Each', 'symbol' => 'pcs', 'type' => 'UNIT', 'is_base' => true, 'precision' => 0, 'fractional' => false],
+            ['code' => 'HOUR', 'name' => 'Hour', 'symbol' => 'hr', 'type' => 'TIME', 'is_base' => true, 'precision' => 2, 'fractional' => true],
+            ['code' => 'DAY', 'name' => 'Day', 'symbol' => 'day', 'type' => 'TIME', 'is_base' => false, 'precision' => 2, 'fractional' => true],
+            ['code' => 'KM', 'name' => 'Kilometer', 'symbol' => 'km', 'type' => 'DISTANCE', 'is_base' => true, 'precision' => 2, 'fractional' => true],
+            ['code' => 'MONTH', 'name' => 'Month', 'symbol' => 'mo', 'type' => 'TIME', 'is_base' => false, 'precision' => 2, 'fractional' => true],
         ];
 
         foreach ($uoms as $uom) {
             DB::table('unit_of_measures')->updateOrInsert(
                 [
                     'tenant_id' => $tenantId,
-                    'name' => $uom['name'],
+                    'code' => $uom['code'],
                 ],
                 [
+                    'allow_fractional_quantity' => $uom['fractional'],
+                    'category' => $uom['type'],
+                    'decimal_precision' => $uom['precision'],
+                    'description' => 'Bootstrap unit of measure.',
                     'is_base' => $uom['is_base'],
+                    'is_active' => true,
                     'metadata' => $this->json(['seed_source' => 'core_bootstrap']),
+                    'name' => $uom['name'],
                     'organization_unit_id' => $organizationUnitId,
                     'row_version' => 1,
                     'symbol' => $uom['symbol'],
                     'type' => $uom['type'],
+                    'usable_for_inventory' => in_array($uom['type'], ['UNIT', 'MASS', 'VOLUME'], true),
+                    'usable_for_purchase' => true,
+                    'usable_for_rental' => in_array($uom['type'], ['TIME', 'DISTANCE'], true),
+                    'usable_for_sales' => true,
+                    'usable_for_service' => true,
                     'updated_at' => now(),
                     'created_at' => now(),
                 ],

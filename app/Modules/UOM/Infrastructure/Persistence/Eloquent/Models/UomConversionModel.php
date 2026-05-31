@@ -24,10 +24,12 @@ final class UomConversionModel extends CoreModel
             'metadata' => 'array',
             'from_uom_id' => 'integer',
             'to_uom_id' => 'integer',
-            'factor' => 'decimal:4',
+            'factor' => 'decimal:8',
             'item_id' => 'integer',
             'is_bidirectional' => 'boolean',
             'is_active' => 'boolean',
+            'effective_from' => 'date',
+            'effective_to' => 'date',
         ]);
     }
 }

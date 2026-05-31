@@ -93,7 +93,7 @@ final class UomConversionService implements UomConversionServiceInterface
         int|string $uomId,
         int $tenantId,
     ): Result {
-        $uom = $this->uomRepository->findById($uomId);
+        $uom = $this->uomRepository->findByIdInTenant($uomId, $tenantId);
 
         if ($uom === null) {
             return Result::failure(new Error(UomErrorCode::NOT_FOUND, 'Unit of measure not found.'));
@@ -162,8 +162,8 @@ final class UomConversionService implements UomConversionServiceInterface
         int|string $toUomId,
         int $tenantId,
     ): Result {
-        $fromUom = $this->uomRepository->findById($fromUomId);
-        $toUom   = $this->uomRepository->findById($toUomId);
+        $fromUom = $this->uomRepository->findByIdInTenant($fromUomId, $tenantId);
+        $toUom   = $this->uomRepository->findByIdInTenant($toUomId, $tenantId);
 
         if ($fromUom === null || $toUom === null) {
             return Result::failure(new Error(UomErrorCode::NOT_FOUND, 'One or both units of measure not found.'));
@@ -187,12 +187,12 @@ final class UomConversionService implements UomConversionServiceInterface
 
         $baseId = $base->get('id');
 
-        // from Ã¢â€ â€™ base
+        // from -> base
         $fromToBase = ($fromUomId == $baseId)
             ? 1.0
             : $this->resolveDirectFactor($fromUomId, $baseId, $tenantId, null);
 
-        // base Ã¢â€ â€™ to
+        // base -> target
         $baseToTarget = ($toUomId == $baseId)
             ? 1.0
             : $this->resolveDirectFactor($baseId, $toUomId, $tenantId, null);

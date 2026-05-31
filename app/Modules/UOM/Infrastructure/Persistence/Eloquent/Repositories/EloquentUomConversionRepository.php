@@ -18,6 +18,16 @@ final class EloquentUomConversionRepository extends EloquentRepository implement
         parent::__construct($model);
     }
 
+    public function findByIdInTenant(int|string $id, int $tenantId): ?DataRecord
+    {
+        $model = $this->query()
+            ->where('tenant_id', $tenantId)
+            ->whereKey($id)
+            ->first();
+
+        return $model instanceof Model ? $this->toRecord($model) : null;
+    }
+
     public function findConversionBetween(
         int|string $fromUomId,
         int|string $toUomId,

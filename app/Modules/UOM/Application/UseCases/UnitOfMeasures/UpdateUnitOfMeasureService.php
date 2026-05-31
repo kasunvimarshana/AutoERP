@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\UOM\Application\UseCases\UnitOfMeasures;
 
+use Modules\Core\Application\Contracts\CurrentOrganizationUnitContextAccessorInterface;
+use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Modules\UOM\Application\Contracts\UseCases\UnitOfMeasures\UpdateUnitOfMeasureServiceInterface;
@@ -13,21 +15,43 @@ use Throwable;
 
 final class UpdateUnitOfMeasureService implements UpdateUnitOfMeasureServiceInterface
 {
-    public function __construct(private readonly UnitOfMeasureRepositoryInterface $repository)
-    {
+    public function __construct(
+        private readonly UnitOfMeasureRepositoryInterface $repository,
+        private readonly CurrentTenantContextAccessorInterface $currentTenant,
+        private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
+    ) {
     }
 
     public function execute(int|string $id, array $payload): Result
     {
         try {
-            $current = $this->repository->findById($id);
+            $tenantId = $this->currentTenant->currentTenantId();
+            if ($tenantId === null) {
+                return Result::failure(new Error(UomErrorCode::INVALID_VALUE, 'Tenant context is required.'));
+            }
+
+            $current = $this->repository->findByIdInTenant($id, $tenantId);
 
             if ($current === null) {
                 return Result::failure(new Error(UomErrorCode::NOT_FOUND, 'UnitOfMeasure not found.'));
             }
 
-            $tenantId = (int) ($payload['tenant_id'] ?? $current->get('tenant_id'));
+            $payload['tenant_id'] = $tenantId;
+            $payload['organization_unit_id'] ??= $current->get('organization_unit_id') ?? $this->currentOrganizationUnit->currentOrganizationUnitId();
+            $payload['category'] ??= $payload['type'] ?? $current->get('category') ?? $current->get('type');
+            $payload['type'] ??= $payload['category'];
+            if (array_key_exists('code', $payload)) {
+                $payload['code'] = strtoupper(trim((string) $payload['code']));
+            }
+
+            $code = (string) ($payload['code'] ?? $current->get('code'));
             $name = (string) ($payload['name'] ?? $current->get('name'));
+
+            foreach ($this->repository->list(['tenant_id' => $tenantId, 'code' => $code]) as $record) {
+                if ((int) $record->get('id') !== (int) $id) {
+                    return Result::failure(new Error(UomErrorCode::DUPLICATE_NAME, 'Unit code already exists.'));
+                }
+            }
 
             foreach ($this->repository->list(['tenant_id' => $tenantId, 'name' => $name]) as $record) {
                 if ((int) $record->get('id') !== (int) $id) {

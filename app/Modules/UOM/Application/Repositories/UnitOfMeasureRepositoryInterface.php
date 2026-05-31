@@ -10,6 +10,10 @@ use Modules\Core\Application\DTO\PagedResult;
 
 interface UnitOfMeasureRepositoryInterface extends RepositoryPortInterface
 {
+    public function findByIdInTenant(int|string $id, int $tenantId): ?DataRecord;
+
+    public function findByCode(string $code, int $tenantId): ?DataRecord;
+
     public function findBySymbol(string $symbol, int $tenantId): ?DataRecord;
 
     public function findBaseUomForType(string $type, int $tenantId): ?DataRecord;

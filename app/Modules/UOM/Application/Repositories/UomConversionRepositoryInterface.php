@@ -9,6 +9,8 @@ use Modules\Core\Application\DTO\DataRecord;
 
 interface UomConversionRepositoryInterface extends RepositoryPortInterface
 {
+    public function findByIdInTenant(int|string $id, int $tenantId): ?DataRecord;
+
     public function findConversionBetween(
         int|string $fromUomId,
         int|string $toUomId,

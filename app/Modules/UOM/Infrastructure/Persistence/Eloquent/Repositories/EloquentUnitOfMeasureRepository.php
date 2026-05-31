@@ -18,6 +18,26 @@ final class EloquentUnitOfMeasureRepository extends EloquentRepository implement
         parent::__construct($model);
     }
 
+    public function findByIdInTenant(int|string $id, int $tenantId): ?DataRecord
+    {
+        $model = $this->query()
+            ->where('tenant_id', $tenantId)
+            ->whereKey($id)
+            ->first();
+
+        return $model !== null ? $this->toRecord($model) : null;
+    }
+
+    public function findByCode(string $code, int $tenantId): ?DataRecord
+    {
+        $model = $this->query()
+            ->where('code', $code)
+            ->where('tenant_id', $tenantId)
+            ->first();
+
+        return $model !== null ? $this->toRecord($model) : null;
+    }
+
     public function findBySymbol(string $symbol, int $tenantId): ?DataRecord
     {
         $model = $this->query()
@@ -64,7 +84,8 @@ final class EloquentUnitOfMeasureRepository extends EloquentRepository implement
             unset($criteria['search']);
 
             $query->where(function (Builder $q) use ($search): void {
-                $q->where('name', 'like', '%' . $search . '%')
+                $q->where('code', 'like', '%' . $search . '%')
+                  ->orWhere('name', 'like', '%' . $search . '%')
                   ->orWhere('symbol', 'like', '%' . $search . '%');
             });
         }

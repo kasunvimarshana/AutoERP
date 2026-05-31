@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\UOM\Application\UseCases\UnitOfMeasures;
 
+use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Modules\UOM\Application\Contracts\UseCases\UnitOfMeasures\ListUnitOfMeasuresServiceInterface;
@@ -14,13 +15,21 @@ use Throwable;
 
 final class ListUnitOfMeasuresService implements ListUnitOfMeasuresServiceInterface
 {
-    public function __construct(private readonly UnitOfMeasureRepositoryInterface $repository)
-    {
+    public function __construct(
+        private readonly UnitOfMeasureRepositoryInterface $repository,
+        private readonly CurrentTenantContextAccessorInterface $currentTenant,
+    ) {
     }
 
     public function execute(array $criteria, int $perPage, int $page): Result
     {
         try {
+            $tenantId = $this->currentTenant->currentTenantId();
+            if ($tenantId === null) {
+                return Result::failure(new Error(UomErrorCode::INVALID_VALUE, 'Tenant context is required.'));
+            }
+
+            $criteria['tenant_id'] = $tenantId;
             $resolvedPage = $page > 0 ? $page : UomDefaults::DEFAULT_PAGE;
             $resolvedPerPage = $perPage > 0
                 ? min($perPage, (int) config('uom.pagination.max_per_page', UomDefaults::MAX_PER_PAGE))

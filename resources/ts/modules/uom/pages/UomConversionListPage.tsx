@@ -41,7 +41,7 @@ export function UomConversionListPage() {
             <PageHeader actions={<Link to="/uom/conversions/new"><Button>New Conversion</Button></Link>} eyebrow="UOM" subtitle="Conversions describe compatible unit relationships. Backend applies factors and rounding." title="Conversions" />
             <SearchFilterBar onSearch={setQuery} placeholder="Search from unit, to unit, factor, category..." />
             <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 md:grid-cols-3">
-                <Select onChange={(event) => setCategory(event.target.value)} options={[{ label: 'Count', value: 'Count' }, { label: 'Volume', value: 'Volume' }, { label: 'Mass', value: 'Mass' }, { label: 'Duration', value: 'Duration' }, { label: 'Distance', value: 'Distance' }]} placeholder="All categories" value={category} />
+                <Select onChange={(event) => setCategory(event.target.value)} options={[{ label: 'Unit / Count', value: 'UNIT' }, { label: 'Volume', value: 'VOLUME' }, { label: 'Mass', value: 'MASS' }, { label: 'Time', value: 'TIME' }, { label: 'Distance', value: 'DISTANCE' }]} placeholder="All categories" value={category} />
                 <Select onChange={(event) => setStatus(event.target.value)} options={[{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }]} placeholder="All statuses" value={status} />
                 <Select options={[{ label: 'General', value: 'general' }, { label: 'Item-specific', value: 'item' }]} placeholder="General / item-specific" />
             </div>

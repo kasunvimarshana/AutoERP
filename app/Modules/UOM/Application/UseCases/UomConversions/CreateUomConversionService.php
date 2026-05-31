@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\UOM\Application\UseCases\UomConversions;
 
+use Modules\Core\Application\Contracts\CurrentOrganizationUnitContextAccessorInterface;
+use Modules\Core\Application\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Modules\UOM\Application\Contracts\UseCases\UomConversions\CreateUomConversionServiceInterface;
@@ -17,15 +19,25 @@ final class CreateUomConversionService implements CreateUomConversionServiceInte
     public function __construct(
         private readonly UomConversionRepositoryInterface $repository,
         private readonly UnitOfMeasureRepositoryInterface $uomRepository,
+        private readonly CurrentTenantContextAccessorInterface $currentTenant,
+        private readonly CurrentOrganizationUnitContextAccessorInterface $currentOrganizationUnit,
     ) {
     }
 
     public function execute(array $payload): Result
     {
         try {
+            $tenantId = $this->currentTenant->currentTenantId();
+            if ($tenantId === null) {
+                return Result::failure(new Error(UomErrorCode::INVALID_VALUE, 'Tenant context is required.'));
+            }
+
+            $payload['tenant_id'] = $tenantId;
+            $payload['organization_unit_id'] ??= $this->currentOrganizationUnit->currentOrganizationUnitId();
+            $payload['row_version'] ??= 1;
+
             $fromUomId = (int) ($payload['from_uom_id'] ?? 0);
             $toUomId = (int) ($payload['to_uom_id'] ?? 0);
-            $tenantId = (int) ($payload['tenant_id'] ?? 0);
             $itemId = isset($payload['item_id']) ? (int) $payload['item_id'] : null;
             $factor = (float) ($payload['factor'] ?? 0);
 
@@ -43,8 +55,8 @@ final class CreateUomConversionService implements CreateUomConversionServiceInte
                 ));
             }
 
-            $fromUom = $this->uomRepository->findById($fromUomId);
-            $toUom = $this->uomRepository->findById($toUomId);
+            $fromUom = $this->uomRepository->findByIdInTenant($fromUomId, $tenantId);
+            $toUom = $this->uomRepository->findByIdInTenant($toUomId, $tenantId);
 
             if ($fromUom === null || $toUom === null) {
                 return Result::failure(new Error(
@@ -63,6 +75,8 @@ final class CreateUomConversionService implements CreateUomConversionServiceInte
             if ($this->repository->findConversionBetween($fromUomId, $toUomId, $tenantId, $itemId) !== null) {
                 return Result::failure(new Error(UomErrorCode::DUPLICATE_CONVERSION, 'Conversion already exists.'));
             }
+
+            $payload['category'] ??= $fromUom->get('category') ?? $fromUom->get('type');
 
             return Result::success($this->repository->create($payload));
         } catch (Throwable $exception) {

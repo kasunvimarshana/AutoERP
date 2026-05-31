@@ -9,6 +9,7 @@ use Modules\Core\Infrastructure\Persistence\Eloquent\Seeders\CoreBootstrapSeeder
 use Modules\Document\Infrastructure\Persistence\Eloquent\Seeders\DocumentModuleSeeder;
 use Modules\Item\Infrastructure\Persistence\Eloquent\Seeders\ItemModuleSeeder;
 use Modules\Purchase\Infrastructure\Persistence\Eloquent\Seeders\PurchaseModuleSeeder;
+use Modules\UOM\Infrastructure\Persistence\Eloquent\Seeders\UomModuleSeeder;
 use Modules\Vehicle\Infrastructure\Persistence\Eloquent\Seeders\VehicleModuleSeeder;
 use Modules\VehicleRental\Infrastructure\Persistence\Eloquent\Seeders\VehicleRentalModuleSeeder;
 use Modules\Voucher\Infrastructure\Persistence\Eloquent\Seeders\VoucherModuleSeeder;
@@ -25,6 +26,7 @@ class DatabaseSeeder extends Seeder
         $this->call(array_filter([
             class_exists(CoreBootstrapSeeder::class) ? CoreBootstrapSeeder::class : null,
             class_exists(AuthModuleSeeder::class) ? AuthModuleSeeder::class : null,
+            class_exists(UomModuleSeeder::class) ? UomModuleSeeder::class : null,
             class_exists(ItemModuleSeeder::class) ? ItemModuleSeeder::class : null,
             class_exists(DocumentModuleSeeder::class) ? DocumentModuleSeeder::class : null,
             class_exists(VehicleModuleSeeder::class) ? VehicleModuleSeeder::class : null,
