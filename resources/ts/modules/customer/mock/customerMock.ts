@@ -57,9 +57,9 @@ export const customerContacts: CustomerContact[] = [
 ];
 
 export const customerAddresses: CustomerAddress[] = [
-    { city: 'Colombo', country: 'Sri Lanka', customerId: 'cus-001', id: 'addr-001', isPrimary: true, line1: 'No. 24, Warehouse Road', line2: 'Orugodawatta', type: 'billing' },
-    { city: 'Colombo', country: 'Sri Lanka', customerId: 'cus-001', id: 'addr-002', isPrimary: false, line1: 'Northline Service Yard', type: 'service' },
-    { city: 'Kandy', country: 'Sri Lanka', customerId: 'cus-002', id: 'addr-003', isPrimary: true, line1: 'Metro Hire Depot', type: 'billing' },
+    { city: 'Colombo', country: 'Sri Lanka', customerId: 'cus-001', id: 'addr-001', isPrimary: true, line1: 'No. 24, Warehouse Road', line2: 'Orugodawatta', postalCode: '10600', type: 'billing' },
+    { city: 'Colombo', country: 'Sri Lanka', customerId: 'cus-001', id: 'addr-002', isPrimary: false, line1: 'Northline Service Yard', postalCode: '10600', type: 'service' },
+    { city: 'Kandy', country: 'Sri Lanka', customerId: 'cus-002', id: 'addr-003', isPrimary: true, line1: 'Metro Hire Depot', postalCode: '20000', type: 'billing' },
 ];
 
 export const customerVehicles: CustomerVehicle[] = [

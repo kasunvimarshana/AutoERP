@@ -58,8 +58,10 @@ type CustomerDetailState = {
 export function CustomerDetailPage() {
     const { id } = useParams();
     const [activeTab, setActiveTab] = useState('overview');
+    const [actionError, setActionError] = useState('');
     const [detail, setDetail] = useState<CustomerDetailState | null>(null);
     const [error, setError] = useState('');
+    const [isChangingStatus, setIsChangingStatus] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -118,6 +120,20 @@ export function CustomerDetailPage() {
 
     const { addresses, contacts, creditProfile, customer, financeDefaults, partyLinks, taxProfile, userAccess, vehicles } = detail;
 
+    async function changeCustomerStatus(status: Customer['status']) {
+        setIsChangingStatus(true);
+        setActionError('');
+
+        try {
+            const response = await customerApi.changeStatus(customer.id, status);
+            setDetail((current) => current ? { ...current, customer: response.data } : current);
+        } catch (caught) {
+            setActionError(caught instanceof Error ? caught.message : 'Unable to change customer status.');
+        } finally {
+            setIsChangingStatus(false);
+        }
+    }
+
     return (
         <div className="space-y-6">
             <PageHeader
@@ -126,6 +142,17 @@ export function CustomerDetailPage() {
                         <Link to="/customers">
                             <Button variant="secondary">Back</Button>
                         </Link>
+                        {customer.status !== 'active' ? (
+                            <Button disabled={isChangingStatus} onClick={() => void changeCustomerStatus('active')} variant="secondary">Activate</Button>
+                        ) : null}
+                        {customer.status === 'active' ? (
+                            <Button disabled={isChangingStatus} onClick={() => void changeCustomerStatus('inactive')} variant="secondary">Deactivate</Button>
+                        ) : null}
+                        {customer.status !== 'blocked' ? (
+                            <Button disabled={isChangingStatus} onClick={() => void changeCustomerStatus('blocked')} variant="danger">Block</Button>
+                        ) : (
+                            <Button disabled={isChangingStatus} onClick={() => void changeCustomerStatus('active')} variant="secondary">Unblock</Button>
+                        )}
                         <Link to={`/customers/${customer.id}/edit`}>
                             <Button>Edit Customer</Button>
                         </Link>
@@ -135,6 +162,7 @@ export function CustomerDetailPage() {
                 subtitle="Customer detail aggregates profile, contacts, addresses, vehicles, backend-owned credit previews, finance defaults, optional user access, and audit."
                 title={customer.name}
             />
+            {actionError ? <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{actionError}</div> : null}
             <CustomerSummaryCard customer={customer} />
             <Card className="p-5">
                 <Tabs active={activeTab} items={tabs} onChange={setActiveTab} />
@@ -147,8 +175,8 @@ export function CustomerDetailPage() {
                         <div className="mt-4 grid gap-4 md:grid-cols-2">
                             {[
                                 ['Customer code', customer.code],
-                                ['Industry', customer.industry],
-                                ['Primary contact', customer.contactPerson],
+                                ['Industry', customer.industry || 'Not provided'],
+                                ['Primary contact', customer.contactPerson || 'Not provided'],
                                 ['Tax number', customer.taxNumber || 'Not provided'],
                                 ['Created', customer.createdAt],
                                 ['User access', customer.userAccessStatus === 'linked' ? 'Linked separately' : 'No user linked'],
@@ -170,8 +198,20 @@ export function CustomerDetailPage() {
                     />
                 </div>
             ) : null}
-            {activeTab === 'contacts' ? <CustomerContactsTable contacts={contacts} /> : null}
-            {activeTab === 'addresses' ? <CustomerAddressesTable addresses={addresses} /> : null}
+            {activeTab === 'contacts' ? (
+                <CustomerContactsTable
+                    contacts={contacts}
+                    customerId={customer.id}
+                    onSaved={(contact) => setDetail((current) => current ? { ...current, contacts: [...current.contacts, contact] } : current)}
+                />
+            ) : null}
+            {activeTab === 'addresses' ? (
+                <CustomerAddressesTable
+                    addresses={addresses}
+                    customerId={customer.id}
+                    onSaved={(address) => setDetail((current) => current ? { ...current, addresses: [...current.addresses, address] } : current)}
+                />
+            ) : null}
             {activeTab === 'vehicles' ? <CustomerVehiclesTable vehicles={vehicles} /> : null}
             {activeTab === 'tax' ? <CustomerTaxProfileForm profile={taxProfile} /> : null}
             {activeTab === 'credit' ? <CustomerCreditProfilePanel profile={creditProfile} /> : null}

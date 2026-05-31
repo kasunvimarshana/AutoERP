@@ -15,12 +15,19 @@ export function CustomerListPage() {
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(true);
+    const [search, setSearch] = useState('');
+    const activeCount = customers.filter((customer) => customer.status === 'active').length;
+    const linkedUserCount = customers.filter((customer) => customer.userAccessStatus === 'linked').length;
 
     useEffect(() => {
         let mounted = true;
 
-        customerApi
-            .listCustomers()
+        const timeout = window.setTimeout(() => {
+            setIsLoading(true);
+            setError('');
+
+            customerApi
+                .listCustomers({ search })
             .then((response) => {
                 if (mounted) {
                     setCustomers(response.data);
@@ -36,11 +43,13 @@ export function CustomerListPage() {
                     setIsLoading(false);
                 }
             });
+        }, 250);
 
         return () => {
             mounted = false;
+            window.clearTimeout(timeout);
         };
-    }, []);
+    }, [search]);
 
     return (
         <div className="space-y-6">
@@ -56,9 +65,9 @@ export function CustomerListPage() {
             />
             <div className="grid gap-4 md:grid-cols-3">
                 {[
-                    ['Active customers', '2', 'Mock master-data count'],
-                    ['Optional user links', '1', 'Customer login is not automatic'],
-                    ['Backend credit previews', '3', 'Readonly mock values'],
+                    ['Loaded customers', String(customers.length), 'From the Customer API'],
+                    ['Active customers', String(activeCount), 'Displayed page status count'],
+                    ['Optional user links', String(linkedUserCount), 'Customer login remains separate'],
                 ].map(([label, value, helper]) => (
                     <Card className="p-5" key={label}>
                         <p className="text-sm text-slate-500">{label}</p>
@@ -67,7 +76,7 @@ export function CustomerListPage() {
                     </Card>
                 ))}
             </div>
-            <SearchFilterBar placeholder="Search customer code, name, phone, email, tax number..." />
+            <SearchFilterBar onSearch={setSearch} placeholder="Search customer code, name, phone, email, tax number..." />
             {isLoading ? <EmptyState description="Loading customers from the Customer service..." title="Loading customers" /> : null}
             {error ? <EmptyState description={error} title="Customer service unavailable" /> : null}
             {!isLoading && !error && customers.length === 0 ? <EmptyState description="Create your first customer without linking a user account." title="No customers found" /> : null}

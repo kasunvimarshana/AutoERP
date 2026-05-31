@@ -8,6 +8,7 @@ export type Customer = {
     id: string;
     industry: string;
     name: string;
+    notes?: string;
     phone: string;
     status: CustomerStatus;
     taxNumber?: string;
@@ -32,6 +33,7 @@ export type CustomerAddress = {
     isPrimary: boolean;
     line1: string;
     line2?: string;
+    postalCode: string;
     type: 'billing' | 'delivery' | 'service';
 };
 
@@ -95,6 +97,7 @@ export type CustomerFormInput = {
     email: string;
     industry: string;
     name: string;
+    notes?: string;
     phone: string;
     taxNumber?: string;
 };

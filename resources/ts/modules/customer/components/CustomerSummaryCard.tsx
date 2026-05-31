@@ -15,9 +15,9 @@ export function CustomerSummaryCard({ customer }: { customer: Customer }) {
             </div>
             <div className="mt-5 grid gap-4 md:grid-cols-4">
                 {[
-                    ['Primary contact', customer.contactPerson],
-                    ['Email', customer.email],
-                    ['Phone', customer.phone],
+                    ['Primary contact', customer.contactPerson || 'Not provided'],
+                    ['Email', customer.email || 'Not provided'],
+                    ['Phone', customer.phone || 'Not provided'],
                     ['User access', customer.userAccessStatus === 'linked' ? 'Linked' : 'Not linked'],
                 ].map(([label, value]) => (
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3" key={label}>

@@ -11,8 +11,8 @@ export function CustomerCreditProfilePanel({ profile }: { profile: CustomerCredi
                 { label: 'Credit status', value: profile.creditStatus },
                 { label: 'Aging summary', value: profile.agingSummary },
             ]}
-            status="Mocked"
-            subtitle="Readonly mock backend preview. The frontend does not calculate balances or aging."
+            status="Backend"
+            subtitle="Readonly backend response. The frontend does not calculate balances or aging."
             title="Credit Profile"
         />
     );

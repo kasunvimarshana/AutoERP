@@ -34,6 +34,7 @@ export function CustomerForm({ customer, mode }: { customer?: Customer; mode: 'c
             email: String(formData.get('email') ?? ''),
             industry: String(formData.get('industry') ?? ''),
             name: String(formData.get('customer_name') ?? ''),
+            notes: String(formData.get('notes') ?? ''),
             phone: String(formData.get('phone') ?? ''),
             taxNumber: String(formData.get('tax_number') ?? ''),
         };
@@ -109,7 +110,7 @@ export function CustomerForm({ customer, mode }: { customer?: Customer; mode: 'c
                         </div>
                         <div className="space-y-2 md:col-span-2">
                             <FieldLabel>Notes</FieldLabel>
-                            <Textarea name="notes" placeholder="Operational notes, billing preferences, or service instructions." />
+                            <Textarea defaultValue={customer?.notes} name="notes" placeholder="Operational notes, billing preferences, or service instructions." />
                             <FieldError message={errors.notes?.[0]} />
                         </div>
                     </div>
@@ -128,9 +129,8 @@ export function CustomerForm({ customer, mode }: { customer?: Customer; mode: 'c
 
                 <div className="flex justify-end gap-3">
                     <Link to="/customers">
-                    <Button variant="secondary">Cancel</Button>
+                        <Button type="button" variant="secondary">Cancel</Button>
                     </Link>
-                    <Button disabled={isSubmitting}>Save Draft</Button>
                     <Button disabled={isSubmitting} type="submit" variant="blue">{mode === 'edit' ? 'Update Customer' : 'Create Customer'}</Button>
                 </div>
             </div>

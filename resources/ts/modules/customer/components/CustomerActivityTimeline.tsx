@@ -4,8 +4,8 @@ export function CustomerActivityTimeline() {
     return (
         <AuditTimeline
             events={[
-                { actor: 'Customer service', description: 'Mock customer profile reviewed.', time: 'Today 09:10' },
-                { actor: 'Backend audit', description: 'Real audit/history endpoint will populate this panel after integration.', time: 'Pending integration' },
+                { actor: 'Customer API', description: 'Customer profile data is loaded from backend services.', time: 'Current session' },
+                { actor: 'Audit module', description: 'Detailed customer audit endpoint is not exposed for this slice yet.', time: 'Not available' },
             ]}
         />
     );

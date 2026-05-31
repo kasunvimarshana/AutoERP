@@ -1,18 +1,5 @@
 import type { ApiCollectionResponse, ApiResponse } from '../../../services/api/apiResponse';
-import { ApiError } from '../../../services/api/apiErrors';
 import { httpClient } from '../../../services/api/httpClient';
-import { mockCollectionResponse, mockResponse } from '../../../services/mock/mockResponse';
-import {
-    customerAddresses,
-    customerContacts,
-    customerCreditProfiles,
-    customerFinanceDefaults,
-    customerTaxProfiles,
-    customerUserAccess,
-    customerVehicles,
-    customers,
-    getCustomerById,
-} from '../mock/customerMock';
 import type {
     Customer,
     CustomerAddress,
@@ -27,403 +14,356 @@ import type {
     CustomerVehicle,
 } from '../types/customer.types';
 
-type BackendCustomer = Record<string, unknown>;
+type BackendRecord = Record<string, unknown>;
 
-const CUSTOMER_API_MODE = import.meta.env.VITE_CUSTOMER_API_MODE ?? 'auto';
+type CustomerListQuery = {
+    page?: number;
+    perPage?: number;
+    search?: string;
+    status?: CustomerStatus;
+};
 
-function shouldUseMockOnly() {
-    return CUSTOMER_API_MODE === 'mock';
+function asRecord(value: unknown): BackendRecord {
+    return value && typeof value === 'object' && !Array.isArray(value) ? (value as BackendRecord) : {};
 }
 
-async function withMockFallback<T>(realCall: () => Promise<T>, mockCall: () => Promise<T>, fallbackStatuses = [401, 403, 404, 419]): Promise<T> {
-    if (shouldUseMockOnly()) {
-        return mockCall();
+function asString(value: unknown, fallback = ''): string {
+    if (value === null || value === undefined) {
+        return fallback;
     }
 
-    try {
-        return await realCall();
-    } catch (error) {
-        if (CUSTOMER_API_MODE === 'real') {
-            throw error;
-        }
-
-        if (error instanceof ApiError && !fallbackStatuses.includes(error.status)) {
-            throw error;
-        }
-
-        return mockCall();
-    }
+    return String(value);
 }
 
-function asString(value: unknown, fallback = '') {
-    return value === null || value === undefined ? fallback : String(value);
+function asOptionalString(value: unknown): string | undefined {
+    const normalized = asString(value).trim();
+
+    return normalized === '' ? undefined : normalized;
+}
+
+function asBoolean(value: unknown, fallback = false): boolean {
+    if (typeof value === 'boolean') {
+        return value;
+    }
+
+    if (typeof value === 'number') {
+        return value === 1;
+    }
+
+    if (typeof value === 'string') {
+        return ['1', 'true', 'yes'].includes(value.toLowerCase());
+    }
+
+    return fallback;
 }
 
 function normalizeStatus(value: unknown): CustomerStatus {
     const status = asString(value, 'pending').toLowerCase();
 
-    if (['active', 'blocked', 'inactive', 'pending'].includes(status)) {
-        return status as CustomerStatus;
+    if (status === 'active' || status === 'blocked' || status === 'inactive') {
+        return status;
     }
 
-    return status === 'draft' ? 'pending' : 'active';
+    return 'pending';
 }
 
-function normalizeCustomer(raw: BackendCustomer): Customer {
+function normalizeCustomer(raw: BackendRecord): Customer {
+    const metadata = asRecord(raw.metadata);
+    const userAccounts = Array.isArray(raw.user_accounts) ? raw.user_accounts : [];
+
     return {
-        code: asString(raw.customer_code ?? raw.code, 'CUS-MOCK'),
-        contactPerson: asString(raw.contact_person ?? raw.display_name ?? raw.customer_name ?? raw.name, 'Not provided'),
-        createdAt: asString(raw.created_at ?? raw.createdAt, 'Backend timestamp pending'),
-        email: asString(raw.email, 'Not provided'),
+        code: asString(raw.customer_code ?? raw.code),
+        contactPerson: asString(metadata.contact_person ?? raw.contact_person ?? raw.display_name ?? raw.customer_name ?? raw.name),
+        createdAt: asString(raw.created_at ?? raw.createdAt),
+        email: asString(raw.email),
         id: asString(raw.id),
-        industry: asString(raw.customer_type ?? raw.industry, 'Customer'),
-        name: asString(raw.customer_name ?? raw.name ?? raw.display_name, 'Unnamed customer'),
-        phone: asString(raw.phone ?? raw.mobile, 'Not provided'),
+        industry: asString(raw.customer_type ?? raw.industry),
+        name: asString(raw.customer_name ?? raw.name ?? raw.display_name),
+        notes: asString(raw.notes),
+        phone: asString(raw.phone ?? raw.mobile),
         status: normalizeStatus(raw.status),
-        taxNumber: asString(raw.tax_number ?? raw.vat_number ?? raw.taxNumber, ''),
-        userAccessStatus: raw.user_access_status === 'linked' || raw.has_user_access === true ? 'linked' : 'none',
+        taxNumber: asOptionalString(raw.tax_number ?? raw.vat_number ?? raw.taxNumber),
+        userAccessStatus: raw.user_access_status === 'linked' || raw.has_user_access === true || userAccounts.length > 0 ? 'linked' : 'none',
     };
 }
 
-function normalizeContact(raw: BackendCustomer): CustomerContact {
+function normalizeContact(raw: BackendRecord): CustomerContact {
     return {
         customerId: asString(raw.customer_id),
-        email: asString(raw.email, 'Not provided'),
+        email: asString(raw.email),
         id: asString(raw.id),
-        isPrimary: Boolean(raw.is_primary),
-        name: asString(raw.contact_name ?? raw.name, 'Unnamed contact'),
-        phone: asString(raw.phone ?? raw.mobile, 'Not provided'),
-        role: asString(raw.designation ?? raw.role ?? raw.department, 'Contact'),
+        isPrimary: asBoolean(raw.is_primary),
+        name: asString(raw.contact_name ?? raw.name),
+        phone: asString(raw.phone ?? raw.mobile),
+        role: asString(raw.designation ?? raw.role ?? raw.department),
     };
 }
 
-function normalizeAddress(raw: BackendCustomer): CustomerAddress {
+function normalizeAddress(raw: BackendRecord): CustomerAddress {
     return {
-        city: asString(raw.city, 'Not provided'),
-        country: asString(raw.country_name ?? raw.country, 'Not provided'),
+        city: asString(raw.city),
+        country: asString(raw.country_name ?? raw.country),
         customerId: asString(raw.customer_id),
         id: asString(raw.id),
-        isPrimary: Boolean(raw.is_primary ?? raw.is_primary_billing ?? raw.is_primary_shipping),
-        line1: asString(raw.address_line1 ?? raw.address_line_1 ?? raw.line1, 'Not provided'),
-        line2: asString(raw.address_line2 ?? raw.address_line_2 ?? raw.line2, ''),
-        type: asString(raw.address_type ?? raw.type, 'billing') as CustomerAddress['type'],
+        isPrimary: asBoolean(raw.is_primary ?? raw.is_primary_billing ?? raw.is_primary_shipping),
+        line1: asString(raw.address_line_1 ?? raw.address_line1 ?? raw.line1),
+        line2: asOptionalString(raw.address_line_2 ?? raw.address_line2 ?? raw.line2),
+        postalCode: asString(raw.postal_code),
+        type: normalizeAddressType(raw.address_type ?? raw.type),
     };
 }
 
-function normalizeVehicle(raw: BackendCustomer): CustomerVehicle {
+function normalizeAddressType(value: unknown): CustomerAddress['type'] {
+    const type = asString(value, 'billing').toLowerCase();
+
+    if (type === 'delivery' || type === 'service') {
+        return type;
+    }
+
+    return 'billing';
+}
+
+function normalizeVehicle(raw: BackendRecord): CustomerVehicle {
     return {
         customerId: asString(raw.customer_id),
         id: asString(raw.id),
-        make: asString(raw.make ?? raw.vehicle_make, 'Vehicle'),
-        model: asString(raw.model ?? raw.vehicle_model, ''),
-        plateNumber: asString(raw.plate_number ?? raw.registration_number ?? raw.vehicle_number, 'Not provided'),
-        status: Boolean(raw.is_active ?? true) ? 'Active' : 'Inactive',
-        vin: asString(raw.vin, ''),
-        year: asString(raw.year ?? raw.model_year, ''),
+        make: asString(raw.make ?? raw.vehicle_make),
+        model: asString(raw.model ?? raw.vehicle_model),
+        plateNumber: asString(raw.plate_number ?? raw.registration_number ?? raw.vehicle_number),
+        status: asBoolean(raw.is_active, true) ? 'Active' : 'Inactive',
+        vin: asOptionalString(raw.vin),
+        year: asString(raw.year ?? raw.model_year),
     };
 }
 
-function normalizeTaxProfile(raw: BackendCustomer, customerId: string): CustomerTaxProfile {
+function normalizeTaxProfile(raw: BackendRecord, customerId: string): CustomerTaxProfile {
     return {
         customerId,
-        exemptionReason: asString(raw.exemption_certificate_reference ?? raw.exemptionReason, ''),
-        taxGroup: asString(raw.tax_group_name ?? raw.tax_group ?? raw.tax_group_id, 'Backend tax group'),
-        taxRegistrationNumber: asString(raw.tax_registration_number ?? raw.vat_number, ''),
-        taxStatus: raw.tax_exempt === true ? 'exempt' : asString(raw.tax_registration_number ?? raw.vat_number, '') ? 'registered' : 'unregistered',
+        exemptionReason: asOptionalString(raw.exemption_certificate_reference ?? raw.exemptionReason),
+        taxGroup: asString(raw.tax_group_name ?? raw.tax_group ?? raw.tax_group_id),
+        taxRegistrationNumber: asOptionalString(raw.tax_registration_number ?? raw.vat_number),
+        taxStatus: raw.tax_exempt === true ? 'exempt' : asOptionalString(raw.tax_registration_number ?? raw.vat_number) ? 'registered' : 'unregistered',
     };
 }
 
-function normalizeCreditProfile(raw: BackendCustomer, customerId: string): CustomerCreditProfile {
+function normalizeCreditProfile(raw: BackendRecord, customerId: string): CustomerCreditProfile {
     return {
-        agingSummary: asString(raw.aging_summary, 'Backend aging preview pending'),
-        backendPreviewStatus: 'Backend credit-check response',
-        creditLimit: asString(raw.credit_limit, 'Backend-owned credit limit'),
-        creditStatus: asString(raw.credit_status ?? raw.status, 'Backend credit status pending'),
+        agingSummary: asString(raw.aging_summary, 'Not available from backend'),
+        backendPreviewStatus: asString(raw.credit_status ?? raw.status, 'Backend credit-check response'),
+        creditLimit: asString(raw.credit_limit, 'Not configured'),
+        creditStatus: asString(raw.credit_status ?? raw.status, 'Not available from backend'),
         customerId,
-        outstandingBalance: asString(raw.outstanding_balance, 'Backend-owned outstanding balance'),
-        paymentTerms: asString(raw.payment_terms ?? raw.credit_days, 'Backend payment terms pending'),
+        outstandingBalance: asString(raw.outstanding_balance, 'Not available from backend'),
+        paymentTerms: asString(raw.payment_terms ?? raw.credit_days, 'Not configured'),
     };
 }
 
-function normalizeFinanceDefaults(raw: BackendCustomer, customerId: string): CustomerFinanceDefaults {
+function normalizeFinanceDefaults(raw: BackendRecord, customerId: string): CustomerFinanceDefaults {
     return {
-        arAccount: asString(raw.default_receivable_account_name ?? raw.default_receivable_account_id, 'Backend AR account'),
-        costCenter: asString(raw.cost_center_name ?? raw.cost_center_id, 'Backend cost center'),
-        currency: asString(raw.default_currency_code ?? raw.default_currency_id, 'Backend currency'),
+        arAccount: asString(raw.default_receivable_account_name ?? raw.default_receivable_account_id),
+        costCenter: asString(raw.cost_center_name ?? raw.cost_center_id),
+        currency: asString(raw.default_currency_code ?? raw.default_currency_id),
         customerId,
-        paymentTerm: asString(raw.default_payment_term_name ?? raw.default_payment_term_id, 'Backend payment term'),
-        revenueAccount: asString(raw.default_income_account_name ?? raw.default_income_account_id, 'Backend revenue account'),
+        paymentTerm: asString(raw.default_payment_term_name ?? raw.default_payment_term_id),
+        revenueAccount: asString(raw.default_income_account_name ?? raw.default_income_account_id),
     };
 }
 
-function normalizeUserAccess(raw: BackendCustomer, customerId: string): CustomerUserAccess {
+function normalizeUserAccess(raw: BackendRecord, customerId: string): CustomerUserAccess {
     return {
         customerId,
-        email: asString(raw.email ?? raw.user_email, 'Not provided'),
+        email: asString(raw.email ?? raw.user_email),
         id: asString(raw.id),
-        lastLogin: asString(raw.last_login_at ?? raw.lastLogin, ''),
-        status: asString(raw.status, 'active') as CustomerUserAccess['status'],
+        lastLogin: asOptionalString(raw.last_login_at ?? raw.lastLogin),
+        status: normalizeUserAccessStatus(raw.access_status ?? raw.status),
         userName: asString(raw.user_name ?? raw.name ?? raw.user_id, 'Linked user'),
     };
 }
 
-function toBackendCustomerPayload(input: CustomerFormInput) {
+function normalizeUserAccessStatus(value: unknown): CustomerUserAccess['status'] {
+    const status = asString(value, 'active').toLowerCase();
+
+    if (status === 'inactive' || status === 'invited') {
+        return status;
+    }
+
+    return 'active';
+}
+
+function toBackendCustomerPayload(input: CustomerFormInput): BackendRecord {
     return {
         create_user: false,
         customer_code: input.code,
         customer_name: input.name,
-        customer_type: input.industry,
+        customer_type: input.industry || null,
         display_name: input.name,
         email: input.email || null,
         metadata: {
-            contact_person: input.contactPerson,
+            contact_person: input.contactPerson || null,
         },
+        notes: input.notes || null,
         phone: input.phone || null,
         tax_number: input.taxNumber || null,
+    };
+}
+
+function toBackendContactPayload(customerId: string, input: CustomerContact): BackendRecord {
+    return {
+        contact_name: input.name,
+        customer_id: Number(customerId),
+        designation: input.role || null,
+        email: input.email || null,
+        is_primary: input.isPrimary,
+        phone: input.phone || null,
+    };
+}
+
+function toBackendAddressPayload(customerId: string, input: CustomerAddress): BackendRecord {
+    return {
+        address_line_1: input.line1,
+        address_line_2: input.line2 || null,
+        address_type: input.type,
+        city: input.city,
+        country_name: input.country || null,
+        customer_id: Number(customerId),
+        is_primary: input.isPrimary,
+        postal_code: input.postalCode || '00000',
     };
 }
 
 export const customerApi = {
     activateCustomer: (customerId: string) => customerApi.changeStatus(customerId, 'active'),
     blockCustomer: (customerId: string) => customerApi.changeStatus(customerId, 'blocked'),
-    changeStatus: (customerId: string, status: CustomerStatus) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendCustomer>>(`/api/customer/customers/${customerId}/status`, {
-                    body: { status },
-                    method: 'PATCH',
-                });
+    changeStatus: async (customerId: string, status: CustomerStatus): Promise<ApiResponse<Customer>> => {
+        const response = await httpClient<ApiResponse<BackendRecord>>(`/api/customer/customers/${customerId}/status`, {
+            body: { status },
+            method: 'PATCH',
+        });
 
-                return { ...response, data: normalizeCustomer(response.data) };
-            },
-            () => mockResponse({ ...getCustomerById(customerId), status }),
-        ),
-    createCustomer: (input: CustomerFormInput) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendCustomer>>('/api/customer/customers', {
-                    body: toBackendCustomerPayload(input),
-                    method: 'POST',
-                });
+        return { ...response, data: normalizeCustomer(response.data) };
+    },
+    createCustomer: async (input: CustomerFormInput): Promise<ApiResponse<Customer>> => {
+        const response = await httpClient<ApiResponse<BackendRecord>>('/api/customer/customers', {
+            body: toBackendCustomerPayload(input),
+            method: 'POST',
+        });
 
-                return { ...response, data: normalizeCustomer(response.data) };
-            },
-            () => mockResponse({ ...customers[0], ...input, id: 'mock-customer' }),
-        ),
+        return { ...response, data: normalizeCustomer(response.data) };
+    },
     deactivateCustomer: (customerId: string) => customerApi.changeStatus(customerId, 'inactive'),
     deactivateUserAccess: (customerId: string, accessId: string, reason?: string) =>
-        withMockFallback(
-            () =>
-                httpClient<ApiResponse<unknown>>(`/api/customer/customers/${customerId}/user-accesses/${accessId}/deactivate`, {
-                    body: { reason: reason || null },
-                    method: 'PATCH',
-                }),
-            () => mockResponse({ accessId, action: 'deactivate-user-access', customerId, reason }),
-        ),
-    getCreditProfile: (customerId: string) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendCustomer>>(`/api/customer/customers/${customerId}/credit-check`, { method: 'POST' });
+        httpClient<ApiResponse<unknown>>(`/api/customer/customers/${customerId}/user-accesses/${accessId}/deactivate`, {
+            body: { reason: reason || null },
+            method: 'PATCH',
+        }),
+    getCreditProfile: async (customerId: string): Promise<ApiResponse<CustomerCreditProfile>> => {
+        const response = await httpClient<ApiResponse<BackendRecord>>(`/api/customer/customers/${customerId}/credit-check`, { method: 'POST' });
 
-                return { ...response, data: normalizeCreditProfile(response.data, customerId) };
-            },
-            () => mockResponse(customerCreditProfiles.find((profile) => profile.customerId === customerId) ?? customerCreditProfiles[0]),
-        ),
-    getCustomer: (customerId: string) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendCustomer>>(`/api/customer/customers/${customerId}`);
+        return { ...response, data: normalizeCreditProfile(response.data, customerId) };
+    },
+    getCustomer: async (customerId: string): Promise<ApiResponse<Customer>> => {
+        const response = await httpClient<ApiResponse<BackendRecord>>(`/api/customer/customers/${customerId}`);
 
-                return { ...response, data: normalizeCustomer(response.data) };
-            },
-            () => mockResponse(getCustomerById(customerId)),
-        ),
-    getFinanceDefaults: (customerId: string) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendCustomer>>(`/api/customer/customers/${customerId}/finance-defaults`);
+        return { ...response, data: normalizeCustomer(response.data) };
+    },
+    getFinanceDefaults: async (customerId: string): Promise<ApiResponse<CustomerFinanceDefaults>> => {
+        const response = await httpClient<ApiResponse<BackendRecord>>(`/api/customer/customers/${customerId}/finance-defaults`);
 
-                return { ...response, data: normalizeFinanceDefaults(response.data, customerId) };
-            },
-            () => mockResponse(customerFinanceDefaults.find((defaults) => defaults.customerId === customerId) ?? customerFinanceDefaults[0]),
-        ),
-    getTaxProfile: (customerId: string) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendCustomer>>(`/api/customer/customers/${customerId}/tax-profile`);
+        return { ...response, data: normalizeFinanceDefaults(response.data, customerId) };
+    },
+    getTaxProfile: async (customerId: string): Promise<ApiResponse<CustomerTaxProfile>> => {
+        const response = await httpClient<ApiResponse<BackendRecord>>(`/api/customer/customers/${customerId}/tax-profile`);
 
-                return { ...response, data: normalizeTaxProfile(response.data, customerId) };
-            },
-            () => mockResponse(customerTaxProfiles.find((profile) => profile.customerId === customerId) ?? customerTaxProfiles[0]),
-        ),
+        return { ...response, data: normalizeTaxProfile(response.data, customerId) };
+    },
     linkUserAccess: (customerId: string, input: CustomerUserAccessLinkInput) =>
-        withMockFallback(
-            () =>
-                httpClient<ApiResponse<unknown>>(`/api/customer/customers/${customerId}/user-accesses/link-existing`, {
-                    body: {
-                        access_role: input.accessRole || null,
-                        invited: input.invited ?? false,
-                        is_primary: input.isPrimary ?? false,
-                        user_id: Number(input.userId),
-                    },
-                    method: 'POST',
-                }),
-            () => mockResponse({ customerId, ...input, action: 'link-user-access' }),
-        ),
-    listAddresses: (customerId: string) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiCollectionResponse<BackendCustomer>>('/api/customer/customer-addresses', { query: { customer_id: customerId } });
-
-                return { ...response, data: response.data.map(normalizeAddress) };
+        httpClient<ApiResponse<unknown>>(`/api/customer/customers/${customerId}/user-accesses/link-existing`, {
+            body: {
+                access_role: input.accessRole || null,
+                invited: input.invited ?? false,
+                is_primary: input.isPrimary ?? false,
+                user_id: Number(input.userId),
             },
-            () => mockCollectionResponse(customerAddresses.filter((address) => address.customerId === customerId)),
-            [401, 403, 404, 419, 422],
-        ),
-    listContacts: (customerId: string) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiCollectionResponse<BackendCustomer>>('/api/customer/customer-contacts', { query: { customer_id: customerId } });
+            method: 'POST',
+        }),
+    listAddresses: async (customerId: string): Promise<ApiCollectionResponse<CustomerAddress>> => {
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/customer/customer-addresses', { query: { customer_id: customerId } });
 
-                return { ...response, data: response.data.map(normalizeContact) };
-            },
-            () => mockCollectionResponse(customerContacts.filter((contact) => contact.customerId === customerId)),
-            [401, 403, 404, 419, 422],
-        ),
-    listCustomers: () =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiCollectionResponse<BackendCustomer>>('/api/customer/customers');
+        return { ...response, data: response.data.map(normalizeAddress) };
+    },
+    listContacts: async (customerId: string): Promise<ApiCollectionResponse<CustomerContact>> => {
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/customer/customer-contacts', { query: { customer_id: customerId } });
 
-                return { ...response, data: response.data.map(normalizeCustomer) };
+        return { ...response, data: response.data.map(normalizeContact) };
+    },
+    listCustomers: async (query: CustomerListQuery = {}): Promise<ApiCollectionResponse<Customer>> => {
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/customer/customers', {
+            query: {
+                page: query.page,
+                per_page: query.perPage ?? 50,
+                search: query.search,
+                status: query.status,
             },
-            () => mockCollectionResponse(customers),
-        ),
-    listUserAccess: (customerId: string) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiCollectionResponse<BackendCustomer>>(`/api/customer/customers/${customerId}/user-accesses`);
+        });
 
-                return { ...response, data: response.data.map((item) => normalizeUserAccess(item, customerId)) };
-            },
-            () => mockCollectionResponse(customerUserAccess.filter((access) => access.customerId === customerId)),
-        ),
-    listVehicles: (customerId: string) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiCollectionResponse<BackendCustomer>>('/api/customer/customer-vehicles', { query: { customer_id: customerId } });
+        return { ...response, data: response.data.map(normalizeCustomer) };
+    },
+    listUserAccess: async (customerId: string): Promise<ApiCollectionResponse<CustomerUserAccess>> => {
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/customer/customers/${customerId}/user-accesses`);
 
-                return { ...response, data: response.data.map(normalizeVehicle) };
-            },
-            () => mockCollectionResponse(customerVehicles.filter((vehicle) => vehicle.customerId === customerId)),
-            [401, 403, 404, 419, 422],
-        ),
+        return { ...response, data: response.data.map((item) => normalizeUserAccess(item, customerId)) };
+    },
+    listVehicles: async (customerId: string): Promise<ApiCollectionResponse<CustomerVehicle>> => {
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/customer/customer-vehicles', { query: { customer_id: customerId } });
+
+        return { ...response, data: response.data.map(normalizeVehicle) };
+    },
     unblockCustomer: (customerId: string) => customerApi.changeStatus(customerId, 'active'),
-    updateCreditProfile: (customerId: string, input: CustomerCreditProfile) =>
-        withMockFallback<ApiResponse<unknown>>(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendCustomer>>(`/api/customer/customers/${customerId}`, {
-                    body: {
-                        credit_profile: {
-                            credit_days: Number.parseInt(input.paymentTerms, 10) || null,
-                            credit_limit: Number.parseFloat(input.creditLimit.replace(/[^\d.]/g, '')) || null,
-                            credit_hold: input.creditStatus.toLowerCase().includes('hold'),
-                        },
-                    },
-                    method: 'PATCH',
-                });
+    updateCustomer: async (customerId: string, input: CustomerFormInput): Promise<ApiResponse<Customer>> => {
+        const response = await httpClient<ApiResponse<BackendRecord>>(`/api/customer/customers/${customerId}`, {
+            body: toBackendCustomerPayload(input),
+            method: 'PUT',
+        });
 
-                return { ...response, data: normalizeCustomer(response.data) };
-            },
-            () => mockResponse({ customerId, input }),
-        ),
-    updateCustomer: (customerId: string, input: CustomerFormInput) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendCustomer>>(`/api/customer/customers/${customerId}`, {
-                    body: toBackendCustomerPayload(input),
-                    method: 'PUT',
-                });
-
-                return { ...response, data: normalizeCustomer(response.data) };
-            },
-            () => mockResponse({ ...getCustomerById(customerId), ...input }),
-        ),
+        return { ...response, data: normalizeCustomer(response.data) };
+    },
     updateFinanceDefaults: (customerId: string, input: unknown) =>
-        withMockFallback(
-            () => httpClient<ApiResponse<unknown>>(`/api/customer/customers/${customerId}/finance-defaults`, { body: input, method: 'PUT' }),
-            () => mockResponse({ customerId, input }),
-        ),
-    updateTaxProfile: (customerId: string, input: CustomerTaxProfile) =>
-        withMockFallback<ApiResponse<unknown>>(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendCustomer>>(`/api/customer/customers/${customerId}`, {
-                    body: {
-                        tax_profile: {
-                            exemption_certificate_reference: input.exemptionReason || null,
-                            tax_exempt: input.taxStatus === 'exempt',
-                            tax_registration_number: input.taxRegistrationNumber || null,
-                        },
-                    },
-                    method: 'PATCH',
-                });
-
-                return { ...response, data: normalizeCustomer(response.data) };
+        httpClient<ApiResponse<unknown>>(`/api/customer/customers/${customerId}/finance-defaults`, { body: input, method: 'PUT' }),
+    upsertAddress: async (customerId: string, input: CustomerAddress): Promise<ApiResponse<CustomerAddress>> => {
+        const hasExistingId = input.id.trim() !== '';
+        const response = await httpClient<ApiResponse<BackendRecord>>(
+            hasExistingId ? `/api/customer/customer-addresses/${input.id}` : '/api/customer/customer-addresses',
+            {
+                body: toBackendAddressPayload(customerId, input),
+                method: hasExistingId ? 'PATCH' : 'POST',
             },
-            () => mockResponse({ ...input, customerId }),
-        ),
-    upsertAddress: (customerId: string, input: CustomerAddress) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendCustomer>>('/api/customer/customer-addresses', {
-                    body: {
-                        address_line1: input.line1,
-                        address_line2: input.line2 || null,
-                        city: input.city,
-                        country_id: 1,
-                        customer_id: customerId,
-                        is_default: input.isPrimary,
-                        postal_code: '00000',
-                        type: input.type,
-                    },
-                    method: 'POST',
-                });
+        );
 
-                return { ...response, data: normalizeAddress(response.data) };
+        return { ...response, data: normalizeAddress(response.data) };
+    },
+    upsertContact: async (customerId: string, input: CustomerContact): Promise<ApiResponse<CustomerContact>> => {
+        const hasExistingId = input.id.trim() !== '';
+        const response = await httpClient<ApiResponse<BackendRecord>>(
+            hasExistingId ? `/api/customer/customer-contacts/${input.id}` : '/api/customer/customer-contacts',
+            {
+                body: toBackendContactPayload(customerId, input),
+                method: hasExistingId ? 'PATCH' : 'POST',
             },
-            () => mockResponse({ ...input, customerId }),
-        ),
-    upsertContact: (customerId: string, input: CustomerContact) =>
-        withMockFallback(
-            async () => {
-                const response = await httpClient<ApiResponse<BackendCustomer>>('/api/customer/customer-contacts', {
-                    body: {
-                        customer_id: customerId,
-                        email: input.email || null,
-                        is_primary: input.isPrimary,
-                        name: input.name,
-                        phone: input.phone || null,
-                        role: input.role || null,
-                    },
-                    method: 'POST',
-                });
+        );
 
-                return { ...response, data: normalizeContact(response.data) };
+        return { ...response, data: normalizeContact(response.data) };
+    },
+    upsertVehicle: async (customerId: string, input: CustomerVehicle): Promise<ApiResponse<CustomerVehicle>> => {
+        const response = await httpClient<ApiResponse<BackendRecord>>('/api/customer/customer-vehicles', {
+            body: {
+                customer_id: Number(customerId),
+                is_active: input.status.toLowerCase() === 'active',
+                is_current: true,
+                vehicle_id: Number(input.id),
             },
-            () => mockResponse({ ...input, customerId }),
-        ),
-    upsertVehicle: (customerId: string, input: CustomerVehicle) =>
-        withMockFallback(
-            () =>
-                httpClient<ApiResponse<BackendCustomer>>('/api/customer/customer-vehicles', {
-                    body: {
-                        customer_id: customerId,
-                        is_active: input.status.toLowerCase() === 'active',
-                        is_current: true,
-                        vehicle_id: input.id,
-                    },
-                    method: 'POST',
-                }).then((response) => ({ ...response, data: normalizeVehicle(response.data) })),
-            () => mockResponse({ ...input, customerId }),
-        ),
+            method: 'POST',
+        });
+
+        return { ...response, data: normalizeVehicle(response.data) };
+    },
 };
