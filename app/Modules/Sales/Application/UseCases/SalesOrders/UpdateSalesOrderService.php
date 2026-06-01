@@ -13,9 +13,7 @@ use Throwable;
 
 final class UpdateSalesOrderService implements UpdateSalesOrderServiceInterface
 {
-    public function __construct(private readonly SalesOrderRepositoryInterface $repository)
-    {
-    }
+    public function __construct(private readonly SalesOrderRepositoryInterface $repository) {}
 
     public function execute(int|string $id, array $payload): Result
     {

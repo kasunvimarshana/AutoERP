@@ -31,8 +31,7 @@ final class SalesPaymentController extends Controller
         private readonly ListPaymentAllocationsServiceInterface $listAllocations,
         private readonly CreatePaymentAllocationServiceInterface $createAllocation,
         private readonly CreateWriteOffServiceInterface $createWriteOff,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -124,10 +123,12 @@ final class SalesPaymentController extends Controller
         $sourceId = (int) ($payload['source_id'] ?? 0);
         if ($sourceType !== '' && $sourceId > 0) {
             $payload['payment_id'] = (int) $id;
+
             return $this->respond($this->integration->allocateSourcePayment($sourceType, $sourceId, $payload));
         }
 
         $payload['payment_id'] = (int) $id;
+
         return $this->respond($this->createAllocation->execute($payload));
     }
 

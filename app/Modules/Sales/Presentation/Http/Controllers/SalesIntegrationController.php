@@ -12,9 +12,7 @@ use Modules\Sales\Presentation\Http\Requests\SalesIntegrationActionRequest;
 
 final class SalesIntegrationController extends Controller
 {
-    public function __construct(private readonly SalesIntegrationServiceInterface $service)
-    {
-    }
+    public function __construct(private readonly SalesIntegrationServiceInterface $service) {}
 
     public function listDocuments(
         SalesIntegrationActionRequest $request,

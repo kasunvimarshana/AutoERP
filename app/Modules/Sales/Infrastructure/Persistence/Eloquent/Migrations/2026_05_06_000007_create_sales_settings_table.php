@@ -36,6 +36,8 @@ return new class extends Migration
             $table->foreignId('default_return_account_id')->nullable()->constrained('accounts')->nullOnDelete();
             $table->foreignId('default_rounding_account_id')->nullable()->constrained('accounts')->nullOnDelete();
             $table->foreignId('default_write_off_account_id')->nullable()->constrained('accounts')->nullOnDelete();
+            $table->foreignId('default_customer_advance_account_id')->nullable()->constrained('accounts')->nullOnDelete();
+            $table->foreignId('default_refund_account_id')->nullable()->constrained('accounts')->nullOnDelete();
 
             $table->foreignId('default_payment_term_id')->nullable()->constrained('payment_terms')->nullOnDelete();
             $table->foreignId('default_currency_id')->nullable()->constrained('currencies')->nullOnDelete();

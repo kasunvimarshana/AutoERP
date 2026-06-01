@@ -12,9 +12,7 @@ use Modules\Sales\Presentation\Http\Requests\SalesWorkflowActionRequest;
 
 final class SalesWorkflowController extends Controller
 {
-    public function __construct(private readonly SalesWorkflowServiceInterface $workflowService)
-    {
-    }
+    public function __construct(private readonly SalesWorkflowServiceInterface $workflowService) {}
 
     public function transition(SalesWorkflowActionRequest $request, string $entityType, int|string $id): JsonResponse
     {
@@ -60,6 +58,16 @@ final class SalesWorkflowController extends Controller
     ): JsonResponse {
         return $this->respond(
             $this->workflowService->postFinance($entityType, $id, $this->withTenantContext($request))
+        );
+    }
+
+    public function previewFinance(
+        SalesWorkflowActionRequest $request,
+        string $entityType,
+        int|string $id
+    ): JsonResponse {
+        return $this->respond(
+            $this->workflowService->previewFinance($entityType, $id, $this->withTenantContext($request))
         );
     }
 

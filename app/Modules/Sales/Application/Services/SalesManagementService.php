@@ -399,6 +399,8 @@ final class SalesManagementService implements SalesManagementServiceInterface
             'default_gdn_status' => 'draft',
             'default_sales_invoice_status' => 'draft',
             'default_sales_return_status' => 'draft',
+            'default_customer_advance_account_id' => $payload['default_customer_advance_account_id'] ?? null,
+            'default_refund_account_id' => $payload['default_refund_account_id'] ?? null,
             'require_sales_order_before_gdn' => false,
             'require_gdn_before_invoice' => false,
         ], $payload));

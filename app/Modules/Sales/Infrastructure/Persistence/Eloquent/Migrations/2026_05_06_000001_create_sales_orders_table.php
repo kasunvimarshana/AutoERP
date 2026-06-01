@@ -76,7 +76,7 @@ return new class extends Migration
                 ->default(0)
                 ->comment(
                     'Application-calculated: subtotal - discount_total + tax_total + '
-                    . 'debit_note_total - credit_note_total'
+                    .'debit_note_total - credit_note_total'
                 );
 
             $table->decimal('paid_amount', 20, 4)->default(0);

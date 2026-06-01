@@ -13,9 +13,7 @@ use Throwable;
 
 final class DeleteGdnHeaderService implements DeleteGdnHeaderServiceInterface
 {
-    public function __construct(private readonly GdnHeaderRepositoryInterface $repository)
-    {
-    }
+    public function __construct(private readonly GdnHeaderRepositoryInterface $repository) {}
 
     public function execute(int|string $id): Result
     {

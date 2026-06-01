@@ -13,9 +13,7 @@ use Throwable;
 
 final class UpdateSalesReturnLineService implements UpdateSalesReturnLineServiceInterface
 {
-    public function __construct(private readonly SalesReturnLineRepositoryInterface $repository)
-    {
-    }
+    public function __construct(private readonly SalesReturnLineRepositoryInterface $repository) {}
 
     public function execute(int|string $id, array $payload): Result
     {

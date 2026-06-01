@@ -10,11 +10,11 @@ use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Modules\Document\Application\Services\DocumentOrchestrator;
 use Modules\Document\Domain\Aggregates\DocumentAggregate;
+use Modules\Payment\Application\Contracts\Services\AdvancePaymentServiceInterface;
 use Modules\Payment\Application\Contracts\Services\PaymentPostingServiceInterface;
 use Modules\Payment\Application\Contracts\Services\PaymentReversalServiceInterface;
 use Modules\Payment\Application\Contracts\Services\PaymentServiceInterface;
 use Modules\Payment\Application\Contracts\Services\RefundServiceInterface;
-use Modules\Payment\Application\Contracts\Services\AdvancePaymentServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\AdvancePayments\ListAdvancePaymentsServiceInterface;
 use Modules\Sales\Application\Contracts\Services\SalesIntegrationServiceInterface;
 use Modules\Sales\Application\Contracts\Services\SalesWorkflowServiceInterface;
@@ -50,8 +50,7 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
         private readonly PaymentReversalServiceInterface $paymentReversalService,
         private readonly RefundServiceInterface $refundService,
         private readonly ListAdvancePaymentsServiceInterface $listAdvancePaymentsService,
-    ) {
-    }
+    ) {}
 
     public function listSourceDocuments(string $entityType, int|string $id, array $payload): Result
     {
@@ -385,10 +384,19 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
                 'currency_id' => $payload['currency_id'] ?? $record->get('currency_id'),
                 'exchange_rate' => $payload['exchange_rate'] ?? null,
                 'base_amount' => $payload['base_amount'] ?? $amount,
+                'direction' => 'inbound',
                 'payment_method_id' => $payload['payment_method_id'] ?? null,
                 'account_id' => $payload['account_id'] ?? null,
                 'status' => $payload['status'] ?? 'draft',
                 'reference' => $payload['reference'] ?? $record->get('reference'),
+                'source_module' => 'sales',
+                'source_type' => $entityType,
+                'source_id' => $sourceId,
+                'source_reference' => $this->resolveSourceReference($entityType, $record),
+                'source_context' => [
+                    'customer_id' => $record->get('customer_id'),
+                    'document_id' => $documentId,
+                ],
                 'notes' => $payload['notes'] ?? null,
                 'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
                 'created_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
@@ -497,6 +505,14 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
                 'exchange_rate' => $payload['exchange_rate'] ?? null,
                 'base_amount' => $payload['base_amount'] ?? $amount,
                 'reference' => $payload['reference'] ?? $record->get('reference'),
+                'source_module' => 'sales',
+                'source_type' => $entityType,
+                'source_id' => $sourceId,
+                'source_reference' => $this->resolveSourceReference($entityType, $record),
+                'source_context' => [
+                    'customer_id' => $customerId,
+                    'document_id' => $documentId,
+                ],
                 'notes' => $payload['notes'] ?? null,
                 'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
                 'created_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
@@ -828,6 +844,18 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
         };
     }
 
+    private function resolveSourceReference(string $entityType, DataRecord $record): string
+    {
+        $value = match ($entityType) {
+            'sales_order' => $record->get('so_number') ?? $record->get('reference'),
+            'gdn_header' => $record->get('gdn_number') ?? $record->get('reference'),
+            'sales_return' => $record->get('return_number') ?? $record->get('reference'),
+            default => $record->get('reference'),
+        };
+
+        return (string) ($value ?? ($entityType.'#'.$record->id()));
+    }
+
     private function findSourceLine(string $entityType, int $sourceLineId, int $sourceId): ?DataRecord
     {
         $line = match ($entityType) {
@@ -896,11 +924,8 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
         DataRecord $sourceLine,
     ): float {
         $baseQuantity = match ($entityType) {
-            'sales_order' => max(
-                (float) $sourceLine->get('received_qty', 0),
-                (float) $sourceLine->get('ordered_qty', 0),
-            ),
-            'gdn_header' => (float) $sourceLine->get('accepted_qty', $sourceLine->get('received_qty', 0)),
+            'sales_order' => (float) $sourceLine->get('ordered_qty', 0),
+            'gdn_header' => (float) $sourceLine->get('delivered_qty', 0),
             'sales_return' => (float) $sourceLine->get('return_qty', 0),
             default => 0.0,
         };
@@ -945,6 +970,7 @@ final class SalesIntegrationService implements SalesIntegrationServiceInterface
 
         if ($itemQuantity > 0 && $lineTotal > 0) {
             $unitAmount = $lineTotal / $itemQuantity;
+
             return round(max(0.0, $unitAmount * $linkedQuantity), 4);
         }
 

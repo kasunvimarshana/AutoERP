@@ -9,7 +9,7 @@ use Modules\Core\Application\Results\Result;
 interface CreateGdnHeaderServiceInterface
 {
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     public function execute(array $payload): Result;
 }

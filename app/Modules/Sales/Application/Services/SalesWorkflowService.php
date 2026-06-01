@@ -131,8 +131,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
         private readonly ItemRepositoryInterface $itemRepository,
         private readonly UnitOfMeasureRepositoryInterface $unitOfMeasureRepository,
         private readonly UomConversionServiceInterface $uomConversionService,
-    ) {
-    }
+    ) {}
 
     public function transition(string $entityType, int|string $id, array $payload): Result
     {
@@ -462,11 +461,20 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
                     partyId: $record->get('customer_id') !== null ? (int) $record->get('customer_id') : null,
                     dueDate: isset($payload['due_date']) ? (string) $payload['due_date'] : null,
                     notes: isset($payload['notes']) ? (string) $payload['notes'] : null,
+                    documentDefinitionId: $settings instanceof DataRecord
+                        ? $this->resolveDefaultDocumentDefinitionIdFromSettings($entityType, $settings)
+                        : null,
+                    sourceModule: 'sales',
+                    sourceType: $entityType,
+                    sourceId: (int) $record->id(),
+                    sourceReference: $this->resolveSourceReference($entityType, $record),
+                    title: $this->financeDescription($entityType, $record),
                     data: [
+                        'source_module' => 'sales',
                         'source_type' => $entityType,
                         'source_id' => (int) $record->id(),
                         'sales_reference' => $record->get('reference'),
-                        'sales_number' => $record->get('po_number')
+                        'sales_number' => $record->get('so_number')
                             ?? $record->get('gdn_number')
                             ?? $record->get('return_number'),
                     ],
@@ -675,6 +683,13 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
                         'payment_id' => (int) $payload['payment_id'],
                         'document_type' => $entityType,
                         'document_id' => $documentId,
+                        'source_module' => 'sales',
+                        'source_type' => $entityType,
+                        'source_id' => (int) $record->id(),
+                        'source_reference' => $this->resolveSourceReference($entityType, $record),
+                        'source_context' => [
+                            'customer_id' => $record->get('customer_id'),
+                        ],
                         'allocated_amount' => $allocatedAmount,
                         'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
                         'reference' => $payload['reference'] ?? null,
@@ -686,6 +701,13 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
                         'advance_payment_id' => (int) $payload['advance_payment_id'],
                         'document_type' => $entityType,
                         'document_id' => $documentId,
+                        'source_module' => 'sales',
+                        'source_type' => $entityType,
+                        'source_id' => (int) $record->id(),
+                        'source_reference' => $this->resolveSourceReference($entityType, $record),
+                        'source_context' => [
+                            'customer_id' => $record->get('customer_id'),
+                        ],
                         'allocated_amount' => $allocatedAmount,
                         'metadata' => is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
                         'reference' => $payload['reference'] ?? null,
@@ -792,7 +814,6 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
                 ));
             }
 
-
             return $this->withinEntityTransaction($entityType, function () use (
                 $lineRecords,
                 $entityType,
@@ -806,17 +827,21 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
                 foreach ($lineRecords as $line) {
                     $quantity = $entityType === 'sales_return'
                         ? (float) $line->get('return_qty', 0)
-                        : (float) $line->get('received_qty', 0);
+                        : (float) $line->get('delivered_qty', 0);
                     if ($quantity <= 0) {
                         continue;
                     }
 
                     $itemId = (int) $line->get('item_id', 0);
-                    if (! $this->itemRepository->findByIdInTenant($itemId, $tenantId) instanceof DataRecord) {
+                    $item = $this->itemRepository->findByIdInTenant($itemId, $tenantId);
+                    if (! $item instanceof DataRecord) {
                         return Result::failure(new Error(
                             SalesErrorCode::INVALID_VALUE,
                             'Inventory posting failed because item is not available in tenant scope.',
                         ));
+                    }
+                    if (! (bool) $item->get('is_stockable', false)) {
+                        continue;
                     }
 
                     $transactionUomId = (int) $line->get('uom_id', 0);
@@ -847,7 +872,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
                     }
 
                     $baseQuantity = (float) $baseQuantityResult->valueOrFail();
-                    $direction = $entityType === 'sales_return' ? 'OUT' : 'IN';
+                    $direction = $entityType === 'sales_return' ? 'IN' : 'OUT';
                     $movementType = $entityType === 'sales_return' ? 'SALES_RETURN' : 'SALES_GDN';
 
                     $movementResult = $this->createStockMovementService->execute([
@@ -861,8 +886,14 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
                         'serial_id' => $line->get('serial_id'),
                         'location_id' => $line->get('location_id'),
                         'warehouse_id' => $line->get('warehouse_id') ?? $record->get('warehouse_id'),
+                        'source_module' => 'sales',
                         'source_type' => $entityType,
                         'source_id' => (int) $record->id(),
+                        'source_reference' => $this->resolveSourceReference($entityType, $record),
+                        'source_context' => [
+                            'customer_id' => $record->get('customer_id'),
+                            'status' => $record->get('status'),
+                        ],
                         'source_line_id' => (int) $line->id(),
                         'transaction_uom_id' => $transactionUomId,
                         'base_uom_id' => (int) $baseUom->id(),
@@ -872,8 +903,8 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
                         'quantity_out' => $direction === 'OUT' ? $quantity : 0,
                         'base_quantity_in' => $direction === 'IN' ? $baseQuantity : 0,
                         'base_quantity_out' => $direction === 'OUT' ? $baseQuantity : 0,
-                        'unit_cost' => (float) $line->get('unit_price', 0),
-                        'total_cost' => round($quantity * (float) $line->get('unit_price', 0), 4),
+                        'unit_cost' => (float) ($line->get('unit_cost') ?? $item->get('standard_cost') ?? 0),
+                        'total_cost' => round($quantity * (float) ($line->get('unit_cost') ?? $item->get('standard_cost') ?? 0), 4),
                         'status' => 'POSTED',
                         'performed_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
                         'performed_at' => now()->toDateTimeString(),
@@ -946,13 +977,19 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
                 ));
             }
 
-            $entryPayload = is_array($payload['entry_payload'] ?? null) ? $payload['entry_payload'] : [];
-            $linesPayload = is_array($payload['lines_payload'] ?? null) ? $payload['lines_payload'] : [];
-            if ($entryPayload === [] || $linesPayload === []) {
-                return Result::failure(new Error(
-                    SalesErrorCode::INVALID_VALUE,
-                    'entry_payload and lines_payload are required.',
-                ));
+            $postingPayloadResult = $this->resolveFinancePostingPayload($entityType, $record, $payload, $tenantId);
+            if ($postingPayloadResult->isFailure()) {
+                return $postingPayloadResult;
+            }
+
+            [$entryPayload, $linesPayload] = $postingPayloadResult->valueOrFail();
+            if (($payload['preview_only'] ?? false) === true) {
+                return Result::success([
+                    'entry_payload' => $entryPayload,
+                    'lines_payload' => $linesPayload,
+                    'totals' => $this->calculateJournalLineTotals($linesPayload),
+                    'balanced' => $this->journalLinesAreBalanced($linesPayload),
+                ]);
             }
 
             $idempotencyKey = $this->normalizeIdempotencyKey($payload['idempotency_key'] ?? null);
@@ -985,8 +1022,22 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
             $entryPayload['tenant_id'] = $tenantId;
             $entryPayload['organization_unit_id'] = $entryPayload['organization_unit_id']
                 ?? $record->get('organization_unit_id');
+            $entryPayload['source_module'] = $entryPayload['source_module'] ?? 'sales';
             $entryPayload['source_type'] = $entryPayload['source_type'] ?? $entityType;
             $entryPayload['source_id'] = $entryPayload['source_id'] ?? (int) $record->id();
+            $entryPayload['source_reference'] = $entryPayload['source_reference']
+                ?? $this->resolveSourceReference($entityType, $record);
+            $entryPayload['source_context'] = $entryPayload['source_context'] ?? [
+                'customer_id' => $record->get('customer_id'),
+                'status' => $record->get('status'),
+            ];
+
+            if (! $this->journalLinesAreBalanced($linesPayload)) {
+                return Result::failure(new Error(
+                    SalesErrorCode::INVALID_VALUE,
+                    'Sales finance posting is not balanced.',
+                ));
+            }
 
             return $this->withinEntityTransaction($entityType, function () use (
                 $entryPayload,
@@ -1025,6 +1076,13 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
         } catch (Throwable $exception) {
             return Result::failure(new Error(SalesErrorCode::INVALID_VALUE, $exception->getMessage()));
         }
+    }
+
+    public function previewFinance(string $entityType, int|string $id, array $payload): Result
+    {
+        $payload['preview_only'] = true;
+
+        return $this->postFinance($entityType, $id, $payload);
     }
 
     public function reverseFinance(string $entityType, int|string $id, array $payload): Result
@@ -1194,6 +1252,287 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
         };
     }
 
+    /**
+     * @return Result<array{0: array<string, mixed>, 1: list<array<string, mixed>>}>
+     */
+    private function resolveFinancePostingPayload(
+        string $entityType,
+        DataRecord $record,
+        array $payload,
+        int $tenantId,
+    ): Result {
+        $entryPayload = is_array($payload['entry_payload'] ?? null) ? $payload['entry_payload'] : [];
+        $linesPayload = is_array($payload['lines_payload'] ?? null) ? $payload['lines_payload'] : [];
+        if ($entryPayload !== [] && $linesPayload !== []) {
+            return Result::success([$entryPayload, $linesPayload]);
+        }
+
+        $settings = $this->resolveActiveSettings(
+            $tenantId,
+            $record->get('organization_unit_id') !== null ? (int) $record->get('organization_unit_id') : null,
+        );
+        if (! $settings instanceof DataRecord) {
+            return Result::failure(new Error(
+                SalesErrorCode::INVALID_VALUE,
+                'Sales settings are required before finance posting.',
+            ));
+        }
+
+        $accounts = [
+            'receivable' => (int) $settings->get('default_customer_receivable_account_id', 0),
+            'revenue' => (int) $settings->get('default_sales_income_account_id', 0),
+            'inventory' => (int) $settings->get('default_inventory_account_id', 0),
+            'cogs' => (int) $settings->get('default_cogs_account_id', 0),
+            'tax' => (int) $settings->get('default_sales_tax_account_id', 0),
+            'discount' => (int) $settings->get('default_sales_discount_account_id', 0),
+        ];
+        foreach (['receivable', 'revenue', 'inventory', 'cogs'] as $required) {
+            if ($accounts[$required] < 1) {
+                return Result::failure(new Error(
+                    SalesErrorCode::INVALID_VALUE,
+                    'Sales settings must include AR, revenue, inventory asset and COGS accounts.',
+                ));
+            }
+        }
+
+        $sourceLines = $this->resolveLines($entityType, (int) $record->id());
+        if ($sourceLines === []) {
+            return Result::failure(new Error(SalesErrorCode::INVALID_VALUE, 'No sales lines found to post.'));
+        }
+
+        $journalLines = [];
+        $grossTotal = 0.0;
+        $netTotal = 0.0;
+        $taxTotal = 0.0;
+        $discountTotal = 0.0;
+        $cogsTotal = 0.0;
+        $isReturn = $entityType === 'sales_return';
+
+        foreach ($sourceLines as $line) {
+            if (! $line instanceof DataRecord) {
+                continue;
+            }
+
+            $itemId = (int) $line->get('item_id', 0);
+            $item = $itemId > 0 ? $this->itemRepository->findByIdInTenant($itemId, $tenantId) : null;
+            if (! $item instanceof DataRecord) {
+                return Result::failure(new Error(
+                    SalesErrorCode::INVALID_VALUE,
+                    'Finance posting failed because a sales line item is not available in tenant scope.',
+                ));
+            }
+            if (! (bool) $item->get('is_sellable', true)) {
+                return Result::failure(new Error(
+                    SalesErrorCode::INVALID_VALUE,
+                    'Finance posting failed because a sales line item is not sellable.',
+                ));
+            }
+
+            $gross = round((float) $line->get('gross_amount', 0), 4);
+            $net = round((float) $line->get('line_total', 0), 4);
+            $tax = round((float) $line->get('tax_amount', 0), 4);
+            $discount = round((float) $line->get('discount_amount', max(0.0, $gross - $net)), 4);
+            if ($gross <= 0 && $net <= 0 && $tax <= 0) {
+                continue;
+            }
+            if ($tax > 0 && $accounts['tax'] < 1) {
+                return Result::failure(new Error(
+                    SalesErrorCode::INVALID_VALUE,
+                    'Sales settings must include an output tax account when tax is posted.',
+                ));
+            }
+            if ($discount > 0 && $accounts['discount'] < 1) {
+                return Result::failure(new Error(
+                    SalesErrorCode::INVALID_VALUE,
+                    'Sales settings must include a sales discount account when discount is posted.',
+                ));
+            }
+
+            $revenueAccountId = (int) ($line->get('account_id') ?? 0);
+            if ($revenueAccountId < 1) {
+                $revenueAccountId = (int) ($item->get('income_account_id') ?? $accounts['revenue']);
+            }
+            if ($revenueAccountId < 1) {
+                $revenueAccountId = $accounts['revenue'];
+            }
+
+            $isStockable = (bool) $item->get('is_stockable', false);
+            $quantity = $isReturn
+                ? (float) $line->get('return_qty', 0)
+                : ($entityType === 'gdn_header'
+                    ? (float) $line->get('delivered_qty', 0)
+                    : (float) $line->get('ordered_qty', 0));
+            $unitCost = (float) ($line->get('unit_cost') ?? $item->get('standard_cost') ?? 0);
+            $costAmount = $isStockable ? round(max(0.0, $quantity) * max(0.0, $unitCost), 4) : 0.0;
+
+            $description = (string) ($line->get('description') ?? $this->resolveSourceReference($entityType, $record));
+            if ($isReturn) {
+                $journalLines[] = $this->journalLine($record, $revenueAccountId, $gross, 0.0, 'Reverse sales revenue '.$description, count($journalLines) + 1);
+                if ($tax > 0) {
+                    $journalLines[] = $this->journalLine($record, $accounts['tax'], $tax, 0.0, 'Reverse output tax', count($journalLines) + 1);
+                }
+                if ($discount > 0) {
+                    $journalLines[] = $this->journalLine($record, $accounts['discount'], 0.0, $discount, 'Reverse sales discount', count($journalLines) + 1);
+                }
+                $journalLines[] = $this->journalLine($record, $accounts['receivable'], 0.0, $net + $tax, $description, count($journalLines) + 1);
+
+                if ($costAmount > 0) {
+                    $inventoryAccountId = (int) ($item->get('inventory_account_id') ?? $accounts['inventory']);
+                    $cogsAccountId = (int) ($item->get('cogs_account_id') ?? $accounts['cogs']);
+                    $journalLines[] = $this->journalLine($record, $inventoryAccountId, $costAmount, 0.0, 'Sales return inventory '.$description, count($journalLines) + 1);
+                    $journalLines[] = $this->journalLine($record, $cogsAccountId, 0.0, $costAmount, 'Reverse COGS '.$description, count($journalLines) + 1);
+                }
+            } else {
+                $journalLines[] = $this->journalLine($record, $accounts['receivable'], $net + $tax, 0.0, $description, count($journalLines) + 1);
+                if ($discount > 0) {
+                    $journalLines[] = $this->journalLine($record, $accounts['discount'], $discount, 0.0, 'Sales discount', count($journalLines) + 1);
+                }
+                $journalLines[] = $this->journalLine($record, $revenueAccountId, 0.0, $gross, 'Sales revenue '.$description, count($journalLines) + 1);
+                if ($tax > 0) {
+                    $journalLines[] = $this->journalLine($record, $accounts['tax'], 0.0, $tax, 'Output tax', count($journalLines) + 1);
+                }
+
+                if ($costAmount > 0) {
+                    $inventoryAccountId = (int) ($item->get('inventory_account_id') ?? $accounts['inventory']);
+                    $cogsAccountId = (int) ($item->get('cogs_account_id') ?? $accounts['cogs']);
+                    $journalLines[] = $this->journalLine($record, $cogsAccountId, $costAmount, 0.0, 'COGS '.$description, count($journalLines) + 1);
+                    $journalLines[] = $this->journalLine($record, $inventoryAccountId, 0.0, $costAmount, 'Issue inventory '.$description, count($journalLines) + 1);
+                }
+            }
+
+            $grossTotal += $gross;
+            $netTotal += $net;
+            $taxTotal += $tax;
+            $discountTotal += $discount;
+            $cogsTotal += $costAmount;
+        }
+
+        if ($journalLines === []) {
+            return Result::failure(new Error(SalesErrorCode::INVALID_VALUE, 'No positive sales amounts found to post.'));
+        }
+
+        return Result::success([[
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $record->get('organization_unit_id'),
+            'entry_number' => $payload['entry_number']
+                ?? $this->buildSalesJournalNumber($entityType, (int) $record->id(), $payload),
+            'entry_type' => 'AUTO',
+            'description' => $payload['description'] ?? $this->financeDescription($entityType, $record),
+            'entry_date' => $payload['entry_date'] ?? now()->toDateString(),
+            'posting_date' => $payload['posting_date']
+                ?? $record->get('return_date')
+                ?? $record->get('delivered_date')
+                ?? $record->get('order_date')
+                ?? now()->toDateString(),
+            'currency_id' => $record->get('currency_id'),
+            'source_module' => 'sales',
+            'source_type' => $entityType,
+            'source_id' => (int) $record->id(),
+            'source_reference' => $this->resolveSourceReference($entityType, $record),
+            'source_context' => [
+                'customer_id' => $record->get('customer_id'),
+                'gross_total' => round($grossTotal, 4),
+                'net_total' => round($netTotal, 4),
+                'tax_total' => round($taxTotal, 4),
+                'discount_total' => round($discountTotal, 4),
+                'cogs_total' => round($cogsTotal, 4),
+                'settings_id' => $settings->id(),
+            ],
+            'created_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
+            'posted_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
+            'metadata' => array_merge(
+                is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
+                ['source_module' => 'sales'],
+            ),
+        ], $journalLines]);
+    }
+
+    private function journalLine(
+        DataRecord $record,
+        int $accountId,
+        float $debit,
+        float $credit,
+        string $description,
+        int $lineNumber,
+    ): array {
+        return [
+            'tenant_id' => (int) $record->get('tenant_id', 0),
+            'organization_unit_id' => $record->get('organization_unit_id'),
+            'account_id' => $accountId,
+            'description' => $description,
+            'debit_amount' => round($debit, 4),
+            'credit_amount' => round($credit, 4),
+            'currency_id' => $record->get('currency_id'),
+            'exchange_rate' => (float) $record->get('exchange_rate', 1),
+            'party_type' => 'customer',
+            'party_id' => $record->get('customer_id'),
+            'line_number' => $lineNumber,
+        ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $lines
+     * @return array<string, float>
+     */
+    private function calculateJournalLineTotals(array $lines): array
+    {
+        $debit = 0.0;
+        $credit = 0.0;
+        foreach ($lines as $line) {
+            if (! is_array($line)) {
+                continue;
+            }
+            $rate = (float) ($line['exchange_rate'] ?? 1);
+            $debit += (float) ($line['debit_amount'] ?? 0) * $rate;
+            $credit += (float) ($line['credit_amount'] ?? 0) * $rate;
+        }
+
+        return [
+            'debit_total' => round($debit, 4),
+            'credit_total' => round($credit, 4),
+        ];
+    }
+
+    /** @param list<array<string, mixed>> $lines */
+    private function journalLinesAreBalanced(array $lines): bool
+    {
+        $totals = $this->calculateJournalLineTotals($lines);
+
+        return $totals['debit_total'] > 0.0
+            && round($totals['debit_total'], 4) === round($totals['credit_total'], 4);
+    }
+
+    private function buildSalesJournalNumber(string $entityType, int $entityId, array $payload): string
+    {
+        $suffix = $this->normalizeIdempotencyKey($payload['idempotency_key'] ?? null);
+        if ($suffix === '') {
+            $suffix = now()->format('YmdHis');
+        }
+
+        return 'SAL-'.strtoupper(str_replace('_', '-', $entityType)).'-'.$entityId.'-'.$suffix;
+    }
+
+    private function financeDescription(string $entityType, DataRecord $record): string
+    {
+        return match ($entityType) {
+            'sales_return' => 'Sales return posting '.$this->resolveSourceReference($entityType, $record),
+            'gdn_header' => 'Sales delivery posting '.$this->resolveSourceReference($entityType, $record),
+            default => 'Customer invoice posting '.$this->resolveSourceReference($entityType, $record),
+        };
+    }
+
+    private function resolveSourceReference(string $entityType, DataRecord $record): string
+    {
+        $value = match ($entityType) {
+            'sales_order' => $record->get('so_number') ?? $record->get('reference'),
+            'gdn_header' => $record->get('gdn_number') ?? $record->get('reference'),
+            'sales_return' => $record->get('return_number') ?? $record->get('reference'),
+            default => $record->get('reference'),
+        };
+
+        return (string) ($value ?? ($entityType.'#'.$record->id()));
+    }
+
     /** @return list<array<string, mixed>> */
     private function resolveDocumentItems(
         string $entityType,
@@ -1212,7 +1551,9 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
         foreach ($records as $line) {
             $qty = $entityType === 'sales_return'
                 ? (float) $line->get('return_qty', 0)
-                : (float) $line->get('received_qty', $line->get('ordered_qty', 0));
+                : ($entityType === 'gdn_header'
+                    ? (float) $line->get('delivered_qty', 0)
+                    : (float) $line->get('ordered_qty', 0));
             if ($qty <= 0) {
                 continue;
             }
@@ -1545,6 +1886,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
         ]);
 
         $tenantScoped = end($tenantScopedSettings);
+
         return $tenantScoped instanceof DataRecord ? $tenantScoped : null;
     }
 
@@ -1582,6 +1924,22 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
         }
 
         return 0;
+    }
+
+    private function resolveDefaultDocumentDefinitionIdFromSettings(string $entityType, DataRecord $settings): ?int
+    {
+        $definitionId = match ($entityType) {
+            'sales_order' => (int) ($settings->get('sales_invoice_document_definition_id')
+                ?? $settings->get('sales_order_document_definition_id')
+                ?? 0),
+            'gdn_header' => (int) ($settings->get('sales_invoice_document_definition_id')
+                ?? $settings->get('gdn_document_definition_id')
+                ?? 0),
+            'sales_return' => (int) ($settings->get('sales_return_document_definition_id') ?? 0),
+            default => 0,
+        };
+
+        return $definitionId > 0 ? $definitionId : null;
     }
 
     private function hasEligibleGdnForSalesOrder(int $purchaseOrderId, int $tenantId): bool
@@ -1744,7 +2102,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
     {
         return match ($entityType) {
             'sales_order' => (float) $line->get('ordered_qty', 0),
-            'gdn_header' => (float) $line->get('received_qty', 0),
+            'gdn_header' => (float) $line->get('delivered_qty', 0),
             'sales_return' => (float) $line->get('return_qty', 0),
             default => 0.0,
         };

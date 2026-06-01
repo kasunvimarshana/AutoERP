@@ -24,8 +24,7 @@ final class GdnHeaderController extends Controller
         private readonly CreateGdnHeaderServiceInterface $createService,
         private readonly UpdateGdnHeaderServiceInterface $updateService,
         private readonly DeleteGdnHeaderServiceInterface $deleteService,
-    ) {
-    }
+    ) {}
 
     public function index(ListGdnHeaderRequest $request): JsonResponse
     {

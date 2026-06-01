@@ -14,9 +14,7 @@ use Throwable;
 
 final class ListGdnHeadersService implements ListGdnHeadersServiceInterface
 {
-    public function __construct(private readonly GdnHeaderRepositoryInterface $repository)
-    {
-    }
+    public function __construct(private readonly GdnHeaderRepositoryInterface $repository) {}
 
     public function execute(array $criteria, int $perPage, int $page): Result
     {

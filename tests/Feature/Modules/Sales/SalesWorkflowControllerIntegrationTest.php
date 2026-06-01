@@ -18,7 +18,7 @@ final class SalesWorkflowControllerIntegrationTest extends TestCase
         $this->withoutMiddleware();
     }
 
-    public function testTransitionEndpointForwardsPayloadToWorkflowService(): void
+    public function test_transition_endpoint_forwards_payload_to_workflow_service(): void
     {
         $service = $this->createMock(SalesWorkflowServiceInterface::class);
         $service->expects(self::once())
@@ -43,7 +43,7 @@ final class SalesWorkflowControllerIntegrationTest extends TestCase
         $response->assertOk()->assertJson(['data' => ['ok' => true]]);
     }
 
-    public function testTransitionEndpointReturns404WhenEntityIsMissing(): void
+    public function test_transition_endpoint_returns404_when_entity_is_missing(): void
     {
         $service = $this->createMock(SalesWorkflowServiceInterface::class);
         $service->expects(self::once())
@@ -65,7 +65,7 @@ final class SalesWorkflowControllerIntegrationTest extends TestCase
         ]);
     }
 
-    public function testCreateDocumentEndpointForwardsIdempotencyPayloadToWorkflowService(): void
+    public function test_create_document_endpoint_forwards_idempotency_payload_to_workflow_service(): void
     {
         $service = $this->createMock(SalesWorkflowServiceInterface::class);
         $service->expects(self::once())

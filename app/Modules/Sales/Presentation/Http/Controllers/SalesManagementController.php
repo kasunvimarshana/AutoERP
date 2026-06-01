@@ -12,9 +12,7 @@ use Modules\Sales\Application\Contracts\Services\SalesManagementServiceInterface
 
 final class SalesManagementController extends Controller
 {
-    public function __construct(private readonly SalesManagementServiceInterface $service)
-    {
-    }
+    public function __construct(private readonly SalesManagementServiceInterface $service) {}
 
     public function upsertSalesOrderWithLines(Request $request): JsonResponse
     {

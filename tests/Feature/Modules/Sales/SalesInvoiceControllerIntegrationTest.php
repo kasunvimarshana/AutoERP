@@ -17,7 +17,7 @@ final class SalesInvoiceControllerIntegrationTest extends TestCase
         $this->withoutMiddleware();
     }
 
-    public function testAvailableSoLinesForInvoiceUsesDedicatedManagementMethod(): void
+    public function test_available_so_lines_for_invoice_uses_dedicated_management_method(): void
     {
         $integration = $this->createMock(SalesIntegrationServiceInterface::class);
         $management = $this->createMock(SalesManagementServiceInterface::class);
@@ -41,7 +41,7 @@ final class SalesInvoiceControllerIntegrationTest extends TestCase
         ]);
     }
 
-    public function testAvailableSoLinesForInvoiceReturns422WhenParamsMissing(): void
+    public function test_available_so_lines_for_invoice_returns422_when_params_missing(): void
     {
         $integration = $this->createMock(SalesIntegrationServiceInterface::class);
         $management = $this->createMock(SalesManagementServiceInterface::class);
@@ -58,7 +58,7 @@ final class SalesInvoiceControllerIntegrationTest extends TestCase
         ]);
     }
 
-    public function testStoreFromSoForwardsToIntegrationService(): void
+    public function test_store_from_so_forwards_to_integration_service(): void
     {
         $integration = $this->createMock(SalesIntegrationServiceInterface::class);
         $management = $this->createMock(SalesManagementServiceInterface::class);
@@ -96,7 +96,7 @@ final class SalesInvoiceControllerIntegrationTest extends TestCase
         ]);
     }
 
-    public function testCalculateInvoiceReturns422WhenLinesMissing(): void
+    public function test_calculate_invoice_returns422_when_lines_missing(): void
     {
         $integration = $this->createMock(SalesIntegrationServiceInterface::class);
         $management = $this->createMock(SalesManagementServiceInterface::class);
@@ -111,7 +111,7 @@ final class SalesInvoiceControllerIntegrationTest extends TestCase
         $response->assertStatus(422)->assertJsonValidationErrors(['lines']);
     }
 
-    public function testCalculateInvoiceReturns422WhenUnitPriceMissing(): void
+    public function test_calculate_invoice_returns422_when_unit_price_missing(): void
     {
         $integration = $this->createMock(SalesIntegrationServiceInterface::class);
         $management = $this->createMock(SalesManagementServiceInterface::class);

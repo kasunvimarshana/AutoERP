@@ -13,9 +13,7 @@ use Throwable;
 
 final class DeleteSalesReturnService implements DeleteSalesReturnServiceInterface
 {
-    public function __construct(private readonly SalesReturnRepositoryInterface $repository)
-    {
-    }
+    public function __construct(private readonly SalesReturnRepositoryInterface $repository) {}
 
     public function execute(int|string $id): Result
     {

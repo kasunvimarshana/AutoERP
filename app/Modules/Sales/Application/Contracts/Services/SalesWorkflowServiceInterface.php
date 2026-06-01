@@ -24,5 +24,8 @@ interface SalesWorkflowServiceInterface
     public function postFinance(string $entityType, int|string $id, array $payload): Result;
 
     /** @param array<string, mixed> $payload */
+    public function previewFinance(string $entityType, int|string $id, array $payload): Result;
+
+    /** @param array<string, mixed> $payload */
     public function reverseFinance(string $entityType, int|string $id, array $payload): Result;
 }
