@@ -13,9 +13,7 @@ use Throwable;
 
 final class CreateSalesOrderService implements CreateSalesOrderServiceInterface
 {
-    public function __construct(private readonly SalesOrderRepositoryInterface $repository)
-    {
-    }
+    public function __construct(private readonly SalesOrderRepositoryInterface $repository) {}
 
     public function execute(array $payload): Result
     {

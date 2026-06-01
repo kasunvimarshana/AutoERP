@@ -24,8 +24,7 @@ final class SalesReturnController extends Controller
         private readonly CreateSalesReturnServiceInterface $createService,
         private readonly UpdateSalesReturnServiceInterface $updateService,
         private readonly DeleteSalesReturnServiceInterface $deleteService,
-    ) {
-    }
+    ) {}
 
     public function index(ListSalesReturnRequest $request): JsonResponse
     {

@@ -6,15 +6,15 @@ namespace Modules\Sales\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\Core\Application\Results\Result;
 use Modules\Sales\Application\Contracts\Services\SalesWorkflowServiceInterface;
+use Modules\Sales\Presentation\Http\Controllers\Concerns\RespondsWithSalesResult;
 use Modules\Sales\Presentation\Http\Requests\SalesWorkflowActionRequest;
 
 final class SalesWorkflowController extends Controller
 {
-    public function __construct(private readonly SalesWorkflowServiceInterface $workflowService)
-    {
-    }
+    use RespondsWithSalesResult;
+
+    public function __construct(private readonly SalesWorkflowServiceInterface $workflowService) {}
 
     public function transition(SalesWorkflowActionRequest $request, string $entityType, int|string $id): JsonResponse
     {
@@ -98,17 +98,5 @@ final class SalesWorkflowController extends Controller
         }
 
         return $payload;
-    }
-
-    private function respond(Result $result): JsonResponse
-    {
-        if ($result->isFailure()) {
-            $error = $result->errorOrFail();
-            $statusCode = $error->code === 'SALES_NOT_FOUND' ? 404 : 422;
-
-            return response()->json(['message' => $error->message], $statusCode);
-        }
-
-        return response()->json(['data' => $result->valueOrFail()]);
     }
 }

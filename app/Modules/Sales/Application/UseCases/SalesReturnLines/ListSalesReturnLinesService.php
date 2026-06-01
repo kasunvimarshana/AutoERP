@@ -14,9 +14,7 @@ use Throwable;
 
 final class ListSalesReturnLinesService implements ListSalesReturnLinesServiceInterface
 {
-    public function __construct(private readonly SalesReturnLineRepositoryInterface $repository)
-    {
-    }
+    public function __construct(private readonly SalesReturnLineRepositoryInterface $repository) {}
 
     public function execute(array $criteria, int $perPage, int $page): Result
     {

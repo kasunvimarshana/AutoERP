@@ -6,6 +6,4 @@ namespace Modules\Sales\Application\Repositories;
 
 use Modules\Core\Application\Repositories\Contracts\RepositoryPortInterface;
 
-interface SalesPaymentAllocationRepositoryInterface extends RepositoryPortInterface
-{
-}
+interface SalesPaymentAllocationRepositoryInterface extends RepositoryPortInterface {}

@@ -112,16 +112,16 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
     ];
 
     public function __construct(
-        private readonly SalesOrderRepositoryInterface $purchaseOrderRepository,
-        private readonly SalesOrderLineRepositoryInterface $purchaseOrderLineRepository,
+        private readonly SalesOrderRepositoryInterface $salesOrderRepository,
+        private readonly SalesOrderLineRepositoryInterface $salesOrderLineRepository,
         private readonly GdnHeaderRepositoryInterface $gdnHeaderRepository,
         private readonly GdnLineRepositoryInterface $gdnLineRepository,
-        private readonly SalesReturnRepositoryInterface $purchaseReturnRepository,
-        private readonly SalesReturnLineRepositoryInterface $purchaseReturnLineRepository,
-        private readonly SalesDocumentLinkRepositoryInterface $purchaseDocumentLinkRepository,
-        private readonly SalesPaymentAllocationRepositoryInterface $purchasePaymentAllocationRepository,
-        private readonly SalesSettingRepositoryInterface $purchaseSettingRepository,
-        private readonly SalesStatusHistoryRepositoryInterface $purchaseStatusHistoryRepository,
+        private readonly SalesReturnRepositoryInterface $salesReturnRepository,
+        private readonly SalesReturnLineRepositoryInterface $salesReturnLineRepository,
+        private readonly SalesDocumentLinkRepositoryInterface $salesDocumentLinkRepository,
+        private readonly SalesPaymentAllocationRepositoryInterface $salesPaymentAllocationRepository,
+        private readonly SalesSettingRepositoryInterface $salesSettingRepository,
+        private readonly SalesStatusHistoryRepositoryInterface $salesStatusHistoryRepository,
         private readonly DocumentOrchestrator $documentOrchestrator,
         private readonly PaymentAllocationServiceInterface $paymentAllocationService,
         private readonly AdvancePaymentAllocationServiceInterface $advancePaymentAllocationService,
@@ -131,8 +131,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
         private readonly ItemRepositoryInterface $itemRepository,
         private readonly UnitOfMeasureRepositoryInterface $unitOfMeasureRepository,
         private readonly UomConversionServiceInterface $uomConversionService,
-    ) {
-    }
+    ) {}
 
     public function transition(string $entityType, int|string $id, array $payload): Result
     {
@@ -313,7 +312,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
                 $metadata['workflow_action'] = 'transition';
                 $metadata['target_status'] = $status;
 
-                $this->purchaseStatusHistoryRepository->create([
+                $this->salesStatusHistoryRepository->create([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $record->get('organization_unit_id'),
                     'metadata' => $metadata,
@@ -466,7 +465,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
                         'source_type' => $entityType,
                         'source_id' => (int) $record->id(),
                         'sales_reference' => $record->get('reference'),
-                        'sales_number' => $record->get('po_number')
+                        'sales_number' => $record->get('so_number')
                             ?? $record->get('gdn_number')
                             ?? $record->get('return_number'),
                     ],
@@ -482,7 +481,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
                     ));
                 }
 
-                $this->purchaseDocumentLinkRepository->create([
+                $this->salesDocumentLinkRepository->create([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $record->get('organization_unit_id'),
                     'metadata' => $this->metadataWithIdempotencyKey(
@@ -508,7 +507,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
                         continue;
                     }
 
-                    $this->purchaseDocumentLinkRepository->create([
+                    $this->salesDocumentLinkRepository->create([
                         'tenant_id' => $tenantId,
                         'organization_unit_id' => $record->get('organization_unit_id'),
                         'metadata' => $this->metadataWithIdempotencyKey(
@@ -635,7 +634,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
 
             $maxAllocatableAmount = $this->resolveMaxAllocatableAmount($tenantId, $documentId);
             if ($maxAllocatableAmount > 0) {
-                $existingAllocations = $this->purchasePaymentAllocationRepository->list([
+                $existingAllocations = $this->salesPaymentAllocationRepository->list([
                     'tenant_id' => $tenantId,
                     'document_id' => $documentId,
                     'status' => 'active',
@@ -701,7 +700,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
                     return $allocationResult;
                 }
 
-                $this->purchasePaymentAllocationRepository->create([
+                $this->salesPaymentAllocationRepository->create([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $record->get('organization_unit_id'),
                     'metadata' => $this->metadataWithIdempotencyKey($payload, $idempotencyKey, $idempotencySignature),
@@ -792,7 +791,6 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
                 ));
             }
 
-
             return $this->withinEntityTransaction($entityType, function () use (
                 $lineRecords,
                 $entityType,
@@ -804,9 +802,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
                 $idempotencySignature,
             ): Result {
                 foreach ($lineRecords as $line) {
-                    $quantity = $entityType === 'sales_return'
-                        ? (float) $line->get('return_qty', 0)
-                        : (float) $line->get('received_qty', 0);
+                    $quantity = $this->resolveInventoryPostingQuantity($entityType, $line);
                     if ($quantity <= 0) {
                         continue;
                     }
@@ -847,7 +843,8 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
                     }
 
                     $baseQuantity = (float) $baseQuantityResult->valueOrFail();
-                    $direction = $entityType === 'sales_return' ? 'OUT' : 'IN';
+                    // Sales delivery issues stock; only restocked return quantity comes back into inventory.
+                    $direction = $entityType === 'sales_return' ? 'IN' : 'OUT';
                     $movementType = $entityType === 'sales_return' ? 'SALES_RETURN' : 'SALES_GDN';
 
                     $movementResult = $this->createStockMovementService->execute([
@@ -899,7 +896,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
                 $metadata = $this->metadataWithIdempotencyKey($payload, $idempotencyKey, $idempotencySignature);
                 $metadata['workflow_action'] = 'inventory_post';
 
-                $this->purchaseStatusHistoryRepository->create([
+                $this->salesStatusHistoryRepository->create([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $record->get('organization_unit_id'),
                     'metadata' => $metadata,
@@ -1007,7 +1004,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
                 $metadata = $this->metadataWithIdempotencyKey($payload, $idempotencyKey, $idempotencySignature);
                 $metadata['workflow_action'] = 'finance_post';
 
-                $this->purchaseStatusHistoryRepository->create([
+                $this->salesStatusHistoryRepository->create([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $record->get('organization_unit_id'),
                     'metadata' => $metadata,
@@ -1133,7 +1130,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
                 $metadata['workflow_action'] = 'finance_reverse';
                 $metadata['journal_entry_id'] = (string) $journalEntryId;
 
-                $this->purchaseStatusHistoryRepository->create([
+                $this->salesStatusHistoryRepository->create([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $record->get('organization_unit_id'),
                     'metadata' => $metadata,
@@ -1156,9 +1153,9 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
     private function findEntity(string $entityType, int|string $id): ?DataRecord
     {
         return match ($entityType) {
-            'sales_order' => $this->purchaseOrderRepository->findById($id),
+            'sales_order' => $this->salesOrderRepository->findById($id),
             'gdn_header' => $this->gdnHeaderRepository->findById($id),
-            'sales_return' => $this->purchaseReturnRepository->findById($id),
+            'sales_return' => $this->salesReturnRepository->findById($id),
             default => null,
         };
     }
@@ -1166,9 +1163,9 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
     private function withinEntityTransaction(string $entityType, callable $callback): Result
     {
         return match ($entityType) {
-            'sales_order' => $this->purchaseOrderRepository->transaction($callback),
+            'sales_order' => $this->salesOrderRepository->transaction($callback),
             'gdn_header' => $this->gdnHeaderRepository->transaction($callback),
-            'sales_return' => $this->purchaseReturnRepository->transaction($callback),
+            'sales_return' => $this->salesReturnRepository->transaction($callback),
             default => Result::failure(new Error(SalesErrorCode::INVALID_VALUE, 'Unsupported entity type.')),
         };
     }
@@ -1176,9 +1173,9 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
     private function updateEntity(string $entityType, int|string $id, array $payload): DataRecord
     {
         return match ($entityType) {
-            'sales_order' => $this->purchaseOrderRepository->update($id, $payload),
+            'sales_order' => $this->salesOrderRepository->update($id, $payload),
             'gdn_header' => $this->gdnHeaderRepository->update($id, $payload),
-            'sales_return' => $this->purchaseReturnRepository->update($id, $payload),
+            'sales_return' => $this->salesReturnRepository->update($id, $payload),
             default => throw new \InvalidArgumentException('Unsupported entity type.'),
         };
     }
@@ -1187,9 +1184,9 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
     private function resolveLines(string $entityType, int $entityId): array
     {
         return match ($entityType) {
-            'sales_order' => $this->purchaseOrderLineRepository->list(['sales_order_id' => $entityId]),
+            'sales_order' => $this->salesOrderLineRepository->list(['sales_order_id' => $entityId]),
             'gdn_header' => $this->gdnLineRepository->list(['gdn_header_id' => $entityId]),
-            'sales_return' => $this->purchaseReturnLineRepository->list(['sales_return_id' => $entityId]),
+            'sales_return' => $this->salesReturnLineRepository->list(['sales_return_id' => $entityId]),
             default => [],
         };
     }
@@ -1210,9 +1207,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
         $items = [];
 
         foreach ($records as $line) {
-            $qty = $entityType === 'sales_return'
-                ? (float) $line->get('return_qty', 0)
-                : (float) $line->get('received_qty', $line->get('ordered_qty', 0));
+            $qty = $this->resolveDocumentLineQuantity($entityType, $line);
             if ($qty <= 0) {
                 continue;
             }
@@ -1291,7 +1286,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
 
     private function resolveLatestDocumentId(string $entityType, int $sourceId, int $tenantId): int
     {
-        $links = $this->purchaseDocumentLinkRepository->list([
+        $links = $this->salesDocumentLinkRepository->list([
             'tenant_id' => $tenantId,
             'source_type' => $entityType,
             'source_id' => $sourceId,
@@ -1308,7 +1303,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
 
     private function resolveMaxAllocatableAmount(int $tenantId, int $documentId): float
     {
-        $links = $this->purchaseDocumentLinkRepository->list([
+        $links = $this->salesDocumentLinkRepository->list([
             'tenant_id' => $tenantId,
             'document_id' => $documentId,
             'status' => 'active',
@@ -1336,7 +1331,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
         int $sourceId,
         string $idempotencyKey,
     ): ?DataRecord {
-        $links = $this->purchaseDocumentLinkRepository->list([
+        $links = $this->salesDocumentLinkRepository->list([
             'tenant_id' => $tenantId,
             'source_type' => $entityType,
             'source_id' => $sourceId,
@@ -1370,7 +1365,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
         int $documentId,
         string $idempotencyKey,
     ): ?DataRecord {
-        $allocations = $this->purchasePaymentAllocationRepository->list([
+        $allocations = $this->salesPaymentAllocationRepository->list([
             'tenant_id' => $tenantId,
             'document_id' => $documentId,
             'status' => 'active',
@@ -1401,7 +1396,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
         string $idempotencyKey,
         string $action,
     ): ?DataRecord {
-        $histories = $this->purchaseStatusHistoryRepository->list([
+        $histories = $this->salesStatusHistoryRepository->list([
             'tenant_id' => $tenantId,
             'entity_type' => $entityType,
             'entity_id' => $entityId,
@@ -1527,7 +1522,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
     private function resolveActiveSettings(int $tenantId, ?int $organizationUnitId): ?DataRecord
     {
         if ($organizationUnitId !== null && $organizationUnitId > 0) {
-            $orgScopedSettings = $this->purchaseSettingRepository->list([
+            $orgScopedSettings = $this->salesSettingRepository->list([
                 'tenant_id' => $tenantId,
                 'organization_unit_id' => $organizationUnitId,
                 'is_active' => true,
@@ -1539,12 +1534,13 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
             }
         }
 
-        $tenantScopedSettings = $this->purchaseSettingRepository->list([
+        $tenantScopedSettings = $this->salesSettingRepository->list([
             'tenant_id' => $tenantId,
             'is_active' => true,
         ]);
 
         $tenantScoped = end($tenantScopedSettings);
+
         return $tenantScoped instanceof DataRecord ? $tenantScoped : null;
     }
 
@@ -1584,11 +1580,11 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
         return 0;
     }
 
-    private function hasEligibleGdnForSalesOrder(int $purchaseOrderId, int $tenantId): bool
+    private function hasEligibleGdnForSalesOrder(int $salesOrderId, int $tenantId): bool
     {
         $gdns = $this->gdnHeaderRepository->list([
             'tenant_id' => $tenantId,
-            'sales_order_id' => $purchaseOrderId,
+            'sales_order_id' => $salesOrderId,
         ]);
 
         foreach ($gdns as $gdn) {
@@ -1621,7 +1617,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
 
     private function canFinalizeEntity(string $entityType, int $sourceId, int $tenantId): bool
     {
-        $activeLinks = $this->purchaseDocumentLinkRepository->list([
+        $activeLinks = $this->salesDocumentLinkRepository->list([
             'tenant_id' => $tenantId,
             'source_type' => $entityType,
             'source_id' => $sourceId,
@@ -1646,7 +1642,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
 
         $documentIds = array_values(array_unique($documentIds));
         foreach ($documentIds as $documentId) {
-            $activeAllocations = $this->purchasePaymentAllocationRepository->list([
+            $activeAllocations = $this->salesPaymentAllocationRepository->list([
                 'tenant_id' => $tenantId,
                 'document_id' => $documentId,
                 'status' => 'active',
@@ -1711,7 +1707,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
                 continue;
             }
 
-            $existingLinks = $this->purchaseDocumentLinkRepository->list([
+            $existingLinks = $this->salesDocumentLinkRepository->list([
                 'tenant_id' => $tenantId,
                 'source_type' => $entityType,
                 'source_id' => $sourceId,
@@ -1744,7 +1740,28 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
     {
         return match ($entityType) {
             'sales_order' => (float) $line->get('ordered_qty', 0),
-            'gdn_header' => (float) $line->get('received_qty', 0),
+            'gdn_header' => (float) $line->get('delivered_qty', 0),
+            'sales_return' => (float) $line->get('return_qty', 0),
+            default => 0.0,
+        };
+    }
+
+    private function resolveInventoryPostingQuantity(string $entityType, DataRecord $line): float
+    {
+        if ($entityType === 'sales_return') {
+            $restockQty = (float) $line->get('restock_qty', 0);
+
+            return $restockQty > 0 ? $restockQty : (float) $line->get('return_qty', 0);
+        }
+
+        return (float) $line->get('delivered_qty', 0);
+    }
+
+    private function resolveDocumentLineQuantity(string $entityType, DataRecord $line): float
+    {
+        return match ($entityType) {
+            'sales_order' => (float) $line->get('ordered_qty', 0),
+            'gdn_header' => (float) $line->get('delivered_qty', 0),
             'sales_return' => (float) $line->get('return_qty', 0),
             default => 0.0,
         };
@@ -1768,7 +1785,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
                 }
             }
 
-            $dependentReturns = $this->purchaseReturnRepository->list([
+            $dependentReturns = $this->salesReturnRepository->list([
                 'tenant_id' => $tenantId,
                 'original_sales_order_id' => $sourceId,
             ]);
@@ -1788,7 +1805,7 @@ final class SalesWorkflowService implements SalesWorkflowServiceInterface
         }
 
         if ($entityType === 'gdn_header') {
-            $dependentReturns = $this->purchaseReturnRepository->list([
+            $dependentReturns = $this->salesReturnRepository->list([
                 'tenant_id' => $tenantId,
                 'original_gdn_id' => $sourceId,
             ]);

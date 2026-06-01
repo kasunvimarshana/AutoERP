@@ -3,16 +3,16 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use Modules\Sales\Presentation\Http\Controllers\SalesOrderController;
-use Modules\Sales\Presentation\Http\Controllers\SalesOrderLineController;
-use Modules\Sales\Presentation\Http\Controllers\SalesInvoiceController;
-use Modules\Sales\Presentation\Http\Controllers\SalesPaymentController;
 use Modules\Sales\Presentation\Http\Controllers\GdnHeaderController;
 use Modules\Sales\Presentation\Http\Controllers\GdnLineController;
+use Modules\Sales\Presentation\Http\Controllers\SalesIntegrationController;
+use Modules\Sales\Presentation\Http\Controllers\SalesInvoiceController;
+use Modules\Sales\Presentation\Http\Controllers\SalesManagementController;
+use Modules\Sales\Presentation\Http\Controllers\SalesOrderController;
+use Modules\Sales\Presentation\Http\Controllers\SalesOrderLineController;
+use Modules\Sales\Presentation\Http\Controllers\SalesPaymentController;
 use Modules\Sales\Presentation\Http\Controllers\SalesReturnController;
 use Modules\Sales\Presentation\Http\Controllers\SalesReturnLineController;
-use Modules\Sales\Presentation\Http\Controllers\SalesManagementController;
-use Modules\Sales\Presentation\Http\Controllers\SalesIntegrationController;
 use Modules\Sales\Presentation\Http\Controllers\SalesWorkflowController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
@@ -26,7 +26,7 @@ $currentOrganizationUnitMiddleware = (string) config(
 Route::prefix('api/sales')
     ->middleware([
         'api',
-        'auth:' . $protectedGuard,
+        'auth:'.$protectedGuard,
         $currentUserMiddleware,
         $currentTenantMiddleware,
         $currentOrganizationUnitMiddleware,

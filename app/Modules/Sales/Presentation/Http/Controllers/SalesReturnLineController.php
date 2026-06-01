@@ -24,8 +24,7 @@ final class SalesReturnLineController extends Controller
         private readonly CreateSalesReturnLineServiceInterface $createService,
         private readonly UpdateSalesReturnLineServiceInterface $updateService,
         private readonly DeleteSalesReturnLineServiceInterface $deleteService,
-    ) {
-    }
+    ) {}
 
     public function index(ListSalesReturnLineRequest $request): JsonResponse
     {

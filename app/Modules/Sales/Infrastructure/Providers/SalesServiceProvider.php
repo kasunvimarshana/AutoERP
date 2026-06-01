@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace Modules\Sales\Infrastructure\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Sales\Application\Contracts\Services\SalesAmountCalculatorInterface;
+use Modules\Sales\Application\Contracts\Services\SalesIntegrationServiceInterface;
+use Modules\Sales\Application\Contracts\Services\SalesManagementServiceInterface;
+use Modules\Sales\Application\Contracts\Services\SalesWorkflowServiceInterface;
 use Modules\Sales\Application\Contracts\UseCases\GdnHeaders\CreateGdnHeaderServiceInterface;
 use Modules\Sales\Application\Contracts\UseCases\GdnHeaders\DeleteGdnHeaderServiceInterface;
 use Modules\Sales\Application\Contracts\UseCases\GdnHeaders\GetGdnHeaderServiceInterface;
@@ -35,19 +39,17 @@ use Modules\Sales\Application\Contracts\UseCases\SalesReturns\DeleteSalesReturnS
 use Modules\Sales\Application\Contracts\UseCases\SalesReturns\GetSalesReturnServiceInterface;
 use Modules\Sales\Application\Contracts\UseCases\SalesReturns\ListSalesReturnsServiceInterface;
 use Modules\Sales\Application\Contracts\UseCases\SalesReturns\UpdateSalesReturnServiceInterface;
-use Modules\Sales\Application\Contracts\Services\SalesIntegrationServiceInterface;
-use Modules\Sales\Application\Contracts\Services\SalesManagementServiceInterface;
-use Modules\Sales\Application\Contracts\Services\SalesWorkflowServiceInterface;
-use Modules\Sales\Application\Repositories\SalesDocumentLinkRepositoryInterface;
-use Modules\Sales\Application\Repositories\SalesPaymentAllocationRepositoryInterface;
-use Modules\Sales\Application\Repositories\SalesSettingRepositoryInterface;
-use Modules\Sales\Application\Repositories\SalesStatusHistoryRepositoryInterface;
 use Modules\Sales\Application\Repositories\GdnHeaderRepositoryInterface;
 use Modules\Sales\Application\Repositories\GdnLineRepositoryInterface;
+use Modules\Sales\Application\Repositories\SalesDocumentLinkRepositoryInterface;
 use Modules\Sales\Application\Repositories\SalesOrderLineRepositoryInterface;
 use Modules\Sales\Application\Repositories\SalesOrderRepositoryInterface;
+use Modules\Sales\Application\Repositories\SalesPaymentAllocationRepositoryInterface;
 use Modules\Sales\Application\Repositories\SalesReturnLineRepositoryInterface;
 use Modules\Sales\Application\Repositories\SalesReturnRepositoryInterface;
+use Modules\Sales\Application\Repositories\SalesSettingRepositoryInterface;
+use Modules\Sales\Application\Repositories\SalesStatusHistoryRepositoryInterface;
+use Modules\Sales\Application\Services\SalesAmountCalculator;
 use Modules\Sales\Application\Services\SalesIntegrationService;
 use Modules\Sales\Application\Services\SalesManagementService;
 use Modules\Sales\Application\Services\SalesWorkflowService;
@@ -106,7 +108,7 @@ final class SalesServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__ . '/../Config/sales.php', 'sales');
+        $this->mergeConfigFrom(__DIR__.'/../Config/sales.php', 'sales');
 
         foreach (
             [
@@ -140,6 +142,7 @@ final class SalesServiceProvider extends ServiceProvider
                 CreateSalesReturnLineServiceInterface::class => CreateSalesReturnLineService::class,
                 UpdateSalesReturnLineServiceInterface::class => UpdateSalesReturnLineService::class,
                 DeleteSalesReturnLineServiceInterface::class => DeleteSalesReturnLineService::class,
+                SalesAmountCalculatorInterface::class => SalesAmountCalculator::class,
                 SalesManagementServiceInterface::class => SalesManagementService::class,
                 SalesIntegrationServiceInterface::class => SalesIntegrationService::class,
                 SalesWorkflowServiceInterface::class => SalesWorkflowService::class,
@@ -149,52 +152,52 @@ final class SalesServiceProvider extends ServiceProvider
         }
 
         $this->app->singleton(SalesOrderRepositoryInterface::class, function (): SalesOrderRepositoryInterface {
-            return new EloquentSalesOrderRepository(new SalesOrderModel());
+            return new EloquentSalesOrderRepository(new SalesOrderModel);
         });
         $this->app->singleton(SalesOrderLineRepositoryInterface::class, function (): SalesOrderLineRepositoryInterface {
-            return new EloquentSalesOrderLineRepository(new SalesOrderLineModel());
+            return new EloquentSalesOrderLineRepository(new SalesOrderLineModel);
         });
         $this->app->singleton(GdnHeaderRepositoryInterface::class, function (): GdnHeaderRepositoryInterface {
-            return new EloquentGdnHeaderRepository(new GdnHeaderModel());
+            return new EloquentGdnHeaderRepository(new GdnHeaderModel);
         });
         $this->app->singleton(GdnLineRepositoryInterface::class, function (): GdnLineRepositoryInterface {
-            return new EloquentGdnLineRepository(new GdnLineModel());
+            return new EloquentGdnLineRepository(new GdnLineModel);
         });
         $this->app->singleton(SalesReturnRepositoryInterface::class, function (): SalesReturnRepositoryInterface {
-            return new EloquentSalesReturnRepository(new SalesReturnModel());
+            return new EloquentSalesReturnRepository(new SalesReturnModel);
         });
         $this->app->singleton(
             SalesReturnLineRepositoryInterface::class,
             function (): SalesReturnLineRepositoryInterface {
-                return new EloquentSalesReturnLineRepository(new SalesReturnLineModel());
+                return new EloquentSalesReturnLineRepository(new SalesReturnLineModel);
             }
         );
         $this->app->singleton(SalesSettingRepositoryInterface::class, function (): SalesSettingRepositoryInterface {
-            return new EloquentSalesSettingRepository(new SalesSettingModel());
+            return new EloquentSalesSettingRepository(new SalesSettingModel);
         });
         $this->app->singleton(
             SalesDocumentLinkRepositoryInterface::class,
             function (): SalesDocumentLinkRepositoryInterface {
-                return new EloquentSalesDocumentLinkRepository(new SalesDocumentLinkModel());
+                return new EloquentSalesDocumentLinkRepository(new SalesDocumentLinkModel);
             }
         );
         $this->app->singleton(
             SalesPaymentAllocationRepositoryInterface::class,
             function (): SalesPaymentAllocationRepositoryInterface {
-                return new EloquentSalesPaymentAllocationRepository(new SalesPaymentAllocationModel());
+                return new EloquentSalesPaymentAllocationRepository(new SalesPaymentAllocationModel);
             }
         );
         $this->app->singleton(
             SalesStatusHistoryRepositoryInterface::class,
             function (): SalesStatusHistoryRepositoryInterface {
-                return new EloquentSalesStatusHistoryRepository(new SalesStatusHistoryModel());
+                return new EloquentSalesStatusHistoryRepository(new SalesStatusHistoryModel);
             }
         );
     }
 
     public function boot(): void
     {
-        $this->loadRoutesFrom(__DIR__ . '/../../routes/api.php');
-        $this->loadMigrationsFrom(__DIR__ . '/../Persistence/Eloquent/Migrations');
+        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
+        $this->loadMigrationsFrom(__DIR__.'/../Persistence/Eloquent/Migrations');
     }
 }

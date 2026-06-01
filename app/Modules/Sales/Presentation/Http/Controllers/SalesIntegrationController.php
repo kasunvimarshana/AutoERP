@@ -6,15 +6,15 @@ namespace Modules\Sales\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\Core\Application\Results\Result;
 use Modules\Sales\Application\Contracts\Services\SalesIntegrationServiceInterface;
+use Modules\Sales\Presentation\Http\Controllers\Concerns\RespondsWithSalesResult;
 use Modules\Sales\Presentation\Http\Requests\SalesIntegrationActionRequest;
 
 final class SalesIntegrationController extends Controller
 {
-    public function __construct(private readonly SalesIntegrationServiceInterface $service)
-    {
-    }
+    use RespondsWithSalesResult;
+
+    public function __construct(private readonly SalesIntegrationServiceInterface $service) {}
 
     public function listDocuments(
         SalesIntegrationActionRequest $request,
@@ -184,17 +184,5 @@ final class SalesIntegrationController extends Controller
         }
 
         return $payload;
-    }
-
-    private function respond(Result $result): JsonResponse
-    {
-        if ($result->isFailure()) {
-            $error = $result->errorOrFail();
-            $statusCode = $error->code === 'SALES_NOT_FOUND' ? 404 : 422;
-
-            return response()->json(['message' => $error->message, 'code' => $error->code], $statusCode);
-        }
-
-        return response()->json(['data' => $result->valueOrFail()]);
     }
 }

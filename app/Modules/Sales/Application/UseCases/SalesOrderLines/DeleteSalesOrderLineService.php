@@ -13,9 +13,7 @@ use Throwable;
 
 final class DeleteSalesOrderLineService implements DeleteSalesOrderLineServiceInterface
 {
-    public function __construct(private readonly SalesOrderLineRepositoryInterface $repository)
-    {
-    }
+    public function __construct(private readonly SalesOrderLineRepositoryInterface $repository) {}
 
     public function execute(int|string $id): Result
     {

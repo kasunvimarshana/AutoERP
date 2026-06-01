@@ -24,8 +24,7 @@ final class GdnLineController extends Controller
         private readonly CreateGdnLineServiceInterface $createService,
         private readonly UpdateGdnLineServiceInterface $updateService,
         private readonly DeleteGdnLineServiceInterface $deleteService,
-    ) {
-    }
+    ) {}
 
     public function index(ListGdnLineRequest $request): JsonResponse
     {

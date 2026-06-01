@@ -14,9 +14,7 @@ use Throwable;
 
 final class ListSalesOrderLinesService implements ListSalesOrderLinesServiceInterface
 {
-    public function __construct(private readonly SalesOrderLineRepositoryInterface $repository)
-    {
-    }
+    public function __construct(private readonly SalesOrderLineRepositoryInterface $repository) {}
 
     public function execute(array $criteria, int $perPage, int $page): Result
     {

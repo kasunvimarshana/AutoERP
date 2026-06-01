@@ -67,7 +67,7 @@ return new class extends Migration
                 ->default(0)
                 ->comment(
                     'Application-calculated: subtotal - discount_total + tax_total + '
-                    . 'debit_note_total - credit_note_total - line_restocking_total'
+                    .'debit_note_total - credit_note_total - line_restocking_total'
                 );
 
             $table->foreignId('tax_account_id')->nullable()->constrained('accounts', 'id')->nullOnDelete();

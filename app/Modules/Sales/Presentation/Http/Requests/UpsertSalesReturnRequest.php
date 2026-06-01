@@ -21,7 +21,28 @@ final class UpsertSalesReturnRequest extends FormRequest
         $required = $this->isMethod('post') ? ['required'] : ['sometimes'];
 
         return [
-
+            'tenant_id' => [...$required, 'integer', 'min:1'],
+            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'metadata' => ['nullable', 'array'],
+            'reference' => ['nullable', 'string', 'max:255'],
+            'customer_id' => [...$required, 'integer', 'min:1'],
+            'original_sales_order_id' => ['nullable', 'integer', 'min:1'],
+            'original_gdn_id' => ['nullable', 'integer', 'min:1'],
+            'original_document_id' => ['nullable', 'integer', 'min:1'],
+            'return_number' => [...$required, 'string', 'max:255'],
+            'status' => ['sometimes', 'string', 'max:255'],
+            'refund_status' => ['sometimes', 'string', 'max:255'],
+            'currency_id' => ['nullable', 'integer', 'min:1'],
+            'exchange_rate' => ['nullable', 'numeric', 'gt:0'],
+            'return_date' => [...$required, 'date'],
+            'return_reason' => ['nullable', 'string', 'max:255'],
+            'header_discount_type' => ['nullable', 'string', 'max:255'],
+            'header_discount_value' => ['nullable', 'numeric', 'min:0'],
+            'header_tax_group_id' => ['nullable', 'integer', 'min:1'],
+            'tax_account_id' => ['nullable', 'integer', 'min:1'],
+            'discount_account_id' => ['nullable', 'integer', 'min:1'],
+            'return_account_id' => ['nullable', 'integer', 'min:1'],
+            'notes' => ['nullable', 'string'],
         ];
     }
 }

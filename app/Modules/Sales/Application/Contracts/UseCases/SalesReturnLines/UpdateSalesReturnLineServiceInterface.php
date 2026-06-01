@@ -9,7 +9,7 @@ use Modules\Core\Application\Results\Result;
 interface UpdateSalesReturnLineServiceInterface
 {
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     public function execute(int|string $id, array $payload): Result;
 }

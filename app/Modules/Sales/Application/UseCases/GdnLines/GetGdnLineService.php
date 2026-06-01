@@ -13,9 +13,7 @@ use Throwable;
 
 final class GetGdnLineService implements GetGdnLineServiceInterface
 {
-    public function __construct(private readonly GdnLineRepositoryInterface $repository)
-    {
-    }
+    public function __construct(private readonly GdnLineRepositoryInterface $repository) {}
 
     public function execute(int|string $id): Result
     {

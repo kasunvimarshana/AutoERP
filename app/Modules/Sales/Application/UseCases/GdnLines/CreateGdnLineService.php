@@ -13,9 +13,7 @@ use Throwable;
 
 final class CreateGdnLineService implements CreateGdnLineServiceInterface
 {
-    public function __construct(private readonly GdnLineRepositoryInterface $repository)
-    {
-    }
+    public function __construct(private readonly GdnLineRepositoryInterface $repository) {}
 
     public function execute(array $payload): Result
     {

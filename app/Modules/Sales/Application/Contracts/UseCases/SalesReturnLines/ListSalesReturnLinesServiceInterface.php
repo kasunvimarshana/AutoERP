@@ -9,7 +9,7 @@ use Modules\Core\Application\Results\Result;
 interface ListSalesReturnLinesServiceInterface
 {
     /**
-     * @param array<string, mixed> $criteria
+     * @param  array<string, mixed>  $criteria
      */
     public function execute(array $criteria, int $perPage, int $page): Result;
 }

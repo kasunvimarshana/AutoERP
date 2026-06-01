@@ -24,8 +24,7 @@ final class SalesOrderLineController extends Controller
         private readonly CreateSalesOrderLineServiceInterface $createService,
         private readonly UpdateSalesOrderLineServiceInterface $updateService,
         private readonly DeleteSalesOrderLineServiceInterface $deleteService,
-    ) {
-    }
+    ) {}
 
     public function index(ListSalesOrderLineRequest $request): JsonResponse
     {
