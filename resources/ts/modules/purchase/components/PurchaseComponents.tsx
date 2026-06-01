@@ -1,4 +1,4 @@
-import { useEffect, useState, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ApiError } from '../../../services/api/apiErrors';
 import { PreviewPanel } from '../../../shared/components/business/PreviewPanel';
@@ -35,6 +35,7 @@ import type {
     PurchaseReturnFormInput,
     PurchaseReturnLine,
     PurchaseSettings,
+    PurchaseSettingsFormInput,
     SupplierRefund,
 } from '../types/purchase.types';
 import { purchaseApi } from '../services/purchaseApi';
@@ -59,7 +60,7 @@ export function PurchaseDashboardCards({ metrics }: { metrics: PurchaseDashboard
 
 export function PurchaseOrderForm({ initialOrder, mode = 'create' }: { initialOrder?: PurchaseOrder; mode?: 'create' | 'edit' }) {
     const navigate = useNavigate();
-    const { errors, globalError, isLoading, lookups, setField, setGlobalError, setLineField, submit, values } = usePurchaseOrderForm(initialOrder);
+    const { addLine, errors, globalError, isLoading, lookupActions, lookups, removeLine, setField, setGlobalError, setLineField, submit, values } = usePurchaseOrderForm(initialOrder);
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
@@ -76,19 +77,24 @@ export function PurchaseOrderForm({ initialOrder, mode = 'create' }: { initialOr
         <form className="space-y-5" onSubmit={(event) => void handleSubmit(event)}>
             <FormSection description="Supplier eligibility, payment terms, workflow defaults, and sequence values are backend validated." title="Purchase Order Header">
                 <div className="grid gap-4 md:grid-cols-3">
-                    <Field error={errors.supplier_id} label="Supplier"><LookupSelect disabled={isLoading} onChange={(value) => setField('supplierId', value)} options={lookups.suppliers} placeholder="Select supplier" value={values.supplierId} /></Field>
+                    <Field error={errors.supplier_id} label="Supplier"><LookupSelect disabled={isLoading} isLoading={lookupActions.loading.suppliers} onOpen={lookupActions.loadSuppliers} onChange={(value) => setField('supplierId', value)} options={lookups.suppliers} placeholder="Select supplier" value={values.supplierId} /></Field>
                     <Field error={errors.po_number} label="PO number"><Input onChange={(event) => setField('poNumber', event.target.value)} value={values.poNumber} /></Field>
                     <Field error={errors.order_date} label="Order date"><Input onChange={(event) => setField('orderDate', event.target.value)} type="date" value={values.orderDate} /></Field>
                     <Field error={errors.expected_date} label="Expected date"><Input onChange={(event) => setField('expectedDate', event.target.value)} type="date" value={values.expectedDate ?? ''} /></Field>
-                    <Field error={errors.warehouse_id} label="Warehouse"><LookupSelect disabled={isLoading} onChange={(value) => setField('warehouseId', value)} options={lookups.warehouses} placeholder="Select warehouse" value={values.warehouseId} /></Field>
+                    <Field error={errors.warehouse_id} label="Warehouse"><LookupSelect disabled={isLoading} isLoading={lookupActions.loading.warehouses} onOpen={lookupActions.loadWarehouses} onChange={(value) => setField('warehouseId', value)} options={lookups.warehouses} placeholder="Select warehouse" value={values.warehouseId} /></Field>
                     <Field label="Workflow"><Select onChange={(event) => setField('status', event.target.value)} value={values.status ?? 'draft'}><option value="draft">Save as draft</option><option value="submitted">Submit for approval</option></Select></Field>
                     <Field error={errors.notes} label="Notes"><Textarea onChange={(event) => setField('notes', event.target.value)} placeholder="Supplier instructions, delivery notes, internal remarks" value={values.notes ?? ''} /></Field>
                 </div>
             </FormSection>
             <FormSection description="Frontend collects item, UOM, quantity, price inputs. Backend resolves UOM conversion, discounts, tax, and totals." title="Order Lines">
-                <PurchaseLineEditor errors={errors} line={values.lines[0]} lineIndex={0} lookups={lookups} onLineChange={setLineField} quantityLabel="Ordered qty" />
+                <div className="space-y-4">
+                    {values.lines.map((line, index) => (
+                        <PurchaseLineEditor errors={errors} key={line.clientKey} line={line} lineIndex={index} lookupActions={lookupActions} lookups={lookups} onLineChange={setLineField} onRemove={values.lines.length > 1 ? () => removeLine(index) : undefined} quantityLabel="Ordered qty" />
+                    ))}
+                </div>
                 <div className="mt-4 flex flex-wrap justify-end gap-3">
                     {globalError ? <p className="mr-auto text-sm font-semibold text-red-600">{globalError}</p> : null}
+                    <Button disabled={isLoading} onClick={addLine} type="button" variant="secondary">Add Line</Button>
                     <Button disabled={isLoading} type="submit" variant="blue">{mode === 'edit' ? 'Update With Lines' : 'Create With Lines'}</Button>
                 </div>
             </FormSection>
@@ -136,7 +142,7 @@ export function PurchaseOrderSummaryCard({ order }: { order: PurchaseOrder }) {
     );
 }
 
-export function PurchaseWorkflowActions({ entityId, entityType, status }: { entityId: string; entityType: string; status: string }) {
+export function PurchaseWorkflowActions({ entityId, entityType, sourceId, sourceType, status }: { entityId: string; entityType: string; sourceId?: string; sourceType?: string; status: string }) {
     const [message, setMessage] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -150,8 +156,12 @@ export function PurchaseWorkflowActions({ entityId, entityType, status }: { enti
                 await purchaseApi.grns.transition(entityId, action);
             } else if (entityType === 'purchase_return') {
                 await purchaseApi.returns.transition(entityId, action);
+            } else if (entityType === 'purchase_invoice' && sourceType && sourceId) {
+                if (action === 'post') await purchaseApi.invoices.post(entityId, sourceType, sourceId);
+                if (action === 'cancel') await purchaseApi.invoices.cancel(entityId, sourceType, sourceId);
+                if (action === 'reverse') await purchaseApi.invoices.reverse(entityId, sourceType, sourceId);
             } else {
-                setMessage('This entity type does not expose a Purchase workflow transition endpoint.');
+                setMessage('This record needs persisted source context before workflow actions are available.');
                 return;
             }
             setMessage(`${action} requested from backend.`);
@@ -167,14 +177,14 @@ export function PurchaseWorkflowActions({ entityId, entityType, status }: { enti
             rows={[
                 { label: 'Entity', value: `${entityType} ${entityId}` },
                 { label: 'Current status', value: status },
-                { label: 'Allowed actions', value: entityType === 'purchase_invoice' ? 'Invoice status uses invoice-specific post/cancel/reverse endpoints.' : 'Validated by backend on submit.' },
+                { label: 'Allowed actions', value: entityType === 'purchase_invoice' ? 'Invoice post/cancel/reverse endpoints' : 'Validated by backend on submit.' },
             ]}
             status="Workflow"
             title="Workflow Actions"
         >
             <div className="flex flex-wrap items-center gap-2">
-                {['submit', 'approve', 'cancel', 'reverse'].map((action) => (
-                    <Button disabled={isSubmitting || entityType === 'purchase_invoice'} key={action} onClick={() => void transition(action)} type="button" variant={action === 'submit' ? 'blue' : 'secondary'}>
+                {(entityType === 'purchase_invoice' ? ['post', 'cancel', 'reverse'] : ['submit', 'approve', 'cancel', 'reverse']).map((action) => (
+                    <Button disabled={isSubmitting || (entityType === 'purchase_invoice' && (!sourceType || !sourceId))} key={action} onClick={() => void transition(action)} type="button" variant={action === 'submit' || action === 'post' ? 'blue' : 'secondary'}>
                         {action.charAt(0).toUpperCase() + action.slice(1)}
                     </Button>
                 ))}
@@ -186,7 +196,7 @@ export function PurchaseWorkflowActions({ entityId, entityType, status }: { enti
 
 export function GrnForm({ initialGrn, mode = 'create' }: { initialGrn?: GoodsReceivedNote; mode?: 'create' | 'edit' }) {
     const navigate = useNavigate();
-    const { errors, globalError, isLoading, lookups, setField, setGlobalError, setLineField, submit, values } = useGrnForm(initialGrn);
+    const { addLine, errors, globalError, isLoading, lookupActions, lookups, removeLine, setField, setGlobalError, setLineField, submit, values } = useGrnForm(initialGrn);
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
@@ -203,18 +213,22 @@ export function GrnForm({ initialGrn, mode = 'create' }: { initialGrn?: GoodsRec
         <form className="space-y-5" onSubmit={(event) => void handleSubmit(event)}>
             <FormSection description="GRN records quantity received. Backend validates PO lines, UOM conversion, warehouse, batch/serial, and stock effect." title="GRN Header">
                 <div className="grid gap-4 md:grid-cols-3">
-                    <Field error={errors.supplier_id} label="Supplier"><LookupSelect disabled={isLoading} onChange={(value) => setField('supplierId', value)} options={lookups.suppliers} placeholder="Select supplier" value={values.supplierId} /></Field>
+                    <Field error={errors.supplier_id} label="Supplier"><LookupSelect disabled={isLoading} isLoading={lookupActions.loading.suppliers} onOpen={lookupActions.loadSuppliers} onChange={(value) => setField('supplierId', value)} options={lookups.suppliers} placeholder="Select supplier" value={values.supplierId} /></Field>
                     <Field error={errors.grn_number} label="GRN number"><Input onChange={(event) => setField('grnNumber', event.target.value)} value={values.grnNumber} /></Field>
-                    <Field label="Source PO optional"><Input onChange={(event) => setField('purchaseOrderId', event.target.value)} placeholder="Purchase order id, if linked" value={values.purchaseOrderId ?? ''} /></Field>
+                    <Field label="Source PO optional"><LookupSelect disabled={isLoading} isLoading={lookupActions.loading.purchaseOrders} onOpen={lookupActions.loadPurchaseOrders} onChange={(value) => setField('purchaseOrderId', value)} options={lookups.purchaseOrders} placeholder="Select linked PO" value={values.purchaseOrderId ?? ''} /></Field>
                     <Field error={errors.received_date} label="GRN date"><Input onChange={(event) => setField('grnDate', event.target.value)} type="date" value={values.grnDate} /></Field>
-                    <Field error={errors.warehouse_id} label="Warehouse"><LookupSelect disabled={isLoading} onChange={(value) => setField('warehouseId', value)} options={lookups.warehouses} placeholder="Select warehouse" value={values.warehouseId} /></Field>
+                    <Field error={errors.warehouse_id} label="Warehouse"><LookupSelect disabled={isLoading} isLoading={lookupActions.loading.warehouses} onOpen={lookupActions.loadWarehouses} onChange={(value) => setField('warehouseId', value)} options={lookups.warehouses} placeholder="Select warehouse" value={values.warehouseId} /></Field>
                     <Field label="Status"><Select onChange={(event) => setField('status', event.target.value)} value={values.status ?? 'draft'}><option value="draft">Draft</option><option value="submitted">Submitted</option><option value="confirmed">Confirmed</option></Select></Field>
                     <Field error={errors.notes} label="Notes"><Textarea onChange={(event) => setField('notes', event.target.value)} placeholder="Receiving notes" value={values.notes ?? ''} /></Field>
                 </div>
             </FormSection>
             <FormSection description="Accepted/rejected quantities are submitted as inputs. Backend returns authoritative stock movement effect." title="Received Lines">
-                <PurchaseLineEditor errors={errors} line={values.lines[0]} lineIndex={0} lookups={lookups} onLineChange={setLineField} quantityLabel="Received qty" />
-                <div className="mt-4 flex justify-end gap-3">{globalError ? <p className="mr-auto text-sm font-semibold text-red-600">{globalError}</p> : null}<Button disabled={isLoading} type="submit" variant="blue">{mode === 'edit' ? 'Update GRN' : 'Create GRN'}</Button></div>
+                <div className="space-y-4">
+                    {values.lines.map((line, index) => (
+                        <PurchaseLineEditor errors={errors} key={line.clientKey} line={line} lineIndex={index} lookupActions={lookupActions} lookups={lookups} onLineChange={setLineField} onRemove={values.lines.length > 1 ? () => removeLine(index) : undefined} quantityLabel="Received qty" />
+                    ))}
+                </div>
+                <div className="mt-4 flex justify-end gap-3">{globalError ? <p className="mr-auto text-sm font-semibold text-red-600">{globalError}</p> : null}<Button disabled={isLoading} onClick={addLine} type="button" variant="secondary">Add Line</Button><Button disabled={isLoading} type="submit" variant="blue">{mode === 'edit' ? 'Update GRN' : 'Create GRN'}</Button></div>
             </FormSection>
         </form>
     );
@@ -234,7 +248,7 @@ export function GrnInventoryEffectPanel({ effects }: { effects: PurchaseInventor
 
 export function PurchaseInvoiceForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
     const navigate = useNavigate();
-    const { errors, globalError, isLoading, lookups, preview, previewInvoice, setField, setGlobalError, setLineField, submit, values } = useInvoiceForm();
+    const { addLine, errors, globalError, isLoading, lookupActions, lookups, preview, previewInvoice, removeLine, setField, setGlobalError, setLineField, submit, values } = useInvoiceForm();
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
@@ -252,17 +266,22 @@ export function PurchaseInvoiceForm({ mode = 'create' }: { mode?: 'create' | 'ed
             <FormSection description="Supports direct invoice, invoice from PO, GRN, or multiple GRNs according to backend settings." title="Supplier Invoice Header">
                 <div className="grid gap-4 md:grid-cols-3">
                     <Field label="Invoice source"><Select onChange={(event) => setField('sourceType', event.target.value as PurchaseInvoiceFormInput['sourceType'])} value={values.sourceType}><option value="purchase_order">From PO</option><option value="grn_header">From GRN</option></Select></Field>
-                    <Field error={errors.source_id} label="Source id"><Input onChange={(event) => setField('sourceId', event.target.value)} placeholder="Backend source id" value={values.sourceId} /></Field>
+                    <Field error={errors.source_id} label="Source document"><LookupSelect disabled={isLoading} isLoading={values.sourceType === 'grn_header' ? lookupActions.loading.grns : lookupActions.loading.purchaseOrders} onOpen={values.sourceType === 'grn_header' ? lookupActions.loadGrns : lookupActions.loadPurchaseOrders} onChange={(value) => setField('sourceId', value)} options={values.sourceType === 'grn_header' ? lookups.grns : lookups.purchaseOrders} placeholder={values.sourceType === 'grn_header' ? 'Select GRN' : 'Select purchase order'} value={values.sourceId} /></Field>
                     <Field error={errors.invoice_date} label="Invoice date"><Input onChange={(event) => setField('invoiceDate', event.target.value)} type="date" value={values.invoiceDate} /></Field>
                     <Field error={errors.due_date} label="Due date"><Input onChange={(event) => setField('dueDate', event.target.value)} type="date" value={values.dueDate ?? ''} /></Field>
                     <Field label="Supplier invoice no"><Input onChange={(event) => setField('supplierInvoiceNumber', event.target.value)} placeholder="Supplier reference" value={values.supplierInvoiceNumber ?? ''} /></Field>
                 </div>
             </FormSection>
             <FormSection description="Line amount, discounts, taxes, UOM conversion, payable amount, and balances are previewed by backend only." title="Invoice Lines">
-                <PurchaseLineEditor errors={errors} line={values.lines[0]} lineIndex={0} lookups={lookups} onLineChange={setLineField} quantityLabel="Invoice qty" />
+                <div className="space-y-4">
+                    {values.lines.map((line, index) => (
+                        <PurchaseLineEditor errors={errors} key={line.clientKey} line={line} lineIndex={index} lookupActions={lookupActions} lookups={lookups} onLineChange={setLineField} onRemove={values.lines.length > 1 ? () => removeLine(index) : undefined} quantityLabel="Invoice qty" />
+                    ))}
+                </div>
                 {preview ? <PurchaseInvoiceCalculationPanel preview={preview} /> : null}
                 <div className="mt-4 flex flex-wrap justify-end gap-3">
                     {globalError ? <p className="mr-auto text-sm font-semibold text-red-600">{globalError}</p> : null}
+                    <Button disabled={isLoading} onClick={addLine} type="button" variant="secondary">Add Line</Button>
                     <Button disabled={isLoading} onClick={() => void previewInvoice()} type="button" variant="secondary">Preview Calculation</Button>
                     <Button disabled={isLoading} type="submit">{mode === 'edit' ? 'Update Invoice' : 'Create Invoice'}</Button>
                 </div>
@@ -276,14 +295,25 @@ export function PurchaseInvoiceLineTable({ rows }: { rows: PurchaseInvoiceLine[]
 }
 
 export function PurchaseInvoiceCalculationPanel({ preview }: { preview?: PurchaseCalculationPreview }) {
+    if (!preview) {
+        return (
+            <PreviewPanel
+                rows={[{ label: 'Preview', value: 'Not requested for this invoice view' }]}
+                status="Unavailable"
+                subtitle="Open the invoice form to request a backend calculation preview before saving."
+                title="Invoice Calculation Preview"
+            />
+        );
+    }
+
     return (
         <PreviewPanel
             rows={[
-                { label: 'Subtotal', value: preview?.calculated.subtotal ?? 'Run backend preview' },
-                { label: 'Discount', value: preview?.calculated.discountTotal ?? 'Run backend preview' },
-                { label: 'Tax', value: preview?.calculated.taxTotal ?? 'Run backend preview' },
-                { label: 'Grand total', value: preview?.calculated.grandTotal ?? 'Run backend preview' },
-                { label: 'UOM conversion', value: preview?.calculated.uomConversion ?? 'Validated by backend preview' },
+                { label: 'Subtotal', value: preview.calculated.subtotal },
+                { label: 'Discount', value: preview.calculated.discountTotal },
+                { label: 'Tax', value: preview.calculated.taxTotal },
+                { label: 'Grand total', value: preview.calculated.grandTotal },
+                { label: 'UOM conversion', value: preview.calculated.uomConversion },
             ]}
             status="Backend Preview"
             subtitle="Invoice total, discount, tax, UOM, and payable values are never calculated in the frontend."
@@ -308,9 +338,8 @@ export function PurchaseInvoiceDocumentPanel({ entityId, entityType }: { entityI
     return (
         <PreviewPanel
             rows={[
-                { label: 'Document source', value: entityType && entityId ? `${entityType} ${entityId}` : 'No persisted source selected' },
-                { label: 'Document number', value: 'Generated by Sequence/Document backend' },
-                { label: 'Rendering', value: 'Document module backend' },
+                { label: 'Document source', value: entityType && entityId ? `${entityType} ${entityId}` : 'Persisted source required' },
+                { label: 'Generation', value: entityType && entityId ? 'Available' : 'Unavailable for this invoice' },
             ]}
             status="Document"
             title="Document Invoice"
@@ -325,7 +354,7 @@ export function PurchaseInvoiceDocumentPanel({ entityId, entityType }: { entityI
 
 export function PurchasePaymentForm() {
     const navigate = useNavigate();
-    const { errors, globalError, isLoading, lookups, preview, previewAllocation, setField, setGlobalError, submit, values } = usePaymentForm();
+    const { errors, globalError, isLoading, lookupActions, lookups, preview, previewAllocation, setField, setGlobalError, submit, values } = usePaymentForm();
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
@@ -340,13 +369,13 @@ export function PurchasePaymentForm() {
         <form className="space-y-5" onSubmit={(event) => void handleSubmit(event)}>
             <FormSection description="Payment is routed through Payment module. Backend validates payable invoices, allocations, balances, and posting." title="Supplier Payment">
                 <div className="grid gap-4 md:grid-cols-3">
-                    <Field error={errors.party_id ?? errors.supplier_id} label="Supplier"><LookupSelect disabled={isLoading} onChange={(value) => setField('supplierId', value)} options={lookups.suppliers} placeholder="Select supplier" value={values.supplierId} /></Field>
+                    <Field error={errors.party_id ?? errors.supplier_id} label="Supplier"><LookupSelect disabled={isLoading} isLoading={lookupActions.loading.suppliers} onOpen={lookupActions.loadSuppliers} onChange={(value) => setField('supplierId', value)} options={lookups.suppliers} placeholder="Select supplier" value={values.supplierId} /></Field>
                     <Field error={errors.payment_date} label="Payment date"><Input onChange={(event) => setField('paymentDate', event.target.value)} type="date" value={values.paymentDate} /></Field>
                     <Field error={errors.payment_method} label="Payment method"><Select onChange={(event) => setField('method', event.target.value)} value={values.method}><option value="bank_transfer">Bank Transfer</option><option value="cash">Cash</option><option value="check">Check</option><option value="card">Card</option></Select></Field>
                     <Field error={errors.amount} label="Amount"><Input onChange={(event) => setField('amount', event.target.value)} placeholder="Input amount only" type="number" value={values.amount} /></Field>
                     <Field error={errors.reference_number} label="Reference"><Input onChange={(event) => setField('reference', event.target.value)} placeholder="Bank/check/reference number" value={values.reference ?? ''} /></Field>
                     <Field label="Source type"><Select onChange={(event) => setField('sourceType', event.target.value)} value={values.sourceType ?? ''}><option value="">Unlinked supplier payment</option><option value="purchase_order">Purchase order</option><option value="grn_header">GRN</option></Select></Field>
-                    <Field error={errors.source_id} label="Source id"><Input onChange={(event) => setField('sourceId', event.target.value)} placeholder="Persisted source id" value={values.sourceId ?? ''} /></Field>
+                    <Field error={errors.source_id} label="Source document"><LookupSelect disabled={isLoading || !values.sourceType} isLoading={values.sourceType === 'purchase_order' ? lookupActions.loading.purchaseOrders : lookupActions.loading.grns} onOpen={values.sourceType === 'purchase_order' ? lookupActions.loadPurchaseOrders : lookupActions.loadGrns} onChange={(value) => setField('sourceId', value)} options={values.sourceType === 'purchase_order' ? lookups.purchaseOrders : lookups.grns} placeholder="Select source document" value={values.sourceId ?? ''} /></Field>
                 </div>
             </FormSection>
             <PurchasePaymentAllocationPanel preview={preview} />
@@ -360,14 +389,18 @@ export function PurchasePaymentForm() {
 }
 
 export function PurchasePaymentAllocationPanel({ allocations = [], preview }: { allocations?: PurchasePaymentAllocation[]; preview?: Record<string, unknown> }) {
+    const rows = preview
+        ? [
+            { label: 'Allocated amount', value: String(preview.requested_amount ?? preview.allocated_amount ?? '') },
+            { label: 'Outstanding amount', value: String(preview.outstanding_amount ?? '') },
+            { label: 'Balance after allocation', value: String(preview.remaining_after_allocation ?? '') },
+        ]
+        : [{ label: 'Preview', value: 'Select a source document and amount to request allocation preview.' }];
+
     return (
         <PreviewPanel
-            rows={[
-                { label: 'Allocated amount', value: preview ? String(preview.requested_amount ?? preview.allocated_amount ?? '') : 'Run backend preview' },
-                { label: 'Outstanding amount', value: preview ? String(preview.outstanding_amount ?? '') : 'Run backend preview' },
-                { label: 'Balance after allocation', value: preview ? String(preview.remaining_after_allocation ?? '') : 'Run backend preview' },
-            ]}
-            status="Backend Preview"
+            rows={rows}
+            status={preview ? 'Backend Preview' : 'Not requested'}
             title="Payment Allocation"
         >
             {allocations.length ? <SimpleTable columns={[['sourceDocument', 'Document'], ['allocatedAmount', 'Allocated'], ['documentBalanceAfter', 'Balance After'], ['status', 'Status']]} rows={allocations} /> : null}
@@ -381,7 +414,7 @@ export function PurchaseAdvancePanel({ advances }: { advances: PurchaseAdvance[]
 
 export function PurchaseReturnForm({ initialReturn }: { initialReturn?: PurchaseReturn }) {
     const navigate = useNavigate();
-    const { errors, globalError, isLoading, lookups, setField, setGlobalError, setLineField, submit, values } = useReturnForm(initialReturn);
+    const { addLine, errors, globalError, isLoading, lookupActions, lookups, removeLine, setField, setGlobalError, setLineField, submit, values } = useReturnForm(initialReturn);
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
         event.preventDefault();
@@ -398,9 +431,9 @@ export function PurchaseReturnForm({ initialReturn }: { initialReturn?: Purchase
         <form className="space-y-5" onSubmit={(event) => void handleSubmit(event)}>
             <FormSection description="Returnable quantity, stock reversal, AP adjustment, and refund eligibility are backend-owned." title="Purchase Return">
                 <div className="grid gap-4 md:grid-cols-3">
-                    <Field error={errors.supplier_id} label="Supplier"><LookupSelect disabled={isLoading} onChange={(value) => setField('supplierId', value)} options={lookups.suppliers} placeholder="Select supplier" value={values.supplierId} /></Field>
-                    <Field label="Source type"><Select onChange={(event) => setField('sourceType', event.target.value)} value={values.sourceType ?? ''}><option value="">Direct return</option><option value="purchase_order">Purchase order</option><option value="grn_header">GRN</option><option value="document">Supplier invoice document</option></Select></Field>
-                    <Field label="Source id"><Input onChange={(event) => setField('sourceId', event.target.value)} placeholder="Persisted source id" value={values.sourceId ?? ''} /></Field>
+                    <Field error={errors.supplier_id} label="Supplier"><LookupSelect disabled={isLoading} isLoading={lookupActions.loading.suppliers} onOpen={lookupActions.loadSuppliers} onChange={(value) => setField('supplierId', value)} options={lookups.suppliers} placeholder="Select supplier" value={values.supplierId} /></Field>
+                    <Field label="Source type"><Select onChange={(event) => setField('sourceType', event.target.value)} value={values.sourceType ?? ''}><option value="">Direct return</option><option value="purchase_order">Purchase order</option><option value="grn_header">GRN</option></Select></Field>
+                    <Field label="Source document"><LookupSelect disabled={isLoading || !values.sourceType} onChange={(value) => setField('sourceId', value)} options={values.sourceType === 'purchase_order' ? lookups.purchaseOrders : lookups.grns} placeholder="Select source document" value={values.sourceId ?? ''} /></Field>
                     <Field error={errors.return_number} label="Return number"><Input onChange={(event) => setField('returnNumber', event.target.value)} value={values.returnNumber} /></Field>
                     <Field error={errors.return_date} label="Return date"><Input onChange={(event) => setField('returnDate', event.target.value)} type="date" value={values.returnDate} /></Field>
                     <Field error={errors.return_reason} label="Reason"><Input onChange={(event) => setField('returnReason', event.target.value)} placeholder="Damage, over supply, wrong item..." value={values.returnReason ?? ''} /></Field>
@@ -408,8 +441,12 @@ export function PurchaseReturnForm({ initialReturn }: { initialReturn?: Purchase
                 </div>
             </FormSection>
             <FormSection description="Backend validates returnable quantities and previews inventory/AP effects." title="Return Lines">
-                <PurchaseLineEditor errors={errors} line={values.lines[0]} lineIndex={0} lookups={lookups} onLineChange={setLineField} quantityLabel="Return qty" />
-                <div className="mt-4 flex justify-end gap-3">{globalError ? <p className="mr-auto text-sm font-semibold text-red-600">{globalError}</p> : null}<Button disabled={isLoading} type="submit">{initialReturn ? 'Update Return' : 'Create Return'}</Button></div>
+                <div className="space-y-4">
+                    {values.lines.map((line, index) => (
+                        <PurchaseLineEditor errors={errors} key={line.clientKey} line={line} lineIndex={index} lookupActions={lookupActions} lookups={lookups} onLineChange={setLineField} onRemove={values.lines.length > 1 ? () => removeLine(index) : undefined} quantityLabel="Return qty" />
+                    ))}
+                </div>
+                <div className="mt-4 flex justify-end gap-3">{globalError ? <p className="mr-auto text-sm font-semibold text-red-600">{globalError}</p> : null}<Button disabled={isLoading} onClick={addLine} type="button" variant="secondary">Add Line</Button><Button disabled={isLoading} type="submit">{initialReturn ? 'Update Return' : 'Create Return'}</Button></div>
             </FormSection>
         </form>
     );
@@ -472,15 +509,34 @@ export function PurchaseActivityTimeline({ rows }: { rows: PurchaseAuditEntry[] 
 }
 
 export function PurchaseSettingsForm({ settings }: { settings: PurchaseSettings }) {
+    const submitState = useSubmitState();
     const [message, setMessage] = useState('');
+    const [values, setValues] = useState<PurchaseSettingsFormInput>({
+        allow_direct_grn: settings.allowGrnWithoutPo,
+        allow_direct_purchase_document: settings.allowDirectInvoice,
+        allow_over_receipt: settings.allowOverReceipt,
+        require_grn_before_invoice: !settings.allowInvoiceWithoutGrn,
+    });
 
     async function initialize(): Promise<void> {
         await purchaseApi.settings.initialize();
         setMessage('Purchase settings initialized by backend.');
     }
 
+    async function save(event: FormEvent<HTMLFormElement>): Promise<void> {
+        event.preventDefault();
+        const response = await submitState.submit(() => purchaseApi.settings.update(values));
+        if (response) {
+            setMessage('Purchase settings saved.');
+        }
+    }
+
+    function setBoolean(field: keyof PurchaseSettingsFormInput, value: string): void {
+        setValues((current) => ({ ...current, [field]: value === 'true' }));
+    }
+
     return (
-        <form className="space-y-5">
+        <form className="space-y-5" onSubmit={(event) => void save(event)}>
             <FormSection description="Settings guide backend workflow behavior; global configuration stays outside Purchase." title="Accounting, Document, and Warehouse Defaults">
                 <div className="grid gap-4 md:grid-cols-3">
                     <Field label="Default payable account"><Input defaultValue={settings.defaultPayableAccount} /></Field>
@@ -498,15 +554,15 @@ export function PurchaseSettingsForm({ settings }: { settings: PurchaseSettings 
                     <Field label="Invoice sequence"><Input defaultValue={settings.invoiceSequence} /></Field>
                     <Field label="Return sequence"><Input defaultValue={settings.returnSequence} /></Field>
                     <Field label="Stock receive timing"><Input defaultValue={settings.stockReceiveTiming} /></Field>
-                    <Field label="Allow direct invoice"><Select defaultValue={String(settings.allowDirectInvoice)}><option value="true">Yes</option><option value="false">No</option></Select></Field>
-                    <Field label="Allow GRN without PO"><Select defaultValue={String(settings.allowGrnWithoutPo)}><option value="true">Yes</option><option value="false">No</option></Select></Field>
-                    <Field label="Allow invoice without GRN"><Select defaultValue={String(settings.allowInvoiceWithoutGrn)}><option value="true">Yes</option><option value="false">No</option></Select></Field>
-                    <Field label="Allow over receipt"><Select defaultValue={String(settings.allowOverReceipt)}><option value="true">Yes</option><option value="false">No</option></Select></Field>
+                    <Field error={submitState.errors.allow_direct_purchase_document} label="Allow direct invoice"><Select onChange={(event) => setBoolean('allow_direct_purchase_document', event.target.value)} value={String(values.allow_direct_purchase_document)}><option value="true">Yes</option><option value="false">No</option></Select></Field>
+                    <Field error={submitState.errors.allow_direct_grn} label="Allow GRN without PO"><Select onChange={(event) => setBoolean('allow_direct_grn', event.target.value)} value={String(values.allow_direct_grn)}><option value="true">Yes</option><option value="false">No</option></Select></Field>
+                    <Field error={submitState.errors.require_grn_before_invoice} label="Require GRN before invoice"><Select onChange={(event) => setBoolean('require_grn_before_invoice', event.target.value)} value={String(values.require_grn_before_invoice)}><option value="true">Yes</option><option value="false">No</option></Select></Field>
+                    <Field error={submitState.errors.allow_over_receipt} label="Allow over receipt"><Select onChange={(event) => setBoolean('allow_over_receipt', event.target.value)} value={String(values.allow_over_receipt)}><option value="true">Yes</option><option value="false">No</option></Select></Field>
                 </div>
                 <div className="mt-4 flex justify-end gap-3">
-                    {message ? <span className="mr-auto text-sm text-slate-600">{message}</span> : null}
-                    <Button onClick={() => void initialize()} type="button" variant="secondary">Initialize Defaults</Button>
-                    <Button disabled title="Editing purchase settings requires exposing writable config fields from the backend settings resource." type="button" variant="blue">Save Settings unavailable</Button>
+                    {submitState.globalError || message ? <span className="mr-auto text-sm text-slate-600">{submitState.globalError || message}</span> : null}
+                    <Button disabled={submitState.isSubmitting} onClick={() => void initialize()} type="button" variant="secondary">Initialize Defaults</Button>
+                    <Button disabled={submitState.isSubmitting} type="submit" variant="blue">Save Settings</Button>
                 </div>
             </FormSection>
         </form>
@@ -620,52 +676,113 @@ function SimpleTable<T extends { id: string }>({ columns, rows }: { columns: Arr
 }
 
 function usePurchaseLookups() {
+    const mountedRef = useRef(true);
+    const loadedLookupRef = useRef(new Set<string>());
+    const loadingLookupRef = useRef(new Set<string>());
+    const loadedItemUomsRef = useRef(new Set<string>());
+    const loadingItemUomsRef = useRef(new Set<string>());
     const [lookups, setLookups] = useState({
+        grns: [] as PurchaseLookupOption[],
         items: [] as PurchaseLookupOption[],
+        purchaseOrders: [] as PurchaseLookupOption[],
         suppliers: [] as PurchaseLookupOption[],
         uomsByItem: {} as Record<string, PurchaseLookupOption[]>,
         warehouses: [] as PurchaseLookupOption[],
     });
-    const [isLoading, setIsLoading] = useState(true);
+    const [loading, setLoading] = useState({
+        grns: false,
+        items: false,
+        purchaseOrders: false,
+        suppliers: false,
+        warehouses: false,
+    });
 
     useEffect(() => {
-        let mounted = true;
-        Promise.all([
-            purchaseApi.lookups.suppliers(),
-            purchaseApi.lookups.items(),
-            purchaseApi.lookups.warehouses(),
-        ])
-            .then(([suppliers, items, warehouses]) => {
-                if (mounted) {
-                    setLookups((current) => ({
-                        ...current,
-                        items: items.data,
-                        suppliers: suppliers.data,
-                        warehouses: warehouses.data,
-                    }));
-                }
-            })
-            .finally(() => {
-                if (mounted) setIsLoading(false);
-            });
-
         return () => {
-            mounted = false;
+            mountedRef.current = false;
         };
     }, []);
 
-    async function loadItemUoms(itemId: string): Promise<void> {
-        if (!itemId || lookups.uomsByItem[itemId]) {
+    const loadLookup = useCallback(async (
+        key: keyof Omit<typeof lookups, 'uomsByItem'>,
+        loader: () => Promise<{ data: PurchaseLookupOption[] }>,
+    ): Promise<void> => {
+        if (loadedLookupRef.current.has(key) || loadingLookupRef.current.has(key)) {
             return;
         }
-        const response = await purchaseApi.lookups.itemUoms(itemId);
-        setLookups((current) => ({
-            ...current,
-            uomsByItem: { ...current.uomsByItem, [itemId]: response.data },
-        }));
-    }
 
-    return { isLoading, loadItemUoms, lookups };
+        loadingLookupRef.current.add(key);
+        setLoading((current) => ({ ...current, [key]: true }));
+
+        try {
+            const response = await loader();
+            loadedLookupRef.current.add(key);
+
+            if (mountedRef.current) {
+                setLookups((current) => ({ ...current, [key]: response.data }));
+            }
+        } catch {
+            // Keep the form usable; field/backend validation still protects invalid selections.
+        } finally {
+            loadingLookupRef.current.delete(key);
+            if (mountedRef.current) {
+                setLoading((current) => ({ ...current, [key]: false }));
+            }
+        }
+    }, []);
+
+    const loadSuppliers = useCallback(() => loadLookup('suppliers', purchaseApi.lookups.suppliers), [loadLookup]);
+    const loadItems = useCallback(() => loadLookup('items', purchaseApi.lookups.items), [loadLookup]);
+    const loadWarehouses = useCallback(() => loadLookup('warehouses', purchaseApi.lookups.warehouses), [loadLookup]);
+    const loadPurchaseOrders = useCallback(() => loadLookup('purchaseOrders', purchaseApi.lookups.purchaseOrders), [loadLookup]);
+    const loadGrns = useCallback(() => loadLookup('grns', purchaseApi.lookups.grns), [loadLookup]);
+
+    const loadItemUoms = useCallback(async (itemId: string): Promise<void> => {
+        if (!itemId || loadedItemUomsRef.current.has(itemId) || loadingItemUomsRef.current.has(itemId)) {
+            return;
+        }
+
+        loadingItemUomsRef.current.add(itemId);
+
+        try {
+            const response = await purchaseApi.lookups.itemUoms(itemId);
+            loadedItemUomsRef.current.add(itemId);
+
+            if (!mountedRef.current) {
+                return;
+            }
+
+            setLookups((current) => current.uomsByItem[itemId]
+                ? current
+                : {
+                    ...current,
+                    uomsByItem: { ...current.uomsByItem, [itemId]: response.data },
+                });
+        } catch {
+            // Keep line editing responsive; backend validation reports missing UOMs on submit.
+        } finally {
+            loadingItemUomsRef.current.delete(itemId);
+        }
+    }, []);
+
+    return {
+        isLoading: false,
+        loadGrns,
+        loadItemUoms,
+        loadItems,
+        loadPurchaseOrders,
+        loadSuppliers,
+        loadWarehouses,
+        loading,
+        lookups,
+    };
+}
+
+let purchaseLineKeySequence = 0;
+
+function nextPurchaseLineClientKey(): string {
+    purchaseLineKeySequence += 1;
+    return `purchase-line-${purchaseLineKeySequence}`;
 }
 
 function today(): string {
@@ -674,6 +791,7 @@ function today(): string {
 
 function defaultLine(line?: Partial<PurchaseLineFormInput>): PurchaseLineFormInput {
     return {
+        clientKey: line?.clientKey ?? nextPurchaseLineClientKey(),
         discountType: line?.discountType ?? '',
         discountValue: line?.discountValue ?? '',
         itemId: line?.itemId ?? '',
@@ -719,28 +837,30 @@ function useSubmitState() {
 }
 
 function usePurchaseOrderForm(initial?: PurchaseOrder) {
-    const { isLoading, loadItemUoms, lookups } = usePurchaseLookups();
+    const lookupActions = usePurchaseLookups();
+    const { isLoading, loadItemUoms, lookups } = lookupActions;
     const submitState = useSubmitState();
     const [values, setValues] = useState<PurchaseOrderFormInput>({
         expectedDate: initial?.expectedDate || '',
         lines: [defaultLine(initial?.lines[0] ? { itemId: initial.lines[0].itemId, quantity: initial.lines[0].orderedQuantity, unitPrice: initial.lines[0].unitPrice, uomId: initial.lines[0].uomId } : undefined)],
         notes: '',
         orderDate: initial?.orderDate || today(),
-        poNumber: initial?.poNumber || `PO-${Date.now()}`,
+        poNumber: initial?.poNumber || '',
         status: initial?.status || 'draft',
         supplierId: initial?.supplierId || '',
         warehouseId: initial?.warehouseId || '',
     });
 
-    return formState(values, setValues, lookups, loadItemUoms, isLoading || submitState.isSubmitting, submitState);
+    return formState(values, setValues, lookups, loadItemUoms, lookupActions, isLoading || submitState.isSubmitting, submitState);
 }
 
 function useGrnForm(initial?: GoodsReceivedNote) {
-    const { isLoading, loadItemUoms, lookups } = usePurchaseLookups();
+    const lookupActions = usePurchaseLookups();
+    const { isLoading, loadItemUoms, lookups } = lookupActions;
     const submitState = useSubmitState();
     const [values, setValues] = useState<GrnFormInput>({
         grnDate: initial?.grnDate || today(),
-        grnNumber: initial?.grnNumber || `GRN-${Date.now()}`,
+        grnNumber: initial?.grnNumber || '',
         lines: [defaultLine(initial?.lines[0] ? { itemId: initial.lines[0].itemId, quantity: initial.lines[0].acceptedQuantity, unitPrice: '0', uomId: initial.lines[0].uomId } : undefined)],
         notes: '',
         purchaseOrderId: initial?.sourcePo && /^\d+$/.test(initial.sourcePo) ? initial.sourcePo : '',
@@ -749,17 +869,18 @@ function useGrnForm(initial?: GoodsReceivedNote) {
         warehouseId: initial?.warehouseId || '',
     });
 
-    return formState(values, setValues, lookups, loadItemUoms, isLoading || submitState.isSubmitting, submitState);
+    return formState(values, setValues, lookups, loadItemUoms, lookupActions, isLoading || submitState.isSubmitting, submitState);
 }
 
 function useReturnForm(initial?: PurchaseReturn) {
-    const { isLoading, loadItemUoms, lookups } = usePurchaseLookups();
+    const lookupActions = usePurchaseLookups();
+    const { isLoading, loadItemUoms, lookups } = lookupActions;
     const submitState = useSubmitState();
     const [values, setValues] = useState<PurchaseReturnFormInput>({
         lines: [defaultLine(initial?.lines[0] ? { itemId: initial.lines[0].itemId, quantity: initial.lines[0].returnQuantity, unitPrice: '0', uomId: initial.lines[0].uomId } : undefined)],
         notes: '',
         returnDate: today(),
-        returnNumber: initial?.returnNumber || `PRET-${Date.now()}`,
+        returnNumber: initial?.returnNumber || '',
         returnReason: '',
         sourceId: '',
         sourceType: '',
@@ -767,11 +888,12 @@ function useReturnForm(initial?: PurchaseReturn) {
         supplierId: initial?.supplierId || '',
     });
 
-    return formState(values, setValues, lookups, loadItemUoms, isLoading || submitState.isSubmitting, submitState);
+    return formState(values, setValues, lookups, loadItemUoms, lookupActions, isLoading || submitState.isSubmitting, submitState);
 }
 
 function useInvoiceForm() {
-    const { isLoading, loadItemUoms, lookups } = usePurchaseLookups();
+    const lookupActions = usePurchaseLookups();
+    const { isLoading, loadItemUoms, lookups } = lookupActions;
     const submitState = useSubmitState();
     const [preview, setPreview] = useState<PurchaseCalculationPreview>();
     const [values, setValues] = useState<PurchaseInvoiceFormInput>({
@@ -803,11 +925,12 @@ function useInvoiceForm() {
         }
     }
 
-    return { ...formState(values, setValues, lookups, loadItemUoms, isLoading || submitState.isSubmitting, submitState), preview, previewInvoice };
+    return { ...formState(values, setValues, lookups, loadItemUoms, lookupActions, isLoading || submitState.isSubmitting, submitState), preview, previewInvoice };
 }
 
 function usePaymentForm() {
-    const { isLoading, lookups } = usePurchaseLookups();
+    const lookupActions = usePurchaseLookups();
+    const { isLoading, lookups } = lookupActions;
     const submitState = useSubmitState();
     const [preview, setPreview] = useState<Record<string, unknown>>();
     const [values, setValues] = useState<PurchasePaymentFormInput>({
@@ -835,7 +958,7 @@ function usePaymentForm() {
         }
     }
 
-    return { ...submitState, errors: submitState.errors, globalError: submitState.globalError, isLoading: isLoading || submitState.isSubmitting, lookups, preview, previewAllocation, setField, values };
+    return { ...submitState, errors: submitState.errors, globalError: submitState.globalError, isLoading: isLoading || submitState.isSubmitting, lookupActions, lookups, preview, previewAllocation, setField, values };
 }
 
 function formState<T extends { lines: PurchaseLineFormInput[] }>(
@@ -843,6 +966,7 @@ function formState<T extends { lines: PurchaseLineFormInput[] }>(
     setValues: Dispatch<SetStateAction<T>>,
     lookups: ReturnType<typeof usePurchaseLookups>['lookups'],
     loadItemUoms: (itemId: string) => Promise<void>,
+    lookupActions: ReturnType<typeof usePurchaseLookups>,
     isLoading: boolean,
     submitState: ReturnType<typeof useSubmitState>,
 ) {
@@ -863,6 +987,20 @@ function formState<T extends { lines: PurchaseLineFormInput[] }>(
         });
     }
 
+    function addLine(): void {
+        setValues((current) => ({ ...current, lines: [...current.lines, defaultLine({ quantity: '1', unitPrice: '0' })] }));
+    }
+
+    function removeLine(index: number): void {
+        setValues((current) => {
+            if (current.lines.length <= 1) {
+                return current;
+            }
+
+            return { ...current, lines: current.lines.filter((_, lineIndex) => lineIndex !== index) };
+        });
+    }
+
     useEffect(() => {
         values.lines.forEach((line) => {
             if (line.itemId) {
@@ -871,14 +1009,36 @@ function formState<T extends { lines: PurchaseLineFormInput[] }>(
         });
     }, [loadItemUoms, values.lines]);
 
-    return { ...submitState, errors: submitState.errors, globalError: submitState.globalError, isLoading, lookups, setField, setLineField, values };
+    return { ...submitState, addLine, errors: submitState.errors, globalError: submitState.globalError, isLoading, lookupActions, lookups, removeLine, setField, setLineField, values };
 }
 
-function LookupSelect({ disabled, onChange, options, placeholder, value }: { disabled?: boolean; onChange: (value: string) => void; options: PurchaseLookupOption[]; placeholder: string; value: string }) {
+function LookupSelect({
+    disabled,
+    isLoading = false,
+    onChange,
+    onOpen,
+    options,
+    placeholder,
+    value,
+}: {
+    disabled?: boolean;
+    isLoading?: boolean;
+    onChange: (value: string) => void;
+    onOpen?: () => Promise<void>;
+    options: PurchaseLookupOption[];
+    placeholder: string;
+    value: string;
+}) {
+    function loadOnDemand(): void {
+        if (!disabled) {
+            void onOpen?.();
+        }
+    }
+
     return (
-        <Select disabled={disabled} onChange={(event) => onChange(event.target.value)} value={value}>
-            <option value="">{placeholder}</option>
-            {options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+        <Select disabled={disabled} onChange={(event) => onChange(event.target.value)} onFocus={loadOnDemand} onMouseDown={loadOnDemand} value={value}>
+            <option value="">{isLoading ? 'Loading options...' : placeholder}</option>
+            {options.map((option) => <option key={`${option.id}:${option.label}`} value={option.id}>{option.label}</option>)}
         </Select>
     );
 }
@@ -887,26 +1047,30 @@ function PurchaseLineEditor({
     errors,
     line,
     lineIndex,
+    lookupActions,
     lookups,
     onLineChange,
+    onRemove,
     quantityLabel,
 }: {
     errors: Record<string, string>;
     line: PurchaseLineFormInput;
     lineIndex: number;
+    lookupActions: ReturnType<typeof usePurchaseLookups>;
     lookups: ReturnType<typeof usePurchaseLookups>['lookups'];
     onLineChange: (index: number, field: keyof PurchaseLineFormInput, value: string) => void;
+    onRemove?: () => void;
     quantityLabel: string;
 }) {
     const itemUoms = line.itemId ? lookups.uomsByItem[line.itemId] ?? [] : [];
 
     return (
-        <div className="grid gap-4 md:grid-cols-6">
+        <div className="grid gap-4 rounded-lg border border-slate-200 p-4 md:grid-cols-6">
             <Field error={errors[`lines.${lineIndex}.item_id`] ?? errors.item_id} label="Item">
-                <LookupSelect onChange={(value) => onLineChange(lineIndex, 'itemId', value)} options={lookups.items} placeholder="Select item first" value={line.itemId} />
+                <LookupSelect isLoading={lookupActions.loading.items} onOpen={lookupActions.loadItems} onChange={(value) => onLineChange(lineIndex, 'itemId', value)} options={lookups.items} placeholder="Select item first" value={line.itemId} />
             </Field>
             <Field error={errors[`lines.${lineIndex}.uom_id`] ?? errors.uom_id} label="UOM">
-                <LookupSelect disabled={!line.itemId || itemUoms.length === 0} onChange={(value) => onLineChange(lineIndex, 'uomId', value)} options={itemUoms} placeholder={line.itemId ? 'Select item UOM' : 'Select item first'} value={line.uomId} />
+                <LookupSelect disabled={!line.itemId} onOpen={() => lookupActions.loadItemUoms(line.itemId)} onChange={(value) => onLineChange(lineIndex, 'uomId', value)} options={itemUoms} placeholder={line.itemId ? 'Select item UOM' : 'Select item first'} value={line.uomId} />
                 {line.itemId && itemUoms.length === 0 ? <span className="text-xs text-amber-600">No UOM configured for this item.</span> : null}
             </Field>
             <Field error={errors[`lines.${lineIndex}.quantity`] ?? errors[`lines.${lineIndex}.ordered_qty`] ?? errors[`lines.${lineIndex}.received_qty`] ?? errors[`lines.${lineIndex}.return_qty`]} label={quantityLabel}>
@@ -921,6 +1085,7 @@ function PurchaseLineEditor({
             <Field error={errors[`lines.${lineIndex}.discount_value`]} label="Discount value">
                 <Input min="0" onChange={(event) => onLineChange(lineIndex, 'discountValue', event.target.value)} step="0.0001" type="number" value={line.discountValue ?? ''} />
             </Field>
+            {onRemove ? <div className="flex items-end"><Button onClick={onRemove} type="button" variant="ghost">Remove</Button></div> : null}
         </div>
     );
 }

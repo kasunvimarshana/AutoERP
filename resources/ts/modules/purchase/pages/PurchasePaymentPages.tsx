@@ -8,7 +8,6 @@ import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import {
     PurchaseActivityTimeline,
     PurchaseAdvancePanel,
-    PurchaseFinancePostingPanel,
     PurchasePaymentAllocationPanel,
     PurchasePaymentForm,
     PurchasePaymentTable,

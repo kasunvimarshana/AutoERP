@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
 import { DataToolbar } from '../../../shared/components/data/DataToolbar';
@@ -7,7 +7,6 @@ import { Button } from '../../../shared/components/ui/Button';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import {
     SalesActivityTimeline,
-    SalesFinancePostingPanel,
     SalesInvoiceCalculationPanel,
     SalesInvoiceDocumentPanel,
     SalesInvoiceForm,
@@ -74,13 +73,58 @@ export function SalesInvoiceDetailPage() {
     const [payments, setPayments] = useState<SalesPayment[]>([]);
     const [returns, setReturns] = useState<SalesReturn[]>([]);
     const [activeTab, setActiveTab] = useState('overview');
+    const [tabError, setTabError] = useState('');
+    const [tabLoading, setTabLoading] = useState('');
+    const loadedTabsRef = useRef(new Set<string>());
 
     useEffect(() => {
-        salesApi.invoices.get(id).then((response) => setInvoice(response.data));
-        salesApi.payments.list().then((response) => setPayments(response.data));
-        salesApi.returns.list().then((response) => setReturns(response.data));
+        let mounted = true;
+        loadedTabsRef.current.clear();
+        setActiveTab('overview');
+        setInvoice(undefined);
         setHistory([]);
+        salesApi.invoices.get(id).then((response) => {
+            if (mounted) setInvoice(response.data);
+        });
+        return () => {
+            mounted = false;
+        };
     }, [id]);
+
+    useEffect(() => {
+        if (!invoice || !['payments', 'returns'].includes(activeTab) || loadedTabsRef.current.has(activeTab)) {
+            return;
+        }
+
+        const currentInvoice = invoice;
+        let mounted = true;
+        setTabLoading(activeTab);
+        setTabError('');
+
+        async function loadTab(): Promise<void> {
+            try {
+                if (activeTab === 'payments') {
+                    const response = await salesApi.payments.list({ perPage: 20 });
+                    if (mounted) setPayments(response.data);
+                } else {
+                    const response = await salesApi.returns.list({ perPage: 20, search: currentInvoice.invoiceNumber });
+                    if (mounted) setReturns(response.data);
+                }
+
+                if (mounted) loadedTabsRef.current.add(activeTab);
+            } catch (caught: unknown) {
+                if (mounted) setTabError(caught instanceof Error ? caught.message : 'Unable to load tab data.');
+            } finally {
+                if (mounted) setTabLoading('');
+            }
+        }
+
+        void loadTab();
+
+        return () => {
+            mounted = false;
+        };
+    }, [activeTab, invoice]);
 
     if (!invoice) {
         return <EmptyState description="Loading customer invoice details..." title="Loading" />;
@@ -95,9 +139,9 @@ export function SalesInvoiceDetailPage() {
             {activeTab === 'calculation' ? <SalesInvoiceCalculationPanel /> : null}
             {activeTab === 'source' ? <SalesSourceReferencePanel reference={invoice.sourceReference} /> : null}
             {activeTab === 'document' ? <SalesInvoiceDocumentPanel /> : null}
-            {activeTab === 'payments' ? <SalesPaymentTable rows={payments.filter((payment) => payment.customerId === invoice.customerId)} /> : null}
+            {activeTab === 'payments' ? tabLoading === 'payments' ? <EmptyState description="Loading customer payments..." title="Loading payments" /> : tabError ? <EmptyState description={tabError} title="Payments unavailable" /> : <SalesPaymentTable rows={payments.filter((payment) => payment.customerId === invoice.customerId)} /> : null}
             {activeTab === 'finance' ? <EmptyState description="Posting preview requires a persisted sales source context. Backend invoice detail is source-scoped." title="Finance preview unavailable" /> : null}
-            {activeTab === 'returns' ? <SalesReturnTable rows={returns.filter((record) => record.sourceReference === invoice.invoiceNumber || record.sourceReference === invoice.id)} /> : null}
+            {activeTab === 'returns' ? tabLoading === 'returns' ? <EmptyState description="Loading related returns..." title="Loading returns" /> : tabError ? <EmptyState description={tabError} title="Returns unavailable" /> : <SalesReturnTable rows={returns.filter((record) => record.sourceReference === invoice.invoiceNumber || record.sourceReference === invoice.id)} /> : null}
             {activeTab === 'history' ? <SalesActivityTimeline rows={history} /> : null}
         </div>
     );

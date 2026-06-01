@@ -10,11 +10,11 @@ use Modules\Core\Application\Results\Error;
 use Modules\Core\Application\Results\Result;
 use Modules\Document\Application\Services\DocumentOrchestrator;
 use Modules\Document\Domain\Aggregates\DocumentAggregate;
+use Modules\Payment\Application\Contracts\Services\AdvancePaymentServiceInterface;
 use Modules\Payment\Application\Contracts\Services\PaymentPostingServiceInterface;
 use Modules\Payment\Application\Contracts\Services\PaymentReversalServiceInterface;
 use Modules\Payment\Application\Contracts\Services\PaymentServiceInterface;
 use Modules\Payment\Application\Contracts\Services\RefundServiceInterface;
-use Modules\Payment\Application\Contracts\Services\AdvancePaymentServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\AdvancePayments\ListAdvancePaymentsServiceInterface;
 use Modules\Purchase\Application\Contracts\Services\PurchaseIntegrationServiceInterface;
 use Modules\Purchase\Application\Contracts\Services\PurchaseWorkflowServiceInterface;
@@ -50,7 +50,91 @@ final class PurchaseIntegrationService implements PurchaseIntegrationServiceInte
         private readonly PaymentReversalServiceInterface $paymentReversalService,
         private readonly RefundServiceInterface $refundService,
         private readonly ListAdvancePaymentsServiceInterface $listAdvancePaymentsService,
-    ) {
+    ) {}
+
+    public function listAllSourceDocuments(array $payload): Result
+    {
+        try {
+            $tenantId = (int) ($payload['tenant_id'] ?? 0);
+            if ($tenantId < 1) {
+                return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'tenant_id is required.'));
+            }
+
+            $criteria = [
+                'tenant_id' => $tenantId,
+                'status' => 'active',
+                'source_line_id' => null,
+                'document_line_id' => null,
+            ];
+
+            if (! empty($payload['source_type'])) {
+                $criteria['source_type'] = (string) $payload['source_type'];
+            }
+
+            if (! empty($payload['source_id'])) {
+                $criteria['source_id'] = (int) $payload['source_id'];
+            }
+
+            $documents = [];
+            $seenDocumentIds = [];
+            foreach ($this->purchaseDocumentLinkRepository->list($criteria) as $link) {
+                if (! $link instanceof DataRecord) {
+                    continue;
+                }
+
+                $documentId = (int) $link->get('document_id', 0);
+                if ($documentId < 1 || isset($seenDocumentIds[$documentId])) {
+                    continue;
+                }
+
+                $aggregate = $this->documentOrchestrator->show($tenantId, $documentId);
+                $row = $this->serializeDocumentAggregate($aggregate, $link);
+                if ($this->matchesDocumentSearch($row, (string) ($payload['search'] ?? ''))) {
+                    $documents[] = $row;
+                    $seenDocumentIds[$documentId] = true;
+                }
+            }
+
+            return Result::success($documents);
+        } catch (Throwable $exception) {
+            return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, $exception->getMessage()));
+        }
+    }
+
+    public function showLinkedSourceDocument(int $documentId, array $payload): Result
+    {
+        try {
+            $tenantId = (int) ($payload['tenant_id'] ?? 0);
+            if ($tenantId < 1) {
+                return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'tenant_id is required.'));
+            }
+
+            $links = $this->purchaseDocumentLinkRepository->list([
+                'tenant_id' => $tenantId,
+                'document_id' => $documentId,
+                'status' => 'active',
+                'source_line_id' => null,
+                'document_line_id' => null,
+            ]);
+
+            $headerLink = $links[0] ?? null;
+            if (! $headerLink instanceof DataRecord) {
+                return Result::failure(new Error(PurchaseErrorCode::NOT_FOUND, 'Supplier invoice is not linked to a purchase source.'));
+            }
+
+            $aggregate = $this->documentOrchestrator->show($tenantId, $documentId);
+            $data = $this->serializeDocumentAggregate($aggregate, $headerLink);
+            $data['line_links'] = $this->serializeLineLinks(
+                $tenantId,
+                (string) $headerLink->get('source_type'),
+                (int) $headerLink->get('source_id'),
+                $documentId,
+            );
+
+            return Result::success($data);
+        } catch (Throwable $exception) {
+            return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, $exception->getMessage()));
+        }
     }
 
     public function listSourceDocuments(string $entityType, int|string $id, array $payload): Result
@@ -945,6 +1029,7 @@ final class PurchaseIntegrationService implements PurchaseIntegrationServiceInte
 
         if ($itemQuantity > 0 && $lineTotal > 0) {
             $unitAmount = $lineTotal / $itemQuantity;
+
             return round(max(0.0, $unitAmount * $linkedQuantity), 4);
         }
 
@@ -1057,5 +1142,27 @@ final class PurchaseIntegrationService implements PurchaseIntegrationServiceInte
                 'status' => $headerLink->get('status'),
             ],
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $document
+     */
+    private function matchesDocumentSearch(array $document, string $search): bool
+    {
+        $needle = strtolower(trim($search));
+        if ($needle === '') {
+            return true;
+        }
+
+        foreach (['document_number', 'status', 'notes'] as $key) {
+            if (str_contains(strtolower((string) ($document[$key] ?? '')), $needle)) {
+                return true;
+            }
+        }
+
+        $link = is_array($document['purchase_link'] ?? null) ? $document['purchase_link'] : [];
+
+        return str_contains(strtolower((string) ($link['source_type'] ?? '')), $needle)
+            || str_contains(strtolower((string) ($link['source_id'] ?? '')), $needle);
     }
 }

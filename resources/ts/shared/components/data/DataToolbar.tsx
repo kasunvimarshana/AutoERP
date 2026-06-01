@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Checkbox } from '../ui/Checkbox';
@@ -130,9 +130,19 @@ export function DataToolbar({
     const [draftFilterValues, setDraftFilterValues] = useState<DataToolbarFilterValues>(filterValues);
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [columnsOpen, setColumnsOpen] = useState(false);
+    const onSearchChangeRef = useRef(onSearchChange);
+    const filterValuesRef = useRef(filterValues);
 
     useEffect(() => {
-        setSearchDraft(searchValue);
+        onSearchChangeRef.current = onSearchChange;
+    }, [onSearchChange]);
+
+    useEffect(() => {
+        filterValuesRef.current = filterValues;
+    }, [filterValues]);
+
+    useEffect(() => {
+        setSearchDraft((current) => (current === searchValue ? current : searchValue));
     }, [searchValue]);
 
     useEffect(() => {
@@ -157,17 +167,17 @@ export function DataToolbar({
         window.addEventListener('keydown', closeOnEscape);
 
         return () => window.removeEventListener('keydown', closeOnEscape);
-    }, [filterValues, filtersOpen]);
+    }, [filtersOpen]);
 
     useEffect(() => {
         const timer = window.setTimeout(() => {
             if (searchDraft !== searchValue) {
-                onSearchChange?.(searchDraft);
+                onSearchChangeRef.current?.(searchDraft);
             }
         }, debounceMs);
 
         return () => window.clearTimeout(timer);
-    }, [onSearchChange, searchDraft, searchValue]);
+    }, [searchDraft, searchValue]);
 
     const chips = useMemo(
         () => activeFilterChips ?? buildFilterChips(filters, filterValues),
@@ -203,7 +213,7 @@ export function DataToolbar({
 
     function closeFilters(): void {
         setDraftFilterValues((current) => (
-            filterValuesEqual(current, filterValues) ? current : filterValues
+            filterValuesEqual(current, filterValuesRef.current) ? current : filterValuesRef.current
         ));
         setFiltersOpen(false);
     }
@@ -216,7 +226,9 @@ export function DataToolbar({
     }
 
     function updateDraftFilter(filterId: string, value: DataToolbarFilterValue): void {
-        setDraftFilterValues((current) => ({ ...current, [filterId]: value }));
+        setDraftFilterValues((current) => (
+            filterValueEqual(current[filterId], value) ? current : { ...current, [filterId]: value }
+        ));
     }
 
     return (
@@ -280,7 +292,7 @@ export function DataToolbar({
                                 value={sortValue}
                             >
                                 <option value="">Default sort</option>
-                                {sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                                {sortOptions.map((option) => <option key={optionKey(option)} value={option.value}>{option.label}</option>)}
                             </Select>
                         </div>
                     ) : null}
@@ -418,7 +430,7 @@ function SavedViewsControl({
                     value={selectedSavedView}
                 >
                     <option value="">Saved views</option>
-                    {savedViews.map((view) => <option key={view.id} value={view.id}>{view.name}</option>)}
+                    {savedViews.map((view) => <option key={`${view.id}:${view.name}`} value={view.id}>{view.name}</option>)}
                 </Select>
                 {onSaveView ? <Button disabled={disabled} onClick={onSaveView} variant="secondary">Save</Button> : null}
             </div>
@@ -484,7 +496,7 @@ function renderFilterInput(
                 value={stringValue(value)}
             >
                 <option value="">{filter.placeholder ?? `Any ${filter.label.toLowerCase()}`}</option>
-                {filter.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                {filter.options?.map((option) => <option key={optionKey(option)} value={option.value}>{option.label}</option>)}
             </Select>
         );
     }
@@ -500,7 +512,7 @@ function renderFilterInput(
                 onChange={(event) => onChange(Array.from(event.target.selectedOptions).map((option) => option.value))}
                 value={values}
             >
-                {filter.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                {filter.options?.map((option) => <option key={optionKey(option)} value={option.value}>{option.label}</option>)}
             </select>
         );
     }
@@ -576,6 +588,10 @@ function filterValueEqual(left: DataToolbarFilterValue, right: DataToolbarFilter
 
 function optionLabel(filter: DataToolbarFilterConfig, value: string): string {
     return filter.options?.find((option) => option.value === value)?.label ?? value;
+}
+
+function optionKey(option: { label: string; value: string }): string {
+    return `${option.value}:${option.label}`;
 }
 
 function stringValue(value: DataToolbarFilterValue): string {

@@ -308,6 +308,7 @@ export type SalesListQuery = {
 };
 
 export type SalesLineFormInput = {
+    clientKey?: string;
     discountType?: string;
     discountValue?: string;
     itemId: string;

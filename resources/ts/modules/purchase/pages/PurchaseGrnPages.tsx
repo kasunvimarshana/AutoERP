@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
 import { DataToolbar, type DataToolbarFilterValue } from '../../../shared/components/data/DataToolbar';
@@ -93,12 +93,57 @@ export function GrnDetailPage() {
     const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
     const [history, setHistory] = useState<PurchaseAuditEntry[]>([]);
     const [activeTab, setActiveTab] = useState('overview');
+    const [tabError, setTabError] = useState('');
+    const [tabLoading, setTabLoading] = useState('');
+    const loadedTabsRef = useRef(new Set<string>());
 
     useEffect(() => {
-        purchaseApi.grns.get(id).then((response) => setGrn(response.data));
-        purchaseApi.invoices.list().then((response) => setInvoices(response.data));
-        purchaseApi.grns.history(id).then((response) => setHistory(response.data)).catch(() => setHistory([]));
+        let mounted = true;
+        loadedTabsRef.current.clear();
+        setActiveTab('overview');
+        setGrn(undefined);
+        purchaseApi.grns.get(id).then((response) => {
+            if (mounted) setGrn(response.data);
+        });
+        return () => {
+            mounted = false;
+        };
     }, [id]);
+
+    useEffect(() => {
+        if (!grn || !['invoices', 'history'].includes(activeTab) || loadedTabsRef.current.has(activeTab)) {
+            return;
+        }
+
+        const currentGrn = grn;
+        let mounted = true;
+        setTabLoading(activeTab);
+        setTabError('');
+
+        async function loadTab(): Promise<void> {
+            try {
+                if (activeTab === 'invoices') {
+                    const response = await purchaseApi.invoices.list({ perPage: 20, search: currentGrn.grnNumber });
+                    if (mounted) setInvoices(response.data);
+                } else {
+                    const response = await purchaseApi.grns.history(id).catch(() => ({ data: [] }));
+                    if (mounted) setHistory(response.data);
+                }
+
+                if (mounted) loadedTabsRef.current.add(activeTab);
+            } catch (caught: unknown) {
+                if (mounted) setTabError(caught instanceof Error ? caught.message : 'Unable to load tab data.');
+            } finally {
+                if (mounted) setTabLoading('');
+            }
+        }
+
+        void loadTab();
+
+        return () => {
+            mounted = false;
+        };
+    }, [activeTab, grn, id]);
 
     if (!grn) {
         return <EmptyState description="Loading GRN details..." title="Loading" />;
@@ -124,9 +169,9 @@ export function GrnDetailPage() {
             {activeTab === 'lines' ? <GrnLineTable rows={grn.lines} /> : null}
             {activeTab === 'source' ? <PurchaseSourceReferencePanel reference={grn.sourcePo} /> : null}
             {activeTab === 'inventory' ? <GrnInventoryEffectPanel effects={[]} /> : null}
-            {activeTab === 'invoices' ? <PurchaseInvoiceTable rows={invoices.filter((invoice) => invoice.sourceReference === grn.grnNumber || invoice.sourceReference === grn.id)} /> : null}
+            {activeTab === 'invoices' ? tabLoading === 'invoices' ? <EmptyState description="Loading related invoices..." title="Loading invoices" /> : tabError ? <EmptyState description={tabError} title="Invoices unavailable" /> : <PurchaseInvoiceTable rows={invoices.filter((invoice) => invoice.sourceReference === grn.grnNumber || invoice.sourceReference === grn.id)} /> : null}
             {activeTab === 'documents' ? <PurchaseSourceReferencePanel reference={grn.grnNumber} /> : null}
-            {activeTab === 'history' ? <PurchaseActivityTimeline rows={history} /> : null}
+            {activeTab === 'history' ? tabLoading === 'history' ? <EmptyState description="Loading audit timeline..." title="Loading audit" /> : tabError ? <EmptyState description={tabError} title="Audit unavailable" /> : <PurchaseActivityTimeline rows={history} /> : null}
         </div>
     );
 }

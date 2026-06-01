@@ -7,6 +7,7 @@ namespace Modules\Purchase\Presentation\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Modules\Core\Application\DTO\DataRecord;
 use Modules\Core\Application\DTO\PagedResult;
 use Modules\Payment\Application\Contracts\UseCases\PaymentAllocations\CreatePaymentAllocationServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\PaymentAllocations\ListPaymentAllocationsServiceInterface;
@@ -195,6 +196,40 @@ final class PurchasePaymentController extends Controller
         }
 
         return $this->respond($this->integration->refundPayment($paymentId, $payload));
+    }
+
+    public function refunds(Request $request): JsonResponse
+    {
+        $payload = $this->withContext($request);
+        $payload['party_type'] = 'supplier';
+        unset($payload['per_page'], $payload['page']);
+
+        $result = $this->listPayments->execute($payload, 100, 1);
+        if ($result->isFailure()) {
+            return $this->respond($result);
+        }
+
+        $value = $result->valueOrFail();
+        if (! $value instanceof PagedResult) {
+            return response()->json(['message' => 'Unexpected refund list response.'], 500);
+        }
+
+        $rows = array_values(array_filter(
+            $value->items,
+            static fn ($row): bool => $row instanceof DataRecord
+                && (int) $row->get('reversal_of_payment_id', 0) > 0,
+        ));
+
+        return response()->json([
+            'data' => array_map(static fn ($row): array => $row->toArray(), $rows),
+            'meta' => [
+                'total' => count($rows),
+                'page' => 1,
+                'per_page' => 100,
+                'page_count' => 1,
+                'has_more' => false,
+            ],
+        ]);
     }
 
     public function writeOff(Request $request): JsonResponse

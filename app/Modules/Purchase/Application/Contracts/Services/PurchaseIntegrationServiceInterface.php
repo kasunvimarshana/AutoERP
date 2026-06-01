@@ -8,6 +8,10 @@ use Modules\Core\Application\Results\Result;
 
 interface PurchaseIntegrationServiceInterface
 {
+    public function listAllSourceDocuments(array $payload): Result;
+
+    public function showLinkedSourceDocument(int $documentId, array $payload): Result;
+
     public function listSourceDocuments(string $entityType, int|string $id, array $payload): Result;
 
     public function showSourceDocument(string $entityType, int|string $id, int $documentId, array $payload): Result;

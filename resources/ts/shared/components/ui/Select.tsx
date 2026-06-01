@@ -18,7 +18,7 @@ export function Select({ children, className, options, placeholder, ...props }: 
         >
             {placeholder ? <option value="">{placeholder}</option> : null}
             {options?.map((option) => (
-                <option key={option.value} value={option.value}>
+                <option key={`${option.value}:${option.label}`} value={option.value}>
                     {option.label}
                 </option>
             ))}

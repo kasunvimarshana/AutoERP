@@ -9,7 +9,6 @@ import {
     CustomerAdvancePanel,
     CustomerRefundPanel,
     SalesActivityTimeline,
-    SalesFinancePostingPanel,
     SalesPaymentAllocationPanel,
     SalesPaymentForm,
     SalesPaymentTable,

@@ -14,22 +14,55 @@ export function SalesDashboardPage() {
     const [invoices, setInvoices] = useState<SalesInvoice[]>([]);
     const [orders, setOrders] = useState<SalesOrder[]>([]);
     const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
+    const [recentError, setRecentError] = useState('');
+    const [recentLoaded, setRecentLoaded] = useState(false);
+    const [recentLoading, setRecentLoading] = useState(false);
 
     useEffect(() => {
-        Promise.all([
-            salesApi.dashboard.summary(),
-            salesApi.orders.list({ perPage: 3 }),
-            salesApi.deliveries.list({ perPage: 3 }),
-            salesApi.invoices.list({ perPage: 3 }),
-        ])
-            .then(([summary, orderResponse, deliveryResponse, invoiceResponse]) => {
+        let mounted = true;
+        setIsLoading(true);
+
+        salesApi.dashboard.summary()
+            .then((summary) => {
+                if (!mounted) return;
                 setMetrics(summary.data);
-                setOrders(orderResponse.data);
-                setDeliveries(deliveryResponse.data);
-                setInvoices(invoiceResponse.data);
             })
-            .catch((caught: unknown) => setError(caught instanceof Error ? caught.message : 'Unable to load Sales dashboard.'));
+            .catch((caught: unknown) => {
+                if (mounted) setError(caught instanceof Error ? caught.message : 'Unable to load Sales dashboard.');
+            })
+            .finally(() => {
+                if (mounted) setIsLoading(false);
+            });
+
+        return () => {
+            mounted = false;
+        };
     }, []);
+
+    async function loadRecentDocuments(): Promise<void> {
+        if (recentLoaded || recentLoading) return;
+
+        setRecentLoading(true);
+        setRecentError('');
+
+        try {
+            const [orderResponse, deliveryResponse, invoiceResponse] = await Promise.all([
+                salesApi.orders.list({ perPage: 3 }),
+                salesApi.deliveries.list({ perPage: 3 }),
+                salesApi.invoices.list({ perPage: 3 }),
+            ]);
+
+            setOrders(orderResponse.data);
+            setDeliveries(deliveryResponse.data);
+            setInvoices(invoiceResponse.data);
+            setRecentLoaded(true);
+        } catch (caught) {
+            setRecentError(caught instanceof Error ? caught.message : 'Unable to load recent Sales documents.');
+        } finally {
+            setRecentLoading(false);
+        }
+    }
 
     return (
         <div className="space-y-6">
@@ -41,6 +74,7 @@ export function SalesDashboardPage() {
             />
             <SalesDashboardCards metrics={metrics} />
             {error ? <EmptyState description={error} title="Sales dashboard unavailable" /> : null}
+            {!error && isLoading ? <EmptyState description="Loading real Sales metrics..." title="Loading Sales dashboard" /> : null}
             <PreviewPanel status="Workflow" title="Supported Sales Workflows">
                 <div className="grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-3">
                     {['Quotation -> Sales Order -> Delivery/GDN -> Customer Invoice -> Payment', 'Sales Order -> Delivery/GDN -> Customer Invoice -> Payment', 'Sales Order -> Customer Invoice -> Payment', 'Direct Customer Invoice -> Payment', 'Customer Advance -> Allocation -> Settlement', 'Sales Return -> Customer Refund / Credit'].map((workflow) => (
@@ -48,19 +82,31 @@ export function SalesDashboardPage() {
                     ))}
                 </div>
             </PreviewPanel>
-            <div className="grid gap-5 xl:grid-cols-2">
-                <div className="space-y-3">
-                    <h2 className="text-base font-bold text-slate-950">Recent Sales Orders</h2>
-                    <SalesOrderTable rows={orders.slice(0, 3)} />
+            <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h2 className="text-base font-bold text-slate-950">Recent Sales Documents</h2>
+                    <Button disabled={recentLoading} onClick={() => void loadRecentDocuments()} type="button" variant="secondary">{recentLoaded ? 'Refresh Loaded Documents' : 'Load Recent Documents'}</Button>
                 </div>
-                <div className="space-y-3">
-                    <h2 className="text-base font-bold text-slate-950">Deliveries Awaiting Invoice</h2>
-                    <GdnTable rows={deliveries} />
-                </div>
-            </div>
-            <div className="space-y-3">
-                <h2 className="text-base font-bold text-slate-950">Customer Invoices</h2>
-                <SalesInvoiceTable rows={invoices} />
+                {recentError ? <EmptyState description={recentError} title="Recent documents unavailable" /> : null}
+                {!recentLoaded && !recentError ? <EmptyState description="Recent orders, deliveries, and invoices load only when requested." title="Recent documents not loaded" /> : null}
+                {recentLoaded ? (
+                    <>
+                        <div className="grid gap-5 xl:grid-cols-2">
+                            <div className="space-y-3">
+                                <h2 className="text-base font-bold text-slate-950">Recent Sales Orders</h2>
+                                <SalesOrderTable rows={orders} />
+                            </div>
+                            <div className="space-y-3">
+                                <h2 className="text-base font-bold text-slate-950">Deliveries Awaiting Invoice</h2>
+                                <GdnTable rows={deliveries} />
+                            </div>
+                        </div>
+                        <div className="space-y-3">
+                            <h2 className="text-base font-bold text-slate-950">Customer Invoices</h2>
+                            <SalesInvoiceTable rows={invoices} />
+                        </div>
+                    </>
+                ) : null}
             </div>
         </div>
     );

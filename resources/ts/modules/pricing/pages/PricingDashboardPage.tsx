@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
 import { Button } from '../../../shared/components/ui/Button';
 import { Card } from '../../../shared/components/ui/Card';
+import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { pricingApi } from '../services/pricingApi';
 import type { Discount, PriceHistory, PriceList, PricingRule } from '../types/pricing.types';
 
@@ -11,19 +12,29 @@ export function PricingDashboardPage() {
     const [rules, setRules] = useState<PricingRule[]>([]);
     const [discounts, setDiscounts] = useState<Discount[]>([]);
     const [history, setHistory] = useState<PriceHistory[]>([]);
+    const [error, setError] = useState('');
+    const [isLoaded, setIsLoaded] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
-    useEffect(() => {
-        let mounted = true;
-        Promise.all([pricingApi.listPriceLists(), pricingApi.listPricingRules(), pricingApi.listDiscounts(), pricingApi.listPriceHistory()]).then(([priceListResponse, ruleResponse, discountResponse, historyResponse]) => {
-            if (mounted) {
-                setPriceLists(priceListResponse.data);
-                setRules(ruleResponse.data);
-                setDiscounts(discountResponse.data);
-                setHistory(historyResponse.data);
-            }
-        });
-        return () => { mounted = false; };
-    }, []);
+    async function loadDashboardData(): Promise<void> {
+        if (isLoading) return;
+
+        setIsLoading(true);
+        setError('');
+
+        try {
+            const [priceListResponse, ruleResponse, discountResponse, historyResponse] = await Promise.all([pricingApi.listPriceLists(), pricingApi.listPricingRules(), pricingApi.listDiscounts(), pricingApi.listPriceHistory()]);
+            setPriceLists(priceListResponse.data);
+            setRules(ruleResponse.data);
+            setDiscounts(discountResponse.data);
+            setHistory(historyResponse.data);
+            setIsLoaded(true);
+        } catch (caught) {
+            setError(caught instanceof Error ? caught.message : 'Unable to load Pricing dashboard.');
+        } finally {
+            setIsLoading(false);
+        }
+    }
 
     const metrics = [
         ['Active price lists', String(priceLists.filter((row) => row.status === 'active').length), 'Loaded from Pricing API'],
@@ -40,9 +51,14 @@ export function PricingDashboardPage() {
                 subtitle="Pricing supports sales, purchase, service, rental, customer-specific, and supplier-specific rates. Authoritative price resolving stays in backend."
                 title="Pricing"
             />
-            <div className="grid gap-4 md:grid-cols-4">
-                {metrics.map(([label, value, helper]) => <Card className="p-5" key={label}><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-2xl font-bold text-slate-950">{value}</p><p className="mt-1 text-xs text-slate-400">{helper}</p></Card>)}
+            <div className="flex justify-end">
+                <Button disabled={isLoading} onClick={() => void loadDashboardData()} type="button" variant="secondary">{isLoaded ? 'Refresh Dashboard Data' : 'Load Dashboard Data'}</Button>
             </div>
+            {error ? <EmptyState description={error} title="Pricing dashboard unavailable" /> : null}
+            {!isLoaded && !error ? <EmptyState description="Pricing metrics load only when requested." title="Dashboard data not loaded" /> : null}
+            {isLoaded ? <div className="grid gap-4 md:grid-cols-4">
+                {metrics.map(([label, value, helper]) => <Card className="p-5" key={label}><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-2xl font-bold text-slate-950">{value}</p><p className="mt-1 text-xs text-slate-400">{helper}</p></Card>)}
+            </div> : null}
             <div className="grid gap-4 md:grid-cols-4">
                 {[
                     ['Price Lists', 'Manage sales, purchase, service, rental, and party-specific lists.', '/pricing/price-lists'],

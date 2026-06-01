@@ -94,7 +94,7 @@ export function DocumentRecordSummaryCard({ document, onStatusChanged }: { docum
             </div>
             <div className="mt-5 flex flex-wrap gap-2">
                 {statusOptions.map((option) => (
-                    <Button disabled={isSaving || document.status === option.value} key={option.value} onClick={() => void changeStatus(option.value as DocumentStatus)} type="button" variant={document.status === option.value ? 'secondary' : 'ghost'}>
+                    <Button disabled={isSaving || document.status === option.value} key={`${option.value}:${option.label}`} onClick={() => void changeStatus(option.value as DocumentStatus)} type="button" variant={document.status === option.value ? 'secondary' : 'ghost'}>
                         {option.label}
                     </Button>
                 ))}

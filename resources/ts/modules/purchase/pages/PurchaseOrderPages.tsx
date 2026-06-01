@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
 import { DataToolbar, type DataToolbarFilterValue } from '../../../shared/components/data/DataToolbar';
@@ -8,7 +8,6 @@ import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import {
     GrnTable,
     PurchaseActivityTimeline,
-    PurchaseFinancePostingPanel,
     PurchaseInvoiceTable,
     PurchaseOrderForm,
     PurchaseOrderLineTable,
@@ -98,14 +97,63 @@ export function PurchaseOrderDetailPage() {
     const [payments, setPayments] = useState<PurchasePayment[]>([]);
     const [history, setHistory] = useState<PurchaseAuditEntry[]>([]);
     const [activeTab, setActiveTab] = useState('overview');
+    const [tabError, setTabError] = useState('');
+    const [tabLoading, setTabLoading] = useState('');
+    const loadedTabsRef = useRef(new Set<string>());
 
     useEffect(() => {
-        purchaseApi.orders.get(id).then((response) => setOrder(response.data));
-        purchaseApi.grns.list().then((response) => setGrns(response.data));
-        purchaseApi.invoices.list().then((response) => setInvoices(response.data));
-        purchaseApi.payments.list().then((response) => setPayments(response.data));
-        purchaseApi.orders.history(id).then((response) => setHistory(response.data)).catch(() => setHistory([]));
+        let mounted = true;
+        loadedTabsRef.current.clear();
+        setActiveTab('overview');
+        setOrder(undefined);
+        purchaseApi.orders.get(id).then((response) => {
+            if (mounted) setOrder(response.data);
+        });
+        return () => {
+            mounted = false;
+        };
     }, [id]);
+
+    useEffect(() => {
+        if (!order || !['grns', 'invoices', 'payments', 'audit'].includes(activeTab) || loadedTabsRef.current.has(activeTab)) {
+            return;
+        }
+
+        const currentOrder = order;
+        let mounted = true;
+        setTabLoading(activeTab);
+        setTabError('');
+
+        async function loadTab(): Promise<void> {
+            try {
+                if (activeTab === 'grns') {
+                    const response = await purchaseApi.grns.list({ perPage: 20, search: currentOrder.poNumber });
+                    if (mounted) setGrns(response.data);
+                } else if (activeTab === 'invoices') {
+                    const response = await purchaseApi.invoices.list({ perPage: 20, search: currentOrder.poNumber });
+                    if (mounted) setInvoices(response.data);
+                } else if (activeTab === 'payments') {
+                    const response = await purchaseApi.payments.list({ perPage: 20 });
+                    if (mounted) setPayments(response.data);
+                } else {
+                    const response = await purchaseApi.orders.history(id).catch(() => ({ data: [] }));
+                    if (mounted) setHistory(response.data);
+                }
+
+                if (mounted) loadedTabsRef.current.add(activeTab);
+            } catch (caught: unknown) {
+                if (mounted) setTabError(caught instanceof Error ? caught.message : 'Unable to load tab data.');
+            } finally {
+                if (mounted) setTabLoading('');
+            }
+        }
+
+        void loadTab();
+
+        return () => {
+            mounted = false;
+        };
+    }, [activeTab, id, order]);
 
     if (!order) {
         return <EmptyState description="Loading purchase order details..." title="Loading" />;
@@ -136,12 +184,12 @@ export function PurchaseOrderDetailPage() {
             />
             {activeTab === 'overview' ? <PurchaseOrderSummaryCard order={order} /> : null}
             {activeTab === 'lines' ? <PurchaseOrderLineTable rows={order.lines} /> : null}
-            {activeTab === 'grns' ? <GrnTable rows={grns.filter((grn) => grn.sourcePo === order.poNumber || grn.sourcePo === order.id)} /> : null}
-            {activeTab === 'invoices' ? <PurchaseInvoiceTable rows={invoices.filter((invoice) => invoice.sourceReference === order.poNumber || invoice.sourceReference === order.id)} /> : null}
-            {activeTab === 'payments' ? <PurchasePaymentTable rows={payments.filter((payment) => payment.supplierId === order.supplierId)} /> : null}
+            {activeTab === 'grns' ? tabLoading === 'grns' ? <EmptyState description="Loading related GRNs..." title="Loading GRNs" /> : tabError ? <EmptyState description={tabError} title="GRNs unavailable" /> : <GrnTable rows={grns.filter((grn) => grn.sourcePo === order.poNumber || grn.sourcePo === order.id)} /> : null}
+            {activeTab === 'invoices' ? tabLoading === 'invoices' ? <EmptyState description="Loading related invoices..." title="Loading invoices" /> : tabError ? <EmptyState description={tabError} title="Invoices unavailable" /> : <PurchaseInvoiceTable rows={invoices.filter((invoice) => invoice.sourceReference === order.poNumber || invoice.sourceReference === order.id)} /> : null}
+            {activeTab === 'payments' ? tabLoading === 'payments' ? <EmptyState description="Loading supplier payments..." title="Loading payments" /> : tabError ? <EmptyState description={tabError} title="Payments unavailable" /> : <PurchasePaymentTable rows={payments.filter((payment) => payment.supplierId === order.supplierId)} /> : null}
             {activeTab === 'documents' ? <PurchaseSourceReferencePanel reference={order.poNumber} /> : null}
             {activeTab === 'workflow' ? <PurchaseWorkflowActions entityId={order.id} entityType="purchase_order" status={order.status} /> : null}
-            {activeTab === 'audit' ? <PurchaseActivityTimeline rows={history} /> : null}
+            {activeTab === 'audit' ? tabLoading === 'audit' ? <EmptyState description="Loading audit timeline..." title="Loading audit" /> : tabError ? <EmptyState description={tabError} title="Audit unavailable" /> : <PurchaseActivityTimeline rows={history} /> : null}
         </div>
     );
 }

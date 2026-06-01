@@ -3,16 +3,16 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use Modules\Purchase\Presentation\Http\Controllers\PurchaseOrderController;
-use Modules\Purchase\Presentation\Http\Controllers\PurchaseOrderLineController;
-use Modules\Purchase\Presentation\Http\Controllers\PurchaseInvoiceController;
-use Modules\Purchase\Presentation\Http\Controllers\PurchasePaymentController;
 use Modules\Purchase\Presentation\Http\Controllers\GrnHeaderController;
 use Modules\Purchase\Presentation\Http\Controllers\GrnLineController;
+use Modules\Purchase\Presentation\Http\Controllers\PurchaseIntegrationController;
+use Modules\Purchase\Presentation\Http\Controllers\PurchaseInvoiceController;
+use Modules\Purchase\Presentation\Http\Controllers\PurchaseManagementController;
+use Modules\Purchase\Presentation\Http\Controllers\PurchaseOrderController;
+use Modules\Purchase\Presentation\Http\Controllers\PurchaseOrderLineController;
+use Modules\Purchase\Presentation\Http\Controllers\PurchasePaymentController;
 use Modules\Purchase\Presentation\Http\Controllers\PurchaseReturnController;
 use Modules\Purchase\Presentation\Http\Controllers\PurchaseReturnLineController;
-use Modules\Purchase\Presentation\Http\Controllers\PurchaseManagementController;
-use Modules\Purchase\Presentation\Http\Controllers\PurchaseIntegrationController;
 use Modules\Purchase\Presentation\Http\Controllers\PurchaseWorkflowController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
@@ -26,7 +26,7 @@ $currentOrganizationUnitMiddleware = (string) config(
 Route::prefix('api/purchase')
     ->middleware([
         'api',
-        'auth:' . $protectedGuard,
+        'auth:'.$protectedGuard,
         $currentUserMiddleware,
         $currentTenantMiddleware,
         $currentOrganizationUnitMiddleware,
@@ -115,6 +115,8 @@ Route::prefix('api/purchase')
         Route::post('purchase-advances/{id}/allocate', [PurchasePaymentController::class, 'allocateAdvance'])
             ->whereNumber('id')
             ->name('purchase-advances.allocate');
+        Route::get('purchase-refunds', [PurchasePaymentController::class, 'refunds'])
+            ->name('purchase-refunds.index');
         Route::post('purchase-refunds', [PurchasePaymentController::class, 'refund'])
             ->name('purchase-refunds.store');
         Route::post('purchase-write-offs', [PurchasePaymentController::class, 'writeOff'])
@@ -184,6 +186,8 @@ Route::prefix('api/purchase')
             ->name('lookups.returnable-lines');
         Route::get('lookups/payable-documents', [PurchaseManagementController::class, 'payableDocuments'])
             ->name('lookups.payable-documents');
+        Route::get('dashboard/summary', [PurchaseManagementController::class, 'dashboardSummary'])
+            ->name('dashboard.summary');
 
         Route::prefix('integrations')
             ->group(function (): void {

@@ -17,7 +17,7 @@ export function WorkflowTimeline({ steps = defaultSteps }: { steps?: WorkflowSte
     return (
         <div className="space-y-3">
             {steps.map((step, index) => (
-                <div className="flex items-start gap-3" key={step.label}>
+                <div className="flex items-start gap-3" key={`${step.label}:${step.status ?? 'pending'}:${step.description ?? ''}`}>
                     <span
                         className={cn(
                             'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold',

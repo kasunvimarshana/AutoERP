@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
 import { DataToolbar, type DataToolbarFilterValue } from '../../../shared/components/data/DataToolbar';
@@ -9,7 +9,6 @@ import {
     CustomerRefundPanel,
     GdnInventoryEffectPanel,
     SalesActivityTimeline,
-    SalesFinancePostingPanel,
     SalesReturnForm,
     SalesReturnLineTable,
     SalesReturnTable,
@@ -77,12 +76,50 @@ export function SalesReturnDetailPage() {
     const [history, setHistory] = useState<SalesAuditEntry[]>([]);
     const [refunds, setRefunds] = useState<CustomerRefund[]>([]);
     const [activeTab, setActiveTab] = useState('overview');
+    const [tabError, setTabError] = useState('');
+    const [tabLoading, setTabLoading] = useState('');
+    const loadedTabsRef = useRef(new Set<string>());
 
     useEffect(() => {
-        salesApi.returns.get(id).then((response) => setRecord(response.data));
-        salesApi.refunds.list().then((response) => setRefunds(response.data));
+        let mounted = true;
+        loadedTabsRef.current.clear();
+        setActiveTab('overview');
+        setRecord(undefined);
         setHistory([]);
+        salesApi.returns.get(id).then((response) => {
+            if (mounted) setRecord(response.data);
+        });
+        return () => {
+            mounted = false;
+        };
     }, [id]);
+
+    useEffect(() => {
+        if (!record || activeTab !== 'refunds' || loadedTabsRef.current.has(activeTab)) {
+            return;
+        }
+
+        let mounted = true;
+        setTabLoading(activeTab);
+        setTabError('');
+
+        salesApi.refunds.list({ perPage: 20, search: record.returnNumber })
+            .then((response) => {
+                if (!mounted) return;
+                setRefunds(response.data);
+                loadedTabsRef.current.add(activeTab);
+            })
+            .catch((caught: unknown) => {
+                if (mounted) setTabError(caught instanceof Error ? caught.message : 'Unable to load refunds.');
+            })
+            .finally(() => {
+                if (mounted) setTabLoading('');
+            });
+
+        return () => {
+            mounted = false;
+        };
+    }, [activeTab, record]);
 
     if (!record) {
         return <EmptyState description="Loading sales return details..." title="Loading" />;
@@ -97,7 +134,7 @@ export function SalesReturnDetailPage() {
             {activeTab === 'source' ? <SalesSourceReferencePanel reference={record.sourceReference} /> : null}
             {activeTab === 'inventory' ? <EmptyState description="Inventory effect is posted through the backend workflow action for this return." title="Inventory effect source-scoped" /> : null}
             {activeTab === 'finance' ? <EmptyState description="Finance posting is posted through the backend workflow action for this return." title="Finance effect source-scoped" /> : null}
-            {activeTab === 'refunds' ? <CustomerRefundPanel refunds={refunds.filter((refund) => refund.sourceReference === record.returnNumber || refund.sourceReference === record.id)} /> : null}
+            {activeTab === 'refunds' ? tabLoading === 'refunds' ? <EmptyState description="Loading related refunds..." title="Loading refunds" /> : tabError ? <EmptyState description={tabError} title="Refunds unavailable" /> : <CustomerRefundPanel refunds={refunds.filter((refund) => refund.sourceReference === record.returnNumber || refund.sourceReference === record.id)} /> : null}
             {activeTab === 'history' ? <SalesActivityTimeline rows={history} /> : null}
         </div>
     );

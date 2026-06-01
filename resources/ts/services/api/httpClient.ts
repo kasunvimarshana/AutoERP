@@ -5,11 +5,15 @@ type HttpMethod = 'DELETE' | 'GET' | 'PATCH' | 'POST' | 'PUT';
 
 type HttpClientOptions<TBody = unknown> = {
     body?: TBody;
+    cacheTtlMs?: number;
     method?: HttpMethod;
     query?: Record<string, string | number | boolean | null | undefined>;
+    signal?: AbortSignal;
 };
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
+const inFlightGetRequests = new Map<string, Promise<unknown>>();
+const cachedGetResponses = new Map<string, { expiresAt: number; value: unknown }>();
 
 type ApiErrorPayload = {
     error?: {
@@ -85,9 +89,43 @@ function apiErrorFromPayload(payload: ApiErrorPayload, status: number): ApiError
 
 export async function httpClient<TResponse, TBody = unknown>(
     path: string,
-    { body, method = 'GET', query }: HttpClientOptions<TBody> = {},
+    { body, cacheTtlMs = 0, method = 'GET', query, signal }: HttpClientOptions<TBody> = {},
 ): Promise<TResponse> {
-    const response = await fetch(buildUrl(path, query), {
+    const url = buildUrl(path, query);
+    const canDedupe = method === 'GET' && !signal;
+    const cached = cacheTtlMs > 0 ? cachedGetResponses.get(url) : undefined;
+    if (cached && cached.expiresAt > Date.now()) {
+        return cached.value as TResponse;
+    }
+
+    if (canDedupe && inFlightGetRequests.has(url)) {
+        return inFlightGetRequests.get(url) as Promise<TResponse>;
+    }
+
+    const request = sendRequest<TResponse, TBody>(url, { body, method, signal }).then((payload) => {
+        if (cacheTtlMs > 0 && method === 'GET') {
+            cachedGetResponses.set(url, { expiresAt: Date.now() + cacheTtlMs, value: payload });
+        }
+
+        return payload;
+    }).finally(() => {
+        if (canDedupe) {
+            inFlightGetRequests.delete(url);
+        }
+    });
+
+    if (canDedupe) {
+        inFlightGetRequests.set(url, request);
+    }
+
+    return request;
+}
+
+async function sendRequest<TResponse, TBody = unknown>(
+    url: string,
+    { body, method = 'GET', signal }: Pick<HttpClientOptions<TBody>, 'body' | 'method' | 'signal'>,
+): Promise<TResponse> {
+    const response = await fetch(url, {
         body: body === undefined ? undefined : JSON.stringify(body),
         credentials: 'include',
         headers: {
@@ -97,6 +135,7 @@ export async function httpClient<TResponse, TBody = unknown>(
             ...authHeaders(),
         },
         method,
+        signal,
     });
 
     if (response.status === 204) {

@@ -28,9 +28,7 @@ final class PurchaseInvoiceController extends Controller
         $sourceType = (string) ($payload['source_type'] ?? '');
         $sourceId = (int) ($payload['source_id'] ?? 0);
         if ($sourceType === '' || $sourceId < 1) {
-            return response()->json([
-                'message' => 'source_type and source_id are required for invoice listing.',
-            ], 422);
+            return $this->respond($this->integration->listAllSourceDocuments($payload));
         }
 
         return $this->respond($this->integration->listSourceDocuments($sourceType, $sourceId, $payload));
@@ -42,9 +40,7 @@ final class PurchaseInvoiceController extends Controller
         $sourceType = (string) ($payload['source_type'] ?? '');
         $sourceId = (int) ($payload['source_id'] ?? 0);
         if ($sourceType === '' || $sourceId < 1) {
-            return response()->json([
-                'message' => 'source_type and source_id are required for invoice lookup.',
-            ], 422);
+            return $this->respond($this->integration->showLinkedSourceDocument($documentId, $payload));
         }
 
         return $this->respond($this->integration->showSourceDocument($sourceType, $sourceId, $documentId, $payload));

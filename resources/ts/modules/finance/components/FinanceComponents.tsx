@@ -206,7 +206,7 @@ export function JournalEntryForm({
             <FormSection description="Enter debit or credit per line. Backend returns the authoritative balance and posting preview." title="Journal Lines">
                 <div className="space-y-4">
                     {defaults.lines.map((line, index) => (
-                        <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 md:grid-cols-5" key={index}>
+                        <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 md:grid-cols-5" key={`journal-line-${index}-${line.accountId}-${line.debit}-${line.credit}`}>
                             <Field error={fieldError(errors, `lines.${index}.account_id`)} label={`Line ${index + 1} account`}>
                                 <Select defaultValue={line.accountId} name={`lines.${index}.accountId`} required>
                                     <option value="">Select account</option>

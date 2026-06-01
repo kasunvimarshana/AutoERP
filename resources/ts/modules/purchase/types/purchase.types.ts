@@ -101,7 +101,9 @@ export type PurchaseInvoice = {
     invoiceNumber: string;
     lines: PurchaseInvoiceLine[];
     paidAmount: string;
+    sourceId?: string;
     sourceReference?: string;
+    sourceType?: 'grn_header' | 'purchase_order' | 'purchase_return' | string;
     supplierId?: string;
     status: PurchaseInvoiceStatus;
     supplier: string;
@@ -205,6 +207,13 @@ export type PurchaseSettings = {
     stockReceiveTiming: string;
 };
 
+export type PurchaseSettingsFormInput = {
+    allow_direct_grn: boolean;
+    allow_direct_purchase_document: boolean;
+    allow_over_receipt: boolean;
+    require_grn_before_invoice: boolean;
+};
+
 export type PurchaseCalculationPreview = {
     breakdown: Array<{ label: string; value: string }>;
     calculated: {
@@ -265,6 +274,7 @@ export type PurchaseListQuery = {
 };
 
 export type PurchaseLineFormInput = {
+    clientKey?: string;
     discountType?: string;
     discountValue?: string;
     itemId: string;

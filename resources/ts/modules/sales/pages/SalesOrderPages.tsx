@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
 import { DataToolbar, type DataToolbarFilterValue } from '../../../shared/components/data/DataToolbar';
@@ -9,7 +9,6 @@ import {
     GdnTable,
     SalesActivityTimeline,
     SalesCreditCheckPanel,
-    SalesFinancePostingPanel,
     SalesInvoiceTable,
     SalesOrderForm,
     SalesOrderLineTable,
@@ -93,14 +92,63 @@ export function SalesOrderDetailPage() {
     const [invoices, setInvoices] = useState<SalesInvoice[]>([]);
     const [payments, setPayments] = useState<SalesPayment[]>([]);
     const [activeTab, setActiveTab] = useState('overview');
+    const [tabError, setTabError] = useState('');
+    const [tabLoading, setTabLoading] = useState('');
+    const loadedTabsRef = useRef(new Set<string>());
 
     useEffect(() => {
-        salesApi.orders.get(id).then((response) => setOrder(response.data));
-        salesApi.deliveries.list().then((response) => setDeliveries(response.data));
-        salesApi.invoices.list().then((response) => setInvoices(response.data));
-        salesApi.payments.list().then((response) => setPayments(response.data));
-        salesApi.orders.history(id).then((response) => setHistory(response.data));
+        let mounted = true;
+        loadedTabsRef.current.clear();
+        setActiveTab('overview');
+        setOrder(undefined);
+        salesApi.orders.get(id).then((response) => {
+            if (mounted) setOrder(response.data);
+        });
+        return () => {
+            mounted = false;
+        };
     }, [id]);
+
+    useEffect(() => {
+        if (!order || !['deliveries', 'invoices', 'payments', 'audit'].includes(activeTab) || loadedTabsRef.current.has(activeTab)) {
+            return;
+        }
+
+        const currentOrder = order;
+        let mounted = true;
+        setTabLoading(activeTab);
+        setTabError('');
+
+        async function loadTab(): Promise<void> {
+            try {
+                if (activeTab === 'deliveries') {
+                    const response = await salesApi.deliveries.list({ perPage: 20, search: currentOrder.soNumber });
+                    if (mounted) setDeliveries(response.data);
+                } else if (activeTab === 'invoices') {
+                    const response = await salesApi.invoices.list({ perPage: 20, search: currentOrder.soNumber });
+                    if (mounted) setInvoices(response.data);
+                } else if (activeTab === 'payments') {
+                    const response = await salesApi.payments.list({ perPage: 20 });
+                    if (mounted) setPayments(response.data);
+                } else {
+                    const response = await salesApi.orders.history(id).catch(() => ({ data: [] }));
+                    if (mounted) setHistory(response.data);
+                }
+
+                if (mounted) loadedTabsRef.current.add(activeTab);
+            } catch (caught: unknown) {
+                if (mounted) setTabError(caught instanceof Error ? caught.message : 'Unable to load tab data.');
+            } finally {
+                if (mounted) setTabLoading('');
+            }
+        }
+
+        void loadTab();
+
+        return () => {
+            mounted = false;
+        };
+    }, [activeTab, id, order]);
 
     if (!order) {
         return <EmptyState description="Loading sales order details..." title="Loading" />;
@@ -126,12 +174,12 @@ export function SalesOrderDetailPage() {
             />
             {activeTab === 'overview' ? <><SalesOrderSummaryCard order={order} /><SalesCreditCheckPanel /><SalesStockAvailabilityPanel /></> : null}
             {activeTab === 'lines' ? <SalesOrderLineTable rows={order.lines} /> : null}
-            {activeTab === 'deliveries' ? <GdnTable rows={deliveries.filter((gdn) => gdn.sourceOrder === order.soNumber || gdn.sourceOrder === order.id)} /> : null}
-            {activeTab === 'invoices' ? <SalesInvoiceTable rows={invoices.filter((invoice) => invoice.sourceReference === order.soNumber || invoice.sourceReference === order.id)} /> : null}
-            {activeTab === 'payments' ? <SalesPaymentTable rows={payments.filter((payment) => payment.customerId === order.customerId)} /> : null}
+            {activeTab === 'deliveries' ? tabLoading === 'deliveries' ? <EmptyState description="Loading related deliveries..." title="Loading deliveries" /> : tabError ? <EmptyState description={tabError} title="Deliveries unavailable" /> : <GdnTable rows={deliveries.filter((gdn) => gdn.sourceOrder === order.soNumber || gdn.sourceOrder === order.id)} /> : null}
+            {activeTab === 'invoices' ? tabLoading === 'invoices' ? <EmptyState description="Loading related invoices..." title="Loading invoices" /> : tabError ? <EmptyState description={tabError} title="Invoices unavailable" /> : <SalesInvoiceTable rows={invoices.filter((invoice) => invoice.sourceReference === order.soNumber || invoice.sourceReference === order.id)} /> : null}
+            {activeTab === 'payments' ? tabLoading === 'payments' ? <EmptyState description="Loading customer payments..." title="Loading payments" /> : tabError ? <EmptyState description={tabError} title="Payments unavailable" /> : <SalesPaymentTable rows={payments.filter((payment) => payment.customerId === order.customerId)} /> : null}
             {activeTab === 'documents' ? <SalesSourceReferencePanel reference={order.soNumber} /> : null}
             {activeTab === 'workflow' ? <><SalesWorkflowActions entityId={order.id} entityType="sales_order" status={order.status} /><EmptyState description="Finance posting is posted through the backend workflow action for this sales order." title="Finance preview source-scoped" /></> : null}
-            {activeTab === 'audit' ? <SalesActivityTimeline rows={history} /> : null}
+            {activeTab === 'audit' ? tabLoading === 'audit' ? <EmptyState description="Loading audit timeline..." title="Loading audit" /> : tabError ? <EmptyState description={tabError} title="Audit unavailable" /> : <SalesActivityTimeline rows={history} /> : null}
         </div>
     );
 }

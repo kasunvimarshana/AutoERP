@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
 import { DataToolbar, type DataToolbarFilterValue } from '../../../shared/components/data/DataToolbar';
@@ -86,12 +86,57 @@ export function GdnDetailPage() {
     const [history, setHistory] = useState<SalesAuditEntry[]>([]);
     const [invoices, setInvoices] = useState<SalesInvoice[]>([]);
     const [activeTab, setActiveTab] = useState('overview');
+    const [tabError, setTabError] = useState('');
+    const [tabLoading, setTabLoading] = useState('');
+    const loadedTabsRef = useRef(new Set<string>());
 
     useEffect(() => {
-        salesApi.deliveries.get(id).then((response) => setGdn(response.data));
-        salesApi.invoices.list().then((response) => setInvoices(response.data));
-        salesApi.deliveries.history(id).then((response) => setHistory(response.data));
+        let mounted = true;
+        loadedTabsRef.current.clear();
+        setActiveTab('overview');
+        setGdn(undefined);
+        salesApi.deliveries.get(id).then((response) => {
+            if (mounted) setGdn(response.data);
+        });
+        return () => {
+            mounted = false;
+        };
     }, [id]);
+
+    useEffect(() => {
+        if (!gdn || !['invoices', 'history'].includes(activeTab) || loadedTabsRef.current.has(activeTab)) {
+            return;
+        }
+
+        const currentGdn = gdn;
+        let mounted = true;
+        setTabLoading(activeTab);
+        setTabError('');
+
+        async function loadTab(): Promise<void> {
+            try {
+                if (activeTab === 'invoices') {
+                    const response = await salesApi.invoices.list({ perPage: 20, search: currentGdn.gdnNumber });
+                    if (mounted) setInvoices(response.data);
+                } else {
+                    const response = await salesApi.deliveries.history(id).catch(() => ({ data: [] }));
+                    if (mounted) setHistory(response.data);
+                }
+
+                if (mounted) loadedTabsRef.current.add(activeTab);
+            } catch (caught: unknown) {
+                if (mounted) setTabError(caught instanceof Error ? caught.message : 'Unable to load tab data.');
+            } finally {
+                if (mounted) setTabLoading('');
+            }
+        }
+
+        void loadTab();
+
+        return () => {
+            mounted = false;
+        };
+    }, [activeTab, gdn, id]);
 
     if (!gdn) {
         return <EmptyState description="Loading delivery details..." title="Loading" />;
@@ -105,9 +150,9 @@ export function GdnDetailPage() {
             {activeTab === 'lines' ? <GdnLineTable rows={gdn.lines} /> : null}
             {activeTab === 'source' ? <SalesSourceReferencePanel reference={gdn.sourceOrder} /> : null}
             {activeTab === 'inventory' ? <EmptyState description="Inventory effect is posted through the backend workflow action for this delivery." title="Inventory effect source-scoped" /> : null}
-            {activeTab === 'invoices' ? <SalesInvoiceTable rows={invoices.filter((invoice) => invoice.sourceReference === gdn.gdnNumber || invoice.sourceReference === gdn.id)} /> : null}
+            {activeTab === 'invoices' ? tabLoading === 'invoices' ? <EmptyState description="Loading related invoices..." title="Loading invoices" /> : tabError ? <EmptyState description={tabError} title="Invoices unavailable" /> : <SalesInvoiceTable rows={invoices.filter((invoice) => invoice.sourceReference === gdn.gdnNumber || invoice.sourceReference === gdn.id)} /> : null}
             {activeTab === 'documents' ? <SalesSourceReferencePanel reference={gdn.gdnNumber} /> : null}
-            {activeTab === 'history' ? <SalesActivityTimeline rows={history} /> : null}
+            {activeTab === 'history' ? tabLoading === 'history' ? <EmptyState description="Loading audit timeline..." title="Loading audit" /> : tabError ? <EmptyState description={tabError} title="Audit unavailable" /> : <SalesActivityTimeline rows={history} /> : null}
         </div>
     );
 }

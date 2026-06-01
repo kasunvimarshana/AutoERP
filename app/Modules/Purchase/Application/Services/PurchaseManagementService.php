@@ -378,6 +378,54 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
         }
     }
 
+    public function getDashboardSummary(int $tenantId, ?int $organizationUnitId): Result
+    {
+        try {
+            if ($tenantId < 1) {
+                return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'tenant_id is required.'));
+            }
+
+            $criteria = ['tenant_id' => $tenantId];
+            if ($organizationUnitId !== null) {
+                $criteria['organization_unit_id'] = $organizationUnitId;
+            }
+
+            $orders = $this->purchaseOrderRepository->list($criteria);
+            $grns = $this->grnHeaderRepository->list($criteria);
+            $returns = $this->purchaseReturnRepository->list($criteria);
+            $documentLinks = $this->purchaseDocumentLinkRepository->list(array_merge($criteria, [
+                'source_line_id' => null,
+                'document_line_id' => null,
+                'status' => 'active',
+            ]));
+
+            return Result::success([
+                [
+                    'label' => 'Purchase orders',
+                    'value' => (string) count($orders),
+                    'status' => $this->statusSummary($orders),
+                ],
+                [
+                    'label' => 'Open GRNs',
+                    'value' => (string) count(array_filter($grns, static fn (DataRecord $row): bool => ! in_array((string) $row->get('status'), ['cancelled', 'reversed', 'documented'], true))),
+                    'status' => $this->statusSummary($grns),
+                ],
+                [
+                    'label' => 'Supplier invoices',
+                    'value' => (string) count($documentLinks),
+                    'status' => 'document-linked',
+                ],
+                [
+                    'label' => 'Purchase returns',
+                    'value' => (string) count($returns),
+                    'status' => $this->statusSummary($returns),
+                ],
+            ]);
+        } catch (Throwable $exception) {
+            return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, $exception->getMessage()));
+        }
+    }
+
     public function getPurchaseSettings(int $tenantId, ?int $organizationUnitId): Result
     {
         try {
@@ -401,6 +449,21 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
         } catch (Throwable $exception) {
             return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, $exception->getMessage()));
         }
+    }
+
+    /**
+     * @param  list<DataRecord>  $records
+     */
+    private function statusSummary(array $records): string
+    {
+        $active = 0;
+        foreach ($records as $record) {
+            if (! in_array((string) $record->get('status'), ['cancelled', 'closed', 'reversed'], true)) {
+                $active++;
+            }
+        }
+
+        return $active > 0 ? $active.' active' : 'clear';
     }
 
     public function upsertPurchaseSettings(array $payload): Result

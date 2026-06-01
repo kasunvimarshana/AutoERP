@@ -1,7 +1,6 @@
 import type { ApiCollectionResponse, ApiPreviewResponse, ApiResponse } from '../../../services/api/apiResponse';
 import { getStoredAuthSession, getStoredOrganizationUnitId, getStoredTenantId } from '../../../services/api/authTokenStorage';
 import { httpClient } from '../../../services/api/httpClient';
-import { documentApi } from '../../document/services/documentApi';
 import { inventoryApi } from '../../inventory/services/inventoryApi';
 import { itemApi } from '../../item/services/itemApi';
 import { supplierApi } from '../../supplier/services/supplierApi';
@@ -32,6 +31,7 @@ import type {
     PurchaseReturnFormInput,
     PurchaseReturnLine,
     PurchaseSettings,
+    PurchaseSettingsFormInput,
     SupplierRefund,
 } from '../types/purchase.types';
 
@@ -42,8 +42,6 @@ type LookupContext = {
     uoms: Map<string, PurchaseLookupOption>;
     warehouses: Map<string, PurchaseLookupOption>;
 };
-
-let lookupCache: Promise<LookupContext> | null = null;
 
 function asRecord(value: unknown): BackendRecord {
     return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as BackendRecord : {};
@@ -99,6 +97,10 @@ function directLabel(raw: BackendRecord, keys: string[], fallback = ''): string 
     return fallback;
 }
 
+function recordArray(value: unknown): BackendRecord[] {
+    return Array.isArray(value) ? value.filter((row): row is BackendRecord => row !== null && typeof row === 'object' && !Array.isArray(row)) : [];
+}
+
 function normalizeLookup(id: unknown, code: unknown, name: unknown, fallback: string): PurchaseLookupOption {
     const normalizedId = asString(id);
     const normalizedCode = asString(code);
@@ -111,34 +113,18 @@ function normalizeLookup(id: unknown, code: unknown, name: unknown, fallback: st
     };
 }
 
-async function lookupContext(): Promise<LookupContext> {
-    if (!lookupCache) {
-        lookupCache = Promise.all([
-            supplierApi.listSuppliers({ perPage: 200 }),
-            itemApi.listItems({ perPage: 200 }),
-            itemApi.listUoms(),
-            inventoryApi.listWarehouses(),
-        ]).then(([suppliers, items, uoms, warehouses]) => ({
-            items: new Map(items.data.map((item) => [item.id, normalizeLookup(item.id, item.code, item.name, 'Item')])),
-            suppliers: new Map(suppliers.data.map((supplier) => [supplier.id, normalizeLookup(supplier.id, supplier.code, supplier.displayName || supplier.name, 'Supplier')])),
-            uoms: new Map(uoms.data.map((uom) => [uom.id, normalizeLookup(uom.id, uom.symbol, uom.name, 'UOM')])),
-            warehouses: new Map(warehouses.data.map((warehouse) => [warehouse.id, normalizeLookup(warehouse.id, warehouse.secondary, warehouse.label, 'Warehouse')])),
-        }));
-    }
-
-    return lookupCache;
-}
-
-export function clearPurchaseLookupCache(): void {
-    lookupCache = null;
+function emptyLookupContext(): LookupContext {
+    return {
+        items: new Map(),
+        suppliers: new Map(),
+        uoms: new Map(),
+        warehouses: new Map(),
+    };
 }
 
 function normalizeOrderLine(raw: BackendRecord, lookups: LookupContext, index = 0): PurchaseOrderLine {
     const itemId = asString(raw.item_id);
     const uomId = asString(raw.uom_id);
-    const ordered = Number(raw.ordered_qty ?? raw.quantity ?? 0);
-    const received = Number(raw.received_qty ?? 0);
-    const remaining = Math.max(0, ordered - received);
 
     return {
         backendConvertedQuantity: money(raw.base_quantity ?? raw.converted_quantity ?? raw.ordered_qty),
@@ -149,7 +135,7 @@ function normalizeOrderLine(raw: BackendRecord, lookups: LookupContext, index = 
         lineTotal: money(raw.line_total ?? raw.line_total_with_tax),
         orderedQuantity: money(raw.ordered_qty ?? raw.quantity),
         receivedQuantity: money(raw.received_qty),
-        remainingQuantity: money(raw.remaining_quantity ?? remaining),
+        remainingQuantity: money(raw.remaining_quantity ?? raw.available_quantity ?? raw.open_quantity),
         taxAmount: money(raw.tax_amount),
         unitPrice: money(raw.unit_price),
         uom: directLabel(raw, ['uom_label', 'uom_symbol', 'uom_code', 'uom_name']) || lookupLabel(lookups.uoms, uomId, 'UOM not loaded'),
@@ -170,7 +156,7 @@ function normalizeOrder(raw: BackendRecord, lookups: LookupContext, lines: Backe
         id: asString(raw.id),
         lines: lines.map((line, index) => normalizeOrderLine(line, lookups, index)),
         orderDate: asString(raw.order_date ?? raw.po_date),
-        poNumber: asString(raw.po_number ?? raw.purchase_order_number, `PO-${asString(raw.id)}`),
+        poNumber: asString(raw.po_number ?? raw.purchase_order_number, 'Unnumbered purchase order'),
         status: asString(raw.status, 'draft') as PurchaseOrder['status'],
         supplier: directLabel(raw, ['supplier_label', 'supplier_name', 'supplier_code']) || lookupLabel(lookups.suppliers, supplierId, 'Supplier not loaded'),
         supplierId,
@@ -207,11 +193,11 @@ function normalizeGrn(raw: BackendRecord, lookups: LookupContext, lines: Backend
         creditNoteTotal: money(raw.credit_note_total),
         debitNoteTotal: money(raw.debit_note_total),
         grnDate: asString(raw.received_date ?? raw.grn_date),
-        grnNumber: asString(raw.grn_number, `GRN-${asString(raw.id)}`),
+        grnNumber: asString(raw.grn_number, 'Unnumbered GRN'),
         id: asString(raw.id),
         inventoryStatus: asString(raw.inventory_status ?? raw.putaway_status ?? raw.status, 'draft'),
         lines: lines.map((line, index) => normalizeGrnLine(line, lookups, index)),
-        sourcePo: asString(raw.purchase_order_number ?? raw.purchase_order_id),
+        sourcePo: asString(raw.purchase_order_number ?? raw.source_reference, raw.purchase_order_id ? 'Linked purchase order' : ''),
         status: asString(raw.status, 'draft') as GoodsReceivedNote['status'],
         supplier: directLabel(raw, ['supplier_label', 'supplier_name', 'supplier_code']) || lookupLabel(lookups.suppliers, supplierId, 'Supplier not loaded'),
         supplierId,
@@ -242,6 +228,9 @@ function normalizeInvoiceLine(raw: BackendRecord, lookups: LookupContext, index 
 
 function normalizeInvoice(raw: BackendRecord, lookups: LookupContext, lines: BackendRecord[] = []): PurchaseInvoice {
     const supplierId = asString(raw.supplier_id ?? raw.party_id);
+    const purchaseLink = asRecord(raw.purchase_link);
+    const sourceType = asString(raw.source_type ?? purchaseLink.source_type);
+    const sourceId = asString(raw.source_id ?? purchaseLink.source_id);
 
     return {
         balance: money(raw.balance ?? raw.outstanding_amount),
@@ -250,10 +239,12 @@ function normalizeInvoice(raw: BackendRecord, lookups: LookupContext, lines: Bac
         grandTotal: money(raw.grand_total ?? raw.linked_amount ?? raw.total_amount),
         id: asString(raw.id ?? raw.document_id),
         invoiceDate: asString(raw.invoice_date ?? raw.document_date ?? raw.created_at).slice(0, 10),
-        invoiceNumber: asString(raw.invoice_number ?? raw.document_number ?? raw.source_reference, `PINV-${asString(raw.id ?? raw.document_id)}`),
+        invoiceNumber: asString(raw.invoice_number ?? raw.document_number ?? raw.source_reference, 'Unnumbered supplier invoice'),
         lines: lines.map((line, index) => normalizeInvoiceLine(line, lookups, index)),
         paidAmount: money(raw.paid_amount ?? raw.allocated_amount),
-        sourceReference: asString(raw.source_reference ?? raw.source_type),
+        sourceId,
+        sourceReference: asString(raw.source_reference ?? raw.document_number, sourceType ? 'Linked purchase source' : ''),
+        sourceType,
         status: asString(raw.status, 'draft') as PurchaseInvoice['status'],
         supplier: directLabel(raw, ['supplier_label', 'supplier_name', 'party_label']) || lookupLabel(lookups.suppliers, supplierId, 'Supplier not loaded'),
         supplierId,
@@ -313,7 +304,7 @@ function normalizeReturn(raw: BackendRecord, lookups: LookupContext, lines: Back
         debitNoteTotal: money(raw.debit_note_total),
         id: asString(raw.id),
         lines: lines.map((line, index) => normalizeReturnLine(line, lookups, index)),
-        returnNumber: asString(raw.return_number, `PRET-${asString(raw.id)}`),
+        returnNumber: asString(raw.return_number, 'Unnumbered purchase return'),
         returnTotal: money(raw.grand_total),
         sourceReference: asString(raw.source_reference ?? raw.original_document_id ?? raw.original_grn_id ?? raw.original_purchase_order_id),
         status: asString(raw.status, 'draft') as PurchaseReturn['status'],
@@ -321,6 +312,18 @@ function normalizeReturn(raw: BackendRecord, lookups: LookupContext, lines: Back
         supplierId,
         updatedAt: asString(raw.updated_at),
     };
+}
+
+function workflowStatus(action: string): string {
+    return {
+        approve: 'approved',
+        cancel: 'cancelled',
+        close: 'closed',
+        confirm: 'confirmed',
+        post: 'posted',
+        reverse: 'reversed',
+        submit: 'submitted',
+    }[action] ?? action;
 }
 
 function ledgerNotesFromSource(
@@ -463,32 +466,14 @@ async function returnLines(returnId: string): Promise<BackendRecord[]> {
 export const purchaseApi = {
     dashboard: {
         summary: async (): Promise<ApiCollectionResponse<PurchaseDashboardMetric>> => {
-            const [orders, grns, invoices, payments, returns] = await Promise.allSettled([
-                purchaseApi.orders.list({ perPage: 1 }),
-                purchaseApi.grns.list({ perPage: 1 }),
-                purchaseApi.invoices.list({ perPage: 1 }),
-                purchaseApi.payments.list({ perPage: 1 }),
-                purchaseApi.returns.list({ perPage: 1 }),
-            ]);
-            const total = (result: PromiseSettledResult<ApiCollectionResponse<unknown>>) => result.status === 'fulfilled'
-                ? String(result.value.meta?.total ?? result.value.data.length)
-                : 'Unavailable';
-
-            return {
-                data: [
-                    { label: 'Purchase Orders', status: 'active', value: total(orders) },
-                    { label: 'GRNs', status: 'posted', value: total(grns) },
-                    { label: 'Supplier Invoices', status: 'posted', value: total(invoices) },
-                    { label: 'Supplier Payments', status: 'posted', value: total(payments) },
-                    { label: 'Purchase Returns', status: 'draft', value: total(returns) },
-                ],
-            };
+            const response = await httpClient<ApiCollectionResponse<PurchaseDashboardMetric>>('/api/purchase/dashboard/summary', { query: contextQuery() });
+            return { ...response, data: response.data.map((metric) => ({ label: asString(metric.label), status: asString(metric.status, 'active'), value: asString(metric.value, '0') })) };
         },
     },
     lookups: {
         items: async () => {
-            const ctx = await lookupContext();
-            return { data: Array.from(ctx.items.values()) };
+            const response = await itemApi.listItems({ perPage: 50 });
+            return { data: response.data.map((item) => normalizeLookup(item.id, item.code, item.name, 'Item')) };
         },
         itemUoms: async (itemId: string) => {
             const response = await itemApi.getItemUnits(itemId);
@@ -499,37 +484,60 @@ export const purchaseApi = {
             })).filter((unit) => unit.id && !unit.id.startsWith('base-uom'));
             return { data };
         },
-        suppliers: async () => ({ data: Array.from((await lookupContext()).suppliers.values()) }),
-        uoms: async () => ({ data: Array.from((await lookupContext()).uoms.values()) }),
-        warehouses: async () => ({ data: Array.from((await lookupContext()).warehouses.values()) }),
+        suppliers: async () => {
+            const response = await supplierApi.listSuppliers({ perPage: 50 });
+            return { data: response.data.map((supplier) => normalizeLookup(supplier.id, supplier.code, supplier.displayName || supplier.name, 'Supplier')) };
+        },
+        uoms: async () => {
+            const response = await itemApi.listUoms();
+            return { data: response.data.map((uom) => normalizeLookup(uom.id, uom.symbol, uom.name, 'UOM')) };
+        },
+        warehouses: async () => {
+            const response = await inventoryApi.listWarehouses();
+            return { data: response.data.map((warehouse) => normalizeLookup(warehouse.id, warehouse.secondary, warehouse.label, 'Warehouse')) };
+        },
+        purchaseOrders: async () => {
+            const response = await purchaseApi.orders.list({ perPage: 20 });
+            return { data: response.data.map((order) => ({ id: order.id, label: `${order.poNumber} - ${order.supplier}`, secondary: order.status })) };
+        },
+        grns: async () => {
+            const response = await purchaseApi.grns.list({ perPage: 20 });
+            return { data: response.data.map((grn) => ({ id: grn.id, label: `${grn.grnNumber} - ${grn.supplier}`, secondary: grn.status })) };
+        },
+        payableDocuments: async (supplierId?: string) => {
+            const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/purchase/lookups/payable-documents', { query: contextQuery({ supplier_id: asOptionalNumber(supplierId) }) });
+            return {
+                data: response.data.map((row) => ({
+                    id: asString(row.document_id ?? row.id ?? row.source_id),
+                    label: asString(row.document_number ?? row.source_reference, 'Payable document'),
+                    secondary: money(row.outstanding_amount ?? row.balance ?? row.grand_total),
+                })),
+            };
+        },
     },
     orders: {
         list: async (query: PurchaseListQuery = {}): Promise<ApiCollectionResponse<PurchaseOrder>> => {
-            const [response, lookups] = await Promise.all([
-                httpClient<ApiCollectionResponse<BackendRecord>>('/api/purchase/purchase-orders', {
-                    query: contextQuery({ page: query.page, per_page: query.perPage ?? 50, po_number: query.search, status: query.status }),
-                }),
-                lookupContext(),
-            ]);
+            const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/purchase/purchase-orders', {
+                query: contextQuery({ page: query.page, per_page: query.perPage ?? 50, po_number: query.search, status: query.status }),
+            });
+            const lookups = emptyLookupContext();
             return collection(response, (row) => normalizeOrder(row, lookups));
         },
         get: async (id: string): Promise<ApiResponse<PurchaseOrder>> => {
-            const [response, lines, lookups] = await Promise.all([
+            const [response, lines] = await Promise.all([
                 httpClient<ApiResponse<BackendRecord>>(`/api/purchase/purchase-orders/${id}`),
                 orderLines(id),
-                lookupContext(),
             ]);
+            const lookups = emptyLookupContext();
             return { ...response, data: normalizeOrder(response.data, lookups, lines) };
         },
         createWithLines: async (input: PurchaseOrderFormInput) => {
-            clearPurchaseLookupCache();
             const response = await httpClient<ApiResponse<BackendRecord>>('/api/purchase/purchase-orders/with-lines', { body: orderPayload(input), method: 'POST' });
-            return { ...response, data: normalizeOrder(response.data, await lookupContext()) };
+            return { ...response, data: normalizeOrder(response.data, emptyLookupContext()) };
         },
         updateWithLines: async (id: string, input: PurchaseOrderFormInput) => {
-            clearPurchaseLookupCache();
             const response = await httpClient<ApiResponse<BackendRecord>>(`/api/purchase/purchase-orders/${id}/with-lines`, { body: orderPayload(input), method: 'PUT' });
-            return { ...response, data: normalizeOrder(response.data, await lookupContext()) };
+            return { ...response, data: normalizeOrder(response.data, emptyLookupContext()) };
         },
         history: async (id: string): Promise<ApiCollectionResponse<PurchaseAuditEntry>> => {
             const response = await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/purchase/workflows/purchase_order/${id}/history`, { query: contextQuery() });
@@ -541,33 +549,31 @@ export const purchaseApi = {
                 type: asString(row.type ?? row.status, 'workflow'),
             }));
         },
-        transition: (id: string, action: string) => httpClient<ApiResponse<unknown>>(`/api/purchase/workflows/purchase_order/${id}/transition`, { body: contextPayload({ action }), method: 'POST' }),
+        transition: (id: string, action: string) => httpClient<ApiResponse<unknown>>(`/api/purchase/workflows/purchase_order/${id}/transition`, { body: contextPayload({ status: workflowStatus(action) }), method: 'POST' }),
     },
     grns: {
         list: async (query: PurchaseListQuery = {}): Promise<ApiCollectionResponse<GoodsReceivedNote>> => {
-            const [response, lookups] = await Promise.all([
-                httpClient<ApiCollectionResponse<BackendRecord>>('/api/purchase/grn-headers', {
-                    query: contextQuery({ grn_number: query.search, page: query.page, per_page: query.perPage ?? 50, status: query.status }),
-                }),
-                lookupContext(),
-            ]);
+            const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/purchase/grn-headers', {
+                query: contextQuery({ grn_number: query.search, page: query.page, per_page: query.perPage ?? 50, status: query.status }),
+            });
+            const lookups = emptyLookupContext();
             return collection(response, (row) => normalizeGrn(row, lookups));
         },
         get: async (id: string): Promise<ApiResponse<GoodsReceivedNote>> => {
-            const [response, lines, lookups] = await Promise.all([
+            const [response, lines] = await Promise.all([
                 httpClient<ApiResponse<BackendRecord>>(`/api/purchase/grn-headers/${id}`),
                 grnLines(id),
-                lookupContext(),
             ]);
+            const lookups = emptyLookupContext();
             return { ...response, data: normalizeGrn(response.data, lookups, lines) };
         },
         createDirect: async (input: GrnFormInput) => {
             const response = await httpClient<ApiResponse<BackendRecord>>('/api/purchase/grn-headers/with-lines', { body: grnPayload(input), method: 'POST' });
-            return { ...response, data: normalizeGrn(response.data, await lookupContext()) };
+            return { ...response, data: normalizeGrn(response.data, emptyLookupContext()) };
         },
         updateWithLines: async (id: string, input: GrnFormInput) => {
             const response = await httpClient<ApiResponse<BackendRecord>>(`/api/purchase/grn-headers/${id}/with-lines`, { body: grnPayload(input), method: 'PUT' });
-            return { ...response, data: normalizeGrn(response.data, await lookupContext()) };
+            return { ...response, data: normalizeGrn(response.data, emptyLookupContext()) };
         },
         history: async (id: string): Promise<ApiCollectionResponse<PurchaseAuditEntry>> => {
             const response = await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/purchase/workflows/grn_header/${id}/history`, { query: contextQuery() });
@@ -580,62 +586,19 @@ export const purchaseApi = {
             }));
         },
         postInventory: (id: string) => httpClient<ApiResponse<unknown>>(`/api/purchase/workflows/grn_header/${id}/inventory/post`, { body: contextPayload(), method: 'POST' }),
-        transition: (id: string, action: string) => httpClient<ApiResponse<unknown>>(`/api/purchase/workflows/grn_header/${id}/transition`, { body: contextPayload({ action }), method: 'POST' }),
+        transition: (id: string, action: string) => httpClient<ApiResponse<unknown>>(`/api/purchase/workflows/grn_header/${id}/transition`, { body: contextPayload({ status: workflowStatus(action) }), method: 'POST' }),
     },
     invoices: {
-        list: async (_query: PurchaseListQuery = {}): Promise<ApiCollectionResponse<PurchaseInvoice>> => {
-            const [response, lookups] = await Promise.all([
-                documentApi.listDocuments(),
-                lookupContext(),
-            ]);
-            const purchaseDocuments = response.data.filter((document) => (
-                document.sourceModule === 'purchase'
-                || ['purchase_invoice', 'supplier_invoice'].includes(document.typeCode)
-                || ['purchase_order', 'grn_header', 'purchase_return'].includes(document.sourceType)
-            ));
-
-            return {
-                data: purchaseDocuments.map((document) => normalizeInvoice({
-                    document_date: document.documentDate,
-                    document_id: document.id,
-                    document_number: document.documentNumber,
-                    due_date: document.dueDate,
-                    grand_total: document.grandTotal,
-                    source_reference: document.sourceReference,
-                    source_type: document.sourceType,
-                    status: document.status,
-                    updated_at: document.createdAt,
-                }, lookups)),
-                meta: response.meta,
-            };
+        list: async (query: PurchaseListQuery = {}): Promise<ApiCollectionResponse<PurchaseInvoice>> => {
+            const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/purchase/purchase-invoices', { query: contextQuery({ page: query.page, per_page: query.perPage ?? 50, search: query.search, status: query.status }) });
+            const lookups = emptyLookupContext();
+            return collection(response, (row) => normalizeInvoice(row, lookups, recordArray(row.line_links).length ? recordArray(row.line_links) : recordArray(row.items)));
         },
         get: async (id: string): Promise<ApiResponse<PurchaseInvoice>> => {
-            const lookups = await lookupContext();
-            const [document, lines] = await Promise.all([
-                documentApi.getDocument(id),
-                documentApi.listDocumentLines(id),
-            ]);
-            return {
-                data: normalizeInvoice({
-                    document_date: document.data.documentDate,
-                    document_id: document.data.id,
-                    document_number: document.data.documentNumber,
-                    due_date: document.data.dueDate,
-                    grand_total: document.data.grandTotal,
-                    source_reference: document.data.sourceReference,
-                    source_type: document.data.sourceType,
-                    status: document.data.status,
-                    updated_at: document.data.createdAt,
-                }, lookups, lines.data.map((line) => ({
-                    id: line.id,
-                    item_label: line.itemLabel,
-                    line_total: line.lineTotal,
-                    quantity: line.quantity,
-                    source_line_id: line.sourceLineId,
-                    unit_price: line.unitPrice,
-                    uom_label: line.uomLabel,
-                }))),
-            };
+            const response = await httpClient<ApiResponse<BackendRecord>>(`/api/purchase/purchase-invoices/${id}`, { query: contextQuery() });
+            const lookups = emptyLookupContext();
+            const lines = Array.isArray(response.data.line_links) ? response.data.line_links as BackendRecord[] : Array.isArray(response.data.items) ? response.data.items as BackendRecord[] : [];
+            return { ...response, data: normalizeInvoice(response.data, lookups, lines) };
         },
         preview: async (input: unknown): Promise<ApiPreviewResponse<unknown, PurchaseCalculationPreview['calculated']>> => {
             const response = await httpClient<ApiResponse<BackendRecord>>('/api/purchase/calculate-invoice', { body: contextPayload(asRecord(input)), method: 'POST' });
@@ -663,18 +626,16 @@ export const purchaseApi = {
     },
     payments: {
         list: async (query: PurchaseListQuery = {}): Promise<ApiCollectionResponse<PurchasePayment>> => {
-            const [response, lookups] = await Promise.all([
-                httpClient<ApiCollectionResponse<BackendRecord>>('/api/purchase/purchase-payments', { query: contextQuery({ page: query.page, per_page: query.perPage ?? 50, status: query.status }) }),
-                lookupContext(),
-            ]);
+            const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/purchase/purchase-payments', { query: contextQuery({ page: query.page, per_page: query.perPage ?? 50, status: query.status }) });
+            const lookups = emptyLookupContext();
             return collection(response, (row) => normalizePayment(row, lookups));
         },
         get: async (id: string): Promise<ApiResponse<PurchasePayment>> => {
-            const [response, allocations, lookups] = await Promise.all([
+            const [response, allocations] = await Promise.all([
                 httpClient<ApiResponse<BackendRecord>>(`/api/purchase/purchase-payments/${id}`),
                 httpClient<ApiCollectionResponse<BackendRecord>>(`/api/purchase/purchase-payments/${id}/allocations`, { query: contextQuery() }),
-                lookupContext(),
             ]);
+            const lookups = emptyLookupContext();
             return { ...response, data: normalizePayment(response.data, lookups, allocations.data) };
         },
         create: (input: PurchasePaymentFormInput) => httpClient<ApiResponse<unknown>>('/api/purchase/purchase-payments', {
@@ -703,7 +664,7 @@ export const purchaseApi = {
         list: async (): Promise<ApiCollectionResponse<PurchaseAdvance>> => {
             const response = await httpClient<ApiResponse<{ advances?: BackendRecord[] } | BackendRecord[]>>('/api/purchase/integrations/suppliers/advances', { query: contextQuery() });
             const raw = Array.isArray(response.data) ? response.data : Array.isArray(response.data.advances) ? response.data.advances : [];
-            const lookups = await lookupContext();
+            const lookups = emptyLookupContext();
             return {
                 data: raw.map((row, index) => ({
                     advanceNumber: asString(row.payment_number ?? row.reference_number, `ADV-${index + 1}`),
@@ -720,36 +681,46 @@ export const purchaseApi = {
     },
     returns: {
         list: async (query: PurchaseListQuery = {}): Promise<ApiCollectionResponse<PurchaseReturn>> => {
-            const [response, lookups] = await Promise.all([
-                httpClient<ApiCollectionResponse<BackendRecord>>('/api/purchase/purchase-returns', { query: contextQuery({ page: query.page, per_page: query.perPage ?? 50, return_number: query.search, status: query.status }) }),
-                lookupContext(),
-            ]);
+            const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/purchase/purchase-returns', { query: contextQuery({ page: query.page, per_page: query.perPage ?? 50, return_number: query.search, status: query.status }) });
+            const lookups = emptyLookupContext();
             return collection(response, (row) => normalizeReturn(row, lookups));
         },
         get: async (id: string): Promise<ApiResponse<PurchaseReturn>> => {
-            const [response, lines, lookups] = await Promise.all([
+            const [response, lines] = await Promise.all([
                 httpClient<ApiResponse<BackendRecord>>(`/api/purchase/purchase-returns/${id}`),
                 returnLines(id),
-                lookupContext(),
             ]);
+            const lookups = emptyLookupContext();
             return { ...response, data: normalizeReturn(response.data, lookups, lines) };
         },
         createWithLines: async (input: PurchaseReturnFormInput) => {
             const response = await httpClient<ApiResponse<BackendRecord>>('/api/purchase/purchase-returns/with-lines', { body: returnPayload(input), method: 'POST' });
-            return { ...response, data: normalizeReturn(response.data, await lookupContext()) };
+            return { ...response, data: normalizeReturn(response.data, emptyLookupContext()) };
         },
         updateWithLines: async (id: string, input: PurchaseReturnFormInput) => {
             const response = await httpClient<ApiResponse<BackendRecord>>(`/api/purchase/purchase-returns/${id}/with-lines`, { body: returnPayload(input), method: 'PUT' });
-            return { ...response, data: normalizeReturn(response.data, await lookupContext()) };
+            return { ...response, data: normalizeReturn(response.data, emptyLookupContext()) };
         },
         previewEffect: async (input: unknown): Promise<ApiPreviewResponse<unknown, BackendRecord>> => {
             const response = await httpClient<ApiResponse<BackendRecord[]>>('/api/purchase/lookups/returnable-lines', { query: contextQuery(asRecord(input) as Record<string, string | number | boolean | undefined>) });
             return { breakdown: response.data, calculated: { line_count: response.data.length }, errors: [], input, warnings: [] };
         },
-        transition: (id: string, action: string) => httpClient<ApiResponse<unknown>>(`/api/purchase/workflows/purchase_return/${id}/transition`, { body: contextPayload({ action }), method: 'POST' }),
+        transition: (id: string, action: string) => httpClient<ApiResponse<unknown>>(`/api/purchase/workflows/purchase_return/${id}/transition`, { body: contextPayload({ status: workflowStatus(action) }), method: 'POST' }),
     },
     refunds: {
-        list: async (): Promise<ApiCollectionResponse<SupplierRefund>> => ({ data: [] }),
+        list: async (query: PurchaseListQuery = {}): Promise<ApiCollectionResponse<SupplierRefund>> => {
+            const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/purchase/purchase-refunds', { query: contextQuery({ page: query.page, per_page: query.perPage ?? 50, search: query.search, status: query.status }) });
+            const lookups = emptyLookupContext();
+            return collection(response, (row) => ({
+                amount: money(row.amount),
+                id: asString(row.id),
+                method: asString(row.payment_method_name ?? row.payment_method ?? row.payment_method_id, 'Payment method'),
+                refundNumber: asString(row.payment_number ?? row.reference_number, 'Unnumbered refund'),
+                sourceReference: asString(row.reference ?? row.reference_number, 'Refund payment'),
+                status: asString(row.status, 'posted'),
+                supplier: lookupLabel(lookups.suppliers, row.party_id ?? row.supplier_id, 'Supplier not loaded'),
+            }));
+        },
         create: (input: unknown) => httpClient<ApiResponse<unknown>>('/api/purchase/purchase-refunds', { body: contextPayload(asRecord(input)), method: 'POST' }),
     },
     ledgerNotes: {
@@ -773,7 +744,10 @@ export const purchaseApi = {
             const response = await httpClient<ApiResponse<BackendRecord | null>>('/api/purchase/settings', { query: contextQuery() });
             return { ...response, data: normalizeSettings(asRecord(response.data)) };
         },
-        update: (input: unknown) => httpClient<ApiResponse<unknown>>('/api/purchase/settings', { body: contextPayload(asRecord(input)), method: 'PUT' }),
+        update: async (input: PurchaseSettingsFormInput) => {
+            const response = await httpClient<ApiResponse<BackendRecord>>('/api/purchase/settings', { body: contextPayload(input as unknown as BackendRecord), method: 'PUT' });
+            return { ...response, data: normalizeSettings(response.data) };
+        },
         initialize: () => httpClient<ApiResponse<unknown>>('/api/purchase/settings/initialize', { body: contextPayload(), method: 'POST' }),
     },
     previews: {

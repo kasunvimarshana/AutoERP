@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
 import { Button } from '../../../shared/components/ui/Button';
@@ -9,25 +9,29 @@ import { uomApi } from '../services/uomApi';
 export function UomDashboardPage() {
     const [summary, setSummary] = useState({ activeConversions: 0, baseUnits: 0, units: 0 });
     const [error, setError] = useState('');
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoaded, setIsLoaded] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
-    useEffect(() => {
-        let mounted = true;
-        Promise.all([uomApi.listUnits(), uomApi.listConversions()])
-            .then(([unitResponse, conversionResponse]) => {
-                if (mounted) {
-                    setSummary({
-                        activeConversions: conversionResponse.data.filter((conversion) => conversion.isActive).length,
-                        baseUnits: unitResponse.data.filter((unit) => unit.isBase).length,
-                        units: unitResponse.data.length,
-                    });
-                }
-            })
-            .catch((caught: unknown) => { if (mounted) setError(caught instanceof Error ? caught.message : 'Unable to load UOM summary.'); })
-            .finally(() => { if (mounted) setIsLoading(false); });
+    async function loadDashboardData(): Promise<void> {
+        if (isLoading) return;
 
-        return () => { mounted = false; };
-    }, []);
+        setIsLoading(true);
+        setError('');
+
+        try {
+            const [unitResponse, conversionResponse] = await Promise.all([uomApi.listUnits(), uomApi.listConversions()]);
+            setSummary({
+                activeConversions: conversionResponse.data.filter((conversion) => conversion.isActive).length,
+                baseUnits: unitResponse.data.filter((unit) => unit.isBase).length,
+                units: unitResponse.data.length,
+            });
+            setIsLoaded(true);
+        } catch (caught: unknown) {
+            setError(caught instanceof Error ? caught.message : 'Unable to load UOM summary.');
+        } finally {
+            setIsLoading(false);
+        }
+    }
 
     return (
         <div className="space-y-6">
@@ -37,9 +41,12 @@ export function UomDashboardPage() {
                 subtitle="Units and conversions for item, inventory, pricing, service, and rental contexts."
                 title="UOM"
             />
-            {isLoading ? <EmptyState description="Loading UOM summary..." title="Loading UOM" /> : null}
+            <div className="flex justify-end">
+                <Button disabled={isLoading} onClick={() => void loadDashboardData()} type="button" variant="secondary">{isLoaded ? 'Refresh Dashboard Data' : 'Load Dashboard Data'}</Button>
+            </div>
             {error ? <EmptyState description={error} title="UOM summary unavailable" /> : null}
-            {!isLoading && !error ? (
+            {!isLoaded && !error ? <EmptyState description="UOM summary loads only when requested." title="Dashboard data not loaded" /> : null}
+            {isLoaded && !error ? (
                 <div className="grid gap-4 md:grid-cols-3">
                     {[
                         ['Units', String(summary.units), '/uom/units'],

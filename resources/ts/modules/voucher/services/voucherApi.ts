@@ -1,5 +1,4 @@
 import type { ApiCollectionResponse, ApiPreviewResponse, ApiResponse } from '../../../services/api/apiResponse';
-import { ApiError } from '../../../services/api/apiErrors';
 import { httpClient } from '../../../services/api/httpClient';
 import { mockCollectionResponse, mockPreviewResponse, mockResponse } from '../../../services/mock/mockResponse';
 import {
@@ -31,24 +30,12 @@ function shouldUseMockOnly() {
     return VOUCHER_API_MODE === 'mock';
 }
 
-async function withMockFallback<T>(realCall: () => Promise<T>, mockCall: () => Promise<T>, fallbackStatuses = [401, 403, 404, 419, 422]): Promise<T> {
+async function withMockFallback<T>(realCall: () => Promise<T>, mockCall: () => Promise<T>): Promise<T> {
     if (shouldUseMockOnly()) {
         return mockCall();
     }
 
-    try {
-        return await realCall();
-    } catch (error) {
-        if (VOUCHER_API_MODE === 'real') {
-            throw error;
-        }
-
-        if (error instanceof ApiError && !fallbackStatuses.includes(error.status)) {
-            throw error;
-        }
-
-        return mockCall();
-    }
+    return realCall();
 }
 
 function asString(value: unknown, fallback = '') {

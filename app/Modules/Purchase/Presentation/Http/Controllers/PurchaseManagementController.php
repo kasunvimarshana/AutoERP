@@ -68,6 +68,16 @@ final class PurchaseManagementController extends Controller
         return $this->respond($this->service->getStatusHistory($entityType, $id, $tenantId));
     }
 
+    public function dashboardSummary(Request $request): JsonResponse
+    {
+        $tenantId = (int) ($request->input('tenant_id', 0));
+        $organizationUnitId = $request->has('organization_unit_id')
+            ? (int) $request->input('organization_unit_id')
+            : null;
+
+        return $this->respond($this->service->getDashboardSummary($tenantId, $organizationUnitId));
+    }
+
     public function showSettings(Request $request): JsonResponse
     {
         $tenantId = (int) ($request->input('tenant_id', 0));

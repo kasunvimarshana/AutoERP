@@ -239,7 +239,7 @@ export function EmployeeSummaryCard({ departments = [], designations = [], emplo
             </div>
             <div className="mt-5 grid gap-3 text-sm md:grid-cols-2">
                 {rows.map((row) => (
-                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3" key={row.label}>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3" key={`${employee.id}:${row.label}`}>
                         <p className="text-slate-500">{row.label}</p>
                         <p className="font-semibold text-slate-900">{row.value}</p>
                     </div>

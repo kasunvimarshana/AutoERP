@@ -22,6 +22,8 @@ interface PurchaseManagementServiceInterface
 
     public function getStatusHistory(string $entityType, int $entityId, int $tenantId): Result;
 
+    public function getDashboardSummary(int $tenantId, ?int $organizationUnitId): Result;
+
     public function getPurchaseSettings(int $tenantId, ?int $organizationUnitId): Result;
 
     public function upsertPurchaseSettings(array $payload): Result;
