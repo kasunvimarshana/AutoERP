@@ -3,17 +3,18 @@ import { Link } from 'react-router-dom';
 import { PreviewPanel } from '../../../shared/components/business/PreviewPanel';
 import { Button } from '../../../shared/components/ui/Button';
 import { JobCardTable, ServiceInvoiceTable, VehicleServiceDashboardCards, VehicleServicePageHeader } from '../components/VehicleServiceComponents';
-import { serviceInvoices } from '../mock/vehicleServiceMock';
 import { vehicleServiceApi } from '../services/vehicleServiceApi';
-import type { VehicleServiceDashboardMetric, VehicleServiceJobCard } from '../types/vehicleService.types';
+import type { VehicleServiceDashboardMetric, VehicleServiceInvoice, VehicleServiceJobCard } from '../types/vehicleService.types';
 
 export function VehicleServiceDashboardPage() {
     const [metrics, setMetrics] = useState<VehicleServiceDashboardMetric[]>([]);
     const [jobCards, setJobCards] = useState<VehicleServiceJobCard[]>([]);
+    const [serviceInvoices, setServiceInvoices] = useState<VehicleServiceInvoice[]>([]);
 
     useEffect(() => {
         vehicleServiceApi.dashboard.summary().then((response) => setMetrics(response.data));
         vehicleServiceApi.jobCards.list().then((response) => setJobCards(response.data));
+        vehicleServiceApi.invoices.list().then((response) => setServiceInvoices(response.data));
     }, []);
 
     return (

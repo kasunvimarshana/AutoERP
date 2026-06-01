@@ -1,25 +1,40 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { PreviewPanel } from '../../../shared/components/business/PreviewPanel';
 import { Button } from '../../../shared/components/ui/Button';
-import { getInvoiceById, getJobCardById } from '../mock/vehicleServiceMock';
 import { ServiceInvoiceDocumentPanel, ServiceInvoicePreviewPanel, VehicleServiceFinancePostingPanel, VehicleServicePageHeader } from '../components/VehicleServiceComponents';
 import { vehicleServiceApi } from '../services/vehicleServiceApi';
-import type { VehicleServiceInvoice } from '../types/vehicleService.types';
+import type { VehicleServiceInvoice, VehicleServiceJobCard } from '../types/vehicleService.types';
 
 export function ServiceInvoiceDetailPage() {
-    const { id = 'svc-inv-001' } = useParams();
-    const [invoice, setInvoice] = useState<VehicleServiceInvoice>(getInvoiceById(id));
-    const jobCard = getJobCardById(invoice.jobCardNumber);
+    const { id = '' } = useParams();
+    const [invoice, setInvoice] = useState<VehicleServiceInvoice>();
+    const [jobCard, setJobCard] = useState<VehicleServiceJobCard>();
+    const [error, setError] = useState<string>();
 
     useEffect(() => {
-        vehicleServiceApi.invoices.get(id).then((response) => setInvoice(response.data));
+        vehicleServiceApi.invoices.get(id)
+            .then((response) => {
+                setInvoice(response.data);
+                return vehicleServiceApi.jobCards.get(response.data.id);
+            })
+            .then((response) => setJobCard(response.data))
+            .catch((caught: unknown) => setError(caught instanceof Error ? caught.message : 'Unable to load service invoice.'));
     }, [id]);
+
+    if (error) {
+        return <EmptyState description={error} title="Service invoice unavailable" />;
+    }
+
+    if (!invoice || !jobCard) {
+        return <EmptyState description="Loading service invoice from backend..." title="Loading invoice" />;
+    }
 
     return (
         <div className="space-y-6">
             <VehicleServicePageHeader
-                actions={<><Link to="/vehicle-service/invoices"><Button variant="secondary">All Invoices</Button></Link><Button variant="blue">Generate Document</Button></>}
+                actions={<><Link to="/vehicle-service/invoices"><Button variant="secondary">All Invoices</Button></Link><Link to="/vehicle-service/invoices/new"><Button variant="blue">Generate Document</Button></Link></>}
                 subtitle="Readonly service invoice view. Official totals, document rendering, finance posting, and payment allocations are backend-owned."
                 title={invoice.invoiceNumber}
             />

@@ -8,21 +8,21 @@ final class VehicleServiceDocumentSeedCatalog
 {
     public const DEFAULT_TENANT_CODE = 'DEFAULT';
 
-    /** @return array<string, array{name: string, category: string}> */
+    /** @return array<string, array{name: string, description: string}> */
     public static function documentTypes(): array
     {
         return [
             'VEHICLE_SERVICE_JOBCARD' => [
                 'name' => 'Vehicle Service Job Card',
-                'category' => 'service',
+                'description' => 'Generic job card document generated from a vehicle service job.',
             ],
             'VEHICLE_SERVICE_INVOICE' => [
                 'name' => 'Vehicle Service Invoice',
-                'category' => 'sales',
+                'description' => 'Generic service invoice document generated from a vehicle service job.',
             ],
             'VEHICLE_SERVICE_REFUND' => [
                 'name' => 'Vehicle Service Refund',
-                'category' => 'sales',
+                'description' => 'Generic refund document generated from a vehicle service job payment context.',
             ],
         ];
     }

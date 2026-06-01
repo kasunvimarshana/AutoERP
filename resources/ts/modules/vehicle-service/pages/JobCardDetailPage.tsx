@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Button } from '../../../shared/components/ui/Button';
 import { Card } from '../../../shared/components/ui/Card';
 import { Tabs } from '../../../shared/components/ui/Tabs';
@@ -22,7 +23,6 @@ import {
     VehicleServicePartyContextPanel,
     VehicleServiceWorkflowActions,
 } from '../components/VehicleServiceComponents';
-import { getJobCardById } from '../mock/vehicleServiceMock';
 import { vehicleServiceApi } from '../services/vehicleServiceApi';
 import type { VehicleServiceJobCard } from '../types/vehicleService.types';
 
@@ -40,13 +40,32 @@ const detailTabs = [
 ];
 
 export function JobCardDetailPage() {
-    const { id = 'job-001' } = useParams();
+    const { id = '' } = useParams();
     const [activeTab, setActiveTab] = useState('overview');
-    const [jobCard, setJobCard] = useState<VehicleServiceJobCard>(getJobCardById(id));
+    const [jobCard, setJobCard] = useState<VehicleServiceJobCard>();
+    const [error, setError] = useState<string>();
+
+    function reload(): void {
+        if (!id) {
+            return;
+        }
+
+        vehicleServiceApi.jobCards.get(id)
+            .then((response) => setJobCard(response.data))
+            .catch((caught: unknown) => setError(caught instanceof Error ? caught.message : 'Unable to load job card.'));
+    }
 
     useEffect(() => {
-        vehicleServiceApi.jobCards.get(id).then((response) => setJobCard(response.data));
+        reload();
     }, [id]);
+
+    if (error) {
+        return <EmptyState description={error} title="Job card unavailable" />;
+    }
+
+    if (!jobCard) {
+        return <EmptyState description="Loading job card from backend..." title="Loading job card" />;
+    }
 
     return (
         <div className="space-y-6">
@@ -94,7 +113,7 @@ export function JobCardDetailPage() {
                     </Card>
                     <div className="space-y-5">
                         <VehicleServicePartyContextPanel jobCard={jobCard} />
-                        <VehicleServiceWorkflowActions jobCard={jobCard} />
+                        <VehicleServiceWorkflowActions jobCard={jobCard} onChanged={reload} />
                     </div>
                 </div>
             ) : null}

@@ -5,17 +5,34 @@ import { FormSection } from '../../../shared/components/forms/FormSection';
 import { Input } from '../../../shared/components/ui/Input';
 import { Textarea } from '../../../shared/components/ui/Textarea';
 import { DiagnosticsPanel, VehicleServicePageHeader } from '../components/VehicleServiceComponents';
-import { getJobCardById } from '../mock/vehicleServiceMock';
 import { vehicleServiceApi } from '../services/vehicleServiceApi';
 import type { VehicleServiceDiagnostic } from '../types/vehicleService.types';
 
 export function JobCardDiagnosticsPage() {
-    const { id = 'job-001' } = useParams();
-    const [rows, setRows] = useState<VehicleServiceDiagnostic[]>(getJobCardById(id).diagnostics);
+    const { id = '' } = useParams();
+    const [rows, setRows] = useState<VehicleServiceDiagnostic[]>([]);
+    const [form, setForm] = useState({ findings: '', phase: '', recommendation: '' });
+
+    function reload(): void {
+        vehicleServiceApi.diagnostics.list(id).then((response) => setRows(response.data));
+    }
 
     useEffect(() => {
-        vehicleServiceApi.diagnostics.list(id).then((response) => setRows(response.data as VehicleServiceDiagnostic[]));
+        reload();
     }, [id]);
+
+    async function save(): Promise<void> {
+        await vehicleServiceApi.diagnostics.upsert({
+            diagnostic_number: `DIAG-${Date.now()}`,
+            findings: form.findings,
+            job_card_id: Number(id),
+            phase: form.phase,
+            recommendation: form.recommendation,
+            status: 'draft',
+        });
+        setForm({ findings: '', phase: '', recommendation: '' });
+        reload();
+    }
 
     return (
         <div className="space-y-6">
@@ -26,10 +43,10 @@ export function JobCardDiagnosticsPage() {
             />
             <FormSection description="Create or update diagnostic findings against the job card." title="Diagnostic entry">
                 <div className="grid gap-4 md:grid-cols-2">
-                    <Input placeholder="Diagnostic phase" />
-                    <Input placeholder="Diagnostic type" />
-                    <Textarea placeholder="Findings" />
-                    <Textarea placeholder="Recommendation" />
+                    <Input onChange={(event) => setForm((current) => ({ ...current, phase: event.target.value }))} placeholder="Diagnostic phase" value={form.phase} />
+                    <Textarea onChange={(event) => setForm((current) => ({ ...current, findings: event.target.value }))} placeholder="Findings" value={form.findings} />
+                    <Textarea onChange={(event) => setForm((current) => ({ ...current, recommendation: event.target.value }))} placeholder="Recommendation" value={form.recommendation} />
+                    <Button onClick={save} variant="blue">Save Diagnostic</Button>
                 </div>
             </FormSection>
             <DiagnosticsPanel rows={rows} />

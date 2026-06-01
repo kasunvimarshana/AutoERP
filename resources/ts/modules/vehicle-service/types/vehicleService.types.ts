@@ -5,6 +5,7 @@ export type VehicleServiceJobCardStatus =
     | 'waiting_parts'
     | 'invoiceable'
     | 'completed'
+    | 'invoiced'
     | 'closed'
     | 'cancelled';
 
@@ -61,11 +62,14 @@ export type VehicleServiceJobCardLine = {
     id: string;
     invoiceable: boolean;
     item: string;
+    itemId?: string;
     lineType: VehicleServiceLineType;
     quantity: string;
     stockBehavior: string;
     taxPreview: string;
+    unitPrice?: string;
     uom: string;
+    uomId?: string;
 };
 
 export type VehicleServiceSparePartLine = VehicleServiceJobCardLine & {
@@ -244,4 +248,69 @@ export type VehicleServiceDashboardMetric = {
     label: string;
     tone: string;
     value: string;
+};
+
+export type VehicleServiceLookupOption = {
+    id: string;
+    label: string;
+    secondary?: string;
+};
+
+export type VehicleServiceJobCardLineFormInput = {
+    accountId?: string;
+    description: string;
+    discountType?: string;
+    discountValue?: string;
+    id?: string;
+    itemId: string;
+    lineType: VehicleServiceLineType;
+    quantity: string;
+    requiresStockMovement: boolean;
+    taxGroupId?: string;
+    unitCost?: string;
+    unitPrice: string;
+    uomId: string;
+    warehouseId?: string;
+};
+
+export type VehicleServiceJobCardFormInput = {
+    billingCustomerId: string;
+    billingCustomerName?: string;
+    billingCustomerType: VehicleServicePartyReference['type'];
+    customerComplaint: string;
+    expectedCompletion: string;
+    headerDiscountType?: string;
+    headerDiscountValue?: string;
+    headerTaxGroupId?: string;
+    initialDiagnosis: string;
+    jobCardNumber: string;
+    laborItems: VehicleServiceJobCardLineFormInput[];
+    lines: VehicleServiceJobCardLineFormInput[];
+    nextServiceDate: string;
+    nonInventoryItems: VehicleServiceJobCardLineFormInput[];
+    notes: string;
+    odometer: string;
+    openedAt: string;
+    payerId: string;
+    payerName?: string;
+    payerType: VehicleServicePartyReference['type'];
+    priceListId?: string;
+    priority: string;
+    receivedAt: string;
+    serviceCustomerId: string;
+    serviceCustomerName?: string;
+    serviceCustomerType: VehicleServicePartyReference['type'];
+    serviceTypeId: string;
+    status: VehicleServiceJobCardStatus;
+    supervisorId: string;
+    vehicleId: string;
+    warehouseId: string;
+};
+
+export type VehicleServicePaymentFormInput = {
+    amount: string;
+    documentId: string;
+    documentType: string;
+    jobCardId: string;
+    paymentId: string;
 };
