@@ -10,10 +10,17 @@ class PurchaseDocumentTypesSeeder extends Seeder
 {
     public function run(): void
     {
-        DB::table('document_types')->upsert(
-            PurchaseDocumentSeedCatalog::documentTypes(),
-            ['code'],
-            ['name', 'default_status', 'is_active', 'requires_source'],
-        );
+        foreach (PurchaseDocumentSeedCatalog::documentTypes() as $documentType) {
+            DB::table('document_types')->updateOrInsert(
+                ['code' => $documentType['code']],
+                [
+                    'default_status' => $documentType['default_status'],
+                    'is_active' => $documentType['is_active'],
+                    'name' => $documentType['name'],
+                    'requires_source' => $documentType['requires_source'],
+                    'updated_at' => now(),
+                ],
+            );
+        }
     }
 }

@@ -7,6 +7,7 @@ const grns = () => import('../../modules/purchase/pages/PurchaseGrnPages');
 const invoices = () => import('../../modules/purchase/pages/PurchaseInvoicePages');
 const payments = () => import('../../modules/purchase/pages/PurchasePaymentPages');
 const returns = () => import('../../modules/purchase/pages/PurchaseReturnPages');
+const ledgerNotes = () => import('../../modules/purchase/pages/PurchaseLedgerNotePages');
 const settings = () => lazyNamed(() => import('../../modules/purchase/pages/PurchaseSettingsPage'), 'PurchaseSettingsPage');
 
 export const purchaseRoutes: RouteObject[] = [
@@ -32,6 +33,8 @@ export const purchaseRoutes: RouteObject[] = [
     { element: lazyNamed(returns, 'PurchaseReturnListPage'), path: 'purchase/returns' },
     { element: lazyNamed(returns, 'PurchaseReturnCreatePage'), path: 'purchase/returns/new' },
     { element: lazyNamed(returns, 'PurchaseReturnDetailPage'), path: 'purchase/returns/:id' },
+    { element: lazyNamed(returns, 'PurchaseReturnEditPage'), path: 'purchase/returns/:id/edit' },
     { element: lazyNamed(payments, 'SupplierRefundListPage'), path: 'purchase/refunds' },
+    { element: lazyNamed(ledgerNotes, 'PurchaseLedgerNoteListPage'), path: 'purchase/ledger-notes' },
     { element: settings(), path: 'purchase/settings' },
 ];

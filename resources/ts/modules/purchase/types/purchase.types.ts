@@ -16,6 +16,7 @@ export type PurchaseOrderLine = {
     backendConvertedQuantity: string;
     discountAmount: string;
     id: string;
+    itemId?: string;
     item: string;
     lineTotal: string;
     orderedQuantity: string;
@@ -23,20 +24,26 @@ export type PurchaseOrderLine = {
     remainingQuantity: string;
     taxAmount: string;
     unitPrice: string;
+    uomId?: string;
     uom: string;
 };
 
 export type PurchaseOrder = {
     balance: string;
+    creditNoteTotal: string;
+    debitNoteTotal: string;
     expectedDate: string;
     grandTotal: string;
     id: string;
     lines: PurchaseOrderLine[];
     orderDate: string;
     poNumber: string;
+    supplierId?: string;
     status: PurchaseOrderStatus;
     supplier: string;
     updatedAt: string;
+    warehouse?: string;
+    warehouseId?: string;
     workflow: string;
 };
 
@@ -44,34 +51,43 @@ export type GoodsReceivedNoteLine = {
     acceptedQuantity: string;
     backendBaseQuantity: string;
     id: string;
+    itemId?: string;
     item: string;
     orderedQuantity?: string;
     rejectedQuantity: string;
     sourceLine?: string;
+    uomId?: string;
     uom: string;
 };
 
 export type GoodsReceivedNote = {
+    creditNoteTotal: string;
+    debitNoteTotal: string;
     grnDate: string;
     grnNumber: string;
     id: string;
     inventoryStatus: string;
     lines: GoodsReceivedNoteLine[];
     sourcePo?: string;
+    supplierId?: string;
     status: GrnStatus;
     supplier: string;
     updatedAt: string;
+    warehouse?: string;
+    warehouseId?: string;
 };
 
 export type PurchaseInvoiceLine = {
     discountAmount: string;
     id: string;
     invoiceQuantity: string;
+    itemId?: string;
     item: string;
     lineTotal: string;
     sourceLine?: string;
     taxAmount: string;
     unitPrice: string;
+    uomId?: string;
     uom: string;
 };
 
@@ -86,6 +102,7 @@ export type PurchaseInvoice = {
     lines: PurchaseInvoiceLine[];
     paidAmount: string;
     sourceReference?: string;
+    supplierId?: string;
     status: PurchaseInvoiceStatus;
     supplier: string;
     updatedAt: string;
@@ -108,6 +125,7 @@ export type PurchasePayment = {
     paymentNumber: string;
     reference: string;
     status: PurchasePaymentStatus;
+    supplierId?: string;
     supplier: string;
     unallocatedAmount: string;
 };
@@ -124,21 +142,38 @@ export type PurchaseAdvance = {
 export type PurchaseReturnLine = {
     backendReturnableQuantity: string;
     id: string;
+    itemId?: string;
     item: string;
     returnQuantity: string;
     sourceLine: string;
+    uomId?: string;
     uom: string;
 };
 
 export type PurchaseReturn = {
+    creditNoteTotal: string;
+    debitNoteTotal: string;
     id: string;
     returnNumber: string;
     returnTotal: string;
     sourceReference: string;
     status: PurchaseReturnStatus;
+    supplierId?: string;
     supplier: string;
     updatedAt: string;
     lines: PurchaseReturnLine[];
+};
+
+export type PurchaseLedgerNote = {
+    amount: string;
+    id: string;
+    noteType: 'credit' | 'debit';
+    sourceId: string;
+    sourceReference: string;
+    sourceType: 'grn_header' | 'purchase_order' | 'purchase_return';
+    status: string;
+    supplier: string;
+    updatedAt: string;
 };
 
 export type SupplierRefund = {
@@ -214,4 +249,79 @@ export type PurchaseDashboardMetric = {
     label: string;
     status: string;
     value: string;
+};
+
+export type PurchaseLookupOption = {
+    id: string;
+    label: string;
+    secondary?: string;
+};
+
+export type PurchaseListQuery = {
+    page?: number;
+    perPage?: number;
+    search?: string;
+    status?: string;
+};
+
+export type PurchaseLineFormInput = {
+    discountType?: string;
+    discountValue?: string;
+    itemId: string;
+    quantity: string;
+    unitPrice: string;
+    uomId: string;
+};
+
+export type PurchaseOrderFormInput = {
+    expectedDate?: string;
+    lines: PurchaseLineFormInput[];
+    notes?: string;
+    orderDate: string;
+    poNumber: string;
+    status?: string;
+    supplierId: string;
+    warehouseId: string;
+};
+
+export type GrnFormInput = {
+    grnDate: string;
+    grnNumber: string;
+    lines: PurchaseLineFormInput[];
+    notes?: string;
+    purchaseOrderId?: string;
+    status?: string;
+    supplierId: string;
+    warehouseId: string;
+};
+
+export type PurchaseReturnFormInput = {
+    lines: PurchaseLineFormInput[];
+    notes?: string;
+    returnDate: string;
+    returnNumber: string;
+    returnReason?: string;
+    sourceId?: string;
+    sourceType?: string;
+    status?: string;
+    supplierId: string;
+};
+
+export type PurchasePaymentFormInput = {
+    amount: string;
+    method: string;
+    paymentDate: string;
+    reference?: string;
+    sourceId?: string;
+    sourceType?: string;
+    supplierId: string;
+};
+
+export type PurchaseInvoiceFormInput = {
+    dueDate?: string;
+    invoiceDate: string;
+    lines: PurchaseLineFormInput[];
+    sourceId: string;
+    sourceType: 'grn_header' | 'purchase_order';
+    supplierInvoiceNumber?: string;
 };

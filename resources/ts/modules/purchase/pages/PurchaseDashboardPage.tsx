@@ -9,17 +9,20 @@ import {
     PurchaseInvoiceTable,
     PurchaseOrderTable,
 } from '../components/PurchaseComponents';
-import { grns, purchaseInvoices } from '../mock/purchaseMock';
 import { purchaseApi } from '../services/purchaseApi';
-import type { PurchaseDashboardMetric, PurchaseOrder } from '../types/purchase.types';
+import type { GoodsReceivedNote, PurchaseDashboardMetric, PurchaseInvoice, PurchaseOrder } from '../types/purchase.types';
 
 export function PurchaseDashboardPage() {
     const [metrics, setMetrics] = useState<PurchaseDashboardMetric[]>([]);
     const [orders, setOrders] = useState<PurchaseOrder[]>([]);
+    const [grns, setGrns] = useState<GoodsReceivedNote[]>([]);
+    const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
 
     useEffect(() => {
         purchaseApi.dashboard.summary().then((response) => setMetrics(response.data));
         purchaseApi.orders.list().then((response) => setOrders(response.data));
+        purchaseApi.grns.list().then((response) => setGrns(response.data));
+        purchaseApi.invoices.list().then((response) => setInvoices(response.data));
     }, []);
 
     return (
@@ -50,7 +53,7 @@ export function PurchaseDashboardPage() {
             </div>
             <div className="space-y-3">
                 <h2 className="text-base font-bold text-slate-950">Supplier Invoices</h2>
-                <PurchaseInvoiceTable rows={purchaseInvoices} />
+                <PurchaseInvoiceTable rows={invoices} />
             </div>
         </div>
     );

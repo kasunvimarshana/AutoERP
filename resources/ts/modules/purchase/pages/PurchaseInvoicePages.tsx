@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
-import { SearchFilterBar } from '../../../shared/components/data/SearchFilterBar';
+import { DataToolbar } from '../../../shared/components/data/DataToolbar';
 import { Tabs } from '../../../shared/components/ui/Tabs';
 import { Button } from '../../../shared/components/ui/Button';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
@@ -18,22 +18,32 @@ import {
     PurchaseSourceReferencePanel,
     PurchaseWorkflowActions,
 } from '../components/PurchaseComponents';
-import { financePostingPreview, purchaseActivity, purchasePayments, purchaseReturns } from '../mock/purchaseMock';
 import { purchaseApi } from '../services/purchaseApi';
-import type { PurchaseInvoice } from '../types/purchase.types';
+import type { PurchaseAuditEntry, PurchaseInvoice, PurchasePayment, PurchaseReturn } from '../types/purchase.types';
 
 export function PurchaseInvoiceListPage() {
     const [rows, setRows] = useState<PurchaseInvoice[]>([]);
+    const [query, setQuery] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState('');
 
     useEffect(() => {
-        purchaseApi.invoices.list().then((response) => setRows(response.data));
-    }, []);
+        let mounted = true;
+        setIsLoading(true);
+        purchaseApi.invoices.list({ search: query })
+            .then((response) => { if (mounted) setRows(response.data); })
+            .catch((caught: unknown) => { if (mounted) setError(caught instanceof Error ? caught.message : 'Unable to load supplier invoices.'); })
+            .finally(() => { if (mounted) setIsLoading(false); });
+        return () => { mounted = false; };
+    }, [query]);
 
     return (
         <div className="space-y-6">
             <PageHeader actions={<Link to="/purchase/invoices/new"><Button>Create Supplier Invoice</Button></Link>} eyebrow="Purchase" subtitle="Supplier invoices are payable authority. Backend previews totals, tax, discounts, UOM, AP, documents, and balances." title="Supplier Invoices" />
-            <SearchFilterBar placeholder="Search invoice number, supplier, source PO/GRN, status..." />
-            {rows.length ? <PurchaseInvoiceTable rows={rows} /> : <EmptyState description="No supplier invoices returned yet." title="No invoices" />}
+            <DataToolbar isLoading={isLoading} onSearchChange={setQuery} savedViewsDisabledReason="Saved views require a user-preferences backend for Purchase lists." searchPlaceholder="Search invoice number..." searchValue={query} />
+            {error ? <EmptyState description={error} title="Supplier invoice API unavailable" /> : null}
+            {!error && rows.length ? <PurchaseInvoiceTable rows={rows} /> : null}
+            {!error && !isLoading && !rows.length ? <EmptyState description="The current backend exposes source-scoped supplier invoices. Open invoice creation from a PO/GRN until a global invoice index endpoint is added." title="No invoices returned" /> : null}
         </div>
     );
 }
@@ -59,10 +69,16 @@ export function PurchaseInvoiceEditPage() {
 export function PurchaseInvoiceDetailPage() {
     const { id = 'pinv-001' } = useParams();
     const [invoice, setInvoice] = useState<PurchaseInvoice>();
+    const [payments, setPayments] = useState<PurchasePayment[]>([]);
+    const [returns, setReturns] = useState<PurchaseReturn[]>([]);
+    const [history, setHistory] = useState<PurchaseAuditEntry[]>([]);
     const [activeTab, setActiveTab] = useState('overview');
 
     useEffect(() => {
         purchaseApi.invoices.get(id).then((response) => setInvoice(response.data));
+        purchaseApi.payments.list().then((response) => setPayments(response.data));
+        purchaseApi.returns.list().then((response) => setReturns(response.data));
+        setHistory([]);
     }, [id]);
 
     if (!invoice) {
@@ -72,7 +88,7 @@ export function PurchaseInvoiceDetailPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                actions={<><Link to={`/purchase/invoices/${invoice.id}/edit`}><Button variant="secondary">Edit</Button></Link><Button variant="blue">Post via Backend</Button></>}
+                actions={<Link to={`/purchase/invoices/${invoice.id}/edit`}><Button variant="secondary">Edit</Button></Link>}
                 eyebrow="Supplier Invoice"
                 subtitle="Invoice detail with calculation preview, source matching, document, payment allocation, AP posting, returns, and audit."
                 title={invoice.invoiceNumber}
@@ -97,10 +113,10 @@ export function PurchaseInvoiceDetailPage() {
             {activeTab === 'calculation' ? <PurchaseInvoiceCalculationPanel /> : null}
             {activeTab === 'source' ? <PurchaseSourceReferencePanel reference={invoice.sourceReference} /> : null}
             {activeTab === 'document' ? <PurchaseInvoiceDocumentPanel /> : null}
-            {activeTab === 'payments' ? <PurchasePaymentTable rows={purchasePayments} /> : null}
-            {activeTab === 'finance' ? <PurchaseFinancePostingPanel preview={financePostingPreview} /> : null}
-            {activeTab === 'returns' ? <PurchaseReturnTable rows={purchaseReturns.filter((record) => record.sourceReference === invoice.invoiceNumber)} /> : null}
-            {activeTab === 'history' ? <PurchaseActivityTimeline rows={purchaseActivity} /> : null}
+            {activeTab === 'payments' ? <PurchasePaymentTable rows={payments.filter((payment) => payment.supplierId === invoice.supplierId)} /> : null}
+            {activeTab === 'finance' ? <EmptyState description="Posting preview requires a persisted purchase source context. Backend invoice detail is source-scoped." title="Finance preview unavailable" /> : null}
+            {activeTab === 'returns' ? <PurchaseReturnTable rows={returns.filter((record) => record.sourceReference === invoice.invoiceNumber || record.sourceReference === invoice.id)} /> : null}
+            {activeTab === 'history' ? <PurchaseActivityTimeline rows={history} /> : null}
         </div>
     );
 }

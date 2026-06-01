@@ -90,16 +90,21 @@ type DataToolbarProps = {
 };
 
 const debounceMs = 300;
+const emptyFilterValues: DataToolbarFilterValues = {};
+const emptyFilters: DataToolbarFilterConfig[] = [];
+const emptySavedViews: DataToolbarSavedView[] = [];
+const emptySortOptions: DataToolbarSortOption[] = [];
+const emptyColumnOptions: DataToolbarColumnOption[] = [];
 
 export function DataToolbar({
     actions,
     activeFilterChips,
-    columnOptions = [],
+    columnOptions = emptyColumnOptions,
     density = 'comfortable',
     disabled = false,
     exportDisabledReason = 'Export is not available for this list.',
-    filterValues = {},
-    filters = [],
+    filterValues = emptyFilterValues,
+    filters = emptyFilters,
     isLoading = false,
     onColumnVisibilityChange,
     onExport,
@@ -110,14 +115,14 @@ export function DataToolbar({
     onSavedViewChange,
     onSearchChange,
     onSortChange,
-    savedViews = [],
+    savedViews = emptySavedViews,
     savedViewsDisabledReason = 'Saved views are not configured for this list yet.',
     searchPlaceholder = 'Search records...',
     searchValue = '',
     secondaryActions,
     selectedSavedView = '',
     showExport = false,
-    sortOptions = [],
+    sortOptions = emptySortOptions,
     sortValue = '',
     variant = 'default',
 }: DataToolbarProps) {
@@ -132,7 +137,9 @@ export function DataToolbar({
 
     useEffect(() => {
         if (!filtersOpen) {
-            setDraftFilterValues(filterValues);
+            setDraftFilterValues((current) => (
+                filterValuesEqual(current, filterValues) ? current : filterValues
+            ));
         }
     }, [filterValues, filtersOpen]);
 
@@ -181,17 +188,23 @@ export function DataToolbar({
     }
 
     function resetFilters(): void {
-        setDraftFilterValues({});
+        setDraftFilterValues((current) => (
+            filterValuesEqual(current, emptyFilterValues) ? current : emptyFilterValues
+        ));
         onResetFilters?.();
     }
 
     function openFilters(): void {
-        setDraftFilterValues(filterValues);
+        setDraftFilterValues((current) => (
+            filterValuesEqual(current, filterValues) ? current : filterValues
+        ));
         setFiltersOpen(true);
     }
 
     function closeFilters(): void {
-        setDraftFilterValues(filterValues);
+        setDraftFilterValues((current) => (
+            filterValuesEqual(current, filterValues) ? current : filterValues
+        ));
         setFiltersOpen(false);
     }
 
@@ -536,6 +549,29 @@ function buildFilterChips(filters: DataToolbarFilterConfig[], filterValues: Data
 
         return [{ id: filter.id, label: filter.label, value: optionLabel(filter, value) }];
     });
+}
+
+function filterValuesEqual(left: DataToolbarFilterValues, right: DataToolbarFilterValues): boolean {
+    const leftKeys = Object.keys(left);
+    const rightKeys = Object.keys(right);
+
+    if (leftKeys.length !== rightKeys.length) {
+        return false;
+    }
+
+    return leftKeys.every((key) => filterValueEqual(left[key], right[key]));
+}
+
+function filterValueEqual(left: DataToolbarFilterValue, right: DataToolbarFilterValue): boolean {
+    if (Array.isArray(left) || Array.isArray(right)) {
+        if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
+            return false;
+        }
+
+        return left.every((entry, index) => entry === right[index]);
+    }
+
+    return left === right;
 }
 
 function optionLabel(filter: DataToolbarFilterConfig, value: string): string {
