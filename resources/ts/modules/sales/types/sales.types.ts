@@ -16,11 +16,13 @@ export type SalesSourceReference = {
 export type SalesQuotationLine = {
     discountAmount: string;
     id: string;
+    itemId?: string;
     item: string;
     lineTotal: string;
     quantity: string;
     taxAmount: string;
     unitPrice: string;
+    uomId?: string;
     uom: string;
 };
 
@@ -41,6 +43,7 @@ export type SalesOrderLine = {
     deliveredQuantity: string;
     discountAmount: string;
     id: string;
+    itemId?: string;
     item: string;
     lineTotal: string;
     orderedQuantity: string;
@@ -48,12 +51,16 @@ export type SalesOrderLine = {
     stockAvailability: string;
     taxAmount: string;
     unitPrice: string;
+    uomId?: string;
     uom: string;
 };
 
 export type SalesOrder = {
     balance: string;
+    creditNoteTotal: string;
+    customerId?: string;
     customer: string;
+    debitNoteTotal: string;
     expectedDate: string;
     grandTotal: string;
     id: string;
@@ -63,22 +70,29 @@ export type SalesOrder = {
     status: SalesOrderStatus;
     updatedAt: string;
     workflow: string;
+    warehouse?: string;
+    warehouseId?: string;
 };
 
 export type GoodsDeliveryNoteLine = {
     backendBaseQuantity: string;
     deliveredQuantity: string;
     id: string;
+    itemId?: string;
     item: string;
     orderedQuantity?: string;
     pickedQuantity: string;
     rejectedQuantity: string;
     sourceLine?: string;
+    uomId?: string;
     uom: string;
 };
 
 export type GoodsDeliveryNote = {
+    creditNoteTotal: string;
+    customerId?: string;
     customer: string;
+    debitNoteTotal: string;
     deliveryDate: string;
     gdnNumber: string;
     id: string;
@@ -87,6 +101,8 @@ export type GoodsDeliveryNote = {
     sourceOrder?: string;
     status: GdnStatus;
     updatedAt: string;
+    warehouse?: string;
+    warehouseId?: string;
 };
 
 export type SalesInvoiceLine = {
@@ -98,11 +114,14 @@ export type SalesInvoiceLine = {
     sourceLine?: string;
     taxAmount: string;
     unitPrice: string;
+    itemId?: string;
+    uomId?: string;
     uom: string;
 };
 
 export type SalesInvoice = {
     balance: string;
+    customerId?: string;
     customer: string;
     documentStatus: string;
     dueDate: string;
@@ -128,6 +147,7 @@ export type SalesPaymentAllocation = {
 export type SalesPayment = {
     allocations: SalesPaymentAllocation[];
     amount: string;
+    customerId?: string;
     customer: string;
     id: string;
     method: string;
@@ -150,14 +170,19 @@ export type CustomerAdvance = {
 export type SalesReturnLine = {
     backendReturnableQuantity: string;
     id: string;
+    itemId?: string;
     item: string;
     returnQuantity: string;
     sourceLine: string;
+    uomId?: string;
     uom: string;
 };
 
 export type SalesReturn = {
+    creditNoteTotal: string;
+    customerId?: string;
     customer: string;
+    debitNoteTotal: string;
     id: string;
     lines: SalesReturnLine[];
     returnNumber: string;
@@ -267,4 +292,91 @@ export type SalesDashboardMetric = {
     label: string;
     status: string;
     value: string;
+};
+
+export type SalesLookupOption = {
+    id: string;
+    label: string;
+    secondary?: string;
+};
+
+export type SalesListQuery = {
+    page?: number;
+    perPage?: number;
+    search?: string;
+    status?: string;
+};
+
+export type SalesLineFormInput = {
+    discountType?: string;
+    discountValue?: string;
+    itemId: string;
+    quantity: string;
+    unitPrice: string;
+    uomId: string;
+};
+
+export type SalesOrderFormInput = {
+    customerId: string;
+    expectedDate?: string;
+    lines: SalesLineFormInput[];
+    notes?: string;
+    orderDate: string;
+    soNumber: string;
+    status?: string;
+    warehouseId: string;
+};
+
+export type GdnFormInput = {
+    customerId: string;
+    deliveryDate: string;
+    gdnNumber: string;
+    lines: SalesLineFormInput[];
+    notes?: string;
+    salesOrderId?: string;
+    status?: string;
+    warehouseId: string;
+};
+
+export type SalesInvoiceFormInput = {
+    dueDate?: string;
+    invoiceDate: string;
+    lines: SalesLineFormInput[];
+    sourceId: string;
+    sourceType: 'gdn_header' | 'sales_order';
+    customerReference?: string;
+};
+
+export type SalesPaymentFormInput = {
+    amount: string;
+    customerId: string;
+    method: string;
+    paymentDate: string;
+    reference?: string;
+    sourceId?: string;
+    sourceType?: string;
+};
+
+export type SalesReturnFormInput = {
+    customerId: string;
+    lines: SalesLineFormInput[];
+    notes?: string;
+    returnDate: string;
+    returnNumber: string;
+    returnReason?: string;
+    sourceId?: string;
+    sourceType?: string;
+    status?: string;
+};
+
+export type SalesLedgerNote = {
+    amount: string;
+    id: string;
+    noteType: 'credit' | 'debit';
+    sourceId: string;
+    sourceReference: string;
+    sourceType: 'gdn_header' | 'sales_order' | 'sales_return';
+    status: string;
+    customer: string;
+    updatedAt: string;
 };

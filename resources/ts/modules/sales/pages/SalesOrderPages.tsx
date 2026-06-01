@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
-import { SearchFilterBar } from '../../../shared/components/data/SearchFilterBar';
+import { DataToolbar, type DataToolbarFilterValue } from '../../../shared/components/data/DataToolbar';
 import { Tabs } from '../../../shared/components/ui/Tabs';
 import { Button } from '../../../shared/components/ui/Button';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
@@ -20,22 +20,49 @@ import {
     SalesStockAvailabilityPanel,
     SalesWorkflowActions,
 } from '../components/SalesComponents';
-import { creditCheckPreview, financePostingPreview, gdns, salesActivity, salesInvoices, salesPayments, stockAvailabilityPreview } from '../mock/salesMock';
 import { salesApi } from '../services/salesApi';
-import type { SalesOrder } from '../types/sales.types';
+import type { GoodsDeliveryNote, SalesAuditEntry, SalesInvoice, SalesOrder, SalesPayment } from '../types/sales.types';
 
 export function SalesOrderListPage() {
     const [rows, setRows] = useState<SalesOrder[]>([]);
+    const [query, setQuery] = useState('');
+    const [status, setStatus] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState('');
 
     useEffect(() => {
-        salesApi.orders.list().then((response) => setRows(response.data));
-    }, []);
+        let mounted = true;
+        setIsLoading(true);
+        setError('');
+        salesApi.orders.list({ search: query, status })
+            .then((response) => { if (mounted) setRows(response.data); })
+            .catch((caught: unknown) => { if (mounted) setError(caught instanceof Error ? caught.message : 'Unable to load sales orders.'); })
+            .finally(() => { if (mounted) setIsLoading(false); });
+        return () => { mounted = false; };
+    }, [query, status]);
+
+    function updateFilter(filterId: string, value: DataToolbarFilterValue): void {
+        if (filterId === 'status') setStatus(typeof value === 'string' ? value : '');
+    }
 
     return (
         <div className="space-y-6">
             <PageHeader actions={<Link to="/sales/orders/new"><Button>Create SO</Button></Link>} eyebrow="Sales" subtitle="Customer commitments, credit checks, pricing previews, reservations, approvals, and flexible downstream delivery/invoice flows." title="Sales Orders" />
-            <SearchFilterBar placeholder="Search SO number, customer, status, item..." />
-            {rows.length ? <SalesOrderTable rows={rows} /> : <EmptyState description="No sales orders returned yet." title="No sales orders" />}
+            <DataToolbar
+                filterValues={{ status }}
+                filters={[{ id: 'status', label: 'Status', options: ['draft', 'submitted', 'approved', 'partially_delivered', 'delivered', 'closed', 'cancelled', 'reversed'].map((value) => ({ label: value, value })), type: 'status' }]}
+                isLoading={isLoading}
+                onFilterChange={updateFilter}
+                onRemoveFilter={() => setStatus('')}
+                onResetFilters={() => setStatus('')}
+                onSearchChange={setQuery}
+                savedViewsDisabledReason="Saved views require a user-preferences backend for Sales lists."
+                searchPlaceholder="Search SO number, customer, status, item..."
+                searchValue={query}
+            />
+            {error ? <EmptyState description={error} title="Sales order API unavailable" /> : null}
+            {!error && rows.length ? <SalesOrderTable rows={rows} /> : null}
+            {!error && !isLoading && !rows.length ? <EmptyState description="No sales orders returned yet." title="No sales orders" /> : null}
         </div>
     );
 }
@@ -61,10 +88,18 @@ export function SalesOrderEditPage() {
 export function SalesOrderDetailPage() {
     const { id = 'so-001' } = useParams();
     const [order, setOrder] = useState<SalesOrder>();
+    const [deliveries, setDeliveries] = useState<GoodsDeliveryNote[]>([]);
+    const [history, setHistory] = useState<SalesAuditEntry[]>([]);
+    const [invoices, setInvoices] = useState<SalesInvoice[]>([]);
+    const [payments, setPayments] = useState<SalesPayment[]>([]);
     const [activeTab, setActiveTab] = useState('overview');
 
     useEffect(() => {
         salesApi.orders.get(id).then((response) => setOrder(response.data));
+        salesApi.deliveries.list().then((response) => setDeliveries(response.data));
+        salesApi.invoices.list().then((response) => setInvoices(response.data));
+        salesApi.payments.list().then((response) => setPayments(response.data));
+        salesApi.orders.history(id).then((response) => setHistory(response.data));
     }, [id]);
 
     if (!order) {
@@ -89,14 +124,14 @@ export function SalesOrderDetailPage() {
                 ]}
                 onChange={setActiveTab}
             />
-            {activeTab === 'overview' ? <><SalesOrderSummaryCard order={order} /><SalesCreditCheckPanel result={creditCheckPreview} /><SalesStockAvailabilityPanel preview={stockAvailabilityPreview} /></> : null}
+            {activeTab === 'overview' ? <><SalesOrderSummaryCard order={order} /><SalesCreditCheckPanel /><SalesStockAvailabilityPanel /></> : null}
             {activeTab === 'lines' ? <SalesOrderLineTable rows={order.lines} /> : null}
-            {activeTab === 'deliveries' ? <GdnTable rows={gdns.filter((gdn) => gdn.sourceOrder === order.soNumber)} /> : null}
-            {activeTab === 'invoices' ? <SalesInvoiceTable rows={salesInvoices.filter((invoice) => invoice.sourceReference === 'GDN-2026-0007')} /> : null}
-            {activeTab === 'payments' ? <SalesPaymentTable rows={salesPayments} /> : null}
+            {activeTab === 'deliveries' ? <GdnTable rows={deliveries.filter((gdn) => gdn.sourceOrder === order.soNumber || gdn.sourceOrder === order.id)} /> : null}
+            {activeTab === 'invoices' ? <SalesInvoiceTable rows={invoices.filter((invoice) => invoice.sourceReference === order.soNumber || invoice.sourceReference === order.id)} /> : null}
+            {activeTab === 'payments' ? <SalesPaymentTable rows={payments.filter((payment) => payment.customerId === order.customerId)} /> : null}
             {activeTab === 'documents' ? <SalesSourceReferencePanel reference={order.soNumber} /> : null}
-            {activeTab === 'workflow' ? <><SalesWorkflowActions entityId={order.id} entityType="sales_order" status={order.status} /><SalesFinancePostingPanel preview={financePostingPreview} /></> : null}
-            {activeTab === 'audit' ? <SalesActivityTimeline rows={salesActivity} /> : null}
+            {activeTab === 'workflow' ? <><SalesWorkflowActions entityId={order.id} entityType="sales_order" status={order.status} /><EmptyState description="Finance posting is posted through the backend workflow action for this sales order." title="Finance preview source-scoped" /></> : null}
+            {activeTab === 'audit' ? <SalesActivityTimeline rows={history} /> : null}
         </div>
     );
 }

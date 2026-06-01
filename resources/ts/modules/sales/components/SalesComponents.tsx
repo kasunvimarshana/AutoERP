@@ -1,20 +1,24 @@
-import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { PreviewPanel } from '../../../shared/components/business/PreviewPanel';
 import { StatusBadge } from '../../../shared/components/business/StatusBadge';
 import { DataTable, type DataTableColumn } from '../../../shared/components/data/DataTable';
 import { FormSection } from '../../../shared/components/forms/FormSection';
 import { Button } from '../../../shared/components/ui/Button';
 import { Card } from '../../../shared/components/ui/Card';
+import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Input } from '../../../shared/components/ui/Input';
 import { Select } from '../../../shared/components/ui/Select';
 import { Textarea } from '../../../shared/components/ui/Textarea';
+import { ApiError } from '../../../services/api/apiErrors';
+import { salesApi } from '../services/salesApi';
 import type {
     CustomerAdvance,
     CustomerRefund,
     GoodsDeliveryNote,
     GoodsDeliveryNoteLine,
     SalesAuditEntry,
+    SalesCalculationPreview,
     SalesCreditCheckResult,
     SalesDashboardMetric,
     SalesFinancePostingPreview,
@@ -22,15 +26,22 @@ import type {
     SalesInvoice,
     SalesInvoiceLine,
     SalesOrder,
+    SalesOrderFormInput,
     SalesOrderLine,
     SalesPayment,
     SalesPaymentAllocation,
+    SalesPaymentFormInput,
     SalesQuotation,
     SalesQuotationLine,
     SalesReturn,
+    SalesReturnFormInput,
     SalesReturnLine,
     SalesSettings,
     SalesStockAvailabilityPreview,
+    GdnFormInput,
+    SalesInvoiceFormInput,
+    SalesLineFormInput,
+    SalesLookupOption,
 } from '../types/sales.types';
 
 export function SalesDashboardCards({ metrics }: { metrics: SalesDashboardMetric[] }) {
@@ -53,22 +64,10 @@ export function SalesDashboardCards({ metrics }: { metrics: SalesDashboardMetric
 
 export function SalesQuotationForm() {
     return (
-        <form className="space-y-5">
-            <FormSection description="Quotation/proforma is a clean frontend placeholder until backend quotation endpoints are added." title="Quotation Header">
-                <div className="grid gap-4 md:grid-cols-3">
-                    <Field label="Customer"><Input placeholder="Select customer" /></Field>
-                    <Field label="Quotation date"><Input type="date" defaultValue="2026-05-30" /></Field>
-                    <Field label="Expiry date"><Input type="date" /></Field>
-                    <Field label="Price list"><Input placeholder="Backend price list" /></Field>
-                    <Field label="Status"><Select><option>Draft</option><option>Send</option></Select></Field>
-                    <Field label="Notes"><Textarea placeholder="Quotation notes" /></Field>
-                </div>
-            </FormSection>
-            <FormSection description="Pricing, discounts, tax, and totals are previewed by backend when quotation APIs exist." title="Quotation Lines">
-                <SalesQuotationLineTable rows={[draftQuotationLine]} />
-                <div className="mt-4 flex justify-end gap-3"><Button variant="secondary">Save Draft</Button><Button variant="blue">Preview Price</Button></div>
-            </FormSection>
-        </form>
+        <EmptyState
+            description="This repository does not contain a Sales quotation migration, service, controller, or API route. Sales order, delivery, invoice, payment, and return flows are connected to real backend APIs."
+            title="Quotation backend unavailable"
+        />
     );
 }
 
@@ -77,26 +76,81 @@ export function SalesQuotationLineTable({ rows }: { rows: SalesQuotationLine[] }
 }
 
 export function SalesOrderForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const { errors, globalError, isLoading, lookups } = useSalesLookups();
+    const [isSaving, setIsSaving] = useState(false);
+    const [values, setValues] = useState<SalesOrderFormInput>(() => ({
+        customerId: '',
+        expectedDate: '',
+        lines: [emptyLine()],
+        notes: '',
+        orderDate: today(),
+        soNumber: `SO-${Date.now()}`,
+        status: 'draft',
+        warehouseId: '',
+    }));
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    const [submitError, setSubmitError] = useState('');
+
+    useEffect(() => {
+        if (mode !== 'edit' || !id) return;
+        salesApi.orders.get(id).then((response) => {
+            const order = response.data;
+            setValues({
+                customerId: order.customerId ?? '',
+                expectedDate: order.expectedDate,
+                lines: order.lines.length ? order.lines.map((line) => ({ itemId: line.itemId ?? '', quantity: line.orderedQuantity, unitPrice: line.unitPrice, uomId: line.uomId ?? '' })) : [emptyLine()],
+                notes: '',
+                orderDate: order.orderDate,
+                soNumber: order.soNumber,
+                status: order.status,
+                warehouseId: order.warehouseId ?? '',
+            });
+        }).catch((caught: unknown) => setSubmitError(errorMessage(caught, 'Unable to load sales order.')));
+    }, [id, mode]);
+
+    function setField<K extends keyof SalesOrderFormInput>(field: K, value: SalesOrderFormInput[K]): void {
+        setValues((current) => ({ ...current, [field]: value }));
+    }
+
+    async function submit(event: FormEvent): Promise<void> {
+        event.preventDefault();
+        setIsSaving(true);
+        setFieldErrors({});
+        setSubmitError('');
+        try {
+            const response = mode === 'edit' && id
+                ? await salesApi.orders.updateWithLines(id, values)
+                : await salesApi.orders.createWithLines(values);
+            navigate(`/sales/orders/${response.data.id}`);
+        } catch (caught) {
+            setFieldErrors(extractFieldErrors(caught));
+            setSubmitError(errorMessage(caught, 'Unable to save sales order.'));
+        } finally {
+            setIsSaving(false);
+        }
+    }
+
     return (
-        <form className="space-y-5">
-            <FormSection description="Customer eligibility, credit, stock availability, pricing, and workflow defaults are backend validated." title="Sales Order Header">
+        <form className="space-y-5" onSubmit={(event) => void submit(event)}>
+            {globalError || submitError ? <FormError message={submitError || globalError} /> : null}
+            <FormSection description="Customer, warehouse, pricing, UOM, stock, tax, totals, and workflow are backend validated." title="Sales Order Header">
                 <div className="grid gap-4 md:grid-cols-3">
-                    <Field label="Customer"><Input placeholder="Select customer" /></Field>
-                    <Field label="Order date"><Input type="date" defaultValue="2026-05-30" /></Field>
-                    <Field label="Expected delivery"><Input type="date" /></Field>
-                    <Field label="Payment term"><Input placeholder="Backend customer/default term" /></Field>
-                    <Field label="Warehouse"><Input placeholder="Default warehouse" /></Field>
-                    <Field label="Workflow"><Select><option>Save as draft</option><option>Submit for approval</option></Select></Field>
-                    <Field label="Notes"><Textarea placeholder="Delivery notes, customer PO, internal remarks" /></Field>
+                    <Field error={fieldErrors.customer_id} label="Customer"><LookupSelect disabled={isLoading} onChange={(value) => setField('customerId', value)} options={lookups.customers} placeholder="Select customer" value={values.customerId} /></Field>
+                    <Field error={fieldErrors.so_number} label="SO number"><Input onChange={(event) => setField('soNumber', event.target.value)} value={values.soNumber} /></Field>
+                    <Field error={fieldErrors.order_date} label="Order date"><Input onChange={(event) => setField('orderDate', event.target.value)} type="date" value={values.orderDate} /></Field>
+                    <Field error={fieldErrors.requested_delivery_date} label="Expected delivery"><Input onChange={(event) => setField('expectedDate', event.target.value)} type="date" value={values.expectedDate ?? ''} /></Field>
+                    <Field error={fieldErrors.warehouse_id} label="Warehouse"><LookupSelect disabled={isLoading} onChange={(value) => setField('warehouseId', value)} options={lookups.warehouses} placeholder="Select warehouse" value={values.warehouseId} /></Field>
+                    <Field error={fieldErrors.status} label="Workflow"><Select onChange={(event) => setField('status', event.target.value)} value={values.status}><option value="draft">Draft</option><option value="submitted">Submit</option></Select></Field>
+                    <Field error={fieldErrors.notes} label="Notes"><Textarea onChange={(event) => setField('notes', event.target.value)} placeholder="Delivery notes, customer PO, internal remarks" value={values.notes ?? ''} /></Field>
                 </div>
             </FormSection>
             <SalesCreditCheckPanel />
-            <FormSection description="Frontend collects item, UOM, quantity, and price inputs. Backend resolves pricing, stock availability, discounts, tax, and totals." title="Order Lines">
-                <SalesOrderLineTable rows={[draftOrderLine]} />
+            <FormSection description="Frontend collects item, UOM, quantity, and price inputs. Backend resolves stock, discounts, tax, and totals." title="Order Lines">
+                <SalesLineEditor errors={fieldErrors} lines={values.lines} lookups={lookups} onChange={(lines) => setField('lines', lines)} quantityLabel="Ordered quantity" />
                 <div className="mt-4 flex flex-wrap justify-end gap-3">
-                    <Button variant="secondary">Save Draft</Button>
-                    <Button variant="blue">Preview Price / Stock</Button>
-                    <Button>{mode === 'edit' ? 'Update With Lines' : 'Create With Lines'}</Button>
+                    <Button disabled={isSaving} type="submit">{mode === 'edit' ? 'Update With Lines' : 'Create With Lines'}</Button>
                 </div>
             </FormSection>
         </form>
@@ -145,42 +199,121 @@ export function SalesOrderSummaryCard({ order }: { order: SalesOrder }) {
 }
 
 export function SalesWorkflowActions({ entityId, entityType, status }: { entityId: string; entityType: string; status: string }) {
+    const [message, setMessage] = useState('');
+    const [isBusy, setIsBusy] = useState(false);
+    const supported = entityType === 'sales_order' || entityType === 'gdn_header' || entityType === 'sales_return';
+
+    async function transition(action: string): Promise<void> {
+        if (!supported) return;
+        setIsBusy(true);
+        setMessage('');
+        try {
+            if (entityType === 'sales_order') await salesApi.orders.transition(entityId, action);
+            if (entityType === 'gdn_header') await salesApi.deliveries.transition(entityId, action);
+            if (entityType === 'sales_return') await salesApi.returns.transition(entityId, action);
+            setMessage(`${action} requested successfully.`);
+        } catch (caught) {
+            setMessage(errorMessage(caught, `Unable to ${action}.`));
+        } finally {
+            setIsBusy(false);
+        }
+    }
+
     return (
         <PreviewPanel
             rows={[
                 { label: 'Entity', value: `${entityType} / ${entityId}` },
                 { label: 'Current status', value: status },
-                { label: 'Allowed actions', value: 'Backend permission/status result' },
+                { label: 'Allowed actions', value: supported ? 'Backend validates transition permissions and status.' : 'Use the source document workflow for invoice status changes.' },
             ]}
             status="Workflow"
             title="Workflow Actions"
         >
+            {message ? <p className="mb-3 text-sm font-semibold text-slate-600">{message}</p> : null}
             <div className="flex flex-wrap gap-2">
-                <Button variant="blue">Submit</Button>
-                <Button variant="secondary">Approve</Button>
-                <Button variant="ghost">Cancel</Button>
-                <Button variant="ghost">Reverse</Button>
+                <Button disabled={!supported || isBusy} onClick={() => void transition('submit')} type="button" variant="blue">Submit</Button>
+                <Button disabled={!supported || isBusy} onClick={() => void transition('approve')} type="button" variant="secondary">Approve</Button>
+                <Button disabled={!supported || isBusy} onClick={() => void transition('cancel')} type="button" variant="ghost">Cancel</Button>
+                <Button disabled={!supported || isBusy} onClick={() => void transition('reverse')} type="button" variant="ghost">Reverse</Button>
             </div>
         </PreviewPanel>
     );
 }
 
 export function GdnForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const { errors: lookupError, globalError, isLoading, lookups } = useSalesLookups();
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    const [isSaving, setIsSaving] = useState(false);
+    const [submitError, setSubmitError] = useState('');
+    const [values, setValues] = useState<GdnFormInput>(() => ({
+        customerId: '',
+        deliveryDate: today(),
+        gdnNumber: `GDN-${Date.now()}`,
+        lines: [emptyLine()],
+        notes: '',
+        salesOrderId: '',
+        status: 'draft',
+        warehouseId: '',
+    }));
+
+    useEffect(() => {
+        if (mode !== 'edit' || !id) return;
+        salesApi.deliveries.get(id).then((response) => {
+            const delivery = response.data;
+            setValues({
+                customerId: delivery.customerId ?? '',
+                deliveryDate: delivery.deliveryDate,
+                gdnNumber: delivery.gdnNumber,
+                lines: delivery.lines.length ? delivery.lines.map((line) => ({ itemId: line.itemId ?? '', quantity: line.deliveredQuantity, unitPrice: '0', uomId: line.uomId ?? '' })) : [emptyLine()],
+                notes: '',
+                salesOrderId: delivery.sourceOrder && /^\d+$/.test(delivery.sourceOrder) ? delivery.sourceOrder : '',
+                status: delivery.status,
+                warehouseId: delivery.warehouseId ?? '',
+            });
+        }).catch((caught: unknown) => setSubmitError(errorMessage(caught, 'Unable to load delivery.')));
+    }, [id, mode]);
+
+    function setField<K extends keyof GdnFormInput>(field: K, value: GdnFormInput[K]): void {
+        setValues((current) => ({ ...current, [field]: value }));
+    }
+
+    async function submit(event: FormEvent): Promise<void> {
+        event.preventDefault();
+        setIsSaving(true);
+        setFieldErrors({});
+        setSubmitError('');
+        try {
+            const response = mode === 'edit' && id
+                ? await salesApi.deliveries.updateWithLines(id, values)
+                : await salesApi.deliveries.createDirect(values);
+            navigate(`/sales/deliveries/${response.data.id}`);
+        } catch (caught) {
+            setFieldErrors(extractFieldErrors(caught));
+            setSubmitError(errorMessage(caught, 'Unable to save delivery.'));
+        } finally {
+            setIsSaving(false);
+        }
+    }
+
     return (
-        <form className="space-y-5">
-            <FormSection description="GDN records quantity delivered. Backend validates sales order lines, stock availability, UOM, warehouse, batch/serial, and stock issue." title="Delivery / GDN Header">
+        <form className="space-y-5" onSubmit={(event) => void submit(event)}>
+            {globalError || lookupError || submitError ? <FormError message={submitError || globalError || lookupError} /> : null}
+            <FormSection description="GDN records delivered quantity. Backend validates order lines, stock, UOM, warehouse, and stock issue." title="Delivery / GDN Header">
                 <div className="grid gap-4 md:grid-cols-3">
-                    <Field label="Customer"><Input placeholder="Select customer" /></Field>
-                    <Field label="Source order optional"><Input placeholder="SO-2026-0001 or direct delivery" /></Field>
-                    <Field label="Delivery date"><Input type="date" defaultValue="2026-05-30" /></Field>
-                    <Field label="Warehouse"><Input placeholder="Issue warehouse" /></Field>
-                    <Field label="Picking status"><Select><option>Pending picking</option><option>Picked</option></Select></Field>
-                    <Field label="Notes"><Textarea placeholder="Dispatch notes" /></Field>
+                    <Field error={fieldErrors.customer_id} label="Customer"><LookupSelect disabled={isLoading} onChange={(value) => setField('customerId', value)} options={lookups.customers} placeholder="Select customer" value={values.customerId} /></Field>
+                    <Field label="Source order optional"><Input onChange={(event) => setField('salesOrderId', event.target.value)} placeholder="Persisted sales order id, if linked" value={values.salesOrderId ?? ''} /></Field>
+                    <Field error={fieldErrors.gdn_number} label="GDN number"><Input onChange={(event) => setField('gdnNumber', event.target.value)} value={values.gdnNumber} /></Field>
+                    <Field error={fieldErrors.delivery_date} label="Delivery date"><Input onChange={(event) => setField('deliveryDate', event.target.value)} type="date" value={values.deliveryDate} /></Field>
+                    <Field error={fieldErrors.warehouse_id} label="Warehouse"><LookupSelect disabled={isLoading} onChange={(value) => setField('warehouseId', value)} options={lookups.warehouses} placeholder="Issue warehouse" value={values.warehouseId} /></Field>
+                    <Field error={fieldErrors.status} label="Picking status"><Select onChange={(event) => setField('status', event.target.value)} value={values.status}><option value="draft">Draft</option><option value="picked">Picked</option></Select></Field>
+                    <Field error={fieldErrors.notes} label="Notes"><Textarea onChange={(event) => setField('notes', event.target.value)} placeholder="Dispatch notes" value={values.notes ?? ''} /></Field>
                 </div>
             </FormSection>
-            <FormSection description="Delivered/rejected quantities are submitted as inputs. Backend returns authoritative stock movement effect." title="Delivered Lines">
-                <GdnLineTable rows={[draftGdnLine]} />
-                <div className="mt-4 flex justify-end gap-3"><Button variant="secondary">Save Draft</Button><Button variant="blue">{mode === 'edit' ? 'Update GDN' : 'Create GDN'}</Button></div>
+            <FormSection description="Delivered quantities are submitted as inputs. Backend owns stock movement effects." title="Delivered Lines">
+                <SalesLineEditor errors={fieldErrors} lines={values.lines} lookups={lookups} onChange={(lines) => setField('lines', lines)} quantityLabel="Delivered quantity" />
+                <div className="mt-4 flex justify-end gap-3"><Button disabled={isSaving} type="submit" variant="blue">{mode === 'edit' ? 'Update GDN' : 'Create GDN'}</Button></div>
             </FormSection>
         </form>
     );
@@ -199,25 +332,72 @@ export function GdnInventoryEffectPanel({ effects }: { effects: SalesInventoryEf
 }
 
 export function SalesInvoiceForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
+    const navigate = useNavigate();
+    const { errors: lookupError, globalError, isLoading, lookups } = useSalesLookups();
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    const [isSaving, setIsSaving] = useState(false);
+    const [preview, setPreview] = useState<SalesCalculationPreview['calculated']>();
+    const [submitError, setSubmitError] = useState('');
+    const [values, setValues] = useState<SalesInvoiceFormInput>(() => ({
+        dueDate: '',
+        invoiceDate: today(),
+        lines: [emptyLine()],
+        sourceId: '',
+        sourceType: 'sales_order',
+    }));
+
+    function setField<K extends keyof SalesInvoiceFormInput>(field: K, value: SalesInvoiceFormInput[K]): void {
+        setValues((current) => ({ ...current, [field]: value }));
+    }
+
+    async function previewInvoice(): Promise<void> {
+        setSubmitError('');
+        try {
+            const response = await salesApi.invoices.preview({ lines: values.lines.map((line) => ({ quantity: Number(line.quantity), unit_price: Number(line.unitPrice) })) });
+            setPreview(response.calculated);
+        } catch (caught) {
+            setFieldErrors(extractFieldErrors(caught));
+            setSubmitError(errorMessage(caught, 'Unable to preview invoice.'));
+        }
+    }
+
+    async function submit(event: FormEvent): Promise<void> {
+        event.preventDefault();
+        setIsSaving(true);
+        setFieldErrors({});
+        setSubmitError('');
+        try {
+            const response = values.sourceType === 'gdn_header'
+                ? await salesApi.invoices.createFromDelivery(values.sourceId, values)
+                : await salesApi.invoices.createFromOrder(values.sourceId, values);
+            const created = asComponentRecord(response.data);
+            navigate(`/sales/invoices/${String(created.id ?? created.document_id ?? values.sourceId)}`);
+        } catch (caught) {
+            setFieldErrors(extractFieldErrors(caught));
+            setSubmitError(errorMessage(caught, 'Unable to save invoice.'));
+        } finally {
+            setIsSaving(false);
+        }
+    }
+
     return (
-        <form className="space-y-5">
-            <FormSection description="Supports direct invoice, invoice from sales order, GDN, or multiple GDNs according to backend settings." title="Customer Invoice Header">
+        <form className="space-y-5" onSubmit={(event) => void submit(event)}>
+            {globalError || lookupError || submitError ? <FormError message={submitError || globalError || lookupError} /> : null}
+            <FormSection description="Supports invoice from sales order or GDN according to backend settings." title="Customer Invoice Header">
                 <div className="grid gap-4 md:grid-cols-3">
-                    <Field label="Customer"><Input placeholder="Select customer" /></Field>
-                    <Field label="Invoice source"><Select><option>Direct invoice</option><option>From sales order</option><option>From GDN</option><option>From multiple GDNs</option></Select></Field>
-                    <Field label="Source reference"><Input placeholder="SO / GDN / document reference" /></Field>
-                    <Field label="Invoice date"><Input type="date" defaultValue="2026-05-30" /></Field>
-                    <Field label="Due date"><Input type="date" /></Field>
-                    <Field label="Customer PO/ref"><Input placeholder="Customer reference" /></Field>
-                    <Field label="Notes"><Textarea placeholder="Invoice notes" /></Field>
+                    <Field error={fieldErrors.source_type} label="Invoice source"><Select onChange={(event) => setField('sourceType', event.target.value as SalesInvoiceFormInput['sourceType'])} value={values.sourceType}><option value="sales_order">From sales order</option><option value="gdn_header">From GDN</option></Select></Field>
+                    <Field error={fieldErrors.source_id} label="Source id"><Input onChange={(event) => setField('sourceId', event.target.value)} placeholder="Persisted source id" value={values.sourceId} /></Field>
+                    <Field error={fieldErrors.invoice_date} label="Invoice date"><Input onChange={(event) => setField('invoiceDate', event.target.value)} type="date" value={values.invoiceDate} /></Field>
+                    <Field error={fieldErrors.due_date} label="Due date"><Input onChange={(event) => setField('dueDate', event.target.value)} type="date" value={values.dueDate ?? ''} /></Field>
+                    <Field label="Customer PO/ref"><Input onChange={(event) => setField('customerReference', event.target.value)} value={values.customerReference ?? ''} /></Field>
                 </div>
             </FormSection>
-            <FormSection description="Line amount, pricing, discounts, taxes, UOM conversion, receivable amount, and balances are previewed by backend only." title="Invoice Lines">
-                <SalesInvoiceLineTable rows={[draftInvoiceLine]} />
+            <FormSection description="Pricing, discounts, taxes, UOM conversion, receivable amount, and balances are previewed by backend only." title="Invoice Lines">
+                <SalesLineEditor errors={fieldErrors} lines={values.lines} lookups={lookups} onChange={(lines) => setField('lines', lines)} quantityLabel="Invoice quantity" />
+                {preview ? <PreviewPanel rows={[{ label: 'Subtotal', value: preview.subtotal }, { label: 'Discount', value: preview.discountTotal }, { label: 'Tax', value: preview.taxTotal }, { label: 'Grand total', value: preview.grandTotal }, { label: 'UOM', value: preview.uomConversion }]} status="Backend Preview" title="Invoice Calculation Preview" /> : null}
                 <div className="mt-4 flex flex-wrap justify-end gap-3">
-                    <Button variant="secondary">Save Draft</Button>
-                    <Button variant="blue">Preview Calculation</Button>
-                    <Button>{mode === 'edit' ? 'Update Invoice' : 'Create Invoice'}</Button>
+                    <Button disabled={isSaving} onClick={() => void previewInvoice()} type="button" variant="blue">Preview Calculation</Button>
+                    <Button disabled={isSaving || isLoading} type="submit">{mode === 'edit' ? 'Update Invoice' : 'Create Invoice'}</Button>
                 </div>
             </FormSection>
         </form>
@@ -232,14 +412,9 @@ export function SalesInvoiceCalculationPanel() {
     return (
         <PreviewPanel
             rows={[
-                { label: 'Pricing', value: 'Backend resolved' },
-                { label: 'Subtotal', value: 'Backend calculated' },
-                { label: 'Discount', value: 'Backend calculated' },
-                { label: 'Tax', value: 'Backend calculated' },
-                { label: 'Grand total', value: 'Backend calculated' },
-                { label: 'UOM conversion', value: 'Backend returned' },
+                { label: 'Source', value: 'Use the create/edit invoice form to request /api/sales/calculate-invoice with current line input.' },
             ]}
-            status="Backend Preview"
+            status="Backend endpoint"
             subtitle="Invoice total, price, discount, tax, UOM, and receivable values are never calculated in the frontend."
             title="Invoice Calculation Preview"
         />
@@ -263,33 +438,74 @@ export function SalesInvoiceDocumentPanel() {
 }
 
 export function SalesPaymentForm() {
+    const navigate = useNavigate();
+    const { errors: lookupError, globalError, isLoading, lookups } = useSalesLookups();
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    const [isSaving, setIsSaving] = useState(false);
+    const [preview, setPreview] = useState<Record<string, unknown>>();
+    const [submitError, setSubmitError] = useState('');
+    const [values, setValues] = useState<SalesPaymentFormInput>(() => ({ amount: '', customerId: '', method: 'bank_transfer', paymentDate: today(), reference: '', sourceId: '', sourceType: 'sales_invoice' }));
+
+    function setField<K extends keyof SalesPaymentFormInput>(field: K, value: SalesPaymentFormInput[K]): void {
+        setValues((current) => ({ ...current, [field]: value }));
+    }
+
+    async function previewAllocation(): Promise<void> {
+        setSubmitError('');
+        try {
+            const response = await salesApi.payments.previewAllocation({ amount: Number(values.amount), customer_id: Number(values.customerId), source_id: values.sourceId ? Number(values.sourceId) : undefined, source_type: values.sourceType });
+            setPreview(response.calculated);
+        } catch (caught) {
+            setFieldErrors(extractFieldErrors(caught));
+            setSubmitError(errorMessage(caught, 'Unable to preview allocation.'));
+        }
+    }
+
+    async function submit(event: FormEvent): Promise<void> {
+        event.preventDefault();
+        setIsSaving(true);
+        setFieldErrors({});
+        setSubmitError('');
+        try {
+            const response = await salesApi.payments.create(values);
+            const created = asComponentRecord(response.data);
+            navigate(`/sales/payments/${String(created.id ?? values.sourceId)}`);
+        } catch (caught) {
+            setFieldErrors(extractFieldErrors(caught));
+            setSubmitError(errorMessage(caught, 'Unable to save payment.'));
+        } finally {
+            setIsSaving(false);
+        }
+    }
+
     return (
-        <form className="space-y-5">
+        <form className="space-y-5" onSubmit={(event) => void submit(event)}>
+            {globalError || lookupError || submitError ? <FormError message={submitError || globalError || lookupError} /> : null}
             <FormSection description="Payment is routed through Payment module. Backend validates receivable invoices, allocations, balances, and posting." title="Customer Payment">
                 <div className="grid gap-4 md:grid-cols-3">
-                    <Field label="Customer"><Input placeholder="Select customer" /></Field>
-                    <Field label="Payment date"><Input type="date" defaultValue="2026-05-30" /></Field>
-                    <Field label="Payment method"><Select><option>Bank Transfer</option><option>Cash</option><option>Check</option><option>Card</option></Select></Field>
-                    <Field label="Amount"><Input placeholder="Input amount only" /></Field>
-                    <Field label="Reference"><Input placeholder="Bank/check/reference number" /></Field>
-                    <Field label="Source invoice optional"><Input placeholder="SINV-..." /></Field>
+                    <Field error={fieldErrors.party_id ?? fieldErrors.customer_id} label="Customer"><LookupSelect disabled={isLoading} onChange={(value) => setField('customerId', value)} options={lookups.customers} placeholder="Select customer" value={values.customerId} /></Field>
+                    <Field error={fieldErrors.payment_date} label="Payment date"><Input onChange={(event) => setField('paymentDate', event.target.value)} type="date" value={values.paymentDate} /></Field>
+                    <Field error={fieldErrors.payment_method} label="Payment method"><Select onChange={(event) => setField('method', event.target.value)} value={values.method}><option value="bank_transfer">Bank Transfer</option><option value="cash">Cash</option><option value="check">Check</option><option value="card">Card</option></Select></Field>
+                    <Field error={fieldErrors.amount} label="Amount"><Input onChange={(event) => setField('amount', event.target.value)} placeholder="Input amount only" type="number" value={values.amount} /></Field>
+                    <Field error={fieldErrors.reference_number} label="Reference"><Input onChange={(event) => setField('reference', event.target.value)} placeholder="Bank/check/reference number" value={values.reference ?? ''} /></Field>
+                    <Field error={fieldErrors.source_id} label="Source invoice optional"><Input onChange={(event) => setField('sourceId', event.target.value)} placeholder="Persisted invoice id" value={values.sourceId ?? ''} /></Field>
                 </div>
             </FormSection>
-            <SalesPaymentAllocationPanel />
-            <div className="flex justify-end gap-3"><Button variant="secondary">Save Draft</Button><Button variant="blue">Preview Allocation</Button><Button>Create Payment</Button></div>
+            <SalesPaymentAllocationPanel preview={preview} />
+            <div className="flex justify-end gap-3"><Button disabled={isSaving} onClick={() => void previewAllocation()} type="button" variant="blue">Preview Allocation</Button><Button disabled={isSaving || isLoading} type="submit">Create Payment</Button></div>
         </form>
     );
 }
 
-export function SalesPaymentAllocationPanel({ allocations = [] }: { allocations?: SalesPaymentAllocation[] }) {
+export function SalesPaymentAllocationPanel({ allocations = [], preview }: { allocations?: SalesPaymentAllocation[]; preview?: Record<string, unknown> }) {
     return (
         <PreviewPanel
             rows={[
-                { label: 'Allocated amount', value: 'Backend calculated' },
-                { label: 'Unallocated amount', value: 'Backend calculated' },
-                { label: 'Invoice balance after allocation', value: 'Backend calculated' },
+                { label: 'Allocated amount', value: displayPreviewValue(preview, ['allocated_amount', 'allocatedAmount'], 'Run backend preview') },
+                { label: 'Unallocated amount', value: displayPreviewValue(preview, ['unallocated_amount', 'unallocatedAmount'], 'Run backend preview') },
+                { label: 'Invoice balance after allocation', value: displayPreviewValue(preview, ['document_balance_after', 'documentBalanceAfter'], 'Run backend preview') },
             ]}
-            status="Backend Preview"
+            status="Backend endpoint"
             title="Payment Allocation"
         >
             {allocations.length ? <SimpleTable columns={[['sourceDocument', 'Document'], ['allocatedAmount', 'Allocated'], ['documentBalanceAfter', 'Balance After'], ['status', 'Status']]} rows={allocations} /> : null}
@@ -302,20 +518,63 @@ export function CustomerAdvancePanel({ advances }: { advances: CustomerAdvance[]
 }
 
 export function SalesReturnForm() {
+    const navigate = useNavigate();
+    const { errors: lookupError, globalError, isLoading, lookups } = useSalesLookups();
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    const [isSaving, setIsSaving] = useState(false);
+    const [preview, setPreview] = useState<Record<string, unknown>>();
+    const [submitError, setSubmitError] = useState('');
+    const [values, setValues] = useState<SalesReturnFormInput>(() => ({ customerId: '', lines: [emptyLine()], notes: '', returnDate: today(), returnNumber: `SRET-${Date.now()}`, returnReason: '', sourceId: '', sourceType: 'gdn_header', status: 'draft' }));
+
+    function setField<K extends keyof SalesReturnFormInput>(field: K, value: SalesReturnFormInput[K]): void {
+        setValues((current) => ({ ...current, [field]: value }));
+    }
+
+    async function previewReturn(): Promise<void> {
+        setSubmitError('');
+        try {
+            const response = await salesApi.returns.previewEffect({ source_id: values.sourceId ? Number(values.sourceId) : undefined, source_type: values.sourceType });
+            setPreview(response.calculated);
+        } catch (caught) {
+            setFieldErrors(extractFieldErrors(caught));
+            setSubmitError(errorMessage(caught, 'Unable to preview return effect.'));
+        }
+    }
+
+    async function submit(event: FormEvent): Promise<void> {
+        event.preventDefault();
+        setIsSaving(true);
+        setFieldErrors({});
+        setSubmitError('');
+        try {
+            const response = await salesApi.returns.createWithLines(values);
+            navigate(`/sales/returns/${response.data.id}`);
+        } catch (caught) {
+            setFieldErrors(extractFieldErrors(caught));
+            setSubmitError(errorMessage(caught, 'Unable to save return.'));
+        } finally {
+            setIsSaving(false);
+        }
+    }
+
     return (
-        <form className="space-y-5">
+        <form className="space-y-5" onSubmit={(event) => void submit(event)}>
+            {globalError || lookupError || submitError ? <FormError message={submitError || globalError || lookupError} /> : null}
             <FormSection description="Returnable quantity, stock reversal, AR adjustment, and refund eligibility are backend-owned." title="Sales Return">
                 <div className="grid gap-4 md:grid-cols-3">
-                    <Field label="Customer"><Input placeholder="Select customer" /></Field>
-                    <Field label="Source document"><Input placeholder="SO / GDN / Invoice / Direct" /></Field>
-                    <Field label="Return date"><Input type="date" defaultValue="2026-05-30" /></Field>
-                    <Field label="Reason"><Input placeholder="Damage, wrong item, customer return..." /></Field>
-                    <Field label="Notes"><Textarea placeholder="Return notes" /></Field>
+                    <Field error={fieldErrors.customer_id} label="Customer"><LookupSelect disabled={isLoading} onChange={(value) => setField('customerId', value)} options={lookups.customers} placeholder="Select customer" value={values.customerId} /></Field>
+                    <Field label="Source type"><Select onChange={(event) => setField('sourceType', event.target.value)} value={values.sourceType}><option value="gdn_header">GDN</option><option value="sales_order">Sales Order</option><option value="document">Invoice Document</option></Select></Field>
+                    <Field label="Source id"><Input onChange={(event) => setField('sourceId', event.target.value)} placeholder="Persisted source id" value={values.sourceId ?? ''} /></Field>
+                    <Field error={fieldErrors.return_number} label="Return number"><Input onChange={(event) => setField('returnNumber', event.target.value)} value={values.returnNumber} /></Field>
+                    <Field error={fieldErrors.return_date} label="Return date"><Input onChange={(event) => setField('returnDate', event.target.value)} type="date" value={values.returnDate} /></Field>
+                    <Field error={fieldErrors.return_reason} label="Reason"><Input onChange={(event) => setField('returnReason', event.target.value)} placeholder="Damage, wrong item, customer return..." value={values.returnReason ?? ''} /></Field>
+                    <Field error={fieldErrors.notes} label="Notes"><Textarea onChange={(event) => setField('notes', event.target.value)} placeholder="Return notes" value={values.notes ?? ''} /></Field>
                 </div>
             </FormSection>
             <FormSection description="Backend validates returnable quantities and previews inventory/AR effects." title="Return Lines">
-                <SalesReturnLineTable rows={[draftReturnLine]} />
-                <div className="mt-4 flex justify-end gap-3"><Button variant="blue">Preview Return Effect</Button><Button>Create Return</Button></div>
+                <SalesLineEditor errors={fieldErrors} lines={values.lines} lookups={lookups} onChange={(lines) => setField('lines', lines)} quantityLabel="Return quantity" />
+                {preview ? <PreviewPanel rows={[{ label: 'Returnable lines', value: displayPreviewValue(preview, ['line_count'], 'Backend returned') }]} status="Backend Preview" title="Return Effect Preview" /> : null}
+                <div className="mt-4 flex justify-end gap-3"><Button disabled={isSaving} onClick={() => void previewReturn()} type="button" variant="blue">Preview Return Effect</Button><Button disabled={isSaving || isLoading} type="submit">Create Return</Button></div>
             </FormSection>
         </form>
     );
@@ -352,8 +611,8 @@ export function SalesStockAvailabilityPanel({ preview }: { preview?: SalesStockA
         <PreviewPanel
             rows={[
                 { label: 'Requested quantity', value: preview?.calculated.requestedQuantity ?? 'Input only' },
-                { label: 'Available quantity', value: preview?.calculated.availableQuantity ?? 'Backend calculated' },
-                { label: 'Reserved quantity', value: preview?.calculated.reservedQuantity ?? 'Backend calculated' },
+                { label: 'Available quantity', value: preview?.calculated.availableQuantity ?? 'Run stock availability endpoint' },
+                { label: 'Reserved quantity', value: preview?.calculated.reservedQuantity ?? 'Run stock availability endpoint' },
                 { label: 'Decision', value: preview?.calculated.decision ?? 'Backend decision' },
             ]}
             status="Stock Preview"
@@ -367,8 +626,8 @@ export function SalesCreditCheckPanel({ result }: { result?: SalesCreditCheckRes
         <PreviewPanel
             rows={[
                 { label: 'Credit limit', value: result?.calculated.creditLimit ?? 'Backend returned' },
-                { label: 'Current exposure', value: result?.calculated.currentExposure ?? 'Backend calculated' },
-                { label: 'Projected exposure', value: result?.calculated.projectedExposure ?? 'Backend calculated' },
+                { label: 'Current exposure', value: result?.calculated.currentExposure ?? 'Requires customer credit endpoint' },
+                { label: 'Projected exposure', value: result?.calculated.projectedExposure ?? 'Requires customer credit endpoint' },
                 { label: 'Decision', value: result?.calculated.decision ?? 'Backend credit decision' },
             ]}
             status="Credit Check"
@@ -410,6 +669,22 @@ export function SalesActivityTimeline({ rows }: { rows: SalesAuditEntry[] }) {
 }
 
 export function SalesSettingsForm({ settings }: { settings: SalesSettings }) {
+    const [message, setMessage] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+
+    async function initialize(): Promise<void> {
+        setIsSaving(true);
+        setMessage('');
+        try {
+            await salesApi.settings.initialize();
+            setMessage('Sales defaults initialized by backend.');
+        } catch (caught) {
+            setMessage(errorMessage(caught, 'Unable to initialize Sales settings.'));
+        } finally {
+            setIsSaving(false);
+        }
+    }
+
     return (
         <form className="space-y-5">
             <FormSection description="Settings guide backend workflow behavior; global configuration stays outside Sales." title="Accounting, Document, and Warehouse Defaults">
@@ -438,7 +713,11 @@ export function SalesSettingsForm({ settings }: { settings: SalesSettings }) {
                     <Field label="Allow invoice without delivery"><Select defaultValue={String(settings.allowInvoiceWithoutDelivery)}><option value="true">Yes</option><option value="false">No</option></Select></Field>
                     <Field label="Allow negative stock"><Select defaultValue={String(settings.allowNegativeStock)}><option value="true">Yes</option><option value="false">No</option></Select></Field>
                 </div>
-                <div className="mt-4 flex justify-end gap-3"><Button variant="secondary">Initialize Defaults</Button><Button variant="blue">Save Settings</Button></div>
+                {message ? <p className="mt-4 text-sm font-semibold text-slate-600">{message}</p> : null}
+                <div className="mt-4 flex justify-end gap-3">
+                    <Button disabled={isSaving} onClick={() => void initialize()} type="button" variant="secondary">Initialize Defaults</Button>
+                    <Button disabled title="Editable settings require a dedicated Sales settings editor contract; current screen displays persisted backend defaults." type="button" variant="blue">Save Settings unavailable</Button>
+                </div>
             </FormSection>
         </form>
     );
@@ -553,13 +832,144 @@ function SimpleTable<T extends { id: string }>({ columns, rows }: { columns: Arr
     return <DataTable columns={tableColumns} getRowKey={(row) => row.id} rows={rows} />;
 }
 
-function Field({ children, label }: { children: ReactNode; label: string }) {
+function Field({ children, error, label }: { children: ReactNode; error?: string; label: string }) {
     return (
         <label className="space-y-2 text-sm">
             <span className="font-semibold text-slate-700">{label}</span>
             {children}
+            {error ? <span className="block text-xs font-semibold text-red-600">{error}</span> : null}
         </label>
     );
+}
+
+function FormError({ message }: { message: string }) {
+    return <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{message}</div>;
+}
+
+function LookupSelect({ disabled, onChange, options, placeholder, value }: { disabled?: boolean; onChange: (value: string) => void; options: SalesLookupOption[]; placeholder: string; value: string }) {
+    return (
+        <Select disabled={disabled} onChange={(event) => onChange(event.target.value)} value={value}>
+            <option value="">{placeholder}</option>
+            {options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+        </Select>
+    );
+}
+
+function SalesLineEditor({
+    errors,
+    lines,
+    lookups,
+    onChange,
+    quantityLabel,
+}: {
+    errors: Record<string, string>;
+    lines: SalesLineFormInput[];
+    lookups: SalesLookupState;
+    onChange: (lines: SalesLineFormInput[]) => void;
+    quantityLabel: string;
+}) {
+    function updateLine(index: number, field: keyof SalesLineFormInput, value: string): void {
+        onChange(lines.map((line, lineIndex) => {
+            if (lineIndex !== index) return line;
+            if (field === 'itemId') return { ...line, itemId: value, uomId: '' };
+            return { ...line, [field]: value };
+        }));
+    }
+
+    return (
+        <div className="space-y-4">
+            {lines.map((line, index) => {
+                const itemUoms = lookups.itemUoms[line.itemId] ?? [];
+                return (
+                    <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 md:grid-cols-5" key={`line-${index}`}>
+                        <Field error={errors[`lines.${index}.item_id`] ?? errors.item_id} label="Item">
+                            <LookupSelect onChange={(value) => updateLine(index, 'itemId', value)} options={lookups.items} placeholder="Select item" value={line.itemId} />
+                        </Field>
+                        <Field error={errors[`lines.${index}.uom_id`] ?? errors.uom_id} label="UOM">
+                            <LookupSelect disabled={!line.itemId || itemUoms.length === 0} onChange={(value) => updateLine(index, 'uomId', value)} options={itemUoms} placeholder={line.itemId ? 'Select item UOM' : 'Select item first'} value={line.uomId} />
+                        </Field>
+                        <Field error={errors[`lines.${index}.quantity`] ?? errors.quantity} label={quantityLabel}>
+                            <Input min="0" onChange={(event) => updateLine(index, 'quantity', event.target.value)} type="number" value={line.quantity} />
+                        </Field>
+                        <Field error={errors[`lines.${index}.unit_price`] ?? errors.unit_price} label="Unit price input">
+                            <Input min="0" onChange={(event) => updateLine(index, 'unitPrice', event.target.value)} type="number" value={line.unitPrice} />
+                        </Field>
+                        <div className="flex items-end gap-2">
+                            <Button disabled={lines.length === 1} onClick={() => onChange(lines.filter((_, lineIndex) => lineIndex !== index))} type="button" variant="ghost">Remove</Button>
+                        </div>
+                    </div>
+                );
+            })}
+            <Button onClick={() => onChange([...lines, emptyLine()])} type="button" variant="secondary">Add Line</Button>
+        </div>
+    );
+}
+
+type SalesLookupState = {
+    customers: SalesLookupOption[];
+    itemUoms: Record<string, SalesLookupOption[]>;
+    items: SalesLookupOption[];
+    warehouses: SalesLookupOption[];
+};
+
+function useSalesLookups(): { errors: string; globalError: string; isLoading: boolean; lookups: SalesLookupState } {
+    const [errors, setErrors] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
+    const [lookups, setLookups] = useState<SalesLookupState>({ customers: [], itemUoms: {}, items: [], warehouses: [] });
+
+    useEffect(() => {
+        let mounted = true;
+        Promise.all([salesApi.lookups.customers(), salesApi.lookups.items(), salesApi.lookups.warehouses()])
+            .then(([customers, items, warehouses]) => {
+                if (!mounted) return;
+                setLookups((current) => ({ ...current, customers: customers.data, items: items.data, warehouses: warehouses.data }));
+                return Promise.all(items.data.map((item) => salesApi.lookups.itemUoms(item.id).then((response) => [item.id, response.data] as const).catch(() => [item.id, []] as const)));
+            })
+            .then((entries) => {
+                if (!mounted || !entries) return;
+                setLookups((current) => ({ ...current, itemUoms: Object.fromEntries(entries) }));
+            })
+            .catch((caught: unknown) => {
+                if (mounted) setErrors(errorMessage(caught, 'Unable to load Sales lookups.'));
+            })
+            .finally(() => {
+                if (mounted) setIsLoading(false);
+            });
+
+        return () => { mounted = false; };
+    }, []);
+
+    return { errors, globalError: errors, isLoading, lookups };
+}
+
+function emptyLine(): SalesLineFormInput {
+    return { itemId: '', quantity: '1', unitPrice: '0', uomId: '' };
+}
+
+function today(): string {
+    return new Date().toISOString().slice(0, 10);
+}
+
+function extractFieldErrors(caught: unknown): Record<string, string> {
+    if (!(caught instanceof ApiError)) return {};
+    return Object.fromEntries(Object.entries(caught.errors).map(([field, messages]) => [field, messages[0] ?? 'Invalid value.']));
+}
+
+function errorMessage(caught: unknown, fallback: string): string {
+    return caught instanceof Error ? caught.message : fallback;
+}
+
+function asComponentRecord(value: unknown): Record<string, unknown> {
+    return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function displayPreviewValue(preview: Record<string, unknown> | undefined, keys: string[], fallback: string): string {
+    if (!preview) return fallback;
+    for (const key of keys) {
+        const value = preview[key];
+        if (value !== null && value !== undefined && value !== '') return String(value);
+    }
+    return fallback;
 }
 
 function Info({ label, value }: { label: string; value: string }) {
@@ -570,9 +980,3 @@ function Info({ label, value }: { label: string; value: string }) {
         </div>
     );
 }
-
-const draftQuotationLine: SalesQuotationLine = { discountAmount: 'Backend calculated', id: 'draft-quotation-line', item: 'Select item', lineTotal: 'Backend calculated', quantity: 'Input quantity', taxAmount: 'Backend calculated', unitPrice: 'Backend resolved', uom: 'Select UOM' };
-const draftOrderLine: SalesOrderLine = { backendConvertedQuantity: 'Backend converted', deliveredQuantity: 'Backend tracked', discountAmount: 'Backend calculated', id: 'draft-so-line', item: 'Select item', lineTotal: 'Backend calculated', orderedQuantity: 'Input quantity', remainingQuantity: 'Backend calculated', stockAvailability: 'Backend checked', taxAmount: 'Backend calculated', unitPrice: 'Input / backend resolved', uom: 'Select UOM' };
-const draftGdnLine: GoodsDeliveryNoteLine = { backendBaseQuantity: 'Backend converted', deliveredQuantity: 'Input quantity', id: 'draft-gdn-line', item: 'Select item', orderedQuantity: 'Backend SO qty if linked', pickedQuantity: 'Input quantity', rejectedQuantity: 'Input quantity', sourceLine: 'Optional SO line', uom: 'Select UOM' };
-const draftInvoiceLine: SalesInvoiceLine = { discountAmount: 'Backend calculated', id: 'draft-invoice-line', invoiceQuantity: 'Input quantity', item: 'Select item', lineTotal: 'Backend calculated', sourceLine: 'Optional SO/GDN line', taxAmount: 'Backend calculated', unitPrice: 'Input / backend resolved', uom: 'Select UOM' };
-const draftReturnLine: SalesReturnLine = { backendReturnableQuantity: 'Backend calculated', id: 'draft-return-line', item: 'Select item', returnQuantity: 'Input quantity', sourceLine: 'Source GDN/invoice line', uom: 'Select UOM' };

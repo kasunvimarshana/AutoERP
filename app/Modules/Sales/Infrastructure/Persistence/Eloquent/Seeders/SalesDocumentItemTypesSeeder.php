@@ -10,10 +10,11 @@ class SalesDocumentItemTypesSeeder extends Seeder
 {
     public function run(): void
     {
-        DB::table('document_item_types')->upsert(
-            SalesDocumentSeedCatalog::itemTypes(),
-            ['code'],
-            ['name', 'display_name', 'is_active'],
-        );
+        foreach (SalesDocumentSeedCatalog::itemTypes() as $itemType) {
+            DB::table('document_item_types')->updateOrInsert(
+                ['code' => $itemType['code']],
+                $itemType,
+            );
+        }
     }
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
-import { SearchFilterBar } from '../../../shared/components/data/SearchFilterBar';
+import { DataToolbar } from '../../../shared/components/data/DataToolbar';
 import { Tabs } from '../../../shared/components/ui/Tabs';
 import { Button } from '../../../shared/components/ui/Button';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
@@ -18,22 +18,33 @@ import {
     SalesSourceReferencePanel,
     SalesWorkflowActions,
 } from '../components/SalesComponents';
-import { financePostingPreview, salesActivity, salesPayments, salesReturns } from '../mock/salesMock';
 import { salesApi } from '../services/salesApi';
-import type { SalesInvoice } from '../types/sales.types';
+import type { SalesAuditEntry, SalesInvoice, SalesPayment, SalesReturn } from '../types/sales.types';
 
 export function SalesInvoiceListPage() {
     const [rows, setRows] = useState<SalesInvoice[]>([]);
+    const [query, setQuery] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState('');
 
     useEffect(() => {
-        salesApi.invoices.list().then((response) => setRows(response.data));
-    }, []);
+        let mounted = true;
+        setIsLoading(true);
+        setError('');
+        salesApi.invoices.list({ search: query })
+            .then((response) => { if (mounted) setRows(response.data); })
+            .catch((caught: unknown) => { if (mounted) setError(caught instanceof Error ? caught.message : 'Unable to load customer invoices.'); })
+            .finally(() => { if (mounted) setIsLoading(false); });
+        return () => { mounted = false; };
+    }, [query]);
 
     return (
         <div className="space-y-6">
             <PageHeader actions={<Link to="/sales/invoices/new"><Button>Create Customer Invoice</Button></Link>} eyebrow="Sales" subtitle="Customer invoices are receivable authority. Backend previews pricing, tax, discounts, UOM, AR, COGS, documents, and balances." title="Customer Invoices" />
-            <SearchFilterBar placeholder="Search invoice number, customer, source SO/GDN, status..." />
-            {rows.length ? <SalesInvoiceTable rows={rows} /> : <EmptyState description="No customer invoices returned yet." title="No invoices" />}
+            <DataToolbar isLoading={isLoading} onSearchChange={setQuery} savedViewsDisabledReason="Saved views require a user-preferences backend for Sales lists." searchPlaceholder="Search invoice number, customer, source SO/GDN, status..." searchValue={query} />
+            {error ? <EmptyState description={error} title="Customer invoice API unavailable" /> : null}
+            {!error && rows.length ? <SalesInvoiceTable rows={rows} /> : null}
+            {!error && !isLoading && !rows.length ? <EmptyState description="The current backend exposes source-scoped invoices. Global list reads real Document module invoice records." title="No invoices returned" /> : null}
         </div>
     );
 }
@@ -59,10 +70,16 @@ export function SalesInvoiceEditPage() {
 export function SalesInvoiceDetailPage() {
     const { id = 'sinv-001' } = useParams();
     const [invoice, setInvoice] = useState<SalesInvoice>();
+    const [history, setHistory] = useState<SalesAuditEntry[]>([]);
+    const [payments, setPayments] = useState<SalesPayment[]>([]);
+    const [returns, setReturns] = useState<SalesReturn[]>([]);
     const [activeTab, setActiveTab] = useState('overview');
 
     useEffect(() => {
         salesApi.invoices.get(id).then((response) => setInvoice(response.data));
+        salesApi.payments.list().then((response) => setPayments(response.data));
+        salesApi.returns.list().then((response) => setReturns(response.data));
+        setHistory([]);
     }, [id]);
 
     if (!invoice) {
@@ -78,10 +95,10 @@ export function SalesInvoiceDetailPage() {
             {activeTab === 'calculation' ? <SalesInvoiceCalculationPanel /> : null}
             {activeTab === 'source' ? <SalesSourceReferencePanel reference={invoice.sourceReference} /> : null}
             {activeTab === 'document' ? <SalesInvoiceDocumentPanel /> : null}
-            {activeTab === 'payments' ? <SalesPaymentTable rows={salesPayments} /> : null}
-            {activeTab === 'finance' ? <SalesFinancePostingPanel preview={financePostingPreview} /> : null}
-            {activeTab === 'returns' ? <SalesReturnTable rows={salesReturns.filter((record) => record.sourceReference === invoice.invoiceNumber)} /> : null}
-            {activeTab === 'history' ? <SalesActivityTimeline rows={salesActivity} /> : null}
+            {activeTab === 'payments' ? <SalesPaymentTable rows={payments.filter((payment) => payment.customerId === invoice.customerId)} /> : null}
+            {activeTab === 'finance' ? <EmptyState description="Posting preview requires a persisted sales source context. Backend invoice detail is source-scoped." title="Finance preview unavailable" /> : null}
+            {activeTab === 'returns' ? <SalesReturnTable rows={returns.filter((record) => record.sourceReference === invoice.invoiceNumber || record.sourceReference === invoice.id)} /> : null}
+            {activeTab === 'history' ? <SalesActivityTimeline rows={history} /> : null}
         </div>
     );
 }

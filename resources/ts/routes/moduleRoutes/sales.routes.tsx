@@ -8,6 +8,7 @@ const deliveries = () => import('../../modules/sales/pages/SalesGdnPages');
 const invoices = () => import('../../modules/sales/pages/SalesInvoicePages');
 const payments = () => import('../../modules/sales/pages/SalesPaymentPages');
 const returns = () => import('../../modules/sales/pages/SalesReturnPages');
+const ledgerNotes = () => import('../../modules/sales/pages/SalesLedgerNotePages');
 const settings = () => lazyNamed(() => import('../../modules/sales/pages/SalesSettingsPage'), 'SalesSettingsPage');
 
 export const salesRoutes: RouteObject[] = [
@@ -15,6 +16,7 @@ export const salesRoutes: RouteObject[] = [
     { element: lazyNamed(quotations, 'SalesQuotationListPage'), path: 'sales/quotations' },
     { element: lazyNamed(quotations, 'SalesQuotationCreatePage'), path: 'sales/quotations/new' },
     { element: lazyNamed(quotations, 'SalesQuotationDetailPage'), path: 'sales/quotations/:id' },
+    { element: lazyNamed(quotations, 'SalesQuotationCreatePage'), path: 'sales/quotations/:id/edit' },
     { element: lazyNamed(orders, 'SalesOrderListPage'), path: 'sales/orders' },
     { element: lazyNamed(orders, 'SalesOrderCreatePage'), path: 'sales/orders/new' },
     { element: lazyNamed(orders, 'SalesOrderDetailPage'), path: 'sales/orders/:id' },
@@ -34,6 +36,8 @@ export const salesRoutes: RouteObject[] = [
     { element: lazyNamed(returns, 'SalesReturnListPage'), path: 'sales/returns' },
     { element: lazyNamed(returns, 'SalesReturnCreatePage'), path: 'sales/returns/new' },
     { element: lazyNamed(returns, 'SalesReturnDetailPage'), path: 'sales/returns/:id' },
+    { element: lazyNamed(returns, 'SalesReturnCreatePage'), path: 'sales/returns/:id/edit' },
     { element: lazyNamed(payments, 'CustomerRefundListPage'), path: 'sales/refunds' },
+    { element: lazyNamed(ledgerNotes, 'SalesLedgerNoteListPage'), path: 'sales/ledger-notes' },
     { element: settings(), path: 'sales/settings' },
 ];
