@@ -94,7 +94,7 @@ function numberOrUndefined(value: string | null | undefined): number | undefined
 function contextQuery(extra: Record<string, string | number | boolean | null | undefined> = {}) {
     return {
         organization_unit_id: numberOrUndefined(getStoredOrganizationUnitId()),
-        per_page: 100,
+        per_page: 25,
         tenant_id: numberOrUndefined(getStoredTenantId()),
         ...extra,
     };
@@ -114,6 +114,10 @@ function userId(): number | undefined {
 
 function collectionPayload<T>(response: ApiCollectionResponse<BackendRecord>, mapper: (row: BackendRecord) => T): ApiCollectionResponse<T> {
     return { ...response, data: response.data.map(mapper) };
+}
+
+function collectionTotal<T>(response: ApiCollectionResponse<T>): number {
+    return response.meta?.total ?? response.data.length;
 }
 
 function normalizeStockLevel(raw: BackendRecord): StockLevel {
@@ -380,7 +384,7 @@ export const inventoryApi = {
         const raw = 'data' in header && header.data ? header.data as BackendRecord : header as BackendRecord;
         return { data: normalizeAdjustment(raw, lines.data.filter((line) => line.id && asString(record(line).stock_adjustment_id) === id)) };
     },
-    getCostLayers: async (): Promise<ApiCollectionResponse<CostLayer>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/inventory-cost-layers', { query: contextQuery() }), normalizeCostLayer),
+    getCostLayers: async (query: InventoryListQuery = {}): Promise<ApiCollectionResponse<CostLayer>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/inventory-cost-layers', { query: contextQuery(query) }), normalizeCostLayer),
     getInventoryActivity: async (): Promise<ApiCollectionResponse<InventoryAuditEntry>> => inventoryApi.getTraceability(),
     getStockLevel: async (id: string): Promise<ApiResponse<StockLevel>> => {
         const response = await httpClient<ApiResponse<BackendRecord> | BackendRecord>(`/api/inventory/stock-levels/${id}`);
@@ -405,7 +409,7 @@ export const inventoryApi = {
         const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/stock-adjustment-lines', { query: contextQuery() });
         return { ...response, data: response.data.map((row) => ({ ...normalizeAdjustmentLine(row), ...row })) as never };
     },
-    listAdjustments: async (): Promise<ApiCollectionResponse<StockAdjustment>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/stock-adjustments', { query: contextQuery() }), (row) => normalizeAdjustment(row)),
+    listAdjustments: async (query: InventoryListQuery = {}): Promise<ApiCollectionResponse<StockAdjustment>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/stock-adjustments', { query: contextQuery(query) }), (row) => normalizeAdjustment(row)),
     listBatches: async (): Promise<ApiCollectionResponse<InventoryBatch>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/batches', { query: contextQuery() }), normalizeBatch),
     listCycleCounts: async (): Promise<ApiCollectionResponse<CycleCount>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/cycle-count-headers', { query: contextQuery() }), (raw) => ({
         countNumber: asString(raw.count_number ?? raw.reference_number, 'Cycle count'),
@@ -419,21 +423,21 @@ export const inventoryApi = {
     })),
     listDashboardMetrics: async (): Promise<ApiCollectionResponse<{ label: string; status: string; value: string }>> => {
         const [levels, movements, reservations, transfers, adjustments, layers] = await Promise.all([
-            inventoryApi.listStockLevels(),
-            inventoryApi.listStockMovements(),
-            inventoryApi.listReservations(),
-            inventoryApi.listTransfers(),
-            inventoryApi.listAdjustments(),
-            inventoryApi.getCostLayers(),
+            inventoryApi.listStockLevels({ per_page: 1 }),
+            inventoryApi.listStockMovements({ per_page: 1 }),
+            inventoryApi.listReservations({ per_page: 1 }),
+            inventoryApi.listTransfers({ per_page: 1 }),
+            inventoryApi.listAdjustments({ per_page: 1 }),
+            inventoryApi.getCostLayers({ per_page: 1 }),
         ]);
         return {
             data: [
-                { label: 'Stock levels', status: 'active', value: String(levels.data.length) },
-                { label: 'Movements', status: 'posted', value: String(movements.data.length) },
-                { label: 'Reservations', status: 'active', value: String(reservations.data.length) },
-                { label: 'Transfers', status: 'draft', value: String(transfers.data.length) },
-                { label: 'Adjustments', status: 'draft', value: String(adjustments.data.length) },
-                { label: 'Cost layers', status: 'active', value: String(layers.data.length) },
+                { label: 'Stock levels', status: 'active', value: String(collectionTotal(levels)) },
+                { label: 'Movements', status: 'posted', value: String(collectionTotal(movements)) },
+                { label: 'Reservations', status: 'active', value: String(collectionTotal(reservations)) },
+                { label: 'Transfers', status: 'draft', value: String(collectionTotal(transfers)) },
+                { label: 'Adjustments', status: 'draft', value: String(collectionTotal(adjustments)) },
+                { label: 'Cost layers', status: 'active', value: String(collectionTotal(layers)) },
             ],
         };
     },
@@ -463,17 +467,17 @@ export const inventoryApi = {
         sourceReference: asString(raw.source_reference, 'Source'),
         status: asStatus(raw.status, 'draft'),
     })),
-    listReservations: async (): Promise<ApiCollectionResponse<StockReservation>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/stock-reservations', { query: contextQuery() }), normalizeReservation),
+    listReservations: async (query: InventoryListQuery = {}): Promise<ApiCollectionResponse<StockReservation>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/stock-reservations', { query: contextQuery(query) }), normalizeReservation),
     listSerials: async (): Promise<ApiCollectionResponse<InventorySerial>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/serials', { query: contextQuery() }), normalizeSerial),
     listStockLevels: async (query: InventoryListQuery = {}): Promise<ApiCollectionResponse<StockLevel>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/stock-levels', { query: contextQuery(query) }), normalizeStockLevel),
-    listStockMovements: async (): Promise<ApiCollectionResponse<StockMovement>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/stock-movements', { query: contextQuery() }), normalizeMovement),
+    listStockMovements: async (query: InventoryListQuery = {}): Promise<ApiCollectionResponse<StockMovement>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/stock-movements', { query: contextQuery(query) }), normalizeMovement),
     listTransferLines: async (): Promise<ApiCollectionResponse<StockTransferLine[] & StockTransferLine>> => {
         const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/stock-transfer-lines', { query: contextQuery() });
         return { ...response, data: response.data.map((row) => ({ ...normalizeTransferLine(row), ...row })) as never };
     },
-    listTransfers: async (): Promise<ApiCollectionResponse<StockTransfer>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/stock-transfers', { query: contextQuery() }), (row) => normalizeTransfer(row)),
+    listTransfers: async (query: InventoryListQuery = {}): Promise<ApiCollectionResponse<StockTransfer>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/stock-transfers', { query: contextQuery(query) }), (row) => normalizeTransfer(row)),
     listUoms: async (): Promise<ApiCollectionResponse<InventoryLookupOption>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/uom/units-of-measure', { query: contextQuery() }), normalizeLookup),
-    listValuation: async (): Promise<ApiCollectionResponse<InventoryValuation>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/inventory-cost-layers', { query: contextQuery() }), normalizeValuation),
+    listValuation: async (query: InventoryListQuery = {}): Promise<ApiCollectionResponse<InventoryValuation>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/inventory/inventory-cost-layers', { query: contextQuery(query) }), normalizeValuation),
     listWarehouses: async (): Promise<ApiCollectionResponse<InventoryLookupOption>> => collectionPayload(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/warehouse/warehouses', { query: contextQuery() }), normalizeLookup),
     postAdjustment: (id: string) => httpClient<ApiResponse<BackendRecord>>(`/api/inventory/stock-adjustments/${id}`, { body: contextPayload({ approved_at: new Date().toISOString(), status: 'COMPLETED' }), method: 'PUT' }),
     previewStockAvailability: async (input: StockAvailabilityPreviewRequest): Promise<ApiPreviewResponse<StockAvailabilityPreviewRequest, StockAvailabilityPreviewResult['calculated']>> => {

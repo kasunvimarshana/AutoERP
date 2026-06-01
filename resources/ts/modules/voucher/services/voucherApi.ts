@@ -23,6 +23,14 @@ import type {
 } from '../types/voucher.types';
 
 type BackendRecord = Record<string, unknown>;
+type VoucherListQuery = {
+    page?: number;
+    partyType?: string;
+    perPage?: number;
+    search?: string;
+    status?: string;
+    type?: string;
+};
 
 const VOUCHER_API_MODE = import.meta.env.VITE_VOUCHER_API_MODE ?? 'auto';
 
@@ -132,6 +140,25 @@ function normalizeHistory(raw: BackendRecord): VoucherAuditEntry {
     };
 }
 
+function normalizeMetric(raw: BackendRecord): VoucherDashboardMetric {
+    return {
+        label: asString(raw.label ?? raw.name ?? raw.metric, 'Voucher metric'),
+        tone: asString(raw.tone ?? raw.status ?? 'neutral'),
+        value: asString(raw.value ?? raw.count ?? raw.total, '0'),
+    };
+}
+
+function normalizeSettings(raw: BackendRecord): VoucherSettings {
+    return {
+        allowDirectPosting: asBoolean(raw.allow_direct_posting ?? raw.allowDirectPosting),
+        allowPartialAllocation: asBoolean(raw.allow_partial_allocation ?? raw.allowPartialAllocation, true),
+        defaultDocumentDefinition: asString(raw.default_document_definition ?? raw.defaultDocumentDefinition),
+        defaultPaymentMethod: asString(raw.default_payment_method ?? raw.defaultPaymentMethod),
+        defaultSequence: asString(raw.default_sequence ?? raw.defaultSequence),
+        requireApproval: asBoolean(raw.require_approval ?? raw.requireApproval, true),
+    };
+}
+
 function normalizePostingPreviewResponse(input: unknown, raw: unknown): ApiPreviewResponse<unknown, VoucherPostingPreview['calculated']> {
     const maybePreview = raw as Partial<ApiPreviewResponse<unknown, VoucherPostingPreview['calculated']>>;
 
@@ -162,14 +189,57 @@ function normalizePostingPreviewResponse(input: unknown, raw: unknown): ApiPrevi
     };
 }
 
+function normalizePaymentImpactPreviewResponse(input: unknown, raw: unknown): ApiPreviewResponse<unknown, VoucherPaymentImpactPreview['calculated']> {
+    const maybePreview = raw as Partial<ApiPreviewResponse<unknown, VoucherPaymentImpactPreview['calculated']>>;
+
+    if (maybePreview.calculated) {
+        return {
+            breakdown: maybePreview.breakdown ?? [],
+            calculated: maybePreview.calculated,
+            errors: maybePreview.errors ?? [],
+            input: maybePreview.input ?? input,
+            warnings: maybePreview.warnings ?? [],
+        };
+    }
+
+    const response = raw as Partial<ApiResponse<BackendRecord>>;
+    const data = (response.data && typeof response.data === 'object' ? response.data : response) as BackendRecord;
+
+    return {
+        breakdown: Array.isArray(data.breakdown) ? data.breakdown as VoucherPaymentImpactPreview['breakdown'] : [],
+        calculated: {
+            allocationBalance: asString(data.allocation_balance ?? data.allocationBalance, 'Backend calculated'),
+            paymentImpact: asString(data.payment_impact ?? data.paymentImpact, 'Backend calculated'),
+            paymentMethodValidation: asString(data.payment_method_validation ?? data.paymentMethodValidation, 'Backend validated'),
+            settlementStatus: asString(data.settlement_status ?? data.settlementStatus, 'Backend calculated'),
+        },
+        errors: [],
+        input,
+        warnings: [],
+    };
+}
+
 export const voucherApi = {
     dashboard: {
-        summary: (): Promise<ApiCollectionResponse<VoucherDashboardMetric>> => mockCollectionResponse(voucherDashboardMetrics),
+        summary: (): Promise<ApiCollectionResponse<VoucherDashboardMetric>> => withMockFallback(
+            async () => {
+                const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/voucher/dashboard/summary');
+                return { ...response, data: response.data.map(normalizeMetric) };
+            },
+            () => mockCollectionResponse(voucherDashboardMetrics),
+        ),
     },
     types: {
-        list: (): Promise<ApiCollectionResponse<VoucherType>> => withMockFallback(
+        list: (query: Pick<VoucherListQuery, 'page' | 'perPage' | 'search' | 'status'> = {}): Promise<ApiCollectionResponse<VoucherType>> => withMockFallback(
             async () => {
-                const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/voucher/types');
+                const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/voucher/types', {
+                    query: {
+                        page: query.page,
+                        per_page: query.perPage ?? 25,
+                        search: query.search,
+                        status: query.status,
+                    },
+                });
                 return { ...response, data: response.data.map(normalizeVoucherType) };
             },
             () => mockCollectionResponse(voucherTypes),
@@ -187,9 +257,18 @@ export const voucherApi = {
         deactivate: (id: string) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/voucher/types/${id}/deactivate`, { method: 'PATCH' }), () => mockResponse({ action: 'deactivate', id })),
     },
     vouchers: {
-        list: (): Promise<ApiCollectionResponse<Voucher>> => withMockFallback(
+        list: (query: VoucherListQuery = {}): Promise<ApiCollectionResponse<Voucher>> => withMockFallback(
             async () => {
-                const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/voucher/vouchers');
+                const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/voucher/vouchers', {
+                    query: {
+                        page: query.page,
+                        party_type: query.partyType,
+                        per_page: query.perPage ?? 25,
+                        search: query.search,
+                        status: query.status,
+                        type: query.type,
+                    },
+                });
                 return { ...response, data: response.data.map(normalizeVoucher) };
             },
             () => mockCollectionResponse(vouchers),
@@ -220,21 +299,34 @@ export const voucherApi = {
         ),
     },
     allocations: {
-        list: (voucherId: string): Promise<ApiCollectionResponse<VoucherAllocation>> => withMockFallback(
+        list: (voucherId: string, query: Pick<VoucherListQuery, 'page' | 'perPage' | 'search' | 'status'> = {}): Promise<ApiCollectionResponse<VoucherAllocation>> => withMockFallback(
             async () => {
-                const response = await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/voucher/vouchers/${voucherId}/allocations`);
+                const response = await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/voucher/vouchers/${voucherId}/allocations`, {
+                    query: {
+                        page: query.page,
+                        per_page: query.perPage ?? 25,
+                        search: query.search,
+                        status: query.status,
+                    },
+                });
                 return { ...response, data: response.data.map(normalizeAllocation) };
             },
             () => mockCollectionResponse(getVoucherById(voucherId).allocations),
         ),
         create: (voucherId: string, input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${voucherId}/allocations`, { body: input, method: 'POST' }), () => mockResponse({ input, voucherId })),
         update: (allocationId: string, input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/voucher/allocations/${allocationId}`, { body: input, method: 'PATCH' }), () => mockResponse({ allocationId, input })),
-        preview: (input: unknown): Promise<ApiPreviewResponse<unknown, VoucherPaymentImpactPreview['calculated']>> => mockPreviewResponse(input, paymentImpactPreview.calculated, paymentImpactPreview.breakdown, paymentImpactPreview.warnings),
+        preview: (input: unknown): Promise<ApiPreviewResponse<unknown, VoucherPaymentImpactPreview['calculated']>> => withMockFallback(
+            async () => normalizePaymentImpactPreviewResponse(
+                input,
+                await httpClient<ApiPreviewResponse<unknown, VoucherPaymentImpactPreview['calculated']> | ApiResponse<BackendRecord>>('/api/voucher/allocations/preview', { body: input, method: 'POST' }),
+            ),
+            () => mockPreviewResponse(input, paymentImpactPreview.calculated, paymentImpactPreview.breakdown, paymentImpactPreview.warnings),
+        ),
     },
     utilities: {
         previewNumber: (input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>('/api/voucher/utilities/preview-number', { body: input, method: 'POST' }), () => mockResponse({ input, voucherNumber: 'Backend sequence preview' })),
-        validateBalance: (input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>('/api/voucher/utilities/validate-balance', { body: input, method: 'POST' }), () => mockResponse({ input, validation: 'Backend/mock balance validation' })),
-        validatePaymentMethod: (input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>('/api/voucher/utilities/validate-payment-method', { body: input, method: 'POST' }), () => mockResponse({ input, validation: 'Backend/mock payment method validation' })),
+        validateBalance: (input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>('/api/voucher/utilities/validate-balance', { body: input, method: 'POST' }), () => mockResponse({ input, validation: 'Backend balance validation' })),
+        validatePaymentMethod: (input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>('/api/voucher/utilities/validate-payment-method', { body: input, method: 'POST' }), () => mockResponse({ input, validation: 'Backend payment method validation' })),
         previewPosting: (voucherId: string): Promise<ApiPreviewResponse<unknown, VoucherPostingPreview['calculated']>> => withMockFallback(
             async () => normalizePostingPreviewResponse(
                 { voucherId },
@@ -242,18 +334,42 @@ export const voucherApi = {
             ),
             () => mockPreviewResponse({ voucherId }, getVoucherById(voucherId).postingPreview.calculated, getVoucherById(voucherId).postingPreview.breakdown, getVoucherById(voucherId).postingPreview.warnings),
         ),
-        previewPaymentImpact: (input: unknown): Promise<ApiPreviewResponse<unknown, VoucherPaymentImpactPreview['calculated']>> => mockPreviewResponse(input, paymentImpactPreview.calculated, paymentImpactPreview.breakdown, paymentImpactPreview.warnings),
+        previewPaymentImpact: (input: unknown): Promise<ApiPreviewResponse<unknown, VoucherPaymentImpactPreview['calculated']>> => withMockFallback(
+            async () => normalizePaymentImpactPreviewResponse(
+                input,
+                await httpClient<ApiPreviewResponse<unknown, VoucherPaymentImpactPreview['calculated']> | ApiResponse<BackendRecord>>('/api/voucher/utilities/preview-payment-impact', { body: input, method: 'POST' }),
+            ),
+            () => mockPreviewResponse(input, paymentImpactPreview.calculated, paymentImpactPreview.breakdown, paymentImpactPreview.warnings),
+        ),
     },
     documents: {
-        preview: (voucherId: string) => mockResponse(getVoucherById(voucherId).document),
-        generate: (voucherId: string) => mockResponse({ action: 'generate-voucher-document', voucherId }),
+        preview: (voucherId: string) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${voucherId}/document/preview`), () => mockResponse(getVoucherById(voucherId).document)),
+        generate: (voucherId: string) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${voucherId}/document/generate`, { method: 'POST' }), () => mockResponse({ action: 'generate-voucher-document', voucherId })),
     },
     settings: {
-        get: (): Promise<ApiResponse<VoucherSettings>> => mockResponse(voucherSettings),
-        update: (input: unknown) => mockResponse(input),
+        get: (): Promise<ApiResponse<VoucherSettings>> => withMockFallback(
+            async () => {
+                const response = await httpClient<ApiResponse<BackendRecord>>('/api/voucher/settings');
+                return { ...response, data: normalizeSettings(response.data) };
+            },
+            () => mockResponse(voucherSettings),
+        ),
+        update: (input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>('/api/voucher/settings', { body: input, method: 'PATCH' }), () => mockResponse(input)),
     },
     previews: {
-        posting: (input: unknown): Promise<ApiPreviewResponse<unknown, VoucherPostingPreview['calculated']>> => mockPreviewResponse(input, postingPreview.calculated, postingPreview.breakdown, postingPreview.warnings),
-        paymentImpact: (input: unknown): Promise<ApiPreviewResponse<unknown, VoucherPaymentImpactPreview['calculated']>> => mockPreviewResponse(input, paymentImpactPreview.calculated, paymentImpactPreview.breakdown, paymentImpactPreview.warnings),
+        posting: (input: unknown): Promise<ApiPreviewResponse<unknown, VoucherPostingPreview['calculated']>> => withMockFallback(
+            async () => normalizePostingPreviewResponse(
+                input,
+                await httpClient<ApiPreviewResponse<unknown, VoucherPostingPreview['calculated']> | ApiResponse<unknown>>('/api/voucher/previews/posting', { body: input, method: 'POST' }),
+            ),
+            () => mockPreviewResponse(input, postingPreview.calculated, postingPreview.breakdown, postingPreview.warnings),
+        ),
+        paymentImpact: (input: unknown): Promise<ApiPreviewResponse<unknown, VoucherPaymentImpactPreview['calculated']>> => withMockFallback(
+            async () => normalizePaymentImpactPreviewResponse(
+                input,
+                await httpClient<ApiPreviewResponse<unknown, VoucherPaymentImpactPreview['calculated']> | ApiResponse<BackendRecord>>('/api/voucher/previews/payment-impact', { body: input, method: 'POST' }),
+            ),
+            () => mockPreviewResponse(input, paymentImpactPreview.calculated, paymentImpactPreview.breakdown, paymentImpactPreview.warnings),
+        ),
     },
 };

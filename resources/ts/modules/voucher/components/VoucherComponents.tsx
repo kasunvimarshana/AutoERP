@@ -7,16 +7,20 @@ import { DataTable } from '../../../shared/components/data/DataTable';
 import { FormSection } from '../../../shared/components/forms/FormSection';
 import { Button } from '../../../shared/components/ui/Button';
 import { Card } from '../../../shared/components/ui/Card';
+import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Input } from '../../../shared/components/ui/Input';
 import { Select } from '../../../shared/components/ui/Select';
 import { Tabs } from '../../../shared/components/ui/Tabs';
 import { Textarea } from '../../../shared/components/ui/Textarea';
-import { voucherTypes } from '../mock/voucherMock';
+import { voucherApi } from '../services/voucherApi';
 import type {
     Voucher,
     VoucherAllocation,
     VoucherAuditEntry,
     VoucherDashboardMetric,
+    VoucherDocument,
+    VoucherPaymentImpactPreview,
+    VoucherPostingPreview,
     VoucherSettings,
     VoucherType,
 } from '../types/voucher.types';
@@ -58,13 +62,17 @@ export function VoucherPageHeader({ actions, subtitle, title }: { actions?: Reac
 }
 
 export function VoucherDashboardCards({ metrics }: { metrics: VoucherDashboardMetric[] }) {
+    if (!metrics.length) {
+        return <EmptyState description="No voucher metrics were returned for this workspace." title="No voucher metrics" />;
+    }
+
     return (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
             {metrics.map((metric) => (
                 <Card className="p-5" key={metric.label}>
                     <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{metric.label}</p>
                     <p className="mt-2 text-2xl font-bold text-slate-950">{metric.value}</p>
-                    <p className="mt-2 text-xs font-semibold text-slate-500">{metric.tone} status from backend/mock</p>
+                    <p className="mt-2 text-xs font-semibold text-slate-500">{metric.tone} status</p>
                 </Card>
             ))}
         </div>
@@ -124,6 +132,10 @@ export function VoucherTypeTable({ rows }: { rows: VoucherType[] }) {
 }
 
 export function VoucherTable({ rows }: { rows: Voucher[] }) {
+    if (!rows.length) {
+        return <EmptyState description="Try changing the search or filter criteria." title="No vouchers found" />;
+    }
+
     return (
         <DataTable
             columns={[
@@ -182,10 +194,30 @@ export function VoucherTypeForm({ type }: { type?: VoucherType }) {
 }
 
 export function VoucherHeaderForm({ voucher }: { voucher?: Voucher }) {
+    const [typeOptions, setTypeOptions] = useState<Array<{ label: string; value: string }>>(
+        voucher?.voucherType ? [{ label: voucher.voucherType, value: voucher.voucherType }] : [],
+    );
+    const [hasLoadedTypes, setHasLoadedTypes] = useState(false);
+
+    function loadVoucherTypes(): void {
+        if (hasLoadedTypes) {
+            return;
+        }
+
+        setHasLoadedTypes(true);
+        voucherApi.types.list({ perPage: 25 })
+            .then((response) => {
+                setTypeOptions(response.data.map((type) => ({ label: type.name, value: type.id })));
+            })
+            .catch(() => {
+                setHasLoadedTypes(false);
+            });
+    }
+
     return (
         <FormSection description="Header values are collected for backend validation, numbering, workflow, payment and posting preview." title="Header">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <Field label="Voucher type"><Select defaultValue={voucher?.voucherType} options={voucherTypes.map((type) => ({ label: type.name, value: type.name }))} placeholder="Select voucher type" /></Field>
+                <Field label="Voucher type"><Select defaultValue={voucher?.voucherType} onFocus={loadVoucherTypes} onMouseDown={loadVoucherTypes} options={typeOptions} placeholder={typeOptions.length ? 'Select voucher type' : 'Open to load voucher types'} /></Field>
                 <Field label="Voucher date"><Input defaultValue={voucher?.voucherDate} type="date" /></Field>
                 <Field label="Reference number"><Input defaultValue={voucher?.referenceNumber} placeholder="External/reference number" /></Field>
                 <Field label="Party type"><Select defaultValue={voucher?.partyType} options={partyTypeOptions} placeholder="Select party type" /></Field>
@@ -248,6 +280,10 @@ export function VoucherLineEditor({ voucher }: { voucher?: Voucher }) {
 }
 
 export function VoucherAllocationTable({ rows }: { rows: VoucherAllocation[] }) {
+    if (!rows.length) {
+        return <EmptyState description="No allocations were returned for this voucher." title="No allocations" />;
+    }
+
     return (
         <DataTable
             columns={[
@@ -263,7 +299,9 @@ export function VoucherAllocationTable({ rows }: { rows: VoucherAllocation[] }) 
     );
 }
 
-export function VoucherAllocationPanel({ voucher }: { voucher: Voucher }) {
+export function VoucherAllocationPanel({ allocations, voucher }: { allocations?: VoucherAllocation[]; voucher: Voucher }) {
+    const rows = allocations ?? voucher.allocations;
+
     return (
         <div className="space-y-5">
             <FormSection description="Allocations point to generic target modules and documents. Backend owns allocation balances and target eligibility." title="Allocations">
@@ -275,7 +313,7 @@ export function VoucherAllocationPanel({ voucher }: { voucher: Voucher }) {
                 </div>
             </FormSection>
             <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
-                <VoucherAllocationTable rows={voucher.allocations} />
+                <VoucherAllocationTable rows={rows} />
                 <PreviewPanel rows={[
                     { label: 'Allocation balance', value: voucher.paymentImpact.calculated.allocationBalance },
                     { label: 'Settlement status', value: voucher.paymentImpact.calculated.settlementStatus },
@@ -286,15 +324,17 @@ export function VoucherAllocationPanel({ voucher }: { voucher: Voucher }) {
     );
 }
 
-export function VoucherPostingPreviewPanel({ voucher }: { voucher: Voucher }) {
+export function VoucherPostingPreviewPanel({ preview, voucher }: { preview?: VoucherPostingPreview; voucher: Voucher }) {
+    const postingPreview = preview ?? voucher.postingPreview;
+
     return (
         <PreviewPanel
             rows={[
-                { label: 'Debit total', value: voucher.postingPreview.calculated.debitTotal },
-                { label: 'Credit total', value: voucher.postingPreview.calculated.creditTotal },
-                { label: 'Balanced?', value: voucher.postingPreview.calculated.balanced },
-                { label: 'Posting eligibility', value: voucher.postingPreview.calculated.eligibility },
-                { label: 'Journal impact', value: voucher.postingPreview.calculated.journalImpact },
+                { label: 'Debit total', value: postingPreview.calculated.debitTotal },
+                { label: 'Credit total', value: postingPreview.calculated.creditTotal },
+                { label: 'Balanced?', value: postingPreview.calculated.balanced },
+                { label: 'Posting eligibility', value: postingPreview.calculated.eligibility },
+                { label: 'Journal impact', value: postingPreview.calculated.journalImpact },
             ]}
             status="Finance Preview"
             title="Posting Preview / Finance"
@@ -305,20 +345,22 @@ export function VoucherPostingPreviewPanel({ voucher }: { voucher: Voucher }) {
                     { header: 'Effect', key: 'effect' },
                 ]}
                 getRowKey={(row) => `${row.account}-${row.effect}`}
-                rows={voucher.postingPreview.breakdown}
+                rows={postingPreview.breakdown}
             />
         </PreviewPanel>
     );
 }
 
-export function VoucherPaymentImpactPanel({ voucher }: { voucher: Voucher }) {
+export function VoucherPaymentImpactPanel({ preview, voucher }: { preview?: VoucherPaymentImpactPreview; voucher: Voucher }) {
+    const paymentImpact = preview ?? voucher.paymentImpact;
+
     return (
         <PreviewPanel
             rows={[
-                { label: 'Payment impact', value: voucher.paymentImpact.calculated.paymentImpact },
-                { label: 'Allocation balance', value: voucher.paymentImpact.calculated.allocationBalance },
-                { label: 'Settlement status', value: voucher.paymentImpact.calculated.settlementStatus },
-                { label: 'Payment validation', value: voucher.paymentImpact.calculated.paymentMethodValidation },
+                { label: 'Payment impact', value: paymentImpact.calculated.paymentImpact },
+                { label: 'Allocation balance', value: paymentImpact.calculated.allocationBalance },
+                { label: 'Settlement status', value: paymentImpact.calculated.settlementStatus },
+                { label: 'Payment validation', value: paymentImpact.calculated.paymentMethodValidation },
             ]}
             status="Payment Preview"
             title="Payment Impact"
@@ -326,12 +368,14 @@ export function VoucherPaymentImpactPanel({ voucher }: { voucher: Voucher }) {
     );
 }
 
-export function VoucherDocumentPanel({ voucher }: { voucher: Voucher }) {
+export function VoucherDocumentPanel({ document, voucher }: { document?: VoucherDocument; voucher: Voucher }) {
+    const voucherDocument = document ?? voucher.document;
+
     return (
         <PreviewPanel rows={[
-            { label: 'Document number', value: voucher.document.documentNumber },
-            { label: 'Template', value: voucher.document.template },
-            { label: 'Status', value: voucher.document.status },
+            { label: 'Document number', value: voucherDocument.documentNumber },
+            { label: 'Template', value: voucherDocument.template },
+            { label: 'Status', value: voucherDocument.status },
         ]} status="Document" title="Voucher Document" />
     );
 }
@@ -382,6 +426,10 @@ export function VoucherWorkflowActions({ voucher }: { voucher: Voucher }) {
 }
 
 export function VoucherActivityTimeline({ rows }: { rows: VoucherAuditEntry[] }) {
+    if (!rows.length) {
+        return <EmptyState description="No voucher activity was returned yet." title="No activity" />;
+    }
+
     return (
         <div className="space-y-3">
             {rows.map((entry) => (
@@ -399,7 +447,7 @@ export function VoucherActivityTimeline({ rows }: { rows: VoucherAuditEntry[] })
     );
 }
 
-export function VoucherForm({ voucher }: { voucher: Voucher }) {
+export function VoucherForm({ voucher }: { voucher?: Voucher }) {
     const [activeTab, setActiveTab] = useState('header');
     const tabs = [
         { label: 'Header', value: 'header' },
@@ -413,8 +461,9 @@ export function VoucherForm({ voucher }: { voucher: Voucher }) {
             <Card className="p-5"><Tabs active={activeTab} items={tabs} onChange={setActiveTab} trailing={<StatusBadge status="Backend owned" />} /></Card>
             {activeTab === 'header' ? <VoucherHeaderForm voucher={voucher} /> : null}
             {activeTab === 'lines' ? <VoucherLineEditor voucher={voucher} /> : null}
-            {activeTab === 'allocations' ? <VoucherAllocationPanel voucher={voucher} /> : null}
-            {activeTab === 'review' ? (
+            {activeTab === 'allocations' && voucher ? <VoucherAllocationPanel voucher={voucher} /> : null}
+            {activeTab === 'allocations' && !voucher ? <EmptyState description="Save the voucher draft before adding allocations." title="No voucher draft yet" /> : null}
+            {activeTab === 'review' && voucher ? (
                 <div className="grid gap-5 xl:grid-cols-2">
                     <PreviewPanel rows={[
                         { label: 'Voucher', value: voucher.voucherNumber },
@@ -428,6 +477,7 @@ export function VoucherForm({ voucher }: { voucher: Voucher }) {
                     <VoucherDocumentPanel voucher={voucher} />
                 </div>
             ) : null}
+            {activeTab === 'review' && !voucher ? <EmptyState description="Create a voucher draft before requesting backend previews." title="Preview unavailable" /> : null}
         </div>
     );
 }

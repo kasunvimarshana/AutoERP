@@ -72,7 +72,7 @@ function money(value: unknown, fallback = '0.0000'): string {
 function contextQuery(query: Record<string, string | number | boolean | undefined> = {}) {
     return {
         organization_unit_id: asOptionalNumber(getStoredOrganizationUnitId() ?? undefined),
-        per_page: 100,
+        per_page: 25,
         tenant_id: asOptionalNumber(getStoredTenantId() ?? undefined),
         ...query,
     };
@@ -656,9 +656,9 @@ export const salesApi = {
     ledgerNotes: {
         list: async (query: SalesListQuery & { noteType?: string } = {}): Promise<ApiCollectionResponse<SalesLedgerNote>> => {
             const [orders, deliveries, returns] = await Promise.all([
-                salesApi.orders.list({ perPage: 100, search: query.search, status: query.status }),
-                salesApi.deliveries.list({ perPage: 100, search: query.search, status: query.status }),
-                salesApi.returns.list({ perPage: 100, search: query.search, status: query.status }),
+                salesApi.orders.list({ perPage: 25, search: query.search, status: query.status }),
+                salesApi.deliveries.list({ perPage: 25, search: query.search, status: query.status }),
+                salesApi.returns.list({ perPage: 25, search: query.search, status: query.status }),
             ]);
             const data = [
                 ...orders.data.flatMap((order) => ledgerNotesFromSource(order, 'sales_order', order.soNumber)),

@@ -53,7 +53,7 @@ function decimal(value: unknown, fallback = '0.0000'): string {
 function contextQuery(extra: Record<string, string | number | boolean | null | undefined> = {}) {
     return {
         organization_unit_id: numberOrUndefined(getStoredOrganizationUnitId()),
-        per_page: 100,
+        per_page: 25,
         tenant_id: numberOrUndefined(getStoredTenantId()),
         ...extra,
     };

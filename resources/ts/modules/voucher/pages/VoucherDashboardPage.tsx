@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { PreviewPanel } from '../../../shared/components/business/PreviewPanel';
 import { Button } from '../../../shared/components/ui/Button';
+import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { VoucherDashboardCards, VoucherPageHeader, VoucherTable } from '../components/VoucherComponents';
 import { voucherApi } from '../services/voucherApi';
 import type { Voucher, VoucherDashboardMetric } from '../types/voucher.types';
@@ -9,10 +9,39 @@ import type { Voucher, VoucherDashboardMetric } from '../types/voucher.types';
 export function VoucherDashboardPage() {
     const [metrics, setMetrics] = useState<VoucherDashboardMetric[]>([]);
     const [rows, setRows] = useState<Voucher[]>([]);
+    const [error, setError] = useState<Error | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
-        voucherApi.dashboard.summary().then((response) => setMetrics(response.data));
-        voucherApi.vouchers.list().then((response) => setRows(response.data));
+        let active = true;
+        setIsLoading(true);
+        Promise.all([
+            voucherApi.dashboard.summary(),
+            voucherApi.vouchers.list({ perPage: 5 }),
+        ])
+            .then(([metricResponse, voucherResponse]) => {
+                if (!active) {
+                    return;
+                }
+
+                setMetrics(metricResponse.data);
+                setRows(voucherResponse.data);
+                setError(null);
+            })
+            .catch((caught: Error) => {
+                if (active) {
+                    setError(caught);
+                }
+            })
+            .finally(() => {
+                if (active) {
+                    setIsLoading(false);
+                }
+            });
+
+        return () => {
+            active = false;
+        };
     }, []);
 
     return (
@@ -22,14 +51,9 @@ export function VoucherDashboardPage() {
                 subtitle="Generic voucher workflows for payment, receipt, journal, contra, expense, advance, refund, write-off, and adjustment vouchers."
                 title="Voucher Dashboard"
             />
+            {isLoading ? <EmptyState description="Loading voucher dashboard summary..." title="Loading vouchers" /> : null}
+            {error ? <EmptyState description={error.message} title="Voucher dashboard failed" /> : null}
             <VoucherDashboardCards metrics={metrics} />
-            <PreviewPanel status="Architecture" title="Voucher Module">
-                <div className="grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-4">
-                    {['Multiple voucher types', 'Backend balance validation', 'Approval workflow actions', 'Finance posting preview', 'Payment impact preview', 'Document generation', 'Generic allocations', 'Audit/history'].map((item) => (
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 font-semibold text-slate-700" key={item}>{item}</div>
-                    ))}
-                </div>
-            </PreviewPanel>
             <div className="space-y-3">
                 <h2 className="text-base font-bold text-slate-950">Recent Vouchers</h2>
                 <VoucherTable rows={rows} />

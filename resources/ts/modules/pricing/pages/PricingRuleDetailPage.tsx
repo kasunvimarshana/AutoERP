@@ -23,24 +23,27 @@ export function PricingRuleDetailPage() {
     const { id } = useParams();
     const [activeTab, setActiveTab] = useState('overview');
     const [rule, setRule] = useState<PricingRule | null>(null);
-    const [conditions, setConditions] = useState<PricingRuleCondition[]>([]);
-    const [discountRules, setDiscountRules] = useState<DiscountRule[]>([]);
-    const [usage, setUsage] = useState<PricingUsageSummary | null>(null);
-    const [activity, setActivity] = useState<PricingAuditEntry[]>([]);
+    const [conditions, setConditions] = useState<PricingRuleCondition[]>();
+    const [discountRules, setDiscountRules] = useState<DiscountRule[]>();
+    const [usage, setUsage] = useState<PricingUsageSummary>();
+    const [activity, setActivity] = useState<PricingAuditEntry[]>();
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         let mounted = true;
         const ruleId = id ?? '';
-        Promise.all([pricingApi.getPricingRule(ruleId), pricingApi.listPricingRuleConditions(ruleId), pricingApi.listDiscountRules(), pricingApi.getPricingUsage(ruleId, 'rule'), pricingApi.getPricingActivity(ruleId)])
-            .then(([ruleResponse, conditionResponse, discountRuleResponse, usageResponse, activityResponse]) => {
+        setIsLoading(true);
+        setRule(null);
+        setConditions(undefined);
+        setDiscountRules(undefined);
+        setUsage(undefined);
+        setActivity(undefined);
+        pricingApi.getPricingRule(ruleId)
+            .then((ruleResponse) => {
                 if (mounted) {
                     setRule(ruleResponse.data);
-                    setConditions(conditionResponse.data);
-                    setDiscountRules(discountRuleResponse.data);
-                    setUsage(usageResponse.data);
-                    setActivity(activityResponse.data);
+                    setError('');
                 }
             })
             .catch((caught: unknown) => { if (mounted) setError(caught instanceof Error ? caught.message : 'Unable to load pricing rule detail.'); })
@@ -48,8 +51,36 @@ export function PricingRuleDetailPage() {
         return () => { mounted = false; };
     }, [id]);
 
+    useEffect(() => {
+        if (!rule) {
+            return undefined;
+        }
+
+        let mounted = true;
+
+        if (activeTab === 'conditions' && conditions === undefined) {
+            pricingApi.listPricingRuleConditions(rule.id).then((response) => mounted && setConditions(response.data)).catch((caught: unknown) => mounted && setError(caught instanceof Error ? caught.message : 'Unable to load rule conditions.'));
+        }
+
+        if (activeTab === 'discounts' && discountRules === undefined) {
+            pricingApi.listDiscountRules().then((response) => mounted && setDiscountRules(response.data)).catch((caught: unknown) => mounted && setError(caught instanceof Error ? caught.message : 'Unable to load discount rules.'));
+        }
+
+        if (activeTab === 'usage' && usage === undefined) {
+            pricingApi.getPricingUsage(rule.id, 'rule').then((response) => mounted && setUsage(response.data)).catch((caught: unknown) => mounted && setError(caught instanceof Error ? caught.message : 'Unable to load pricing usage.'));
+        }
+
+        if (activeTab === 'audit' && activity === undefined) {
+            pricingApi.getPricingActivity(rule.id).then((response) => mounted && setActivity(response.data)).catch((caught: unknown) => mounted && setError(caught instanceof Error ? caught.message : 'Unable to load pricing activity.'));
+        }
+
+        return () => {
+            mounted = false;
+        };
+    }, [activeTab, activity, conditions, discountRules, rule, usage]);
+
     if (isLoading) return <EmptyState description="Loading pricing rule detail..." title="Loading rule" />;
-    if (error || !rule || !usage) return <EmptyState description={error || 'Pricing rule was not found.'} title="Unable to load pricing rule" />;
+    if (error || !rule) return <EmptyState description={error || 'Pricing rule was not found.'} title="Unable to load pricing rule" />;
 
     return (
         <div className="space-y-6">
@@ -65,10 +96,10 @@ export function PricingRuleDetailPage() {
             </Card>
             <Card className="p-5"><Tabs active={activeTab} items={tabs} onChange={setActiveTab} /></Card>
             {activeTab === 'overview' ? <PreviewPanel rows={[{ label: 'Rule type', value: rule.ruleType }, { label: 'Action value', value: rule.actionValue }, { label: 'Valid', value: `${rule.validFrom} to ${rule.validTo}` }]} title="Overview" /> : null}
-            {activeTab === 'conditions' ? <PricingRuleConditionsTable conditions={conditions} /> : null}
-            {activeTab === 'discounts' ? <DiscountRulesTable rules={discountRules} /> : null}
-            {activeTab === 'usage' ? <PricingUsagePanel usage={usage} /> : null}
-            {activeTab === 'audit' ? <PricingActivityTimeline entries={activity} /> : null}
+            {activeTab === 'conditions' ? conditions ? <PricingRuleConditionsTable conditions={conditions} /> : <EmptyState description="Loading pricing rule conditions..." title="Loading conditions" /> : null}
+            {activeTab === 'discounts' ? discountRules ? <DiscountRulesTable rules={discountRules} /> : <EmptyState description="Loading applied discount rules..." title="Loading discounts" /> : null}
+            {activeTab === 'usage' ? usage ? <PricingUsagePanel usage={usage} /> : <EmptyState description="Loading backend usage summary..." title="Loading usage" /> : null}
+            {activeTab === 'audit' ? activity ? <PricingActivityTimeline entries={activity} /> : <EmptyState description="Loading pricing activity..." title="Loading activity" /> : null}
         </div>
     );
 }

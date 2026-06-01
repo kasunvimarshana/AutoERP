@@ -1,21 +1,55 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PreviewPanel } from '../../../shared/components/business/PreviewPanel';
+import { DataToolbar, type DataToolbarFilterValue } from '../../../shared/components/data/DataToolbar';
 import { Button } from '../../../shared/components/ui/Button';
-import { Card } from '../../../shared/components/ui/Card';
-import { Input } from '../../../shared/components/ui/Input';
-import { Select } from '../../../shared/components/ui/Select';
-import { getVoucherTypeById } from '../mock/voucherMock';
+import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { voucherApi } from '../services/voucherApi';
 import { VoucherPageHeader, VoucherTypeForm, VoucherTypeSummaryCard, VoucherTypeTable } from '../components/VoucherComponents';
 import type { VoucherType } from '../types/voucher.types';
 
 export function VoucherTypeListPage() {
     const [rows, setRows] = useState<VoucherType[]>([]);
+    const [filters, setFilters] = useState<Record<string, DataToolbarFilterValue>>({});
+    const [search, setSearch] = useState('');
+    const [error, setError] = useState<Error | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
-        voucherApi.types.list().then((response) => setRows(response.data));
-    }, []);
+        let active = true;
+        setIsLoading(true);
+        voucherApi.types.list({
+            perPage: 25,
+            search,
+            status: String(filters.status ?? ''),
+        })
+            .then((response) => {
+                if (!active) {
+                    return;
+                }
+
+                setRows(response.data);
+                setError(null);
+            })
+            .catch((caught: Error) => {
+                if (active) {
+                    setError(caught);
+                }
+            })
+            .finally(() => {
+                if (active) {
+                    setIsLoading(false);
+                }
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [filters.status, search]);
+
+    function updateFilter(filterId: string, value: DataToolbarFilterValue): void {
+        setFilters((current) => ({ ...current, [filterId]: value }));
+    }
 
     return (
         <div className="space-y-6">
@@ -24,14 +58,19 @@ export function VoucherTypeListPage() {
                 subtitle="Voucher types define generic voucher behavior, direction, payment requirements, approval, balance validation, sequence, and document defaults."
                 title="Voucher Types"
             />
-            <Card className="p-4">
-                <div className="grid gap-3 md:grid-cols-[1fr_180px_180px_160px]">
-                    <Input placeholder="Search type code, name, category..." />
-                    <Select options={[{ label: 'Any direction', value: '' }, { label: 'Payment', value: 'payment' }, { label: 'Receipt', value: 'receipt' }, { label: 'Journal', value: 'journal' }, { label: 'Adjustment', value: 'adjustment' }]} />
-                    <Select options={[{ label: 'Any status', value: '' }, { label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }]} />
-                    <Button variant="secondary">Filter</Button>
-                </div>
-            </Card>
+            {error ? <EmptyState description={error.message} title="Voucher types failed" /> : null}
+            <DataToolbar
+                disabled={isLoading}
+                filterValues={filters}
+                filters={[{ id: 'status', label: 'Status', options: [{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }], type: 'status' }]}
+                isLoading={isLoading}
+                onFilterChange={updateFilter}
+                onResetFilters={() => setFilters({})}
+                onSearchChange={setSearch}
+                savedViewsDisabledReason="Saved voucher type views need a preferences endpoint."
+                searchPlaceholder="Search type code, name, category..."
+                searchValue={search}
+            />
             <VoucherTypeTable rows={rows} />
         </div>
     );
@@ -51,12 +90,38 @@ export function VoucherTypeCreatePage() {
 }
 
 export function VoucherTypeEditPage() {
-    const { id = 'vtype-001' } = useParams();
-    const [type, setType] = useState<VoucherType>(getVoucherTypeById(id));
+    const { id = '' } = useParams();
+    const [type, setType] = useState<VoucherType | null>(null);
+    const [error, setError] = useState<Error | null>(null);
 
     useEffect(() => {
-        voucherApi.types.get(id).then((response) => setType(response.data));
+        let active = true;
+        setType(null);
+        voucherApi.types.get(id)
+            .then((response) => {
+                if (active) {
+                    setType(response.data);
+                    setError(null);
+                }
+            })
+            .catch((caught: Error) => {
+                if (active) {
+                    setError(caught);
+                }
+            });
+
+        return () => {
+            active = false;
+        };
     }, [id]);
+
+    if (error) {
+        return <EmptyState description={error.message} title="Voucher type failed" />;
+    }
+
+    if (!type) {
+        return <EmptyState description="Loading voucher type from backend..." title="Loading voucher type" />;
+    }
 
     return (
         <div className="space-y-6">
@@ -71,12 +136,38 @@ export function VoucherTypeEditPage() {
 }
 
 export function VoucherTypeDetailPage() {
-    const { id = 'vtype-001' } = useParams();
-    const [type, setType] = useState<VoucherType>(getVoucherTypeById(id));
+    const { id = '' } = useParams();
+    const [type, setType] = useState<VoucherType | null>(null);
+    const [error, setError] = useState<Error | null>(null);
 
     useEffect(() => {
-        voucherApi.types.get(id).then((response) => setType(response.data));
+        let active = true;
+        setType(null);
+        voucherApi.types.get(id)
+            .then((response) => {
+                if (active) {
+                    setType(response.data);
+                    setError(null);
+                }
+            })
+            .catch((caught: Error) => {
+                if (active) {
+                    setError(caught);
+                }
+            });
+
+        return () => {
+            active = false;
+        };
     }, [id]);
+
+    if (error) {
+        return <EmptyState description={error.message} title="Voucher type failed" />;
+    }
+
+    if (!type) {
+        return <EmptyState description="Loading voucher type from backend..." title="Loading voucher type" />;
+    }
 
     return (
         <div className="space-y-6">

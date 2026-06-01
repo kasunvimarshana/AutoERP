@@ -24,23 +24,19 @@ const tabs = [
     { label: 'Audit / History', value: 'audit' },
 ];
 
-type ItemDetailState = {
-    activity: ItemAuditEntry[];
-    attributes: ItemAttribute[];
-    comboComponents: ItemComboComponent[];
-    identifiers: ItemIdentifier[];
-    inventorySummary: ItemInventorySummary;
-    item: Item;
-    pricingReferences: ItemPricingReference[];
-    units: ItemUnit[];
-    usage: ItemUsageSummary;
-    variants: ItemVariant[];
-};
-
 export function ItemDetailPage() {
     const { id } = useParams();
     const [activeTab, setActiveTab] = useState('overview');
-    const [detail, setDetail] = useState<ItemDetailState | null>(null);
+    const [item, setItem] = useState<Item | null>(null);
+    const [activity, setActivity] = useState<ItemAuditEntry[]>();
+    const [attributes, setAttributes] = useState<ItemAttribute[]>();
+    const [comboComponents, setComboComponents] = useState<ItemComboComponent[]>();
+    const [identifiers, setIdentifiers] = useState<ItemIdentifier[]>();
+    const [inventorySummary, setInventorySummary] = useState<ItemInventorySummary>();
+    const [pricingReferences, setPricingReferences] = useState<ItemPricingReference[]>();
+    const [units, setUnits] = useState<ItemUnit[]>();
+    const [usage, setUsage] = useState<ItemUsageSummary>();
+    const [variants, setVariants] = useState<ItemVariant[]>();
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isChangingStatus, setIsChangingStatus] = useState(false);
@@ -49,33 +45,87 @@ export function ItemDetailPage() {
     useEffect(() => {
         let mounted = true;
         const itemId = id ?? '';
-        Promise.all([
-            itemApi.getItem(itemId),
-            itemApi.getItemUnits(itemId),
-            itemApi.listAttributes(),
-            itemApi.listVariants(itemId),
-            itemApi.listComboComponents(itemId),
-            itemApi.listIdentifiers(itemId),
-            itemApi.getPricingReferences(itemId),
-            itemApi.getInventorySummary(itemId),
-            itemApi.getItemUsage(itemId),
-            itemApi.getItemActivity(itemId),
-        ])
-            .then(([item, units, attributes, variants, comboComponents, identifiers, pricingReferences, inventorySummary, usage, activity]) => {
-                if (mounted) setDetail({ activity: activity.data, attributes: attributes.data, comboComponents: comboComponents.data, identifiers: identifiers.data, inventorySummary: inventorySummary.data, item: item.data, pricingReferences: pricingReferences.data, units: units.data, usage: usage.data, variants: variants.data });
+        setIsLoading(true);
+        setItem(null);
+        setActivity(undefined);
+        setAttributes(undefined);
+        setComboComponents(undefined);
+        setIdentifiers(undefined);
+        setInventorySummary(undefined);
+        setPricingReferences(undefined);
+        setUnits(undefined);
+        setUsage(undefined);
+        setVariants(undefined);
+        itemApi.getItem(itemId)
+            .then((response) => {
+                if (mounted) {
+                    setItem(response.data);
+                    setError('');
+                }
             })
             .catch((caught: unknown) => { if (mounted) setError(caught instanceof Error ? caught.message : 'Unable to load item detail.'); })
             .finally(() => { if (mounted) setIsLoading(false); });
         return () => { mounted = false; };
     }, [id, reloadKey]);
 
-    if (isLoading) return <EmptyState description="Loading item setup, capability summaries, and audit..." title="Loading item detail" />;
-    if (!detail) return <EmptyState description={error || 'Item was not found.'} title="Unable to load item" />;
+    useEffect(() => {
+        if (!item) {
+            return undefined;
+        }
 
-    const { activity, attributes, comboComponents, identifiers, inventorySummary, item, pricingReferences, units, usage, variants } = detail;
+        let mounted = true;
+        const itemId = item.id;
+
+        if (activeTab === 'overview' && usage === undefined) {
+            itemApi.getItemUsage(itemId).then((response) => mounted && setUsage(response.data)).catch((caught: unknown) => mounted && setError(caught instanceof Error ? caught.message : 'Unable to load item usage.'));
+        }
+
+        if (activeTab === 'units' && units === undefined) {
+            itemApi.getItemUnits(itemId).then((response) => mounted && setUnits(response.data)).catch((caught: unknown) => mounted && setError(caught instanceof Error ? caught.message : 'Unable to load item units.'));
+        }
+
+        if (activeTab === 'attributes' && attributes === undefined) {
+            itemApi.listAttributes().then((response) => mounted && setAttributes(response.data)).catch((caught: unknown) => mounted && setError(caught instanceof Error ? caught.message : 'Unable to load item attributes.'));
+        }
+
+        if (activeTab === 'variants' && variants === undefined) {
+            itemApi.listVariants(itemId).then((response) => mounted && setVariants(response.data)).catch((caught: unknown) => mounted && setError(caught instanceof Error ? caught.message : 'Unable to load item variants.'));
+        }
+
+        if (activeTab === 'combo' && comboComponents === undefined) {
+            itemApi.listComboComponents(itemId).then((response) => mounted && setComboComponents(response.data)).catch((caught: unknown) => mounted && setError(caught instanceof Error ? caught.message : 'Unable to load combo components.'));
+        }
+
+        if (activeTab === 'identifiers' && identifiers === undefined) {
+            itemApi.listIdentifiers(itemId).then((response) => mounted && setIdentifiers(response.data)).catch((caught: unknown) => mounted && setError(caught instanceof Error ? caught.message : 'Unable to load item identifiers.'));
+        }
+
+        if (activeTab === 'pricing' && pricingReferences === undefined) {
+            itemApi.getPricingReferences(itemId).then((response) => mounted && setPricingReferences(response.data)).catch((caught: unknown) => mounted && setError(caught instanceof Error ? caught.message : 'Unable to load pricing references.'));
+        }
+
+        if (activeTab === 'inventory' && inventorySummary === undefined) {
+            itemApi.getInventorySummary(itemId).then((response) => mounted && setInventorySummary(response.data)).catch((caught: unknown) => mounted && setError(caught instanceof Error ? caught.message : 'Unable to load inventory summary.'));
+        }
+
+        if (activeTab === 'usage' && usage === undefined) {
+            itemApi.getItemUsage(itemId).then((response) => mounted && setUsage(response.data)).catch((caught: unknown) => mounted && setError(caught instanceof Error ? caught.message : 'Unable to load item usage.'));
+        }
+
+        if (activeTab === 'audit' && activity === undefined) {
+            itemApi.getItemActivity(itemId).then((response) => mounted && setActivity(response.data)).catch((caught: unknown) => mounted && setError(caught instanceof Error ? caught.message : 'Unable to load item activity.'));
+        }
+
+        return () => {
+            mounted = false;
+        };
+    }, [activeTab, activity, attributes, comboComponents, identifiers, inventorySummary, item, pricingReferences, units, usage, variants]);
+
+    if (isLoading) return <EmptyState description="Loading item header from backend..." title="Loading item detail" />;
+    if (!item) return <EmptyState description={error || 'Item was not found.'} title="Unable to load item" />;
 
     async function changeStatus(action: 'activate' | 'deactivate') {
-        if (!detail) {
+        if (!item) {
             return;
         }
 
@@ -84,9 +134,9 @@ export function ItemDetailPage() {
 
         try {
             const response = action === 'activate'
-                ? await itemApi.activateItem(detail.item.id)
-                : await itemApi.deactivateItem(detail.item.id);
-            setDetail({ ...detail, item: response.data });
+                ? await itemApi.activateItem(item.id)
+                : await itemApi.deactivateItem(item.id);
+            setItem(response.data);
         } catch (caught) {
             setError(caught instanceof Error ? caught.message : 'Unable to change item status.');
         } finally {
@@ -115,33 +165,33 @@ export function ItemDetailPage() {
                             ].map(([label, value]) => <div className="rounded-lg border border-slate-200 bg-slate-50 p-3" key={label}><p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p><p className="mt-1 text-sm font-semibold text-slate-800">{value}</p></div>)}
                         </div>
                     </Card>
-                    <ItemCapabilityPanel capabilities={usage.capabilities} />
+                    {usage ? <ItemCapabilityPanel capabilities={usage.capabilities} /> : <EmptyState description="Loading item capability summary..." title="Loading capabilities" />}
                 </div>
             ) : null}
-            {activeTab === 'units' ? <ItemUnitsPanel units={units} /> : null}
-            {activeTab === 'attributes' ? <ItemAttributesTable attributes={attributes} /> : null}
+            {activeTab === 'units' ? units ? <ItemUnitsPanel units={units} /> : <EmptyState description="Loading item UOMs..." title="Loading units" /> : null}
+            {activeTab === 'attributes' ? attributes ? <ItemAttributesTable attributes={attributes} /> : <EmptyState description="Loading item attributes..." title="Loading attributes" /> : null}
             {activeTab === 'variants' ? (
                 <div className="space-y-5">
                     <ItemVariantCreateForm item={item} onSaved={() => setReloadKey((value) => value + 1)} />
-                    <ItemVariantsTable onDelete={async (row) => { await itemApi.deleteVariant(row.id); setReloadKey((value) => value + 1); }} variants={variants} />
+                    {variants ? <ItemVariantsTable onDelete={async (row) => { await itemApi.deleteVariant(row.id); setReloadKey((value) => value + 1); }} variants={variants} /> : <EmptyState description="Loading item variants..." title="Loading variants" />}
                 </div>
             ) : null}
             {activeTab === 'combo' ? (
                 <div className="space-y-5">
                     <ItemComboComponentCreateForm item={item} onSaved={() => setReloadKey((value) => value + 1)} />
-                    <ItemComboComponentsTable components={comboComponents} onDelete={async (row) => { await itemApi.deleteComboComponent(row.id); setReloadKey((value) => value + 1); }} />
+                    {comboComponents ? <ItemComboComponentsTable components={comboComponents} onDelete={async (row) => { await itemApi.deleteComboComponent(row.id); setReloadKey((value) => value + 1); }} /> : <EmptyState description="Loading combo components..." title="Loading components" />}
                 </div>
             ) : null}
             {activeTab === 'identifiers' ? (
                 <div className="space-y-5">
                     <ItemIdentifierCreateForm item={item} onSaved={() => setReloadKey((value) => value + 1)} />
-                    <ItemIdentifiersTable identifiers={identifiers} onDelete={async (row) => { await itemApi.deleteIdentifier(row.id); setReloadKey((value) => value + 1); }} />
+                    {identifiers ? <ItemIdentifiersTable identifiers={identifiers} onDelete={async (row) => { await itemApi.deleteIdentifier(row.id); setReloadKey((value) => value + 1); }} /> : <EmptyState description="Loading item identifiers..." title="Loading identifiers" />}
                 </div>
             ) : null}
-            {activeTab === 'pricing' ? <ItemPricingReferencesPanel references={pricingReferences} /> : null}
-            {activeTab === 'inventory' ? <ItemInventorySummaryPanel summary={inventorySummary} /> : null}
-            {activeTab === 'usage' ? <ItemUsagePanel summary={usage} /> : null}
-            {activeTab === 'audit' ? <ItemActivityTimeline entries={activity} /> : null}
+            {activeTab === 'pricing' ? pricingReferences ? <ItemPricingReferencesPanel references={pricingReferences} /> : <EmptyState description="Loading pricing references..." title="Loading pricing" /> : null}
+            {activeTab === 'inventory' ? inventorySummary ? <ItemInventorySummaryPanel summary={inventorySummary} /> : <EmptyState description="Loading inventory summary..." title="Loading inventory" /> : null}
+            {activeTab === 'usage' ? usage ? <ItemUsagePanel summary={usage} /> : <EmptyState description="Loading usage summary..." title="Loading usage" /> : null}
+            {activeTab === 'audit' ? activity ? <ItemActivityTimeline entries={activity} /> : <EmptyState description="Loading item activity..." title="Loading activity" /> : null}
         </div>
     );
 }

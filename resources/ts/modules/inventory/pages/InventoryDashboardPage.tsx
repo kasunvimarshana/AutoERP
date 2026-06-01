@@ -14,17 +14,30 @@ export function InventoryDashboardPage() {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
+        let active = true;
         Promise.all([
             inventoryApi.listDashboardMetrics(),
-            inventoryApi.listStockMovements(),
-            inventoryApi.listValuation(),
+            inventoryApi.listStockMovements({ per_page: 5 }),
+            inventoryApi.listValuation({ per_page: 5 }),
         ])
             .then(([metricResponse, movementResponse, valuationResponse]) => {
+                if (!active) {
+                    return;
+                }
+
                 setMetrics(metricResponse.data);
-                setMovements(movementResponse.data.slice(0, 5));
-                setValuation(valuationResponse.data.slice(0, 5));
+                setMovements(movementResponse.data);
+                setValuation(valuationResponse.data);
             })
-            .catch((caught: unknown) => setError(caught instanceof Error ? caught.message : 'Unable to load inventory dashboard.'));
+            .catch((caught: unknown) => {
+                if (active) {
+                    setError(caught instanceof Error ? caught.message : 'Unable to load inventory dashboard.');
+                }
+            });
+
+        return () => {
+            active = false;
+        };
     }, []);
 
     return (
