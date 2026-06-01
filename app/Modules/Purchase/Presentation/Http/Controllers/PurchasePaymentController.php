@@ -8,7 +8,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Modules\Core\Application\DTO\PagedResult;
-use Modules\Core\Application\Results\Result;
 use Modules\Payment\Application\Contracts\UseCases\PaymentAllocations\CreatePaymentAllocationServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\PaymentAllocations\ListPaymentAllocationsServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\Payments\CreatePaymentServiceInterface;
@@ -18,9 +17,12 @@ use Modules\Payment\Application\Contracts\UseCases\Payments\ListPaymentsServiceI
 use Modules\Payment\Application\Contracts\UseCases\Payments\UpdatePaymentServiceInterface;
 use Modules\Payment\Application\Contracts\UseCases\WriteOffs\CreateWriteOffServiceInterface;
 use Modules\Purchase\Application\Contracts\Services\PurchaseIntegrationServiceInterface;
+use Modules\Purchase\Presentation\Http\Controllers\Concerns\RespondsWithPurchaseResult;
 
 final class PurchasePaymentController extends Controller
 {
+    use RespondsWithPurchaseResult;
+
     public function __construct(
         private readonly PurchaseIntegrationServiceInterface $integration,
         private readonly ListPaymentsServiceInterface $listPayments,
@@ -31,8 +33,7 @@ final class PurchasePaymentController extends Controller
         private readonly ListPaymentAllocationsServiceInterface $listAllocations,
         private readonly CreatePaymentAllocationServiceInterface $createAllocation,
         private readonly CreateWriteOffServiceInterface $createWriteOff,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -105,9 +106,6 @@ final class PurchasePaymentController extends Controller
 
     public function void(Request $request, int|string $id): JsonResponse
     {
-        $payload = $this->withContext($request);
-        $payload['target_status'] = 'voided';
-
         return $this->respond($this->updatePayment->execute($id, ['status' => 'voided']));
     }
 
@@ -123,10 +121,12 @@ final class PurchasePaymentController extends Controller
         $sourceId = (int) ($payload['source_id'] ?? 0);
         if ($sourceType !== '' && $sourceId > 0) {
             $payload['payment_id'] = (int) $id;
+
             return $this->respond($this->integration->allocateSourcePayment($sourceType, $sourceId, $payload));
         }
 
         $payload['payment_id'] = (int) $id;
+
         return $this->respond($this->createAllocation->execute($payload));
     }
 
@@ -278,17 +278,5 @@ final class PurchasePaymentController extends Controller
         }
 
         return $payload;
-    }
-
-    private function respond(Result $result): JsonResponse
-    {
-        if ($result->isFailure()) {
-            $error = $result->errorOrFail();
-            $statusCode = $error->code === 'PURCHASE_NOT_FOUND' || $error->code === 'PAYMENT_NOT_FOUND' ? 404 : 422;
-
-            return response()->json(['message' => $error->message, 'code' => $error->code], $statusCode);
-        }
-
-        return response()->json(['data' => $result->valueOrFail()]);
     }
 }

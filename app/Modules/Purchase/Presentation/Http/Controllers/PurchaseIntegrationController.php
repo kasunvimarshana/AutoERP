@@ -6,22 +6,22 @@ namespace Modules\Purchase\Presentation\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\Core\Application\Results\Result;
 use Modules\Purchase\Application\Contracts\Services\PurchaseIntegrationServiceInterface;
+use Modules\Purchase\Presentation\Http\Controllers\Concerns\RespondsWithPurchaseResult;
 use Modules\Purchase\Presentation\Http\Requests\PurchaseIntegrationActionRequest;
 
 final class PurchaseIntegrationController extends Controller
 {
-    public function __construct(private readonly PurchaseIntegrationServiceInterface $service)
-    {
-    }
+    use RespondsWithPurchaseResult;
+
+    public function __construct(private readonly PurchaseIntegrationServiceInterface $service) {}
 
     public function listDocuments(
         PurchaseIntegrationActionRequest $request,
         string $entityType,
         int|string $id,
     ): JsonResponse {
-        return $this->respond($this->service->listSourceDocuments($entityType, $id, $this->withContext($request)));
+        return $this->respond($this->service->listSourceDocuments($entityType, $id, $this->withContext($request)), true);
     }
 
     public function showDocument(
@@ -31,7 +31,8 @@ final class PurchaseIntegrationController extends Controller
         int $documentId,
     ): JsonResponse {
         return $this->respond(
-            $this->service->showSourceDocument($entityType, $id, $documentId, $this->withContext($request))
+            $this->service->showSourceDocument($entityType, $id, $documentId, $this->withContext($request)),
+            true,
         );
     }
 
@@ -40,7 +41,7 @@ final class PurchaseIntegrationController extends Controller
         string $entityType,
         int|string $id,
     ): JsonResponse {
-        return $this->respond($this->service->createSourceDocument($entityType, $id, $this->withContext($request)));
+        return $this->respond($this->service->createSourceDocument($entityType, $id, $this->withContext($request)), true);
     }
 
     public function changeDocumentStatus(
@@ -50,7 +51,8 @@ final class PurchaseIntegrationController extends Controller
         int $documentId,
     ): JsonResponse {
         return $this->respond(
-            $this->service->changeSourceDocumentStatus($entityType, $id, $documentId, $this->withContext($request))
+            $this->service->changeSourceDocumentStatus($entityType, $id, $documentId, $this->withContext($request)),
+            true,
         );
     }
 
@@ -61,7 +63,8 @@ final class PurchaseIntegrationController extends Controller
         int $documentId,
     ): JsonResponse {
         return $this->respond(
-            $this->service->matchSourceDocumentLine($entityType, $id, $documentId, $this->withContext($request))
+            $this->service->matchSourceDocumentLine($entityType, $id, $documentId, $this->withContext($request)),
+            true,
         );
     }
 
@@ -72,7 +75,8 @@ final class PurchaseIntegrationController extends Controller
         int $documentId,
     ): JsonResponse {
         return $this->respond(
-            $this->service->unmatchSourceDocumentLine($entityType, $id, $documentId, $this->withContext($request))
+            $this->service->unmatchSourceDocumentLine($entityType, $id, $documentId, $this->withContext($request)),
+            true,
         );
     }
 
@@ -81,7 +85,7 @@ final class PurchaseIntegrationController extends Controller
         string $entityType,
         int|string $id,
     ): JsonResponse {
-        return $this->respond($this->service->createSourcePayment($entityType, $id, $this->withContext($request)));
+        return $this->respond($this->service->createSourcePayment($entityType, $id, $this->withContext($request)), true);
     }
 
     public function createAdvance(
@@ -89,7 +93,7 @@ final class PurchaseIntegrationController extends Controller
         string $entityType,
         int|string $id,
     ): JsonResponse {
-        return $this->respond($this->service->createSourceAdvance($entityType, $id, $this->withContext($request)));
+        return $this->respond($this->service->createSourceAdvance($entityType, $id, $this->withContext($request)), true);
     }
 
     public function allocatePayment(
@@ -97,7 +101,7 @@ final class PurchaseIntegrationController extends Controller
         string $entityType,
         int|string $id,
     ): JsonResponse {
-        return $this->respond($this->service->allocateSourcePayment($entityType, $id, $this->withContext($request)));
+        return $this->respond($this->service->allocateSourcePayment($entityType, $id, $this->withContext($request)), true);
     }
 
     public function applyAdvance(
@@ -105,7 +109,7 @@ final class PurchaseIntegrationController extends Controller
         string $entityType,
         int|string $id,
     ): JsonResponse {
-        return $this->respond($this->service->applySourceAdvance($entityType, $id, $this->withContext($request)));
+        return $this->respond($this->service->applySourceAdvance($entityType, $id, $this->withContext($request)), true);
     }
 
     public function listPaymentAllocations(
@@ -114,7 +118,8 @@ final class PurchaseIntegrationController extends Controller
         int|string $id,
     ): JsonResponse {
         return $this->respond(
-            $this->service->listSourcePaymentAllocations($entityType, $id, $this->withContext($request))
+            $this->service->listSourcePaymentAllocations($entityType, $id, $this->withContext($request)),
+            true,
         );
     }
 
@@ -123,7 +128,7 @@ final class PurchaseIntegrationController extends Controller
         string $entityType,
         int|string $id,
     ): JsonResponse {
-        return $this->respond($this->service->sourcePaymentSummary($entityType, $id, $this->withContext($request)));
+        return $this->respond($this->service->sourcePaymentSummary($entityType, $id, $this->withContext($request)), true);
     }
 
     public function supplierPayables(PurchaseIntegrationActionRequest $request): JsonResponse
@@ -132,7 +137,7 @@ final class PurchaseIntegrationController extends Controller
         $tenantId = (int) ($payload['tenant_id'] ?? 0);
         $supplierId = isset($payload['supplier_id']) ? (int) $payload['supplier_id'] : null;
 
-        return $this->respond($this->service->supplierPayables($tenantId, $supplierId));
+        return $this->respond($this->service->supplierPayables($tenantId, $supplierId), true);
     }
 
     public function supplierAdvanceBalances(PurchaseIntegrationActionRequest $request): JsonResponse
@@ -141,22 +146,22 @@ final class PurchaseIntegrationController extends Controller
         $tenantId = (int) ($payload['tenant_id'] ?? 0);
         $supplierId = isset($payload['supplier_id']) ? (int) $payload['supplier_id'] : null;
 
-        return $this->respond($this->service->supplierAdvanceBalances($tenantId, $supplierId));
+        return $this->respond($this->service->supplierAdvanceBalances($tenantId, $supplierId), true);
     }
 
     public function postPayment(PurchaseIntegrationActionRequest $request, int|string $paymentId): JsonResponse
     {
-        return $this->respond($this->service->postPayment($paymentId, $this->withContext($request)));
+        return $this->respond($this->service->postPayment($paymentId, $this->withContext($request)), true);
     }
 
     public function reversePayment(PurchaseIntegrationActionRequest $request, int|string $paymentId): JsonResponse
     {
-        return $this->respond($this->service->reversePayment($paymentId, $this->withContext($request)));
+        return $this->respond($this->service->reversePayment($paymentId, $this->withContext($request)), true);
     }
 
     public function refundPayment(PurchaseIntegrationActionRequest $request, int|string $paymentId): JsonResponse
     {
-        return $this->respond($this->service->refundPayment($paymentId, $this->withContext($request)));
+        return $this->respond($this->service->refundPayment($paymentId, $this->withContext($request)), true);
     }
 
     /** @return array<string, mixed> */
@@ -184,17 +189,5 @@ final class PurchaseIntegrationController extends Controller
         }
 
         return $payload;
-    }
-
-    private function respond(Result $result): JsonResponse
-    {
-        if ($result->isFailure()) {
-            $error = $result->errorOrFail();
-            $statusCode = $error->code === 'PURCHASE_NOT_FOUND' ? 404 : 422;
-
-            return response()->json(['message' => $error->message, 'code' => $error->code], $statusCode);
-        }
-
-        return response()->json(['data' => $result->valueOrFail()]);
     }
 }

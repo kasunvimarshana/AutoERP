@@ -51,8 +51,11 @@ final class UpsertGrnHeaderRequest extends FormRequest
             'debit_note_total' => ['nullable', 'numeric'],
             'credit_note_total' => ['nullable', 'numeric'],
             'grand_total' => ['nullable', 'numeric'],
+            'tax_account_id' => ['nullable', 'integer', 'min:1', 'exists:accounts,id'],
+            'discount_account_id' => ['nullable', 'integer', 'min:1', 'exists:accounts,id'],
+            'grn_account_id' => ['nullable', 'integer', 'min:1', 'exists:accounts,id'],
             'notes' => ['nullable', 'string'],
-            'created_by' => ['nullable', 'integer', 'min:1']
+            'created_by' => ['nullable', 'integer', 'min:1'],
         ];
     }
 }

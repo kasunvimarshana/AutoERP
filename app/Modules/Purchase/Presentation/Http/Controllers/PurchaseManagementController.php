@@ -7,14 +7,14 @@ namespace Modules\Purchase\Presentation\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Modules\Core\Application\Results\Result;
 use Modules\Purchase\Application\Contracts\Services\PurchaseManagementServiceInterface;
+use Modules\Purchase\Presentation\Http\Controllers\Concerns\RespondsWithPurchaseResult;
 
 final class PurchaseManagementController extends Controller
 {
-    public function __construct(private readonly PurchaseManagementServiceInterface $service)
-    {
-    }
+    use RespondsWithPurchaseResult;
+
+    public function __construct(private readonly PurchaseManagementServiceInterface $service) {}
 
     public function upsertPurchaseOrderWithLines(Request $request): JsonResponse
     {
@@ -117,17 +117,5 @@ final class PurchaseManagementController extends Controller
         $supplierId = $request->has('supplier_id') ? (int) $request->input('supplier_id') : null;
 
         return $this->respond($this->service->getPayableDocuments($tenantId, $supplierId));
-    }
-
-    private function respond(Result $result): JsonResponse
-    {
-        if ($result->isFailure()) {
-            $error = $result->errorOrFail();
-            $statusCode = $error->code === 'PURCHASE_NOT_FOUND' ? 404 : 422;
-
-            return response()->json(['message' => $error->message], $statusCode);
-        }
-
-        return response()->json(['data' => $result->valueOrFail()]);
     }
 }

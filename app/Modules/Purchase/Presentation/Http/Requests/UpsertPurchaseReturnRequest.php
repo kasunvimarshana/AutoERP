@@ -36,6 +36,7 @@ final class UpsertPurchaseReturnRequest extends FormRequest
             'exchange_rate' => ['nullable', 'numeric'],
             'return_date' => array_merge($required, ['date']),
             'return_reason' => ['nullable', 'string', 'max:255'],
+            'is_without_original' => ['nullable', 'boolean'],
             'subtotal' => ['nullable', 'numeric'],
             'line_tax_total' => ['nullable', 'numeric'],
             'line_discount_total' => ['nullable', 'numeric'],
@@ -50,8 +51,11 @@ final class UpsertPurchaseReturnRequest extends FormRequest
             'debit_note_total' => ['nullable', 'numeric'],
             'credit_note_total' => ['nullable', 'numeric'],
             'grand_total' => ['nullable', 'numeric'],
+            'tax_account_id' => ['nullable', 'integer', 'min:1', 'exists:accounts,id'],
+            'discount_account_id' => ['nullable', 'integer', 'min:1', 'exists:accounts,id'],
+            'purchase_return_account_id' => ['nullable', 'integer', 'min:1', 'exists:accounts,id'],
             'notes' => ['nullable', 'string'],
-            'created_by' => ['nullable', 'integer', 'min:1']
+            'created_by' => ['nullable', 'integer', 'min:1'],
         ];
     }
 }
