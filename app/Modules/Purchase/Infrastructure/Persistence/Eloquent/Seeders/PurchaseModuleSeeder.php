@@ -19,6 +19,7 @@ class PurchaseModuleSeeder extends Seeder
             PurchaseDocumentDefinitionsSeeder::class,
             PurchaseDocumentWorkflowSeeder::class,
             PurchaseDocumentSequenceSeeder::class,
+            PurchaseSettingsSeeder::class,
         ]);
     }
 }

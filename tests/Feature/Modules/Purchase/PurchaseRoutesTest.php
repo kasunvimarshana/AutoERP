@@ -9,7 +9,7 @@ use Tests\TestCase;
 
 final class PurchaseRoutesTest extends TestCase
 {
-    public function testPurchaseRoutesAreRegistered(): void
+    public function test_purchase_routes_are_registered(): void
     {
         self::assertTrue(Route::has('purchase.purchase-orders.index'));
         self::assertTrue(Route::has('purchase.purchase-orders.store'));
@@ -41,11 +41,16 @@ final class PurchaseRoutesTest extends TestCase
         self::assertTrue(Route::has('purchase.purchase-return-lines.show'));
         self::assertTrue(Route::has('purchase.purchase-return-lines.update'));
         self::assertTrue(Route::has('purchase.purchase-return-lines.destroy'));
+        self::assertTrue(Route::has('purchase.ledger-notes.index'));
+        self::assertTrue(Route::has('purchase.ledger-notes.store'));
+        self::assertTrue(Route::has('purchase.ledger-notes.update'));
+        self::assertTrue(Route::has('purchase.ledger-notes.destroy'));
         self::assertTrue(Route::has('purchase.workflows.transition'));
         self::assertTrue(Route::has('purchase.workflows.document'));
         self::assertTrue(Route::has('purchase.workflows.payment.allocate'));
         self::assertTrue(Route::has('purchase.workflows.inventory.post'));
         self::assertTrue(Route::has('purchase.workflows.finance.post'));
+        self::assertTrue(Route::has('purchase.workflows.finance.preview'));
         self::assertTrue(Route::has('purchase.workflows.finance.reverse'));
         self::assertTrue(Route::has('purchase.workflows.history'));
         self::assertTrue(Route::has('purchase.purchase-orders.with-lines.store'));
@@ -119,14 +124,14 @@ final class PurchaseRoutesTest extends TestCase
         self::assertTrue(Route::has('purchase.preview-payment-allocation'));
     }
 
-    public function testPurchaseRoutesUseContextMiddlewares(): void
+    public function test_purchase_routes_use_context_middlewares(): void
     {
         $route = Route::getRoutes()->getByName('purchase.purchase-orders.index');
 
         self::assertNotNull($route);
 
         $middlewares = $route->gatherMiddleware();
-        self::assertContains('auth:' . (string) config('module-auth.protected_route_guard', 'auth-api'), $middlewares);
+        self::assertContains('auth:'.(string) config('module-auth.protected_route_guard', 'auth-api'), $middlewares);
         self::assertContains((string) config('core.current_user.middleware_alias', 'current.user'), $middlewares);
         self::assertContains((string) config('core.current_tenant.middleware_alias', 'current.tenant'), $middlewares);
         self::assertContains(

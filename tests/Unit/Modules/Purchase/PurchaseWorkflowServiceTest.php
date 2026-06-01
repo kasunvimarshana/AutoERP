@@ -36,23 +36,41 @@ use PHPUnit\Framework\TestCase;
 final class PurchaseWorkflowServiceTest extends TestCase
 {
     private PurchaseOrderRepositoryInterface&MockObject $purchaseOrderRepository;
+
     private PurchaseOrderLineRepositoryInterface&MockObject $purchaseOrderLineRepository;
+
     private GrnHeaderRepositoryInterface&MockObject $grnHeaderRepository;
+
     private GrnLineRepositoryInterface&MockObject $grnLineRepository;
+
     private PurchaseReturnRepositoryInterface&MockObject $purchaseReturnRepository;
+
     private PurchaseReturnLineRepositoryInterface&MockObject $purchaseReturnLineRepository;
+
     private PurchaseDocumentLinkRepositoryInterface&MockObject $purchaseDocumentLinkRepository;
+
     private PurchasePaymentAllocationRepositoryInterface&MockObject $purchasePaymentAllocationRepository;
+
     private PurchaseSettingRepositoryInterface&MockObject $purchaseSettingRepository;
+
     private PurchaseStatusHistoryRepositoryInterface&MockObject $purchaseStatusHistoryRepository;
+
     private DocumentOrchestrator&MockObject $documentOrchestrator;
+
     private PaymentAllocationServiceInterface&MockObject $paymentAllocationService;
+
     private AdvancePaymentAllocationServiceInterface&MockObject $advancePaymentAllocationService;
+
     private CreateStockMovementServiceInterface&MockObject $createStockMovementService;
+
     private FinancePostingServiceInterface&MockObject $financePostingService;
+
     private PriceResolverServiceInterface&MockObject $priceResolverService;
+
     private ItemRepositoryInterface&MockObject $itemRepository;
+
     private UnitOfMeasureRepositoryInterface&MockObject $unitOfMeasureRepository;
+
     private UomConversionServiceInterface&MockObject $uomConversionService;
 
     private PurchaseWorkflowService $service;
@@ -119,7 +137,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         );
     }
 
-    public function testTransitionFailsWhenTenantDoesNotMatch(): void
+    public function test_transition_fails_when_tenant_does_not_match(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -142,7 +160,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
     }
 
-    public function testTransitionFailsWhenStatusPathIsNotAllowed(): void
+    public function test_transition_fails_when_status_path_is_not_allowed(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -165,7 +183,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
     }
 
-    public function testTransitionToCancelledFailsWhenActiveDependenciesExist(): void
+    public function test_transition_to_cancelled_fails_when_active_dependencies_exist(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -224,7 +242,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
     }
 
-    public function testCreateDocumentRequiresDocumentTypeId(): void
+    public function test_create_document_requires_document_type_id(): void
     {
         $this->purchaseSettingRepository
             ->expects(self::exactly(2))
@@ -251,7 +269,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
     }
 
-    public function testAllocatePaymentFailsWithoutDocumentLinkOrDocumentId(): void
+    public function test_allocate_payment_fails_without_document_link_or_document_id(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -278,7 +296,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
     }
 
-    public function testPostInventoryUsesBaseUomConversion(): void
+    public function test_post_inventory_uses_base_uom_conversion(): void
     {
         $this->purchaseReturnRepository
             ->expects(self::once())
@@ -347,7 +365,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertTrue($result->isSuccess());
     }
 
-    public function testPostFinanceRequiresEntryAndLinesPayload(): void
+    public function test_post_finance_requires_entry_and_lines_payload(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -369,7 +387,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
     }
 
-    public function testTransitionToReversedRequiresReason(): void
+    public function test_transition_to_reversed_requires_reason(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -423,7 +441,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
     }
 
-    public function testTransitionToReversedRequiresFinanceAcknowledgementForClosedPurchaseOrder(): void
+    public function test_transition_to_reversed_requires_finance_acknowledgement_for_closed_purchase_order(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -476,7 +494,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
     }
 
-    public function testTransitionToReversedRequiresInventoryAcknowledgementForPostedGrn(): void
+    public function test_transition_to_reversed_requires_inventory_acknowledgement_for_posted_grn(): void
     {
         $this->grnHeaderRepository
             ->expects(self::once())
@@ -521,7 +539,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
     }
 
-    public function testTransitionToCancelledFailsWhenPurchaseOrderHasUnfinalizedGrnDependency(): void
+    public function test_transition_to_cancelled_fails_when_purchase_order_has_unfinalized_grn_dependency(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -569,7 +587,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
     }
 
-    public function testTransitionToReversedFailsWhenGrnHasUnfinalizedReturnDependency(): void
+    public function test_transition_to_reversed_fails_when_grn_has_unfinalized_return_dependency(): void
     {
         $this->grnHeaderRepository
             ->expects(self::once())
@@ -620,7 +638,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
     }
 
-    public function testTransitionToReversedSucceedsWhenDocumentLinksExistButNoActiveAllocations(): void
+    public function test_transition_to_reversed_succeeds_when_document_links_exist_but_no_active_allocations(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -713,7 +731,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertTrue($result->isSuccess());
     }
 
-    public function testAllocatePaymentFailsWhenPaymentAndAdvancePaymentAreBothProvided(): void
+    public function test_allocate_payment_fails_when_payment_and_advance_payment_are_both_provided(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -742,7 +760,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         );
     }
 
-    public function testCreateDocumentFailsWhenSettingsRequireGrnBeforeDirectPurchaseDocument(): void
+    public function test_create_document_fails_when_settings_require_grn_before_direct_purchase_document(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -791,7 +809,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertSame(PurchaseErrorCode::INVALID_VALUE, $result->errorOrFail()->code);
     }
 
-    public function testCreateDocumentUsesSettingsDefaultDocumentTypeWhenNotProvided(): void
+    public function test_create_document_uses_settings_default_document_type_when_not_provided(): void
     {
         $this->purchaseDocumentLinkRepository
             ->method('list')
@@ -904,7 +922,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertSame(9901, (int) (($result->valueOrFail()['document_id'] ?? 0)));
     }
 
-    public function testCreateDocumentFailsWhenRequestedQuantityExceedsAvailableLineQuantity(): void
+    public function test_create_document_fails_when_requested_quantity_exceeds_available_line_quantity(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -974,7 +992,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         );
     }
 
-    public function testAllocatePaymentFailsWhenAllocationExceedsLinkedDocumentAmount(): void
+    public function test_allocate_payment_fails_when_allocation_exceeds_linked_document_amount(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -1032,7 +1050,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertSame('Allocation exceeds document allocatable amount.', $result->errorOrFail()->message);
     }
 
-    public function testAllocatePaymentSucceedsAtAllocationBoundary(): void
+    public function test_allocate_payment_succeeds_at_allocation_boundary(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -1109,7 +1127,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertTrue($result->isSuccess());
     }
 
-    public function testCreateDocumentReturnsIdempotentReplayWhenKeyAlreadyExists(): void
+    public function test_create_document_returns_idempotent_replay_when_key_already_exists(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -1189,7 +1207,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertTrue((bool) ($result->valueOrFail()['idempotent_replay'] ?? false));
     }
 
-    public function testCreateDocumentFailsWhenIdempotencyKeyIsReusedWithDifferentPayload(): void
+    public function test_create_document_fails_when_idempotency_key_is_reused_with_different_payload(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -1244,7 +1262,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         );
     }
 
-    public function testAllocatePaymentReturnsIdempotentReplayWhenKeyAlreadyExists(): void
+    public function test_allocate_payment_returns_idempotent_replay_when_key_already_exists(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -1290,7 +1308,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertTrue((bool) ($result->valueOrFail()['idempotent_replay'] ?? false));
     }
 
-    public function testAllocatePaymentFailsWhenIdempotencyKeyIsReusedWithDifferentPayload(): void
+    public function test_allocate_payment_fails_when_idempotency_key_is_reused_with_different_payload(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -1337,7 +1355,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         );
     }
 
-    public function testPostInventoryReturnsIdempotentReplayWhenKeyAlreadyExists(): void
+    public function test_post_inventory_returns_idempotent_replay_when_key_already_exists(): void
     {
         $this->purchaseReturnRepository
             ->expects(self::once())
@@ -1381,7 +1399,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertTrue((bool) ($result->valueOrFail()['idempotent_replay'] ?? false));
     }
 
-    public function testPostInventoryFailsWhenIdempotencyKeyIsReusedWithDifferentPayload(): void
+    public function test_post_inventory_fails_when_idempotency_key_is_reused_with_different_payload(): void
     {
         $this->grnHeaderRepository
             ->expects(self::once())
@@ -1428,7 +1446,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         );
     }
 
-    public function testPostFinanceReturnsIdempotentReplayWhenKeyAlreadyExists(): void
+    public function test_post_finance_returns_idempotent_replay_when_key_already_exists(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -1474,7 +1492,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertTrue((bool) ($result->valueOrFail()['idempotent_replay'] ?? false));
     }
 
-    public function testPostFinanceFailsWhenIdempotencyKeyIsReusedWithDifferentPayload(): void
+    public function test_post_finance_fails_when_idempotency_key_is_reused_with_different_payload(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -1521,7 +1539,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         );
     }
 
-    public function testTransitionReturnsIdempotentReplayWhenHistoryExistsForSameTargetStatus(): void
+    public function test_transition_returns_idempotent_replay_when_history_exists_for_same_target_status(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -1567,7 +1585,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertTrue($result->isSuccess());
     }
 
-    public function testTransitionFailsWhenIdempotencyKeyIsReusedWithDifferentTargetStatus(): void
+    public function test_transition_fails_when_idempotency_key_is_reused_with_different_target_status(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -1614,7 +1632,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         );
     }
 
-    public function testTransitionFailsWhenIdempotencyKeySignatureConflicts(): void
+    public function test_transition_fails_when_idempotency_key_signature_conflicts(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -1662,7 +1680,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         );
     }
 
-    public function testReverseFinanceReturnsIdempotentReplayWhenKeyAlreadyExists(): void
+    public function test_reverse_finance_returns_idempotent_replay_when_key_already_exists(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -1708,7 +1726,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         self::assertTrue((bool) ($result->valueOrFail()['idempotent_replay'] ?? false));
     }
 
-    public function testReverseFinanceFailsWhenIdempotencyKeyIsReusedWithDifferentJournalEntryId(): void
+    public function test_reverse_finance_fails_when_idempotency_key_is_reused_with_different_journal_entry_id(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -1758,7 +1776,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         );
     }
 
-    public function testReverseFinanceFailsWhenIdempotencyKeySignatureConflicts(): void
+    public function test_reverse_finance_fails_when_idempotency_key_signature_conflicts(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -1805,7 +1823,7 @@ final class PurchaseWorkflowServiceTest extends TestCase
         );
     }
 
-    public function testReverseFinanceFailsWhenIdempotentHistoryLacksReplayJournalMetadata(): void
+    public function test_reverse_finance_fails_when_idempotent_history_lacks_replay_journal_metadata(): void
     {
         $this->purchaseOrderRepository
             ->expects(self::once())
@@ -1852,5 +1870,148 @@ final class PurchaseWorkflowServiceTest extends TestCase
             'idempotency_key cannot be safely replayed due to missing finance reversal metadata.',
             $result->errorOrFail()->message,
         );
+    }
+
+    public function test_preview_finance_builds_balanced_supplier_invoice_posting_from_settings(): void
+    {
+        $this->purchaseOrderRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(1001)
+            ->willReturn(new DataRecord([
+                'id' => 1001,
+                'tenant_id' => 1,
+                'organization_unit_id' => 12,
+                'supplier_id' => 20,
+                'status' => 'documented',
+                'po_number' => 'PO-1001',
+                'exchange_rate' => 1,
+            ]));
+
+        $this->purchaseSettingRepository
+            ->expects(self::once())
+            ->method('list')
+            ->willReturn([
+                new DataRecord([
+                    'id' => 3,
+                    'default_supplier_payable_account_id' => 2000,
+                    'default_inventory_account_id' => 1200,
+                    'default_purchase_account_id' => 5000,
+                    'default_purchase_tax_account_id' => 1300,
+                    'default_purchase_discount_account_id' => 5100,
+                ]),
+            ]);
+
+        $this->purchaseOrderLineRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with(['purchase_order_id' => 1001])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 501,
+                    'item_id' => 10,
+                    'description' => 'Stock part',
+                    'gross_amount' => 100,
+                    'line_total' => 90,
+                    'discount_amount' => 10,
+                    'tax_amount' => 15,
+                ]),
+            ]);
+
+        $this->itemRepository
+            ->expects(self::once())
+            ->method('findByIdInTenant')
+            ->with(10, 1)
+            ->willReturn(new DataRecord([
+                'id' => 10,
+                'is_purchasable' => true,
+                'is_stockable' => true,
+            ]));
+
+        $result = $this->service->postFinance('purchase_order', 1001, [
+            'tenant_id' => 1,
+            'preview_only' => true,
+        ]);
+
+        self::assertTrue($result->isSuccess());
+        $preview = $result->valueOrFail();
+        self::assertTrue($preview['balanced']);
+        self::assertSame(115.0, $preview['totals']['debit_total']);
+        self::assertSame(115.0, $preview['totals']['credit_total']);
+        self::assertSame('purchase', $preview['entry_payload']['source_module']);
+        self::assertSame(1200, $preview['lines_payload'][0]['account_id']);
+        self::assertSame(5100, $preview['lines_payload'][2]['account_id']);
+        self::assertSame(2000, $preview['lines_payload'][3]['account_id']);
+    }
+
+    public function test_preview_finance_builds_balanced_purchase_return_reversal(): void
+    {
+        $this->purchaseReturnRepository
+            ->expects(self::once())
+            ->method('findById')
+            ->with(2001)
+            ->willReturn(new DataRecord([
+                'id' => 2001,
+                'tenant_id' => 1,
+                'organization_unit_id' => 12,
+                'supplier_id' => 20,
+                'status' => 'posted',
+                'return_number' => 'PRET-2001',
+                'exchange_rate' => 1,
+            ]));
+
+        $this->purchaseSettingRepository
+            ->expects(self::once())
+            ->method('list')
+            ->willReturn([
+                new DataRecord([
+                    'id' => 4,
+                    'default_supplier_payable_account_id' => 2000,
+                    'default_inventory_account_id' => 1200,
+                    'default_purchase_account_id' => 5000,
+                    'default_purchase_tax_account_id' => 1300,
+                    'default_purchase_discount_account_id' => 5100,
+                ]),
+            ]);
+
+        $this->purchaseReturnLineRepository
+            ->expects(self::once())
+            ->method('list')
+            ->with(['purchase_return_id' => 2001])
+            ->willReturn([
+                new DataRecord([
+                    'id' => 601,
+                    'item_id' => 10,
+                    'description' => 'Returned stock part',
+                    'gross_amount' => 100,
+                    'line_total' => 90,
+                    'discount_amount' => 10,
+                    'tax_amount' => 15,
+                ]),
+            ]);
+
+        $this->itemRepository
+            ->expects(self::once())
+            ->method('findByIdInTenant')
+            ->with(10, 1)
+            ->willReturn(new DataRecord([
+                'id' => 10,
+                'is_purchasable' => true,
+                'is_stockable' => true,
+            ]));
+
+        $result = $this->service->postFinance('purchase_return', 2001, [
+            'tenant_id' => 1,
+            'preview_only' => true,
+        ]);
+
+        self::assertTrue($result->isSuccess());
+        $preview = $result->valueOrFail();
+        self::assertTrue($preview['balanced']);
+        self::assertSame(115.0, $preview['totals']['debit_total']);
+        self::assertSame(115.0, $preview['totals']['credit_total']);
+        self::assertSame(2000, $preview['lines_payload'][0]['account_id']);
+        self::assertSame(1200, $preview['lines_payload'][2]['account_id']);
+        self::assertSame(1300, $preview['lines_payload'][3]['account_id']);
     }
 }

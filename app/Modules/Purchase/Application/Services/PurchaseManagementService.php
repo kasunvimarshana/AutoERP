@@ -394,6 +394,8 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
             'allow_line_discount' => true,
             'tax_calculation_level' => 'line',
             'header_discount_allocation_method' => 'proportional',
+            'default_advance_payment_account_id' => $payload['default_advance_payment_account_id'] ?? null,
+            'default_refund_account_id' => $payload['default_refund_account_id'] ?? null,
             'default_po_status' => 'draft',
             'default_grn_status' => 'draft',
             'default_document_status' => 'draft',

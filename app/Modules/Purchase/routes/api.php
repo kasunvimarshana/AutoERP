@@ -3,16 +3,17 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use Modules\Purchase\Presentation\Http\Controllers\PurchaseOrderController;
-use Modules\Purchase\Presentation\Http\Controllers\PurchaseOrderLineController;
-use Modules\Purchase\Presentation\Http\Controllers\PurchaseInvoiceController;
-use Modules\Purchase\Presentation\Http\Controllers\PurchasePaymentController;
 use Modules\Purchase\Presentation\Http\Controllers\GrnHeaderController;
 use Modules\Purchase\Presentation\Http\Controllers\GrnLineController;
+use Modules\Purchase\Presentation\Http\Controllers\PurchaseIntegrationController;
+use Modules\Purchase\Presentation\Http\Controllers\PurchaseInvoiceController;
+use Modules\Purchase\Presentation\Http\Controllers\PurchaseLedgerNoteController;
+use Modules\Purchase\Presentation\Http\Controllers\PurchaseManagementController;
+use Modules\Purchase\Presentation\Http\Controllers\PurchaseOrderController;
+use Modules\Purchase\Presentation\Http\Controllers\PurchaseOrderLineController;
+use Modules\Purchase\Presentation\Http\Controllers\PurchasePaymentController;
 use Modules\Purchase\Presentation\Http\Controllers\PurchaseReturnController;
 use Modules\Purchase\Presentation\Http\Controllers\PurchaseReturnLineController;
-use Modules\Purchase\Presentation\Http\Controllers\PurchaseManagementController;
-use Modules\Purchase\Presentation\Http\Controllers\PurchaseIntegrationController;
 use Modules\Purchase\Presentation\Http\Controllers\PurchaseWorkflowController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
@@ -26,7 +27,7 @@ $currentOrganizationUnitMiddleware = (string) config(
 Route::prefix('api/purchase')
     ->middleware([
         'api',
-        'auth:' . $protectedGuard,
+        'auth:'.$protectedGuard,
         $currentUserMiddleware,
         $currentTenantMiddleware,
         $currentOrganizationUnitMiddleware,
@@ -39,6 +40,8 @@ Route::prefix('api/purchase')
         Route::apiResource('grn-lines', GrnLineController::class);
         Route::apiResource('purchase-returns', PurchaseReturnController::class);
         Route::apiResource('purchase-return-lines', PurchaseReturnLineController::class);
+        Route::apiResource('ledger-notes', PurchaseLedgerNoteController::class)
+            ->only(['index', 'store', 'update', 'destroy']);
 
         Route::get('purchase-invoices', [PurchaseInvoiceController::class, 'index'])
             ->name('purchase-invoices.index');
@@ -251,6 +254,8 @@ Route::prefix('api/purchase')
                     ->name('workflows.inventory.post');
                 Route::post('finance/post', [PurchaseWorkflowController::class, 'postFinance'])
                     ->name('workflows.finance.post');
+                Route::post('finance/preview', [PurchaseWorkflowController::class, 'previewFinance'])
+                    ->name('workflows.finance.preview');
                 Route::post('finance/reverse', [PurchaseWorkflowController::class, 'reverseFinance'])
                     ->name('workflows.finance.reverse');
                 Route::get('history', [PurchaseManagementController::class, 'statusHistory'])

@@ -131,8 +131,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
         private readonly ItemRepositoryInterface $itemRepository,
         private readonly UnitOfMeasureRepositoryInterface $unitOfMeasureRepository,
         private readonly UomConversionServiceInterface $uomConversionService,
-    ) {
-    }
+    ) {}
 
     public function transition(string $entityType, int|string $id, array $payload): Result
     {
@@ -462,7 +461,12 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                     partyId: $record->get('supplier_id') !== null ? (int) $record->get('supplier_id') : null,
                     dueDate: isset($payload['due_date']) ? (string) $payload['due_date'] : null,
                     notes: isset($payload['notes']) ? (string) $payload['notes'] : null,
+                    sourceModule: 'purchase',
+                    sourceType: $entityType,
+                    sourceId: (int) $record->id(),
+                    sourceReference: $this->resolveSourceReference($entityType, $record),
                     data: [
+                        'source_module' => 'purchase',
                         'source_type' => $entityType,
                         'source_id' => (int) $record->id(),
                         'purchase_reference' => $record->get('reference'),
@@ -792,7 +796,6 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 ));
             }
 
-
             return $this->withinEntityTransaction($entityType, function () use (
                 $lineRecords,
                 $entityType,
@@ -812,11 +815,21 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                     }
 
                     $itemId = (int) $line->get('item_id', 0);
-                    if (! $this->itemRepository->findByIdInTenant($itemId, $tenantId) instanceof DataRecord) {
+                    $item = $this->itemRepository->findByIdInTenant($itemId, $tenantId);
+                    if (! $item instanceof DataRecord) {
                         return Result::failure(new Error(
                             PurchaseErrorCode::INVALID_VALUE,
                             'Inventory posting failed because item is not available in tenant scope.',
                         ));
+                    }
+                    if (! (bool) $item->get('is_purchasable', true)) {
+                        return Result::failure(new Error(
+                            PurchaseErrorCode::INVALID_VALUE,
+                            'Inventory posting failed because item is not purchasable.',
+                        ));
+                    }
+                    if (! (bool) $item->get('is_stockable', true)) {
+                        continue;
                     }
 
                     $transactionUomId = (int) $line->get('uom_id', 0);
@@ -861,9 +874,16 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                         'serial_id' => $line->get('serial_id'),
                         'location_id' => $line->get('location_id'),
                         'warehouse_id' => $line->get('warehouse_id') ?? $record->get('warehouse_id'),
+                        'source_module' => 'purchase',
                         'source_type' => $entityType,
                         'source_id' => (int) $record->id(),
+                        'source_reference' => $this->resolveSourceReference($entityType, $record),
+                        'source_context' => [
+                            'status' => $record->get('status'),
+                            'supplier_id' => $record->get('supplier_id'),
+                        ],
                         'source_line_id' => (int) $line->id(),
+                        'uom_id' => $transactionUomId,
                         'transaction_uom_id' => $transactionUomId,
                         'base_uom_id' => (int) $baseUom->id(),
                         'quantity' => $quantity,
@@ -946,13 +966,19 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
                 ));
             }
 
-            $entryPayload = is_array($payload['entry_payload'] ?? null) ? $payload['entry_payload'] : [];
-            $linesPayload = is_array($payload['lines_payload'] ?? null) ? $payload['lines_payload'] : [];
-            if ($entryPayload === [] || $linesPayload === []) {
-                return Result::failure(new Error(
-                    PurchaseErrorCode::INVALID_VALUE,
-                    'entry_payload and lines_payload are required.',
-                ));
+            $postingPayloadResult = $this->resolveFinancePostingPayload($entityType, $record, $payload, $tenantId);
+            if ($postingPayloadResult->isFailure()) {
+                return $postingPayloadResult;
+            }
+
+            [$entryPayload, $linesPayload] = $postingPayloadResult->valueOrFail();
+            if (($payload['preview_only'] ?? false) === true) {
+                return Result::success([
+                    'entry_payload' => $entryPayload,
+                    'lines_payload' => $linesPayload,
+                    'totals' => $this->calculateJournalLineTotals($linesPayload),
+                    'balanced' => $this->journalLinesAreBalanced($linesPayload),
+                ]);
             }
 
             $idempotencyKey = $this->normalizeIdempotencyKey($payload['idempotency_key'] ?? null);
@@ -985,8 +1011,22 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
             $entryPayload['tenant_id'] = $tenantId;
             $entryPayload['organization_unit_id'] = $entryPayload['organization_unit_id']
                 ?? $record->get('organization_unit_id');
+            $entryPayload['source_module'] = $entryPayload['source_module'] ?? 'purchase';
             $entryPayload['source_type'] = $entryPayload['source_type'] ?? $entityType;
             $entryPayload['source_id'] = $entryPayload['source_id'] ?? (int) $record->id();
+            $entryPayload['source_reference'] = $entryPayload['source_reference']
+                ?? $this->resolveSourceReference($entityType, $record);
+            $entryPayload['source_context'] = $entryPayload['source_context'] ?? [
+                'supplier_id' => $record->get('supplier_id'),
+                'status' => $record->get('status'),
+            ];
+
+            if (! $this->journalLinesAreBalanced($linesPayload)) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Purchase finance posting is not balanced.',
+                ));
+            }
 
             return $this->withinEntityTransaction($entityType, function () use (
                 $entryPayload,
@@ -1192,6 +1232,264 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
             'purchase_return' => $this->purchaseReturnLineRepository->list(['purchase_return_id' => $entityId]),
             default => [],
         };
+    }
+
+    /**
+     * @return Result<array{0: array<string, mixed>, 1: list<array<string, mixed>>}>
+     */
+    private function resolveFinancePostingPayload(
+        string $entityType,
+        DataRecord $record,
+        array $payload,
+        int $tenantId,
+    ): Result {
+        $entryPayload = is_array($payload['entry_payload'] ?? null) ? $payload['entry_payload'] : [];
+        $linesPayload = is_array($payload['lines_payload'] ?? null) ? $payload['lines_payload'] : [];
+        if ($entryPayload !== [] && $linesPayload !== []) {
+            return Result::success([$entryPayload, $linesPayload]);
+        }
+
+        $settings = $this->resolveActiveSettings(
+            $tenantId,
+            $record->get('organization_unit_id') !== null ? (int) $record->get('organization_unit_id') : null,
+        );
+        if (! $settings instanceof DataRecord) {
+            return Result::failure(new Error(
+                PurchaseErrorCode::INVALID_VALUE,
+                'Purchase settings are required before finance posting.',
+            ));
+        }
+
+        $accounts = [
+            'payable' => (int) $settings->get('default_supplier_payable_account_id', 0),
+            'inventory' => (int) $settings->get('default_inventory_account_id', 0),
+            'expense' => (int) $settings->get('default_purchase_account_id', 0),
+            'tax' => (int) $settings->get('default_purchase_tax_account_id', 0),
+            'discount' => (int) $settings->get('default_purchase_discount_account_id', 0),
+        ];
+        foreach (['payable', 'inventory', 'expense'] as $required) {
+            if ($accounts[$required] < 1) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Purchase settings must include AP, inventory asset and purchase expense accounts.',
+                ));
+            }
+        }
+
+        $sourceLines = $this->resolveLines($entityType, (int) $record->id());
+        if ($sourceLines === []) {
+            return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'No purchase lines found to post.'));
+        }
+
+        $journalLines = [];
+        $grossTotal = 0.0;
+        $netTotal = 0.0;
+        $taxTotal = 0.0;
+        $discountTotal = 0.0;
+        $isReturn = $entityType === 'purchase_return';
+
+        foreach ($sourceLines as $line) {
+            if (! $line instanceof DataRecord) {
+                continue;
+            }
+
+            $itemId = (int) $line->get('item_id', 0);
+            $item = $itemId > 0 ? $this->itemRepository->findByIdInTenant($itemId, $tenantId) : null;
+            if (! $item instanceof DataRecord) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Finance posting failed because a purchase line item is not available in tenant scope.',
+                ));
+            }
+            if (! (bool) $item->get('is_purchasable', true)) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Finance posting failed because a purchase line item is not purchasable.',
+                ));
+            }
+
+            $gross = round((float) $line->get('gross_amount', 0), 4);
+            $net = round((float) $line->get('line_total', 0), 4);
+            $tax = round((float) $line->get('tax_amount', 0), 4);
+            $discount = round((float) $line->get('discount_amount', max(0.0, $gross - $net)), 4);
+            if ($gross <= 0 && $net <= 0 && $tax <= 0) {
+                continue;
+            }
+            if ($tax > 0 && $accounts['tax'] < 1) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Purchase settings must include an input tax account when tax is posted.',
+                ));
+            }
+            if ($discount > 0 && $accounts['discount'] < 1) {
+                return Result::failure(new Error(
+                    PurchaseErrorCode::INVALID_VALUE,
+                    'Purchase settings must include a purchase discount account when discount is posted.',
+                ));
+            }
+
+            $lineAccountId = (int) ($line->get('account_id') ?? 0);
+            if ($lineAccountId < 1) {
+                $lineAccountId = (bool) $item->get('is_stockable', true)
+                    ? (int) ($item->get('inventory_account_id') ?? $accounts['inventory'])
+                    : (int) ($item->get('expense_account_id') ?? $accounts['expense']);
+            }
+            if ($lineAccountId < 1) {
+                $lineAccountId = (bool) $item->get('is_stockable', true)
+                    ? $accounts['inventory']
+                    : $accounts['expense'];
+            }
+
+            $description = (string) ($line->get('description') ?? $this->resolveSourceReference($entityType, $record));
+            if ($isReturn) {
+                $journalLines[] = $this->journalLine($record, $accounts['payable'], $net + $tax, 0.0, $description, count($journalLines) + 1);
+                if ($discount > 0) {
+                    $journalLines[] = $this->journalLine($record, $accounts['discount'], $discount, 0.0, 'Reverse purchase discount', count($journalLines) + 1);
+                }
+                $journalLines[] = $this->journalLine($record, $lineAccountId, 0.0, $gross, $description, count($journalLines) + 1);
+                if ($tax > 0) {
+                    $journalLines[] = $this->journalLine($record, $accounts['tax'], 0.0, $tax, 'Reverse input tax', count($journalLines) + 1);
+                }
+            } else {
+                $journalLines[] = $this->journalLine($record, $lineAccountId, $gross, 0.0, $description, count($journalLines) + 1);
+                if ($tax > 0) {
+                    $journalLines[] = $this->journalLine($record, $accounts['tax'], $tax, 0.0, 'Input tax', count($journalLines) + 1);
+                }
+                if ($discount > 0) {
+                    $journalLines[] = $this->journalLine($record, $accounts['discount'], 0.0, $discount, 'Purchase discount', count($journalLines) + 1);
+                }
+                $journalLines[] = $this->journalLine($record, $accounts['payable'], 0.0, $net + $tax, $description, count($journalLines) + 1);
+            }
+
+            $grossTotal += $gross;
+            $netTotal += $net;
+            $taxTotal += $tax;
+            $discountTotal += $discount;
+        }
+
+        if ($journalLines === []) {
+            return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'No positive purchase amounts found to post.'));
+        }
+
+        return Result::success([[
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $record->get('organization_unit_id'),
+            'entry_number' => $payload['entry_number']
+                ?? $this->buildPurchaseJournalNumber($entityType, (int) $record->id(), $payload),
+            'entry_type' => 'AUTO',
+            'description' => $payload['description'] ?? $this->financeDescription($entityType, $record),
+            'entry_date' => $payload['entry_date'] ?? now()->toDateString(),
+            'posting_date' => $payload['posting_date']
+                ?? $record->get('return_date')
+                ?? $record->get('received_date')
+                ?? $record->get('order_date')
+                ?? now()->toDateString(),
+            'currency_id' => $record->get('currency_id'),
+            'source_module' => 'purchase',
+            'source_type' => $entityType,
+            'source_id' => (int) $record->id(),
+            'source_reference' => $this->resolveSourceReference($entityType, $record),
+            'source_context' => [
+                'supplier_id' => $record->get('supplier_id'),
+                'gross_total' => round($grossTotal, 4),
+                'net_total' => round($netTotal, 4),
+                'tax_total' => round($taxTotal, 4),
+                'discount_total' => round($discountTotal, 4),
+                'settings_id' => $settings->id(),
+            ],
+            'created_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
+            'posted_by' => isset($payload['actor_id']) ? (int) $payload['actor_id'] : null,
+            'metadata' => array_merge(
+                is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [],
+                ['source_module' => 'purchase'],
+            ),
+        ], $journalLines]);
+    }
+
+    private function journalLine(
+        DataRecord $record,
+        int $accountId,
+        float $debit,
+        float $credit,
+        string $description,
+        int $lineNumber,
+    ): array {
+        return [
+            'tenant_id' => (int) $record->get('tenant_id', 0),
+            'organization_unit_id' => $record->get('organization_unit_id'),
+            'account_id' => $accountId,
+            'description' => $description,
+            'debit_amount' => round($debit, 4),
+            'credit_amount' => round($credit, 4),
+            'currency_id' => $record->get('currency_id'),
+            'exchange_rate' => (float) $record->get('exchange_rate', 1),
+            'party_type' => 'supplier',
+            'party_id' => $record->get('supplier_id'),
+            'line_number' => $lineNumber,
+        ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $lines
+     * @return array<string, float>
+     */
+    private function calculateJournalLineTotals(array $lines): array
+    {
+        $debit = 0.0;
+        $credit = 0.0;
+        foreach ($lines as $line) {
+            if (! is_array($line)) {
+                continue;
+            }
+            $rate = (float) ($line['exchange_rate'] ?? 1);
+            $debit += (float) ($line['debit_amount'] ?? 0) * $rate;
+            $credit += (float) ($line['credit_amount'] ?? 0) * $rate;
+        }
+
+        return [
+            'debit_total' => round($debit, 4),
+            'credit_total' => round($credit, 4),
+        ];
+    }
+
+    /** @param list<array<string, mixed>> $lines */
+    private function journalLinesAreBalanced(array $lines): bool
+    {
+        $totals = $this->calculateJournalLineTotals($lines);
+
+        return $totals['debit_total'] > 0.0
+            && round($totals['debit_total'], 4) === round($totals['credit_total'], 4);
+    }
+
+    private function buildPurchaseJournalNumber(string $entityType, int $entityId, array $payload): string
+    {
+        $suffix = $this->normalizeIdempotencyKey($payload['idempotency_key'] ?? null);
+        if ($suffix === '') {
+            $suffix = now()->format('YmdHis');
+        }
+
+        return 'PUR-'.strtoupper(str_replace('_', '-', $entityType)).'-'.$entityId.'-'.$suffix;
+    }
+
+    private function financeDescription(string $entityType, DataRecord $record): string
+    {
+        return match ($entityType) {
+            'purchase_return' => 'Purchase return posting '.$this->resolveSourceReference($entityType, $record),
+            'grn_header' => 'Purchase GRN posting '.$this->resolveSourceReference($entityType, $record),
+            default => 'Supplier invoice posting '.$this->resolveSourceReference($entityType, $record),
+        };
+    }
+
+    private function resolveSourceReference(string $entityType, DataRecord $record): string
+    {
+        $value = match ($entityType) {
+            'purchase_order' => $record->get('po_number') ?? $record->get('reference'),
+            'grn_header' => $record->get('grn_number') ?? $record->get('reference'),
+            'purchase_return' => $record->get('return_number') ?? $record->get('reference'),
+            default => $record->get('reference'),
+        };
+
+        return (string) ($value ?? ($entityType.'#'.$record->id()));
     }
 
     /** @return list<array<string, mixed>> */
@@ -1545,6 +1843,7 @@ final class PurchaseWorkflowService implements PurchaseWorkflowServiceInterface
         ]);
 
         $tenantScoped = end($tenantScopedSettings);
+
         return $tenantScoped instanceof DataRecord ? $tenantScoped : null;
     }
 

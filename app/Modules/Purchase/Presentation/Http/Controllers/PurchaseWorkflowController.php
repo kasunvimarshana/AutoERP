@@ -63,6 +63,19 @@ final class PurchaseWorkflowController extends Controller
         );
     }
 
+    public function previewFinance(
+        PurchaseWorkflowActionRequest $request,
+        string $entityType,
+        int|string $id
+    ): JsonResponse {
+        $payload = $this->withTenantContext($request);
+        $payload['preview_only'] = true;
+
+        return $this->respond(
+            $this->workflowService->postFinance($entityType, $id, $payload)
+        );
+    }
+
     public function reverseFinance(
         PurchaseWorkflowActionRequest $request,
         string $entityType,
