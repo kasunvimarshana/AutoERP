@@ -15,13 +15,13 @@ type PreviewPanelProps = {
     title: string;
 };
 
-export function PreviewPanel({ children, rows, status = 'Mocked', subtitle, title }: PreviewPanelProps) {
+export function PreviewPanel({ children, rows, status = 'Backend', subtitle, title }: PreviewPanelProps) {
     return (
         <Card className="p-5">
             <div className="mb-4 flex items-start justify-between gap-4">
                 <div>
                     <h2 className="text-sm font-bold uppercase tracking-wide text-slate-700">{title}</h2>
-                    <p className="mt-1 text-sm text-slate-500">{subtitle ?? 'Backend preview placeholder. No authoritative calculation runs in the frontend.'}</p>
+                    <p className="mt-1 text-sm text-slate-500">{subtitle ?? 'Readonly backend/API values. No authoritative calculation runs in the frontend.'}</p>
                 </div>
                 <StatusBadge status={status} />
             </div>

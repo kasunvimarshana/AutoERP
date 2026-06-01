@@ -64,6 +64,18 @@ final class VehicleRentalManagementService implements VehicleRentalManagementSer
         }
     }
 
+    public function listRentalVehicles(int $tenantId): Result
+    {
+        try {
+            return Result::success($this->normalizeRecords($this->vehicleRepository->list([
+                'tenant_id' => $tenantId,
+                'is_active' => true,
+            ])));
+        } catch (Throwable $exception) {
+            return $this->failure($exception);
+        }
+    }
+
     public function getAgreement(int $agreementId): Result
     {
         try {

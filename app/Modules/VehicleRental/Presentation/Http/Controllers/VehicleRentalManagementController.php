@@ -46,6 +46,11 @@ final class VehicleRentalManagementController extends Controller
         return $this->respond($this->service->syncExtraCharges($agreementId, $request->all()));
     }
 
+    public function rentalVehicles(VehicleRentalSettingsRequest $request): JsonResponse
+    {
+        return $this->respond($this->service->listRentalVehicles((int) $request->input('tenant_id', 0)));
+    }
+
     public function storeReplacement(VehicleRentalRecordRequest $request): JsonResponse
     {
         return $this->respond($this->service->upsertReplacement(null, $request->all()));

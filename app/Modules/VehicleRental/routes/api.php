@@ -82,6 +82,8 @@ Route::prefix('api/vehicle-rental')
             ->name('vehicle-availability.show');
         Route::get('provider-payables', [VehicleRentalManagementController::class, 'providerPayables'])
             ->name('provider-payables.index');
+        Route::get('rental-vehicles', [VehicleRentalManagementController::class, 'rentalVehicles'])
+            ->name('rental-vehicles.index');
 
         Route::post(
             'workflow/agreements/{agreementId}/transition',
