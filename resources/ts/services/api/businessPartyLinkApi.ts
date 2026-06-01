@@ -1,5 +1,4 @@
 import type { ApiCollectionResponse } from './apiResponse';
-import { ApiError } from './apiErrors';
 import { httpClient } from './httpClient';
 import { mockCollectionResponse, mockResponse } from '../mock/mockResponse';
 import { businessPartyLinks } from '../mock/businessPartyLinkMock';
@@ -20,30 +19,18 @@ type BusinessPartyLinkInput = {
     targetPartyType: BusinessPartyType;
 };
 
-const CORE_API_MODE = import.meta.env.VITE_CORE_API_MODE ?? 'auto';
+const CORE_API_MODE = import.meta.env.VITE_CORE_API_MODE ?? 'real';
 
 function shouldUseMockOnly() {
     return CORE_API_MODE === 'mock';
 }
 
-async function withMockFallback<T>(realCall: () => Promise<T>, mockCall: () => Promise<T>, fallbackStatuses = [401, 403, 404, 419, 422]): Promise<T> {
+async function withExplicitMock<T>(realCall: () => Promise<T>, mockCall: () => Promise<T>): Promise<T> {
     if (shouldUseMockOnly()) {
         return mockCall();
     }
 
-    try {
-        return await realCall();
-    } catch (error) {
-        if (CORE_API_MODE === 'real') {
-            throw error;
-        }
-
-        if (error instanceof ApiError && !fallbackStatuses.includes(error.status)) {
-            throw error;
-        }
-
-        return mockCall();
-    }
+    return realCall();
 }
 
 function asString(value: unknown, fallback = '') {
@@ -123,7 +110,7 @@ function mockListForTarget(targetPartyType: BusinessPartyType, targetPartyId?: s
 
 export const businessPartyLinkApi = {
     create: (input: BusinessPartyLinkInput) =>
-        withMockFallback(
+        withExplicitMock(
             async () => {
                 const response = await httpClient<{ data: BackendBusinessPartyLink }>('/api/core/business-party-links', {
                     body: toBackendPayload(input),
@@ -135,7 +122,7 @@ export const businessPartyLinkApi = {
             () => mockResponse({ ...input, id: 'party-link-mock', isActive: true } as BusinessPartyLink),
         ),
     deactivate: (linkId: string, endDate?: string) =>
-        withMockFallback(
+        withExplicitMock(
             () =>
                 httpClient<{ data: BackendBusinessPartyLink }>(`/api/core/business-party-links/${linkId}/deactivate`, {
                     body: { end_date: endDate || null },
@@ -150,7 +137,7 @@ export const businessPartyLinkApi = {
                 }),
         ),
     listForSource: (sourcePartyType: BusinessPartyType, sourcePartyId?: string): Promise<ApiCollectionResponse<BusinessPartyLink>> =>
-        withMockFallback(
+        withExplicitMock(
             async () => {
                 const response = await httpClient<ApiCollectionResponse<BackendBusinessPartyLink>>('/api/core/business-party-links', {
                     query: {
@@ -164,7 +151,7 @@ export const businessPartyLinkApi = {
             () => mockCollectionResponse(mockListForSource(sourcePartyType, sourcePartyId)),
         ),
     listForTarget: (targetPartyType: BusinessPartyType, targetPartyId?: string): Promise<ApiCollectionResponse<BusinessPartyLink>> =>
-        withMockFallback(
+        withExplicitMock(
             async () => {
                 const response = await httpClient<ApiCollectionResponse<BackendBusinessPartyLink>>('/api/core/business-party-links', {
                     query: {

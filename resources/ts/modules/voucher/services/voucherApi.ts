@@ -24,18 +24,26 @@ import type {
 
 type BackendRecord = Record<string, unknown>;
 
-const VOUCHER_API_MODE = import.meta.env.VITE_VOUCHER_API_MODE ?? 'auto';
+const VOUCHER_API_MODE = import.meta.env.VITE_VOUCHER_API_MODE ?? 'real';
 
 function shouldUseMockOnly() {
     return VOUCHER_API_MODE === 'mock';
 }
 
-async function withMockFallback<T>(realCall: () => Promise<T>, mockCall: () => Promise<T>): Promise<T> {
+async function withExplicitMock<T>(realCall: () => Promise<T>, mockCall: () => Promise<T>): Promise<T> {
     if (shouldUseMockOnly()) {
         return mockCall();
     }
 
     return realCall();
+}
+
+function mockOnly<T>(feature: string, mockCall: () => Promise<T>): Promise<T> {
+    if (shouldUseMockOnly()) {
+        return mockCall();
+    }
+
+    return Promise.reject(new Error(`${feature} is available only when VITE_VOUCHER_API_MODE=mock until a real backend endpoint is configured.`));
 }
 
 function asString(value: unknown, fallback = '') {
@@ -164,54 +172,54 @@ function normalizePostingPreviewResponse(input: unknown, raw: unknown): ApiPrevi
 
 export const voucherApi = {
     dashboard: {
-        summary: (): Promise<ApiCollectionResponse<VoucherDashboardMetric>> => mockCollectionResponse(voucherDashboardMetrics),
+        summary: (): Promise<ApiCollectionResponse<VoucherDashboardMetric>> => mockOnly('Voucher dashboard summary', () => mockCollectionResponse(voucherDashboardMetrics)),
     },
     types: {
-        list: (): Promise<ApiCollectionResponse<VoucherType>> => withMockFallback(
+        list: (): Promise<ApiCollectionResponse<VoucherType>> => withExplicitMock(
             async () => {
                 const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/voucher/types');
                 return { ...response, data: response.data.map(normalizeVoucherType) };
             },
             () => mockCollectionResponse(voucherTypes),
         ),
-        get: (id: string): Promise<ApiResponse<VoucherType>> => withMockFallback(
+        get: (id: string): Promise<ApiResponse<VoucherType>> => withExplicitMock(
             async () => {
                 const response = await httpClient<ApiResponse<BackendRecord>>(`/api/voucher/types/${id}`);
                 return { ...response, data: normalizeVoucherType(response.data) };
             },
             () => mockResponse(getVoucherTypeById(id)),
         ),
-        create: (input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>('/api/voucher/types', { body: input, method: 'POST' }), () => mockResponse(input)),
-        update: (id: string, input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/voucher/types/${id}`, { body: input, method: 'PATCH' }), () => mockResponse({ id, input })),
-        activate: (id: string) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/voucher/types/${id}/activate`, { method: 'PATCH' }), () => mockResponse({ action: 'activate', id })),
-        deactivate: (id: string) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/voucher/types/${id}/deactivate`, { method: 'PATCH' }), () => mockResponse({ action: 'deactivate', id })),
+        create: (input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>('/api/voucher/types', { body: input, method: 'POST' }), () => mockResponse(input)),
+        update: (id: string, input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/voucher/types/${id}`, { body: input, method: 'PATCH' }), () => mockResponse({ id, input })),
+        activate: (id: string) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/voucher/types/${id}/activate`, { method: 'PATCH' }), () => mockResponse({ action: 'activate', id })),
+        deactivate: (id: string) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/voucher/types/${id}/deactivate`, { method: 'PATCH' }), () => mockResponse({ action: 'deactivate', id })),
     },
     vouchers: {
-        list: (): Promise<ApiCollectionResponse<Voucher>> => withMockFallback(
+        list: (): Promise<ApiCollectionResponse<Voucher>> => withExplicitMock(
             async () => {
                 const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/voucher/vouchers');
                 return { ...response, data: response.data.map(normalizeVoucher) };
             },
             () => mockCollectionResponse(vouchers),
         ),
-        get: (id: string): Promise<ApiResponse<Voucher>> => withMockFallback(
+        get: (id: string): Promise<ApiResponse<Voucher>> => withExplicitMock(
             async () => {
                 const response = await httpClient<ApiResponse<BackendRecord>>(`/api/voucher/vouchers/${id}`);
                 return { ...response, data: normalizeVoucher(response.data) };
             },
             () => mockResponse(getVoucherById(id)),
         ),
-        create: (input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>('/api/voucher/vouchers', { body: input, method: 'POST' }), () => mockResponse(input)),
-        update: (id: string, input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${id}`, { body: input, method: 'PATCH' }), () => mockResponse({ id, input })),
-        deleteDraft: (id: string) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${id}`, { method: 'DELETE' }), () => mockResponse({ action: 'delete-draft', id })),
-        syncLines: (id: string, input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${id}/lines`, { body: input, method: 'PUT' }), () => mockResponse({ id, input })),
-        submit: (id: string) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${id}/submit`, { method: 'POST' }), () => mockResponse({ action: 'submit', id })),
-        approve: (id: string, input?: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${id}/approve`, { body: input, method: 'POST' }), () => mockResponse({ action: 'approve', id, input })),
-        reject: (id: string, input?: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${id}/reject`, { body: input, method: 'POST' }), () => mockResponse({ action: 'reject', id, input })),
-        post: (id: string) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${id}/post`, { method: 'POST' }), () => mockResponse({ action: 'post', id })),
-        cancel: (id: string) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${id}/cancel`, { method: 'POST' }), () => mockResponse({ action: 'cancel', id })),
-        reverse: (id: string, input?: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${id}/reverse`, { body: input, method: 'POST' }), () => mockResponse({ action: 'reverse', id, input })),
-        history: (id: string): Promise<ApiCollectionResponse<VoucherAuditEntry>> => withMockFallback(
+        create: (input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>('/api/voucher/vouchers', { body: input, method: 'POST' }), () => mockResponse(input)),
+        update: (id: string, input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${id}`, { body: input, method: 'PATCH' }), () => mockResponse({ id, input })),
+        deleteDraft: (id: string) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${id}`, { method: 'DELETE' }), () => mockResponse({ action: 'delete-draft', id })),
+        syncLines: (id: string, input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${id}/lines`, { body: input, method: 'PUT' }), () => mockResponse({ id, input })),
+        submit: (id: string) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${id}/submit`, { method: 'POST' }), () => mockResponse({ action: 'submit', id })),
+        approve: (id: string, input?: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${id}/approve`, { body: input, method: 'POST' }), () => mockResponse({ action: 'approve', id, input })),
+        reject: (id: string, input?: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${id}/reject`, { body: input, method: 'POST' }), () => mockResponse({ action: 'reject', id, input })),
+        post: (id: string) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${id}/post`, { method: 'POST' }), () => mockResponse({ action: 'post', id })),
+        cancel: (id: string) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${id}/cancel`, { method: 'POST' }), () => mockResponse({ action: 'cancel', id })),
+        reverse: (id: string, input?: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${id}/reverse`, { body: input, method: 'POST' }), () => mockResponse({ action: 'reverse', id, input })),
+        history: (id: string): Promise<ApiCollectionResponse<VoucherAuditEntry>> => withExplicitMock(
             async () => {
                 const response = await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/voucher/vouchers/${id}/history`);
                 return { ...response, data: response.data.map(normalizeHistory) };
@@ -220,40 +228,40 @@ export const voucherApi = {
         ),
     },
     allocations: {
-        list: (voucherId: string): Promise<ApiCollectionResponse<VoucherAllocation>> => withMockFallback(
+        list: (voucherId: string): Promise<ApiCollectionResponse<VoucherAllocation>> => withExplicitMock(
             async () => {
                 const response = await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/voucher/vouchers/${voucherId}/allocations`);
                 return { ...response, data: response.data.map(normalizeAllocation) };
             },
             () => mockCollectionResponse(getVoucherById(voucherId).allocations),
         ),
-        create: (voucherId: string, input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${voucherId}/allocations`, { body: input, method: 'POST' }), () => mockResponse({ input, voucherId })),
-        update: (allocationId: string, input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/voucher/allocations/${allocationId}`, { body: input, method: 'PATCH' }), () => mockResponse({ allocationId, input })),
-        preview: (input: unknown): Promise<ApiPreviewResponse<unknown, VoucherPaymentImpactPreview['calculated']>> => mockPreviewResponse(input, paymentImpactPreview.calculated, paymentImpactPreview.breakdown, paymentImpactPreview.warnings),
+        create: (voucherId: string, input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/voucher/vouchers/${voucherId}/allocations`, { body: input, method: 'POST' }), () => mockResponse({ input, voucherId })),
+        update: (allocationId: string, input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/voucher/allocations/${allocationId}`, { body: input, method: 'PATCH' }), () => mockResponse({ allocationId, input })),
+        preview: (input: unknown): Promise<ApiPreviewResponse<unknown, VoucherPaymentImpactPreview['calculated']>> => mockOnly('Voucher allocation preview', () => mockPreviewResponse(input, paymentImpactPreview.calculated, paymentImpactPreview.breakdown, paymentImpactPreview.warnings)),
     },
     utilities: {
-        previewNumber: (input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>('/api/voucher/utilities/preview-number', { body: input, method: 'POST' }), () => mockResponse({ input, voucherNumber: 'Backend sequence preview' })),
-        validateBalance: (input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>('/api/voucher/utilities/validate-balance', { body: input, method: 'POST' }), () => mockResponse({ input, validation: 'Backend/mock balance validation' })),
-        validatePaymentMethod: (input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>('/api/voucher/utilities/validate-payment-method', { body: input, method: 'POST' }), () => mockResponse({ input, validation: 'Backend/mock payment method validation' })),
-        previewPosting: (voucherId: string): Promise<ApiPreviewResponse<unknown, VoucherPostingPreview['calculated']>> => withMockFallback(
+        previewNumber: (input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>('/api/voucher/utilities/preview-number', { body: input, method: 'POST' }), () => mockResponse({ input, voucherNumber: 'Backend sequence preview' })),
+        validateBalance: (input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>('/api/voucher/utilities/validate-balance', { body: input, method: 'POST' }), () => mockResponse({ input, validation: 'Backend/mock balance validation' })),
+        validatePaymentMethod: (input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>('/api/voucher/utilities/validate-payment-method', { body: input, method: 'POST' }), () => mockResponse({ input, validation: 'Backend/mock payment method validation' })),
+        previewPosting: (voucherId: string): Promise<ApiPreviewResponse<unknown, VoucherPostingPreview['calculated']>> => withExplicitMock(
             async () => normalizePostingPreviewResponse(
                 { voucherId },
                 await httpClient<ApiPreviewResponse<unknown, VoucherPostingPreview['calculated']> | ApiResponse<unknown>>(`/api/voucher/utilities/${voucherId}/preview-posting`),
             ),
             () => mockPreviewResponse({ voucherId }, getVoucherById(voucherId).postingPreview.calculated, getVoucherById(voucherId).postingPreview.breakdown, getVoucherById(voucherId).postingPreview.warnings),
         ),
-        previewPaymentImpact: (input: unknown): Promise<ApiPreviewResponse<unknown, VoucherPaymentImpactPreview['calculated']>> => mockPreviewResponse(input, paymentImpactPreview.calculated, paymentImpactPreview.breakdown, paymentImpactPreview.warnings),
+        previewPaymentImpact: (input: unknown): Promise<ApiPreviewResponse<unknown, VoucherPaymentImpactPreview['calculated']>> => mockOnly('Voucher payment impact preview', () => mockPreviewResponse(input, paymentImpactPreview.calculated, paymentImpactPreview.breakdown, paymentImpactPreview.warnings)),
     },
     documents: {
-        preview: (voucherId: string) => mockResponse(getVoucherById(voucherId).document),
-        generate: (voucherId: string) => mockResponse({ action: 'generate-voucher-document', voucherId }),
+        preview: (voucherId: string) => mockOnly('Voucher document preview', () => mockResponse(getVoucherById(voucherId).document)),
+        generate: (voucherId: string) => mockOnly('Voucher document generation', () => mockResponse({ action: 'generate-voucher-document', voucherId })),
     },
     settings: {
-        get: (): Promise<ApiResponse<VoucherSettings>> => mockResponse(voucherSettings),
-        update: (input: unknown) => mockResponse(input),
+        get: (): Promise<ApiResponse<VoucherSettings>> => mockOnly('Voucher settings', () => mockResponse(voucherSettings)),
+        update: (input: unknown) => mockOnly('Voucher settings update', () => mockResponse(input)),
     },
     previews: {
-        posting: (input: unknown): Promise<ApiPreviewResponse<unknown, VoucherPostingPreview['calculated']>> => mockPreviewResponse(input, postingPreview.calculated, postingPreview.breakdown, postingPreview.warnings),
-        paymentImpact: (input: unknown): Promise<ApiPreviewResponse<unknown, VoucherPaymentImpactPreview['calculated']>> => mockPreviewResponse(input, paymentImpactPreview.calculated, paymentImpactPreview.breakdown, paymentImpactPreview.warnings),
+        posting: (input: unknown): Promise<ApiPreviewResponse<unknown, VoucherPostingPreview['calculated']>> => mockOnly('Voucher posting preview', () => mockPreviewResponse(input, postingPreview.calculated, postingPreview.breakdown, postingPreview.warnings)),
+        paymentImpact: (input: unknown): Promise<ApiPreviewResponse<unknown, VoucherPaymentImpactPreview['calculated']>> => mockOnly('Voucher payment impact preview', () => mockPreviewResponse(input, paymentImpactPreview.calculated, paymentImpactPreview.breakdown, paymentImpactPreview.warnings)),
     },
 };

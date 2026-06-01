@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ApiError } from '../../../services/api/apiErrors';
 import { FieldError } from '../../../shared/components/forms/FieldError';
@@ -22,6 +22,17 @@ type FormLookupState = {
     taxGroups: ItemLookupOption[];
     uoms: UomOption[];
 };
+
+type ComboComponentFormRow = ComboComponentInput & {
+    clientKey: string;
+};
+
+let comboRowSequence = 0;
+
+function nextComboRowKey() {
+    comboRowSequence += 1;
+    return `combo-row-${Date.now()}-${comboRowSequence}`;
+}
 
 function FieldLabel({ children }: { children: string }) {
     return <label className="text-xs font-bold uppercase tracking-wide text-slate-500">{children}</label>;
@@ -51,8 +62,10 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
     const [lookups, setLookups] = useState<FormLookupState>({ accounts: [], brands: [], categories: [], componentItems: [], itemTypes: [], taxGroups: [], uoms: [] });
     const [lookupError, setLookupError] = useState('');
     const [lookupsLoading, setLookupsLoading] = useState(true);
+    const [componentItemsLoading, setComponentItemsLoading] = useState(false);
+    const [componentItemsLoaded, setComponentItemsLoaded] = useState(false);
     const [selectedType, setSelectedType] = useState<ItemType>(item?.itemType ?? 'inventory_product');
-    const [comboItems, setComboItems] = useState<ComboComponentInput[]>([]);
+    const [comboItems, setComboItems] = useState<ComboComponentFormRow[]>([]);
     const [baseUomId, setBaseUomId] = useState(item?.baseUomId ?? '');
     const [behavior, setBehavior] = useState({
         chargeable: item?.allowChargeUsage ?? false,
@@ -65,6 +78,7 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
     });
     const [setupPreview, setSetupPreview] = useState<ItemTypeSetupPreview | null>(null);
     const [setupPreviewError, setSetupPreviewError] = useState('');
+    const [setupPreviewLoading, setSetupPreviewLoading] = useState(false);
 
     useEffect(() => {
         let mounted = true;
@@ -75,15 +89,14 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
             itemApi.listUoms(),
             itemApi.listFinanceAccounts(),
             itemApi.listTaxGroups(),
-            itemApi.listItems({ perPage: 200 }),
         ])
-            .then(([categories, brands, itemTypes, uoms, accounts, taxGroups, componentItems]) => {
+            .then(([categories, brands, itemTypes, uoms, accounts, taxGroups]) => {
                 if (mounted) {
                     setLookups({
                         accounts: accounts.data,
                         brands: brands.data,
                         categories: categories.data,
-                        componentItems: componentItems.data,
+                        componentItems: [],
                         itemTypes: itemTypes.data,
                         taxGroups: taxGroups.data,
                         uoms: uoms.data,
@@ -106,6 +119,30 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
         };
     }, []);
 
+    const loadComponentItems = useCallback(() => {
+        if (componentItemsLoaded || componentItemsLoading) {
+            return;
+        }
+
+        setComponentItemsLoading(true);
+        setLookupError('');
+        itemApi.listItems({ perPage: 50 })
+            .then((response) => {
+                setLookups((current) => ({ ...current, componentItems: response.data }));
+                setComponentItemsLoaded(true);
+            })
+            .catch((error: unknown) => {
+                setLookupError(error instanceof Error ? error.message : 'Unable to load component item options.');
+            })
+            .finally(() => setComponentItemsLoading(false));
+    }, [componentItemsLoaded, componentItemsLoading]);
+
+    useEffect(() => {
+        if (selectedType === 'combo') {
+            loadComponentItems();
+        }
+    }, [loadComponentItems, selectedType]);
+
     useEffect(() => {
         if (!item || item.itemType !== 'combo') {
             return;
@@ -116,6 +153,7 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
             .then((response) => {
                 if (mounted) {
                     setComboItems(response.data.map((component) => ({
+                        clientKey: nextComboRowKey(),
                         componentItemId: component.componentItemId ?? '',
                         quantity: component.quantity,
                         uomId: component.uomId ?? item.baseUomId ?? '',
@@ -157,53 +195,48 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
         }
     }, [baseUomId, lookups.uoms]);
 
-    useEffect(() => {
-        if (!lookups.itemTypes.length) {
+    async function previewSetup() {
+        if (!lookups.itemTypes.length || setupPreviewLoading) {
             return;
         }
 
-        let mounted = true;
+        setSetupPreviewLoading(true);
         setSetupPreviewError('');
 
-        itemApi.getTypeSetupPreview({
+        try {
+            const response = await itemApi.getTypeSetupPreview({
             allowChargeUsage: behavior.chargeable,
             allowConsumptionUsage: behavior.consumable,
             allowIssueUsage: behavior.issuable,
             allowReceiptUsage: behavior.purchasable,
             baseUomId,
-            comboItems,
+            comboItems: comboItems.map(({ clientKey, ...row }) => row),
             itemType: selectedType,
             itemTypeId: lookups.itemTypes.find((option) => option.value === selectedType)?.id ?? item?.itemTypeId ?? '',
             stockable: behavior.stockable,
             trackBatch: behavior.trackBatch,
             trackSerial: behavior.trackSerial,
-        })
-            .then((response) => {
-                if (mounted) {
-                    setSetupPreview(response.data);
-                }
-            })
-            .catch((error: unknown) => {
-                if (mounted) {
-                    setSetupPreviewError(error instanceof Error ? error.message : 'Unable to preview item setup.');
-                }
             });
 
-        return () => {
-            mounted = false;
-        };
-    }, [baseUomId, behavior, comboItems, item?.itemTypeId, lookups.itemTypes, selectedType]);
+            setSetupPreview(response.data);
+        } catch (error) {
+            setSetupPreviewError(error instanceof Error ? error.message : 'Unable to preview item setup.');
+        } finally {
+            setSetupPreviewLoading(false);
+        }
+    }
 
     function addComboItem() {
-        setComboItems((rows) => [...rows, { componentItemId: '', quantity: '1', uomId: item?.baseUomId ?? lookups.uoms[0]?.id ?? '' }]);
+        loadComponentItems();
+        setComboItems((rows) => [...rows, { clientKey: nextComboRowKey(), componentItemId: '', quantity: '1', uomId: item?.baseUomId ?? lookups.uoms[0]?.id ?? '' }]);
     }
 
-    function updateComboItem(index: number, field: keyof ComboComponentInput, value: string) {
-        setComboItems((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: value } : row));
+    function updateComboItem(clientKey: string, field: keyof ComboComponentInput, value: string) {
+        setComboItems((rows) => rows.map((row) => row.clientKey === clientKey ? { ...row, [field]: value } : row));
     }
 
-    function removeComboItem(index: number) {
-        setComboItems((rows) => rows.filter((_, rowIndex) => rowIndex !== index));
+    function removeComboItem(clientKey: string) {
+        setComboItems((rows) => rows.filter((row) => row.clientKey !== clientKey));
     }
 
     function updateBehavior(field: keyof typeof behavior, value: boolean) {
@@ -228,7 +261,7 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
             categoryId: stringValue(formData, 'category_id'),
             cogsAccountId: stringValue(formData, 'cogs_account_id'),
             code: stringValue(formData, 'sku'),
-            comboItems,
+            comboItems: comboItems.map(({ clientKey, ...row }) => row),
             defaultChargeUomId: stringValue(formData, 'default_charge_uom_id'),
             defaultConsumptionUomId: stringValue(formData, 'default_consumption_uom_id'),
             defaultIssueUomId: stringValue(formData, 'default_issue_uom_id'),
@@ -515,15 +548,16 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
                         <div className="space-y-4">
                             <div className="flex items-center justify-between gap-3">
                                 <p className="text-sm text-slate-600">Add component references. Backend validates components, circular links, quantities, and UOMs.</p>
-                                <Button onClick={addComboItem} variant="secondary">Add Component</Button>
+                                <Button onClick={addComboItem} type="button" variant="secondary">Add Component</Button>
                             </div>
+                            {componentItemsLoading ? <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">Loading component item options...</div> : null}
                             {!comboItems.length ? <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No combo components added.</div> : null}
-                            {comboItems.map((row, index) => (
-                                <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-[1fr_120px_160px_auto]" key={`${index}-${row.componentItemId}`}>
-                                    <Select onChange={(event) => updateComboItem(index, 'componentItemId', event.target.value)} options={lookups.componentItems.filter((component) => component.id !== item?.id).map((component) => ({ label: `${component.code} - ${component.name}`, value: component.id }))} placeholder="Component item" value={row.componentItemId} />
-                                    <Input min="0.0001" onChange={(event) => updateComboItem(index, 'quantity', event.target.value)} placeholder="Qty" step="0.0001" type="number" value={row.quantity} />
-                                    <Select onChange={(event) => updateComboItem(index, 'uomId', event.target.value)} options={lookups.uoms.map((uom) => ({ label: uom.label, value: uom.id }))} value={row.uomId} />
-                                    <Button onClick={() => removeComboItem(index)} variant="ghost">Remove</Button>
+                            {comboItems.map((row) => (
+                                <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-[1fr_120px_160px_auto]" key={row.clientKey}>
+                                    <Select onChange={(event) => updateComboItem(row.clientKey, 'componentItemId', event.target.value)} options={lookups.componentItems.filter((component) => component.id !== item?.id).map((component) => ({ label: `${component.code} - ${component.name}`, value: component.id }))} placeholder="Component item" value={row.componentItemId} />
+                                    <Input min="0.0001" onChange={(event) => updateComboItem(row.clientKey, 'quantity', event.target.value)} placeholder="Qty" step="0.0001" type="number" value={row.quantity} />
+                                    <Select onChange={(event) => updateComboItem(row.clientKey, 'uomId', event.target.value)} options={lookups.uoms.map((uom) => ({ label: uom.label, value: uom.id }))} value={row.uomId} />
+                                    <Button onClick={() => removeComboItem(row.clientKey)} type="button" variant="ghost">Remove</Button>
                                 </div>
                             ))}
                             <FieldError message={fieldMessage(errors, 'combo_items')} />
@@ -536,6 +570,9 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
                 </div>
             </div>
             <div className="space-y-4">
+                <Button disabled={setupPreviewLoading || !lookups.itemTypes.length} onClick={() => void previewSetup()} type="button" variant="secondary">
+                    {setupPreviewLoading ? 'Previewing...' : 'Preview Backend Setup'}
+                </Button>
                 {setupPreview ? <ItemCapabilityPanel capabilities={setupPreview.capabilities} /> : null}
                 {setupPreviewError ? <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{setupPreviewError}</div> : null}
                 {setupPreview?.warnings.length ? (

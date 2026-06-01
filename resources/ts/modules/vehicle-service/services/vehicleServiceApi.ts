@@ -26,6 +26,7 @@ import type {
 } from '../types/vehicleService.types';
 
 type BackendRecord = Record<string, unknown>;
+const LOOKUP_PAGE_SIZE = 50;
 
 function record(value: unknown): BackendRecord {
     return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as BackendRecord : {};
@@ -546,11 +547,11 @@ export const vehicleServiceApi = {
     },
     lookups: {
         customers: async (): Promise<ApiCollectionResponse<VehicleServiceLookupOption>> => {
-            const response = await customerApi.listCustomers({ perPage: 200 });
+            const response = await customerApi.listCustomers({ perPage: LOOKUP_PAGE_SIZE });
             return { data: response.data.map((customer) => simpleOption(customer.id, `${customer.code} - ${customer.name}`, customer.status)) };
         },
         employees: async (): Promise<ApiCollectionResponse<VehicleServiceLookupOption>> => {
-            const response = await hrApi.employees.list({ perPage: 200, status: 'active' });
+            const response = await hrApi.employees.list({ perPage: LOOKUP_PAGE_SIZE, status: 'active' });
             return { data: response.data.map((employee) => simpleOption(employee.id, `${employee.code} - ${employee.displayName}`, employee.status)) };
         },
         itemUnits: async (itemId: string): Promise<ApiCollectionResponse<VehicleServiceLookupOption>> => {
@@ -558,7 +559,7 @@ export const vehicleServiceApi = {
             return { data: response.data.filter((unit) => unit.id && unit.unit !== 'Not configured').map((unit) => simpleOption(unit.id, unit.unit, unit.purpose)) };
         },
         items: async (): Promise<ApiCollectionResponse<VehicleServiceLookupOption>> => {
-            const response = await itemApi.listItems({ perPage: 200, status: 'active' });
+            const response = await itemApi.listItems({ perPage: LOOKUP_PAGE_SIZE, status: 'active' });
             return { data: response.data.map((item) => simpleOption(item.id, `${item.code} - ${item.name}`, item.itemType)) };
         },
         uoms: async (): Promise<ApiCollectionResponse<VehicleServiceLookupOption>> => {
@@ -566,7 +567,7 @@ export const vehicleServiceApi = {
             return { data: response.data.map((uom) => simpleOption(uom.id, uom.secondary ? `${uom.secondary} - ${uom.label}` : uom.label)) };
         },
         vehicles: async (): Promise<ApiCollectionResponse<VehicleServiceLookupOption>> => {
-            const response = await vehicleApi.list({ perPage: 200 });
+            const response = await vehicleApi.list({ perPage: LOOKUP_PAGE_SIZE });
             return { data: response.data.map((vehicle) => simpleOption(vehicle.id, `${vehicle.registrationNumber} - ${vehicle.make} ${vehicle.model}`, vehicle.status)) };
         },
         warehouses: inventoryApi.listWarehouses,

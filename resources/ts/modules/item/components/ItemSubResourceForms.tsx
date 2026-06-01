@@ -189,10 +189,18 @@ export function ItemComboComponentCreateForm({ item, onSaved }: FormProps) {
     const state = useFormState();
 
     useEffect(() => {
-        Promise.all([itemApi.listItems({ perPage: 200 }), itemApi.listUoms()]).then(([itemRows, uomRows]) => {
-            setItems(itemRows.data);
-            setUoms(uomRows.data);
-        }).catch((error) => state.setMessage(error instanceof Error ? error.message : 'Unable to load component lookups.'));
+        let mounted = true;
+        Promise.all([itemApi.listItems({ perPage: 50 }), itemApi.listUoms()]).then(([itemRows, uomRows]) => {
+            if (mounted) {
+                setItems(itemRows.data);
+                setUoms(uomRows.data);
+            }
+        }).catch((error) => {
+            if (mounted) {
+                state.setMessage(error instanceof Error ? error.message : 'Unable to load component lookups.');
+            }
+        });
+        return () => { mounted = false; };
     }, []);
 
     if (!item) return null;

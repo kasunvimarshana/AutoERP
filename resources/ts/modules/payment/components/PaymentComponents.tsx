@@ -364,7 +364,7 @@ export function CheckPaymentPanel({ checks: rows }: { checks: CheckPayment[] }) 
 }
 
 export function PaymentActivityTimeline({ entries }: { entries: PaymentAuditEntry[] }) {
-    return <div className="space-y-3">{entries.map((entry) => <Card className="p-4" key={entry.id}><p className="text-sm font-semibold text-slate-900">{entry.description}</p><p className="mt-1 text-xs text-slate-400">{entry.actor} - {entry.time}</p></Card>)}</div>;
+    return <div className="space-y-3">{entries.map((entry) => <Card className="p-4" key={`payment-timeline-${entry.id}-${entry.time}`}><p className="text-sm font-semibold text-slate-900">{entry.description}</p><p className="mt-1 text-xs text-slate-400">{entry.actor} - {entry.time}</p></Card>)}</div>;
 }
 
 export function PaymentMethodsTable({ methods }: { methods: PaymentMethod[] }) {

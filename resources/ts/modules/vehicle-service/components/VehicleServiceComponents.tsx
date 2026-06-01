@@ -627,7 +627,7 @@ export function VehicleServiceWorkflowActions({ jobCard, onChanged }: { jobCard:
 }
 
 export function VehicleServiceActivityTimeline({ rows }: { rows: VehicleServiceAuditEntry[] }) {
-    return <div className="space-y-3">{rows.map((entry) => <Card className="p-4" key={entry.id}><p className="font-semibold text-slate-900">{entry.note}</p><p className="mt-1 text-sm text-slate-500">{entry.actor} · {entry.timestamp}</p></Card>)}</div>;
+    return <div className="space-y-3">{rows.map((entry) => <Card className="p-4" key={`vehicle-service-activity-${entry.id}-${entry.timestamp}`}><p className="font-semibold text-slate-900">{entry.note}</p><p className="mt-1 text-sm text-slate-500">{entry.actor} · {entry.timestamp}</p></Card>)}</div>;
 }
 
 export function VehicleServiceSettingsForm({ settings }: { settings: VehicleServiceSettings }) {

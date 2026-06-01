@@ -78,7 +78,7 @@ export function PurchaseOrderForm({ initialOrder, mode = 'create' }: { initialOr
             <FormSection description="Supplier eligibility, payment terms, workflow defaults, and sequence values are backend validated." title="Purchase Order Header">
                 <div className="grid gap-4 md:grid-cols-3">
                     <Field error={errors.supplier_id} label="Supplier"><LookupSelect disabled={isLoading} isLoading={lookupActions.loading.suppliers} onOpen={lookupActions.loadSuppliers} onChange={(value) => setField('supplierId', value)} options={lookups.suppliers} placeholder="Select supplier" value={values.supplierId} /></Field>
-                    <Field error={errors.po_number} label="PO number"><Input onChange={(event) => setField('poNumber', event.target.value)} value={values.poNumber} /></Field>
+                    <Field error={errors.po_number} label="PO number"><Input disabled placeholder="Generated after create" value={values.poNumber || ''} /></Field>
                     <Field error={errors.order_date} label="Order date"><Input onChange={(event) => setField('orderDate', event.target.value)} type="date" value={values.orderDate} /></Field>
                     <Field error={errors.expected_date} label="Expected date"><Input onChange={(event) => setField('expectedDate', event.target.value)} type="date" value={values.expectedDate ?? ''} /></Field>
                     <Field error={errors.warehouse_id} label="Warehouse"><LookupSelect disabled={isLoading} isLoading={lookupActions.loading.warehouses} onOpen={lookupActions.loadWarehouses} onChange={(value) => setField('warehouseId', value)} options={lookups.warehouses} placeholder="Select warehouse" value={values.warehouseId} /></Field>
@@ -494,7 +494,7 @@ export function PurchaseActivityTimeline({ rows }: { rows: PurchaseAuditEntry[] 
     return (
         <div className="space-y-3">
             {rows.map((entry) => (
-                <Card className="p-4" key={entry.id}>
+                <Card className="p-4" key={`purchase-timeline-${entry.id}-${entry.time}`}>
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <p className="text-sm font-semibold text-slate-950">{entry.description}</p>
@@ -696,6 +696,11 @@ function usePurchaseLookups() {
         suppliers: false,
         warehouses: false,
     });
+    const [itemUomLookupState, setItemUomLookupState] = useState({
+        errors: {} as Record<string, string>,
+        loaded: {} as Record<string, boolean>,
+        loading: {} as Record<string, boolean>,
+    });
 
     useEffect(() => {
         return () => {
@@ -743,6 +748,11 @@ function usePurchaseLookups() {
         }
 
         loadingItemUomsRef.current.add(itemId);
+        setItemUomLookupState((current) => ({
+            errors: { ...current.errors, [itemId]: '' },
+            loaded: current.loaded,
+            loading: { ...current.loading, [itemId]: true },
+        }));
 
         try {
             const response = await purchaseApi.lookups.itemUoms(itemId);
@@ -758,15 +768,32 @@ function usePurchaseLookups() {
                     ...current,
                     uomsByItem: { ...current.uomsByItem, [itemId]: response.data },
                 });
-        } catch {
-            // Keep line editing responsive; backend validation reports missing UOMs on submit.
+            setItemUomLookupState((current) => ({
+                errors: current.errors,
+                loaded: { ...current.loaded, [itemId]: true },
+                loading: { ...current.loading, [itemId]: false },
+            }));
+        } catch (error) {
+            if (mountedRef.current) {
+                setItemUomLookupState((current) => ({
+                    errors: { ...current.errors, [itemId]: error instanceof Error ? error.message : 'Unable to load purchase UOMs.' },
+                    loaded: { ...current.loaded, [itemId]: true },
+                    loading: { ...current.loading, [itemId]: false },
+                }));
+            }
         } finally {
             loadingItemUomsRef.current.delete(itemId);
+            if (mountedRef.current) {
+                setItemUomLookupState((current) => current.loading[itemId]
+                    ? { ...current, loading: { ...current.loading, [itemId]: false } }
+                    : current);
+            }
         }
     }, []);
 
     return {
         isLoading: false,
+        itemUomLookupState,
         loadGrns,
         loadItemUoms,
         loadItems,
@@ -1063,6 +1090,10 @@ function PurchaseLineEditor({
     quantityLabel: string;
 }) {
     const itemUoms = line.itemId ? lookups.uomsByItem[line.itemId] ?? [] : [];
+    const itemUomState = line.itemId ? lookupActions.itemUomLookupState : null;
+    const itemUomsLoaded = line.itemId ? itemUomState?.loaded[line.itemId] === true : false;
+    const itemUomsLoading = line.itemId ? itemUomState?.loading[line.itemId] === true : false;
+    const itemUomError = line.itemId ? itemUomState?.errors[line.itemId] : '';
 
     return (
         <div className="grid gap-4 rounded-lg border border-slate-200 p-4 md:grid-cols-6">
@@ -1070,8 +1101,9 @@ function PurchaseLineEditor({
                 <LookupSelect isLoading={lookupActions.loading.items} onOpen={lookupActions.loadItems} onChange={(value) => onLineChange(lineIndex, 'itemId', value)} options={lookups.items} placeholder="Select item first" value={line.itemId} />
             </Field>
             <Field error={errors[`lines.${lineIndex}.uom_id`] ?? errors.uom_id} label="UOM">
-                <LookupSelect disabled={!line.itemId} onOpen={() => lookupActions.loadItemUoms(line.itemId)} onChange={(value) => onLineChange(lineIndex, 'uomId', value)} options={itemUoms} placeholder={line.itemId ? 'Select item UOM' : 'Select item first'} value={line.uomId} />
-                {line.itemId && itemUoms.length === 0 ? <span className="text-xs text-amber-600">No UOM configured for this item.</span> : null}
+                <LookupSelect disabled={!line.itemId || itemUomsLoading} isLoading={itemUomsLoading} onOpen={() => lookupActions.loadItemUoms(line.itemId)} onChange={(value) => onLineChange(lineIndex, 'uomId', value)} options={itemUoms} placeholder={line.itemId ? 'Select item UOM' : 'Select item first'} value={line.uomId} />
+                {itemUomError ? <span className="text-xs text-red-600">{itemUomError}</span> : null}
+                {line.itemId && itemUomsLoaded && itemUoms.length === 0 && !itemUomError ? <span className="text-xs text-amber-600">No purchase UOM configured for this item.</span> : null}
             </Field>
             <Field error={errors[`lines.${lineIndex}.quantity`] ?? errors[`lines.${lineIndex}.ordered_qty`] ?? errors[`lines.${lineIndex}.received_qty`] ?? errors[`lines.${lineIndex}.return_qty`]} label={quantityLabel}>
                 <Input min="0" onChange={(event) => onLineChange(lineIndex, 'quantity', event.target.value)} step="0.0001" type="number" value={line.quantity} />

@@ -21,10 +21,13 @@ use Modules\Purchase\Application\Repositories\PurchaseReturnRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchaseSettingRepositoryInterface;
 use Modules\Purchase\Application\Repositories\PurchaseStatusHistoryRepositoryInterface;
 use Modules\Purchase\Domain\Constants\PurchaseErrorCode;
+use Modules\Sequence\Application\Contracts\UseCases\Sequences\GenerateSequenceNumberServiceInterface;
 use Throwable;
 
 final class PurchaseManagementService implements PurchaseManagementServiceInterface
 {
+    private const PURCHASE_ORDER_DOCUMENT_TYPE = 'PURCHASE_ORDER';
+
     public function __construct(
         private readonly PurchaseOrderRepositoryInterface $purchaseOrderRepository,
         private readonly PurchaseOrderLineRepositoryInterface $purchaseOrderLineRepository,
@@ -37,6 +40,7 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
         private readonly PurchaseDocumentLinkRepositoryInterface $purchaseDocumentLinkRepository,
         private readonly PurchasePaymentAllocationRepositoryInterface $purchasePaymentAllocationRepository,
         private readonly PurchaseAmountCalculatorInterface $amountCalculator,
+        private readonly GenerateSequenceNumberServiceInterface $sequenceGenerator,
     ) {}
 
     public function upsertPurchaseOrderWithLines(?int $id, array $payload): Result
@@ -44,6 +48,15 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
         try {
             return $this->purchaseOrderRepository->transaction(function () use ($id, $payload): Result {
                 $headerPayload = $this->extractHeaderPayload($payload);
+                if ($id === null) {
+                    $numberedPayload = $this->withGeneratedPurchaseOrderNumber($headerPayload);
+                    if ($numberedPayload->isFailure()) {
+                        return $numberedPayload;
+                    }
+
+                    $headerPayload = $numberedPayload->valueOrFail();
+                }
+
                 $header = $id === null
                     ? $this->purchaseOrderRepository->create($this->withDefaultRowVersion($headerPayload))
                     : $this->purchaseOrderRepository->update($id, $headerPayload);
@@ -69,7 +82,12 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                 return Result::success($reloaded);
             });
         } catch (Throwable $exception) {
-            return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, $exception->getMessage()));
+            report($exception);
+
+            return Result::failure(new Error(
+                PurchaseErrorCode::INVALID_VALUE,
+                'Unable to save purchase order. Please check the submitted fields and purchase order sequence settings.',
+            ));
         }
     }
 
@@ -144,7 +162,9 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
                 ]);
             });
         } catch (Throwable $exception) {
-            return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, $exception->getMessage()));
+            report($exception);
+
+            return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'Unable to save purchase order lines.'));
         }
     }
 
@@ -814,6 +834,55 @@ final class PurchaseManagementService implements PurchaseManagementServiceInterf
         }
 
         return $payload;
+    }
+
+    /**
+     * The PO header and its lines are created in one transaction; the sequence is consumed inside it so a failed insert
+     * rolls back the generated number together with the document.
+     *
+     * @return Result<array<string, mixed>>
+     */
+    private function withGeneratedPurchaseOrderNumber(array $payload): Result
+    {
+        unset($payload['po_number']);
+
+        $tenantId = isset($payload['tenant_id']) ? (int) $payload['tenant_id'] : 0;
+        if ($tenantId < 1) {
+            return Result::failure(new Error(PurchaseErrorCode::INVALID_VALUE, 'tenant_id is required to generate a purchase order number.'));
+        }
+
+        $organizationUnitId = array_key_exists('organization_unit_id', $payload) && $payload['organization_unit_id'] !== null
+            ? (int) $payload['organization_unit_id']
+            : null;
+
+        $sequence = $this->sequenceGenerator->execute([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'document_type' => self::PURCHASE_ORDER_DOCUMENT_TYPE,
+            'prefix' => $organizationUnitId !== null ? 'PO-{ORG_ID}-' : 'PO-',
+            'padding' => 6,
+            'at_date' => $payload['order_date'] ?? null,
+            'metadata' => ['source' => 'purchase_order'],
+        ]);
+
+        if ($sequence->isFailure()) {
+            return Result::failure(new Error(
+                PurchaseErrorCode::INVALID_VALUE,
+                'Unable to generate purchase order number. Check the Purchase Order sequence settings.',
+            ));
+        }
+
+        $generatedNumber = (string) (($sequence->valueOrFail()['generated_number'] ?? '') ?: '');
+        if ($generatedNumber === '') {
+            return Result::failure(new Error(
+                PurchaseErrorCode::INVALID_VALUE,
+                'Unable to generate purchase order number. Check the Purchase Order sequence settings.',
+            ));
+        }
+
+        $payload['po_number'] = $generatedNumber;
+
+        return Result::success($payload);
     }
 
     /** @return array<string, mixed> */

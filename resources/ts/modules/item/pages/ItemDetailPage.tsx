@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
 import { Button } from '../../../shared/components/ui/Button';
@@ -24,58 +24,108 @@ const tabs = [
     { label: 'Audit / History', value: 'audit' },
 ];
 
-type ItemDetailState = {
+type ItemTabKey = typeof tabs[number]['value'];
+
+type ItemTabData = {
     activity: ItemAuditEntry[];
     attributes: ItemAttribute[];
     comboComponents: ItemComboComponent[];
     identifiers: ItemIdentifier[];
     inventorySummary: ItemInventorySummary;
-    item: Item;
     pricingReferences: ItemPricingReference[];
     units: ItemUnit[];
-    usage: ItemUsageSummary;
     variants: ItemVariant[];
 };
 
 export function ItemDetailPage() {
     const { id } = useParams();
-    const [activeTab, setActiveTab] = useState('overview');
-    const [detail, setDetail] = useState<ItemDetailState | null>(null);
+    const [activeTab, setActiveTab] = useState<ItemTabKey>('overview');
+    const [item, setItem] = useState<Item | null>(null);
+    const [usage, setUsage] = useState<ItemUsageSummary | null>(null);
+    const [tabData, setTabData] = useState<Partial<ItemTabData>>({});
+    const [tabLoading, setTabLoading] = useState<Partial<Record<ItemTabKey, boolean>>>({});
+    const [tabErrors, setTabErrors] = useState<Partial<Record<ItemTabKey, string>>>({});
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isChangingStatus, setIsChangingStatus] = useState(false);
-    const [reloadKey, setReloadKey] = useState(0);
 
     useEffect(() => {
         let mounted = true;
         const itemId = id ?? '';
+        setIsLoading(true);
+        setError('');
+        setTabData({});
+        setTabErrors({});
+        setTabLoading({});
         Promise.all([
             itemApi.getItem(itemId),
-            itemApi.getItemUnits(itemId),
-            itemApi.listAttributes(),
-            itemApi.listVariants(itemId),
-            itemApi.listComboComponents(itemId),
-            itemApi.listIdentifiers(itemId),
-            itemApi.getPricingReferences(itemId),
-            itemApi.getInventorySummary(itemId),
             itemApi.getItemUsage(itemId),
-            itemApi.getItemActivity(itemId),
         ])
-            .then(([item, units, attributes, variants, comboComponents, identifiers, pricingReferences, inventorySummary, usage, activity]) => {
-                if (mounted) setDetail({ activity: activity.data, attributes: attributes.data, comboComponents: comboComponents.data, identifiers: identifiers.data, inventorySummary: inventorySummary.data, item: item.data, pricingReferences: pricingReferences.data, units: units.data, usage: usage.data, variants: variants.data });
+            .then(([itemResponse, usageResponse]) => {
+                if (mounted) {
+                    setItem(itemResponse.data);
+                    setUsage(usageResponse.data);
+                }
             })
             .catch((caught: unknown) => { if (mounted) setError(caught instanceof Error ? caught.message : 'Unable to load item detail.'); })
             .finally(() => { if (mounted) setIsLoading(false); });
         return () => { mounted = false; };
-    }, [id, reloadKey]);
+    }, [id]);
 
-    if (isLoading) return <EmptyState description="Loading item setup, capability summaries, and audit..." title="Loading item detail" />;
-    if (!detail) return <EmptyState description={error || 'Item was not found.'} title="Unable to load item" />;
+    const loadActiveTab = useCallback((tab: ItemTabKey, force = false) => {
+        const itemId = id ?? '';
+        if (!itemId || tab === 'overview' || tab === 'usage') {
+            return;
+        }
 
-    const { activity, attributes, comboComponents, identifiers, inventorySummary, item, pricingReferences, units, usage, variants } = detail;
+        const hasData = (
+            (tab === 'units' && tabData.units) ||
+            (tab === 'attributes' && tabData.attributes) ||
+            (tab === 'variants' && tabData.variants) ||
+            (tab === 'combo' && tabData.comboComponents) ||
+            (tab === 'identifiers' && tabData.identifiers) ||
+            (tab === 'pricing' && tabData.pricingReferences) ||
+            (tab === 'inventory' && tabData.inventorySummary) ||
+            (tab === 'audit' && tabData.activity)
+        );
+
+        if (!force && (hasData || tabLoading[tab])) {
+            return;
+        }
+
+        setTabLoading((current) => ({ ...current, [tab]: true }));
+        setTabErrors((current) => ({ ...current, [tab]: '' }));
+
+        const request = {
+            audit: () => itemApi.getItemActivity(itemId).then((response) => ({ activity: response.data })),
+            attributes: () => itemApi.listAttributes().then((response) => ({ attributes: response.data })),
+            combo: () => itemApi.listComboComponents(itemId).then((response) => ({ comboComponents: response.data })),
+            identifiers: () => itemApi.listIdentifiers(itemId).then((response) => ({ identifiers: response.data })),
+            inventory: () => itemApi.getInventorySummary(itemId).then((response) => ({ inventorySummary: response.data })),
+            pricing: () => itemApi.getPricingReferences(itemId).then((response) => ({ pricingReferences: response.data })),
+            units: () => itemApi.getItemUnits(itemId).then((response) => ({ units: response.data })),
+            variants: () => itemApi.listVariants(itemId).then((response) => ({ variants: response.data })),
+        }[tab as Exclude<ItemTabKey, 'overview' | 'usage'>];
+
+        if (!request) {
+            return;
+        }
+
+        request()
+            .then((data) => setTabData((current) => ({ ...current, ...data })))
+            .catch((caught: unknown) => setTabErrors((current) => ({ ...current, [tab]: caught instanceof Error ? caught.message : 'Unable to load this tab.' })))
+            .finally(() => setTabLoading((current) => ({ ...current, [tab]: false })));
+    }, [id, tabData, tabLoading]);
+
+    useEffect(() => {
+        loadActiveTab(activeTab);
+    }, [activeTab, loadActiveTab]);
+
+    if (isLoading) return <EmptyState description="Loading the item and capability summary..." title="Loading item detail" />;
+    if (!item || !usage) return <EmptyState description={error || 'Item was not found.'} title="Unable to load item" />;
 
     async function changeStatus(action: 'activate' | 'deactivate') {
-        if (!detail) {
+        if (!item) {
             return;
         }
 
@@ -84,14 +134,35 @@ export function ItemDetailPage() {
 
         try {
             const response = action === 'activate'
-                ? await itemApi.activateItem(detail.item.id)
-                : await itemApi.deactivateItem(detail.item.id);
-            setDetail({ ...detail, item: response.data });
+                ? await itemApi.activateItem(item.id)
+                : await itemApi.deactivateItem(item.id);
+            setItem(response.data);
         } catch (caught) {
             setError(caught instanceof Error ? caught.message : 'Unable to change item status.');
         } finally {
             setIsChangingStatus(false);
         }
+    }
+
+    function refreshTab(tab: ItemTabKey) {
+        loadActiveTab(tab, true);
+    }
+
+    function renderTabState(tab: ItemTabKey, label: string) {
+        if (tabLoading[tab]) {
+            return <EmptyState description={`Loading ${label} from the backend...`} title={`Loading ${label}`} />;
+        }
+
+        if (tabErrors[tab]) {
+            return (
+                <div className="space-y-3">
+                    <EmptyState description={tabErrors[tab]} title={`Unable to load ${label}`} />
+                    <Button onClick={() => refreshTab(tab)} type="button">Retry</Button>
+                </div>
+            );
+        }
+
+        return null;
     }
 
     return (
@@ -118,30 +189,36 @@ export function ItemDetailPage() {
                     <ItemCapabilityPanel capabilities={usage.capabilities} />
                 </div>
             ) : null}
-            {activeTab === 'units' ? <ItemUnitsPanel units={units} /> : null}
-            {activeTab === 'attributes' ? <ItemAttributesTable attributes={attributes} /> : null}
+            {activeTab === 'units' ? renderTabState('units', 'units') ?? <ItemUnitsPanel units={tabData.units ?? []} /> : null}
+            {activeTab === 'attributes' ? renderTabState('attributes', 'attributes') ?? <ItemAttributesTable attributes={tabData.attributes ?? []} /> : null}
             {activeTab === 'variants' ? (
-                <div className="space-y-5">
-                    <ItemVariantCreateForm item={item} onSaved={() => setReloadKey((value) => value + 1)} />
-                    <ItemVariantsTable onDelete={async (row) => { await itemApi.deleteVariant(row.id); setReloadKey((value) => value + 1); }} variants={variants} />
-                </div>
+                renderTabState('variants', 'variants') ?? (
+                    <div className="space-y-5">
+                        <ItemVariantCreateForm item={item} onSaved={() => refreshTab('variants')} />
+                        <ItemVariantsTable onDelete={async (row) => { await itemApi.deleteVariant(row.id); refreshTab('variants'); }} variants={tabData.variants ?? []} />
+                    </div>
+                )
             ) : null}
             {activeTab === 'combo' ? (
-                <div className="space-y-5">
-                    <ItemComboComponentCreateForm item={item} onSaved={() => setReloadKey((value) => value + 1)} />
-                    <ItemComboComponentsTable components={comboComponents} onDelete={async (row) => { await itemApi.deleteComboComponent(row.id); setReloadKey((value) => value + 1); }} />
-                </div>
+                renderTabState('combo', 'combo components') ?? (
+                    <div className="space-y-5">
+                        <ItemComboComponentCreateForm item={item} onSaved={() => refreshTab('combo')} />
+                        <ItemComboComponentsTable components={tabData.comboComponents ?? []} onDelete={async (row) => { await itemApi.deleteComboComponent(row.id); refreshTab('combo'); }} />
+                    </div>
+                )
             ) : null}
             {activeTab === 'identifiers' ? (
-                <div className="space-y-5">
-                    <ItemIdentifierCreateForm item={item} onSaved={() => setReloadKey((value) => value + 1)} />
-                    <ItemIdentifiersTable identifiers={identifiers} onDelete={async (row) => { await itemApi.deleteIdentifier(row.id); setReloadKey((value) => value + 1); }} />
-                </div>
+                renderTabState('identifiers', 'identifiers') ?? (
+                    <div className="space-y-5">
+                        <ItemIdentifierCreateForm item={item} onSaved={() => refreshTab('identifiers')} />
+                        <ItemIdentifiersTable identifiers={tabData.identifiers ?? []} onDelete={async (row) => { await itemApi.deleteIdentifier(row.id); refreshTab('identifiers'); }} />
+                    </div>
+                )
             ) : null}
-            {activeTab === 'pricing' ? <ItemPricingReferencesPanel references={pricingReferences} /> : null}
-            {activeTab === 'inventory' ? <ItemInventorySummaryPanel summary={inventorySummary} /> : null}
+            {activeTab === 'pricing' ? renderTabState('pricing', 'pricing references') ?? <ItemPricingReferencesPanel references={tabData.pricingReferences ?? []} /> : null}
+            {activeTab === 'inventory' ? renderTabState('inventory', 'inventory summary') ?? (tabData.inventorySummary ? <ItemInventorySummaryPanel summary={tabData.inventorySummary} /> : <EmptyState description="No inventory summary is loaded yet." title="No inventory summary" />) : null}
             {activeTab === 'usage' ? <ItemUsagePanel summary={usage} /> : null}
-            {activeTab === 'audit' ? <ItemActivityTimeline entries={activity} /> : null}
+            {activeTab === 'audit' ? renderTabState('audit', 'audit history') ?? <ItemActivityTimeline entries={tabData.activity ?? []} /> : null}
         </div>
     );
 }

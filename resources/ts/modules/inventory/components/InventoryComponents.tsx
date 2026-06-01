@@ -415,7 +415,7 @@ export function InventoryTraceabilityTimeline({ entries }: { entries: InventoryA
     return entries.length ? (
         <div className="space-y-3">
             {entries.map((entry) => (
-                <div className="rounded-lg border border-slate-200 bg-white p-4" key={entry.id}>
+                <div className="rounded-lg border border-slate-200 bg-white p-4" key={`inventory-activity-${entry.id}-${entry.time}`}>
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <p className="text-sm font-semibold text-slate-950">{entry.description}</p>

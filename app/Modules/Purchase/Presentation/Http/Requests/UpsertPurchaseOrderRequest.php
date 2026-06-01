@@ -28,7 +28,7 @@ final class UpsertPurchaseOrderRequest extends FormRequest
             'reference' => ['nullable', 'string', 'max:255'],
             'supplier_id' => array_merge($required, ['integer', 'min:1', 'exists:suppliers,id']),
             'warehouse_id' => array_merge($required, ['integer', 'min:1', 'exists:warehouses,id']),
-            'po_number' => array_merge($required, ['string', 'max:255']),
+            'po_number' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'string', 'max:255'],
             'document_status' => ['nullable', 'string', 'max:255'],
             'currency_id' => ['nullable', 'integer', 'min:1', 'exists:currencies,id'],

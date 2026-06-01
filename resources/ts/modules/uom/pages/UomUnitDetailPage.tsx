@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
 import { Button } from '../../../shared/components/ui/Button';
@@ -26,18 +26,18 @@ export function UomUnitDetailPage() {
     const [activity, setActivity] = useState<UomAuditEntry[]>([]);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(true);
+    const [tabError, setTabError] = useState('');
+    const [loadingTab, setLoadingTab] = useState('');
 
     function loadDetail() {
         let mounted = true;
         const unitId = id ?? '';
         setIsLoading(true);
-        Promise.all([uomApi.getUnit(unitId), uomApi.listConversions(), uomApi.getUnitUsage(unitId), uomApi.getUnitActivity(unitId)])
-            .then(([unitResponse, conversionResponse, usageResponse, activityResponse]) => {
+        Promise.all([uomApi.getUnit(unitId), uomApi.getUnitUsage(unitId)])
+            .then(([unitResponse, usageResponse]) => {
                 if (mounted) {
                     setUnit(unitResponse.data);
-                    setConversions(conversionResponse.data);
                     setUsage(usageResponse.data);
-                    setActivity(activityResponse.data);
                 }
             })
             .catch((caught: unknown) => { if (mounted) setError(caught instanceof Error ? caught.message : 'Unable to load UOM detail.'); })
@@ -52,11 +52,47 @@ export function UomUnitDetailPage() {
     const fromConversions = useMemo(() => conversions.filter((conversion) => conversion.fromUnitId === id), [conversions, id]);
     const toConversions = useMemo(() => conversions.filter((conversion) => conversion.toUnitId === id), [conversions, id]);
 
+    const loadConversions = useCallback((force = false) => {
+        if ((!force && conversions.length > 0) || loadingTab === 'conversions') {
+            return;
+        }
+
+        setLoadingTab('conversions');
+        setTabError('');
+        uomApi.listConversions()
+            .then((response) => setConversions(response.data))
+            .catch((caught: unknown) => setTabError(caught instanceof Error ? caught.message : 'Unable to load conversions.'))
+            .finally(() => setLoadingTab(''));
+    }, [conversions.length, loadingTab]);
+
+    const loadActivity = useCallback(() => {
+        if (activity.length > 0 || loadingTab === 'audit') {
+            return;
+        }
+
+        setLoadingTab('audit');
+        setTabError('');
+        uomApi.getUnitActivity(id ?? '')
+            .then((response) => setActivity(response.data))
+            .catch((caught: unknown) => setTabError(caught instanceof Error ? caught.message : 'Unable to load activity.'))
+            .finally(() => setLoadingTab(''));
+    }, [activity.length, id, loadingTab]);
+
+    useEffect(() => {
+        if (activeTab === 'from' || activeTab === 'to') {
+            loadConversions();
+        }
+
+        if (activeTab === 'audit') {
+            loadActivity();
+        }
+    }, [activeTab, loadActivity, loadConversions]);
+
     async function changeConversionStatus(conversion: UomConversion) {
         conversion.isActive
             ? await uomApi.deactivateConversion(conversion.id)
             : await uomApi.activateConversion(conversion.id);
-        loadDetail();
+        loadConversions(true);
     }
 
     if (isLoading) return <EmptyState description="Loading unit detail and conversion references..." title="Loading UOM unit" />;
@@ -68,11 +104,12 @@ export function UomUnitDetailPage() {
             <UomUnitSummaryCard unit={unit} />
             <UomUnitStatusActions onChanged={(updated) => setUnit(updated)} unit={unit} />
             <Card className="p-5"><Tabs active={activeTab} items={tabs} onChange={setActiveTab} /></Card>
+            {tabError ? <EmptyState description={tabError} title="Unable to load tab data" /> : null}
             {activeTab === 'overview' ? <div className="grid gap-5 xl:grid-cols-[1fr_340px]"><UomPrecisionPanel unit={unit} /><UomItemUsagePanel usage={usage} /></div> : null}
-            {activeTab === 'from' ? <UomConversionTable conversions={fromConversions} onStatusChange={changeConversionStatus} /> : null}
-            {activeTab === 'to' ? <UomConversionTable conversions={toConversions} onStatusChange={changeConversionStatus} /> : null}
+            {activeTab === 'from' ? loadingTab === 'conversions' ? <EmptyState description="Loading conversions from the backend..." title="Loading conversions" /> : <UomConversionTable conversions={fromConversions} onStatusChange={changeConversionStatus} /> : null}
+            {activeTab === 'to' ? loadingTab === 'conversions' ? <EmptyState description="Loading conversions from the backend..." title="Loading conversions" /> : <UomConversionTable conversions={toConversions} onStatusChange={changeConversionStatus} /> : null}
             {activeTab === 'usage' ? <UomItemUsagePanel usage={usage} /> : null}
-            {activeTab === 'audit' ? <UomActivityTimeline entries={activity} /> : null}
+            {activeTab === 'audit' ? loadingTab === 'audit' ? <EmptyState description="Loading UOM activity from the backend..." title="Loading activity" /> : <UomActivityTimeline entries={activity} /> : null}
         </div>
     );
 }

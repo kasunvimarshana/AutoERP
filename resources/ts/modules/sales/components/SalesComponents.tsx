@@ -654,7 +654,7 @@ export function SalesActivityTimeline({ rows }: { rows: SalesAuditEntry[] }) {
     return (
         <div className="space-y-3">
             {rows.map((entry) => (
-                <Card className="p-4" key={entry.id}>
+                <Card className="p-4" key={`sales-timeline-${entry.id}-${entry.time}`}>
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <p className="text-sm font-semibold text-slate-950">{entry.description}</p>

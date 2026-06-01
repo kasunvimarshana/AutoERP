@@ -20,6 +20,7 @@ final class SequenceModel extends CoreModel
         return array_merge(parent::casts(), [
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
+            'metadata' => 'array',
             'padding' => 'integer',
             'next_number' => 'integer',
         ]);

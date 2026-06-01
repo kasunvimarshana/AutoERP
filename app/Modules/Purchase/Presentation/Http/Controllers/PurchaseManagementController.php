@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Modules\Purchase\Application\Contracts\Services\PurchaseManagementServiceInterface;
 use Modules\Purchase\Presentation\Http\Controllers\Concerns\RespondsWithPurchaseResult;
+use Modules\Purchase\Presentation\Http\Requests\UpsertPurchaseOrderWithLinesRequest;
 
 final class PurchaseManagementController extends Controller
 {
@@ -16,14 +17,14 @@ final class PurchaseManagementController extends Controller
 
     public function __construct(private readonly PurchaseManagementServiceInterface $service) {}
 
-    public function upsertPurchaseOrderWithLines(Request $request): JsonResponse
+    public function upsertPurchaseOrderWithLines(UpsertPurchaseOrderWithLinesRequest $request): JsonResponse
     {
-        return $this->respond($this->service->upsertPurchaseOrderWithLines(null, $request->all()));
+        return $this->respond($this->service->upsertPurchaseOrderWithLines(null, $request->validated()));
     }
 
-    public function updatePurchaseOrderWithLines(Request $request, int $id): JsonResponse
+    public function updatePurchaseOrderWithLines(UpsertPurchaseOrderWithLinesRequest $request, int $id): JsonResponse
     {
-        return $this->respond($this->service->upsertPurchaseOrderWithLines($id, $request->all()));
+        return $this->respond($this->service->upsertPurchaseOrderWithLines($id, $request->validated()));
     }
 
     public function syncPurchaseOrderLines(Request $request, int $id): JsonResponse

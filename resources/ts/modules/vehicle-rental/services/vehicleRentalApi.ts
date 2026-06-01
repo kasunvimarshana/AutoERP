@@ -1,5 +1,4 @@
 import type { ApiCollectionResponse, ApiPreviewResponse, ApiResponse } from '../../../services/api/apiResponse';
-import { ApiError } from '../../../services/api/apiErrors';
 import { httpClient } from '../../../services/api/httpClient';
 import { mockCollectionResponse, mockPreviewResponse, mockResponse } from '../../../services/mock/mockResponse';
 import {
@@ -29,30 +28,26 @@ import type {
 
 type BackendRecord = Record<string, unknown>;
 
-const VEHICLE_RENTAL_API_MODE = import.meta.env.VITE_VEHICLE_RENTAL_API_MODE ?? 'auto';
+const VEHICLE_RENTAL_API_MODE = import.meta.env.VITE_VEHICLE_RENTAL_API_MODE ?? 'real';
 
 function shouldUseMockOnly() {
     return VEHICLE_RENTAL_API_MODE === 'mock';
 }
 
-async function withMockFallback<T>(realCall: () => Promise<T>, mockCall: () => Promise<T>, fallbackStatuses = [401, 403, 404, 419, 422]): Promise<T> {
+async function withExplicitMock<T>(realCall: () => Promise<T>, mockCall: () => Promise<T>): Promise<T> {
     if (shouldUseMockOnly()) {
         return mockCall();
     }
 
-    try {
-        return await realCall();
-    } catch (error) {
-        if (VEHICLE_RENTAL_API_MODE === 'real') {
-            throw error;
-        }
+    return realCall();
+}
 
-        if (error instanceof ApiError && !fallbackStatuses.includes(error.status)) {
-            throw error;
-        }
-
+function mockOnly<T>(feature: string, mockCall: () => Promise<T>): Promise<T> {
+    if (shouldUseMockOnly()) {
         return mockCall();
     }
+
+    return Promise.reject(new Error(`${feature} is available only when VITE_VEHICLE_RENTAL_API_MODE=mock until a real backend endpoint is configured.`));
 }
 
 function asString(value: unknown, fallback = '') {
@@ -110,109 +105,109 @@ function normalizeProviderPayable(raw: BackendRecord): VehicleRentalProviderPaya
 
 export const vehicleRentalApi = {
     dashboard: {
-        summary: (): Promise<ApiCollectionResponse<VehicleRentalDashboardMetric>> => mockCollectionResponse(rentalDashboardMetrics),
+        summary: (): Promise<ApiCollectionResponse<VehicleRentalDashboardMetric>> => mockOnly('Vehicle Rental dashboard summary', () => mockCollectionResponse(rentalDashboardMetrics)),
     },
     availability: {
-        list: () => mockCollectionResponse([
+        list: () => mockOnly('Vehicle Rental availability list', () => mockCollectionResponse([
             { availability: 'Backend availability status', id: 'av-001', vehicle: 'WP CAD-4521 | Toyota HiAce' },
             { availability: 'Backend conflict found', id: 'av-002', vehicle: 'WP KA-7781 | Nissan Caravan' },
             { availability: 'External provider available', id: 'av-003', vehicle: 'CP CAB-9410 | Mitsubishi L200' },
-        ]),
-        preview: (input: unknown): Promise<ApiPreviewResponse<unknown, VehicleRentalAvailabilityPreview['calculated']>> => withMockFallback(
+        ])),
+        preview: (input: unknown): Promise<ApiPreviewResponse<unknown, VehicleRentalAvailabilityPreview['calculated']>> => withExplicitMock(
             () => httpClient<ApiPreviewResponse<unknown, VehicleRentalAvailabilityPreview['calculated']>>('/api/vehicle-rental/vehicle-availability', { method: 'GET', query: input as Record<string, string | number | boolean> }),
             () => mockPreviewResponse(input, availabilityPreview.calculated, availabilityPreview.breakdown, availabilityPreview.warnings),
         ),
     },
     agreements: {
-        list: (): Promise<ApiCollectionResponse<VehicleRentalAgreement>> => withMockFallback(
+        list: (): Promise<ApiCollectionResponse<VehicleRentalAgreement>> => withExplicitMock(
             async () => {
                 const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/vehicle-rental/agreements');
                 return { ...response, data: response.data.map(normalizeAgreement) };
             },
             () => mockCollectionResponse(rentalAgreements),
         ),
-        get: (id: string): Promise<ApiResponse<VehicleRentalAgreement>> => withMockFallback(
+        get: (id: string): Promise<ApiResponse<VehicleRentalAgreement>> => withExplicitMock(
             async () => {
                 const response = await httpClient<ApiResponse<BackendRecord>>(`/api/vehicle-rental/agreements/${id}`);
                 return { ...response, data: normalizeAgreement(response.data) };
             },
             () => mockResponse(getAgreementById(id)),
         ),
-        create: (input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>('/api/vehicle-rental/agreements', { body: input, method: 'POST' }), () => mockResponse(input)),
-        update: (id: string, input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/agreements/${id}`, { body: input, method: 'PUT' }), () => mockResponse({ id, input })),
-        syncLines: (id: string, input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/agreements/${id}/lines/sync`, { body: input, method: 'POST' }), () => mockResponse({ id, input })),
-        syncRates: (id: string, input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/agreements/${id}/rates/sync`, { body: input, method: 'POST' }), () => mockResponse({ id, input })),
-        syncRateRules: (id: string, input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/agreements/${id}/rate-rules/sync`, { body: input, method: 'POST' }), () => mockResponse({ id, input })),
-        syncExtraCharges: (id: string, input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/agreements/${id}/extra-charges/sync`, { body: input, method: 'POST' }), () => mockResponse({ id, input })),
-        previewBilling: (id: string, input: unknown): Promise<ApiPreviewResponse<unknown, VehicleRentalBillingPreview['calculated']>> => withMockFallback(
+        create: (input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>('/api/vehicle-rental/agreements', { body: input, method: 'POST' }), () => mockResponse(input)),
+        update: (id: string, input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/agreements/${id}`, { body: input, method: 'PUT' }), () => mockResponse({ id, input })),
+        syncLines: (id: string, input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/agreements/${id}/lines/sync`, { body: input, method: 'POST' }), () => mockResponse({ id, input })),
+        syncRates: (id: string, input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/agreements/${id}/rates/sync`, { body: input, method: 'POST' }), () => mockResponse({ id, input })),
+        syncRateRules: (id: string, input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/agreements/${id}/rate-rules/sync`, { body: input, method: 'POST' }), () => mockResponse({ id, input })),
+        syncExtraCharges: (id: string, input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/agreements/${id}/extra-charges/sync`, { body: input, method: 'POST' }), () => mockResponse({ id, input })),
+        previewBilling: (id: string, input: unknown): Promise<ApiPreviewResponse<unknown, VehicleRentalBillingPreview['calculated']>> => withExplicitMock(
             () => httpClient<ApiPreviewResponse<unknown, VehicleRentalBillingPreview['calculated']>>(`/api/vehicle-rental/agreements/${id}/billing-preview`, { body: input, method: 'POST' }),
             () => mockPreviewResponse(input, getAgreementById(id).billingPreview.calculated, getAgreementById(id).billingPreview.breakdown, getAgreementById(id).billingPreview.warnings),
         ),
-        transition: (id: string, action: string) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/workflow/agreements/${id}/transition`, { body: { action }, method: 'POST' }), () => mockResponse({ action, id })),
-        history: (id: string) => withMockFallback(() => httpClient<ApiCollectionResponse<unknown>>(`/api/vehicle-rental/status-history/agreement/${id}`), () => mockCollectionResponse(getAgreementById(id).activity)),
+        transition: (id: string, action: string) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/workflow/agreements/${id}/transition`, { body: { action }, method: 'POST' }), () => mockResponse({ action, id })),
+        history: (id: string) => withExplicitMock(() => httpClient<ApiCollectionResponse<unknown>>(`/api/vehicle-rental/status-history/agreement/${id}`), () => mockCollectionResponse(getAgreementById(id).activity)),
     },
     runningCharts: {
-        list: (): Promise<ApiCollectionResponse<VehicleRentalRunningChart>> => withMockFallback(
+        list: (): Promise<ApiCollectionResponse<VehicleRentalRunningChart>> => withExplicitMock(
             async () => {
                 const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/vehicle-rental/running-charts');
                 return { ...response, data: response.data.map(normalizeRunningChart) };
             },
             () => mockCollectionResponse(runningCharts),
         ),
-        get: (id: string): Promise<ApiResponse<VehicleRentalRunningChart>> => withMockFallback(
+        get: (id: string): Promise<ApiResponse<VehicleRentalRunningChart>> => withExplicitMock(
             async () => {
                 const response = await httpClient<ApiResponse<BackendRecord>>(`/api/vehicle-rental/running-charts/${id}`);
                 return { ...response, data: normalizeRunningChart(response.data) };
             },
             () => mockResponse(getRunningChartById(id)),
         ),
-        create: (input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>('/api/vehicle-rental/running-charts', { body: input, method: 'POST' }), () => mockResponse(input)),
-        update: (id: string, input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/running-charts/${id}`, { body: input, method: 'PUT' }), () => mockResponse({ id, input })),
-        syncLines: (id: string, input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/running-charts/${id}/lines/sync`, { body: input, method: 'POST' }), () => mockResponse({ id, input })),
-        transition: (id: string, action: string) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/workflow/running-charts/${id}/transition`, { body: { action }, method: 'POST' }), () => mockResponse({ action, id })),
-        previewBilling: (id: string, input: unknown) => mockPreviewResponse(input, getRunningChartById(id).billingPreview.calculated, getRunningChartById(id).billingPreview.breakdown, getRunningChartById(id).billingPreview.warnings),
+        create: (input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>('/api/vehicle-rental/running-charts', { body: input, method: 'POST' }), () => mockResponse(input)),
+        update: (id: string, input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/running-charts/${id}`, { body: input, method: 'PUT' }), () => mockResponse({ id, input })),
+        syncLines: (id: string, input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/running-charts/${id}/lines/sync`, { body: input, method: 'POST' }), () => mockResponse({ id, input })),
+        transition: (id: string, action: string) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/workflow/running-charts/${id}/transition`, { body: { action }, method: 'POST' }), () => mockResponse({ action, id })),
+        previewBilling: (id: string, input: unknown) => mockOnly('Vehicle Rental running chart billing preview', () => mockPreviewResponse(input, getRunningChartById(id).billingPreview.calculated, getRunningChartById(id).billingPreview.breakdown, getRunningChartById(id).billingPreview.warnings)),
     },
     invoices: {
-        list: () => mockCollectionResponse(rentalInvoices),
-        get: (id: string) => mockResponse(rentalInvoices.find((invoice) => invoice.id === id || invoice.invoiceNumber === id) ?? rentalInvoices[0]),
-        generate: (agreementId: string) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/workflow/agreements/${agreementId}/invoice`, { method: 'POST' }), () => mockResponse({ action: 'generate-rental-invoice', agreementId })),
-        preview: (input: unknown) => mockPreviewResponse(input, billingPreview.calculated, billingPreview.breakdown, billingPreview.warnings),
+        list: () => mockOnly('Vehicle Rental invoice list', () => mockCollectionResponse(rentalInvoices)),
+        get: (id: string) => mockOnly('Vehicle Rental invoice detail', () => mockResponse(rentalInvoices.find((invoice) => invoice.id === id || invoice.invoiceNumber === id) ?? rentalInvoices[0])),
+        generate: (agreementId: string) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/workflow/agreements/${agreementId}/invoice`, { method: 'POST' }), () => mockResponse({ action: 'generate-rental-invoice', agreementId })),
+        preview: (input: unknown) => mockOnly('Vehicle Rental invoice preview', () => mockPreviewResponse(input, billingPreview.calculated, billingPreview.breakdown, billingPreview.warnings)),
     },
     payments: {
-        list: () => mockCollectionResponse(rentalPayments),
-        create: (input: unknown) => mockResponse(input),
-        previewAllocation: (input: unknown) => mockPreviewResponse(input, { allocatedAmount: 'Backend calculated', remainingBalance: 'Backend calculated' }),
-        allocate: (agreementId: string, input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/workflow/agreements/${agreementId}/payments/allocate`, { body: input, method: 'POST' }), () => mockResponse({ agreementId, input })),
+        list: () => mockOnly('Vehicle Rental payment list', () => mockCollectionResponse(rentalPayments)),
+        create: (input: unknown) => mockOnly('Vehicle Rental payment create', () => mockResponse(input)),
+        previewAllocation: (input: unknown) => mockOnly('Vehicle Rental payment allocation preview', () => mockPreviewResponse(input, { allocatedAmount: 'Backend calculated', remainingBalance: 'Backend calculated' })),
+        allocate: (agreementId: string, input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/workflow/agreements/${agreementId}/payments/allocate`, { body: input, method: 'POST' }), () => mockResponse({ agreementId, input })),
     },
     providerPayables: {
-        list: (): Promise<ApiCollectionResponse<VehicleRentalProviderPayable>> => withMockFallback(
+        list: (): Promise<ApiCollectionResponse<VehicleRentalProviderPayable>> => withExplicitMock(
             async () => {
                 const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/vehicle-rental/provider-payables');
                 return { ...response, data: response.data.map(normalizeProviderPayable) };
             },
             () => mockCollectionResponse(providerPayables),
         ),
-        get: (id: string) => mockResponse(getProviderPayableById(id)),
-        preview: (input: unknown) => mockPreviewResponse(input, { providerPayable: 'Backend calculated', paymentEligibility: 'Backend workflow checked' }),
-        create: (agreementId: string, input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/workflow/agreements/${agreementId}/provider-payables`, { body: input, method: 'POST' }), () => mockResponse({ agreementId, input })),
-        allocatePayment: (providerPayableId: string, input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/workflow/provider-payables/${providerPayableId}/payments/allocate`, { body: input, method: 'POST' }), () => mockResponse({ input, providerPayableId })),
+        get: (id: string) => mockOnly('Vehicle Rental provider payable detail', () => mockResponse(getProviderPayableById(id))),
+        preview: (input: unknown) => mockOnly('Vehicle Rental provider payable preview', () => mockPreviewResponse(input, { providerPayable: 'Backend calculated', paymentEligibility: 'Backend workflow checked' })),
+        create: (agreementId: string, input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/workflow/agreements/${agreementId}/provider-payables`, { body: input, method: 'POST' }), () => mockResponse({ agreementId, input })),
+        allocatePayment: (providerPayableId: string, input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/workflow/provider-payables/${providerPayableId}/payments/allocate`, { body: input, method: 'POST' }), () => mockResponse({ input, providerPayableId })),
     },
     replacements: {
-        list: () => mockCollectionResponse(replacements),
-        create: (input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>('/api/vehicle-rental/replacements', { body: input, method: 'POST' }), () => mockResponse(input)),
+        list: () => mockOnly('Vehicle Rental replacement list', () => mockCollectionResponse(replacements)),
+        create: (input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>('/api/vehicle-rental/replacements', { body: input, method: 'POST' }), () => mockResponse(input)),
     },
     breakdowns: {
-        list: () => mockCollectionResponse(breakdowns),
-        create: (input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>('/api/vehicle-rental/breakdowns', { body: input, method: 'POST' }), () => mockResponse(input)),
+        list: () => mockOnly('Vehicle Rental breakdown list', () => mockCollectionResponse(breakdowns)),
+        create: (input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>('/api/vehicle-rental/breakdowns', { body: input, method: 'POST' }), () => mockResponse(input)),
     },
     finance: {
-        previewPosting: (agreementId: string) => mockResponse(getAgreementById(agreementId).financePreview),
-        post: (entityType: string, entityId: string) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/workflow/${entityType}/${entityId}/finance/post`, { method: 'POST' }), () => mockResponse({ action: 'post-finance', entityId, entityType })),
-        reverse: (entityType: string, entityId: string) => withMockFallback(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/workflow/${entityType}/${entityId}/finance/reverse`, { method: 'POST' }), () => mockResponse({ action: 'reverse-finance', entityId, entityType })),
+        previewPosting: (agreementId: string) => mockOnly('Vehicle Rental finance preview', () => mockResponse(getAgreementById(agreementId).financePreview)),
+        post: (entityType: string, entityId: string) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/workflow/${entityType}/${entityId}/finance/post`, { method: 'POST' }), () => mockResponse({ action: 'post-finance', entityId, entityType })),
+        reverse: (entityType: string, entityId: string) => withExplicitMock(() => httpClient<ApiResponse<unknown>>(`/api/vehicle-rental/workflow/${entityType}/${entityId}/finance/reverse`, { method: 'POST' }), () => mockResponse({ action: 'reverse-finance', entityId, entityType })),
     },
     settings: {
-        get: () => withMockFallback(() => httpClient<ApiResponse<typeof rentalSettings>>('/api/vehicle-rental/settings'), () => mockResponse(rentalSettings)),
-        update: (input: unknown) => withMockFallback(() => httpClient<ApiResponse<unknown>>('/api/vehicle-rental/settings', { body: input, method: 'POST' }), () => mockResponse(input)),
-        initialize: () => withMockFallback(() => httpClient<ApiResponse<unknown>>('/api/vehicle-rental/settings/initialize', { method: 'POST' }), () => mockResponse(rentalSettings)),
+        get: () => withExplicitMock(() => httpClient<ApiResponse<typeof rentalSettings>>('/api/vehicle-rental/settings'), () => mockResponse(rentalSettings)),
+        update: (input: unknown) => withExplicitMock(() => httpClient<ApiResponse<unknown>>('/api/vehicle-rental/settings', { body: input, method: 'POST' }), () => mockResponse(input)),
+        initialize: () => withExplicitMock(() => httpClient<ApiResponse<unknown>>('/api/vehicle-rental/settings/initialize', { method: 'POST' }), () => mockResponse(rentalSettings)),
     },
 };

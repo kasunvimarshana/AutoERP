@@ -441,7 +441,7 @@ export function VehicleRentalActivityTimeline({ rows }: { rows: VehicleRentalAud
     return (
         <div className="space-y-3">
             {rows.map((entry) => (
-                <Card className="p-4" key={entry.id}>
+                <Card className="p-4" key={`vehicle-rental-activity-${entry.id}-${entry.timestamp}`}>
                     <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                         <div>
                             <p className="font-semibold text-slate-900">{entry.note}</p>

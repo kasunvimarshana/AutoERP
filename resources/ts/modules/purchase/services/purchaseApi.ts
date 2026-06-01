@@ -113,6 +113,18 @@ function normalizeLookup(id: unknown, code: unknown, name: unknown, fallback: st
     };
 }
 
+function normalizeUomLookup(raw: BackendRecord): PurchaseLookupOption {
+    const code = asString(raw.code);
+    const symbol = asString(raw.symbol);
+    const name = asString(raw.name, symbol || code || 'UOM');
+
+    return {
+        id: asString(raw.id),
+        label: code && name ? `${code} - ${name}${symbol ? ` (${symbol})` : ''}` : name,
+        secondary: symbol || code,
+    };
+}
+
 function emptyLookupContext(): LookupContext {
     return {
         items: new Map(),
@@ -404,7 +416,6 @@ function orderPayload(input: PurchaseOrderFormInput): BackendRecord {
         lines: input.lines.map((line) => linePayload(line, 'ordered_qty')),
         notes: input.notes || null,
         order_date: input.orderDate,
-        po_number: input.poNumber,
         status: input.status || 'draft',
         supplier_id: Number(input.supplierId),
         warehouse_id: Number(input.warehouseId),
@@ -476,12 +487,13 @@ export const purchaseApi = {
             return { data: response.data.map((item) => normalizeLookup(item.id, item.code, item.name, 'Item')) };
         },
         itemUoms: async (itemId: string) => {
-            const response = await itemApi.getItemUnits(itemId);
-            const data = response.data.map((unit) => ({
-                id: unit.id,
-                label: unit.unit,
-                secondary: unit.purpose,
-            })).filter((unit) => unit.id && !unit.id.startsWith('base-uom'));
+            const response = await httpClient<ApiResponse<BackendRecord>>(`/api/item/items/${itemId}/uom-setup`, {
+                query: { context: 'purchase' },
+            });
+            const data = recordArray(response.data.allowed_uoms)
+                .map(normalizeUomLookup)
+                .filter((unit) => unit.id);
+
             return { data };
         },
         suppliers: async () => {
