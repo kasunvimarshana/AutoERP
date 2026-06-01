@@ -18,9 +18,14 @@ export function ServiceInvoiceCreatePage() {
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
-        vehicleServiceApi.jobCards.list({ status: 'completed' })
-            .then((response) => setJobCards(response.data))
-            .catch(() => vehicleServiceApi.jobCards.list().then((response) => setJobCards(response.data)));
+        let active = true;
+        vehicleServiceApi.jobCards.list({ per_page: 25, status: 'completed' })
+            .then((response) => active && setJobCards(response.data))
+            .catch(() => vehicleServiceApi.jobCards.list({ per_page: 25 }).then((response) => active && setJobCards(response.data)));
+
+        return () => {
+            active = false;
+        };
     }, []);
 
     async function generate(): Promise<void> {

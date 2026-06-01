@@ -1,5 +1,4 @@
 import type { ApiCollectionResponse } from './apiResponse';
-import { ApiError } from './apiErrors';
 import { httpClient } from './httpClient';
 import { mockCollectionResponse, mockResponse } from '../mock/mockResponse';
 import { businessPartyLinks } from '../mock/businessPartyLinkMock';
@@ -26,24 +25,12 @@ function shouldUseMockOnly() {
     return CORE_API_MODE === 'mock';
 }
 
-async function withMockFallback<T>(realCall: () => Promise<T>, mockCall: () => Promise<T>, fallbackStatuses = [401, 403, 404, 419, 422]): Promise<T> {
+async function withMockFallback<T>(realCall: () => Promise<T>, mockCall: () => Promise<T>): Promise<T> {
     if (shouldUseMockOnly()) {
         return mockCall();
     }
 
-    try {
-        return await realCall();
-    } catch (error) {
-        if (CORE_API_MODE === 'real') {
-            throw error;
-        }
-
-        if (error instanceof ApiError && !fallbackStatuses.includes(error.status)) {
-            throw error;
-        }
-
-        return mockCall();
-    }
+    return realCall();
 }
 
 function asString(value: unknown, fallback = '') {

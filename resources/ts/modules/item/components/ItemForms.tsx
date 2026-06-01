@@ -75,7 +75,7 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
             itemApi.listUoms(),
             itemApi.listFinanceAccounts(),
             itemApi.listTaxGroups(),
-            itemApi.listItems({ perPage: 200 }),
+            itemApi.listItems({ perPage: 25 }),
         ])
             .then(([categories, brands, itemTypes, uoms, accounts, taxGroups, componentItems]) => {
                 if (mounted) {

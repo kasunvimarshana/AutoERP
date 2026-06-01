@@ -16,6 +16,8 @@ import type {
 
 type BackendRecord = Record<string, unknown>;
 
+const LOOKUP_PAGE_SIZE = 25;
+
 function asString(value: unknown, fallback = '') {
     return value === null || value === undefined ? fallback : String(value);
 }
@@ -288,21 +290,21 @@ export const uomApi = {
     listConversions: async () => {
         const [units, items] = await Promise.all([unitLookupMap(), itemLookupMap()]);
         const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/uom/uom-conversions', {
-            query: { per_page: 200 },
+            query: { per_page: LOOKUP_PAGE_SIZE },
         });
 
         return { ...response, data: response.data.map((record) => normalizeConversion(record, units, items)) };
     },
     listItemOptions: async () => {
         const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/items', {
-            query: { per_page: 200 },
+            query: { per_page: LOOKUP_PAGE_SIZE },
         });
 
         return { ...response, data: response.data.map(normalizeLookupOption) };
     },
     listUnits: async () => {
         const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/uom/units-of-measure', {
-            query: { per_page: 200 },
+            query: { per_page: LOOKUP_PAGE_SIZE },
         });
 
         return { ...response, data: response.data.map(normalizeUnit) };

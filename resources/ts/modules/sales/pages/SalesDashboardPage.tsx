@@ -16,6 +16,7 @@ export function SalesDashboardPage() {
     const [error, setError] = useState('');
 
     useEffect(() => {
+        let active = true;
         Promise.all([
             salesApi.dashboard.summary(),
             salesApi.orders.list({ perPage: 3 }),
@@ -23,12 +24,19 @@ export function SalesDashboardPage() {
             salesApi.invoices.list({ perPage: 3 }),
         ])
             .then(([summary, orderResponse, deliveryResponse, invoiceResponse]) => {
+                if (!active) return;
                 setMetrics(summary.data);
                 setOrders(orderResponse.data);
                 setDeliveries(deliveryResponse.data);
-                setInvoices(invoiceResponse.data);
+                setInvoices(invoiceResponse.data.slice(0, 3));
             })
-            .catch((caught: unknown) => setError(caught instanceof Error ? caught.message : 'Unable to load Sales dashboard.'));
+            .catch((caught: unknown) => {
+                if (active) setError(caught instanceof Error ? caught.message : 'Unable to load Sales dashboard.');
+            });
+
+        return () => {
+            active = false;
+        };
     }, []);
 
     return (

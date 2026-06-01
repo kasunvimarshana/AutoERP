@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { PreviewPanel } from '../../../shared/components/business/PreviewPanel';
 import { StatusBadge } from '../../../shared/components/business/StatusBadge';
@@ -78,7 +78,7 @@ export function SalesQuotationLineTable({ rows }: { rows: SalesQuotationLine[] }
 export function SalesOrderForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { errors, globalError, isLoading, lookups } = useSalesLookups();
+    const { errors, globalError, isLoading, loadItemUoms, loadLookup, lookups } = useSalesLookups();
     const [isSaving, setIsSaving] = useState(false);
     const [values, setValues] = useState<SalesOrderFormInput>(() => ({
         customerId: '',
@@ -137,18 +137,18 @@ export function SalesOrderForm({ mode = 'create' }: { mode?: 'create' | 'edit' }
             {globalError || submitError ? <FormError message={submitError || globalError} /> : null}
             <FormSection description="Customer, warehouse, pricing, UOM, stock, tax, totals, and workflow are backend validated." title="Sales Order Header">
                 <div className="grid gap-4 md:grid-cols-3">
-                    <Field error={fieldErrors.customer_id} label="Customer"><LookupSelect disabled={isLoading} onChange={(value) => setField('customerId', value)} options={lookups.customers} placeholder="Select customer" value={values.customerId} /></Field>
+                    <Field error={fieldErrors.customer_id} label="Customer"><LookupSelect disabled={isLoading} onChange={(value) => setField('customerId', value)} onOpen={() => void loadLookup('customers')} options={lookups.customers} placeholder="Select customer" value={values.customerId} /></Field>
                     <Field error={fieldErrors.so_number} label="SO number"><Input onChange={(event) => setField('soNumber', event.target.value)} value={values.soNumber} /></Field>
                     <Field error={fieldErrors.order_date} label="Order date"><Input onChange={(event) => setField('orderDate', event.target.value)} type="date" value={values.orderDate} /></Field>
                     <Field error={fieldErrors.requested_delivery_date} label="Expected delivery"><Input onChange={(event) => setField('expectedDate', event.target.value)} type="date" value={values.expectedDate ?? ''} /></Field>
-                    <Field error={fieldErrors.warehouse_id} label="Warehouse"><LookupSelect disabled={isLoading} onChange={(value) => setField('warehouseId', value)} options={lookups.warehouses} placeholder="Select warehouse" value={values.warehouseId} /></Field>
+                    <Field error={fieldErrors.warehouse_id} label="Warehouse"><LookupSelect disabled={isLoading} onChange={(value) => setField('warehouseId', value)} onOpen={() => void loadLookup('warehouses')} options={lookups.warehouses} placeholder="Select warehouse" value={values.warehouseId} /></Field>
                     <Field error={fieldErrors.status} label="Workflow"><Select onChange={(event) => setField('status', event.target.value)} value={values.status}><option value="draft">Draft</option><option value="submitted">Submit</option></Select></Field>
                     <Field error={fieldErrors.notes} label="Notes"><Textarea onChange={(event) => setField('notes', event.target.value)} placeholder="Delivery notes, customer PO, internal remarks" value={values.notes ?? ''} /></Field>
                 </div>
             </FormSection>
             <SalesCreditCheckPanel />
             <FormSection description="Frontend collects item, UOM, quantity, and price inputs. Backend resolves stock, discounts, tax, and totals." title="Order Lines">
-                <SalesLineEditor errors={fieldErrors} lines={values.lines} lookups={lookups} onChange={(lines) => setField('lines', lines)} quantityLabel="Ordered quantity" />
+                <SalesLineEditor errors={fieldErrors} lines={values.lines} loadItemUoms={loadItemUoms} loadLookup={loadLookup} lookups={lookups} onChange={(lines) => setField('lines', lines)} quantityLabel="Ordered quantity" />
                 <div className="mt-4 flex flex-wrap justify-end gap-3">
                     <Button disabled={isSaving} type="submit">{mode === 'edit' ? 'Update With Lines' : 'Create With Lines'}</Button>
                 </div>
@@ -243,7 +243,7 @@ export function SalesWorkflowActions({ entityId, entityType, status }: { entityI
 export function GdnForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { errors: lookupError, globalError, isLoading, lookups } = useSalesLookups();
+    const { errors: lookupError, globalError, isLoading, loadItemUoms, loadLookup, lookups } = useSalesLookups();
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [isSaving, setIsSaving] = useState(false);
     const [submitError, setSubmitError] = useState('');
@@ -302,17 +302,17 @@ export function GdnForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
             {globalError || lookupError || submitError ? <FormError message={submitError || globalError || lookupError} /> : null}
             <FormSection description="GDN records delivered quantity. Backend validates order lines, stock, UOM, warehouse, and stock issue." title="Delivery / GDN Header">
                 <div className="grid gap-4 md:grid-cols-3">
-                    <Field error={fieldErrors.customer_id} label="Customer"><LookupSelect disabled={isLoading} onChange={(value) => setField('customerId', value)} options={lookups.customers} placeholder="Select customer" value={values.customerId} /></Field>
+                    <Field error={fieldErrors.customer_id} label="Customer"><LookupSelect disabled={isLoading} onChange={(value) => setField('customerId', value)} onOpen={() => void loadLookup('customers')} options={lookups.customers} placeholder="Select customer" value={values.customerId} /></Field>
                     <Field label="Source order optional"><Input onChange={(event) => setField('salesOrderId', event.target.value)} placeholder="Persisted sales order id, if linked" value={values.salesOrderId ?? ''} /></Field>
                     <Field error={fieldErrors.gdn_number} label="GDN number"><Input onChange={(event) => setField('gdnNumber', event.target.value)} value={values.gdnNumber} /></Field>
                     <Field error={fieldErrors.delivery_date} label="Delivery date"><Input onChange={(event) => setField('deliveryDate', event.target.value)} type="date" value={values.deliveryDate} /></Field>
-                    <Field error={fieldErrors.warehouse_id} label="Warehouse"><LookupSelect disabled={isLoading} onChange={(value) => setField('warehouseId', value)} options={lookups.warehouses} placeholder="Issue warehouse" value={values.warehouseId} /></Field>
+                    <Field error={fieldErrors.warehouse_id} label="Warehouse"><LookupSelect disabled={isLoading} onChange={(value) => setField('warehouseId', value)} onOpen={() => void loadLookup('warehouses')} options={lookups.warehouses} placeholder="Issue warehouse" value={values.warehouseId} /></Field>
                     <Field error={fieldErrors.status} label="Picking status"><Select onChange={(event) => setField('status', event.target.value)} value={values.status}><option value="draft">Draft</option><option value="picked">Picked</option></Select></Field>
                     <Field error={fieldErrors.notes} label="Notes"><Textarea onChange={(event) => setField('notes', event.target.value)} placeholder="Dispatch notes" value={values.notes ?? ''} /></Field>
                 </div>
             </FormSection>
             <FormSection description="Delivered quantities are submitted as inputs. Backend owns stock movement effects." title="Delivered Lines">
-                <SalesLineEditor errors={fieldErrors} lines={values.lines} lookups={lookups} onChange={(lines) => setField('lines', lines)} quantityLabel="Delivered quantity" />
+                <SalesLineEditor errors={fieldErrors} lines={values.lines} loadItemUoms={loadItemUoms} loadLookup={loadLookup} lookups={lookups} onChange={(lines) => setField('lines', lines)} quantityLabel="Delivered quantity" />
                 <div className="mt-4 flex justify-end gap-3"><Button disabled={isSaving} type="submit" variant="blue">{mode === 'edit' ? 'Update GDN' : 'Create GDN'}</Button></div>
             </FormSection>
         </form>
@@ -333,7 +333,7 @@ export function GdnInventoryEffectPanel({ effects }: { effects: SalesInventoryEf
 
 export function SalesInvoiceForm({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
     const navigate = useNavigate();
-    const { errors: lookupError, globalError, isLoading, lookups } = useSalesLookups();
+    const { errors: lookupError, globalError, isLoading, loadItemUoms, loadLookup, lookups } = useSalesLookups();
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [isSaving, setIsSaving] = useState(false);
     const [preview, setPreview] = useState<SalesCalculationPreview['calculated']>();
@@ -393,7 +393,7 @@ export function SalesInvoiceForm({ mode = 'create' }: { mode?: 'create' | 'edit'
                 </div>
             </FormSection>
             <FormSection description="Pricing, discounts, taxes, UOM conversion, receivable amount, and balances are previewed by backend only." title="Invoice Lines">
-                <SalesLineEditor errors={fieldErrors} lines={values.lines} lookups={lookups} onChange={(lines) => setField('lines', lines)} quantityLabel="Invoice quantity" />
+                <SalesLineEditor errors={fieldErrors} lines={values.lines} loadItemUoms={loadItemUoms} loadLookup={loadLookup} lookups={lookups} onChange={(lines) => setField('lines', lines)} quantityLabel="Invoice quantity" />
                 {preview ? <PreviewPanel rows={[{ label: 'Subtotal', value: preview.subtotal }, { label: 'Discount', value: preview.discountTotal }, { label: 'Tax', value: preview.taxTotal }, { label: 'Grand total', value: preview.grandTotal }, { label: 'UOM', value: preview.uomConversion }]} status="Backend Preview" title="Invoice Calculation Preview" /> : null}
                 <div className="mt-4 flex flex-wrap justify-end gap-3">
                     <Button disabled={isSaving} onClick={() => void previewInvoice()} type="button" variant="blue">Preview Calculation</Button>
@@ -439,7 +439,7 @@ export function SalesInvoiceDocumentPanel() {
 
 export function SalesPaymentForm() {
     const navigate = useNavigate();
-    const { errors: lookupError, globalError, isLoading, lookups } = useSalesLookups();
+    const { errors: lookupError, globalError, isLoading, loadLookup, lookups } = useSalesLookups();
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [isSaving, setIsSaving] = useState(false);
     const [preview, setPreview] = useState<Record<string, unknown>>();
@@ -483,7 +483,7 @@ export function SalesPaymentForm() {
             {globalError || lookupError || submitError ? <FormError message={submitError || globalError || lookupError} /> : null}
             <FormSection description="Payment is routed through Payment module. Backend validates receivable invoices, allocations, balances, and posting." title="Customer Payment">
                 <div className="grid gap-4 md:grid-cols-3">
-                    <Field error={fieldErrors.party_id ?? fieldErrors.customer_id} label="Customer"><LookupSelect disabled={isLoading} onChange={(value) => setField('customerId', value)} options={lookups.customers} placeholder="Select customer" value={values.customerId} /></Field>
+                    <Field error={fieldErrors.party_id ?? fieldErrors.customer_id} label="Customer"><LookupSelect disabled={isLoading} onChange={(value) => setField('customerId', value)} onOpen={() => void loadLookup('customers')} options={lookups.customers} placeholder="Select customer" value={values.customerId} /></Field>
                     <Field error={fieldErrors.payment_date} label="Payment date"><Input onChange={(event) => setField('paymentDate', event.target.value)} type="date" value={values.paymentDate} /></Field>
                     <Field error={fieldErrors.payment_method} label="Payment method"><Select onChange={(event) => setField('method', event.target.value)} value={values.method}><option value="bank_transfer">Bank Transfer</option><option value="cash">Cash</option><option value="check">Check</option><option value="card">Card</option></Select></Field>
                     <Field error={fieldErrors.amount} label="Amount"><Input onChange={(event) => setField('amount', event.target.value)} placeholder="Input amount only" type="number" value={values.amount} /></Field>
@@ -519,7 +519,7 @@ export function CustomerAdvancePanel({ advances }: { advances: CustomerAdvance[]
 
 export function SalesReturnForm() {
     const navigate = useNavigate();
-    const { errors: lookupError, globalError, isLoading, lookups } = useSalesLookups();
+    const { errors: lookupError, globalError, isLoading, loadItemUoms, loadLookup, lookups } = useSalesLookups();
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [isSaving, setIsSaving] = useState(false);
     const [preview, setPreview] = useState<Record<string, unknown>>();
@@ -562,7 +562,7 @@ export function SalesReturnForm() {
             {globalError || lookupError || submitError ? <FormError message={submitError || globalError || lookupError} /> : null}
             <FormSection description="Returnable quantity, stock reversal, AR adjustment, and refund eligibility are backend-owned." title="Sales Return">
                 <div className="grid gap-4 md:grid-cols-3">
-                    <Field error={fieldErrors.customer_id} label="Customer"><LookupSelect disabled={isLoading} onChange={(value) => setField('customerId', value)} options={lookups.customers} placeholder="Select customer" value={values.customerId} /></Field>
+                    <Field error={fieldErrors.customer_id} label="Customer"><LookupSelect disabled={isLoading} onChange={(value) => setField('customerId', value)} onOpen={() => void loadLookup('customers')} options={lookups.customers} placeholder="Select customer" value={values.customerId} /></Field>
                     <Field label="Source type"><Select onChange={(event) => setField('sourceType', event.target.value)} value={values.sourceType}><option value="gdn_header">GDN</option><option value="sales_order">Sales Order</option><option value="document">Invoice Document</option></Select></Field>
                     <Field label="Source id"><Input onChange={(event) => setField('sourceId', event.target.value)} placeholder="Persisted source id" value={values.sourceId ?? ''} /></Field>
                     <Field error={fieldErrors.return_number} label="Return number"><Input onChange={(event) => setField('returnNumber', event.target.value)} value={values.returnNumber} /></Field>
@@ -572,7 +572,7 @@ export function SalesReturnForm() {
                 </div>
             </FormSection>
             <FormSection description="Backend validates returnable quantities and previews inventory/AR effects." title="Return Lines">
-                <SalesLineEditor errors={fieldErrors} lines={values.lines} lookups={lookups} onChange={(lines) => setField('lines', lines)} quantityLabel="Return quantity" />
+                <SalesLineEditor errors={fieldErrors} lines={values.lines} loadItemUoms={loadItemUoms} loadLookup={loadLookup} lookups={lookups} onChange={(lines) => setField('lines', lines)} quantityLabel="Return quantity" />
                 {preview ? <PreviewPanel rows={[{ label: 'Returnable lines', value: displayPreviewValue(preview, ['line_count'], 'Backend returned') }]} status="Backend Preview" title="Return Effect Preview" /> : null}
                 <div className="mt-4 flex justify-end gap-3"><Button disabled={isSaving} onClick={() => void previewReturn()} type="button" variant="blue">Preview Return Effect</Button><Button disabled={isSaving || isLoading} type="submit">Create Return</Button></div>
             </FormSection>
@@ -846,11 +846,11 @@ function FormError({ message }: { message: string }) {
     return <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{message}</div>;
 }
 
-function LookupSelect({ disabled, onChange, options, placeholder, value }: { disabled?: boolean; onChange: (value: string) => void; options: SalesLookupOption[]; placeholder: string; value: string }) {
+function LookupSelect({ disabled, onChange, onOpen, options, placeholder, value }: { disabled?: boolean; onChange: (value: string) => void; onOpen?: () => void; options: SalesLookupOption[]; placeholder: string; value: string }) {
     return (
-        <Select disabled={disabled} onChange={(event) => onChange(event.target.value)} value={value}>
-            <option value="">{placeholder}</option>
-            {options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+        <Select disabled={disabled} onChange={(event) => onChange(event.target.value)} onFocus={onOpen} onMouseDown={onOpen} value={value}>
+            <option value="">{options.length === 0 ? `${placeholder} (open to load)` : placeholder}</option>
+            {options.map((option) => <option key={`sales-option-${option.id}`} value={option.id}>{option.label}</option>)}
         </Select>
     );
 }
@@ -858,12 +858,16 @@ function LookupSelect({ disabled, onChange, options, placeholder, value }: { dis
 function SalesLineEditor({
     errors,
     lines,
+    loadItemUoms,
+    loadLookup,
     lookups,
     onChange,
     quantityLabel,
 }: {
     errors: Record<string, string>;
     lines: SalesLineFormInput[];
+    loadItemUoms: (itemId: string) => Promise<void>;
+    loadLookup: (name: 'customers' | 'items' | 'warehouses') => Promise<void>;
     lookups: SalesLookupState;
     onChange: (lines: SalesLineFormInput[]) => void;
     quantityLabel: string;
@@ -876,6 +880,14 @@ function SalesLineEditor({
         }));
     }
 
+    useEffect(() => {
+        lines.forEach((line) => {
+            if (line.itemId) {
+                void loadItemUoms(line.itemId);
+            }
+        });
+    }, [lines, loadItemUoms]);
+
     return (
         <div className="space-y-4">
             {lines.map((line, index) => {
@@ -883,7 +895,7 @@ function SalesLineEditor({
                 return (
                     <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 md:grid-cols-5" key={`line-${index}`}>
                         <Field error={errors[`lines.${index}.item_id`] ?? errors.item_id} label="Item">
-                            <LookupSelect onChange={(value) => updateLine(index, 'itemId', value)} options={lookups.items} placeholder="Select item" value={line.itemId} />
+                            <LookupSelect onChange={(value) => updateLine(index, 'itemId', value)} onOpen={() => void loadLookup('items')} options={lookups.items} placeholder="Select item" value={line.itemId} />
                         </Field>
                         <Field error={errors[`lines.${index}.uom_id`] ?? errors.uom_id} label="UOM">
                             <LookupSelect disabled={!line.itemId || itemUoms.length === 0} onChange={(value) => updateLine(index, 'uomId', value)} options={itemUoms} placeholder={line.itemId ? 'Select item UOM' : 'Select item first'} value={line.uomId} />
@@ -912,34 +924,83 @@ type SalesLookupState = {
     warehouses: SalesLookupOption[];
 };
 
-function useSalesLookups(): { errors: string; globalError: string; isLoading: boolean; lookups: SalesLookupState } {
+function useSalesLookups(): {
+    errors: string;
+    globalError: string;
+    isLoading: boolean;
+    loadItemUoms: (itemId: string) => Promise<void>;
+    loadLookup: (name: 'customers' | 'items' | 'warehouses') => Promise<void>;
+    lookups: SalesLookupState;
+} {
     const [errors, setErrors] = useState('');
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
     const [lookups, setLookups] = useState<SalesLookupState>({ customers: [], itemUoms: {}, items: [], warehouses: [] });
+    const mountedRef = useRef(true);
+    const loadingRef = useRef(new Set<string>());
 
-    useEffect(() => {
-        let mounted = true;
-        Promise.all([salesApi.lookups.customers(), salesApi.lookups.items(), salesApi.lookups.warehouses()])
-            .then(([customers, items, warehouses]) => {
-                if (!mounted) return;
-                setLookups((current) => ({ ...current, customers: customers.data, items: items.data, warehouses: warehouses.data }));
-                return Promise.all(items.data.map((item) => salesApi.lookups.itemUoms(item.id).then((response) => [item.id, response.data] as const).catch(() => [item.id, []] as const)));
-            })
-            .then((entries) => {
-                if (!mounted || !entries) return;
-                setLookups((current) => ({ ...current, itemUoms: Object.fromEntries(entries) }));
-            })
-            .catch((caught: unknown) => {
-                if (mounted) setErrors(errorMessage(caught, 'Unable to load Sales lookups.'));
-            })
-            .finally(() => {
-                if (mounted) setIsLoading(false);
-            });
-
-        return () => { mounted = false; };
+    useEffect(() => () => {
+        mountedRef.current = false;
     }, []);
 
-    return { errors, globalError: errors, isLoading, lookups };
+    const loadLookup = useCallback(async (name: 'customers' | 'items' | 'warehouses'): Promise<void> => {
+        if (loadingRef.current.has(name)) {
+            return;
+        }
+        let shouldLoad = false;
+        setLookups((current) => {
+            shouldLoad = current[name].length === 0;
+            return current;
+        });
+        if (!shouldLoad) {
+            return;
+        }
+        loadingRef.current.add(name);
+        setIsLoading(true);
+        try {
+            const response = await salesApi.lookups[name]();
+            if (!mountedRef.current) return;
+            setLookups((current) => current[name].length > 0 ? current : { ...current, [name]: response.data });
+        } catch (caught) {
+            if (mountedRef.current) setErrors(errorMessage(caught, 'Unable to load Sales lookups.'));
+        } finally {
+            loadingRef.current.delete(name);
+            if (mountedRef.current) {
+                setIsLoading(loadingRef.current.size > 0);
+            }
+        }
+    }, []);
+
+    const loadItemUoms = useCallback(async (itemId: string): Promise<void> => {
+        if (!itemId || loadingRef.current.has(`uom:${itemId}`)) {
+            return;
+        }
+        let shouldLoad = false;
+        setLookups((current) => {
+            shouldLoad = !current.itemUoms[itemId];
+            return current;
+        });
+        if (!shouldLoad) {
+            return;
+        }
+        loadingRef.current.add(`uom:${itemId}`);
+        try {
+            const response = await salesApi.lookups.itemUoms(itemId);
+            if (!mountedRef.current) return;
+            setLookups((current) => current.itemUoms[itemId]
+                ? current
+                : { ...current, itemUoms: { ...current.itemUoms, [itemId]: response.data } });
+        } catch {
+            if (mountedRef.current) {
+                setLookups((current) => current.itemUoms[itemId]
+                    ? current
+                    : { ...current, itemUoms: { ...current.itemUoms, [itemId]: [] } });
+            }
+        } finally {
+            loadingRef.current.delete(`uom:${itemId}`);
+        }
+    }, []);
+
+    return { errors, globalError: errors, isLoading, loadItemUoms, loadLookup, lookups };
 }
 
 function emptyLine(): SalesLineFormInput {

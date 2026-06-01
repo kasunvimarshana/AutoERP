@@ -82,6 +82,10 @@ function collectionMeta<T>(response: ApiCollectionResponse<T>) {
     };
 }
 
+function metaTotal<T>(response: ApiCollectionResponse<T>): number {
+    return Number(response.meta?.total ?? response.data.length);
+}
+
 function collection<T>(response: ApiCollectionResponse<BackendRecord>, mapper: (row: BackendRecord) => T): ApiCollectionResponse<T> {
     const data = response.data.map(mapper);
     return { ...response, data, meta: collectionMeta({ ...response, data }) };
@@ -411,20 +415,20 @@ async function safeResponse<T>(callback: () => Promise<ApiResponse<T>>, fallback
 export const vehicleServiceApi = {
     dashboard: {
         summary: async (): Promise<ApiCollectionResponse<VehicleServiceDashboardMetric>> => {
-            const [jobCards, serviceTypes, invoices, payments] = await Promise.all([
-                vehicleServiceApi.jobCards.list(),
-                vehicleServiceApi.serviceTypes.list(),
-                vehicleServiceApi.invoices.list(),
-                vehicleServiceApi.payments.list(),
+            const [jobCards, openJobs, invoiceableJobs, serviceTypes] = await Promise.all([
+                vehicleServiceApi.jobCards.list({ per_page: 1 }),
+                vehicleServiceApi.jobCards.list({ per_page: 1, status: 'open' }),
+                vehicleServiceApi.jobCards.list({ invoice_status: 'invoiced', per_page: 1 }),
+                vehicleServiceApi.serviceTypes.list({ per_page: 1 }),
             ]);
 
             return {
                 data: [
-                    { label: 'Job cards', tone: 'backend', value: String(jobCards.data.length) },
-                    { label: 'Open jobs', tone: 'open', value: String(jobCards.data.filter((job) => !['closed', 'cancelled'].includes(job.status)).length) },
-                    { label: 'Invoiceable', tone: 'invoice', value: String(invoices.data.length) },
-                    { label: 'Payments', tone: 'payment', value: String(payments.data.length) },
-                    { label: 'Service types', tone: 'setup', value: String(serviceTypes.data.length) },
+                    { label: 'Job cards', tone: 'backend', value: String(metaTotal(jobCards)) },
+                    { label: 'Open jobs', tone: 'open', value: String(metaTotal(openJobs)) },
+                    { label: 'Invoiceable', tone: 'invoice', value: String(metaTotal(invoiceableJobs)) },
+                    { label: 'Payments', tone: 'payment', value: 'Open payments' },
+                    { label: 'Service types', tone: 'setup', value: String(metaTotal(serviceTypes)) },
                     { label: 'Backend routes', tone: 'real', value: 'Real API' },
                 ],
             };
@@ -444,7 +448,7 @@ export const vehicleServiceApi = {
     },
     history: {
         list: async (): Promise<ApiCollectionResponse<VehicleServiceAuditEntry>> => {
-            const jobCards = await vehicleServiceApi.jobCards.list();
+            const jobCards = await vehicleServiceApi.jobCards.list({ per_page: 10 });
             const histories = await Promise.all(jobCards.data.map((jobCard) => vehicleServiceApi.jobCards.history(jobCard.id).then((response) => response.data)));
 
             return { data: histories.flat() };
@@ -461,8 +465,8 @@ export const vehicleServiceApi = {
             const jobCard = await vehicleServiceApi.jobCards.get(id);
             return { data: normalizeInvoice(jobCard.data) };
         },
-        list: async (): Promise<ApiCollectionResponse<VehicleServiceInvoice>> => {
-            const response = await vehicleServiceApi.jobCards.list({ invoice_status: 'invoiced' });
+        list: async (query: Record<string, string | number | boolean | undefined> = {}): Promise<ApiCollectionResponse<VehicleServiceInvoice>> => {
+            const response = await vehicleServiceApi.jobCards.list({ invoice_status: 'invoiced', per_page: query.per_page ?? 25, ...query });
             return { data: response.data.filter((jobCard) => jobCard.documentPreview.status !== 'pending' || jobCard.workflowStatus === 'invoiced').map(normalizeInvoice) };
         },
         preview: async (jobCardId: string): Promise<ApiPreviewResponse<unknown, VehicleServiceCalculationPreview['calculated']>> => {
@@ -546,11 +550,11 @@ export const vehicleServiceApi = {
     },
     lookups: {
         customers: async (): Promise<ApiCollectionResponse<VehicleServiceLookupOption>> => {
-            const response = await customerApi.listCustomers({ perPage: 200 });
+            const response = await customerApi.listCustomers({ perPage: 25 });
             return { data: response.data.map((customer) => simpleOption(customer.id, `${customer.code} - ${customer.name}`, customer.status)) };
         },
         employees: async (): Promise<ApiCollectionResponse<VehicleServiceLookupOption>> => {
-            const response = await hrApi.employees.list({ perPage: 200, status: 'active' });
+            const response = await hrApi.employees.list({ perPage: 25, status: 'active' });
             return { data: response.data.map((employee) => simpleOption(employee.id, `${employee.code} - ${employee.displayName}`, employee.status)) };
         },
         itemUnits: async (itemId: string): Promise<ApiCollectionResponse<VehicleServiceLookupOption>> => {
@@ -558,7 +562,7 @@ export const vehicleServiceApi = {
             return { data: response.data.filter((unit) => unit.id && unit.unit !== 'Not configured').map((unit) => simpleOption(unit.id, unit.unit, unit.purpose)) };
         },
         items: async (): Promise<ApiCollectionResponse<VehicleServiceLookupOption>> => {
-            const response = await itemApi.listItems({ perPage: 200, status: 'active' });
+            const response = await itemApi.listItems({ perPage: 25, status: 'active' });
             return { data: response.data.map((item) => simpleOption(item.id, `${item.code} - ${item.name}`, item.itemType)) };
         },
         uoms: async (): Promise<ApiCollectionResponse<VehicleServiceLookupOption>> => {
@@ -566,7 +570,7 @@ export const vehicleServiceApi = {
             return { data: response.data.map((uom) => simpleOption(uom.id, uom.secondary ? `${uom.secondary} - ${uom.label}` : uom.label)) };
         },
         vehicles: async (): Promise<ApiCollectionResponse<VehicleServiceLookupOption>> => {
-            const response = await vehicleApi.list({ perPage: 200 });
+            const response = await vehicleApi.list({ perPage: 25 });
             return { data: response.data.map((vehicle) => simpleOption(vehicle.id, `${vehicle.registrationNumber} - ${vehicle.make} ${vehicle.model}`, vehicle.status)) };
         },
         warehouses: inventoryApi.listWarehouses,
@@ -598,7 +602,7 @@ export const vehicleServiceApi = {
         activate: (id: string) => httpClient<ApiResponse<unknown>>(`/api/vehicle-service/vehicle-service-types/${id}`, { body: { status: 'active' }, method: 'PUT' }),
         create: (input: unknown) => httpClient<ApiResponse<unknown>>('/api/vehicle-service/vehicle-service-types', { body: contextPayload(record(input)), method: 'POST' }),
         deactivate: (id: string) => httpClient<ApiResponse<unknown>>(`/api/vehicle-service/vehicle-service-types/${id}`, { body: { status: 'inactive' }, method: 'PUT' }),
-        list: async (): Promise<ApiCollectionResponse<VehicleServiceType>> => collection(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/vehicle-service/vehicle-service-types', { query: contextQuery() }), normalizeServiceType),
+        list: async (query: Record<string, string | number | boolean | undefined> = {}): Promise<ApiCollectionResponse<VehicleServiceType>> => collection(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/vehicle-service/vehicle-service-types', { query: contextQuery(query) }), normalizeServiceType),
         update: (id: string, input: unknown) => httpClient<ApiResponse<unknown>>(`/api/vehicle-service/vehicle-service-types/${id}`, { body: contextPayload(record(input)), method: 'PUT' }),
     },
     settings: {

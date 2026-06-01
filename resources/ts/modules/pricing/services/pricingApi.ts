@@ -27,6 +27,8 @@ import type {
 
 type BackendRecord = Record<string, unknown>;
 
+const LOOKUP_PAGE_SIZE = 25;
+
 type DiscountPreviewInput = {
     baseAmount: string;
     discountType: 'percentage' | 'fixed';
@@ -470,13 +472,13 @@ export const pricingApi = {
         return { ...response, data: normalizeUsage(response.data) };
     },
     listCurrencies: async () => {
-        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/configuration/currencies', { query: { per_page: 200 } });
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/configuration/currencies', { query: { per_page: LOOKUP_PAGE_SIZE } });
         const data = response.data.map(normalizeLookup);
 
         return { ...response, data, meta: collectionMeta({ ...response, data }) };
     },
     listCustomerPriceLists: async (): Promise<ApiCollectionResponse<CustomerPriceList>> => {
-        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/customer-price-lists', { query: { per_page: 200 } });
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/customer-price-lists', { query: { per_page: LOOKUP_PAGE_SIZE } });
         const data = response.data.map((row) => ({
             customerName: asString(row.customer_name ?? row.customer_id, `Customer #${asString(row.customer_id)}`),
             id: asString(row.id),
@@ -487,7 +489,7 @@ export const pricingApi = {
         return { ...response, data, meta: collectionMeta({ ...response, data }) };
     },
     listDiscountRules: async (): Promise<ApiCollectionResponse<DiscountRule>> => {
-        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/discount-rules', { query: { per_page: 200 } });
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/discount-rules', { query: { per_page: LOOKUP_PAGE_SIZE } });
         const data = response.data.map((row) => ({
             discountId: asString(row.discount_id),
             id: asString(row.id),
@@ -498,19 +500,19 @@ export const pricingApi = {
         return { ...response, data, meta: collectionMeta({ ...response, data }) };
     },
     listDiscounts: async () => {
-        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/discounts', { query: { per_page: 200 } });
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/discounts', { query: { per_page: LOOKUP_PAGE_SIZE } });
         const data = response.data.map(normalizeDiscount);
 
         return { ...response, data, meta: collectionMeta({ ...response, data }) };
     },
     listItems: async () => {
-        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/items', { query: { per_page: 200 } });
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/items', { query: { per_page: LOOKUP_PAGE_SIZE } });
         const data = response.data.map(normalizeLookup);
 
         return { ...response, data, meta: collectionMeta({ ...response, data }) };
     },
     listPriceHistory: async () => {
-        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/price-histories', { query: { per_page: 200 } });
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/price-histories', { query: { per_page: LOOKUP_PAGE_SIZE } });
         const data = response.data.map(normalizeHistory);
 
         return { ...response, data, meta: collectionMeta({ ...response, data }) };
@@ -519,7 +521,7 @@ export const pricingApi = {
         const [items, uoms, response] = await Promise.all([
             itemMap(),
             uomMap(),
-            httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/price-list-items', { query: { per_page: 200, price_list_id: priceListId } }),
+            httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/price-list-items', { query: { per_page: LOOKUP_PAGE_SIZE, price_list_id: priceListId } }),
         ]);
         const data = response.data.map((row) => normalizePriceListItem(row, items, uoms));
 
@@ -527,19 +529,19 @@ export const pricingApi = {
     },
     listPriceLists: async () => {
         const currencies = await currencyMap();
-        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/price-lists', { query: { per_page: 200 } });
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/price-lists', { query: { per_page: LOOKUP_PAGE_SIZE } });
         const data = response.data.map((row) => normalizePriceList(row, currencies));
 
         return { ...response, data, meta: collectionMeta({ ...response, data }) };
     },
     listPricingRuleConditions: async (ruleId?: string) => {
-        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/pricing-rule-conditions', { query: { per_page: 200, pricing_rule_id: ruleId } });
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/pricing-rule-conditions', { query: { per_page: LOOKUP_PAGE_SIZE, pricing_rule_id: ruleId } });
         const data = response.data.map(normalizeRuleCondition);
 
         return { ...response, data, meta: collectionMeta({ ...response, data }) };
     },
     listPricingRules: async () => {
-        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/pricing-rules', { query: { per_page: 200 } });
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/pricing-rules', { query: { per_page: LOOKUP_PAGE_SIZE } });
         const data = response.data.map(normalizePricingRule);
 
         return { ...response, data, meta: collectionMeta({ ...response, data }) };
@@ -548,14 +550,14 @@ export const pricingApi = {
         const [items, uoms, response] = await Promise.all([
             priceListItemMap(),
             uomMap(),
-            httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/pricing-tiers', { query: { per_page: 200 } }),
+            httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/pricing-tiers', { query: { per_page: LOOKUP_PAGE_SIZE } }),
         ]);
         const data = response.data.map((row) => normalizeTier(row, items, uoms));
 
         return { ...response, data, meta: collectionMeta({ ...response, data }) };
     },
     listSupplierPriceLists: async (): Promise<ApiCollectionResponse<SupplierPriceList>> => {
-        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/supplier-price-lists', { query: { per_page: 200 } });
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/supplier-price-lists', { query: { per_page: LOOKUP_PAGE_SIZE } });
         const data = response.data.map((row) => ({
             id: asString(row.id),
             priceListId: asString(row.price_list_id),
@@ -566,7 +568,7 @@ export const pricingApi = {
         return { ...response, data, meta: collectionMeta({ ...response, data }) };
     },
     listUoms: async () => {
-        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/uom/units-of-measure', { query: { per_page: 200 } });
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/uom/units-of-measure', { query: { per_page: LOOKUP_PAGE_SIZE } });
         const data = response.data.map(normalizeLookup);
 
         return { ...response, data, meta: collectionMeta({ ...response, data }) };

@@ -76,11 +76,29 @@ export function SalesInvoiceDetailPage() {
     const [activeTab, setActiveTab] = useState('overview');
 
     useEffect(() => {
-        salesApi.invoices.get(id).then((response) => setInvoice(response.data));
-        salesApi.payments.list().then((response) => setPayments(response.data));
-        salesApi.returns.list().then((response) => setReturns(response.data));
-        setHistory([]);
+        let active = true;
+        salesApi.invoices.get(id).then((response) => active && setInvoice(response.data));
+
+        return () => {
+            active = false;
+        };
     }, [id]);
+
+    useEffect(() => {
+        let active = true;
+
+        if (activeTab === 'payments' && payments.length === 0) {
+            salesApi.payments.list({ perPage: 25 }).then((response) => active && setPayments(response.data));
+        } else if (activeTab === 'returns' && returns.length === 0) {
+            salesApi.returns.list({ perPage: 25 }).then((response) => active && setReturns(response.data));
+        } else if (activeTab === 'history' && history.length === 0) {
+            setHistory([]);
+        }
+
+        return () => {
+            active = false;
+        };
+    }, [activeTab, history.length, payments.length, returns.length]);
 
     if (!invoice) {
         return <EmptyState description="Loading customer invoice details..." title="Loading" />;

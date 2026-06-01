@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ApiError } from '../../../services/api/apiErrors';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
@@ -264,11 +264,15 @@ export function JobCardTable({ rows }: { rows: VehicleServiceJobCard[] }) {
 function LineEditor({
     items,
     line,
+    loadItems,
+    loadWarehouses,
     onChange,
     warehouses,
 }: {
     items: VehicleServiceLookupOption[];
     line: VehicleServiceJobCardLineFormInput;
+    loadItems: () => void;
+    loadWarehouses: () => void;
     onChange: (line: VehicleServiceJobCardLineFormInput) => void;
     warehouses: VehicleServiceLookupOption[];
 }) {
@@ -280,8 +284,10 @@ function LineEditor({
             return;
         }
 
+        let active = true;
         vehicleServiceApi.lookups.itemUnits(line.itemId)
             .then((response) => {
+                if (!active) return;
                 setUoms(response.data);
                 if (line.uomId && !response.data.some((unit) => unit.id === line.uomId)) {
                     onChange({ ...line, uomId: response.data[0]?.id ?? '' });
@@ -289,17 +295,23 @@ function LineEditor({
                     onChange({ ...line, uomId: response.data[0].id });
                 }
             })
-            .catch(() => setUoms([]));
+            .catch(() => {
+                if (active) setUoms([]);
+            });
+
+        return () => {
+            active = false;
+        };
     }, [line.itemId]);
 
     return (
         <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 md:grid-cols-[150px_1fr_100px_130px_120px_1fr]">
             <Select onChange={(event) => onChange({ ...line, lineType: event.target.value as VehicleServiceLineType, requiresStockMovement: event.target.value === 'spare_part' })} options={Object.entries(lineTypeLabels).map(([value, label]) => ({ label, value }))} value={line.lineType} />
-            <Select onChange={(event) => onChange({ ...line, itemId: event.target.value, uomId: '' })} options={optionList(items)} placeholder="Select item/service" value={line.itemId} />
+            <Select onFocus={loadItems} onMouseDown={loadItems} onChange={(event) => onChange({ ...line, itemId: event.target.value, uomId: '' })} options={optionList(items)} placeholder="Select item/service" value={line.itemId} />
             <Input min="0.0001" onChange={(event) => onChange({ ...line, quantity: event.target.value })} type="number" value={line.quantity} />
             <Select disabled={!line.itemId} onChange={(event) => onChange({ ...line, uomId: event.target.value })} options={optionList(uoms)} placeholder={line.itemId ? 'Item UOM' : 'Select item first'} value={line.uomId} />
             <Input min="0" onChange={(event) => onChange({ ...line, unitPrice: event.target.value })} type="number" value={line.unitPrice} />
-            <Select onChange={(event) => onChange({ ...line, warehouseId: event.target.value })} options={optionList(warehouses)} placeholder="Warehouse" value={line.warehouseId ?? ''} />
+            <Select onFocus={loadWarehouses} onMouseDown={loadWarehouses} onChange={(event) => onChange({ ...line, warehouseId: event.target.value })} options={optionList(warehouses)} placeholder="Warehouse" value={line.warehouseId ?? ''} />
             <div className="md:col-span-6"><Textarea onChange={(event) => onChange({ ...line, description: event.target.value })} placeholder="Line notes" value={line.description} /></div>
         </div>
     );
@@ -312,26 +324,48 @@ function useLookups() {
     const [serviceTypes, setServiceTypes] = useState<VehicleServiceLookupOption[]>([]);
     const [vehicles, setVehicles] = useState<VehicleServiceLookupOption[]>([]);
     const [warehouses, setWarehouses] = useState<VehicleServiceLookupOption[]>([]);
+    const mountedRef = useRef(true);
+    const loadingRef = useRef(new Set<string>());
 
-    useEffect(() => {
-        Promise.all([
-            vehicleServiceApi.lookups.customers(),
-            vehicleServiceApi.lookups.employees(),
-            vehicleServiceApi.lookups.items(),
-            vehicleServiceApi.serviceTypes.list(),
-            vehicleServiceApi.lookups.vehicles(),
-            vehicleServiceApi.lookups.warehouses(),
-        ]).then(([customerResponse, employeeResponse, itemResponse, serviceTypeResponse, vehicleResponse, warehouseResponse]) => {
-            setCustomers(customerResponse.data);
-            setEmployees(employeeResponse.data);
-            setItems(itemResponse.data);
-            setServiceTypes(serviceTypeResponse.data.map((serviceType) => ({ id: serviceType.id, label: `${serviceType.code} - ${serviceType.name}` })));
-            setVehicles(vehicleResponse.data);
-            setWarehouses(warehouseResponse.data);
-        }).catch(() => undefined);
+    useEffect(() => () => {
+        mountedRef.current = false;
     }, []);
 
-    return { customers, employees, items, serviceTypes, vehicles, warehouses };
+    const load = useCallback(async (name: 'customers' | 'employees' | 'items' | 'serviceTypes' | 'vehicles' | 'warehouses') => {
+        if (loadingRef.current.has(name)) return;
+
+        let shouldLoad = false;
+        const stateLengths = { customers, employees, items, serviceTypes, vehicles, warehouses };
+        shouldLoad = stateLengths[name].length === 0;
+        if (!shouldLoad) return;
+
+        loadingRef.current.add(name);
+        try {
+            if (name === 'customers') {
+                const response = await vehicleServiceApi.lookups.customers();
+                if (mountedRef.current) setCustomers((current) => current.length ? current : response.data);
+            } else if (name === 'employees') {
+                const response = await vehicleServiceApi.lookups.employees();
+                if (mountedRef.current) setEmployees((current) => current.length ? current : response.data);
+            } else if (name === 'items') {
+                const response = await vehicleServiceApi.lookups.items();
+                if (mountedRef.current) setItems((current) => current.length ? current : response.data);
+            } else if (name === 'serviceTypes') {
+                const response = await vehicleServiceApi.serviceTypes.list({ per_page: 25 });
+                if (mountedRef.current) setServiceTypes((current) => current.length ? current : response.data.map((serviceType) => ({ id: serviceType.id, label: `${serviceType.code} - ${serviceType.name}` })));
+            } else if (name === 'vehicles') {
+                const response = await vehicleServiceApi.lookups.vehicles();
+                if (mountedRef.current) setVehicles((current) => current.length ? current : response.data);
+            } else {
+                const response = await vehicleServiceApi.lookups.warehouses();
+                if (mountedRef.current) setWarehouses((current) => current.length ? current : response.data);
+            }
+        } finally {
+            loadingRef.current.delete(name);
+        }
+    }, [customers, employees, items, serviceTypes, vehicles, warehouses]);
+
+    return { customers, employees, items, load, serviceTypes, vehicles, warehouses };
 }
 
 export function JobCardForm({ jobCard, mode = 'create' }: { jobCard?: VehicleServiceJobCard; mode?: 'create' | 'edit' }) {
@@ -348,6 +382,24 @@ export function JobCardForm({ jobCard, mode = 'create' }: { jobCard?: VehicleSer
             setForm(formFromJobCard(jobCard));
         }
     }, [jobCard?.id]);
+
+    useEffect(() => {
+        if (activeTab === 'intake') {
+            void lookups.load('serviceTypes');
+            void lookups.load('customers');
+            void lookups.load('vehicles');
+            void lookups.load('employees');
+            void lookups.load('warehouses');
+        }
+        if (activeTab === 'lines' || activeTab === 'labour') {
+            void lookups.load('items');
+            void lookups.load('warehouses');
+        }
+        if (activeTab === 'review') {
+            void lookups.load('customers');
+            void lookups.load('vehicles');
+        }
+    }, [activeTab, lookups]);
 
     async function submit(event: FormEvent): Promise<void> {
         event.preventDefault();
@@ -397,13 +449,13 @@ export function JobCardForm({ jobCard, mode = 'create' }: { jobCard?: VehicleSer
                 <FormSection description="Customer, vehicle, party roles, sequence and tenant rules are validated by backend." title="Intake & Header">
                     <div className="grid gap-4 md:grid-cols-2">
                         <Field error={errors.job_card_number} label="Job card number"><Input onChange={(event) => setForm((current) => ({ ...current, jobCardNumber: event.target.value }))} placeholder="Leave blank to generate temporary draft number" value={form.jobCardNumber} /></Field>
-                        <Field error={errors.service_type_id} label="Service type"><Select onChange={(event) => setForm((current) => ({ ...current, serviceTypeId: event.target.value }))} options={optionList(lookups.serviceTypes)} placeholder="Select type" value={form.serviceTypeId} /></Field>
-                        <Field error={errors.service_customer_id ?? errors.linked_customer_id} label="Service customer"><Select onChange={(event) => setForm((current) => ({ ...current, serviceCustomerId: event.target.value, billingCustomerId: current.billingCustomerId || event.target.value, payerId: current.payerId || event.target.value }))} options={optionList(lookups.customers)} placeholder="Select service customer" value={form.serviceCustomerId} /></Field>
-                        <Field error={errors.billing_customer_id} label="Billing customer"><Select onChange={(event) => setForm((current) => ({ ...current, billingCustomerId: event.target.value }))} options={optionList(lookups.customers)} placeholder="May differ from service customer" value={form.billingCustomerId} /></Field>
-                        <Field error={errors.payer_id} label="Payer"><Select onChange={(event) => setForm((current) => ({ ...current, payerId: event.target.value }))} options={optionList(lookups.customers)} placeholder="May differ from billing customer" value={form.payerId} /></Field>
-                        <Field error={errors.vehicle_id} label="Vehicle"><Select onChange={(event) => setForm((current) => ({ ...current, vehicleId: event.target.value }))} options={optionList(lookups.vehicles)} placeholder="Select vehicle" value={form.vehicleId} /></Field>
-                        <Field error={errors.assigned_to} label="Supervisor"><Select onChange={(event) => setForm((current) => ({ ...current, supervisorId: event.target.value }))} options={optionList(lookups.employees)} placeholder="Select supervisor" value={form.supervisorId} /></Field>
-                        <Field error={errors.warehouse_id} label="Default warehouse"><Select onChange={(event) => setForm((current) => ({ ...current, warehouseId: event.target.value }))} options={optionList(lookups.warehouses)} placeholder="Select warehouse" value={form.warehouseId} /></Field>
+                        <Field error={errors.service_type_id} label="Service type"><Select onFocus={() => void lookups.load('serviceTypes')} onMouseDown={() => void lookups.load('serviceTypes')} onChange={(event) => setForm((current) => ({ ...current, serviceTypeId: event.target.value }))} options={optionList(lookups.serviceTypes)} placeholder="Select type" value={form.serviceTypeId} /></Field>
+                        <Field error={errors.service_customer_id ?? errors.linked_customer_id} label="Service customer"><Select onFocus={() => void lookups.load('customers')} onMouseDown={() => void lookups.load('customers')} onChange={(event) => setForm((current) => ({ ...current, serviceCustomerId: event.target.value, billingCustomerId: current.billingCustomerId || event.target.value, payerId: current.payerId || event.target.value }))} options={optionList(lookups.customers)} placeholder="Select service customer" value={form.serviceCustomerId} /></Field>
+                        <Field error={errors.billing_customer_id} label="Billing customer"><Select onFocus={() => void lookups.load('customers')} onMouseDown={() => void lookups.load('customers')} onChange={(event) => setForm((current) => ({ ...current, billingCustomerId: event.target.value }))} options={optionList(lookups.customers)} placeholder="May differ from service customer" value={form.billingCustomerId} /></Field>
+                        <Field error={errors.payer_id} label="Payer"><Select onFocus={() => void lookups.load('customers')} onMouseDown={() => void lookups.load('customers')} onChange={(event) => setForm((current) => ({ ...current, payerId: event.target.value }))} options={optionList(lookups.customers)} placeholder="May differ from billing customer" value={form.payerId} /></Field>
+                        <Field error={errors.vehicle_id} label="Vehicle"><Select onFocus={() => void lookups.load('vehicles')} onMouseDown={() => void lookups.load('vehicles')} onChange={(event) => setForm((current) => ({ ...current, vehicleId: event.target.value }))} options={optionList(lookups.vehicles)} placeholder="Select vehicle" value={form.vehicleId} /></Field>
+                        <Field error={errors.assigned_to} label="Supervisor"><Select onFocus={() => void lookups.load('employees')} onMouseDown={() => void lookups.load('employees')} onChange={(event) => setForm((current) => ({ ...current, supervisorId: event.target.value }))} options={optionList(lookups.employees)} placeholder="Select supervisor" value={form.supervisorId} /></Field>
+                        <Field error={errors.warehouse_id} label="Default warehouse"><Select onFocus={() => void lookups.load('warehouses')} onMouseDown={() => void lookups.load('warehouses')} onChange={(event) => setForm((current) => ({ ...current, warehouseId: event.target.value }))} options={optionList(lookups.warehouses)} placeholder="Select warehouse" value={form.warehouseId} /></Field>
                         <Field label="Opened date"><Input onChange={(event) => setForm((current) => ({ ...current, openedAt: event.target.value }))} type="datetime-local" value={form.openedAt} /></Field>
                         <Field label="Expected completion"><Input onChange={(event) => setForm((current) => ({ ...current, expectedCompletion: event.target.value }))} type="datetime-local" value={form.expectedCompletion} /></Field>
                         <Field label="Odometer"><Input onChange={(event) => setForm((current) => ({ ...current, odometer: event.target.value }))} type="number" value={form.odometer} /></Field>
@@ -417,8 +469,8 @@ export function JobCardForm({ jobCard, mode = 'create' }: { jobCard?: VehicleSer
             {activeTab === 'lines' ? (
                 <FormSection description="Frontend collects item, quantity, UOM and rate. Backend owns price/tax/discount/UOM/stock effects." title="Service, Parts and Non-Inventory Lines">
                     <div className="space-y-3">
-                        {form.lines.map((line, index) => <LineEditor items={lookups.items} key={`line-${index}`} line={line} onChange={(next) => updateLine('lines', index, next)} warehouses={lookups.warehouses} />)}
-                        {form.nonInventoryItems.map((line, index) => <LineEditor items={lookups.items} key={`non-${index}`} line={line} onChange={(next) => updateLine('nonInventoryItems', index, next)} warehouses={lookups.warehouses} />)}
+                        {form.lines.map((line, index) => <LineEditor items={lookups.items} key={`service-line-${line.id ?? index}-${line.lineType}`} line={line} loadItems={() => void lookups.load('items')} loadWarehouses={() => void lookups.load('warehouses')} onChange={(next) => updateLine('lines', index, next)} warehouses={lookups.warehouses} />)}
+                        {form.nonInventoryItems.map((line, index) => <LineEditor items={lookups.items} key={`non-inventory-line-${line.id ?? index}-${line.lineType}`} line={line} loadItems={() => void lookups.load('items')} loadWarehouses={() => void lookups.load('warehouses')} onChange={(next) => updateLine('nonInventoryItems', index, next)} warehouses={lookups.warehouses} />)}
                         <div className="flex flex-wrap gap-2">
                             <Button onClick={() => addLine('lines', 'service')} type="button" variant="secondary">Add Service</Button>
                             <Button onClick={() => addLine('lines', 'spare_part')} type="button" variant="secondary">Add Part</Button>
@@ -431,7 +483,7 @@ export function JobCardForm({ jobCard, mode = 'create' }: { jobCard?: VehicleSer
             {activeTab === 'labour' ? (
                 <FormSection description="Labour items are persisted as backend labour rows. Technician assignment is managed from the job detail page." title="Labour Items">
                     <div className="space-y-3">
-                        {form.laborItems.map((line, index) => <LineEditor items={lookups.items} key={`labor-${index}`} line={line} onChange={(next) => updateLine('laborItems', index, { ...next, lineType: 'labour', requiresStockMovement: false })} warehouses={lookups.warehouses} />)}
+                        {form.laborItems.map((line, index) => <LineEditor items={lookups.items} key={`labour-line-${line.id ?? index}-${line.lineType}`} line={line} loadItems={() => void lookups.load('items')} loadWarehouses={() => void lookups.load('warehouses')} onChange={(next) => updateLine('laborItems', index, { ...next, lineType: 'labour', requiresStockMovement: false })} warehouses={lookups.warehouses} />)}
                         <Button onClick={() => addLine('laborItems', 'labour')} type="button" variant="secondary">Add Labour</Button>
                     </div>
                 </FormSection>
@@ -681,7 +733,12 @@ export function PaymentCreateForm() {
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
-        vehicleServiceApi.jobCards.list().then((response) => setJobs(response.data)).catch(() => undefined);
+        let active = true;
+        vehicleServiceApi.jobCards.list({ per_page: 25 }).then((response) => active && setJobs(response.data)).catch(() => undefined);
+
+        return () => {
+            active = false;
+        };
     }, []);
 
     function update<K extends keyof VehicleServicePaymentFormInput>(key: K, value: VehicleServicePaymentFormInput[K]): void {

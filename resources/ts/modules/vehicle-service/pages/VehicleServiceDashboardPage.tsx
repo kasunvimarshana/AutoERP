@@ -12,9 +12,14 @@ export function VehicleServiceDashboardPage() {
     const [serviceInvoices, setServiceInvoices] = useState<VehicleServiceInvoice[]>([]);
 
     useEffect(() => {
-        vehicleServiceApi.dashboard.summary().then((response) => setMetrics(response.data));
-        vehicleServiceApi.jobCards.list().then((response) => setJobCards(response.data));
-        vehicleServiceApi.invoices.list().then((response) => setServiceInvoices(response.data));
+        let active = true;
+        vehicleServiceApi.dashboard.summary().then((response) => active && setMetrics(response.data));
+        vehicleServiceApi.jobCards.list({ per_page: 5 }).then((response) => active && setJobCards(response.data));
+        vehicleServiceApi.invoices.list({ per_page: 5 }).then((response) => active && setServiceInvoices(response.data));
+
+        return () => {
+            active = false;
+        };
     }, []);
 
     return (

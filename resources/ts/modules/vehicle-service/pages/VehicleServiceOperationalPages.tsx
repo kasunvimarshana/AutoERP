@@ -17,7 +17,12 @@ export function VehicleServiceInspectionsPage() {
     const [jobCards, setJobCards] = useState<VehicleServiceJobCard[]>([]);
 
     useEffect(() => {
-        vehicleServiceApi.jobCards.list().then((response) => setJobCards(response.data));
+        let active = true;
+        vehicleServiceApi.jobCards.list({ per_page: 25 }).then((response) => active && setJobCards(response.data));
+
+        return () => {
+            active = false;
+        };
     }, []);
 
     return (

@@ -33,6 +33,8 @@ import type {
 
 type BackendRecord = Record<string, unknown>;
 
+const LOOKUP_PAGE_SIZE = 25;
+
 type LookupContext = {
     brands?: Map<string, ItemBrand>;
     categories?: Map<string, ItemCategory>;
@@ -377,43 +379,43 @@ function toBackendItemPayload(input: ItemFormInput) {
 }
 
 async function fetchCategories() {
-    const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/item-categories', { query: { is_active: true, per_page: 200 } });
+    const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/item-categories', { query: { is_active: true, per_page: LOOKUP_PAGE_SIZE } });
     const data = response.data.map(normalizeCategory);
     return { ...response, data, meta: collectionMeta({ ...response, data }) };
 }
 
 async function fetchBrands() {
-    const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/item-brands', { query: { is_active: true, per_page: 200 } });
+    const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/item-brands', { query: { is_active: true, per_page: LOOKUP_PAGE_SIZE } });
     const data = response.data.map(normalizeBrand);
     return { ...response, data, meta: collectionMeta({ ...response, data }) };
 }
 
 async function fetchItemTypes() {
-    const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/item-types', { query: { is_active: true, per_page: 200 } });
+    const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/item-types', { query: { is_active: true, per_page: LOOKUP_PAGE_SIZE } });
     const data = response.data.map(normalizeTypeOption);
     return { ...response, data, meta: collectionMeta({ ...response, data }) };
 }
 
 async function fetchUoms() {
-    const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/uom/units-of-measure', { query: { per_page: 200 } });
+    const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/uom/units-of-measure', { query: { per_page: LOOKUP_PAGE_SIZE } });
     const data = response.data.map(normalizeUom);
     return { ...response, data, meta: collectionMeta({ ...response, data }) };
 }
 
 async function fetchAccounts() {
-    const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/finance/accounts', { query: { is_active: true, per_page: 200 } });
+    const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/finance/accounts', { query: { is_active: true, per_page: LOOKUP_PAGE_SIZE } });
     const data = response.data.map(normalizeLookupOption);
     return { ...response, data, meta: collectionMeta({ ...response, data }) };
 }
 
 async function fetchTaxGroups() {
-    const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/finance/tax-groups', { query: { is_active: true, per_page: 200 } });
+    const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/finance/tax-groups', { query: { is_active: true, per_page: LOOKUP_PAGE_SIZE } });
     const data = response.data.map(normalizeLookupOption);
     return { ...response, data, meta: collectionMeta({ ...response, data }) };
 }
 
 async function fetchAttributeValues() {
-    const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/item-attribute-values', { query: { per_page: 200 } });
+    const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/item-attribute-values', { query: { per_page: LOOKUP_PAGE_SIZE } });
     const data: ItemAttributeValue[] = response.data.map((record) => ({
         attributeId: asString(record.attribute_id),
         id: asString(record.id),
@@ -424,7 +426,7 @@ async function fetchAttributeValues() {
 }
 
 async function fetchVariantAttributeValues() {
-    const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/item-variant-attribute-values', { query: { per_page: 200 } });
+    const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/item-variant-attribute-values', { query: { per_page: LOOKUP_PAGE_SIZE } });
     const data = response.data.map((record) => ({
         attributeValueId: asString(record.attribute_value_id),
         id: asString(record.id),
@@ -435,7 +437,7 @@ async function fetchVariantAttributeValues() {
 }
 
 async function fetchPriceLists() {
-    const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/price-lists', { query: { is_active: true, per_page: 200 } });
+    const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/pricing/price-lists', { query: { is_active: true, per_page: LOOKUP_PAGE_SIZE } });
     const data = response.data.map(normalizePriceList);
     return { ...response, data, meta: collectionMeta({ ...response, data }) };
 }
@@ -695,7 +697,7 @@ export const itemApi = {
         };
     },
     listAttributes: async () => {
-        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/item-attributes', { query: { per_page: 200 } });
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/item-attributes', { query: { per_page: LOOKUP_PAGE_SIZE } });
         const data = response.data.map((item) => ({
             group: asString(item.group_name ?? item.group_id),
             id: asString(item.id),
@@ -709,9 +711,9 @@ export const itemApi = {
     listComboComponents: async (itemId?: string) => {
         const [response, itemsResponse, uomResponse] = await Promise.all([
             httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/combo-items', {
-                query: { combo_item_id: itemId, per_page: 200 },
+                query: { combo_item_id: itemId, per_page: LOOKUP_PAGE_SIZE },
             }),
-            itemApi.listItems({ perPage: 200 }),
+            itemApi.listItems({ perPage: 25 }),
             itemApi.listUoms(),
         ]);
         const itemMap = new Map(itemsResponse.data.map((item) => [item.id, item]));
@@ -731,7 +733,7 @@ export const itemApi = {
     },
     listIdentifiers: async (itemId?: string) => {
         const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/item-identifiers', {
-            query: { item_id: itemId, per_page: 200 },
+            query: { item_id: itemId, per_page: LOOKUP_PAGE_SIZE },
         });
         const data = response.data.map((item) => {
             const technology = asString(item.technology, 'barcode_1d').toLowerCase();
@@ -755,11 +757,8 @@ export const itemApi = {
         return { ...response, data, meta: collectionMeta({ ...response, data }) };
     },
     listItems: async (query: ItemListQuery = {}) => {
-        const [response, context] = await Promise.all([
-            httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/items', { query: queryForItems(query) }),
-            lookupContext(),
-        ]);
-        const data = response.data.map((item) => normalizeItem(item, context));
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/items', { query: queryForItems(query) });
+        const data = response.data.map((item) => normalizeItem(item));
         return { ...response, data, meta: collectionMeta({ ...response, data }) };
     },
     listFinanceAccounts: fetchAccounts,
@@ -769,7 +768,7 @@ export const itemApi = {
     listVariants: async (itemId?: string) => {
         const [response, attributes, attributeValues, variantAttributeValues] = await Promise.all([
             httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/item-variants', {
-                query: { item_id: itemId, per_page: 200 },
+                query: { item_id: itemId, per_page: LOOKUP_PAGE_SIZE },
             }),
             itemApi.listAttributes(),
             fetchAttributeValues(),

@@ -100,12 +100,31 @@ export function PurchaseOrderDetailPage() {
     const [activeTab, setActiveTab] = useState('overview');
 
     useEffect(() => {
-        purchaseApi.orders.get(id).then((response) => setOrder(response.data));
-        purchaseApi.grns.list().then((response) => setGrns(response.data));
-        purchaseApi.invoices.list().then((response) => setInvoices(response.data));
-        purchaseApi.payments.list().then((response) => setPayments(response.data));
-        purchaseApi.orders.history(id).then((response) => setHistory(response.data)).catch(() => setHistory([]));
+        let active = true;
+        purchaseApi.orders.get(id).then((response) => active && setOrder(response.data));
+
+        return () => {
+            active = false;
+        };
     }, [id]);
+
+    useEffect(() => {
+        let active = true;
+
+        if (activeTab === 'grns' && grns.length === 0) {
+            purchaseApi.grns.list({ perPage: 25 }).then((response) => active && setGrns(response.data));
+        } else if (activeTab === 'invoices' && invoices.length === 0) {
+            purchaseApi.invoices.list({ perPage: 25 }).then((response) => active && setInvoices(response.data));
+        } else if (activeTab === 'payments' && payments.length === 0) {
+            purchaseApi.payments.list({ perPage: 25 }).then((response) => active && setPayments(response.data));
+        } else if ((activeTab === 'workflow' || activeTab === 'audit') && history.length === 0) {
+            purchaseApi.orders.history(id).then((response) => active && setHistory(response.data)).catch(() => active && setHistory([]));
+        }
+
+        return () => {
+            active = false;
+        };
+    }, [activeTab, grns.length, history.length, id, invoices.length, payments.length]);
 
     if (!order) {
         return <EmptyState description="Loading purchase order details..." title="Loading" />;

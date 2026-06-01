@@ -315,7 +315,7 @@ export const vehicleApi = {
         return { ...response, data: response.data.map(normalizeDocument) };
     },
     listMasterSummaries: async (kind: VehicleMasterSummary['kind']): Promise<ApiCollectionResponse<VehicleMasterSummary>> => {
-        const response = await vehicleApi.list({ perPage: 200 });
+        const response = await vehicleApi.list({ perPage: 25 });
 
         return { data: summarizeVehicles(kind, response.data) };
     },

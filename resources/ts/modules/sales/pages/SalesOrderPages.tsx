@@ -95,12 +95,31 @@ export function SalesOrderDetailPage() {
     const [activeTab, setActiveTab] = useState('overview');
 
     useEffect(() => {
-        salesApi.orders.get(id).then((response) => setOrder(response.data));
-        salesApi.deliveries.list().then((response) => setDeliveries(response.data));
-        salesApi.invoices.list().then((response) => setInvoices(response.data));
-        salesApi.payments.list().then((response) => setPayments(response.data));
-        salesApi.orders.history(id).then((response) => setHistory(response.data));
+        let active = true;
+        salesApi.orders.get(id).then((response) => active && setOrder(response.data));
+
+        return () => {
+            active = false;
+        };
     }, [id]);
+
+    useEffect(() => {
+        let active = true;
+
+        if (activeTab === 'deliveries' && deliveries.length === 0) {
+            salesApi.deliveries.list({ perPage: 25 }).then((response) => active && setDeliveries(response.data));
+        } else if (activeTab === 'invoices' && invoices.length === 0) {
+            salesApi.invoices.list({ perPage: 25 }).then((response) => active && setInvoices(response.data));
+        } else if (activeTab === 'payments' && payments.length === 0) {
+            salesApi.payments.list({ perPage: 25 }).then((response) => active && setPayments(response.data));
+        } else if ((activeTab === 'workflow' || activeTab === 'audit') && history.length === 0) {
+            salesApi.orders.history(id).then((response) => active && setHistory(response.data)).catch(() => active && setHistory([]));
+        }
+
+        return () => {
+            active = false;
+        };
+    }, [activeTab, deliveries.length, history.length, id, invoices.length, payments.length]);
 
     if (!order) {
         return <EmptyState description="Loading sales order details..." title="Loading" />;

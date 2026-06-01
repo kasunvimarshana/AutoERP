@@ -187,7 +187,7 @@ function JournalFormShell({ mode }: { mode: 'create' | 'edit' }) {
     const [error, setError] = useState<Error | null>(null);
 
     useEffect(() => {
-        financeApi.listAccounts({ is_active: true, per_page: 200 })
+        financeApi.listAccounts({ is_active: true, per_page: 25 })
             .then((response) => setAccounts(response.data.filter((account) => account.allowsManualPosting)))
             .catch((caught: Error) => setError(caught));
 

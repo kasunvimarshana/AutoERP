@@ -388,7 +388,18 @@ export const documentApi = {
     listDefinitions: async () => normalizedCollection(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/document/definitions'), normalizeDefinition),
     listDocumentLines: async (documentId: string) => normalizedCollection(await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/document/documents/${documentId}/lines`), normalizeLine),
     listDocumentTypes: async () => normalizedCollection(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/document/types'), normalizeDocumentType),
-    listDocuments: async () => normalizedCollection(await httpClient<ApiCollectionResponse<BackendRecord>>('/api/document/documents'), normalizeDocument),
+    listDocuments: async (query: Record<string, string | number | boolean | undefined> = {}) => normalizedCollection(
+        await httpClient<ApiCollectionResponse<BackendRecord>>('/api/document/documents', {
+            query: {
+                page: query.page,
+                per_page: query.per_page ?? query.perPage,
+                source_module: query.source_module,
+                source_type: query.source_type,
+                status: query.status,
+            },
+        }),
+        normalizeDocument,
+    ),
     listEvents: async (documentId: string) => normalizedCollection(await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/document/documents/${documentId}/events`), normalizeEvent),
     listPermissions: async (documentId: string) => normalizedCollection(await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/document/documents/${documentId}/permissions`), normalizePermission),
     listRelations: async (documentId: string) => normalizedCollection(await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/document/documents/${documentId}/relations`), normalizeRelation),

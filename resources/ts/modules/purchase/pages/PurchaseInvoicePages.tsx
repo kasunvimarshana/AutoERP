@@ -75,11 +75,29 @@ export function PurchaseInvoiceDetailPage() {
     const [activeTab, setActiveTab] = useState('overview');
 
     useEffect(() => {
-        purchaseApi.invoices.get(id).then((response) => setInvoice(response.data));
-        purchaseApi.payments.list().then((response) => setPayments(response.data));
-        purchaseApi.returns.list().then((response) => setReturns(response.data));
-        setHistory([]);
+        let active = true;
+        purchaseApi.invoices.get(id).then((response) => active && setInvoice(response.data));
+
+        return () => {
+            active = false;
+        };
     }, [id]);
+
+    useEffect(() => {
+        let active = true;
+
+        if (activeTab === 'payments' && payments.length === 0) {
+            purchaseApi.payments.list({ perPage: 25 }).then((response) => active && setPayments(response.data));
+        } else if (activeTab === 'returns' && returns.length === 0) {
+            purchaseApi.returns.list({ perPage: 25 }).then((response) => active && setReturns(response.data));
+        } else if (activeTab === 'history' && history.length === 0) {
+            setHistory([]);
+        }
+
+        return () => {
+            active = false;
+        };
+    }, [activeTab, history.length, payments.length, returns.length]);
 
     if (!invoice) {
         return <EmptyState description="Loading supplier invoice details..." title="Loading" />;

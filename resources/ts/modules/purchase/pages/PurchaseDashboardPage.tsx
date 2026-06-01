@@ -19,10 +19,15 @@ export function PurchaseDashboardPage() {
     const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
 
     useEffect(() => {
-        purchaseApi.dashboard.summary().then((response) => setMetrics(response.data));
-        purchaseApi.orders.list().then((response) => setOrders(response.data));
-        purchaseApi.grns.list().then((response) => setGrns(response.data));
-        purchaseApi.invoices.list().then((response) => setInvoices(response.data));
+        let active = true;
+        purchaseApi.dashboard.summary().then((response) => active && setMetrics(response.data));
+        purchaseApi.orders.list({ perPage: 3 }).then((response) => active && setOrders(response.data));
+        purchaseApi.grns.list({ perPage: 3 }).then((response) => active && setGrns(response.data));
+        purchaseApi.invoices.list({ perPage: 3 }).then((response) => active && setInvoices(response.data.slice(0, 3)));
+
+        return () => {
+            active = false;
+        };
     }, []);
 
     return (
