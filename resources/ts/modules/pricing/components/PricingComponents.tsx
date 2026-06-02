@@ -458,7 +458,7 @@ export function PricingUsagePanel({ usage }: { usage: PricingUsageSummary }) {
 
 export function PricingActivityTimeline({ entries }: { entries: PricingAuditEntry[] }) {
     return entries.length
-        ? <AuditTimeline events={entries.map((entry) => ({ actor: entry.actor, description: entry.description, time: entry.time }))} />
+        ? <AuditTimeline events={entries.map((entry) => ({ actor: entry.actor, description: entry.description, id: entry.id, time: entry.time }))} />
         : <EmptyState description="No audit activity was returned for this pricing record." title="No audit activity" />;
 }
 

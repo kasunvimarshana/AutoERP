@@ -593,7 +593,7 @@ export const vehicleServiceApi = {
             return { data: response.data.filter((unit) => unit.id && unit.unit !== 'Not configured').map((unit) => simpleOption(unit.id, unit.unit, unit.purpose)) };
         },
         items: async (): Promise<ApiCollectionResponse<VehicleServiceLookupOption>> => {
-            const response = await itemApi.listItems({ perPage: 25, status: 'active' });
+            const response = await itemApi.lookupItems({ perPage: 25, status: 'active' });
             return { data: response.data.map((item) => simpleOption(item.id, `${item.code} - ${item.name}`, item.itemType)) };
         },
         uoms: async (): Promise<ApiCollectionResponse<VehicleServiceLookupOption>> => {

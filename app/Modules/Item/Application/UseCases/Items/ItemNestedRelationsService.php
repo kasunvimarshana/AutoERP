@@ -12,6 +12,7 @@ use Modules\Item\Application\Repositories\ItemRepositoryInterface;
 use Modules\Item\Application\Repositories\ItemVariantAttributeRepositoryInterface;
 use Modules\Item\Application\Repositories\ItemVariantAttributeValueRepositoryInterface;
 use Modules\Item\Application\Repositories\ItemVariantRepositoryInterface;
+use Modules\Item\Application\Support\ItemUomOptions;
 use Modules\UOM\Application\Repositories\UomConversionRepositoryInterface;
 
 final class ItemNestedRelationsService
@@ -328,6 +329,14 @@ final class ItemNestedRelationsService
                 : (isset($payload['base_uom_id']) ? (int) $payload['base_uom_id'] : 0);
             if ($uomId <= 0) {
                 throw new InvalidArgumentException('Each combo item row requires a valid uom_id.');
+            }
+
+            if (! ItemUomOptions::isAllowed($tenantId, $componentItemId, $uomId)) {
+                throw new InvalidArgumentException(sprintf(
+                    'The selected UOM (%d) is not configured for component item %d.',
+                    $uomId,
+                    $componentItemId,
+                ));
             }
 
             $this->comboItemRepository->create([

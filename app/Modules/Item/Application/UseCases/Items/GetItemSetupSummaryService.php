@@ -64,6 +64,7 @@ final class GetItemSetupSummaryService implements GetItemSetupSummaryServiceInte
 
             $rows = DB::table('price_list_items')
                 ->leftJoin('price_lists', 'price_list_items.price_list_id', '=', 'price_lists.id')
+                ->leftJoin('unit_of_measures', 'price_list_items.uom_id', '=', 'unit_of_measures.id')
                 ->where('price_list_items.tenant_id', $tenantId)
                 ->where('price_list_items.item_id', (int) $item->id())
                 ->select([
@@ -77,6 +78,9 @@ final class GetItemSetupSummaryService implements GetItemSetupSummaryServiceInte
                     'price_list_items.is_active',
                     'price_lists.code as price_list_code',
                     'price_lists.name as price_list_name',
+                    'unit_of_measures.code as uom_code',
+                    'unit_of_measures.name as uom_name',
+                    'unit_of_measures.symbol as uom_symbol',
                 ])
                 ->orderBy('price_list_items.id')
                 ->limit(200)
@@ -87,6 +91,9 @@ final class GetItemSetupSummaryService implements GetItemSetupSummaryServiceInte
                     'price_list_code' => $row->price_list_code,
                     'price_list_name' => $row->price_list_name,
                     'uom_id' => $row->uom_id,
+                    'uom_code' => $row->uom_code,
+                    'uom_name' => $row->uom_name,
+                    'uom_symbol' => $row->uom_symbol,
                     'currency_id' => $row->currency_id,
                     'price' => $this->number($row->price),
                     'discount_type' => $row->discount_type,

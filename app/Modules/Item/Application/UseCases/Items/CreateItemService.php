@@ -41,6 +41,7 @@ final class CreateItemService implements CreateItemServiceInterface
 
             $payload['tenant_id'] = $tenantId;
             $payload['organization_unit_id'] ??= $this->currentOrganizationUnit->currentOrganizationUnitId();
+            $this->normalizeDefaults($payload);
             $nested = $this->extractNestedPayload($payload);
 
             if (! array_key_exists('row_version', $payload)) {
@@ -80,5 +81,27 @@ final class CreateItemService implements CreateItemServiceInterface
         }
 
         return $nested;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function normalizeDefaults(array &$payload): void
+    {
+        $payload['minimum_stock'] = isset($payload['minimum_stock']) && $payload['minimum_stock'] !== ''
+            ? $payload['minimum_stock']
+            : 0;
+        $payload['reorder_point'] = isset($payload['reorder_point']) && $payload['reorder_point'] !== ''
+            ? $payload['reorder_point']
+            : 0;
+        $payload['safety_stock'] = isset($payload['safety_stock']) && $payload['safety_stock'] !== ''
+            ? $payload['safety_stock']
+            : 0;
+        $payload['lead_time_days'] = isset($payload['lead_time_days']) && $payload['lead_time_days'] !== ''
+            ? $payload['lead_time_days']
+            : 0;
+        $payload['review_period_days'] = isset($payload['review_period_days']) && $payload['review_period_days'] !== ''
+            ? $payload['review_period_days']
+            : 30;
     }
 }

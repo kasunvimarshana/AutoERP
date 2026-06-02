@@ -190,7 +190,7 @@ export function UomActivityTimeline({ entries }: { entries: UomAuditEntry[] }) {
         return <EmptyState description="No audit entries have been recorded for this unit." title="No activity" />;
     }
 
-    return <AuditTimeline events={entries.map((entry) => ({ actor: entry.actor, description: entry.description, time: entry.time }))} />;
+    return <AuditTimeline events={entries.map((entry) => ({ actor: entry.actor, description: entry.description, id: entry.id, time: entry.time }))} />;
 }
 
 export function UomConversionPreviewPanel({ preview }: { preview?: UomConversionPreview }) {

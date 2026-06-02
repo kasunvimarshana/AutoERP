@@ -475,7 +475,7 @@ export const purchaseApi = {
     },
     lookups: {
         items: async () => {
-            const response = await itemApi.listItems({ perPage: 25, status: 'active' });
+            const response = await itemApi.lookupItems({ perPage: 25, status: 'active' });
             return { data: response.data.map((item) => normalizeLookup(item.id, item.code, item.name, 'Item')) };
         },
         itemUoms: async (itemId: string) => {

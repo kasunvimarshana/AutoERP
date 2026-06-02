@@ -173,7 +173,7 @@ export function DocumentPermissionsPanel({ permissions }: { permissions: Documen
 }
 
 export function DocumentEventsTimeline({ events }: { events: DocumentEvent[] }) {
-    return <AuditTimeline events={events.map((entry) => ({ actor: entry.actor, description: `${entry.eventType}: ${entry.message}`, time: entry.time }))} />;
+    return <AuditTimeline events={events.map((entry) => ({ actor: entry.actor, description: `${entry.eventType}: ${entry.message}`, id: entry.id, time: entry.time }))} />;
 }
 
 export function DocumentVersionsTable({ versions }: { versions: DocumentVersion[] }) {

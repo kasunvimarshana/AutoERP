@@ -72,6 +72,54 @@ final class ItemController extends Controller
         return new ItemResource($result->valueOrFail());
     }
 
+    public function lookup(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'q' => ['nullable', 'string', 'max:255'],
+            'search' => ['nullable', 'string', 'max:255'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'type' => ['nullable', 'string', 'max:255'],
+            'is_stockable' => ['nullable', 'boolean'],
+            'is_service' => ['nullable', 'boolean'],
+            'is_rentable' => ['nullable', 'boolean'],
+            'status' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $criteria = [
+            'is_active' => true,
+            'is_rentable' => $validated['is_rentable'] ?? null,
+            'is_service' => $validated['is_service'] ?? null,
+            'is_stockable' => $validated['is_stockable'] ?? null,
+            'search' => $validated['q'] ?? $validated['search'] ?? null,
+            'status' => $validated['status'] ?? 'ACTIVE',
+            'type' => $validated['type'] ?? null,
+        ];
+        $perPage = (int) ($validated['limit'] ?? $validated['per_page'] ?? 25);
+
+        $result = $this->listService->execute($criteria, $perPage, 1);
+
+        if ($result->isFailure()) {
+            return response()->json(['message' => $result->errorOrFail()->message], 422);
+        }
+
+        $pageResult = $result->valueOrFail();
+        if (! $pageResult instanceof PagedResult) {
+            return response()->json(['message' => 'Unexpected lookup response.'], 500);
+        }
+
+        return response()->json([
+            'data' => ItemResource::collection($pageResult->items)->resolve(),
+            'meta' => [
+                'total' => $pageResult->total,
+                'page' => $pageResult->page,
+                'per_page' => $pageResult->perPage,
+                'page_count' => $pageResult->pageCount(),
+                'has_more' => $pageResult->hasMore(),
+            ],
+        ]);
+    }
+
     public function store(UpsertItemRequest $request): JsonResponse|ItemResource
     {
         $result = $this->createService->execute($request->validated());

@@ -43,6 +43,10 @@ function fieldMessage(errors: Record<string, string[]>, field: string) {
     return errors[field]?.[0];
 }
 
+function clientKey() {
+    return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+}
+
 export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' }) {
     const navigate = useNavigate();
     const [errors, setErrors] = useState<Record<string, string[]>>({});
@@ -51,6 +55,7 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
     const [lookups, setLookups] = useState<FormLookupState>({ accounts: [], brands: [], categories: [], componentItems: [], itemTypes: [], taxGroups: [], uoms: [] });
     const [lookupError, setLookupError] = useState('');
     const [lookupsLoading, setLookupsLoading] = useState(true);
+    const [lookupLoading, setLookupLoading] = useState('');
     const [selectedType, setSelectedType] = useState<ItemType>(item?.itemType ?? 'inventory_product');
     const [comboItems, setComboItems] = useState<ComboComponentInput[]>([]);
     const [baseUomId, setBaseUomId] = useState(item?.baseUomId ?? '');
@@ -69,23 +74,23 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
     useEffect(() => {
         let mounted = true;
         Promise.all([
-            itemApi.listCategories(),
-            itemApi.listBrands(),
             itemApi.listItemTypes(),
             itemApi.listUoms(),
-            itemApi.listFinanceAccounts(),
-            itemApi.listTaxGroups(),
-            itemApi.listItems({ perPage: 25 }),
         ])
-            .then(([categories, brands, itemTypes, uoms, accounts, taxGroups, componentItems]) => {
+            .then(([itemTypes, uoms]) => {
                 if (mounted) {
                     setLookups({
-                        accounts: accounts.data,
-                        brands: brands.data,
-                        categories: categories.data,
-                        componentItems: componentItems.data,
+                        accounts: Array.from(new Map([
+                            ...(item?.incomeAccountId ? [{ id: item.incomeAccountId, label: item.incomeAccount ?? 'Current income account', name: item.incomeAccount ?? 'Current income account' }] : []),
+                            ...(item?.expenseAccountId ? [{ id: item.expenseAccountId, label: item.expenseAccount ?? 'Current expense account', name: item.expenseAccount ?? 'Current expense account' }] : []),
+                            ...(item?.inventoryAccountId ? [{ id: item.inventoryAccountId, label: item.inventoryAccount ?? 'Current inventory account', name: item.inventoryAccount ?? 'Current inventory account' }] : []),
+                            ...(item?.cogsAccountId ? [{ id: item.cogsAccountId, label: item.cogsAccount ?? 'Current COGS account', name: item.cogsAccount ?? 'Current COGS account' }] : []),
+                        ].map((account) => [account.id, account] as const)).values()),
+                        brands: item?.brandId ? [{ id: item.brandId, isActive: true, name: item.brand ?? 'Current brand' }] : [],
+                        categories: item?.categoryId ? [{ code: '', id: item.categoryId, isActive: true, name: item.category, status: 'active' }] : [],
+                        componentItems: [],
                         itemTypes: itemTypes.data,
-                        taxGroups: taxGroups.data,
+                        taxGroups: item?.taxGroupId ? [{ id: item.taxGroupId, label: 'Current tax group', name: 'Current tax group' }] : [],
                         uoms: uoms.data,
                     });
                 }
@@ -104,7 +109,32 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
         return () => {
             mounted = false;
         };
-    }, []);
+    }, [item]);
+
+    async function loadLookup(kind: keyof Pick<FormLookupState, 'accounts' | 'brands' | 'categories' | 'componentItems' | 'taxGroups'>) {
+        if (lookups[kind].length > 0 && kind !== 'componentItems') {
+            return;
+        }
+
+        setLookupLoading(kind);
+        setLookupError('');
+
+        try {
+            const response = await ({
+                accounts: () => itemApi.listFinanceAccounts(),
+                brands: () => itemApi.listBrands(),
+                categories: () => itemApi.listCategories(),
+                componentItems: () => itemApi.lookupItems({ perPage: 25, status: 'active' }),
+                taxGroups: () => itemApi.listTaxGroups(),
+            }[kind])();
+
+            setLookups((current) => ({ ...current, [kind]: response.data }));
+        } catch (error) {
+            setLookupError(error instanceof Error ? error.message : `Unable to load ${kind}.`);
+        } finally {
+            setLookupLoading('');
+        }
+    }
 
     useEffect(() => {
         if (!item || item.itemType !== 'combo') {
@@ -116,6 +146,7 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
             .then((response) => {
                 if (mounted) {
                     setComboItems(response.data.map((component) => ({
+                        clientKey: component.id || clientKey(),
                         componentItemId: component.componentItemId ?? '',
                         quantity: component.quantity,
                         uomId: component.uomId ?? item.baseUomId ?? '',
@@ -163,6 +194,7 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
         }
 
         let mounted = true;
+        const timeout = window.setTimeout(() => {
         setSetupPreviewError('');
 
         itemApi.getTypeSetupPreview({
@@ -188,14 +220,20 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
                     setSetupPreviewError(error instanceof Error ? error.message : 'Unable to preview item setup.');
                 }
             });
+        }, 300);
 
         return () => {
             mounted = false;
+            window.clearTimeout(timeout);
         };
     }, [baseUomId, behavior, comboItems, item?.itemTypeId, lookups.itemTypes, selectedType]);
 
     function addComboItem() {
-        setComboItems((rows) => [...rows, { componentItemId: '', quantity: '1', uomId: item?.baseUomId ?? lookups.uoms[0]?.id ?? '' }]);
+        if (!lookups.componentItems.length) {
+            void loadLookup('componentItems');
+        }
+
+        setComboItems((rows) => [...rows, { clientKey: clientKey(), componentItemId: '', quantity: '1', uomId: item?.baseUomId ?? lookups.uoms[0]?.id ?? '' }]);
     }
 
     function updateComboItem(index: number, field: keyof ComboComponentInput, value: string) {
@@ -326,8 +364,10 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
                             <Select
                                 defaultValue={item?.categoryId ?? ''}
                                 name="category_id"
+                                onFocus={() => void loadLookup('categories')}
+                                onMouseDown={() => void loadLookup('categories')}
                                 options={lookups.categories.map((category) => ({ label: category.name, value: category.id }))}
-                                placeholder="Select category"
+                                placeholder={lookupLoading === 'categories' ? 'Loading categories...' : 'Select category'}
                             />
                             <FieldError message={fieldMessage(errors, 'category_id')} />
                         </div>
@@ -336,8 +376,10 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
                             <Select
                                 defaultValue={item?.brandId ?? ''}
                                 name="brand_id"
+                                onFocus={() => void loadLookup('brands')}
+                                onMouseDown={() => void loadLookup('brands')}
                                 options={lookups.brands.map((brand) => ({ label: brand.name, value: brand.id }))}
-                                placeholder="Select brand"
+                                placeholder={lookupLoading === 'brands' ? 'Loading brands...' : 'Select brand'}
                             />
                             <FieldError message={fieldMessage(errors, 'brand_id')} />
                         </div>
@@ -406,7 +448,7 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
                     <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2">
                             <FieldLabel>Tax group</FieldLabel>
-                            <Select defaultValue={item?.taxGroupId ?? ''} name="tax_group_id" options={lookups.taxGroups.map((taxGroup) => ({ label: taxGroup.label, value: taxGroup.id }))} placeholder="No tax group" />
+                            <Select defaultValue={item?.taxGroupId ?? ''} name="tax_group_id" onFocus={() => void loadLookup('taxGroups')} onMouseDown={() => void loadLookup('taxGroups')} options={lookups.taxGroups.map((taxGroup) => ({ label: taxGroup.label, value: taxGroup.id }))} placeholder={lookupLoading === 'taxGroups' ? 'Loading tax groups...' : 'No tax group'} />
                             <FieldError message={fieldMessage(errors, 'tax_group_id')} />
                         </div>
                         {[
@@ -417,7 +459,7 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
                         ].map(([name, label, defaultValue]) => (
                             <div className="space-y-2" key={String(name)}>
                                 <FieldLabel>{String(label)}</FieldLabel>
-                                <Select defaultValue={String(defaultValue ?? '')} name={String(name)} options={lookups.accounts.map((account) => ({ label: account.label, value: account.id }))} placeholder="No account default" />
+                                <Select defaultValue={String(defaultValue ?? '')} name={String(name)} onFocus={() => void loadLookup('accounts')} onMouseDown={() => void loadLookup('accounts')} options={lookups.accounts.map((account) => ({ label: account.label, value: account.id }))} placeholder={lookupLoading === 'accounts' ? 'Loading accounts...' : 'No account default'} />
                                 <FieldError message={fieldMessage(errors, String(name))} />
                             </div>
                         ))}
@@ -519,8 +561,8 @@ export function ItemForm({ item, mode }: { item?: Item; mode: 'create' | 'edit' 
                             </div>
                             {!comboItems.length ? <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No combo components added.</div> : null}
                             {comboItems.map((row, index) => (
-                                <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-[1fr_120px_160px_auto]" key={`${index}-${row.componentItemId}`}>
-                                    <Select onChange={(event) => updateComboItem(index, 'componentItemId', event.target.value)} options={lookups.componentItems.filter((component) => component.id !== item?.id).map((component) => ({ label: `${component.code} - ${component.name}`, value: component.id }))} placeholder="Component item" value={row.componentItemId} />
+                                <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-[1fr_120px_160px_auto]" key={row.clientKey}>
+                                    <Select onChange={(event) => updateComboItem(index, 'componentItemId', event.target.value)} onFocus={() => void loadLookup('componentItems')} onMouseDown={() => void loadLookup('componentItems')} options={lookups.componentItems.filter((component) => component.id !== item?.id).map((component) => ({ label: `${component.code} - ${component.name}`, value: component.id }))} placeholder={lookupLoading === 'componentItems' ? 'Loading items...' : 'Component item'} value={row.componentItemId} />
                                     <Input min="0.0001" onChange={(event) => updateComboItem(index, 'quantity', event.target.value)} placeholder="Qty" step="0.0001" type="number" value={row.quantity} />
                                     <Select onChange={(event) => updateComboItem(index, 'uomId', event.target.value)} options={lookups.uoms.map((uom) => ({ label: uom.label, value: uom.id }))} value={row.uomId} />
                                     <Button onClick={() => removeComboItem(index)} variant="ghost">Remove</Button>

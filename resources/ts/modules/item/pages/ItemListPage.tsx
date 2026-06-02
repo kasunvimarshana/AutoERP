@@ -35,34 +35,37 @@ export function ItemListPage() {
 
     useEffect(() => {
         let mounted = true;
-        setIsLoading(true);
-        setError('');
+        const timeout = window.setTimeout(() => {
+            setIsLoading(true);
+            setError('');
 
-        itemApi.listItems({
-            isStockable: stockFilterToBoolean(stockBehavior),
-            search: query,
-            status: status ? (status as ItemStatus) : undefined,
-            type: type ? (type as ItemType) : undefined,
-        })
-            .then((response) => {
-                if (mounted) {
-                    setItems(response.data);
-                    setTotal(Number(response.meta?.total ?? response.data.length));
-                }
+            itemApi.listItems({
+                isStockable: stockFilterToBoolean(stockBehavior),
+                search: query,
+                status: status ? (status as ItemStatus) : undefined,
+                type: type ? (type as ItemType) : undefined,
             })
-            .catch((caught: unknown) => {
-                if (mounted) {
-                    setError(caught instanceof Error ? caught.message : 'Unable to load items.');
-                }
-            })
-            .finally(() => {
-                if (mounted) {
-                    setIsLoading(false);
-                }
-            });
+                .then((response) => {
+                    if (mounted) {
+                        setItems(response.data);
+                        setTotal(Number(response.meta?.total ?? response.data.length));
+                    }
+                })
+                .catch((caught: unknown) => {
+                    if (mounted) {
+                        setError(caught instanceof Error ? caught.message : 'Unable to load items.');
+                    }
+                })
+                .finally(() => {
+                    if (mounted) {
+                        setIsLoading(false);
+                    }
+                });
+        }, 250);
 
         return () => {
             mounted = false;
+            window.clearTimeout(timeout);
         };
     }, [query, status, stockBehavior, type]);
 

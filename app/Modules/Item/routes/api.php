@@ -37,6 +37,7 @@ Route::prefix('api/item')
         Route::apiResource('item-categories', ItemCategoryController::class);
         Route::apiResource('item-brands', ItemBrandController::class);
         Route::get('item-types', [ItemTypeController::class, 'index'])->name('item-types.index');
+        Route::get('items/lookup', [ItemController::class, 'lookup'])->name('items.lookup');
         Route::post('items/preview-type-setup', [ItemController::class, 'previewTypeSetup'])->name('items.preview-type-setup');
         Route::get('items/{item}/capabilities', [ItemController::class, 'capabilities'])->name('items.capabilities');
         Route::get('items/{item}/inventory-summary', [ItemController::class, 'inventorySummary'])->name('items.inventory-summary');

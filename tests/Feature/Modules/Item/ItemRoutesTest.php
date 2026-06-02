@@ -24,6 +24,7 @@ final class ItemRoutesTest extends TestCase
         self::assertTrue(Route::has('item.item-types.index'));
         self::assertTrue(Route::has('item.items.index'));
         self::assertTrue(Route::has('item.items.store'));
+        self::assertTrue(Route::has('item.items.lookup'));
         self::assertTrue(Route::has('item.items.show'));
         self::assertTrue(Route::has('item.items.update'));
         self::assertTrue(Route::has('item.items.destroy'));

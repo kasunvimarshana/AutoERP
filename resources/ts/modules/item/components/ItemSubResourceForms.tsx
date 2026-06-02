@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { ApiError } from '../../../services/api/apiErrors';
 import { FieldError } from '../../../shared/components/forms/FieldError';
 import { FormSection } from '../../../shared/components/forms/FormSection';
@@ -186,14 +186,34 @@ export function ItemVariantCreateForm({ item, onSaved }: FormProps) {
 export function ItemComboComponentCreateForm({ item, onSaved }: FormProps) {
     const [items, setItems] = useState<Item[]>([]);
     const [uoms, setUoms] = useState<UomOption[]>([]);
+    const [lookupLoading, setLookupLoading] = useState('');
     const state = useFormState();
 
-    useEffect(() => {
-        Promise.all([itemApi.listItems({ perPage: 25 }), itemApi.listUoms()]).then(([itemRows, uomRows]) => {
+    async function loadItems() {
+        if (items.length > 0) return;
+        setLookupLoading('items');
+        try {
+            const itemRows = await itemApi.lookupItems({ perPage: 25, status: 'active' });
             setItems(itemRows.data);
+        } catch (error) {
+            state.setMessage(error instanceof Error ? error.message : 'Unable to load component items.');
+        } finally {
+            setLookupLoading('');
+        }
+    }
+
+    async function loadUoms() {
+        if (uoms.length > 0) return;
+        setLookupLoading('uoms');
+        try {
+            const uomRows = await itemApi.listUoms();
             setUoms(uomRows.data);
-        }).catch((error) => state.setMessage(error instanceof Error ? error.message : 'Unable to load component lookups.'));
-    }, []);
+        } catch (error) {
+            state.setMessage(error instanceof Error ? error.message : 'Unable to load UOM options.');
+        } finally {
+            setLookupLoading('');
+        }
+    }
 
     if (!item) return null;
     const currentItem = item;
@@ -224,9 +244,9 @@ export function ItemComboComponentCreateForm({ item, onSaved }: FormProps) {
         <FormSection description="Add persisted combo components. Circular references and invalid UOMs are rejected by the backend." title="Add Combo Component">
             <form className="grid gap-3 md:grid-cols-4" onSubmit={submit}>
                 {state.message ? <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700 md:col-span-4">{state.message}</div> : null}
-                <Select name="component_item_id" options={items.filter((row) => row.id !== currentItem.id).map((row) => ({ label: `${row.code} - ${row.name}`, value: row.id }))} placeholder="Component item" />
+                <Select name="component_item_id" onFocus={() => void loadItems()} onMouseDown={() => void loadItems()} options={items.filter((row) => row.id !== currentItem.id).map((row) => ({ label: `${row.code} - ${row.name}`, value: row.id }))} placeholder={lookupLoading === 'items' ? 'Loading items...' : 'Component item'} />
                 <Input defaultValue="1" min="0.0001" name="quantity" step="0.0001" type="number" />
-                <Select name="uom_id" options={uoms.map((uom) => ({ label: uom.label, value: uom.id }))} placeholder="UOM" />
+                <Select name="uom_id" onFocus={() => void loadUoms()} onMouseDown={() => void loadUoms()} options={uoms.map((uom) => ({ label: uom.label, value: uom.id }))} placeholder={lookupLoading === 'uoms' ? 'Loading UOMs...' : 'UOM'} />
                 <Button disabled={state.saving} type="submit" variant="blue">{state.saving ? 'Adding...' : 'Add Component'}</Button>
             </form>
         </FormSection>

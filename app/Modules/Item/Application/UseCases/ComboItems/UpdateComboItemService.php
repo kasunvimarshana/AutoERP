@@ -10,6 +10,7 @@ use Modules\Core\Application\Results\Result;
 use Modules\Item\Application\Contracts\UseCases\ComboItems\UpdateComboItemServiceInterface;
 use Modules\Item\Application\Repositories\ComboItemRepositoryInterface;
 use Modules\Item\Application\Repositories\ItemRepositoryInterface;
+use Modules\Item\Application\Support\ItemUomOptions;
 use Modules\Item\Domain\Constants\ItemErrorCode;
 use Throwable;
 
@@ -59,6 +60,13 @@ final class UpdateComboItemService implements UpdateComboItemServiceInterface
             if ($this->repository->introducesCycle($tenantId, $comboItemId, $componentItemId, (int) $id)) {
                 return Result::failure(
                     new Error(ItemErrorCode::INVALID_VALUE, 'Combo component would create a circular dependency.'),
+                );
+            }
+
+            $uomId = (int) ($payload['uom_id'] ?? $existing->get('uom_id', 0));
+            if ($uomId < 1 || ! ItemUomOptions::isAllowed($tenantId, $componentItemId, $uomId)) {
+                return Result::failure(
+                    new Error(ItemErrorCode::INVALID_VALUE, 'The selected UOM is not configured for this component item.'),
                 );
             }
 

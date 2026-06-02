@@ -26,6 +26,10 @@ final class ItemCrudEndpointTest extends TestCase
             ->where('tenant_id', $tenantId)
             ->where('name', 'Each')
             ->value('id');
+        $hourUomId = (int) DB::table('unit_of_measures')
+            ->where('tenant_id', $tenantId)
+            ->where('name', 'Hour')
+            ->value('id');
         $itemTypeId = (int) DB::table('item_types')
             ->whereNull('tenant_id')
             ->where('code', 'INVENTORY_PRODUCT')
@@ -61,12 +65,19 @@ final class ItemCrudEndpointTest extends TestCase
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'sku' => 'ITM-TST-001',
+            'lead_time_days' => 0,
         ]);
 
         $this->withHeaders($headers)
             ->getJson('/api/item/items?search=ITM-TST-001')
             ->assertOk()
             ->assertJsonPath('data.0.id', $itemId);
+
+        $this->withHeaders($headers)
+            ->getJson('/api/item/items/lookup?q=ITM-TST-001&limit=10')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $itemId)
+            ->assertJsonPath('data.0.category_name', 'General');
 
         $this->withHeaders($headers)
             ->getJson('/api/item/items/'.$itemId)
@@ -147,6 +158,16 @@ final class ItemCrudEndpointTest extends TestCase
             ->where('tenant_id', $tenantId)
             ->where('sku', 'ITM-FILTER-001')
             ->value('id');
+
+        $this->withHeaders($headers)
+            ->postJson('/api/item/combo-items', [
+                'combo_item_id' => $itemId,
+                'component_item_id' => $componentItemId,
+                'quantity' => 1,
+                'uom_id' => $hourUomId,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'The selected UOM is not configured for this component item.');
 
         $createdCombo = $this->withHeaders($headers)
             ->postJson('/api/item/combo-items', [

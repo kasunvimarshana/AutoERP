@@ -43,6 +43,8 @@ type LookupContext = {
     uoms?: Map<string, UomOption>;
 };
 
+type ItemLookupQuery = Pick<ItemListQuery, 'isStockable' | 'perPage' | 'search' | 'status' | 'type'>;
+
 const FALLBACK_ITEM_TYPES: ItemTypeOption[] = [
     { code: 'INVENTORY_PRODUCT', isChargeable: false, isRentable: false, isService: false, isStockable: true, label: 'Inventory Product', value: 'inventory_product' },
     { code: 'SERVICE', isChargeable: true, isRentable: false, isService: true, isStockable: false, label: 'Service Item', value: 'service' },
@@ -207,12 +209,13 @@ function normalizeBrand(raw: BackendRecord): ItemBrand {
 
 function normalizeUom(raw: BackendRecord): UomOption {
     const symbol = asString(raw.symbol);
-    const name = asString(raw.name, symbol || 'Unit');
+    const code = asString(raw.code);
+    const name = asString(raw.name, symbol || code || 'Unit');
 
     return {
         id: asString(raw.id),
         isBase: asBool(raw.is_base),
-        label: symbol ? `${name} (${symbol})` : name,
+        label: [code, symbol ? `${name} (${symbol})` : name].filter(Boolean).join(' - '),
         name,
         symbol,
         type: asString(raw.type),
@@ -257,8 +260,9 @@ function normalizeItem(raw: BackendRecord, lookups: LookupContext = {}): Item {
         allowIssueUsage: asBool(raw.is_sellable, true),
         allowReceiptUsage: asBool(raw.is_purchasable, true),
         barcode: asOptionalString(raw.barcode),
-        baseUom: baseUom ?? asString(raw.base_uom_name ?? raw.base_uom_code ?? raw.uom ?? raw.base_uom_id, 'Backend UOM'),
+        baseUom: baseUom ?? asString(raw.base_uom_name ?? raw.base_uom_code ?? raw.base_uom_symbol ?? raw.uom, 'Not configured'),
         baseUomId,
+        cogsAccount: asOptionalString(raw.cogs_account_label ?? raw.cogs_account_name ?? raw.cogs_account),
         brand: brand ?? asOptionalString(raw.brand_name ?? raw.brand),
         brandId,
         cogsAccountId: asOptionalString(raw.cogs_account_id),
@@ -272,9 +276,12 @@ function normalizeItem(raw: BackendRecord, lookups: LookupContext = {}): Item {
         description: asOptionalString(raw.description),
         displayName: asString(raw.display_name ?? raw.name, 'Unnamed item'),
         expenseAccountId: asOptionalString(raw.expense_account_id),
+        expenseAccount: asOptionalString(raw.expense_account_label ?? raw.expense_account_name ?? raw.expense_account),
         id: asString(raw.id),
         incomeAccountId: asOptionalString(raw.income_account_id),
+        incomeAccount: asOptionalString(raw.income_account_label ?? raw.income_account_name ?? raw.income_account),
         inventoryAccountId: asOptionalString(raw.inventory_account_id),
+        inventoryAccount: asOptionalString(raw.inventory_account_label ?? raw.inventory_account_name ?? raw.inventory_account),
         isBatchTracked: asBool(raw.is_batch_tracked),
         isRentable: asBool(raw.is_rentable, itemType === 'rental_charge'),
         isSerialTracked: asBool(raw.is_serial_tracked),
@@ -348,7 +355,7 @@ function toBackendItemPayload(input: ItemFormInput) {
         is_service: isService,
         is_stockable: input.stockable,
         item_type_id: asNumberOrUndefined(input.itemTypeId) ?? null,
-        lead_time_days: input.leadTimeDays ? Number(input.leadTimeDays) : null,
+        lead_time_days: input.leadTimeDays ? Number(input.leadTimeDays) : 0,
         maximum_stock: input.maximumStock ? Number(input.maximumStock) : null,
         minimum_stock: input.minimumStock ? Number(input.minimumStock) : 0,
         name: input.name,
@@ -442,22 +449,6 @@ async function fetchPriceLists() {
     return { ...response, data, meta: collectionMeta({ ...response, data }) };
 }
 
-async function lookupContext(): Promise<LookupContext> {
-    const [categories, brands, itemTypes, uoms] = await Promise.all([
-        fetchCategories(),
-        fetchBrands(),
-        fetchItemTypes(),
-        fetchUoms(),
-    ]);
-
-    return {
-        brands: new Map(brands.data.map((brand) => [brand.id, brand])),
-        categories: new Map(categories.data.map((category) => [category.id, category])),
-        itemTypes: new Map(itemTypes.data.flatMap((option) => option.id ? [[option.id, option] as const] : [])),
-        uoms: new Map(uoms.data.map((uom) => [uom.id, uom])),
-    };
-}
-
 function queryForItems(input: ItemListQuery) {
     return {
         is_active: input.status === 'inactive' ? false : undefined,
@@ -472,17 +463,15 @@ function queryForItems(input: ItemListQuery) {
 
 export const itemApi = {
     activateItem: async (itemId: string) => {
-        const context = await lookupContext();
         const response = await httpClient<ApiResponse<BackendRecord>>(`/api/item/items/${itemId}/activate`, { method: 'PATCH' });
-        return { ...response, data: normalizeItem(response.data, context) };
+        return { ...response, data: normalizeItem(response.data) };
     },
     createItem: async (input: ItemFormInput) => {
         const response = await httpClient<ApiResponse<BackendRecord>>('/api/item/items', {
             body: toBackendItemPayload(input),
             method: 'POST',
         });
-        const context = await lookupContext();
-        return { ...response, data: normalizeItem(response.data, context) };
+        return { ...response, data: normalizeItem(response.data) };
     },
     createAttribute: async (input: ItemAttributeInput) => {
         const response = await httpClient<ApiResponse<BackendRecord>>('/api/item/item-attributes', {
@@ -557,9 +546,8 @@ export const itemApi = {
         return response;
     },
     deactivateItem: async (itemId: string) => {
-        const context = await lookupContext();
         const response = await httpClient<ApiResponse<BackendRecord>>(`/api/item/items/${itemId}/deactivate`, { method: 'PATCH' });
-        return { ...response, data: normalizeItem(response.data, context) };
+        return { ...response, data: normalizeItem(response.data) };
     },
     deleteAttribute: (id: string) => httpClient<void>(`/api/item/item-attributes/${id}`, { method: 'DELETE' }),
     deleteCategory: (id: string) => httpClient<void>(`/api/item/item-categories/${id}`, { method: 'DELETE' }),
@@ -589,11 +577,8 @@ export const itemApi = {
         };
     },
     getItem: async (itemId: string) => {
-        const [response, context] = await Promise.all([
-            httpClient<ApiResponse<BackendRecord>>(`/api/item/items/${itemId}`),
-            lookupContext(),
-        ]);
-        return { ...response, data: normalizeItem(response.data, context) };
+        const response = await httpClient<ApiResponse<BackendRecord>>(`/api/item/items/${itemId}`);
+        return { ...response, data: normalizeItem(response.data) };
     },
     getItemActivity: async (itemId: string): Promise<ApiCollectionResponse<ItemAuditEntry>> => {
         const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/audit/audit-logs', {
@@ -609,19 +594,16 @@ export const itemApi = {
         return { ...response, data, meta: collectionMeta({ ...response, data }) };
     },
     getItemUnits: async (itemId: string): Promise<ApiCollectionResponse<ItemUnit>> => {
-        const [setup, item, uoms] = await Promise.all([
-            httpClient<ApiResponse<BackendRecord>>(`/api/item/items/${itemId}/uom-setup`),
-            itemApi.getItem(itemId),
-            itemApi.listUoms(),
-        ]);
-        const uomMap = new Map(uoms.data.map((uom) => [uom.id, uom]));
-        const baseUomId = asOptionalString(setup.data.base_uom_id) ?? item.data.baseUomId;
+        const setup = await httpClient<ApiResponse<BackendRecord>>(`/api/item/items/${itemId}/uom-setup`);
+        const allowedUoms = Array.isArray(setup.data.allowed_uoms) ? setup.data.allowed_uoms.map((row) => normalizeUom(row as BackendRecord)) : [];
+        const uomMap = new Map(allowedUoms.map((uom) => [uom.id, uom]));
+        const baseUomId = asOptionalString(setup.data.base_uom_id);
         const units: ItemUnit[] = [
-            { id: baseUomId ?? 'base-uom', isBase: true, purpose: 'base', unit: baseUomId ? uomMap.get(baseUomId)?.label ?? `UOM #${baseUomId}` : item.data.baseUom },
-            { id: asString(setup.data.default_receipt_uom_id), isBase: false, purpose: 'receipt', unit: setup.data.default_receipt_uom_id ? uomMap.get(asString(setup.data.default_receipt_uom_id))?.label ?? `UOM #${asString(setup.data.default_receipt_uom_id)}` : 'Not configured' },
-            { id: asString(setup.data.default_issue_uom_id), isBase: false, purpose: 'issue', unit: setup.data.default_issue_uom_id ? uomMap.get(asString(setup.data.default_issue_uom_id))?.label ?? `UOM #${asString(setup.data.default_issue_uom_id)}` : 'Not configured' },
-            { id: asString(setup.data.default_consumption_uom_id), isBase: false, purpose: 'consumption', unit: setup.data.default_consumption_uom_id ? uomMap.get(asString(setup.data.default_consumption_uom_id))?.label ?? `UOM #${asString(setup.data.default_consumption_uom_id)}` : 'Not configured' },
-            { id: asString(setup.data.default_charge_uom_id), isBase: false, purpose: 'charge', unit: setup.data.default_charge_uom_id ? uomMap.get(asString(setup.data.default_charge_uom_id))?.label ?? `UOM #${asString(setup.data.default_charge_uom_id)}` : 'Not configured' },
+            { id: baseUomId ?? 'base-uom', isBase: true, purpose: 'base', unit: baseUomId ? uomMap.get(baseUomId)?.label ?? 'Configured base UOM' : 'Not configured' },
+            { id: asString(setup.data.default_receipt_uom_id), isBase: false, purpose: 'receipt', unit: setup.data.default_receipt_uom_id ? uomMap.get(asString(setup.data.default_receipt_uom_id))?.label ?? 'Configured receipt UOM' : 'Not configured' },
+            { id: asString(setup.data.default_issue_uom_id), isBase: false, purpose: 'issue', unit: setup.data.default_issue_uom_id ? uomMap.get(asString(setup.data.default_issue_uom_id))?.label ?? 'Configured issue UOM' : 'Not configured' },
+            { id: asString(setup.data.default_consumption_uom_id), isBase: false, purpose: 'consumption', unit: setup.data.default_consumption_uom_id ? uomMap.get(asString(setup.data.default_consumption_uom_id))?.label ?? 'Configured consumption UOM' : 'Not configured' },
+            { id: asString(setup.data.default_charge_uom_id), isBase: false, purpose: 'charge', unit: setup.data.default_charge_uom_id ? uomMap.get(asString(setup.data.default_charge_uom_id))?.label ?? 'Configured charge UOM' : 'Not configured' },
         ];
 
         return {
@@ -641,7 +623,7 @@ export const itemApi = {
             price: asDecimalString(record.price),
             priceList: asOptionalString(record.price_list_code) ? `${asString(record.price_list_code)} - ${asString(record.price_list_name)}` : asString(record.price_list_name, `Price List #${asString(record.price_list_id)}`),
             status: asBool(record.is_active, true) ? 'Active' : 'Inactive',
-            uom: asOptionalString(record.uom_id),
+            uom: asOptionalString(record.uom_code) ? `${asString(record.uom_code)} - ${asString(record.uom_name)}${asOptionalString(record.uom_symbol) ? ` (${asString(record.uom_symbol)})` : ''}` : undefined,
         }));
 
         return { data, meta: collectionMeta({ data } as ApiCollectionResponse<ItemPricingReference>) };
@@ -709,24 +691,20 @@ export const itemApi = {
     listBrands: fetchBrands,
     listCategories: fetchCategories,
     listComboComponents: async (itemId?: string) => {
-        const [response, itemsResponse, uomResponse] = await Promise.all([
-            httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/combo-items', {
-                query: { combo_item_id: itemId, per_page: LOOKUP_PAGE_SIZE },
-            }),
-            itemApi.listItems({ perPage: 25 }),
-            itemApi.listUoms(),
-        ]);
-        const itemMap = new Map(itemsResponse.data.map((item) => [item.id, item]));
-        const uomMap = new Map(uomResponse.data.map((uom) => [uom.id, uom]));
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/combo-items', {
+            query: { combo_item_id: itemId, per_page: LOOKUP_PAGE_SIZE },
+        });
         const data = response.data.map((component) => ({
             comboItemId: asOptionalString(component.combo_item_id),
             componentItemId: asOptionalString(component.component_item_id),
-            componentItemName: itemMap.get(asString(component.component_item_id))?.name ?? `Item #${asString(component.component_item_id)}`,
-            componentType: itemMap.get(asString(component.component_item_id))?.itemType ?? 'inventory_product' as ItemType,
+            componentItemName: asOptionalString(component.component_item_sku)
+                ? `${asString(component.component_item_sku)} - ${asString(component.component_item_name)}`
+                : asString(component.component_item_name, 'Component item'),
+            componentType: normalizeItemType(component.component_item_type),
             id: asString(component.id),
             quantity: asString(component.quantity, '1'),
-            stockImpact: itemMap.get(asString(component.component_item_id))?.isStockable ? 'Component can affect stock through backend expansion' : 'No stock impact in item setup',
-            uom: uomMap.get(asString(component.uom_id))?.label ?? asString(component.uom_id, 'UOM'),
+            stockImpact: asBool(component.component_is_stockable) ? 'Component can affect stock through backend expansion' : 'No stock impact in item setup',
+            uom: asOptionalString(component.uom_code) ? `${asString(component.uom_code)} - ${asString(component.uom_name)}${asOptionalString(component.uom_symbol) ? ` (${asString(component.uom_symbol)})` : ''}` : 'Configured UOM',
             uomId: asOptionalString(component.uom_id),
         }));
         return { ...response, data, meta: collectionMeta({ ...response, data }) };
@@ -758,6 +736,19 @@ export const itemApi = {
     },
     listItems: async (query: ItemListQuery = {}) => {
         const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/items', { query: queryForItems(query) });
+        const data = response.data.map((item) => normalizeItem(item));
+        return { ...response, data, meta: collectionMeta({ ...response, data }) };
+    },
+    lookupItems: async (query: ItemLookupQuery = {}) => {
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/item/items/lookup', {
+            query: {
+                is_stockable: query.isStockable,
+                limit: query.perPage ?? 25,
+                q: query.search,
+                status: query.status ? statusToBackend(query.status) : undefined,
+                type: query.type,
+            },
+        });
         const data = response.data.map((item) => normalizeItem(item));
         return { ...response, data, meta: collectionMeta({ ...response, data }) };
     },
@@ -801,7 +792,6 @@ export const itemApi = {
             body: toBackendItemPayload(input),
             method: 'PUT',
         });
-        const context = await lookupContext();
-        return { ...response, data: normalizeItem(response.data, context) };
+        return { ...response, data: normalizeItem(response.data) };
     },
 };

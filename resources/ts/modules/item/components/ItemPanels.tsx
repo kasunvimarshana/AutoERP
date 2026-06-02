@@ -72,6 +72,7 @@ export function ItemPricingReferencesPanel({ references }: { references: ItemPri
     return <DataTable columns={[
         { header: 'Price List', key: 'priceList' },
         { header: 'Price', key: 'price' },
+        { header: 'UOM', key: 'uom', render: (row) => row.uom || 'Not configured' },
         { header: 'Discount', key: 'discount' },
         { header: 'Currency', key: 'currency' },
         { header: 'Status', key: 'status', render: (row) => <StatusBadge status={row.status} /> },
@@ -130,5 +131,5 @@ export function ItemCapabilityPanel({ capabilities }: { capabilities: ItemCapabi
 export function ItemActivityTimeline({ entries }: { entries: ItemAuditEntry[] }) {
     if (!entries.length) return <EmptyState description="No audit/activity entries were returned for this item." title="No item activity" />;
 
-    return <AuditTimeline events={entries.map((entry) => ({ actor: entry.actor, description: entry.description, time: entry.time }))} />;
+    return <AuditTimeline events={entries.map((entry) => ({ actor: entry.actor, description: entry.description, id: entry.id, time: entry.time }))} />;
 }

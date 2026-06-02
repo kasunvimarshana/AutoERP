@@ -38,7 +38,7 @@ function normalizeUom(row: BackendRecord): ItemUomOption {
         id: asString(row.id),
         isBase: asBoolean(row.is_base),
         isDefaultForContext: asBoolean(row.is_default_for_context),
-        label: code || symbol || name,
+        label: [code, symbol ? `${name} (${symbol})` : name].filter(Boolean).join(' - '),
         name,
         symbol,
     };

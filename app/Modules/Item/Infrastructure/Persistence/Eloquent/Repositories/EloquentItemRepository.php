@@ -24,7 +24,13 @@ final class EloquentItemRepository extends EloquentRepository implements ItemRep
     {
         $model = $this->query()->where('tenant_id', $tenantId)->find($id);
 
-        return $model === null ? null : $this->toRecord($model);
+        if (! $model instanceof Model) {
+            return null;
+        }
+
+        $records = $this->recordsFromModels([$model]);
+
+        return $records[0] ?? null;
     }
 
     /**
@@ -67,16 +73,7 @@ final class EloquentItemRepository extends EloquentRepository implements ItemRep
     public function list(array $criteria = [], array $with = []): array
     {
         $query = $this->applyItemCriteria($this->query($with), $criteria);
-        $models = $query->get();
-
-        $records = [];
-        foreach ($models as $model) {
-            if ($model instanceof Model) {
-                $records[] = $this->toRecord($model);
-            }
-        }
-
-        return $records;
+        return $this->recordsFromModels($query->get()->all());
     }
 
     public function page(array $criteria, int $perPage, int $page, array $with = []): PagedResult
@@ -84,12 +81,7 @@ final class EloquentItemRepository extends EloquentRepository implements ItemRep
         $query = $this->applyItemCriteria($this->query($with), $criteria);
         $paginator = $query->paginate($perPage, ['*'], 'page', $page);
 
-        $items = [];
-        foreach ($paginator->items() as $model) {
-            if ($model instanceof Model) {
-                $items[] = $this->toRecord($model);
-            }
-        }
+        $items = $this->recordsFromModels($paginator->items());
 
         return new PagedResult(
             $items,
@@ -97,6 +89,150 @@ final class EloquentItemRepository extends EloquentRepository implements ItemRep
             $paginator->currentPage(),
             $paginator->perPage(),
         );
+    }
+
+    /**
+     * @param array<int, mixed> $models
+     * @return list<DataRecord>
+     */
+    private function recordsFromModels(array $models): array
+    {
+        $rows = [];
+        foreach ($models as $model) {
+            if ($model instanceof Model) {
+                $rows[] = $model->toArray();
+            }
+        }
+
+        if ($rows === []) {
+            return [];
+        }
+
+        $categoryMap = $this->lookupLabels('item_categories', $this->idsFromRows($rows, 'category_id'), ['name']);
+        $brandMap = $this->lookupLabels('item_brands', $this->idsFromRows($rows, 'brand_id'), ['name']);
+        $typeMap = $this->lookupLabels('item_types', $this->idsFromRows($rows, 'item_type_id'), ['name', 'code']);
+        $accountMap = $this->lookupLabels('accounts', $this->accountIdsFromRows($rows), ['code', 'name']);
+        $uomMap = $this->lookupLabels('unit_of_measures', $this->uomIdsFromRows($rows), ['name', 'code', 'symbol']);
+
+        $records = [];
+        foreach ($rows as $row) {
+            $categoryId = isset($row['category_id']) ? (int) $row['category_id'] : null;
+            $brandId = isset($row['brand_id']) ? (int) $row['brand_id'] : null;
+            $typeId = isset($row['item_type_id']) ? (int) $row['item_type_id'] : null;
+
+            if ($categoryId !== null && isset($categoryMap[$categoryId])) {
+                $row['category_name'] = $categoryMap[$categoryId]['name'] ?? null;
+            }
+
+            if ($brandId !== null && isset($brandMap[$brandId])) {
+                $row['brand_name'] = $brandMap[$brandId]['name'] ?? null;
+            }
+
+            if ($typeId !== null && isset($typeMap[$typeId])) {
+                $row['item_type_name'] = $typeMap[$typeId]['name'] ?? null;
+                $row['item_type_code'] = $typeMap[$typeId]['code'] ?? null;
+            }
+
+            foreach (['income_account', 'expense_account', 'inventory_account', 'cogs_account'] as $prefix) {
+                $id = isset($row[$prefix . '_id']) ? (int) $row[$prefix . '_id'] : null;
+                if ($id === null || ! isset($accountMap[$id])) {
+                    continue;
+                }
+
+                $accountCode = trim((string) ($accountMap[$id]['code'] ?? ''));
+                $accountName = trim((string) ($accountMap[$id]['name'] ?? ''));
+                $row[$prefix . '_name'] = $accountName !== '' ? $accountName : null;
+                $row[$prefix . '_code'] = $accountCode !== '' ? $accountCode : null;
+                $row[$prefix . '_label'] = trim($accountCode . ' - ' . $accountName, ' -');
+            }
+
+            foreach (['base_uom', 'default_receipt_uom', 'default_issue_uom', 'default_consumption_uom', 'default_charge_uom'] as $prefix) {
+                $id = isset($row[$prefix . '_id']) ? (int) $row[$prefix . '_id'] : null;
+                if ($id === null || ! isset($uomMap[$id])) {
+                    continue;
+                }
+
+                $row[$prefix . '_name'] = $uomMap[$id]['name'] ?? null;
+                $row[$prefix . '_code'] = $uomMap[$id]['code'] ?? null;
+                $row[$prefix . '_symbol'] = $uomMap[$id]['symbol'] ?? null;
+            }
+
+            $records[] = new DataRecord($row);
+        }
+
+        return $records;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     * @return list<int>
+     */
+    private function idsFromRows(array $rows, string $column): array
+    {
+        $ids = [];
+        foreach ($rows as $row) {
+            if (isset($row[$column]) && is_numeric($row[$column])) {
+                $ids[] = (int) $row[$column];
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     * @return list<int>
+     */
+    private function uomIdsFromRows(array $rows): array
+    {
+        $ids = [];
+        foreach (['base_uom_id', 'default_receipt_uom_id', 'default_issue_uom_id', 'default_consumption_uom_id', 'default_charge_uom_id'] as $column) {
+            array_push($ids, ...$this->idsFromRows($rows, $column));
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $rows
+     * @return list<int>
+     */
+    private function accountIdsFromRows(array $rows): array
+    {
+        $ids = [];
+        foreach (['income_account_id', 'expense_account_id', 'inventory_account_id', 'cogs_account_id'] as $column) {
+            array_push($ids, ...$this->idsFromRows($rows, $column));
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * @param list<int> $ids
+     * @param list<string> $columns
+     * @return array<int, array<string, mixed>>
+     */
+    private function lookupLabels(string $table, array $ids, array $columns): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $select = array_merge(['id'], $columns);
+        $rows = DB::table($table)
+            ->whereIn('id', $ids)
+            ->get($select);
+
+        $map = [];
+        foreach ($rows as $row) {
+            $values = [];
+            foreach ($select as $column) {
+                $values[$column] = $row->{$column} ?? null;
+            }
+            $map[(int) $row->id] = $values;
+        }
+
+        return $map;
     }
 
     private function applyItemCriteria(Builder $query, array $criteria): Builder

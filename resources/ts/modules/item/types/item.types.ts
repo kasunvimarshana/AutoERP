@@ -57,6 +57,7 @@ export type ItemLookupOption = {
 };
 
 export type ComboComponentInput = {
+    clientKey: string;
     componentItemId: string;
     quantity: string;
     uomId: string;
@@ -70,6 +71,7 @@ export type Item = {
     barcode?: string;
     baseUom: string;
     baseUomId?: string;
+    cogsAccount?: string;
     brand?: string;
     brandId?: string;
     cogsAccountId?: string;
@@ -83,9 +85,12 @@ export type Item = {
     description?: string;
     displayName: string;
     expenseAccountId?: string;
+    expenseAccount?: string;
     id: string;
     incomeAccountId?: string;
+    incomeAccount?: string;
     inventoryAccountId?: string;
+    inventoryAccount?: string;
     isBatchTracked: boolean;
     isRentable: boolean;
     isSerialTracked: boolean;

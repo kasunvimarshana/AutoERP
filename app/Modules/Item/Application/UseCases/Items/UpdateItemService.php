@@ -45,6 +45,7 @@ final class UpdateItemService implements UpdateItemServiceInterface
 
             $payload['tenant_id'] = $tenantId;
             $payload['organization_unit_id'] ??= $this->currentOrganizationUnit->currentOrganizationUnitId();
+            $this->normalizeDefaults($payload);
             $nested = $this->extractNestedPayload($payload);
 
             $record = $this->repository->transaction(function () use ($id, $payload, $tenantId, $nested) {
@@ -80,5 +81,27 @@ final class UpdateItemService implements UpdateItemServiceInterface
         }
 
         return $nested;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function normalizeDefaults(array &$payload): void
+    {
+        $payload['minimum_stock'] = isset($payload['minimum_stock']) && $payload['minimum_stock'] !== ''
+            ? $payload['minimum_stock']
+            : 0;
+        $payload['reorder_point'] = isset($payload['reorder_point']) && $payload['reorder_point'] !== ''
+            ? $payload['reorder_point']
+            : 0;
+        $payload['safety_stock'] = isset($payload['safety_stock']) && $payload['safety_stock'] !== ''
+            ? $payload['safety_stock']
+            : 0;
+        $payload['lead_time_days'] = isset($payload['lead_time_days']) && $payload['lead_time_days'] !== ''
+            ? $payload['lead_time_days']
+            : 0;
+        $payload['review_period_days'] = isset($payload['review_period_days']) && $payload['review_period_days'] !== ''
+            ? $payload['review_period_days']
+            : 30;
     }
 }
