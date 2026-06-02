@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../../../shared/components/business/PageHeader';
 import { StatusBadge } from '../../../shared/components/business/StatusBadge';
@@ -17,52 +17,41 @@ export function SupplierListPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [query, setQuery] = useState('');
     const [status, setStatus] = useState('');
-    const [category, setCategory] = useState('');
 
     useEffect(() => {
         let mounted = true;
+        const timeout = window.setTimeout(() => {
+            setIsLoading(true);
+            setError('');
 
-        supplierApi
-            .listSuppliers()
-            .then((response) => {
-                if (mounted) {
-                    setSuppliers(response.data);
-                }
-            })
-            .catch((caught: unknown) => {
-                if (mounted) {
-                    setError(caught instanceof Error ? caught.message : 'Unable to load suppliers.');
-                }
-            })
-            .finally(() => {
-                if (mounted) {
-                    setIsLoading(false);
-                }
-            });
+            supplierApi
+                .listSuppliers({ search: query, status: status ? (status as SupplierStatus) : undefined })
+                .then((response) => {
+                    if (mounted) {
+                        setSuppliers(response.data);
+                    }
+                })
+                .catch((caught: unknown) => {
+                    if (mounted) {
+                        setError(caught instanceof Error ? caught.message : 'Unable to load suppliers.');
+                    }
+                })
+                .finally(() => {
+                    if (mounted) {
+                        setIsLoading(false);
+                    }
+                });
+        }, 250);
 
         return () => {
             mounted = false;
+            window.clearTimeout(timeout);
         };
-    }, []);
-
-    const visibleSuppliers = useMemo(() => {
-        const normalizedQuery = query.trim().toLowerCase();
-
-        return suppliers.filter((supplier) => {
-            const matchesQuery = normalizedQuery
-                ? [supplier.code, supplier.name, supplier.email, supplier.phone, supplier.taxNumber, supplier.vatNumber].some((value) => (value ?? '').toLowerCase().includes(normalizedQuery))
-                : true;
-            const matchesStatus = status ? supplier.status === status : true;
-            const matchesCategory = category ? supplier.category === category : true;
-
-            return matchesQuery && matchesStatus && matchesCategory;
-        });
-    }, [category, query, status, suppliers]);
+    }, [query, status]);
 
     function updateFilter(filterId: string, value: DataToolbarFilterValue): void {
         const next = typeof value === 'string' ? value : '';
         if (filterId === 'status') setStatus(next);
-        if (filterId === 'category') setCategory(next);
     }
 
     return (
@@ -91,7 +80,7 @@ export function SupplierListPage() {
                 ))}
             </div>
             <DataToolbar
-                filterValues={{ category, status }}
+                filterValues={{ status }}
                 filters={[
                     { id: 'status', label: 'Status', options: [
                         { label: 'Active', value: 'active' },
@@ -100,16 +89,11 @@ export function SupplierListPage() {
                         { label: 'Draft', value: 'draft' },
                         { label: 'Pending Approval', value: 'pending_approval' },
                     ], placeholder: 'All statuses', type: 'status' },
-                    { id: 'category', label: 'Category', options: [
-                        { label: 'Parts Supplier', value: 'Parts Supplier' },
-                        { label: 'External Service Provider', value: 'External Service Provider' },
-                        { label: 'Fleet Provider', value: 'Fleet Provider' },
-                    ], placeholder: 'All categories', type: 'select' },
                 ]}
                 isLoading={isLoading}
                 onFilterChange={updateFilter}
                 onRemoveFilter={(filterId) => updateFilter(filterId, undefined)}
-                onResetFilters={() => { setStatus(''); setCategory(''); }}
+                onResetFilters={() => { setStatus(''); }}
                 onSearchChange={setQuery}
                 savedViewsDisabledReason="Saved views need a user-preferences backend before they can be enabled for supplier lists."
                 searchPlaceholder="Search supplier code, name, email, phone, tax/VAT number..."
@@ -117,8 +101,8 @@ export function SupplierListPage() {
             />
             {isLoading ? <EmptyState description="Loading suppliers from the Supplier service..." title="Loading suppliers" /> : null}
             {error ? <EmptyState description={error} title="Supplier service unavailable" /> : null}
-            {!isLoading && !error && visibleSuppliers.length === 0 ? <EmptyState description="Create a supplier profile without linking a user account." title="No suppliers found" /> : null}
-            {!isLoading && !error && visibleSuppliers.length > 0 ? (
+            {!isLoading && !error && suppliers.length === 0 ? <EmptyState description="Create a supplier profile without linking a user account." title="No suppliers found" /> : null}
+            {!isLoading && !error && suppliers.length > 0 ? (
                 <DataTable
                     columns={[
                         { header: 'Code', key: 'code', render: (row) => <Link className="font-semibold text-slate-950" to={`/suppliers/${row.id}`}>{row.code}</Link> },
@@ -142,7 +126,7 @@ export function SupplierListPage() {
                         },
                     ]}
                     getRowKey={(row) => row.id}
-                    rows={visibleSuppliers}
+                    rows={suppliers}
                 />
             ) : null}
         </div>

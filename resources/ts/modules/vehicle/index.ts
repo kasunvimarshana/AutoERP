@@ -6,7 +6,6 @@ export { VehicleListPage } from './pages/VehicleListPage';
 export {
     VehicleBrandListPage,
     VehicleCategoryListPage,
-    VehicleHistoryPage,
     VehicleModelListPage,
     VehicleTypeListPage,
 } from './pages/VehicleMasterDataPages';

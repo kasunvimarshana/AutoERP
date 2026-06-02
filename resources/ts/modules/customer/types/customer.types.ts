@@ -1,4 +1,4 @@
-export type CustomerStatus = 'active' | 'blocked' | 'inactive' | 'pending';
+export type CustomerStatus = 'active' | 'archived' | 'blocked' | 'draft' | 'inactive' | 'pending_approval' | 'suspended';
 
 export type Customer = {
     code: string;

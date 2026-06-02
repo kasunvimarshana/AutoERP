@@ -3,11 +3,14 @@ import type { CustomerStatus } from '../types/customer.types';
 
 const tones: Record<CustomerStatus, 'danger' | 'info' | 'success' | 'warning'> = {
     active: 'success',
+    archived: 'warning',
     blocked: 'danger',
+    draft: 'info',
     inactive: 'warning',
-    pending: 'info',
+    pending_approval: 'info',
+    suspended: 'danger',
 };
 
 export function CustomerStatusBadge({ status }: { status: CustomerStatus }) {
-    return <Badge tone={tones[status]}>{status}</Badge>;
+    return <Badge tone={tones[status]}>{status.replace('_', ' ')}</Badge>;
 }

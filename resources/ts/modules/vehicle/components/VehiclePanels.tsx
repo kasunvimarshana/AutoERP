@@ -179,20 +179,6 @@ export function VehicleDocumentsPanel({ documents }: { documents: VehicleDocumen
     );
 }
 
-export function VehicleHistoryPanel({ title }: { title: string }) {
-    return (
-        <PreviewPanel
-            rows={[
-                { label: 'Source', value: 'Backend/reference modules' },
-                { label: 'Calculation', value: 'No frontend totals or availability logic' },
-                { label: 'Current status', value: 'History endpoints not exposed in Vehicle API yet' },
-            ]}
-            subtitle="History references are displayed without calculating service cost, rental usage, or availability in the frontend."
-            title={title}
-        />
-    );
-}
-
 export function VehicleMasterSummaryTable({ rows }: { rows: VehicleMasterSummary[] }) {
     return (
         <DataTable

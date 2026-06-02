@@ -3,7 +3,7 @@ import { PageHeader } from '../../../shared/components/business/PageHeader';
 import { SearchFilterBar } from '../../../shared/components/data/SearchFilterBar';
 import { Card } from '../../../shared/components/ui/Card';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
-import { VehicleHistoryPanel, VehicleMasterSummaryTable } from '../components/VehiclePanels';
+import { VehicleMasterSummaryTable } from '../components/VehiclePanels';
 import { vehicleApi } from '../services/vehicleApi';
 import type { VehicleMasterSummary } from '../types/vehicle.types';
 
@@ -97,17 +97,4 @@ export function VehicleBrandListPage() {
 
 export function VehicleModelListPage() {
     return <VehicleMasterDataPage kind="model" />;
-}
-
-export function VehicleHistoryPage() {
-    return (
-        <div className="space-y-6">
-            <PageHeader
-                eyebrow="Vehicle"
-                subtitle="Vehicle-specific audit/history endpoint is not exposed yet. Business workflow histories remain in their owning modules."
-                title="Vehicle History"
-            />
-            <VehicleHistoryPanel title="Vehicle History" />
-        </div>
-    );
 }

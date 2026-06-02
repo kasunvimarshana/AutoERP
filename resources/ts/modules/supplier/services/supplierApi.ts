@@ -3,7 +3,6 @@ import { httpClient } from '../../../services/api/httpClient';
 import type {
     Supplier,
     SupplierAddress,
-    SupplierAuditEntry,
     SupplierBankAccount,
     SupplierContact,
     SupplierFinanceDefaults,
@@ -22,6 +21,12 @@ type SupplierListQuery = {
     perPage?: number;
     search?: string;
     status?: SupplierStatus;
+};
+
+export type SupplierLookupOption = {
+    id: string;
+    label: string;
+    secondary?: string;
 };
 
 function asRecord(value: unknown): BackendRecord {
@@ -88,6 +93,18 @@ function normalizeSupplier(raw: BackendRecord): Supplier {
         userAccessStatus: raw.user_access_status === 'linked' || raw.has_user_access === true || userAccounts.length > 0 ? 'linked' : 'none',
         vatNumber: asOptionalString(raw.vat_number ?? raw.vatNumber),
         website: asOptionalString(raw.website),
+    };
+}
+
+function normalizeLookup(raw: BackendRecord): SupplierLookupOption {
+    const code = asString(raw.supplier_code ?? raw.code);
+    const name = asString(raw.supplier_name ?? raw.display_name ?? raw.name, 'Supplier');
+    const contact = asOptionalString(raw.phone ?? raw.mobile ?? raw.email);
+
+    return {
+        id: asString(raw.id),
+        label: [code, name].filter(Boolean).join(' - ') || name,
+        secondary: contact,
     };
 }
 
@@ -310,7 +327,6 @@ export const supplierApi = {
 
         return { ...response, data: normalizeSupplier(response.data) };
     },
-    getSupplierActivity: (_supplierId: string): Promise<ApiCollectionResponse<SupplierAuditEntry>> => Promise.resolve({ data: [] }),
     getTaxProfile: async (supplierId: string): Promise<ApiResponse<SupplierTaxProfile>> => {
         const response = await httpClient<ApiResponse<BackendRecord | null>>(`/api/supplier/suppliers/${supplierId}/tax-profile`);
 
@@ -344,13 +360,23 @@ export const supplierApi = {
         const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/supplier/suppliers', {
             query: {
                 page: query.page,
-                per_page: query.perPage ?? 50,
+                per_page: query.perPage ?? 25,
                 search: query.search,
                 status: query.status,
             },
         });
 
         return { ...response, data: response.data.map(normalizeSupplier) };
+    },
+    lookupSuppliers: async (query: Pick<SupplierListQuery, 'perPage' | 'search'> = {}): Promise<ApiCollectionResponse<SupplierLookupOption>> => {
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/supplier/suppliers-lookup', {
+            query: {
+                limit: query.perPage ?? 25,
+                q: query.search,
+            },
+        });
+
+        return { ...response, data: response.data.map(normalizeLookup) };
     },
     listUserAccess: async (supplierId: string): Promise<ApiCollectionResponse<SupplierUserAccess>> => {
         const response = await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/supplier/suppliers/${supplierId}/user-accesses`);

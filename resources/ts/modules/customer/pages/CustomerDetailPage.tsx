@@ -9,7 +9,6 @@ import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Tabs } from '../../../shared/components/ui/Tabs';
 import { businessPartyLinkApi } from '../../../services/api/businessPartyLinkApi';
 import type { BusinessPartyLink } from '../../../shared/types/businessParty.types';
-import { CustomerActivityTimeline } from '../components/CustomerActivityTimeline';
 import { CustomerAddressesTable } from '../components/CustomerAddressesTable';
 import { CustomerContactsTable } from '../components/CustomerContactsTable';
 import { CustomerCreditProfilePanel } from '../components/CustomerCreditProfilePanel';
@@ -40,7 +39,6 @@ const tabs = [
     { label: 'Finance Defaults', value: 'finance' },
     { label: 'User Access', value: 'user-access' },
     { label: 'Cross-Role Links', value: 'cross-role' },
-    { label: 'Activity / Audit', value: 'audit' },
 ];
 
 type CustomerDetailState = {
@@ -55,6 +53,33 @@ type CustomerDetailState = {
     vehicles: CustomerVehicle[];
 };
 
+function emptyTaxProfile(customerId: string): CustomerTaxProfile {
+    return { customerId, taxGroup: 'Not configured', taxStatus: 'unregistered' };
+}
+
+function emptyCreditProfile(customerId: string): CustomerCreditProfile {
+    return {
+        agingSummary: 'Open the tab to load backend credit details.',
+        backendPreviewStatus: 'Not loaded',
+        creditLimit: 'Not loaded',
+        creditStatus: 'Not loaded',
+        customerId,
+        outstandingBalance: 'Not loaded',
+        paymentTerms: 'Not loaded',
+    };
+}
+
+function emptyFinanceDefaults(customerId: string): CustomerFinanceDefaults {
+    return {
+        arAccount: 'Not loaded',
+        costCenter: 'Not loaded',
+        currency: 'Not loaded',
+        customerId,
+        paymentTerm: 'Not loaded',
+        revenueAccount: 'Not loaded',
+    };
+}
+
 export function CustomerDetailPage() {
     const { id } = useParams();
     const [activeTab, setActiveTab] = useState('overview');
@@ -63,34 +88,26 @@ export function CustomerDetailPage() {
     const [error, setError] = useState('');
     const [isChangingStatus, setIsChangingStatus] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set(['overview']));
+    const [tabLoading, setTabLoading] = useState('');
 
     useEffect(() => {
         let mounted = true;
         const customerId = id ?? '';
 
-        Promise.all([
-            customerApi.getCustomer(customerId),
-            customerApi.listContacts(customerId),
-            customerApi.listAddresses(customerId),
-            customerApi.listVehicles(customerId),
-            customerApi.getTaxProfile(customerId),
-            customerApi.getCreditProfile(customerId),
-            customerApi.getFinanceDefaults(customerId),
-            customerApi.listUserAccess(customerId),
-            businessPartyLinkApi.listForSource('customer', customerId),
-        ])
-            .then(([customer, contacts, addresses, vehicles, taxProfile, creditProfile, financeDefaults, userAccess, partyLinks]) => {
+        customerApi.getCustomer(customerId)
+            .then((customer) => {
                 if (mounted) {
                     setDetail({
-                        addresses: addresses.data,
-                        contacts: contacts.data,
-                        creditProfile: creditProfile.data,
+                        addresses: [],
+                        contacts: [],
+                        creditProfile: emptyCreditProfile(customerId),
                         customer: customer.data,
-                        financeDefaults: financeDefaults.data,
-                        partyLinks: partyLinks.data,
-                        taxProfile: taxProfile.data,
-                        userAccess: userAccess.data,
-                        vehicles: vehicles.data,
+                        financeDefaults: emptyFinanceDefaults(customerId),
+                        partyLinks: [],
+                        taxProfile: emptyTaxProfile(customerId),
+                        userAccess: [],
+                        vehicles: [],
                     });
                 }
             })
@@ -109,6 +126,73 @@ export function CustomerDetailPage() {
             mounted = false;
         };
     }, [id]);
+
+    useEffect(() => {
+        let mounted = true;
+        const customerId = id ?? '';
+
+        if (!detail || loadedTabs.has(activeTab)) {
+            return () => {
+                mounted = false;
+            };
+        }
+
+        async function loadTab() {
+            setTabLoading(activeTab);
+            try {
+                if (activeTab === 'contacts') {
+                    const response = await customerApi.listContacts(customerId);
+                    if (mounted) setDetail((current) => current ? { ...current, contacts: response.data } : current);
+                }
+                if (activeTab === 'addresses') {
+                    const response = await customerApi.listAddresses(customerId);
+                    if (mounted) setDetail((current) => current ? { ...current, addresses: response.data } : current);
+                }
+                if (activeTab === 'vehicles') {
+                    const response = await customerApi.listVehicles(customerId);
+                    if (mounted) setDetail((current) => current ? { ...current, vehicles: response.data } : current);
+                }
+                if (activeTab === 'tax') {
+                    const response = await customerApi.getTaxProfile(customerId);
+                    if (mounted) setDetail((current) => current ? { ...current, taxProfile: response.data } : current);
+                }
+                if (activeTab === 'credit') {
+                    const response = await customerApi.getCreditProfile(customerId);
+                    if (mounted) setDetail((current) => current ? { ...current, creditProfile: response.data } : current);
+                }
+                if (activeTab === 'finance') {
+                    const response = await customerApi.getFinanceDefaults(customerId);
+                    if (mounted) setDetail((current) => current ? { ...current, financeDefaults: response.data } : current);
+                }
+                if (activeTab === 'user-access') {
+                    const response = await customerApi.listUserAccess(customerId);
+                    if (mounted) setDetail((current) => current ? { ...current, userAccess: response.data } : current);
+                }
+                if (activeTab === 'cross-role') {
+                    const response = await businessPartyLinkApi.listForSource('customer', customerId);
+                    if (mounted) setDetail((current) => current ? { ...current, partyLinks: response.data } : current);
+                }
+
+                if (mounted) {
+                    setLoadedTabs((current) => new Set([...current, activeTab]));
+                }
+            } catch (caught) {
+                if (mounted) {
+                    setActionError(caught instanceof Error ? caught.message : 'Unable to load this customer section.');
+                }
+            } finally {
+                if (mounted) {
+                    setTabLoading('');
+                }
+            }
+        }
+
+        void loadTab();
+
+        return () => {
+            mounted = false;
+        };
+    }, [activeTab, detail, id, loadedTabs]);
 
     if (isLoading) {
         return <EmptyState description="Loading profile, related records, and backend preview panels..." title="Loading customer detail" />;
@@ -159,7 +243,7 @@ export function CustomerDetailPage() {
                     </>
                 }
                 eyebrow="Customer"
-                subtitle="Customer detail aggregates profile, contacts, addresses, vehicles, backend-owned credit previews, finance defaults, optional user access, and audit."
+                subtitle="Customer detail aggregates profile, contacts, addresses, vehicles, backend-owned credit previews, finance defaults, optional user access, and cross-role links."
                 title={customer.name}
             />
             {actionError ? <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{actionError}</div> : null}
@@ -167,6 +251,7 @@ export function CustomerDetailPage() {
             <Card className="p-5">
                 <Tabs active={activeTab} items={tabs} onChange={setActiveTab} />
             </Card>
+            {tabLoading ? <EmptyState description="Loading this section from the backend..." title="Loading section" /> : null}
 
             {activeTab === 'overview' ? (
                 <div className="grid gap-5 xl:grid-cols-[1fr_340px]">
@@ -223,7 +308,6 @@ export function CustomerDetailPage() {
                     links={partyLinks}
                 />
             ) : null}
-            {activeTab === 'audit' ? <CustomerActivityTimeline /> : null}
         </div>
     );
 }

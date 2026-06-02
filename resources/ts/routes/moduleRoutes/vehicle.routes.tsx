@@ -14,7 +14,6 @@ export const vehicleRoutes: RouteObject[] = [
     { element: lazyNamed(vehicleMasterDataPages, 'VehicleCategoryListPage'), path: 'vehicles/categories' },
     { element: lazyNamed(vehicleMasterDataPages, 'VehicleBrandListPage'), path: 'vehicles/brands' },
     { element: lazyNamed(vehicleMasterDataPages, 'VehicleModelListPage'), path: 'vehicles/models' },
-    { element: lazyNamed(vehicleMasterDataPages, 'VehicleHistoryPage'), path: 'vehicles/history' },
     { element: vehicleDetailPage(), path: 'vehicles/:id' },
     { element: vehicleEditPage(), path: 'vehicles/:id/edit' },
 ];

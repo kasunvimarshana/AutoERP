@@ -23,6 +23,12 @@ type CustomerListQuery = {
     status?: CustomerStatus;
 };
 
+export type CustomerLookupOption = {
+    id: string;
+    label: string;
+    secondary?: string;
+};
+
 function asRecord(value: unknown): BackendRecord {
     return value && typeof value === 'object' && !Array.isArray(value) ? (value as BackendRecord) : {};
 }
@@ -58,13 +64,10 @@ function asBoolean(value: unknown, fallback = false): boolean {
 }
 
 function normalizeStatus(value: unknown): CustomerStatus {
-    const status = asString(value, 'pending').toLowerCase();
+    const status = asString(value, 'draft').toLowerCase();
+    const allowed: CustomerStatus[] = ['active', 'archived', 'blocked', 'draft', 'inactive', 'pending_approval', 'suspended'];
 
-    if (status === 'active' || status === 'blocked' || status === 'inactive') {
-        return status;
-    }
-
-    return 'pending';
+    return allowed.includes(status as CustomerStatus) ? (status as CustomerStatus) : 'draft';
 }
 
 function normalizeCustomer(raw: BackendRecord): Customer {
@@ -84,6 +87,18 @@ function normalizeCustomer(raw: BackendRecord): Customer {
         status: normalizeStatus(raw.status),
         taxNumber: asOptionalString(raw.tax_number ?? raw.vat_number ?? raw.taxNumber),
         userAccessStatus: raw.user_access_status === 'linked' || raw.has_user_access === true || userAccounts.length > 0 ? 'linked' : 'none',
+    };
+}
+
+function normalizeLookup(raw: BackendRecord): CustomerLookupOption {
+    const code = asString(raw.customer_code ?? raw.code);
+    const name = asString(raw.customer_name ?? raw.display_name ?? raw.name, 'Customer');
+    const contact = asOptionalString(raw.phone ?? raw.mobile ?? raw.email);
+
+    return {
+        id: asString(raw.id),
+        label: [code, name].filter(Boolean).join(' - ') || name,
+        secondary: contact,
     };
 }
 
@@ -300,13 +315,23 @@ export const customerApi = {
         const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/customer/customers', {
             query: {
                 page: query.page,
-                per_page: query.perPage ?? 50,
+                per_page: query.perPage ?? 25,
                 search: query.search,
                 status: query.status,
             },
         });
 
         return { ...response, data: response.data.map(normalizeCustomer) };
+    },
+    lookupCustomers: async (query: Pick<CustomerListQuery, 'perPage' | 'search'> = {}): Promise<ApiCollectionResponse<CustomerLookupOption>> => {
+        const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/customer/customers-lookup', {
+            query: {
+                limit: query.perPage ?? 25,
+                q: query.search,
+            },
+        });
+
+        return { ...response, data: response.data.map(normalizeLookup) };
     },
     listUserAccess: async (customerId: string): Promise<ApiCollectionResponse<CustomerUserAccess>> => {
         const response = await httpClient<ApiCollectionResponse<BackendRecord>>(`/api/customer/customers/${customerId}/user-accesses`);

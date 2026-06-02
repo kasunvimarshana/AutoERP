@@ -9,7 +9,6 @@ import { Tabs } from '../../../shared/components/ui/Tabs';
 import { VehicleOwnershipPanel } from '../components/VehicleOwnershipPanel';
 import {
     VehicleDocumentsPanel,
-    VehicleHistoryPanel,
     VehicleInsurancePanel,
     VehicleOverviewPanel,
     VehicleRegistrationPanel,
@@ -28,9 +27,6 @@ const detailTabs = [
     { label: 'Service Profile', value: 'service' },
     { label: 'Rental Profile', value: 'rental' },
     { label: 'Documents', value: 'documents' },
-    { label: 'Service History', value: 'service-history' },
-    { label: 'Rental History', value: 'rental-history' },
-    { label: 'Activity / Audit', value: 'audit' },
 ];
 
 function pageError(error: unknown, fallback: string) {
@@ -52,26 +48,20 @@ export function VehicleDetailPage() {
     const [rentalValidation, setRentalValidation] = useState<VehicleValidationResult | null>(null);
     const [serviceValidation, setServiceValidation] = useState<VehicleValidationResult | null>(null);
     const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+    const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set(['overview']));
+    const [tabLoading, setTabLoading] = useState('');
 
     const loadVehicle = useCallback(async () => {
         setError('');
 
-        const [vehicleResponse, ownershipResponse, currentOwnershipResponse, documentResponse, serviceValidationResponse, rentalValidationResponse] =
+        const [vehicleResponse, currentOwnershipResponse] =
             await Promise.all([
                 vehicleApi.get(id),
-                vehicleApi.listOwnerships(id),
                 vehicleApi.getCurrentOwnership(id, 'legal_owner'),
-                vehicleApi.listDocuments(id),
-                vehicleApi.validateUsage(id, 'service'),
-                vehicleApi.validateUsage(id, 'rental'),
             ]);
 
         setVehicle(vehicleResponse.data);
-        setOwnerships(ownershipResponse.data);
         setCurrentOwnership(currentOwnershipResponse.data);
-        setDocuments(documentResponse.data);
-        setServiceValidation(serviceValidationResponse.data);
-        setRentalValidation(rentalValidationResponse.data);
     }, [id]);
 
     useEffect(() => {
@@ -94,6 +84,62 @@ export function VehicleDetailPage() {
             mounted = false;
         };
     }, [loadVehicle]);
+
+    useEffect(() => {
+        let mounted = true;
+
+        if (!vehicle || loadedTabs.has(activeTab)) {
+            return () => {
+                mounted = false;
+            };
+        }
+
+        async function loadTab() {
+            setTabLoading(activeTab);
+            try {
+                if (activeTab === 'ownership') {
+                    const [ownershipResponse, currentOwnershipResponse] = await Promise.all([
+                        vehicleApi.listOwnerships(id),
+                        vehicleApi.getCurrentOwnership(id, 'legal_owner'),
+                    ]);
+                    if (mounted) {
+                        setOwnerships(ownershipResponse.data);
+                        setCurrentOwnership(currentOwnershipResponse.data);
+                    }
+                }
+                if (activeTab === 'documents') {
+                    const response = await vehicleApi.listDocuments(id);
+                    if (mounted) setDocuments(response.data);
+                }
+                if (activeTab === 'service') {
+                    const response = await vehicleApi.validateUsage(id, 'service');
+                    if (mounted) setServiceValidation(response.data);
+                }
+                if (activeTab === 'rental') {
+                    const response = await vehicleApi.validateUsage(id, 'rental');
+                    if (mounted) setRentalValidation(response.data);
+                }
+
+                if (mounted) {
+                    setLoadedTabs((current) => new Set([...current, activeTab]));
+                }
+            } catch (error: unknown) {
+                if (mounted) {
+                    setError(pageError(error, 'Unable to load this vehicle section.'));
+                }
+            } finally {
+                if (mounted) {
+                    setTabLoading('');
+                }
+            }
+        }
+
+        void loadTab();
+
+        return () => {
+            mounted = false;
+        };
+    }, [activeTab, id, loadedTabs, vehicle]);
 
     async function refreshOwnership() {
         const [ownershipResponse, currentOwnershipResponse] = await Promise.all([
@@ -136,6 +182,7 @@ export function VehicleDetailPage() {
             <Card className="p-5">
                 <Tabs active={activeTab} items={detailTabs} onChange={setActiveTab} />
             </Card>
+            {tabLoading ? <EmptyState description="Loading this vehicle section from the backend..." title="Loading section" /> : null}
 
             {activeTab === 'overview' ? <VehicleOverviewPanel vehicle={vehicle} /> : null}
             {activeTab === 'ownership' ? (
@@ -151,9 +198,6 @@ export function VehicleDetailPage() {
             {activeTab === 'service' ? <VehicleServiceProfilePanel validation={serviceValidation} vehicle={vehicle} /> : null}
             {activeTab === 'rental' ? <VehicleRentalProfilePanel validation={rentalValidation} vehicle={vehicle} /> : null}
             {activeTab === 'documents' ? <VehicleDocumentsPanel documents={documents} /> : null}
-            {activeTab === 'service-history' ? <VehicleHistoryPanel title="Service History References" /> : null}
-            {activeTab === 'rental-history' ? <VehicleHistoryPanel title="Rental History References" /> : null}
-            {activeTab === 'audit' ? <VehicleHistoryPanel title="Activity / Audit" /> : null}
         </div>
     );
 }

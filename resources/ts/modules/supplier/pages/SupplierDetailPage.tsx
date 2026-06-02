@@ -9,7 +9,6 @@ import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Tabs } from '../../../shared/components/ui/Tabs';
 import { businessPartyLinkApi } from '../../../services/api/businessPartyLinkApi';
 import type { BusinessPartyLink } from '../../../shared/types/businessParty.types';
-import { SupplierActivityTimeline } from '../components/SupplierActivityTimeline';
 import { SupplierAddressesTable } from '../components/SupplierAddressesTable';
 import { SupplierBankAccountsTable } from '../components/SupplierBankAccountsTable';
 import { SupplierContactsTable } from '../components/SupplierContactsTable';
@@ -21,7 +20,6 @@ import { supplierApi } from '../services/supplierApi';
 import type {
     Supplier,
     SupplierAddress,
-    SupplierAuditEntry,
     SupplierBankAccount,
     SupplierContact,
     SupplierFinanceDefaults,
@@ -39,11 +37,9 @@ const tabs = [
     { label: 'Finance Defaults', value: 'finance' },
     { label: 'User Access', value: 'user-access' },
     { label: 'Cross-Role Links', value: 'cross-role' },
-    { label: 'Audit / History', value: 'audit' },
 ];
 
 type SupplierDetailState = {
-    activity: SupplierAuditEntry[];
     addresses: SupplierAddress[];
     bankAccounts: SupplierBankAccount[];
     contacts: SupplierContact[];
@@ -54,6 +50,21 @@ type SupplierDetailState = {
     userAccess: SupplierUserAccess[];
 };
 
+function emptyTaxProfile(supplierId: string): SupplierTaxProfile {
+    return { isTaxExempt: false, supplierId, taxType: 'Not loaded', withholdingRate: 'Not loaded' };
+}
+
+function emptyFinanceDefaults(supplierId: string): SupplierFinanceDefaults {
+    return {
+        creditLimit: 'Not loaded',
+        defaultCurrency: 'Not loaded',
+        expenseAccount: 'Not loaded',
+        payableAccount: 'Not loaded',
+        paymentTerm: 'Not loaded',
+        supplierId,
+    };
+}
+
 export function SupplierDetailPage() {
     const { id } = useParams();
     const [activeTab, setActiveTab] = useState('overview');
@@ -62,34 +73,25 @@ export function SupplierDetailPage() {
     const [error, setError] = useState('');
     const [isChangingStatus, setIsChangingStatus] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set(['overview']));
+    const [tabLoading, setTabLoading] = useState('');
 
     useEffect(() => {
         let mounted = true;
         const supplierId = id ?? '';
 
-        Promise.all([
-            supplierApi.getSupplier(supplierId),
-            supplierApi.listContacts(supplierId),
-            supplierApi.listAddresses(supplierId),
-            supplierApi.listBankAccounts(supplierId),
-            supplierApi.getTaxProfile(supplierId),
-            supplierApi.getFinanceDefaults(supplierId),
-            supplierApi.listUserAccess(supplierId),
-            supplierApi.getSupplierActivity(supplierId),
-            businessPartyLinkApi.listForSource('supplier', supplierId),
-        ])
-            .then(([supplier, contacts, addresses, bankAccounts, taxProfile, financeDefaults, userAccess, activity, partyLinks]) => {
+        supplierApi.getSupplier(supplierId)
+            .then((supplier) => {
                 if (mounted) {
                     setDetail({
-                        activity: activity.data,
-                        addresses: addresses.data,
-                        bankAccounts: bankAccounts.data,
-                        contacts: contacts.data,
-                        financeDefaults: financeDefaults.data,
-                        partyLinks: partyLinks.data,
+                        addresses: [],
+                        bankAccounts: [],
+                        contacts: [],
+                        financeDefaults: emptyFinanceDefaults(supplierId),
+                        partyLinks: [],
                         supplier: supplier.data,
-                        taxProfile: taxProfile.data,
-                        userAccess: userAccess.data,
+                        taxProfile: emptyTaxProfile(supplierId),
+                        userAccess: [],
                     });
                 }
             })
@@ -109,15 +111,77 @@ export function SupplierDetailPage() {
         };
     }, [id]);
 
+    useEffect(() => {
+        let mounted = true;
+        const supplierId = id ?? '';
+
+        if (!detail || loadedTabs.has(activeTab)) {
+            return () => {
+                mounted = false;
+            };
+        }
+
+        async function loadTab() {
+            setTabLoading(activeTab);
+            try {
+                if (activeTab === 'contacts') {
+                    const response = await supplierApi.listContacts(supplierId);
+                    if (mounted) setDetail((current) => current ? { ...current, contacts: response.data } : current);
+                }
+                if (activeTab === 'addresses') {
+                    const response = await supplierApi.listAddresses(supplierId);
+                    if (mounted) setDetail((current) => current ? { ...current, addresses: response.data } : current);
+                }
+                if (activeTab === 'bank-accounts') {
+                    const response = await supplierApi.listBankAccounts(supplierId);
+                    if (mounted) setDetail((current) => current ? { ...current, bankAccounts: response.data } : current);
+                }
+                if (activeTab === 'tax') {
+                    const response = await supplierApi.getTaxProfile(supplierId);
+                    if (mounted) setDetail((current) => current ? { ...current, taxProfile: response.data } : current);
+                }
+                if (activeTab === 'finance') {
+                    const response = await supplierApi.getFinanceDefaults(supplierId);
+                    if (mounted) setDetail((current) => current ? { ...current, financeDefaults: response.data } : current);
+                }
+                if (activeTab === 'user-access') {
+                    const response = await supplierApi.listUserAccess(supplierId);
+                    if (mounted) setDetail((current) => current ? { ...current, userAccess: response.data } : current);
+                }
+                if (activeTab === 'cross-role') {
+                    const response = await businessPartyLinkApi.listForSource('supplier', supplierId);
+                    if (mounted) setDetail((current) => current ? { ...current, partyLinks: response.data } : current);
+                }
+                if (mounted) {
+                    setLoadedTabs((current) => new Set([...current, activeTab]));
+                }
+            } catch (caught) {
+                if (mounted) {
+                    setActionError(caught instanceof Error ? caught.message : 'Unable to load this supplier section.');
+                }
+            } finally {
+                if (mounted) {
+                    setTabLoading('');
+                }
+            }
+        }
+
+        void loadTab();
+
+        return () => {
+            mounted = false;
+        };
+    }, [activeTab, detail, id, loadedTabs]);
+
     if (isLoading) {
-        return <EmptyState description="Loading profile, supplier records, backend preview panels, and audit..." title="Loading supplier detail" />;
+        return <EmptyState description="Loading profile, supplier records, and backend preview panels..." title="Loading supplier detail" />;
     }
 
     if (error || !detail) {
         return <EmptyState description={error || 'Supplier was not found.'} title="Unable to load supplier" />;
     }
 
-    const { activity, addresses, bankAccounts, contacts, financeDefaults, partyLinks, supplier, taxProfile, userAccess } = detail;
+    const { addresses, bankAccounts, contacts, financeDefaults, partyLinks, supplier, taxProfile, userAccess } = detail;
 
     async function changeSupplierStatus(status: SupplierStatus) {
         setIsChangingStatus(true);
@@ -158,7 +222,7 @@ export function SupplierDetailPage() {
                     </>
                 }
                 eyebrow="Supplier"
-                subtitle="Supplier detail aggregates vendor profile, contacts, addresses, bank accounts, backend-owned tax/finance previews, optional user access, cross-role links, and audit."
+                subtitle="Supplier detail aggregates vendor profile, contacts, addresses, bank accounts, backend-owned tax/finance previews, optional user access, and cross-role links."
                 title={supplier.name}
             />
             {actionError ? <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{actionError}</div> : null}
@@ -166,6 +230,7 @@ export function SupplierDetailPage() {
             <Card className="p-5">
                 <Tabs active={activeTab} items={tabs} onChange={setActiveTab} />
             </Card>
+            {tabLoading ? <EmptyState description="Loading this section from the backend..." title="Loading section" /> : null}
 
             {activeTab === 'overview' ? (
                 <div className="grid gap-5 xl:grid-cols-[1fr_340px]">
@@ -228,7 +293,6 @@ export function SupplierDetailPage() {
                     links={partyLinks}
                 />
             ) : null}
-            {activeTab === 'audit' ? <SupplierActivityTimeline entries={activity} /> : null}
         </div>
     );
 }

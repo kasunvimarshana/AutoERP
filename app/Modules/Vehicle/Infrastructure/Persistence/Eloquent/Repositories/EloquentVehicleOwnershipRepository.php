@@ -31,7 +31,7 @@ final class EloquentVehicleOwnershipRepository extends EloquentRepository implem
 
         foreach ($models as $model) {
             if ($model instanceof Model) {
-                $records[] = $this->toRecord($model);
+                $records[] = $this->ownershipRecord($model);
             }
         }
 
@@ -46,7 +46,7 @@ final class EloquentVehicleOwnershipRepository extends EloquentRepository implem
             ->where('id', $ownershipId)
             ->first();
 
-        return $model instanceof Model ? $this->toRecord($model) : null;
+        return $model instanceof Model ? $this->ownershipRecord($model) : null;
     }
 
     public function currentForVehicleRole(int $tenantId, int $vehicleId, string $ownershipRole): ?DataRecord
@@ -59,7 +59,7 @@ final class EloquentVehicleOwnershipRepository extends EloquentRepository implem
             ->orderByDesc('start_date')
             ->first();
 
-        return $model instanceof Model ? $this->toRecord($model) : null;
+        return $model instanceof Model ? $this->ownershipRecord($model) : null;
     }
 
     public function vehicleExistsInTenant(int $tenantId, int $vehicleId): bool
@@ -95,6 +95,66 @@ final class EloquentVehicleOwnershipRepository extends EloquentRepository implem
         }
 
         return $query->exists();
+    }
+
+    private function ownershipRecord(Model $model): DataRecord
+    {
+        $data = $model->toArray();
+        $data['owner_display_name'] = $this->ownerDisplayName(
+            (string) ($data['owner_type'] ?? ''),
+            isset($data['owner_id']) ? (int) $data['owner_id'] : null,
+            (string) ($data['owner_name'] ?? ''),
+            isset($data['party_id']) ? (int) $data['party_id'] : null,
+            (int) ($data['tenant_id'] ?? 0),
+        );
+
+        return new DataRecord($data);
+    }
+
+    private function ownerDisplayName(string $ownerType, ?int $ownerId, string $ownerName, ?int $partyId, int $tenantId): string
+    {
+        if (trim($ownerName) !== '') {
+            return trim($ownerName);
+        }
+
+        $table = match ($ownerType) {
+            'customer' => 'customers',
+            'supplier', 'provider' => 'suppliers',
+            'employee' => 'employees',
+            'party' => 'parties',
+            default => null,
+        };
+
+        $lookupId = $ownerType === 'party' ? $partyId : $ownerId;
+        if ($table === null || $lookupId === null || $lookupId < 1 || ! Schema::hasTable($table)) {
+            return match ($ownerType) {
+                'company' => 'Internal company',
+                'external_party' => 'External party',
+                default => ucfirst(str_replace('_', ' ', $ownerType ?: 'owner')),
+            };
+        }
+
+        $row = DB::table($table)
+            ->where('tenant_id', $tenantId)
+            ->where('id', $lookupId)
+            ->first();
+
+        if ($row === null) {
+            return ucfirst(str_replace('_', ' ', $ownerType));
+        }
+
+        $code = match ($table) {
+            'customers' => $row->customer_code ?? null,
+            'suppliers' => $row->supplier_code ?? null,
+            default => $row->code ?? null,
+        };
+        $name = match ($table) {
+            'customers' => $row->display_name ?? $row->customer_name ?? null,
+            'suppliers' => $row->display_name ?? $row->supplier_name ?? null,
+            default => $row->display_name ?? $row->name ?? null,
+        };
+
+        return trim(implode(' - ', array_filter([(string) $code, (string) $name]))) ?: ucfirst(str_replace('_', ' ', $ownerType));
     }
 
     public function clearCurrentRole(int $tenantId, int $vehicleId, string $ownershipRole, ?int $exceptOwnershipId = null): void

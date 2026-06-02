@@ -87,6 +87,26 @@ function normalizeOwnershipRole(value: unknown): VehicleOwnershipRole {
     return allowed.includes(role as VehicleOwnershipRole) ? (role as VehicleOwnershipRole) : 'legal_owner';
 }
 
+function humanizeOwner(ownerType: VehicleOwnerType, ownerId?: string, partyId?: string): string {
+    if (ownerType === 'company') {
+        return 'Internal company';
+    }
+
+    if (ownerType === 'external_party') {
+        return 'External party';
+    }
+
+    if (ownerType === 'party' && partyId) {
+        return 'Linked party';
+    }
+
+    if (ownerId) {
+        return `${ownerType.split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')} record`;
+    }
+
+    return ownerType.split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+}
+
 function toNullableNumber(value: string): number | null {
     const trimmed = value.trim();
     if (trimmed === '') {
@@ -141,7 +161,7 @@ function normalizeOwnership(raw: BackendRecord): VehicleOwnership {
         id: asString(raw.id),
         isCurrent: asBoolean(raw.is_current, true),
         notes: asOptionalString(raw.notes),
-        ownerDisplayName: ownerName ?? (ownerId ? `${ownerType} #${ownerId}` : partyId ? `party #${partyId}` : ownerType),
+        ownerDisplayName: asString(raw.owner_display_name) || ownerName || humanizeOwner(ownerType, ownerId, partyId),
         ownerId,
         ownerName,
         ownerType,
@@ -297,7 +317,7 @@ export const vehicleApi = {
         const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/vehicle/vehicles', {
             query: {
                 page: query.page,
-                per_page: query.perPage ?? 50,
+                per_page: query.perPage ?? 25,
                 rental_enabled: query.rentalEnabled,
                 search: query.search,
                 service_enabled: query.serviceEnabled,
@@ -329,7 +349,7 @@ export const vehicleApi = {
         const response = await httpClient<ApiCollectionResponse<BackendRecord>>('/api/vehicle/vehicles/lookup', {
             query: {
                 page: query.page,
-                per_page: query.perPage ?? 50,
+                per_page: query.perPage ?? 25,
                 rental_enabled: query.rentalEnabled,
                 search: query.search,
                 service_enabled: query.serviceEnabled,

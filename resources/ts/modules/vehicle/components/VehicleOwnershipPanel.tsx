@@ -1,4 +1,4 @@
-import { FormEvent, useState, type ReactNode } from 'react';
+import { FormEvent, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ApiError } from '../../../services/api/apiErrors';
 import { PreviewPanel } from '../../../shared/components/business/PreviewPanel';
 import { StatusBadge } from '../../../shared/components/business/StatusBadge';
@@ -12,6 +12,8 @@ import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Input } from '../../../shared/components/ui/Input';
 import { Select } from '../../../shared/components/ui/Select';
 import { Textarea } from '../../../shared/components/ui/Textarea';
+import { customerApi } from '../../customer/services/customerApi';
+import { supplierApi } from '../../supplier/services/supplierApi';
 import { vehicleApi } from '../services/vehicleApi';
 import type {
     VehicleFieldErrors,
@@ -114,6 +116,13 @@ export function VehicleOwnershipPanel({ currentOwnership, onChanged, ownerships,
     const [formError, setFormError] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [operation, setOperation] = useState('');
+    const [ownerType, setOwnerType] = useState<VehicleOwnerType>('company');
+    const [ownerOptions, setOwnerOptions] = useState<Array<{ label: string; value: string }>>([]);
+    const [ownerSearch, setOwnerSearch] = useState('');
+    const [ownerLookupKey, setOwnerLookupKey] = useState('');
+    const [isLoadingOwners, setIsLoadingOwners] = useState(false);
+    const ownerLookupRequest = useRef(0);
+    const canUseOwnerLookup = ownerType === 'customer' || ownerType === 'supplier' || ownerType === 'provider';
 
     async function handleCreate(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -136,6 +145,59 @@ export function VehicleOwnershipPanel({ currentOwnership, onChanged, ownerships,
             setIsSaving(false);
         }
     }
+
+    const loadOwners = useCallback(async (nextOwnerType = ownerType, search = ownerSearch) => {
+        if (nextOwnerType !== 'customer' && nextOwnerType !== 'supplier' && nextOwnerType !== 'provider') {
+            setOwnerOptions([]);
+            setOwnerLookupKey('');
+            return;
+        }
+
+        const lookupKey = `${nextOwnerType}:${search.trim().toLowerCase()}`;
+        if (ownerLookupKey === lookupKey && ownerOptions.length > 0) {
+            return;
+        }
+
+        const requestId = ownerLookupRequest.current + 1;
+        ownerLookupRequest.current = requestId;
+        setIsLoadingOwners(true);
+        setFormError('');
+
+        try {
+            const response = nextOwnerType === 'customer'
+                ? await customerApi.lookupCustomers({ perPage: 25, search: search.trim() || undefined })
+                : await supplierApi.lookupSuppliers({ perPage: 25, search: search.trim() || undefined });
+            if (ownerLookupRequest.current !== requestId) {
+                return;
+            }
+            setOwnerOptions(response.data.map((option) => ({
+                label: option.secondary ? `${option.label} - ${option.secondary}` : option.label,
+                value: option.id,
+            })));
+            setOwnerLookupKey(lookupKey);
+        } catch (error) {
+            if (ownerLookupRequest.current !== requestId) {
+                return;
+            }
+            setFormError(error instanceof Error ? error.message : 'Unable to load owner options.');
+        } finally {
+            if (ownerLookupRequest.current === requestId) {
+                setIsLoadingOwners(false);
+            }
+        }
+    }, [ownerLookupKey, ownerOptions.length, ownerSearch, ownerType]);
+
+    useEffect(() => {
+        if (!ownerLookupKey || !canUseOwnerLookup) {
+            return undefined;
+        }
+
+        const timeout = window.setTimeout(() => {
+            void loadOwners(ownerType, ownerSearch);
+        }, 250);
+
+        return () => window.clearTimeout(timeout);
+    }, [canUseOwnerLookup, loadOwners, ownerLookupKey, ownerSearch, ownerType]);
 
     async function setCurrent(ownership: VehicleOwnership) {
         setOperation(ownership.id);
@@ -189,11 +251,41 @@ export function VehicleOwnershipPanel({ currentOwnership, onChanged, ownerships,
                         <FieldError message={firstError(errors, 'ownership_type')} />
                     </Field>
                     <Field label="Owner type">
-                        <Select defaultValue="company" name="owner_type" options={ownerTypeOptions} />
+                        <Select
+                            name="owner_type"
+                            onChange={(event) => {
+                                const nextOwnerType = event.target.value as VehicleOwnerType;
+                                setOwnerType(nextOwnerType);
+                                setOwnerOptions([]);
+                                setOwnerSearch('');
+                                setOwnerLookupKey('');
+                                void loadOwners(nextOwnerType, '');
+                            }}
+                            options={ownerTypeOptions}
+                            value={ownerType}
+                        />
                         <FieldError message={firstError(errors, 'owner_type')} />
                     </Field>
-                    <Field label="Owner id">
-                        <Input inputMode="numeric" name="owner_id" placeholder="Customer/supplier/employee id" />
+                    <Field label="Owner record">
+                        <Input
+                            disabled={!canUseOwnerLookup}
+                            onChange={(event) => setOwnerSearch(event.target.value)}
+                            onFocus={() => void loadOwners()}
+                            placeholder={canUseOwnerLookup ? 'Search owner by code, name, or contact' : 'Owner lookup not required'}
+                            value={ownerSearch}
+                        />
+                        <Select
+                            disabled={!canUseOwnerLookup}
+                            name="owner_id"
+                            onFocus={() => void loadOwners()}
+                            onMouseDown={() => void loadOwners()}
+                            options={ownerOptions}
+                            placeholder={
+                                ownerType === 'customer' || ownerType === 'supplier' || ownerType === 'provider'
+                                    ? isLoadingOwners ? 'Loading owners...' : 'Select owner'
+                                    : 'Not required'
+                            }
+                        />
                         <FieldError message={firstError(errors, 'owner_id')} />
                     </Field>
                     <Field label="External owner name">

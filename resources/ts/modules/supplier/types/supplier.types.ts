@@ -104,13 +104,6 @@ export type SupplierUserAccessCreateInput = {
     name?: string;
 };
 
-export type SupplierAuditEntry = {
-    actor: string;
-    description: string;
-    id: string;
-    time: string;
-};
-
 export type SupplierFormInput = {
     category: string;
     code: string;

@@ -76,6 +76,76 @@ final class VehicleModuleSeeder extends Seeder
                 'start_date' => '2026-02-01',
                 'notes' => 'Provider-owned vehicle. Rental provider payable is owned by rental workflows.',
             ]);
+
+            $customerId = $this->optionalIdBy('customers', [
+                'tenant_id' => $tenantId,
+                'customer_code' => 'CUS-DEMO-002',
+            ]);
+
+            if ($customerId !== null) {
+                $this->seedVehicleWithOwnership($tenantId, $organizationUnitId, [
+                    'vehicle_code' => 'VEH-DEMO-003',
+                    'license_plate' => 'WP DEMO-003',
+                    'vin' => 'DEMO-VIN-003',
+                    'make' => 'Honda',
+                    'model' => 'Civic',
+                    'year' => 2020,
+                    'color' => 'Blue',
+                    'category' => 'Sedan',
+                    'usage_profile' => 'service_only',
+                    'service_enabled' => true,
+                    'rental_enabled' => false,
+                    'fuel_type' => 'Petrol',
+                    'transmission' => 'Automatic',
+                    'seating_capacity' => 5,
+                    'current_odometer' => 64120,
+                    'status' => 'active',
+                    'registration_expiry' => '2026-09-30',
+                    'insurance_expiry' => '2026-09-30',
+                ], [
+                    'ownership_type' => 'customer',
+                    'owner_id' => $customerId,
+                    'owner_type' => 'customer',
+                    'ownership_role' => 'legal_owner',
+                    'start_date' => '2026-03-01',
+                    'notes' => 'Customer-owned service vehicle linked through generic ownership context.',
+                ]);
+            }
+
+            $supplierId = $this->optionalIdBy('suppliers', [
+                'tenant_id' => $tenantId,
+                'supplier_code' => 'SUP-DEMO-001',
+            ]);
+
+            if ($supplierId !== null) {
+                $this->seedVehicleWithOwnership($tenantId, $organizationUnitId, [
+                    'vehicle_code' => 'VEH-DEMO-004',
+                    'license_plate' => 'WP DEMO-004',
+                    'vin' => 'DEMO-VIN-004',
+                    'make' => 'Mitsubishi',
+                    'model' => 'L300',
+                    'year' => 2021,
+                    'color' => 'Grey',
+                    'category' => 'Van',
+                    'usage_profile' => 'rent_only',
+                    'service_enabled' => true,
+                    'rental_enabled' => true,
+                    'fuel_type' => 'Diesel',
+                    'transmission' => 'Manual',
+                    'seating_capacity' => 8,
+                    'current_odometer' => 41875,
+                    'status' => 'active',
+                    'registration_expiry' => '2026-11-15',
+                    'insurance_expiry' => '2026-11-15',
+                ], [
+                    'ownership_type' => 'provider',
+                    'owner_id' => $supplierId,
+                    'owner_type' => 'supplier',
+                    'ownership_role' => 'provider',
+                    'start_date' => '2026-03-15',
+                    'notes' => 'Supplier/provider-owned rental vehicle linked to a real supplier record.',
+                ]);
+            }
         }, 3);
     }
 
@@ -170,5 +240,24 @@ final class VehicleModuleSeeder extends Seeder
         }
 
         return (int) $id;
+    }
+
+    /**
+     * @param array<string,mixed> $criteria
+     */
+    private function optionalIdBy(string $table, array $criteria): ?int
+    {
+        if (! Schema::hasTable($table)) {
+            return null;
+        }
+
+        $query = DB::table($table);
+        foreach ($criteria as $column => $value) {
+            $query->where($column, $value);
+        }
+
+        $id = $query->value('id');
+
+        return $id === null ? null : (int) $id;
     }
 }

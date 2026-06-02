@@ -39,29 +39,31 @@ export function VehicleListPage() {
 
     useEffect(() => {
         let mounted = true;
-
-        setIsLoading(true);
-        setError('');
-        vehicleApi
-            .list({ search, status: status || undefined })
-            .then((response) => {
-                if (mounted) {
-                    setRows(response.data);
-                }
-            })
-            .catch((error: unknown) => {
-                if (mounted) {
-                    setError(pageError(error, 'Unable to load vehicles.'));
-                }
-            })
-            .finally(() => {
-                if (mounted) {
-                    setIsLoading(false);
-                }
-            });
+        const timeout = window.setTimeout(() => {
+            setIsLoading(true);
+            setError('');
+            vehicleApi
+                .list({ search, status: status || undefined })
+                .then((response) => {
+                    if (mounted) {
+                        setRows(response.data);
+                    }
+                })
+                .catch((error: unknown) => {
+                    if (mounted) {
+                        setError(pageError(error, 'Unable to load vehicles.'));
+                    }
+                })
+                .finally(() => {
+                    if (mounted) {
+                        setIsLoading(false);
+                    }
+                });
+        }, 250);
 
         return () => {
             mounted = false;
+            window.clearTimeout(timeout);
         };
     }, [search, status]);
 
